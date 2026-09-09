@@ -30,7 +30,7 @@ pub async fn instead(
     running: &[Container],
     confirmed: bool,
 ) -> Result<ReplaceReport, Box<Problem>> {
-    let Some(project) = only_one(survey) else {
+    let Some(project) = crate::migration::one_setup(survey) else {
         return Ok(refused(survey));
     };
 
@@ -76,24 +76,6 @@ pub async fn instead(
     })
 }
 
-/// The one setup that could be stood in place of, where there is exactly one.
-///
-/// It has to hold something lemonfiber runs. A project of somebody's own — a database,
-/// a cache, the app they are writing — is not a media stack this could stand in place
-/// of, and stopping it because it happened to be the only thing here would be the most
-/// expensive misreading in this family.
-fn only_one(survey: &MigrationReport) -> Option<String> {
-    let mut candidates = survey
-        .standing
-        .iter()
-        .filter(|project| project.services.iter().any(|service| service.adoptable));
-    let first = candidates.next()?;
-    if candidates.next().is_some() {
-        return None;
-    }
-    Some(first.project.clone())
-}
-
 /// What is answered where there is no one setup to stand in place of.
 fn refused(survey: &MigrationReport) -> ReplaceReport {
     let why = if survey.read {
@@ -111,73 +93,18 @@ fn refused(survey: &MigrationReport) -> ReplaceReport {
 
 #[cfg(test)]
 mod tests {
-    use super::{only_one, refused};
-    use crate::model::{MigrationReport, OccupantReport, StandingReport};
-
-    fn standing(projects: &[&str]) -> MigrationReport {
-        MigrationReport {
-            read: true,
-            standing: projects
-                .iter()
-                .map(|project| StandingReport {
-                    project: (*project).to_owned(),
-                    services: vec![OccupantReport {
-                        service: "sonarr".to_owned(),
-                        running: true,
-                        ports: Vec::new(),
-                        adoptable: true,
-                    }],
-                })
-                .collect(),
-            ..MigrationReport::default()
-        }
-    }
-
-    /// A project holding nothing lemonfiber runs.
-    fn unrelated(project: &str) -> MigrationReport {
-        MigrationReport {
-            read: true,
-            standing: vec![StandingReport {
-                project: project.to_owned(),
-                services: vec![OccupantReport {
-                    service: "postgres".to_owned(),
-                    running: true,
-                    ports: Vec::new(),
-                    adoptable: false,
-                }],
-            }],
-            ..MigrationReport::default()
-        }
-    }
-
-    #[test]
-    fn the_one_setup_here_is_the_one_stood_in_place_of() {
-        assert_eq!(only_one(&standing(&["media"])), Some("media".to_owned()));
-    }
-
-    /// Two of them is a question only the operator can answer, and stopping the wrong
-    /// one is the most expensive guess in this family.
-    #[test]
-    fn two_setups_is_not_a_choice_lemonfiber_makes() {
-        assert_eq!(only_one(&standing(&["media", "archive"])), None);
-    }
-
-    /// Somebody's own work is not a media stack, and stopping it because it happened
-    /// to be the only thing here would be the most expensive misreading in this family.
-    #[test]
-    fn a_project_holding_nothing_of_ours_is_not_stood_in_place_of() {
-        assert_eq!(only_one(&unrelated("happklaar")), None);
-    }
-
-    #[test]
-    fn nothing_standing_here_is_nothing_to_stand_in_place_of() {
-        assert_eq!(only_one(&standing(&[])), None);
-    }
+    use super::refused;
+    use crate::model::MigrationReport;
 
     /// Having looked and found nothing, and not having looked, are different facts.
     #[test]
     fn what_cannot_be_replaced_says_which_of_the_two_it_is() {
-        let looked = refused(&standing(&[])).refused.unwrap_or_default();
+        let looked = refused(&MigrationReport {
+            read: true,
+            ..MigrationReport::default()
+        })
+        .refused
+        .unwrap_or_default();
         assert!(looked.contains("no single setup"), "{looked}");
         let blind = refused(&MigrationReport::default())
             .refused

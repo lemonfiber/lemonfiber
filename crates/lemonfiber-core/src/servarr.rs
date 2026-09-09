@@ -28,6 +28,7 @@ use crate::ports::service::{
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
+mod carrying;
 mod catalogue;
 mod importing;
 mod pipeline;
@@ -51,6 +52,16 @@ pub struct Servarr {
 }
 
 impl Servarr {
+    /// Whether the service took what was put to it.
+    fn expect_success(&self, response: &crate::ports::http::Response) -> Result<(), Failure> {
+        self.endpoint.expect_success(response)
+    }
+
+    /// The service this client speaks to.
+    fn service(&self) -> &str {
+        self.endpoint.service()
+    }
+
     /// A client for the service named `service`, reached at `base` with `key`,
     /// speaking its API `version` — v3 for Sonarr and Radarr, v1 for Lidarr.
     #[must_use]

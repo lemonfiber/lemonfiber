@@ -6151,6 +6151,132 @@
         }
       }
     },
+    "import": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/ImportReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ImportReport": {
+          "description": "What copying an operator's own records across came to, or would come to.",
+          "type": "object",
+          "properties": {
+            "applied": {
+              "description": "Whether anything was actually carried, as against described.",
+              "type": "boolean"
+            },
+            "carried": {
+              "description": "What was carried across.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RecordReport"
+              }
+            },
+            "not_carried": {
+              "description": "What could not be carried, and why.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/UnsupportedReport"
+              }
+            },
+            "project": {
+              "description": "The project the records were read from.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "refused": {
+              "description": "Why nothing was, where nothing was.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rehearsed": {
+              "description": "Whether this call only said what it would do.",
+              "type": "boolean"
+            },
+            "would_carry": {
+              "description": "What would be, where nothing has been yet.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RecordReport"
+              }
+            }
+          },
+          "required": [
+            "carried",
+            "would_carry",
+            "not_carried",
+            "applied",
+            "rehearsed"
+          ]
+        },
+        "RecordReport": {
+          "description": "One record carried across, or that would be.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "description": "What kind of record it is, in the plural a person reads.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The service it belongs to.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "kind",
+            "name"
+          ]
+        },
+        "UnsupportedReport": {
+          "description": "Something found that lemonfiber cannot take over, named rather than passed over.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why it cannot be adopted, in the operator's terms.",
+              "type": "string"
+            },
+            "what": {
+              "description": "What was found, by the name the engine gives it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "because"
+          ]
+        }
+      }
+    },
     "invitation": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

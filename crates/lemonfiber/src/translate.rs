@@ -204,6 +204,9 @@ pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
         Some(MigrateCommand::Beside { confirm }) => MigrateAction::Beside {
             confirmed: *confirm,
         },
+        Some(MigrateCommand::Import { confirm }) => MigrateAction::Import {
+            confirmed: *confirm,
+        },
         Some(MigrateCommand::Replace { confirm }) => MigrateAction::Replace {
             confirmed: *confirm,
         },
@@ -1247,6 +1250,16 @@ mod tests {
         assert_eq!(
             super::migrating(None),
             lemonfiber_core::app::MigrateAction::Survey
+        );
+    }
+
+    /// Carrying records across carries its confirmation through the same way.
+    #[test]
+    fn carrying_records_across_carries_its_confirmation_through() {
+        let asked = lemonfiber::cli::MigrateCommand::Import { confirm: true };
+        assert_eq!(
+            super::migrating(Some(&asked)),
+            lemonfiber_core::app::MigrateAction::Import { confirmed: true }
         );
     }
 

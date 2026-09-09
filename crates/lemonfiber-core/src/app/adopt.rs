@@ -29,7 +29,7 @@ pub fn adopt(
     mounts: &[String],
     confirmed: bool,
 ) -> Result<AdoptReport, Box<Problem>> {
-    let Some(project) = adoptable(survey) else {
+    let Some(project) = crate::migration::one_setup(survey) else {
         return Ok(nothing(survey));
     };
 
@@ -78,24 +78,6 @@ pub fn adopt(
     })
 }
 
-/// The one project that could be taken over, where there is exactly one.
-///
-/// Exactly one, because adopting is a choice about which stack lemonfiber becomes the
-/// surface for, and a machine holding two of them is one where nobody but the operator
-/// can say which they meant. A project holding nothing lemonfiber runs is not a
-/// candidate at all.
-fn adoptable(survey: &MigrationReport) -> Option<String> {
-    let mut candidates = survey
-        .standing
-        .iter()
-        .filter(|project| project.services.iter().any(|service| service.adoptable));
-    let first = candidates.next()?;
-    if candidates.next().is_some() {
-        return None;
-    }
-    Some(first.project.clone())
-}
-
 /// What is answered where there is no one setup to take over.
 fn nothing(survey: &MigrationReport) -> AdoptReport {
     let refused = if survey.read {
@@ -124,67 +106,15 @@ pub async fn taking(ctx: &Ctx, confirmed: bool) -> Result<AdoptReport, Box<Probl
 
 #[cfg(test)]
 mod tests {
-    use super::{adoptable, nothing};
-    use crate::model::{MigrationReport, OccupantReport, StandingReport};
+    use super::nothing;
+    use crate::model::MigrationReport;
 
-    /// One project standing here, holding the named services.
-    fn standing(project: &str, services: &[(&str, bool)]) -> StandingReport {
-        StandingReport {
-            project: project.to_owned(),
-            services: services
-                .iter()
-                .map(|(service, adoptable)| OccupantReport {
-                    service: (*service).to_owned(),
-                    running: true,
-                    ports: Vec::new(),
-                    adoptable: *adoptable,
-                })
-                .collect(),
-        }
-    }
-
-    /// A survey that looked and found these.
-    fn found(standing: Vec<StandingReport>) -> MigrationReport {
+    /// A survey that looked and found nothing it could act on.
+    fn found() -> MigrationReport {
         MigrationReport {
             read: true,
-            standing,
             ..MigrationReport::default()
         }
-    }
-
-    #[test]
-    fn the_one_setup_holding_our_services_is_the_one_taken_over() {
-        let survey = found(vec![standing("media", &[("sonarr", true)])]);
-        assert_eq!(adoptable(&survey), Some("media".to_owned()));
-    }
-
-    /// Somebody's database and cache are not a stack lemonfiber was asked to become
-    /// the surface for.
-    #[test]
-    fn a_project_holding_nothing_of_ours_is_not_a_candidate() {
-        let survey = found(vec![standing("shop", &[("postgres", false)])]);
-        assert_eq!(adoptable(&survey), None);
-    }
-
-    /// Two of them is a question only the operator can answer, and guessing would make
-    /// lemonfiber the surface for a stack they did not mean.
-    #[test]
-    fn two_setups_holding_our_services_is_not_a_choice_lemonfiber_makes() {
-        let survey = found(vec![
-            standing("media", &[("sonarr", true)]),
-            standing("archive", &[("radarr", true)]),
-        ]);
-        assert_eq!(adoptable(&survey), None);
-    }
-
-    /// A project of ours beside one of theirs is still exactly one candidate.
-    #[test]
-    fn an_unrelated_project_beside_ours_does_not_make_it_ambiguous() {
-        let survey = found(vec![
-            standing("media", &[("sonarr", true)]),
-            standing("shop", &[("redis", false)]),
-        ]);
-        assert_eq!(adoptable(&survey), Some("media".to_owned()));
     }
 
     /// Both refusals, in one place. A survey that looked and found no single setup and
@@ -192,7 +122,7 @@ mod tests {
     /// about what is on the machine.
     #[test]
     fn what_cannot_be_adopted_says_which_of_the_two_it_is() {
-        let looked = nothing(&found(vec![]));
+        let looked = nothing(&found());
         let said = looked.refused.unwrap_or_default();
         assert!(said.contains("no single setup here"), "{said}");
 

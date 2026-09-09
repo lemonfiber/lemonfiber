@@ -21,6 +21,13 @@ pub enum MigrateAction {
         /// Whether the operator has confirmed, having seen where things would listen.
         confirmed: bool,
     },
+    /// Copy the records the setup already here holds into lemonfiber's own services.
+    ///
+    /// Unconfirmed it names what it would carry and carries nothing.
+    Import {
+        /// Whether the operator has confirmed, having seen what would be carried.
+        confirmed: bool,
+    },
     /// Stand in place of the setup already here, stopping it and deleting none of it.
     ///
     /// Unconfirmed it names what it would stop and stops nothing.

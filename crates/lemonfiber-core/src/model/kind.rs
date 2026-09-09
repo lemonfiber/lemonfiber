@@ -75,6 +75,8 @@ pub const CLIENTS: Kind = Kind("clients");
 pub const HOSTING: Kind = Kind("hosting");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
+/// What copying an operator's own records across came to.
+pub const IMPORT: Kind = Kind("import");
 /// An account offered to somebody in the house.
 pub const INVITATION: Kind = Kind("invitation");
 
@@ -165,6 +167,7 @@ pub const ALL: &[Kind] = &[
     CLIENTS,
     HOSTING,
     HOUSEHOLD,
+    IMPORT,
     INVITATION,
     REMOVAL,
     JOB,

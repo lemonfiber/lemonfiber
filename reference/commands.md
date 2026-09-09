@@ -227,6 +227,7 @@ Usage: lemonfiber migrate [OPTIONS] [COMMAND]
 Commands:
   adopt    Take over the setup already here, so lemonfiber manages it
   beside   Run alongside the setup already here, on ports nothing else is using
+  import   Copy what the setup already here holds into lemonfiber's own services
   replace  Stand in place of the setup already here, stopping it and deleting none of it
   help     Print this message or the help of the given subcommand(s)
 
@@ -288,6 +289,35 @@ Usage: lemonfiber migrate beside [OPTIONS]
 Options:
       --confirm
           Go ahead, having seen where each service would listen
+
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber migrate import`
+
+```text
+Copy what the setup already here holds into lemonfiber's own services.
+
+Without `--confirm` it names what it would carry and carries nothing. Nothing of the existing setup is written to either way.
+
+Usage: lemonfiber migrate import [OPTIONS]
+
+Options:
+      --confirm
+          Go ahead, having seen what would be carried
 
       --json
           Print machine-readable output

@@ -15,9 +15,10 @@ use super::{archives, backup, repair, restore, support};
 
 use crate::model::{
     kind, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
-    FormsReport, FrontDoorReport, HostingReport, HouseholdReport, LifecycleReport, MigrationReport,
-    MusicReport, QualityReport, ReplaceReport, ResetReport, StatusReport, StuckReport,
-    SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
+    FormsReport, FrontDoorReport, HostingReport, HouseholdReport, ImportReport, LifecycleReport,
+    MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport, StatusReport,
+    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
+    WizardReport,
 };
 
 /// What dispatching produced.
@@ -45,6 +46,8 @@ pub enum Outcome {
     Beside(BesideReport),
     /// What standing in place of a setup already here came to, or would come to.
     Replacement(ReplaceReport),
+    /// What copying an operator's own records across came to, or would come to.
+    Import(ImportReport),
     /// What upgrading existing content did, or would do, and its stated cost.
     Upgrade(UpgradeReport),
     /// The music format chosen, and what became of applying it.
@@ -127,6 +130,7 @@ impl Outcome {
             Self::Adoption(_) => kind::ADOPTION,
             Self::Beside(_) => kind::BESIDE,
             Self::Replacement(_) => kind::REPLACEMENT,
+            Self::Import(_) => kind::IMPORT,
             Self::Upgrade(_) => kind::UPGRADE,
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
@@ -178,6 +182,7 @@ impl serde::Serialize for Outcome {
             Self::Adoption(report) => report.serialize(serializer),
             Self::Beside(report) => report.serialize(serializer),
             Self::Replacement(report) => report.serialize(serializer),
+            Self::Import(report) => report.serialize(serializer),
             Self::Upgrade(report) => report.serialize(serializer),
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),

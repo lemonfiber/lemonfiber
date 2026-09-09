@@ -54,6 +54,18 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
 
 /// The exit code an outcome deserves.
 ///
+/// What a run that carried an operator's records across exits on.
+///
+/// Anything left behind is the operator's to look at: a record that could not be
+/// carried is one they still have on the old stack and do not have on the new, and a
+/// script that read success would go on as though the library were whole.
+fn carrying(report: &lemonfiber_core::model::ImportReport) -> ExitCode {
+    if report.refused.is_some() || !report.not_carried.is_empty() {
+        return ExitCode::from(VALIDATION);
+    }
+    ExitCode::SUCCESS
+}
+
 /// What a run that stood in place of a setup already here exits on.
 ///
 /// A refusal is the operator's to resolve. So is a stack left half up: a script that
@@ -112,6 +124,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Adoption(report) => adopting(report),
         Outcome::Beside(report) => standing(report),
         Outcome::Replacement(report) => replacing(report),
+        Outcome::Import(report) => carrying(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
         // has mended everything it carried out — which is none of it.
@@ -1240,6 +1253,31 @@ mod tests {
             std::process::ExitCode::from(super::FAILURE)
         );
     }
+    /// A record still on the old stack and not on the new is the operator's to look at.
+    #[test]
+    fn an_import_that_left_a_record_behind_is_not_a_success() {
+        let partial = lemonfiber_core::model::ImportReport {
+            applied: true,
+            not_carried: vec![lemonfiber_core::model::UnsupportedReport {
+                what: "Bake Off".to_owned(),
+                because: "no such profile here".to_owned(),
+            }],
+            ..lemonfiber_core::model::ImportReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Import(partial)),
+            std::process::ExitCode::from(super::VALIDATION)
+        );
+        let whole = lemonfiber_core::model::ImportReport {
+            applied: true,
+            ..lemonfiber_core::model::ImportReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Import(whole)),
+            std::process::ExitCode::SUCCESS
+        );
+    }
+
     /// A stack left half up is the operator's to finish, not a success.
     #[test]
     fn a_replacement_that_left_something_running_is_not_a_success() {

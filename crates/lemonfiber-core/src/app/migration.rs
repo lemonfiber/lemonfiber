@@ -31,6 +31,12 @@ pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<
         MigrateAction::Adopt { confirmed } => super::adopt::taking(ctx, confirmed)
             .await
             .map(Outcome::Adoption),
+        MigrateAction::Import { confirmed } => {
+            let found = looked(ctx).await;
+            super::import::carry(ctx, &found.survey, &found.running, confirmed)
+                .await
+                .map(Outcome::Import)
+        }
         MigrateAction::Replace { confirmed } => {
             let found = looked(ctx).await;
             super::replace::instead(ctx, &found.survey, &found.running, confirmed)

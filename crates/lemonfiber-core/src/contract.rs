@@ -33,10 +33,10 @@ use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
     Admitted, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
-    FormsReport, FrontDoorReport, HostingReport, HouseholdRemoval, HouseholdReport, Invitation,
-    LifecycleReport, MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport,
-    SetupReport, Started, StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport,
-    VersionReport, WalkthroughReport, WizardReport, API_VERSION,
+    FormsReport, FrontDoorReport, HostingReport, HouseholdRemoval, HouseholdReport, ImportReport,
+    Invitation, LifecycleReport, MigrationReport, MusicReport, QualityReport, ReplaceReport,
+    ResetReport, SetupReport, Started, StatusReport, StuckReport, SupervisionReport, TraceReport,
+    UpgradeReport, VersionReport, WalkthroughReport, WizardReport, API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -121,6 +121,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kind::LIFECYCLE,
         schema_for!(Envelope<LifecycleReport>),
     );
+    describing(kinds, kind::IMPORT, schema_for!(Envelope<ImportReport>));
     describing(
         kinds,
         kind::MIGRATION,
@@ -217,10 +218,10 @@ mod tests {
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
         AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, FormsReport,
-        FrontDoorReport, HostingReport, HouseholdReport, LifecycleReport, MigrationReport,
-        MusicReport, QualityReport, ReplaceReport, ResetReport, StatusReport, StuckReport,
-        SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
-        WizardReport,
+        FrontDoorReport, HostingReport, HouseholdReport, ImportReport, LifecycleReport,
+        MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport, StatusReport,
+        StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
+        WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
 
@@ -232,7 +233,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 43;
+    const OUTCOMES: usize = 44;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -288,6 +289,7 @@ mod tests {
             Outcome::Adoption(AdoptReport::default()),
             Outcome::Beside(BesideReport::default()),
             Outcome::Replacement(ReplaceReport::default()),
+            Outcome::Import(ImportReport::default()),
             Outcome::Alerts(AlertReport::default()),
             Outcome::Migration(MigrationReport::default()),
             Outcome::Upgrade(UpgradeReport::default()),

@@ -16,7 +16,12 @@ use lemonfiber_core::app::{Command, MigrateAction};
 use super::Arguments;
 
 /// Every act about a setup that was already here.
-const ABOUT: [&str; 3] = ["migrate-adopt", "migrate-beside", "migrate-replace"];
+const ABOUT: [&str; 4] = [
+    "migrate-adopt",
+    "migrate-beside",
+    "migrate-replace",
+    "migrate-import",
+];
 
 /// Whether this action is about a setup that was already on the machine.
 pub(super) fn about_a_setup_already_here(action: &str) -> bool {
@@ -33,6 +38,9 @@ pub(super) fn asked_for(action: &str, given: &Arguments) -> Command {
             confirmed: given.confirm,
         }),
         "migrate-replace" => Command::Migrate(MigrateAction::Replace {
+            confirmed: given.confirm,
+        }),
+        "migrate-import" => Command::Migrate(MigrateAction::Import {
             confirmed: given.confirm,
         }),
         _ => Command::Migrate(MigrateAction::Adopt {
