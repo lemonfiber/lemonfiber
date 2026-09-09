@@ -879,7 +879,7 @@ mod tests {
             }),
             Outcome::Adoption(AdoptReport {
                 project: Some("media".to_owned()),
-                adopted: true,
+                stance: Stance::Applied,
                 ..AdoptReport::default()
             }),
             Outcome::Import(lemonfiber_core::model::ImportReport {
@@ -888,13 +888,13 @@ mod tests {
                     kind: "series".to_owned(),
                     name: "Taskmaster".to_owned(),
                 }],
-                applied: true,
+                stance: Stance::Applied,
                 ..lemonfiber_core::model::ImportReport::default()
             }),
             Outcome::Replacement(lemonfiber_core::model::ReplaceReport {
                 project: Some("media".to_owned()),
                 stopped: vec!["sonarr".to_owned()],
-                applied: true,
+                stance: Stance::Applied,
                 ..lemonfiber_core::model::ReplaceReport::default()
             }),
             Outcome::Beside(BesideReport {
@@ -904,7 +904,7 @@ mod tests {
                     to: 8990,
                 }],
                 written: Some("/cfg/beside.yml".to_owned()),
-                applied: true,
+                stance: Stance::Applied,
                 ..BesideReport::default()
             }),
         ]

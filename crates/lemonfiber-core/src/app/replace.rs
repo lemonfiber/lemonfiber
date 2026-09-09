@@ -15,6 +15,7 @@
 use crate::error::Problem;
 use crate::model::{MigrationReport, ReplaceReport};
 use crate::ports::docker::Container;
+use crate::reconfigure::Stance;
 
 use super::Ctx;
 
@@ -51,7 +52,7 @@ pub async fn instead(
         return Ok(ReplaceReport {
             project: Some(project),
             would_stop: names,
-            rehearsed: true,
+            stance: Stance::Pending,
             ..ReplaceReport::default()
         });
     }
@@ -71,7 +72,7 @@ pub async fn instead(
         would_stop: names,
         stopped,
         still_running: left,
-        applied: true,
+        stance: Stance::Applied,
         ..ReplaceReport::default()
     })
 }
@@ -86,7 +87,8 @@ fn refused(survey: &MigrationReport) -> ReplaceReport {
          be looked at would be stopping something nobody has seen"
     };
     ReplaceReport {
-        refused: Some(why.to_owned()),
+        stance: Stance::Blocked,
+        refusal: Some(why.to_owned()),
         ..ReplaceReport::default()
     }
 }
@@ -103,11 +105,11 @@ mod tests {
             read: true,
             ..MigrationReport::default()
         })
-        .refused
+        .refusal
         .unwrap_or_default();
         assert!(looked.contains("no single setup"), "{looked}");
         let blind = refused(&MigrationReport::default())
-            .refused
+            .refusal
             .unwrap_or_default();
         assert!(blind.contains("could not be read"), "{blind}");
     }

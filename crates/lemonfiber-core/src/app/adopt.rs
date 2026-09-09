@@ -15,6 +15,7 @@
 use crate::config::{store, PROJECT_KEY};
 use crate::error::{Diagnose, Problem};
 use crate::model::{AdoptReport, CarryingReport, MigrationReport};
+use crate::reconfigure::Stance;
 
 use super::Ctx;
 
@@ -41,7 +42,8 @@ pub fn adopt(
     if let Some(first) = refused.first() {
         return Ok(AdoptReport {
             project: Some(project.clone()),
-            refused: Some(format!(
+            stance: Stance::Blocked,
+            refusal: Some(format!(
                 "{} would have to open a database a later version wrote: {}",
                 first.service, first.because
             )),
@@ -61,7 +63,7 @@ pub fn adopt(
             project: Some(project.clone()),
             upgrades,
             back_up: mounts.to_vec(),
-            rehearsed: true,
+            stance: Stance::Pending,
             ..AdoptReport::default()
         });
     }
@@ -71,7 +73,7 @@ pub fn adopt(
 
     Ok(AdoptReport {
         project: Some(project),
-        adopted: true,
+        stance: Stance::Applied,
         upgrades,
         back_up: mounts.to_vec(),
         ..AdoptReport::default()
@@ -88,7 +90,8 @@ fn nothing(survey: &MigrationReport) -> AdoptReport {
          be looked at would be standing over whatever is actually there"
     };
     AdoptReport {
-        refused: Some(refused.to_owned()),
+        stance: Stance::Blocked,
+        refusal: Some(refused.to_owned()),
         ..AdoptReport::default()
     }
 }
@@ -117,11 +120,11 @@ mod tests {
     #[test]
     fn what_cannot_be_adopted_says_which_of_the_two_it_is() {
         let looked = nothing(&found());
-        let said = looked.refused.unwrap_or_default();
+        let said = looked.refusal.unwrap_or_default();
         assert!(said.contains("no single setup here"), "{said}");
 
         let blind = nothing(&MigrationReport::default());
-        let said = blind.refused.unwrap_or_default();
+        let said = blind.refusal.unwrap_or_default();
         assert!(said.contains("could not be read"), "{said}");
     }
 }

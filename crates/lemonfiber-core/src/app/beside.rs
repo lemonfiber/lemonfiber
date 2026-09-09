@@ -13,6 +13,7 @@ use std::fmt::Write as _;
 use crate::config::{store, OVERLAY_KEY};
 use crate::error::{Diagnose, Problem};
 use crate::model::{BesideReport, MigrationReport, MovedReport};
+use crate::reconfigure::Stance;
 
 use super::Ctx;
 
@@ -36,7 +37,7 @@ pub async fn stand(
     if !confirmed {
         return Ok(BesideReport {
             ports: survey.beside.clone(),
-            rehearsed: true,
+            stance: Stance::Pending,
             ..BesideReport::default()
         });
     }
@@ -55,7 +56,7 @@ pub async fn stand(
     Ok(BesideReport {
         ports: survey.beside.clone(),
         written: Some(path.display().to_string()),
-        applied: true,
+        stance: Stance::Applied,
         ..BesideReport::default()
     })
 }
@@ -76,7 +77,8 @@ fn blocked(survey: &MigrationReport) -> Option<BesideReport> {
          could not be looked at would be guessing which ports are free"
     };
     Some(BesideReport {
-        refused: Some(why.to_owned()),
+        stance: Stance::Blocked,
+        refusal: Some(why.to_owned()),
         ..BesideReport::default()
     })
 }
@@ -141,7 +143,7 @@ mod tests {
     #[test]
     fn a_survey_that_could_not_look_stops_it() {
         let said = blocked(&MigrationReport::default())
-            .and_then(|read| read.refused)
+            .and_then(|read| read.refusal)
             .unwrap_or_default();
         assert!(said.contains("could not be read"), "{said}");
     }
@@ -154,7 +156,7 @@ mod tests {
             ..MigrationReport::default()
         };
         let said = blocked(&looked)
-            .and_then(|read| read.refused)
+            .and_then(|read| read.refusal)
             .unwrap_or_default();
         assert!(said.contains("anywhere else to listen"), "{said}");
     }

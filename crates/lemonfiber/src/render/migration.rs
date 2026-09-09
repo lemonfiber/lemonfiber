@@ -15,6 +15,8 @@ use lemonfiber_core::model::{
     UnsupportedReport,
 };
 
+use lemonfiber_core::reconfigure::Stance;
+
 use super::Lines;
 
 /// What is already on this machine, before anything is proposed.
@@ -58,20 +60,20 @@ pub(super) fn migration(report: &MigrationReport) -> Lines {
 /// A refusal is the whole answer: an operator told they cannot do this needs the reason,
 /// and nothing else on the screen is useful to them. One place rather than one per act,
 /// so the four cannot come to disagree about that.
-fn turned_away(refused: Option<&String>, what: &str) -> Option<Lines> {
-    let refused = refused?;
+fn turned_away(refusal: Option<&String>, what: &str) -> Option<Lines> {
+    let refused = refusal?;
     let mut lines = Lines::default();
     lines.put(format!("{what}: {refused}"));
     Some(lines)
 }
 
 pub(super) fn adoption(report: &AdoptReport) -> Lines {
-    if let Some(said) = turned_away(report.refused.as_ref(), "not adopting") {
+    if let Some(said) = turned_away(report.refusal.as_ref(), "not adopting") {
         return said;
     }
     let mut lines = Lines::default();
     let named = report.project.clone().unwrap_or_default();
-    if report.adopted {
+    if report.stance == Stance::Applied {
         lines.put(format!("lemonfiber now manages {named}"));
     } else {
         lines.put(format!("adopting {named} would:"));
@@ -83,7 +85,7 @@ pub(super) fn adoption(report: &AdoptReport) -> Lines {
             service.service, service.existing, service.ours
         ));
     }
-    if !report.back_up.is_empty() && !report.adopted {
+    if !report.back_up.is_empty() && report.stance != Stance::Applied {
         lines.put(String::new());
         lines.put("back up these before confirming:".to_owned());
         for path in &report.back_up {
@@ -91,7 +93,7 @@ pub(super) fn adoption(report: &AdoptReport) -> Lines {
         }
     }
     lines.put(String::new());
-    if report.adopted {
+    if report.stance == Stance::Applied {
         lines.put("nothing was started, stopped, or moved".to_owned());
     } else {
         lines.put("nothing has been changed; add --confirm to go ahead".to_owned());
@@ -101,11 +103,11 @@ pub(super) fn adoption(report: &AdoptReport) -> Lines {
 
 /// What standing beside a setup already here came to, or would come to.
 pub(super) fn beside(report: &BesideReport) -> Lines {
-    if let Some(said) = turned_away(report.refused.as_ref(), "not standing beside") {
+    if let Some(said) = turned_away(report.refusal.as_ref(), "not standing beside") {
         return said;
     }
     let mut lines = Lines::default();
-    if report.applied {
+    if report.stance == Stance::Applied {
         lines.put("lemonfiber now listens beside what was already here:".to_owned());
     } else {
         lines.put("standing beside what is here, lemonfiber would listen on:".to_owned());
@@ -131,7 +133,7 @@ pub(super) fn beside(report: &BesideReport) -> Lines {
 /// What is still up leads where anything is, because a half-stopped stack is the one
 /// state an operator has to act on before they do anything else.
 pub(super) fn replacement(report: &ReplaceReport) -> Lines {
-    if let Some(said) = turned_away(report.refused.as_ref(), "not standing in place of it") {
+    if let Some(said) = turned_away(report.refusal.as_ref(), "not standing in place of it") {
         return said;
     }
     let mut lines = Lines::default();
@@ -145,7 +147,7 @@ pub(super) fn replacement(report: &ReplaceReport) -> Lines {
         lines.put(String::new());
     }
 
-    if report.applied {
+    if report.stance == Stance::Applied {
         lines.put(format!("stopped in {named}:"));
         for service in &report.stopped {
             lines.put(format!("  {service}"));
@@ -158,7 +160,7 @@ pub(super) fn replacement(report: &ReplaceReport) -> Lines {
     }
 
     lines.put(String::new());
-    if report.applied {
+    if report.stance == Stance::Applied {
         lines.put("nothing was deleted; start them again whenever you like".to_owned());
     } else {
         lines.put("nothing has been stopped; add --confirm to go ahead".to_owned());
@@ -171,14 +173,14 @@ pub(super) fn replacement(report: &ReplaceReport) -> Lines {
 /// What did not travel leads. A record still on the old stack and not on the new is the
 /// thing an operator has to do something about; what arrived safely needs no action.
 pub(super) fn carried(report: &ImportReport) -> Lines {
-    if let Some(said) = turned_away(report.refused.as_ref(), "not carrying anything across") {
+    if let Some(said) = turned_away(report.refusal.as_ref(), "not carrying anything across") {
         return said;
     }
     let mut lines = Lines::default();
 
     listed(&report.not_carried, "could not be carried:", &mut lines);
 
-    let (records, heading) = if report.applied {
+    let (records, heading) = if report.stance == Stance::Applied {
         (&report.carried, "carried across:")
     } else {
         (&report.would_carry, "would carry across:")
@@ -189,12 +191,12 @@ pub(super) fn carried(report: &ImportReport) -> Lines {
         for record in records {
             lines.put(counted(record));
         }
-    } else if report.not_carried.is_empty() {
+    } else if report.stance == Stance::Unchanged {
         lines.put("nothing to carry across; the two hold the same records".to_owned());
     }
 
     lines.put(String::new());
-    if report.applied {
+    if report.stance == Stance::Applied {
         lines.put("the setup already here was only read from".to_owned());
     } else {
         lines.put("nothing has been carried; add --confirm to go ahead".to_owned());
@@ -370,6 +372,7 @@ mod tests {
         MigrationReport, MovedReport, OccupantReport, RecordReport, ReplaceReport, StandingReport,
         UnsupportedReport,
     };
+    use lemonfiber_core::reconfigure::Stance;
 
     /// One survey with something of every kind in it.
     fn a_survey() -> MigrationReport {
@@ -572,7 +575,7 @@ mod tests {
     #[test]
     fn a_refusal_to_adopt_is_the_only_thing_said() {
         let refused = AdoptReport {
-            refused: Some("a database a later version wrote".to_owned()),
+            refusal: Some("a database a later version wrote".to_owned()),
             project: Some("media".to_owned()),
             ..AdoptReport::default()
         };
@@ -586,7 +589,7 @@ mod tests {
     fn a_rehearsal_names_the_upgrade_and_where_to_back_it_up() {
         let rehearsed = AdoptReport {
             project: Some("media".to_owned()),
-            rehearsed: true,
+            stance: Stance::Pending,
             upgrades: vec![CarryingReport {
                 service: "sonarr".to_owned(),
                 existing: "4.0.0".to_owned(),
@@ -614,7 +617,7 @@ mod tests {
     fn adopting_says_what_it_now_manages_and_that_nothing_moved() {
         let adopted = AdoptReport {
             project: Some("media".to_owned()),
-            adopted: true,
+            stance: Stance::Applied,
             ..AdoptReport::default()
         };
         let text = adoption(&adopted).text();
@@ -639,7 +642,7 @@ mod tests {
     fn a_rehearsal_says_where_it_would_listen_and_that_nothing_was_written() {
         let rehearsed = BesideReport {
             ports: moved(),
-            rehearsed: true,
+            stance: Stance::Pending,
             ..BesideReport::default()
         };
         let text = beside(&rehearsed).text();
@@ -658,7 +661,7 @@ mod tests {
         let applied = BesideReport {
             ports: moved(),
             written: Some("/cfg/beside.yml".to_owned()),
-            applied: true,
+            stance: Stance::Applied,
             ..BesideReport::default()
         };
         let text = beside(&applied).text();
@@ -670,7 +673,7 @@ mod tests {
     #[test]
     fn a_refusal_to_stand_beside_is_the_only_thing_said() {
         let refused = BesideReport {
-            refused: Some("nowhere left to listen".to_owned()),
+            refusal: Some("nowhere left to listen".to_owned()),
             ports: moved(),
             ..BesideReport::default()
         };
@@ -685,7 +688,7 @@ mod tests {
         let rehearsed = ReplaceReport {
             project: Some("media".to_owned()),
             would_stop: vec!["sonarr".to_owned()],
-            rehearsed: true,
+            stance: Stance::Pending,
             ..ReplaceReport::default()
         };
         let text = replacement(&rehearsed).text();
@@ -701,7 +704,7 @@ mod tests {
             project: Some("media".to_owned()),
             would_stop: vec!["sonarr".to_owned()],
             stopped: vec!["sonarr".to_owned()],
-            applied: true,
+            stance: Stance::Applied,
             ..ReplaceReport::default()
         };
         let text = replacement(&done).text();
@@ -719,7 +722,7 @@ mod tests {
             project: Some("media".to_owned()),
             stopped: vec!["sonarr".to_owned()],
             still_running: vec!["radarr".to_owned()],
-            applied: true,
+            stance: Stance::Applied,
             ..ReplaceReport::default()
         };
         let text = replacement(&partial).text();
@@ -732,7 +735,7 @@ mod tests {
     #[test]
     fn a_refusal_to_stand_in_place_is_the_only_thing_said() {
         let refused = ReplaceReport {
-            refused: Some("no single setup here".to_owned()),
+            refusal: Some("no single setup here".to_owned()),
             would_stop: vec!["sonarr".to_owned()],
             ..ReplaceReport::default()
         };
@@ -755,7 +758,7 @@ mod tests {
     fn a_rehearsal_names_what_would_travel_and_says_nothing_was_carried() {
         let rehearsed = ImportReport {
             would_carry: vec![record("Taskmaster")],
-            rehearsed: true,
+            stance: Stance::Pending,
             ..ImportReport::default()
         };
         let text = carried(&rehearsed).text();
@@ -773,7 +776,7 @@ mod tests {
                 what: "Bake Off".to_owned(),
                 because: "it follows a profile this stack does not have".to_owned(),
             }],
-            applied: true,
+            stance: Stance::Applied,
             ..ImportReport::default()
         };
         let text = carried(&partial).text();
@@ -787,7 +790,7 @@ mod tests {
     #[test]
     fn two_stacks_that_already_agree_are_said_to_agree() {
         let nothing = ImportReport {
-            applied: true,
+            stance: Stance::Unchanged,
             ..ImportReport::default()
         };
         let text = carried(&nothing).text();
@@ -798,7 +801,7 @@ mod tests {
     #[test]
     fn a_refusal_to_carry_anything_is_the_only_thing_said() {
         let refused = ImportReport {
-            refused: Some("no single setup here".to_owned()),
+            refusal: Some("no single setup here".to_owned()),
             would_carry: vec![record("Taskmaster")],
             ..ImportReport::default()
         };

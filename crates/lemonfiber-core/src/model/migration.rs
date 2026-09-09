@@ -6,6 +6,8 @@
 
 use serde::Serialize;
 
+use crate::reconfigure::Stance;
+
 /// One container of somebody else's stack, as the engine reports it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct OccupantReport {
@@ -115,18 +117,16 @@ pub struct LinkingReport {
 pub struct AdoptReport {
     /// The project lemonfiber would manage, where exactly one could be adopted.
     pub project: Option<String>,
-    /// Whether it was actually adopted, as against described.
-    pub adopted: bool,
-    /// Why it was not, where it was not.
-    pub refused: Option<String>,
+    /// Where the act stands.
+    pub stance: Stance,
+    /// Why nothing was done, where nothing was.
+    pub refusal: Option<String>,
     /// The services whose databases a newer version would upgrade, and whose data
     /// therefore has to be backed up before anything opens it.
     pub upgrades: Vec<CarryingReport>,
     /// The host paths those services keep their data in, so a backup can be taken of
     /// exactly the right thing.
     pub back_up: Vec<String>,
-    /// Whether this call only said what it would do.
-    pub rehearsed: bool,
 }
 
 /// What standing lemonfiber beside an existing setup came to, or would come to.
@@ -136,12 +136,10 @@ pub struct BesideReport {
     pub ports: Vec<MovedReport>,
     /// Where the Compose file that says so was written.
     pub written: Option<String>,
-    /// Whether it was actually written, as against described.
-    pub applied: bool,
-    /// Why it was not, where it was not.
-    pub refused: Option<String>,
-    /// Whether this call only said what it would do.
-    pub rehearsed: bool,
+    /// Where the act stands.
+    pub stance: Stance,
+    /// Why nothing was written, where nothing was.
+    pub refusal: Option<String>,
 }
 
 /// What standing in place of a setup already here came to, or would come to.
@@ -155,12 +153,10 @@ pub struct ReplaceReport {
     pub stopped: Vec<String>,
     /// The services that would not stop and are still up.
     pub still_running: Vec<String>,
-    /// Whether anything was actually stopped, as against described.
-    pub applied: bool,
-    /// Why nothing was, where nothing was.
-    pub refused: Option<String>,
-    /// Whether this call only said what it would do.
-    pub rehearsed: bool,
+    /// Where the act stands.
+    pub stance: Stance,
+    /// Why nothing was stopped, where nothing was.
+    pub refusal: Option<String>,
 }
 
 /// One record carried across, or that would be.
@@ -185,12 +181,10 @@ pub struct ImportReport {
     pub would_carry: Vec<RecordReport>,
     /// What could not be carried, and why.
     pub not_carried: Vec<UnsupportedReport>,
-    /// Whether anything was actually carried, as against described.
-    pub applied: bool,
-    /// Why nothing was, where nothing was.
-    pub refused: Option<String>,
-    /// Whether this call only said what it would do.
-    pub rehearsed: bool,
+    /// Where the act stands.
+    pub stance: Stance,
+    /// Why nothing was carried, where nothing was.
+    pub refusal: Option<String>,
 }
 
 /// What is already on this machine, before anything is proposed.

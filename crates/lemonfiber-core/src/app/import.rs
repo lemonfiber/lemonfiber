@@ -18,6 +18,7 @@ use crate::migration::importing::{carryable, missing, unmatched};
 use crate::model::{ImportReport, MigrationReport, RecordReport, UnsupportedReport};
 use crate::ports::docker::Container;
 use crate::ports::service::{Carried, Carrying, Record};
+use crate::reconfigure::Stance;
 
 use super::Ctx;
 
@@ -85,13 +86,14 @@ pub async fn carry(
         gather(ctx, (&theirs, &ours), kinds, confirmed, &mut found).await;
     }
 
+    // Read before the report takes the lists apart.
+    let stance = stood(confirmed, &found);
     Ok(ImportReport {
         project: Some(project),
         would_carry: named(&found.going),
         carried: found.carried,
         not_carried: found.refused,
-        applied: confirmed,
-        rehearsed: !confirmed,
+        stance,
         ..ImportReport::default()
     })
 }
@@ -250,6 +252,21 @@ fn named(going: &[Going]) -> Vec<RecordReport> {
         .collect()
 }
 
+/// Where an import stands once it has been through both stacks.
+///
+/// Two stacks that already hold the same records is `Unchanged` rather than an applied
+/// import that carried nothing: an operator reading "carried nothing" wants to know
+/// whether that is because there was nothing to carry or because something went wrong.
+const fn stood(confirmed: bool, found: &Found) -> Stance {
+    if !confirmed {
+        return Stance::Pending;
+    }
+    if found.carried.is_empty() && found.refused.is_empty() {
+        return Stance::Unchanged;
+    }
+    Stance::Applied
+}
+
 /// What is answered where there is no one setup to carry anything out of.
 fn nothing(survey: &MigrationReport) -> ImportReport {
     let why = if survey.read {
@@ -259,7 +276,8 @@ fn nothing(survey: &MigrationReport) -> ImportReport {
         "what is on this machine could not be read, so there is nothing to carry across"
     };
     ImportReport {
-        refused: Some(why.to_owned()),
+        stance: Stance::Blocked,
+        refusal: Some(why.to_owned()),
         ..ImportReport::default()
     }
 }
