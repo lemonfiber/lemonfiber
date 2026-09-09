@@ -10,7 +10,11 @@
 //! carried out there, so the whole of the undo logic runs in a test with no
 //! service and no disk.
 
+mod keeping;
+
 use serde::{Deserialize, Serialize};
+
+pub use keeping::{horizon, kept, runs, RUNS_KEPT};
 
 /// A change lemonfiber made, recorded so it can be reversed — exactly this one.
 ///
