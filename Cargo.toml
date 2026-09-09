@@ -27,6 +27,11 @@ argon2 = { version = "0.6", default-features = false, features = ["alloc", "pass
 # which is the whole of what the contract describes.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
 bollard = "0.21"
+# Wall-clock arithmetic in a named zone, for the one window this product holds against a
+# time of day: the hours an operator does not want waking for. Everything else here is
+# instants and calendar days on purpose. Its own tzdb is left to the platform's, so the
+# zone the stack already names in `TZ` is read from the same database the containers use.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-zoneinfo"] }
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
 etcetera = "0.11"

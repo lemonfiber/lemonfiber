@@ -100,6 +100,21 @@ pub fn provider_host_from_env(file: &env::EnvFile) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The hours the operator does not want waking for, where they have said.
+///
+/// Both halves come from the same file the stack reads, so the window and the zone it is
+/// read in cannot disagree with what the containers were handed.
+#[must_use]
+pub fn quiet_from_env(file: &env::EnvFile) -> Option<crate::alert::Quiet> {
+    let said = file.get(super::QUIET_HOURS_KEY)?;
+    let zone = file
+        .get(super::ZONE_KEY)
+        .map(str::trim)
+        .filter(|zone| !zone.is_empty())
+        .unwrap_or(super::DEFAULT_ZONE);
+    crate::alert::Quiet::parse(said, zone)
+}
+
 /// The Compose file layered over the stack's own, where one has been written.
 ///
 /// One at most. Layering two would be two answers to where a service listens, and the
@@ -310,5 +325,33 @@ mod tests {
         assert!(
             super::overlay_from_env(&env::EnvFile::parse("LEMONFIBER_OVERLAY=  \n")).is_empty()
         );
+    }
+
+    /// Nothing recorded is no window, and no window wakes nobody differently.
+    #[test]
+    fn no_quiet_hours_recorded_is_no_window() {
+        assert!(super::quiet_from_env(&env::EnvFile::parse("")).is_none());
+    }
+
+    /// The zone comes from the same file, so the window means the household's evening.
+    #[test]
+    fn a_window_is_read_in_the_zone_the_stack_names() {
+        let file = env::EnvFile::parse("LEMONFIBER_QUIET_HOURS=22:00-07:00\nTZ=Europe/Amsterdam\n");
+        assert!(super::quiet_from_env(&file).is_some());
+    }
+
+    /// And where the stack names none, the compose file's own fallback — not UTC, which
+    /// would be quiet at a different hour from the containers.
+    #[test]
+    fn a_window_with_no_zone_falls_back_the_way_the_compose_file_does() {
+        let file = env::EnvFile::parse("LEMONFIBER_QUIET_HOURS=22:00-07:00\n");
+        assert!(super::quiet_from_env(&file).is_some());
+    }
+
+    /// A window that cannot be read is no window rather than a guess.
+    #[test]
+    fn a_window_that_does_not_read_is_no_window() {
+        let file = env::EnvFile::parse("LEMONFIBER_QUIET_HOURS=whenever\n");
+        assert!(super::quiet_from_env(&file).is_none());
     }
 }

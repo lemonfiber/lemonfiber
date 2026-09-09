@@ -57,6 +57,11 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the address the leak check asks each container for its public address",
     ),
     (
+        super::QUIET_HOURS_KEY,
+        "the hours you would rather not be woken for, which hold everything but the \
+         alerts that cannot wait",
+    ),
+    (
         super::OVERLAY_KEY,
         "a Compose file layered over the stack's own, which standing beside an existing \
          setup writes so the two do not want the same ports",
