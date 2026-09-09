@@ -78,6 +78,7 @@ fn carries_wait(command: &Command) -> bool {
             ..
         })
     ) || matches!(command, Command::Uninstall(asked) if asked.waiting == Waiting::ForTheDownloads)
+        || matches!(command, Command::Update(asked) if asked.wait == Waiting::ForTheDownloads)
 }
 
 fn carries_services(command: &Command) -> bool {
@@ -142,6 +143,7 @@ fn carries_agreement(command: &Command) -> bool {
             }
     ) || carries_a_yes(command)
         || matches!(command, Command::Uninstall(asked) if asked.confirm)
+        || matches!(command, Command::Update(asked) if asked.confirm)
 }
 
 /// Whether a repairing run was told yes, in either of the two ways of saying it.
@@ -239,6 +241,7 @@ fn carries_agreed(command: &Command) -> bool {
 /// Whether the command has the one service it was given in it.
 fn carries_service(command: &Command) -> bool {
     matches!(command, Command::Backup { service: Some(_) })
+        || matches!(command, Command::Update(asked) if asked.service.is_some())
 }
 
 /// Whether the command has the archive it was named in it, as a name rather than a

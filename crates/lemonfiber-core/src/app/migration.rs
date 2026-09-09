@@ -118,16 +118,7 @@ pub(super) async fn looked(ctx: &Ctx) -> Looked {
         seen.extend(containers);
     }
 
-    let ours: Vec<Ours> = manifest
-        .services
-        .iter()
-        .map(|service| Ours {
-            service: service.id.clone(),
-            image: service.image.clone(),
-            tag: service.tag.clone(),
-            port: service.port,
-        })
-        .collect();
+    let ours: Vec<Ours> = crate::migration::pins(&manifest);
 
     let mounted = mounted(ctx, &seen).await;
     let paths = mounted

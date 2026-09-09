@@ -9370,6 +9370,201 @@
         }
       }
     },
+    "self-update": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/UpdateReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Installed": {
+          "description": "How this copy of lemonfiber got onto the machine.\n\nNothing known is the default. Every other answer is a claim about somebody's\nmachine, and a value that arrived by nobody filling it in has established none of\nthem.",
+          "oneOf": [
+            {
+              "description": "Homebrew put it here, on macOS or on Linux.",
+              "type": "string",
+              "const": "homebrew"
+            },
+            {
+              "description": "Scoop put it here.",
+              "type": "string",
+              "const": "scoop"
+            },
+            {
+              "description": "winget put it here.",
+              "type": "string",
+              "const": "winget"
+            },
+            {
+              "description": "`cargo install` built and placed it.",
+              "type": "string",
+              "const": "cargo"
+            },
+            {
+              "description": "A distribution's own package manager placed it.",
+              "type": "string",
+              "const": "distribution"
+            },
+            {
+              "description": "The shell installer this project publishes wrote it.",
+              "type": "string",
+              "const": "installer"
+            },
+            {
+              "description": "Downloaded, unpacked or built by hand, and owned by nobody but the operator.",
+              "type": "string",
+              "const": "elsewhere"
+            },
+            {
+              "description": "This machine would not say where the running binary is, so none of the above\ncan be told apart. Not a failure, and not a licence to guess.",
+              "type": "string",
+              "const": "untellable"
+            }
+          ]
+        },
+        "Standing": {
+          "description": "Where a copy of lemonfiber stands, in the words the specification uses.\n\nNothing known is the default, and it is the right one: a report built before\nanything has been read has not established that this copy is current, and a\ndefault that said so would be a claim made by an empty value.",
+          "oneOf": [
+            {
+              "description": "The version running is the newest known.",
+              "type": "string",
+              "const": "current"
+            },
+            {
+              "description": "A newer version exists, and replacing this copy is lemonfiber's own to do.",
+              "type": "string",
+              "const": "update-available"
+            },
+            {
+              "description": "A newer version exists and a package manager owns this copy, so the update\nis that tool's to make.",
+              "type": "string",
+              "const": "managed-externally"
+            },
+            {
+              "description": "Availability could not be determined, which is not a fault and stops nothing.",
+              "type": "string",
+              "const": "check-failed"
+            }
+          ]
+        },
+        "UpdateReport": {
+          "description": "Where this copy of lemonfiber stands, and what moving it would come to.",
+          "type": "object",
+          "properties": {
+            "afterwards": {
+              "description": "What updating leaves alone, and what it needs afterwards.",
+              "type": "string"
+            },
+            "asked": {
+              "description": "The version the operator asked to move to, where they asked for one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "at": {
+              "description": "Where the running binary is, with any link followed, or nothing where this\nmachine would not say.\n\nThe answer to which of several copies on a search path is the one that ran, so\na version somebody quotes can be attributed to a file rather than to a name.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "carries": {
+              "description": "What a release brings besides the program, and when any of it is fetched.",
+              "type": "string"
+            },
+            "command": {
+              "description": "Exactly what to type, where there is something exact to type.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "configuration": {
+              "description": "Whether the version named can read the configuration on this machine.\n\nOnly where a version was named, since it is the question a downgrade asks and\nnothing else does.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "installed": {
+              "description": "How this copy got onto the machine.",
+              "$ref": "#/$defs/Installed"
+            },
+            "instead": {
+              "description": "Why there is nothing exact to type, where there is not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "offered": {
+              "description": "The newest version released, where the check could read one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "owner": {
+              "description": "The tool that owns this copy, where one does.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "replaceable": {
+              "description": "Whether the directory holding the running binary can be written to.\n\nNothing where it was not asked, which is every copy a package manager owns —\nreplacing one of those is that tool's business and not this one's. Asked by\ntrying rather than by reading permission bits, and reported rather than acted\non: a copy this operator cannot replace is a thing to say with the path, never\na reason to go looking for a way to become somebody else.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "running": {
+              "description": "The version running now.",
+              "type": "string"
+            },
+            "standing": {
+              "description": "Which of the states this is.",
+              "$ref": "#/$defs/Standing"
+            },
+            "untold": {
+              "description": "Why availability could not be told, where it could not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "standing",
+            "running",
+            "installed",
+            "afterwards",
+            "carries"
+          ]
+        }
+      }
+    },
     "setup": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -11937,7 +12132,7 @@
         },
         "data": {
           "description": "The payload.",
-          "$ref": "#/$defs/UpdateReport"
+          "$ref": "#/$defs/Report"
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -11950,170 +12145,264 @@
         "data"
       ],
       "$defs": {
-        "Installed": {
-          "description": "How this copy of lemonfiber got onto the machine.\n\nNothing known is the default. Every other answer is a claim about somebody's\nmachine, and a value that arrived by nobody filling it in has established none of\nthem.",
+        "Applied": {
+          "description": "What one service's update came to.",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "description": "What went wrong, where anything did.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ending": {
+              "description": "How it ended.",
+              "$ref": "#/$defs/Ending"
+            },
+            "from": {
+              "description": "The version it was standing on before the run.",
+              "type": "string"
+            },
+            "reversal": {
+              "description": "How it could be put back, given how it ended.",
+              "$ref": "#/$defs/Reversal"
+            },
+            "service": {
+              "description": "The service it is about.",
+              "type": "string"
+            },
+            "to": {
+              "description": "The version the run was moving it to.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "from",
+            "to",
+            "ending",
+            "reversal"
+          ]
+        },
+        "Change": {
+          "description": "What updating one service would change.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "What the step means, in the words an operator decides on.",
+              "type": "string"
+            },
+            "current": {
+              "description": "The version it is standing on now.",
+              "type": "string"
+            },
+            "irreversible": {
+              "description": "Whether taking it is a step nothing walks back.",
+              "type": "boolean"
+            },
+            "jump": {
+              "description": "How large the step between them is.",
+              "$ref": "#/$defs/Jump"
+            },
+            "refused": {
+              "description": "Whether lemonfiber refuses to take it at all.",
+              "type": "boolean"
+            },
+            "service": {
+              "description": "The service, by its manifest id, which is also its Compose service name.",
+              "type": "string"
+            },
+            "target": {
+              "description": "The version this build pins for it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "current",
+            "target",
+            "jump",
+            "irreversible",
+            "refused",
+            "because"
+          ]
+        },
+        "Ending": {
+          "description": "How one service's update ended.",
           "oneOf": [
             {
-              "description": "Homebrew put it here, on macOS or on Linux.",
+              "description": "Updated, and answering again afterwards.",
               "type": "string",
-              "const": "homebrew"
+              "const": "updated"
             },
             {
-              "description": "Scoop put it here.",
+              "description": "The newer image was never fetched, so nothing about this service changed.",
               "type": "string",
-              "const": "scoop"
+              "const": "not-fetched"
             },
             {
-              "description": "winget put it here.",
+              "description": "It was started on the newer image and did not come back.",
               "type": "string",
-              "const": "winget"
+              "const": "not-started"
             },
             {
-              "description": "`cargo install` built and placed it.",
+              "description": "The run halted before reaching it, so it is standing where it was.",
               "type": "string",
-              "const": "cargo"
+              "const": "not-reached"
+            }
+          ]
+        },
+        "Jump": {
+          "description": "How large a step from one version to another is.\n\nNamed after the part of the version that moved rather than after a size, because\nthat is the fact an operator weighs: a first-number change is where a project puts\nthe work that breaks configurations, and the two behind it are where it puts the\nwork that does not.",
+          "oneOf": [
+            {
+              "description": "The first number moved.",
+              "type": "string",
+              "const": "major"
             },
             {
-              "description": "A distribution's own package manager placed it.",
+              "description": "The second number moved, and the first did not.",
               "type": "string",
-              "const": "distribution"
+              "const": "minor"
             },
             {
-              "description": "The shell installer this project publishes wrote it.",
+              "description": "Nothing before the third number moved.",
               "type": "string",
-              "const": "installer"
+              "const": "patch"
             },
             {
-              "description": "Downloaded, unpacked or built by hand, and owned by nobody but the operator.",
-              "type": "string",
-              "const": "elsewhere"
-            },
-            {
-              "description": "This machine would not say where the running binary is, so none of the above\ncan be told apart. Not a failure, and not a licence to guess.",
+              "description": "One of the tags is not a run of numbers, so the size of the step is unknown.",
               "type": "string",
               "const": "untellable"
             }
           ]
         },
-        "Standing": {
-          "description": "Where a copy of lemonfiber stands, in the words the specification uses.\n\nNothing known is the default, and it is the right one: a report built before\nanything has been read has not established that this copy is current, and a\ndefault that said so would be a claim made by an empty value.",
+        "Report": {
+          "description": "What updating the stack would change, or what a run of it came to.",
+          "type": "object",
+          "properties": {
+            "applied": {
+              "description": "What became of each service the run reached, in the order it reached them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Applied"
+              }
+            },
+            "backup": {
+              "description": "Where the backup taken before anything moved was written.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "changes": {
+              "description": "What would move, and what taking each step means.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Change"
+              }
+            },
+            "confirmed": {
+              "description": "Whether the steps were agreed to, or only shown.",
+              "type": "boolean"
+            },
+            "halted": {
+              "description": "Why the run stopped where it did, where it stopped early.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "in_flight": {
+              "description": "What the download clients are still working on, named so an operator can\ntell whether the thing they have been waiting for is among them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stack_edits": {
+              "description": "Stack files the operator had edited, left as they set them rather than\noverwritten with this build's own, each with the change that was held back.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StackEdit"
+              }
+            },
+            "state": {
+              "description": "The one word the run comes to.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "state",
+            "changes",
+            "in_flight",
+            "confirmed",
+            "stack_edits",
+            "applied"
+          ]
+        },
+        "Reversal": {
+          "description": "How a service could be put back the way it was.\n\nThe distinction is the whole of why this is reported rather than left to be\nworked out: pinning the previous image again is a minute's work, and restoring a\nbackup is an evening. Offering the first where only the second can succeed is\nworse than offering nothing, because it is acted on.",
           "oneOf": [
             {
-              "description": "The version running is the newest known.",
+              "description": "Nothing opened its state on the newer image, so the previous one runs again\nexactly as it did.",
+              "type": "string",
+              "const": "rollback"
+            },
+            {
+              "description": "The newer image was started, so its state may already have been migrated and\nthe backup is the only way back.",
+              "type": "string",
+              "const": "restore"
+            }
+          ]
+        },
+        "StackEdit": {
+          "description": "A stack file the operator edited, preserved rather than overwritten, with the\nchange an upgrade would make shown against it.",
+          "type": "object",
+          "properties": {
+            "diff": {
+              "description": "The lines that differ between the operator's file and what lemonfiber would\nwrite — theirs marked `-`, lemonfiber's `+`, the matching head and tail left\nout. Empty where the two differ only in ways `lines` does not see.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file's path within the stack directory.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "diff"
+          ]
+        },
+        "State": {
+          "description": "Where the stack stands against the versions this build pins.\n\nExactly one of these is true of a run at a time. A surface that had to say\n\"updates available, and also partly applied\" would be reporting the question\nrather than the answer.",
+          "oneOf": [
+            {
+              "description": "Every service is standing on the version pinned for it.",
               "type": "string",
               "const": "current"
             },
             {
-              "description": "A newer version exists, and replacing this copy is lemonfiber's own to do.",
+              "description": "Newer versions are pinned than what is running, and nothing has been applied.",
               "type": "string",
-              "const": "update-available"
+              "const": "updates-available"
             },
             {
-              "description": "A newer version exists and a package manager owns this copy, so the update\nis that tool's to make.",
+              "description": "Everything that had an update took it.",
               "type": "string",
-              "const": "managed-externally"
+              "const": "updated"
             },
             {
-              "description": "Availability could not be determined, which is not a fault and stops nothing.",
+              "description": "Some were updated and one was not; the run stopped there.",
               "type": "string",
-              "const": "check-failed"
+              "const": "partial"
+            },
+            {
+              "description": "Nothing was updated, and the run stopped where it did.",
+              "type": "string",
+              "const": "failed"
             }
-          ]
-        },
-        "UpdateReport": {
-          "description": "Where this copy of lemonfiber stands, and what moving it would come to.",
-          "type": "object",
-          "properties": {
-            "afterwards": {
-              "description": "What updating leaves alone, and what it needs afterwards.",
-              "type": "string"
-            },
-            "asked": {
-              "description": "The version the operator asked to move to, where they asked for one.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "at": {
-              "description": "Where the running binary is, with any link followed, or nothing where this\nmachine would not say.\n\nThe answer to which of several copies on a search path is the one that ran, so\na version somebody quotes can be attributed to a file rather than to a name.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "carries": {
-              "description": "What a release brings besides the program, and when any of it is fetched.",
-              "type": "string"
-            },
-            "command": {
-              "description": "Exactly what to type, where there is something exact to type.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "configuration": {
-              "description": "Whether the version named can read the configuration on this machine.\n\nOnly where a version was named, since it is the question a downgrade asks and\nnothing else does.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "installed": {
-              "description": "How this copy got onto the machine.",
-              "$ref": "#/$defs/Installed"
-            },
-            "instead": {
-              "description": "Why there is nothing exact to type, where there is not.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "offered": {
-              "description": "The newest version released, where the check could read one.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "owner": {
-              "description": "The tool that owns this copy, where one does.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "replaceable": {
-              "description": "Whether the directory holding the running binary can be written to.\n\nNothing where it was not asked, which is every copy a package manager owns —\nreplacing one of those is that tool's business and not this one's. Asked by\ntrying rather than by reading permission bits, and reported rather than acted\non: a copy this operator cannot replace is a thing to say with the path, never\na reason to go looking for a way to become somebody else.",
-              "type": [
-                "boolean",
-                "null"
-              ]
-            },
-            "running": {
-              "description": "The version running now.",
-              "type": "string"
-            },
-            "standing": {
-              "description": "Which of the states this is.",
-              "$ref": "#/$defs/Standing"
-            },
-            "untold": {
-              "description": "Why availability could not be told, where it could not.",
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "standing",
-            "running",
-            "installed",
-            "afterwards",
-            "carries"
           ]
         }
       }

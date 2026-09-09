@@ -8,7 +8,7 @@
 
 use serde::Serialize;
 
-use crate::update::{Installed, Standing};
+use crate::self_update::{Installed, Standing};
 
 /// Where this copy of lemonfiber stands, and what moving it would come to.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]

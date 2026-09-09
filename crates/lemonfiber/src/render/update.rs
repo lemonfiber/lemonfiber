@@ -1,271 +1,311 @@
-//! Where this copy of lemonfiber stands, on a terminal.
+//! What an update would change, and what a run of one came to.
 //!
-//! The standing leads, because it is the whole answer for most operators: this is the
-//! newest one, or it is not, or nobody could tell. Underneath it goes the provenance —
-//! the version, the file it was run from, and which tool put it there — which is what
-//! a bug report is unactionable without.
+//! Two readings of one report, and which one is worth printing is decided by
+//! whether anything was agreed to: before, the whole point is the list of steps and
+//! what each of them costs; after, it is which services moved and how to get back
+//! from the ones that did not.
 //!
-//! The command comes last and alone, because it is the line somebody copies. Where
-//! there is no command there is a sentence saying which reason that is, since an
-//! operator told only that a tool owns this copy has been given a fact rather than a
-//! way forward, and will reach for the thing that overwrites the file.
+//! A stack already on every pinned version ends after one line. Nothing is offered,
+//! nothing is suggested, and there is no second sentence asking again — staying on
+//! the versions you have is a position this product supports rather than one it
+//! argues with.
 
-use lemonfiber_core::model::UpdateReport;
-use lemonfiber_core::update::Standing;
+use lemonfiber_core::app::update::Report;
+use lemonfiber_core::migration::version::Jump;
+use lemonfiber_core::update::{Applied, Change, Ending, Reversal, State};
 
 use super::Lines;
 
-/// Where this copy stands, and what moving it would come to.
-pub(crate) fn standing(report: &UpdateReport) -> Lines {
+/// What an update would change, or what one did.
+pub(crate) fn update(report: &Report) -> Lines {
     let mut lines = Lines::default();
-    lines.put(headline(report));
-    lines.extend(provenance(report));
-    if let Some(untold) = &report.untold {
-        lines.spaced(untold.clone());
+    if report.state == State::Current {
+        lines.put("Every service is on the version this build of lemonfiber pins.");
+        return lines;
     }
-    lines.extend(moving(report));
-    lines.spaced(report.afterwards.clone());
-    lines.spaced(report.carries.clone());
+
+    lines.put(heading(report.state));
+    for change in &report.changes {
+        lines.extend(step(change));
+    }
+    lines.extend(transfers(&report.in_flight));
+    if report.confirmed {
+        lines.extend(carried(report));
+    } else {
+        lines.spaced("Take them with:  lemonfiber update --confirm");
+    }
     lines
 }
 
-/// The one sentence an operator who reads no further is owed.
-fn headline(report: &UpdateReport) -> String {
-    match report.standing {
-        Standing::Current => format!("lemonfiber {} is the newest released.", report.running),
-        Standing::UpdateAvailable | Standing::ManagedExternally => {
-            report.offered.as_ref().map_or_else(
-                || format!("lemonfiber {} — a newer version exists.", report.running),
-                |offered| {
-                    format!(
-                        "lemonfiber {} — {offered} has been released.",
-                        report.running
-                    )
-                },
-            )
+/// The line the report opens with, which is the one word it came to.
+fn heading(state: State) -> &'static str {
+    match state {
+        State::Current | State::UpdatesAvailable => {
+            "Newer versions are pinned than what is running:"
         }
-        Standing::CheckFailed => format!(
-            "lemonfiber {} — whether anything newer exists could not be told.",
-            report.running
-        ),
+        State::Updated => "Updated:",
+        State::Partial => {
+            "Partly updated — the run stopped at the first service that did not come back:"
+        }
+        State::Failed => "Nothing was updated — the run stopped at the first service:",
     }
 }
 
-/// Which file was run, and what put it there.
-fn provenance(report: &UpdateReport) -> Lines {
+/// One step, with the size of it and what taking it means.
+fn step(change: &Change) -> Lines {
     let mut lines = Lines::default();
-    match &report.at {
-        Some(at) => lines.spaced(format!("  run from  {at}")),
-        None => lines.spaced("  run from  this machine would not say"),
+    lines.put(format!(
+        "  {}  {} to {}  ({})",
+        change.service,
+        change.current,
+        change.target,
+        size(change.jump)
+    ));
+    if change.jump == Jump::Major {
+        lines.put(
+            "    A first-number change. Versions that move it carry changes that break \
+             configurations far more often than the two behind it.",
+        );
     }
-    match &report.owner {
-        Some(owner) => lines.put(format!("  put here  by {owner}, which owns it")),
-        None => lines.put(format!("  put here  {}", unowned(report))),
+    if change.refused {
+        lines.put(format!("    Refused: {}", change.because));
+        return lines;
     }
-    if report.replaceable == Some(false) {
-        lines.put("  and       that directory will not take a new file, so replacing it here");
-        lines.put("            needs whoever owns it — this will not try to become them");
+    if change.irreversible {
+        lines.put(format!("    {}", change.because));
     }
     lines
 }
 
-/// How a copy nobody owns got here, in the words the report uses.
-fn unowned(report: &UpdateReport) -> &'static str {
-    match report.installed {
-        lemonfiber_core::update::Installed::Installer => "by the shell installer",
-        lemonfiber_core::update::Installed::Elsewhere => "by hand — no tool owns it",
-        _ => "not known",
+/// How large a step reads, in the words an operator weighs it in.
+fn size(jump: Jump) -> &'static str {
+    match jump {
+        Jump::Major => "major",
+        Jump::Minor => "minor",
+        Jump::Patch => "patch",
+        Jump::Untellable => "size unknown",
     }
 }
 
-/// The line to copy, or the reason there is none.
-fn moving(report: &UpdateReport) -> Lines {
+/// What is still coming down, where anything is.
+fn transfers(active: &[String]) -> Lines {
     let mut lines = Lines::default();
-    if let Some(configuration) = &report.configuration {
-        lines.spaced(configuration.clone());
+    if active.is_empty() {
+        return lines;
     }
-    if let Some(command) = &report.command {
-        lines.spaced(heading(report));
-        lines.put(format!("  {command}"));
-    } else if let Some(instead) = &report.instead {
-        lines.spaced(instead.clone());
+    lines.spaced("Still coming down, and updating stops the download clients:");
+    for one in active {
+        lines.put(format!("  {one}"));
+    }
+    lines.put("Let them finish first with:  lemonfiber update --confirm --wait");
+    lines
+}
+
+/// What the run itself did: the backup it took, each service, and where it stopped.
+fn carried(report: &Report) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(path) = &report.backup {
+        lines.spaced(format!("Backed up to {path} before anything was started."));
+    }
+    if !report.applied.is_empty() {
+        lines.spaced("Service by service:");
+    }
+    for one in &report.applied {
+        lines.extend(service(one));
+    }
+    if let Some(halted) = &report.halted {
+        lines.spaced(halted.clone());
+    }
+    for edit in &report.stack_edits {
+        lines.spaced(format!(
+            "{} is yours — it was left exactly as you set it, and this is what was held back:",
+            edit.path
+        ));
+        lines.block(&edit.diff);
     }
     lines
 }
 
-/// What the command underneath is for.
-fn heading(report: &UpdateReport) -> String {
-    report.asked.as_ref().map_or_else(
-        || "To take it:".to_owned(),
-        |asked| format!("To move to {asked}:"),
-    )
+/// What became of one service, and how to put it back.
+fn service(one: &Applied) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "  {}  {} to {}  — {}",
+        one.service,
+        one.from,
+        one.to,
+        ended(one.ending)
+    ));
+    if let Some(detail) = &one.detail {
+        lines.put(format!("    {detail}"));
+    }
+    if one.ending != Ending::Updated {
+        lines.put(format!("    {}", back(one.reversal)));
+    }
+    lines
+}
+
+/// How one service ended, in one phrase.
+fn ended(ending: Ending) -> &'static str {
+    match ending {
+        Ending::Updated => "updated",
+        Ending::NotFetched => "not fetched, so it is still on the version it was",
+        Ending::NotStarted => "started and did not come back",
+        Ending::NotReached => "not reached, so it is still on the version it was",
+    }
+}
+
+/// The one way back that can actually work for a service that ended this way.
+fn back(reversal: Reversal) -> &'static str {
+    match reversal {
+        Reversal::Rollback => {
+            "Nothing of it opened the newer image, so starting it again puts it back as it was."
+        }
+        Reversal::Restore => {
+            "It opened its state on the newer image, so the backup is the way back: \
+             lemonfiber restore <archive>"
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use lemonfiber_core::model::UpdateReport;
-    use lemonfiber_core::update::{carries, configuration, Installed, Standing, AFTERWARDS};
+    use super::{back, size, update};
+    use lemonfiber_core::app::update::Report;
+    use lemonfiber_core::migration::version::Jump;
+    use lemonfiber_core::model::StackEdit;
+    use lemonfiber_core::update::{Applied, Change, Ending, Reversal};
 
-    use super::standing;
-
-    /// A copy of lemonfiber with a newer one released, put here by whichever tool.
-    fn stands(installed: Installed, standing: Standing) -> UpdateReport {
-        UpdateReport {
-            standing,
-            running: "0.13.0".to_owned(),
-            at: Some("/opt/homebrew/bin/lemonfiber".to_owned()),
-            installed,
-            owner: installed.owner().map(str::to_owned),
-            offered: Some("0.14.0".to_owned()),
-            asked: None,
-            command: None,
-            instead: None,
-            replaceable: None,
-            configuration: None,
-            afterwards: AFTERWARDS.to_owned(),
-            carries: carries(&[1]),
-            untold: None,
+    /// One step, from `current` onto `target`.
+    fn change(jump: Jump, refused: bool) -> Change {
+        Change {
+            service: "sonarr".to_owned(),
+            current: "4.0.15".to_owned(),
+            target: "5.0.0".to_owned(),
+            jump,
+            irreversible: !refused,
+            refused,
+            because: "it migrates its state on first start".to_owned(),
         }
     }
 
-    #[test]
-    fn a_copy_with_nothing_newer_is_told_so_in_the_first_line() {
-        let report = UpdateReport {
-            offered: Some("0.13.0".to_owned()),
-            ..stands(Installed::Elsewhere, Standing::Current)
-        };
-        let said = standing(&report).text();
-        assert!(
-            said.starts_with("lemonfiber 0.13.0 is the newest released."),
-            "{said}"
-        );
-        assert!(said.contains("Nothing in the stack is stopped"), "{said}");
-        assert!(!said.contains("To take it:"), "{said}");
+    /// A report carrying `changes` and `applied`, agreed to or not.
+    fn report(changes: Vec<Change>, applied: Vec<Applied>, confirmed: bool) -> Report {
+        Report {
+            state: lemonfiber_core::update::state(&changes, &applied),
+            changes,
+            in_flight: Vec::new(),
+            confirmed,
+            backup: confirmed.then(|| "/tmp/one.tar.gz".to_owned()),
+            stack_edits: Vec::new(),
+            applied,
+            halted: None,
+        }
     }
 
-    /// The whole of what deferring comes to: the tool that owns the copy is named,
-    /// and the line to type is underneath it.
+    /// Driven through the whole funnel rather than through this module's own
+    /// entry, so the outcome the core hands over is proved to reach these lines
+    /// rather than only to have a rendering somewhere.
     #[test]
-    fn a_copy_a_package_manager_owns_names_the_tool_and_the_command_to_type() {
-        let report = UpdateReport {
-            command: Some("brew upgrade lemonfiber".to_owned()),
-            ..stands(Installed::Homebrew, Standing::ManagedExternally)
-        };
-        let said = standing(&report).text();
-        assert!(said.contains("0.14.0 has been released"), "{said}");
-        assert!(said.contains("by Homebrew, which owns it"), "{said}");
-        assert!(said.contains("To take it:"), "{said}");
-        assert!(said.contains("  brew upgrade lemonfiber"), "{said}");
+    fn a_stack_on_every_pin_is_told_once_and_asked_nothing() {
+        let outcome = lemonfiber_core::app::Outcome::Update(report(Vec::new(), Vec::new(), false));
+        let said = crate::render::shaped(&outcome).text();
+        assert!(said.contains("Every service is on the version"), "{said}");
+        assert!(!said.contains("--confirm"), "{said}");
     }
 
     #[test]
-    fn a_copy_nobody_owns_says_how_it_got_here_rather_than_naming_a_tool() {
-        let report = UpdateReport {
-            at: Some("/home/sam/.cargo/bin/lemonfiber".to_owned()),
-            command: Some("curl -LsSf https://example.test/installer.sh | sh".to_owned()),
-            ..stands(Installed::Installer, Standing::UpdateAvailable)
-        };
-        let said = standing(&report).text();
-        assert!(said.contains("by the shell installer"), "{said}");
-        assert!(said.contains("/home/sam/.cargo/bin/lemonfiber"), "{said}");
+    fn an_available_update_names_both_versions_and_how_to_take_it() {
+        let said = update(&report(vec![change(Jump::Minor, false)], Vec::new(), false)).text();
+        assert!(said.contains("4.0.15 to 5.0.0"), "{said}");
+        assert!(said.contains("lemonfiber update --confirm"), "{said}");
     }
 
     #[test]
-    fn a_copy_put_here_by_hand_says_that_and_a_machine_that_will_not_say_says_that() {
-        let by_hand = standing(&UpdateReport {
-            ..stands(Installed::Elsewhere, Standing::UpdateAvailable)
-        })
+    fn a_first_number_change_is_called_out_rather_than_left_to_the_numbers() {
+        let major = update(&report(vec![change(Jump::Major, false)], Vec::new(), false)).text();
+        let minor = update(&report(vec![change(Jump::Minor, false)], Vec::new(), false)).text();
+        assert!(major.contains("A first-number change"), "{major}");
+        assert!(!minor.contains("A first-number change"), "{minor}");
+    }
+
+    #[test]
+    fn a_step_lemonfiber_will_not_take_says_so_instead_of_warning_about_it() {
+        let said = update(&report(vec![change(Jump::Patch, true)], Vec::new(), false)).text();
+        assert!(said.contains("Refused:"), "{said}");
+    }
+
+    #[test]
+    fn each_size_of_step_has_a_word_of_its_own() {
+        assert_eq!(size(Jump::Major), "major");
+        assert_eq!(size(Jump::Minor), "minor");
+        assert_eq!(size(Jump::Patch), "patch");
+        assert_eq!(size(Jump::Untellable), "size unknown");
+    }
+
+    #[test]
+    fn a_run_says_where_the_backup_went_and_what_each_service_came_to() {
+        let taken = change(Jump::Minor, false);
+        let applied = vec![
+            Applied::ended(
+                &taken,
+                Ending::NotStarted,
+                Some("it did not start".to_owned()),
+            ),
+            Applied::ended(&taken, Ending::NotReached, None),
+        ];
+        let mut carried = report(vec![taken], applied, true);
+        carried.halted = Some("sonarr did not come back".to_owned());
+        carried.stack_edits = vec![StackEdit {
+            path: "compose.yml".to_owned(),
+            diff: "-yours".to_owned(),
+        }];
+        let said = update(&carried).text();
+        assert!(said.contains("Backed up to /tmp/one.tar.gz"), "{said}");
+        assert!(said.contains("started and did not come back"), "{said}");
+        assert!(said.contains("not reached"), "{said}");
+        assert!(said.contains("sonarr did not come back"), "{said}");
+        assert!(said.contains("compose.yml is yours"), "{said}");
+    }
+
+    #[test]
+    fn a_run_where_everything_moved_says_so_in_its_first_line() {
+        let taken = change(Jump::Patch, false);
+        let applied = vec![Applied::ended(&taken, Ending::Updated, None)];
+        let said = update(&report(vec![taken], applied, true)).text();
+        assert!(said.starts_with("Updated:"), "{said}");
+    }
+
+    #[test]
+    fn a_run_that_moved_some_of_them_is_told_apart_from_one_that_moved_none() {
+        let taken = change(Jump::Patch, false);
+        let some = vec![
+            Applied::ended(&taken, Ending::Updated, None),
+            Applied::ended(&taken, Ending::NotReached, None),
+        ];
+        let partly = update(&report(vec![taken.clone()], some, true)).text();
+        let none = update(&report(
+            vec![taken.clone()],
+            vec![Applied::ended(&taken, Ending::NotFetched, None)],
+            true,
+        ))
         .text();
-        assert!(by_hand.contains("by hand — no tool owns it"), "{by_hand}");
-
-        let silent = standing(&UpdateReport {
-            at: None,
-            offered: None,
-            ..stands(Installed::Untellable, Standing::CheckFailed)
-        })
-        .text();
-        assert!(silent.contains("this machine would not say"), "{silent}");
-        assert!(silent.contains("not known"), "{silent}");
-        assert!(
-            silent.starts_with("lemonfiber 0.13.0 — whether anything newer exists"),
-            "{silent}"
-        );
-    }
-
-    /// A directory that will not take a file is said with what it means, and never
-    /// with an offer to become somebody else.
-    #[test]
-    fn a_binary_that_could_not_be_replaced_here_says_so_and_offers_no_escalation() {
-        let report = UpdateReport {
-            replaceable: Some(false),
-            ..stands(Installed::Elsewhere, Standing::UpdateAvailable)
-        };
-        let said = standing(&report).text();
-        assert!(said.contains("will not take a new file"), "{said}");
-        assert!(said.contains("this will not try to become them"), "{said}");
-        assert!(!said.to_lowercase().contains("sudo"), "{said}");
+        assert!(partly.starts_with("Partly updated"), "{partly}");
+        assert!(none.starts_with("Nothing was updated"), "{none}");
     }
 
     #[test]
-    fn a_reason_there_is_no_command_is_said_in_place_of_one() {
-        let report = UpdateReport {
-            instead: Some("No distribution carries lemonfiber.".to_owned()),
-            ..stands(Installed::Distribution, Standing::ManagedExternally)
-        };
-        let said = standing(&report).text();
-        assert!(
-            said.contains("No distribution carries lemonfiber."),
-            "{said}"
-        );
-        assert!(!said.contains("To take it:"), "{said}");
-    }
-
-    /// Naming a version asks about that one, and the sentence a downgrade is owed
-    /// goes above the line that carries it out.
-    #[test]
-    fn a_named_version_is_headed_by_it_and_says_what_it_reads() {
-        let report = UpdateReport {
-            asked: Some("0.12.0".to_owned()),
-            configuration: Some(configuration("0.12.0", "0.13.0")),
-            command: Some("scoop install lemonfiber@0.12.0".to_owned()),
-            ..stands(Installed::Scoop, Standing::UpdateAvailable)
-        };
-        let said = standing(&report).text();
-        assert!(said.contains("0.12.0 is behind the copy running"), "{said}");
-        assert!(said.contains("To move to 0.12.0:"), "{said}");
+    fn what_is_still_coming_down_is_named_with_the_way_to_let_it_finish() {
+        let mut waiting = report(vec![change(Jump::Patch, false)], Vec::new(), false);
+        waiting.in_flight = vec!["Ubuntu.iso (94%)".to_owned()];
+        let said = update(&waiting).text();
+        assert!(said.contains("Ubuntu.iso (94%)"), "{said}");
+        assert!(said.contains("--confirm --wait"), "{said}");
     }
 
     #[test]
-    fn a_check_that_could_not_tell_says_why_rather_than_leaving_a_gap() {
-        let report = UpdateReport {
-            offered: None,
-            untold: Some("The release list is not asked.".to_owned()),
-            ..stands(Installed::Elsewhere, Standing::CheckFailed)
-        };
-        let said = standing(&report).text();
-        assert!(said.contains("The release list is not asked."), "{said}");
-    }
-
-    /// A standing that says something exists with no version read still says it,
-    /// rather than opening with a sentence about a version it has not got.
-    #[test]
-    fn something_newer_with_no_version_read_is_still_said_to_exist() {
-        let report = UpdateReport {
-            offered: None,
-            ..stands(Installed::Elsewhere, Standing::UpdateAvailable)
-        };
-        let said = standing(&report).text();
-        assert!(said.contains("a newer version exists"), "{said}");
-    }
-
-    /// Through the printer rather than by calling this module, because what a
-    /// terminal draws is what the printer chose for the outcome — an arm nothing
-    /// reaches renders nowhere, however good the renderer under it is.
-    #[test]
-    fn the_printer_reaches_this_renderer_for_this_outcome() {
-        let report = stands(Installed::Homebrew, Standing::ManagedExternally);
-        let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Update(report)).text();
-        assert!(drawn.contains("0.14.0 has been released"), "{drawn}");
-        assert!(drawn.contains("manifest schema 1"), "{drawn}");
+    fn the_way_back_is_the_one_that_can_work_for_how_the_service_ended() {
+        assert!(back(Reversal::Rollback).contains("starting it again"));
+        assert!(back(Reversal::Restore).contains("lemonfiber restore"));
     }
 }

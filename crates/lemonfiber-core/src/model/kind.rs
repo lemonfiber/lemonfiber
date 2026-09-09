@@ -112,6 +112,8 @@ pub const RESET: Kind = Kind("reset");
 pub const RESTORE: Kind = Kind("restore");
 /// What seeding wired, and what it left for a re-run.
 pub const SEED: Kind = Kind("seed");
+/// Where this copy of lemonfiber stands, and what moving it would come to.
+pub const SELF_UPDATE: Kind = Kind("self-update");
 /// What setup settled on.
 pub const SETUP: Kind = Kind("setup");
 /// Where the disk stands, where the room went, and what could be got back.
@@ -135,7 +137,7 @@ pub const TRACE: Kind = Kind("trace");
 pub const UNDO: Kind = Kind("undo");
 /// What taking lemonfiber off this machine would come to, or came to.
 pub const UNINSTALL: Kind = Kind("uninstall");
-/// Where this copy of lemonfiber stands, and what moving it would come to.
+/// What moving the stack onto this build's pinned versions would change, or came to.
 pub const UPDATE: Kind = Kind("update");
 /// What upgrading existing content did, or would do.
 pub const UPGRADE: Kind = Kind("upgrade");
@@ -189,6 +191,7 @@ pub const ALL: &[Kind] = &[
     RESET,
     RESTORE,
     SEED,
+    SELF_UPDATE,
     SETUP,
     SPACE,
     START,

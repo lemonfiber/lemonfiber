@@ -101,6 +101,7 @@ pub mod sabnzbd;
 pub mod secret;
 pub mod seed;
 pub mod seerr;
+pub mod self_update;
 pub mod servarr;
 pub mod space;
 pub mod spoken;

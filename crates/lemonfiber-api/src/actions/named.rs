@@ -22,6 +22,7 @@
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
+use lemonfiber_core::app::update::Asked;
 use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::{Tier, TIERS};
@@ -62,6 +63,7 @@ pub const OFFERED: &[&str] = &[
     "space",
     "stop-seeding",
     "bandwidth",
+    "update",
     "backup",
     "invite",
     "remove",
@@ -248,6 +250,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         // browser agrees to is what it was shown. Which removal is required: one
         // with none named has lost the only part of it that decides what goes.
         "uninstall" => removing(tier, confirm, offer, wait),
+        "update" => Ok(updating(service, confirm, wait)),
         "backup" => Ok(Command::Backup { service }),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
@@ -352,6 +355,23 @@ fn removing(
             .agreeing(offer.filter(|given| !given.trim().is_empty()))
             .waiting(wait),
     ))
+}
+
+/// What moving the stack onto this build's pinned versions was asked for.
+///
+/// One request read twice: unconfirmed it says what would change and touches nothing,
+/// and confirmed it takes those steps behind a backup — so what a browser agrees to is
+/// what it was shown.
+///
+/// Apart from the table for the reason [`removing`] is: what it builds is longer than
+/// a row. Nothing here can refuse, because a service the stack does not declare is the
+/// core's answer rather than this surface's.
+fn updating(service: Option<String>, confirm: bool, wait: Waiting) -> Command {
+    Command::Update(Asked {
+        service,
+        confirm,
+        wait,
+    })
 }
 
 /// hostable is offered here without anybody remembering to say so.

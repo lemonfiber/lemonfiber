@@ -2,7 +2,7 @@
 //!
 //! Three reads and a probe, each of which only a real machine can answer, kept apart
 //! from the deciding they feed so that every answer they can produce is reachable from
-//! one laptop. What is decided from them is [`crate::update::Installed`]'s, which sees
+//! one laptop. What is decided from them is [`crate::self_update::Installed`]'s, which sees
 //! the facts and never the filesystem.
 //!
 //! The probe writes beside the binary rather than on it. Replacing a file means
@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::ports::FileSystem;
-use crate::update::{cargo_record_above, probe_beside, receipt_under, Installed, Signs};
+use crate::self_update::{cargo_record_above, probe_beside, receipt_under, Installed, Signs};
 
 /// Where the running binary is, with any link followed.
 ///

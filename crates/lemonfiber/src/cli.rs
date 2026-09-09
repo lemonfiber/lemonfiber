@@ -16,9 +16,9 @@ use std::path::PathBuf;
 
 use clap::{CommandFactory, Parser, Subcommand};
 
+mod carried;
 mod under;
 
-use include_dir::{include_dir, Dir};
 pub use under::{
     AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
     QualityCommand,
@@ -29,30 +29,12 @@ pub use under::{
 // otherwise be a change at every call site that names it.
 pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
+pub use carried::{APP, STACK};
 pub use credentials::RawCredentials;
 pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
-
-/// The stack this binary carries.
-///
-/// Embedding it means the common install has one thing to fetch rather than
-/// two, and `build.rs` has already refused to produce this binary if the
-/// manifest is one it could not read.
-pub static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
-
-/// The app this binary serves a browser.
-///
-/// It arrives as a pinned submodule at `assets/web`, embedded exactly as the
-/// stack above it is — the built tree of a `lemonfiber-web` tag rather than its
-/// source, so what is carried is addressable as a git revision.
-///
-/// A checkout whose submodule is not populated carries an empty directory rather
-/// than failing, so the repository can be worked in without it. What cannot
-/// happen is carrying an app that speaks a wire version this binary does not
-/// serve: `build.rs` compares the two and refuses the build.
-pub static APP: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/web");
 
 /// Set up and run your media stack.
 #[derive(Debug, Parser)]
@@ -361,7 +343,7 @@ pub enum Request {
     /// `--to` asks about one particular version instead of whatever is newest, which
     /// is how going back is asked for — along with whether that version reads the
     /// configuration already on this machine.
-    Update {
+    SelfUpdate {
         /// The version to move to, instead of whatever is newest.
         #[arg(long, value_name = "VERSION")]
         to: Option<String>,
@@ -493,6 +475,24 @@ pub enum Request {
         /// Go ahead and revert, having seen what will be lost.
         #[arg(long)]
         confirm: bool,
+    },
+    /// Move the stack onto the image versions this build of lemonfiber pins.
+    ///
+    /// A bare run changes nothing. It says which services would move, from which
+    /// version to which, how large each step is, and which of them migrate state and
+    /// so cannot be walked back. Run it again with `--confirm` to take the steps: a
+    /// backup is taken first, and the services move one at a time with each proven to
+    /// be answering before the next is touched.
+    Update {
+        /// Move one service instead of every one that has an update.
+        #[arg(long, value_name = "SERVICE")]
+        service: Option<String>,
+        /// Go ahead and move them, having seen what each step costs.
+        #[arg(long)]
+        confirm: bool,
+        /// Let anything still downloading finish before the services are stopped.
+        #[arg(long)]
+        wait: bool,
     },
     /// Back up your configuration to an archive, so it stops being precious.
     Backup {

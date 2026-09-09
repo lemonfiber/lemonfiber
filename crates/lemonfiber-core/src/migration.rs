@@ -44,6 +44,26 @@ pub struct Ours {
     pub port: Option<u16>,
 }
 
+/// Every service this build pins, as its own manifest declares them.
+///
+/// Here rather than at each caller because two readings of one manifest is two ways
+/// for the pins a survey compares against and the pins an update moves onto to
+/// disagree — and the disagreement would be silent, since both are lists of the same
+/// shape read from the same file.
+#[must_use]
+pub fn pins(manifest: &lemonfiber_manifest::Manifest) -> Vec<Ours> {
+    manifest
+        .services
+        .iter()
+        .map(|service| Ours {
+            service: service.id.clone(),
+            image: service.image.clone(),
+            tag: service.tag.clone(),
+            port: service.port,
+        })
+        .collect()
+}
+
 /// What is already here, given what the engine reported.
 ///
 /// `project` is lemonfiber's own Compose project, which is excluded: the survey is

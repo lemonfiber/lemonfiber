@@ -33,6 +33,7 @@ mod reconfigure;
 mod removal;
 pub(crate) mod repair;
 mod seed;
+mod self_update;
 mod space;
 pub(crate) mod stack;
 mod stored;
@@ -244,7 +245,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
-        Outcome::Update(report) => update::standing(report),
+        Outcome::SelfUpdate(report) => self_update::standing(report),
         Outcome::Space(report) => space::reckoning(report),
         Outcome::Letting(offer) => space::letting(offer),
         Outcome::Bandwidth(report) => bandwidth::sharing(report),
@@ -257,6 +258,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Uninstall(report) => uninstall::removal(report),
         Outcome::Wizard(report) => standing(report),
+        Outcome::Update(report) => update::update(report),
         Outcome::Backup(report) => archive::backup(report),
         Outcome::Support(report) => archive::bundle(report),
         Outcome::Archives(listing) => archive::kept(listing),

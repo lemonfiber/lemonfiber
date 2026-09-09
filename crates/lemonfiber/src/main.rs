@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
+use lemonfiber_core::app::update;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
 
 mod acting;
@@ -191,6 +192,19 @@ async fn doctoring(ctx: &Ctx, asked: RawDoctor, json: bool) -> Result<Command, E
     diagnosing(asked.only.as_deref(), asked.disruptive, asked.accept).map_err(ExitCode::from)
 }
 
+/// What moving the stack onto this build's pins was asked for, as the core carries it.
+///
+/// Apart from the arm that reads it for the reason the bundle beside it is: three
+/// fields spelled out twice is nine lines of the one function that has to stay
+/// readable, and the wait is the flag a teardown spells the same way.
+fn updating(service: Option<String>, confirm: bool, wait: bool) -> Command {
+    Command::Update(update::Asked {
+        service,
+        confirm,
+        wait: wait.into(),
+    })
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -306,7 +320,7 @@ async fn main() -> ExitCode {
         // Naming a version asks about that one, and naming none asks about whatever is
         // newest — the same fork the forms listing takes, on a word that replaces
         // nothing either way.
-        Request::Update { to } => Command::Update { to },
+        Request::SelfUpdate { to } => Command::SelfUpdate { to },
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },
@@ -319,6 +333,11 @@ async fn main() -> ExitCode {
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },
+        Request::Update {
+            service,
+            confirm,
+            wait,
+        } => updating(service, confirm, wait),
         Request::Backup { service } => Command::Backup { service },
         Request::Support(asked) => bundling(asked),
         // The web surface holds the process until it is stopped, and answers many

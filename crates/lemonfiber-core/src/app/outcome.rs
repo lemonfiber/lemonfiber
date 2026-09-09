@@ -11,7 +11,7 @@
 use crate::glossary::{Term, Vocabulary};
 use crate::stack::closure::Plan;
 
-use super::{archives, backup, repair, restore, support};
+use super::{archives, backup, repair, restore, support, update};
 
 use crate::model::{
     kind, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
@@ -81,7 +81,7 @@ pub enum Outcome {
     /// Everything this machine keeps of lemonfiber's, and what became of it.
     Stored(crate::stored::Stored),
     /// Where this copy of lemonfiber stands, and what moving it would come to.
-    Update(crate::model::UpdateReport),
+    SelfUpdate(crate::model::UpdateReport),
     /// Where the disk stands, where the room went, and what could be got back.
     Space(crate::space::Reckoning),
     /// What letting one completed download go would cost, and what became of it.
@@ -104,6 +104,8 @@ pub enum Outcome {
     Uninstall(crate::uninstall::Uninstall),
     /// Where setup stands, and what it is still asking for.
     Wizard(WizardReport),
+    /// What moving the stack onto this build's pins would change, or came to.
+    Update(update::Report),
     /// Where a backup archive was written, and what it covers.
     Backup(backup::Report),
     /// What a support bundle would hold, or where one went.
@@ -151,7 +153,7 @@ impl Outcome {
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Credentials(_) => crate::model::kind::CREDENTIALS,
             Self::Stored(_) => crate::model::kind::STORED,
-            Self::Update(_) => crate::model::kind::UPDATE,
+            Self::SelfUpdate(_) => crate::model::kind::SELF_UPDATE,
             Self::Space(_) => kind::SPACE,
             Self::Letting(_) => kind::STOP_SEEDING,
             Self::Bandwidth(_) => kind::BANDWIDTH,
@@ -163,6 +165,7 @@ impl Outcome {
             Self::Reset(_) => kind::RESET,
             Self::Uninstall(_) => kind::UNINSTALL,
             Self::Wizard(_) => kind::WIZARD,
+            Self::Update(_) => kind::UPDATE,
             Self::Backup(_) => kind::BACKUP,
             Self::Support(_) => kind::BUNDLE,
             Self::Archives(_) => kind::ARCHIVES,
@@ -205,7 +208,7 @@ impl serde::Serialize for Outcome {
             Self::Outbound(report) => report.serialize(serializer),
             Self::Credentials(inventory) => inventory.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
-            Self::Update(report) => report.serialize(serializer),
+            Self::SelfUpdate(report) => report.serialize(serializer),
             Self::Space(report) => report.serialize(serializer),
             Self::Letting(offer) => offer.serialize(serializer),
             Self::Bandwidth(report) => report.serialize(serializer),
@@ -217,6 +220,7 @@ impl serde::Serialize for Outcome {
             Self::Reset(report) => report.serialize(serializer),
             Self::Uninstall(report) => report.serialize(serializer),
             Self::Wizard(report) => report.serialize(serializer),
+            Self::Update(report) => report.serialize(serializer),
             Self::Backup(report) => report.serialize(serializer),
             Self::Support(report) => report.serialize(serializer),
             Self::Archives(listing) => listing.serialize(serializer),

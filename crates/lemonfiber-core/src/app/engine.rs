@@ -110,6 +110,27 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     })
 }
 
+/// The Compose invocation for `action` over the whole stack, and the operator's own
+/// edits it left in place while materialising.
+///
+/// The same prelude every lifecycle command runs, offered to the one caller that
+/// drives Compose service by service rather than form by form: an update starts each
+/// service on its own and waits for that one alone, which is a different wait from
+/// the whole-plan one beside it. Building the invocation twice would be two accounts
+/// of where the stack is and which files were written to get there.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be read,
+/// resolved, or written.
+pub(super) fn invocation(
+    ctx: &Ctx,
+    action: &Action,
+) -> Result<(Vec<String>, Vec<StackEdit>), Box<Problem>> {
+    let composed = compose(ctx, &[], action)?;
+    Ok((composed.command, composed.stack_edits))
+}
+
 /// What every service in the named forms is doing.
 ///
 /// Naming no form reports the whole stack, because "what is running" is a

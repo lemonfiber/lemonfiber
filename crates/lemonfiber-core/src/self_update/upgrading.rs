@@ -149,7 +149,7 @@ pub fn configuration(named: &str, running: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{carries, command, configuration, why_not, AFTERWARDS};
-    use crate::update::installed::{Installed, EVERY_WAY};
+    use crate::self_update::installed::{Installed, EVERY_WAY};
 
     #[test]
     fn each_manager_is_asked_in_its_own_words_for_whatever_is_newest() {

@@ -74,7 +74,7 @@ use super::reading::{moved, Reading};
 use super::service;
 use super::{Press, Stage, Wanted};
 
-pub(crate) use given::{Given, Needs};
+pub(crate) use given::{Accepts, Given, Needs};
 pub(super) use listed::all;
 #[cfg(test)]
 pub(super) use listed::every;
@@ -126,14 +126,15 @@ pub(crate) struct Errand {
     /// What it has to be given first.
     pub(crate) needs: Needs,
     /// The further acceptance this errand's own account can call for, where it can
-    /// call for one.
+    /// call for one: what it fills in what is sent, and the words the question says it
+    /// in.
     ///
-    /// One errand can. A restore onto a machine whose data root is not the one the
-    /// archive was taken against is held until that move is accepted, and the run that
-    /// lists what the archive holds is the run that says whether it is. So the words
-    /// are here and the fact is the core's, and the question an operator answers is
-    /// the one the account in front of it called for.
-    accepts: Option<&'static str>,
+    /// Two errands can. A restore onto a machine whose data root is not the one the
+    /// archive was taken against is held until that move is accepted, and an update
+    /// with something still coming down is held until interrupting it is. Both facts
+    /// are the core's and arrive on the run in front of the question, so the words are
+    /// here and what an operator answers is what that account called for.
+    accepts: Option<(Accepts, &'static str)>,
     /// What it sends once it has been agreed to.
     going: Going,
 }
@@ -187,21 +188,23 @@ impl Errand {
     }
 
     /// Whether what the unconfirmed run reported calls for the further acceptance this
-    /// errand can carry, and the words for it where it does.
+    /// errand can carry, and what to fill and say where it does.
     ///
     /// The archive's own account of itself says which data root it was taken against,
-    /// and a difference there is the one thing a re-point is for. Read off the answer
-    /// rather than asked of the operator up front, for the reason the account is put
-    /// in front of the question at all: an effect somebody agrees to before hearing of
-    /// it is not one they agreed to.
-    fn accepting(&self, outcome: &Outcome) -> Option<&'static str> {
-        let accepts = self.accepts?;
-        match outcome {
-            Outcome::Restore(restoration) => {
-                restoration.would.relocation.is_some().then_some(accepts)
-            }
-            _ => None,
-        }
+    /// and a difference there is the one thing a re-point is for; an update's account
+    /// names what the download clients are still working on, and something in that
+    /// list is the one thing the wait is for. Read off the answer rather than asked of
+    /// the operator up front, for the reason the account is put in front of the
+    /// question at all: an effect somebody agrees to before hearing of it is not one
+    /// they agreed to.
+    fn accepting(&self, outcome: &Outcome) -> Option<(Accepts, &'static str)> {
+        let (fills, said) = self.accepts?;
+        let called_for = match outcome {
+            Outcome::Restore(restoration) => restoration.would.relocation.is_some(),
+            Outcome::Update(report) => !report.in_flight.is_empty(),
+            _ => false,
+        };
+        called_for.then_some((fills, said))
     }
 
     /// The name the offer this errand just read gave itself, where its yes is that
@@ -398,7 +401,7 @@ pub(super) fn weighed(
     would: Vec<String>,
 ) -> Stage {
     let given = match errand.accepting(outcome) {
-        Some(accepts) => given.repointing(accepts),
+        Some((fills, said)) => given.accepted(fills, said),
         None => given,
     };
     let given = match errand.answering(outcome) {
@@ -465,12 +468,12 @@ pub(super) fn doing(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{all, every, Errand, Given, Going, Needs, Outcome, Stage, KEY, LINES};
+    use super::{all, every, Accepts, Errand, Given, Going, Needs, Outcome, Stage, KEY, LINES};
     use crate::acting::offer::OFFERED as KEYED;
     use lemonfiber::reaching::{ACTS, ALSO};
     use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT, TAKES_CONSENT};
     use lemonfiber_core::app::restore::{Consent, Kept};
-    use lemonfiber_core::app::Command;
+    use lemonfiber_core::app::{Command, Waiting};
     use lemonfiber_core::bundle::Filenames;
 
     /// One errand naming an action no surface offers, for the paths that report a
@@ -712,6 +715,69 @@ pub(crate) mod tests {
             restoring.and_then(|errand| errand.accepting(&Outcome::Version(a_version())));
 
         assert_eq!(accepting, None);
+    }
+
+    /// An update's own account of itself, with `coming` still on the way down.
+    fn an_update(coming: &[&str]) -> Outcome {
+        Outcome::Update(lemonfiber_core::app::update::Report {
+            state: lemonfiber_core::update::State::UpdatesAvailable,
+            changes: Vec::new(),
+            in_flight: coming.iter().map(|one| (*one).to_owned()).collect(),
+            confirmed: false,
+            backup: None,
+            stack_edits: Vec::new(),
+            applied: Vec::new(),
+            halted: None,
+        })
+    }
+
+    /// Where an update's question stands once the run in front of it has been read.
+    fn after(outcome: &Outcome) -> Option<Stage> {
+        let errand = sending("update")?;
+        Some(super::weighed(
+            errand,
+            Given::nothing(),
+            outcome,
+            Vec::new(),
+        ))
+    }
+
+    /// An update with nothing coming down calls for nothing further, so the question
+    /// under its account is the plain one.
+    #[test]
+    fn an_update_with_nothing_coming_down_asks_nobody_to_wait_for_it() {
+        let errand = sending("update");
+
+        let accepting = errand.and_then(|errand| errand.accepting(&an_update(&[])));
+
+        assert_eq!(accepting, None);
+        let plain = after(&an_update(&[]));
+        assert!(
+            matches!(&plain, Some(Stage::Agreeing { given, .. })
+                if given.asked().wait == Waiting::Never),
+            "a run with nothing to wait for offered the wait anyway"
+        );
+    }
+
+    /// And one that would interrupt a transfer offers the wait, in the sentence the
+    /// yes is given to — which is the only way this screen can reach it.
+    #[test]
+    fn an_update_that_would_interrupt_a_transfer_carries_the_wait_it_was_agreed_to_with() {
+        let errand = sending("update");
+
+        let accepting = errand.and_then(|errand| errand.accepting(&an_update(&["Ubuntu.iso"])));
+
+        assert!(
+            matches!(accepting, Some((Accepts::Wait, _))),
+            "{accepting:?}"
+        );
+        let carried = after(&an_update(&["Ubuntu.iso"]));
+        assert!(
+            matches!(&carried, Some(Stage::Agreeing { given, .. })
+                if given.asked().wait == Waiting::ForTheDownloads
+                    && given.said().contains("finish")),
+            "the wait was not carried into what the yes sends"
+        );
     }
 
     /// An offer over one seeding download, as the core would answer with one.

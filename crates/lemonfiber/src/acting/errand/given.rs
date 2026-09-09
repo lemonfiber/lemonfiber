@@ -20,9 +20,24 @@
 //! and the place they would disagree is the line above the yes.
 
 use lemonfiber_api::actions::Arguments;
+use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
 
 use super::super::offer::Taken;
+
+/// What a further acceptance fills in what an errand sends.
+///
+/// Named rather than a second boolean field per errand, because what the two do is
+/// the same shape and what they mean is not: one moves where a configuration is
+/// restored to, and the other decides whether something part-way down survives the
+/// stop. A row saying which of them it can call for is one a reader can check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Accepts {
+    /// The data root moves to this machine's.
+    Repoint,
+    /// Anything still coming down is let finish before the services are stopped.
+    Wait,
+}
 
 /// What an errand has to be given before it can be sent.
 ///
@@ -244,15 +259,19 @@ impl Given {
         self
     }
 
-    /// The same, having accepted the re-point the archive's own account called for.
+    /// The same, having accepted what the run in front of the question called for.
     ///
     /// The acceptance goes on after the account and never before it. Whether there is
     /// anything to accept is the core's to know — it is the archive that says which
-    /// data root it was taken against — so a question asked ahead of the listing would
-    /// be asking somebody to agree to a move that may not be happening.
-    pub(super) fn repointing(mut self, accepts: &'static str) -> Self {
-        self.asked.repoint = true;
-        self.said = format!("{}, {accepts}", self.said);
+    /// data root it was taken against, and the download clients that say what is still
+    /// coming down — so a question asked ahead of the account would be asking somebody
+    /// to agree to something that may not be happening.
+    pub(super) fn accepted(mut self, fills: Accepts, said: &'static str) -> Self {
+        match fills {
+            Accepts::Repoint => self.asked.repoint = true,
+            Accepts::Wait => self.asked.wait = Waiting::ForTheDownloads,
+        }
+        self.said = format!("{}, {said}", self.said);
         self
     }
 

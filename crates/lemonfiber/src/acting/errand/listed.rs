@@ -10,7 +10,7 @@
 //! answer, so a row naming something no other surface offers is red rather than a
 //! request only this screen can make.
 
-use super::{Errand, Going, Needs};
+use super::{Accepts, Errand, Going, Needs};
 
 /// The errand the list opens on.
 ///
@@ -74,6 +74,22 @@ static AFTER: &[Errand] = &[
         going: Going::Agreed,
     },
     Errand {
+        name: "newer versions of the services",
+        about: "move each service onto the version this build pins, one at a time",
+        action: "update",
+        asks: "Move onto the pinned versions",
+        needs: Needs::Service,
+        accepts: Some((
+            Accepts::Wait,
+            "letting anything still downloading finish before the services are stopped",
+        )),
+        // Agreed rather than once, and it is the row that most needs the run before
+        // the question: that run names every version being left, every version being
+        // moved to, how large each step is, and which of them migrate state and so
+        // cannot be walked back. A yes given without it would be a yes to an evening.
+        going: Going::Agreed,
+    },
+    Errand {
         name: "a backup",
         about: "capture a configuration to an archive kept on this machine",
         action: "backup",
@@ -106,7 +122,10 @@ static AFTER: &[Errand] = &[
         action: "restore",
         asks: "Restore from",
         needs: Needs::Archive("Which backup, by the name it was written under"),
-        accepts: Some("re-pointing the data root to this machine's"),
+        accepts: Some((
+            Accepts::Repoint,
+            "re-pointing the data root to this machine's",
+        )),
         going: Going::Agreed,
     },
     Errand {

@@ -104,7 +104,7 @@ pub const STORED: &str = "/api/stored";
 /// whichever tool owns the copy that is running, which is a thing a browser can put in
 /// front of somebody and never a thing this surface carries out. It takes the version
 /// to move to, which is the one question a downgrade asks.
-pub const UPDATE: &str = "/api/update";
+pub const SELF_UPDATE: &str = "/api/update";
 
 /// Every credential this stack holds, with none of their values.
 ///
@@ -221,7 +221,7 @@ pub const OFFERED: &[&str] = &[
     CREDENTIALS,
     MIGRATION,
     HISTORY,
-    UPDATE,
+    SELF_UPDATE,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -352,7 +352,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // newest, which is the fork the command line takes on the same word. It reaches
         // the command either way: this read replaces nothing, so there is no half of it
         // that belongs behind a named action.
-        UPDATE => Ok(Command::Update { to }),
+        SELF_UPDATE => Ok(Command::SelfUpdate { to }),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.

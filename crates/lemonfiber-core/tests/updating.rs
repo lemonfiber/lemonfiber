@@ -1,644 +1,801 @@
-//! Where this copy of lemonfiber stands, through the dispatcher.
+//! Moving the stack onto the image versions this build pins.
 //!
-//! From here rather than from a `#[cfg(test)]` module for the reason the disclosure
-//! beside it is: the app layer is compiled twice, and a path exercised only in-crate
-//! has its coverage counted from the copy that never ran.
+//! Driven through `dispatch` as every surface reaches it, and from here rather than
+//! from a `#[cfg(test)]` module because the confirmed half is `async` end to end — an
+//! async path exercised only in-crate has its coverage counted from the copy that
+//! never ran.
 //!
-//! Nothing reaches a real filesystem and nothing reaches the network. The two seams
-//! that matter here are exactly those — where the running binary is and what put it
-//! there, and what the release list said — so both are scripted and the assertions
-//! are on what the run *asked for* as much as on what it answered with. A check that
-//! reported the right standing while quietly asking somewhere nobody was told about
-//! would be the failure this whole family exists to prevent.
+//! **The engine and the runner are one machine in two halves.** A staged update stops
+//! the stack, captures it while nothing can be writing, and then starts one service at
+//! a time — so the engine has to say "nothing is running" while the capture is taken
+//! and "this one is" immediately afterwards. Two fakes answering independently could
+//! not be both, and one answering by how many times it had been asked would be
+//! answering a question about this file rather than about the run.
 
-use std::path::PathBuf;
-use std::sync::Arc;
+mod common;
 
-use lemonfiber_core::adapters::{Daemon, Local};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::config::{Reaching, Settings, REACH_UPDATES_KEY};
-use lemonfiber_core::model::UpdateReport;
-use lemonfiber_core::outbound::RELEASE_LIST;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use async_trait::async_trait;
+use common::stack::project;
+use lemonfiber_core::app::update::Asked;
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Waiting};
+use lemonfiber_core::archive::{Archive, Archiving, Fault as ArchiveFault, Reader, Space, Vault};
+use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
+use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::config::{store, Protocols, Settings, QBITTORRENT_PASSWORD_KEY};
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::docker::{
+    Container, Engine, ExecOutput, Failure as EngineFailure, Health, Image, Lifecycle, LogLine,
+    LogQuery, Stats,
+};
 use lemonfiber_core::ports::http::Http;
-use lemonfiber_core::ports::FileSystem;
+use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_core::stack::Source;
-use lemonfiber_core::update::{receipt_under, Installed, Standing};
+use lemonfiber_core::update::{Applied, Ending, Reversal, State};
+use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY};
+use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Stopped;
-use lemonfiber_fixtures::program::Program;
+use lemonfiber_fixtures::pulled::Pulled;
+use lemonfiber_fixtures::support::{a_password, spoke};
+use tokio::sync::mpsc::{channel, Receiver};
 
-/// A moment far enough from the epoch that a day can be subtracted from it.
-const NOW: u64 = 1_700_000_000;
+/// The version the manifest pins Sonarr at, and the one behind it.
+const SONARR: (&str, &str) = ("4.0.14", "4.0.15");
 
-/// A day, which is how long the check leaves between attempts.
-const A_DAY: u64 = 60 * 60 * 24;
+/// The same for Radarr, which the manifest declares after it.
+const RADARR: (&str, &str) = ("5.13.0", "5.14.0");
 
-/// This operator's home directory, where the installer leaves its receipt.
-const HOME: &str = "/home/sam";
-
-/// Where a copy the shell installer wrote sits by default, which is also cargo's.
-const IN_CARGOS_BIN: &str = "/home/sam/.cargo/bin/lemonfiber";
-
-/// A release list holding one published release at this version.
-fn released(tag: &str) -> String {
-    format!(r#"[{{"tag_name":"{tag}","draft":false}}]"#)
+/// How a service the run started comes back, once it has been started.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Coming {
+    /// Running and answering its own probe.
+    Answering,
+    /// Running and saying it is not working.
+    Unwell,
+    /// Nothing appears at all, so the wait runs out.
+    Never,
+    /// Still inside its probe's start period for this many listings, then answering.
+    Slowly(usize),
+    /// The engine stops answering the moment something has been started.
+    Silent,
 }
 
-/// The settings a run reads: where the binary is, where home is, and what may be
-/// reached. The record of past checks sits beside the settings file, so a run given
-/// one has somewhere to keep what it read.
-fn settings(program: Option<&str>) -> Settings {
-    Settings {
-        program: program.map(PathBuf::from),
-        home: Some(PathBuf::from(HOME)),
-        env_file: Some(PathBuf::from("/home/sam/.config/lemonfiber/.env")),
-        ..Settings::default()
+/// The service one Compose invocation names, where it names one.
+///
+/// The fence is what tells a start aimed at one service from the whole-stack stop in
+/// front of it and the whole-stack start behind it: only a narrowed invocation puts
+/// names after `--`.
+fn fenced(argv: &[String]) -> Option<String> {
+    let at = argv.iter().position(|word| word == "--")?;
+    argv.get(at + 1).cloned()
+}
+
+/// What the engine reports and what the runner did, kept in one place.
+struct Machine {
+    /// Every argument vector Compose was handed, in order.
+    seen: Mutex<Vec<Vec<String>>>,
+    /// The services started so far, in the order the run started them.
+    started: Mutex<Vec<String>>,
+    /// How many times the engine has been asked what is running.
+    asked: Mutex<usize>,
+    /// How a started service comes back.
+    coming: Coming,
+    /// What Compose says to a start, where a test is about it refusing one.
+    start: Mutex<Option<Result<Output, RunFailure>>>,
+    /// What Compose says to the first whole-stack invocation — the stop in front of
+    /// the capture — where a test is about it refusing that.
+    stack: Mutex<Option<Result<Output, RunFailure>>>,
+}
+
+impl Machine {
+    /// A machine whose started services come back the given way.
+    fn coming(coming: Coming) -> Arc<Self> {
+        Arc::new(Self {
+            seen: Mutex::new(Vec::new()),
+            started: Mutex::new(Vec::new()),
+            asked: Mutex::new(0),
+            coming,
+            start: Mutex::new(None),
+            stack: Mutex::new(None),
+        })
+    }
+
+    /// The same machine, with Compose refusing the first start it is asked for.
+    fn refusing(self: Arc<Self>, said: Result<Output, RunFailure>) -> Arc<Self> {
+        if let Ok(mut start) = self.start.lock() {
+            *start = Some(said);
+        }
+        self
+    }
+
+    /// The same machine, with Compose refusing the stop that comes before the capture.
+    fn refusing_the_stack(self: Arc<Self>, said: Result<Output, RunFailure>) -> Arc<Self> {
+        if let Ok(mut stack) = self.stack.lock() {
+            *stack = Some(said);
+        }
+        self
+    }
+
+    /// The last thing Compose was asked to do, as the words it was asked in.
+    fn last(&self) -> Vec<String> {
+        self.seen
+            .lock()
+            .ok()
+            .and_then(|seen| seen.last().cloned())
+            .unwrap_or_default()
+    }
+
+    /// The services this run has started, in order.
+    fn started(&self) -> Vec<String> {
+        self.started
+            .lock()
+            .map(|seen| seen.clone())
+            .unwrap_or_default()
+    }
+
+    /// One container for a service the run has started.
+    fn container(service: &str, health: Health) -> Container {
+        Container {
+            id: format!("id-{service}"),
+            project: "lemonfiber".to_owned(),
+            service: service.to_owned(),
+            lifecycle: Lifecycle::Running,
+            health,
+            published: Vec::new(),
+            mounts: Vec::new(),
+            exit: None,
+        }
+    }
+
+    /// How the services started so far answer their probes on this listing.
+    fn health(&self, listings: usize) -> Health {
+        match self.coming {
+            Coming::Unwell => Health::Unhealthy,
+            Coming::Slowly(after) if listings <= after => Health::Starting,
+            _ => Health::Healthy,
+        }
     }
 }
 
-/// Where a run keeps what the last few checks came to.
-fn record() -> PathBuf {
-    PathBuf::from("/home/sam/.config/lemonfiber/updates.json")
+#[async_trait]
+impl Runner for Machine {
+    async fn run(&self, argv: &[String]) -> Result<Output, RunFailure> {
+        if let Ok(mut seen) = self.seen.lock() {
+            seen.push(argv.to_vec());
+        }
+        let Some(service) = fenced(argv) else {
+            return self
+                .stack
+                .lock()
+                .ok()
+                .and_then(|mut stack| stack.take())
+                .unwrap_or_else(|| Ok(spoke("")));
+        };
+        if let Some(said) = self.start.lock().ok().and_then(|mut start| start.take()) {
+            return said;
+        }
+        if let Ok(mut started) = self.started.lock() {
+            started.push(service);
+        }
+        Ok(spoke(""))
+    }
 }
 
-/// A record of checks as it is written down between runs.
-fn remembered(asked: Option<u64>, offered: Option<&str>, quiet: u32) -> String {
-    let asked = asked.map_or_else(|| "null".to_owned(), |at| at.to_string());
-    let offered = offered.map_or_else(|| "null".to_owned(), |read| format!("\"{read}\""));
-    format!(r#"{{"asked":{asked},"offered":{offered},"quiet":{quiet}}}"#)
+#[async_trait]
+impl Engine for Machine {
+    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
+        let listings = self.asked.lock().map_or(0, |mut asked| {
+            *asked += 1;
+            *asked
+        });
+        let started = self.started();
+        if started.is_empty() {
+            return Ok(Vec::new());
+        }
+        if self.coming == Coming::Silent {
+            return Err(EngineFailure::Unreachable {
+                reason: "the daemon went away".to_owned(),
+            });
+        }
+        if self.coming == Coming::Never {
+            return Ok(Vec::new());
+        }
+        let health = self.health(listings);
+        Ok(started
+            .iter()
+            .map(|service| Self::container(service, health))
+            .collect())
+    }
+
+    async fn exec(&self, container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
+        Err(EngineFailure::NoSuchContainer {
+            name: container.to_owned(),
+        })
+    }
+
+    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
+        let (_sender, receiver) = channel(1);
+        Ok(receiver)
+    }
+
+    async fn logs(
+        &self,
+        _project: &str,
+        _services: &[String],
+        _query: LogQuery,
+    ) -> Result<Receiver<LogLine>, EngineFailure> {
+        let (_sender, receiver) = channel(1);
+        Ok(receiver)
+    }
 }
 
-/// The context a check runs against.
-fn ctx(files: &Arc<Program>, http: &Arc<Fake>, settings: Settings) -> Ctx {
+/// An archive that writes wherever it is told and remembers that it did.
+struct Kept {
+    /// Whether writing works at all, which is the precondition an update rests on.
+    writes: bool,
+    /// Every destination it was asked to write, in order.
+    wrote: Mutex<Vec<PathBuf>>,
+}
+
+impl Kept {
+    /// An archive that writes, or one that will not.
+    fn writing(writes: bool) -> Arc<Self> {
+        Arc::new(Self {
+            writes,
+            wrote: Mutex::new(Vec::new()),
+        })
+    }
+
+    /// How many archives it was asked to write.
+    fn written(&self) -> usize {
+        self.wrote.lock().map_or(0, |wrote| wrote.len())
+    }
+}
+
+#[async_trait]
+impl Archive for Kept {
+    async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, ArchiveFault> {
+        Ok(Space {
+            needed: 0,
+            available: 1 << 30,
+        })
+    }
+    async fn write(
+        &self,
+        dest: &Path,
+        _manifest: &BackupManifest,
+        _items: &[Item],
+    ) -> Result<(), ArchiveFault> {
+        if !self.writes {
+            return Err(ArchiveFault::new("the disk said no"));
+        }
+        if let Ok(mut wrote) = self.wrote.lock() {
+            wrote.push(dest.to_path_buf());
+        }
+        Ok(())
+    }
+    async fn write_files(
+        &self,
+        _dest: &Path,
+        _files: &[(String, String)],
+    ) -> Result<(), ArchiveFault> {
+        Err(ArchiveFault::new("an update writes no bundle"))
+    }
+    async fn existing(&self, _dir: &Path) -> Result<Vec<Existing>, ArchiveFault> {
+        Ok(Vec::new())
+    }
+    async fn remove(&self, _dir: &Path, _name: &str) -> Result<(), ArchiveFault> {
+        Ok(())
+    }
+}
+
+/// The other half of the port, so one fake is the one adapter a run holds.
+#[async_trait]
+impl Reader for Kept {
+    async fn read_manifest(&self, _src: &Path) -> Result<BackupManifest, ArchiveFault> {
+        Err(ArchiveFault::new("an update never reads an archive back"))
+    }
+    async fn extract(
+        &self,
+        _src: &Path,
+        _targets: &[(String, PathBuf)],
+    ) -> Result<(), ArchiveFault> {
+        Err(ArchiveFault::new("an update never reads an archive back"))
+    }
+}
+
+/// One image this machine has pulled, standing on lemonfiber's own project.
+fn pulled(image: &str, tag: &str) -> Image {
+    Image {
+        tags: vec![format!("{image}:{tag}")],
+        bytes: 1,
+        projects: vec!["lemonfiber".to_owned()],
+    }
+}
+
+/// The images a stack standing behind its pins would report.
+fn behind(services: &[(&str, &str)]) -> Vec<Image> {
+    services
+        .iter()
+        .map(|(service, tag)| pulled(&format!("lscr.io/linuxserver/{service}"), tag))
+        .collect()
+}
+
+/// A context over the stack this repository carries, against `machine`.
+fn ctx(machine: &Arc<Machine>, images: Vec<Image>, archive: &Arc<Kept>) -> Ctx {
     Ctx::new(
-        Arc::new(Local),
-        Arc::new(Daemon::local()),
-        Stopped::at(NOW),
-        Arc::clone(files) as Arc<dyn FileSystem>,
-        Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
-        settings,
+        Arc::clone(machine) as Arc<dyn Runner>,
+        Arc::clone(machine) as Arc<dyn Engine>,
+        Stopped::today(),
+        Files::empty(),
+        Source::External(project()),
+        Settings::default(),
         Environment::MacOs,
     )
-    .with_http(Arc::clone(http) as Arc<dyn Http>)
+    .with_images(Pulled::holding(images))
+    .with_http(Fake::silent())
+    .keeping(Archiving {
+        paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),
+        vault: Arc::clone(archive) as Arc<dyn Vault>,
+    })
+    .waiting(Duration::ZERO)
 }
 
-/// What the check answered, through the dispatcher rather than by calling it.
-async fn asked(command: Command, ctx: &Ctx) -> UpdateReport {
-    match dispatch(command, ctx).await {
-        Ok(Outcome::Update(report)) => report,
-        other => unreachable!("the check answers with itself: {other:?}"),
+/// What was asked of an update: every service, agreed to or not, waiting or not.
+fn asking(confirm: bool, wait: Waiting) -> Command {
+    Command::Update(Asked {
+        service: None,
+        confirm,
+        wait,
+    })
+}
+
+/// The report a dispatched update produced, or nothing where it refused.
+fn reported(
+    outcome: Result<Outcome, Box<lemonfiber_core::error::Problem>>,
+) -> Option<lemonfiber_core::app::update::Report> {
+    match outcome {
+        Ok(Outcome::Update(report)) => Some(report),
+        _ => None,
     }
 }
 
-/// The ordinary run: a machine, a release list that answers, and nothing named.
-async fn standing(files: &Arc<Program>, http: &Arc<Fake>, program: Option<&str>) -> UpdateReport {
-    let ctx = ctx(files, http, settings(program));
-    asked(Command::Update { to: None }, &ctx).await
-}
-
-/// A copy under a package manager's own tree is that manager's to move, and the
-/// operator is handed its command rather than left holding a fact.
-#[tokio::test]
-async fn a_copy_a_package_manager_owns_is_deferred_to_it_by_name() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(
-        &files,
-        &http,
-        Some("/opt/homebrew/Cellar/lemonfiber/0.13.0/bin/lemonfiber"),
-    )
-    .await;
-
-    assert_eq!(report.standing, Standing::ManagedExternally);
-    assert_eq!(report.installed, Installed::Homebrew);
-    assert_eq!(report.owner.as_deref(), Some("Homebrew"));
-    assert_eq!(report.command.as_deref(), Some("brew upgrade lemonfiber"));
-    assert_eq!(report.instead, None);
-    assert_eq!(report.offered.as_deref(), Some("0.99.0"));
-}
-
-/// And nothing probes beside a file somebody else owns. Whether it could be written
-/// is beside the point, and an answer nothing may act on is one not worth asking for.
-#[tokio::test]
-async fn a_copy_somebody_else_owns_is_never_probed_for_writability() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/usr/bin/lemonfiber")).await;
-
-    assert_eq!(report.installed, Installed::Distribution);
-    assert_eq!(report.replaceable, None);
-    assert!(files.removed().is_empty(), "{:?}", files.removed());
-}
-
-/// The one case a path cannot answer: the shell installer writes into cargo's own
-/// `bin`, so only the receipt beside it says which of the two put this copy here.
-#[tokio::test]
-async fn the_receipt_the_installer_leaves_is_what_tells_it_from_a_cargo_install() {
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let installed = Program::ordinary()
-        .holding(receipt_under(std::path::Path::new(HOME)), "{}")
-        .shared();
-    let report = standing(&installed, &http, Some(IN_CARGOS_BIN)).await;
-    assert_eq!(report.installed, Installed::Installer);
-    assert_eq!(report.standing, Standing::UpdateAvailable);
-    assert_eq!(report.owner, None);
-    let typed = report.command.unwrap_or_default();
-    assert!(typed.contains("releases/download/v0.99.0/"), "{typed}");
-
-    let built = Program::ordinary()
-        .holding(
-            "/home/sam/.cargo/.crates2.json",
-            r#"{"lemonfiber 0.13.0":{}}"#,
-        )
-        .shared();
-    let report = standing(
-        &built,
-        &Fake::always(Answer::reply(200, released("v0.99.0"))),
-        Some(IN_CARGOS_BIN),
-    )
-    .await;
-    assert_eq!(report.installed, Installed::Cargo);
-    let typed = report.command.unwrap_or_default();
-    assert!(typed.contains("--tag v0.99.0"), "{typed}");
-}
-
-/// A record naming some other program is cargo's record of something else, and says
-/// nothing about this copy.
-#[tokio::test]
-async fn a_cargo_record_that_does_not_name_this_program_claims_nothing_about_it() {
-    let files = Program::ordinary()
-        .holding("/home/sam/.cargo/.crates2.json", r#"{"ripgrep 14.0.0":{}}"#)
-        .shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some(IN_CARGOS_BIN)).await;
-
-    assert_eq!(report.installed, Installed::Elsewhere);
-}
-
-/// Following the link is what makes a package manager tellable at all: the name on
-/// the path is in a directory anybody may write to, and the file it points at is not.
-#[tokio::test]
-async fn a_link_is_followed_so_the_tool_that_owns_the_file_can_be_told() {
-    let files = Program::ordinary()
-        .linked(
-            "/usr/local/bin/lemonfiber",
-            "/opt/homebrew/Cellar/lemonfiber/0.13.0/bin/lemonfiber",
-        )
-        .shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/usr/local/bin/lemonfiber")).await;
-
-    assert_eq!(report.installed, Installed::Homebrew);
-    assert_eq!(
-        report.at.as_deref(),
-        Some("/opt/homebrew/Cellar/lemonfiber/0.13.0/bin/lemonfiber")
-    );
-}
-
-/// A machine that will not resolve the path falls back to the one it was given,
-/// which still answers the question an operator asks of it: which file ran.
-#[tokio::test]
-async fn a_machine_that_resolves_nothing_still_names_the_file_that_ran() {
-    let files = Program::ordinary().unresolvable().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.at.as_deref(), Some("/opt/lemonfiber/lemonfiber"));
-    assert_eq!(report.installed, Installed::Elsewhere);
-}
-
-/// A machine that will not say where the running binary is says that, rather than
-/// being guessed at — and a guess here would tell somebody to run a package manager
-/// that never touched this copy.
-#[tokio::test]
-async fn a_machine_that_will_not_say_where_the_binary_is_is_not_guessed_at() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, None).await;
-
-    assert_eq!(report.at, None);
-    assert_eq!(report.installed, Installed::Untellable);
-    assert_eq!(report.replaceable, None);
-}
-
-/// A directory that will not take a new file is reported with the path, and the
-/// report offers no way to become somebody who could.
-#[tokio::test]
-async fn a_directory_that_will_not_take_a_file_is_reported_with_the_path() {
-    let files = Program::ordinary().unwritable().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.replaceable, Some(false));
-    assert_eq!(report.at.as_deref(), Some("/opt/lemonfiber/lemonfiber"));
-    assert_eq!(
-        files.removed(),
-        vec![PathBuf::from("/opt/lemonfiber/.lemonfiber-can-write")],
-        "the probe is taken away whatever it came to"
-    );
-}
-
-/// And one that will takes the probe away again, so a run leaves nothing behind.
-#[tokio::test]
-async fn a_probe_that_succeeded_is_taken_away_again() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.replaceable, Some(true));
-    assert_eq!(
-        files.removed(),
-        vec![PathBuf::from("/opt/lemonfiber/.lemonfiber-can-write")]
-    );
-}
-
-/// Nothing about this machine travels. The address requires a name of anybody asking
-/// and that name is the same word in every copy of this program, which is the whole
-/// of what leaves.
-#[tokio::test]
-async fn the_request_carries_nothing_that_would_tell_one_installation_from_another() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    let sent = http.requests();
-    assert_eq!(sent.len(), 1, "{sent:?}");
-    let Some(asked) = sent.first() else {
-        unreachable!("one request was made");
-    };
-    assert!(asked.url.starts_with(RELEASE_LIST), "{}", asked.url);
-    assert_eq!(asked.body, None);
-    let carried = asked
-        .headers
+/// What one service came to, by name.
+fn came_to(applied: &[Applied], service: &str) -> Option<(Ending, Reversal)> {
+    applied
         .iter()
-        .map(|(name, value)| format!("{name}: {value}"))
-        .collect::<Vec<String>>()
-        .join(" | ");
-    assert!(!carried.contains(env!("CARGO_PKG_VERSION")), "{carried}");
-    assert!(!carried.contains(HOME), "{carried}");
-    assert!(!carried.contains("lemonfiber/"), "{carried}");
+        .find(|one| one.service == service)
+        .map(|one| (one.ending, one.reversal))
 }
 
-/// The switch reaches the code that would make the request, which is the half that
-/// makes it mean anything: a refused check is one that never opened the connection.
 #[tokio::test]
-async fn a_check_the_operator_switched_off_never_reaches_the_release_list() {
-    let files = Program::ordinary().shared();
-    let http = Fake::silent();
-    let ctx = ctx(
-        &files,
-        &http,
-        Settings {
-            reaching: Reaching::without(REACH_UPDATES_KEY),
-            ..settings(Some("/opt/lemonfiber/lemonfiber"))
-        },
-    );
+async fn a_bare_run_names_both_versions_and_changes_nothing() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
 
-    let report = asked(Command::Update { to: None }, &ctx).await;
+    let report = reported(dispatch(asking(false, Waiting::Never), &context).await);
 
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
-    assert_eq!(report.standing, Standing::CheckFailed);
-    let untold = report.untold.unwrap_or_default();
-    assert!(untold.contains("settings say so"), "{untold}");
-    assert!(files.written().is_empty(), "{:?}", files.written());
-}
-
-/// And the blanket switch is the same thing said once. An operator who wants nothing
-/// to leave this machine has not made an exception for this.
-#[tokio::test]
-async fn an_operator_who_wants_nothing_to_leave_is_not_made_an_exception_of() {
-    let files = Program::ordinary().shared();
-    let http = Fake::silent();
-    let ctx = ctx(
-        &files,
-        &http,
-        Settings {
-            reaching: Reaching::none(),
-            ..settings(Some("/opt/lemonfiber/lemonfiber"))
-        },
-    );
-
-    asked(Command::Update { to: None }, &ctx).await;
-
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
-}
-
-/// Running the same read twice reaches the network once. What was read is remembered,
-/// and a version that came out this morning is no more useful to know about now than
-/// in an hour.
-#[tokio::test]
-async fn a_check_made_today_is_answered_from_what_it_read_rather_than_asked_again() {
-    let files = Program::ordinary()
-        .holding(record(), &remembered(Some(NOW), Some("0.99.0"), 0))
-        .shared();
-    let http = Fake::silent();
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
-    assert_eq!(report.offered.as_deref(), Some("0.99.0"));
-    assert_eq!(report.standing, Standing::UpdateAvailable);
-    assert_eq!(report.untold, None);
-}
-
-/// A day later it asks again, which is what makes the answer above a delay rather
-/// than a memory that never refreshes.
-#[tokio::test]
-async fn a_day_later_the_release_list_is_asked_again() {
-    let files = Program::ordinary()
-        .holding(record(), &remembered(Some(NOW - A_DAY), Some("0.12.0"), 0))
-        .shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(http.requests().len(), 1);
-    assert_eq!(report.offered.as_deref(), Some("0.99.0"));
-}
-
-/// A record that has never been answered and is not due yet says which of the four
-/// reasons that is, rather than reading as a machine with no route out.
-#[tokio::test]
-async fn a_check_that_is_not_due_and_has_read_nothing_says_that_rather_than_a_fault() {
-    let files = Program::ordinary()
-        .holding(record(), &remembered(Some(NOW), None, 0))
-        .shared();
-    let http = Fake::silent();
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
-    let untold = report.untold.unwrap_or_default();
-    assert!(untold.contains("not been asked yet today"), "{untold}");
-}
-
-/// Enough failures in a row and it stops entirely. A laptop that has been off the
-/// network for a week must not still be reaching for it on every run.
-#[tokio::test]
-async fn a_machine_that_has_given_up_asking_is_not_made_to_ask_again() {
-    let files = Program::ordinary()
-        .holding(record(), &remembered(Some(NOW - A_DAY * 100), None, 5))
-        .shared();
-    let http = Fake::silent();
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
-    let untold = report.untold.unwrap_or_default();
-    assert!(untold.contains("stopped asking"), "{untold}");
-    assert!(untold.contains("starts again"), "{untold}");
-}
-
-/// An address that says nothing is written down as a failure, so the next attempt is
-/// further off than this one was.
-#[tokio::test]
-async fn an_address_that_says_nothing_is_written_down_and_reported_as_that() {
-    let files = Program::ordinary().shared();
-    let http = Fake::silent();
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.standing, Standing::CheckFailed);
-    let untold = report.untold.unwrap_or_default();
-    assert!(untold.contains("did not answer"), "{untold}");
-    let written = files.written();
-    assert_eq!(written.len(), 1, "{written:?}");
-    let (at, held) = written.first().cloned().unwrap_or_default();
-    assert_eq!(at, record());
-    assert!(held.contains(r#""quiet":1"#), "{held}");
-}
-
-/// A status that is not a success has answered, and it has answered with nothing a
-/// version can be read out of — which to a caller is the same thing as silence.
-#[tokio::test]
-async fn an_address_that_refuses_is_the_same_as_one_that_says_nothing() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(403, "rate limited"));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.standing, Standing::CheckFailed);
-    let written = files.written();
-    let (_, held) = written.first().cloned().unwrap_or_default();
-    assert!(held.contains(r#""quiet":1"#), "{held}");
-}
-
-/// An answer that reached the address and held no version this can order counts as
-/// answered — nothing failed — and is recorded as such rather than as a failure.
-#[tokio::test]
-async fn an_answer_holding_no_orderable_version_is_not_recorded_as_a_failure() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("nightly")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.offered, None);
-    let written = files.written();
-    let (_, held) = written.first().cloned().unwrap_or_default();
-    assert!(held.contains(r#""quiet":0"#), "{held}");
-}
-
-/// A record this run cannot make sense of reads as a machine that has never asked,
-/// and asking is what a machine that has never asked does.
-#[tokio::test]
-async fn a_record_that_will_not_read_is_a_machine_that_has_never_asked() {
-    let files = Program::ordinary()
-        .holding(record(), "this is not a record")
-        .shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(http.requests().len(), 1);
-    assert_eq!(report.offered.as_deref(), Some("0.99.0"));
-}
-
-/// A machine with nowhere to keep a record still asks. What it loses is the quiet,
-/// not the answer, and that is the right way round: a run that refused to check
-/// because it could not find a directory would be a check that had become a
-/// precondition.
-#[tokio::test]
-async fn a_machine_with_nowhere_to_keep_a_record_still_asks_and_writes_nothing() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-    let ctx = ctx(
-        &files,
-        &http,
-        Settings {
-            env_file: None,
-            ..settings(Some("/opt/lemonfiber/lemonfiber"))
-        },
-    );
-
-    let report = asked(Command::Update { to: None }, &ctx).await;
-
-    assert_eq!(http.requests().len(), 1);
-    assert_eq!(report.offered.as_deref(), Some("0.99.0"));
-    assert!(files.written().is_empty(), "{:?}", files.written());
-}
-
-/// Nothing newer is current, whoever owns the file. A copy a package manager put
-/// here and that is already the newest has nothing for that manager to do.
-#[tokio::test]
-async fn a_copy_with_nothing_newer_is_current_whoever_put_it_here() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.0.1")));
-
-    let report = standing(
-        &files,
-        &http,
-        Some("/opt/homebrew/Cellar/lemonfiber/0.13.0/bin/lemonfiber"),
-    )
-    .await;
-
-    assert_eq!(report.standing, Standing::Current);
-    assert_eq!(report.offered.as_deref(), Some("0.0.1"));
-}
-
-/// A copy that is already the newest is offered nothing to type. The command for the
-/// version it is running is an instruction to reinstall, and it reads as a next step
-/// to whoever was looking for one.
-#[tokio::test]
-async fn a_copy_that_is_already_the_newest_is_offered_nothing_to_type() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.0.1")));
-
-    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
-
-    assert_eq!(report.standing, Standing::Current);
-    assert_eq!(report.command, None);
-    assert_eq!(report.instead, None);
-}
-
-/// Naming a version is a different question, and it is answered whatever this copy
-/// already is — otherwise there would be no way to ask for an older one from the
-/// newest release.
-#[tokio::test]
-async fn naming_a_version_is_answered_even_where_this_copy_is_the_newest() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.0.1")));
-    let ctx = ctx(&files, &http, settings(Some(IN_CARGOS_BIN)));
-
-    let report = asked(
-        Command::Update {
-            to: Some("0.9.0".to_owned()),
-        },
-        &ctx,
-    )
-    .await;
-
-    assert_eq!(report.standing, Standing::Current);
-    let typed = report.command.unwrap_or_default();
-    assert!(typed.contains("releases/download/v0.9.0/"), "{typed}");
-}
-
-/// Going back is asked for by naming the version, and is answered with the command
-/// and with whether that version reads what is already on this machine.
-#[tokio::test]
-async fn going_back_is_answered_with_the_command_and_what_that_version_reads() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-    let ctx = ctx(&files, &http, settings(Some(IN_CARGOS_BIN)));
-
-    let report = asked(
-        Command::Update {
-            to: Some("0.9.0".to_owned()),
-        },
-        &ctx,
-    )
-    .await;
-
-    assert_eq!(report.asked.as_deref(), Some("0.9.0"));
-    let typed = report.command.unwrap_or_default();
-    assert!(typed.contains("releases/download/v0.9.0/"), "{typed}");
-    let reads = report.configuration.unwrap_or_default();
-    assert!(
-        reads.contains("0.9.0 is behind the copy running"),
-        "{reads}"
-    );
-}
-
-/// A manager that keeps an index cannot be told a version its index may not carry,
-/// and naming one to it is refused with the reason rather than answered with a
-/// different version.
-#[tokio::test]
-async fn a_manager_that_keeps_an_index_says_it_has_no_form_for_a_named_version() {
-    let files = Program::ordinary().shared();
-    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
-    let ctx = ctx(
-        &files,
-        &http,
-        settings(Some(
-            "/opt/homebrew/Cellar/lemonfiber/0.13.0/bin/lemonfiber",
-        )),
-    );
-
-    let report = asked(
-        Command::Update {
-            to: Some("0.9.0".to_owned()),
-        },
-        &ctx,
-    )
-    .await;
-
-    assert_eq!(report.command, None);
-    let instead = report.instead.unwrap_or_default();
-    assert!(instead.contains("brew uninstall"), "{instead}");
-}
-
-/// What updating leaves alone is said every time rather than when asked, and so is
-/// what a release brings besides the program.
-#[tokio::test]
-async fn what_updating_leaves_alone_and_what_it_brings_are_said_every_time() {
-    let files = Program::ordinary().shared();
-    let http = Fake::silent();
-
-    let report = standing(&files, &http, None).await;
-
-    assert!(
-        report
-            .afterwards
-            .contains("Nothing in the stack is stopped"),
-        "{}",
-        report.afterwards
-    );
-    assert!(
-        report.carries.contains("manifest schema"),
-        "{}",
-        report.carries
-    );
-    assert!(
-        report.carries.contains("newer service images"),
-        "{}",
-        report.carries
-    );
-}
-
-/// The property the whole family rests on: this cannot refuse. Every seam is against
-/// it at once — nowhere to look, nothing answering, nothing readable — and the
-/// answer is still an answer.
-#[tokio::test]
-async fn nothing_here_can_refuse_however_little_could_be_told() {
-    let files = Program::ordinary().unresolvable().unwritable().shared();
-    let http = Fake::silent();
-    let ctx = ctx(&files, &http, Settings::default());
-
-    let answered = dispatch(Command::Update { to: None }, &ctx).await;
-
-    assert!(answered.is_ok(), "{answered:?}");
+    let read = report.map(|report| {
+        (
+            report.state,
+            report.confirmed,
+            report.changes.len(),
+            report
+                .changes
+                .first()
+                .map(|change| (change.current.clone(), change.target.clone())),
+        )
+    });
     assert_eq!(
-        answered.ok().map(|outcome| outcome.envelope().kind),
-        Some(lemonfiber_core::model::kind::UPDATE)
+        read,
+        Some((
+            State::UpdatesAvailable,
+            false,
+            1,
+            Some((SONARR.0.to_owned(), SONARR.1.to_owned()))
+        ))
     );
+    assert_eq!(archive.written(), 0, "a bare run captured something");
+    assert!(machine.started().is_empty(), "a bare run started something");
+}
+
+/// A stack with nothing to move asks the download clients nothing.
+///
+/// Going to two clients to establish that a stack already on its pins would
+/// interrupt nothing is this command making work out of an answer of "nothing".
+#[tokio::test]
+async fn a_stack_on_every_pin_asks_the_download_clients_nothing() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, Vec::new(), &archive);
+
+    let report = reported(dispatch(asking(false, Waiting::Never), &context).await);
+
+    let read = report.map(|report| (report.state, report.in_flight.len(), report.confirmed));
+    assert_eq!(read, Some((State::Current, 0, false)));
+}
+
+#[tokio::test]
+async fn a_stack_already_on_its_pins_is_agreed_to_and_nothing_happens() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, Vec::new(), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| (report.state, report.confirmed, report.backup));
+    assert_eq!(read, Some((State::Current, true, None)));
+    assert_eq!(archive.written(), 0, "nothing to move was captured anyway");
+}
+
+#[tokio::test]
+async fn a_pin_older_than_what_is_running_is_reported_and_never_attempted() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    // Standing on a version later than the pin, which is the one step lemonfiber
+    // refuses: the database has been through it, and the older binary opening it is
+    // what does the damage.
+    let context = ctx(&machine, behind(&[("sonarr", "9.0.0")]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| {
+        (
+            report.changes.first().map(|change| change.refused),
+            report.applied.len(),
+        )
+    });
+    assert_eq!(read, Some((Some(true), 0)));
+    assert!(machine.started().is_empty(), "a refused step was taken");
+}
+
+#[tokio::test]
+async fn a_confirmed_run_captures_before_anything_opens_its_state_on_the_new_image() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| {
+        (
+            report.state,
+            report.backup.is_some(),
+            came_to(&report.applied, "sonarr"),
+            report.halted,
+        )
+    });
+    assert_eq!(
+        read,
+        Some((
+            State::Updated,
+            true,
+            Some((Ending::Updated, Reversal::Restore)),
+            None
+        ))
+    );
+    assert_eq!(archive.written(), 1);
+    assert_eq!(machine.started(), vec!["sonarr".to_owned()]);
+    // The capture took the whole stack down, so the run puts it back — everything it
+    // did not move is on the version it was already running.
+    assert!(
+        machine
+            .last()
+            .ends_with(&["up".to_owned(), "--detach".to_owned()]),
+        "the stack was left down: {:?}",
+        machine.last()
+    );
+}
+
+#[tokio::test]
+async fn a_capture_that_will_not_write_stops_the_run_before_anything_moves() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(false);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let refused = dispatch(asking(true, Waiting::Never), &context).await;
+
+    assert!(refused.is_err(), "the update went ahead without a backup");
+    assert!(
+        machine.started().is_empty(),
+        "a service was started with no archive to go back to"
+    );
+}
+
+#[tokio::test]
+async fn a_stack_that_will_not_come_down_is_never_captured_and_never_moved() {
+    // The capture is refused while anything might be writing, so a stop that could
+    // not even be run is the end of the run rather than something to go on past.
+    let machine =
+        Machine::coming(Coming::Answering).refusing_the_stack(Err(RunFailure::NotFound {
+            program: "docker".to_owned(),
+        }));
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let refused = dispatch(asking(true, Waiting::Never), &context).await;
+
+    assert!(
+        refused.is_err(),
+        "the run went on over a stack it could not stop"
+    );
+    assert_eq!(
+        archive.written(),
+        0,
+        "a stack that never stopped was captured"
+    );
+    assert!(machine.started().is_empty(), "a service was moved anyway");
+}
+
+#[tokio::test]
+async fn a_service_that_does_not_come_back_halts_the_run_and_says_what_did_not_move() {
+    let machine = Machine::coming(Coming::Never);
+    let archive = Kept::writing(true);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", SONARR.0), ("radarr", RADARR.0)]),
+        &archive,
+    );
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| {
+        (
+            report.state,
+            came_to(&report.applied, "sonarr"),
+            came_to(&report.applied, "radarr"),
+            report.halted.unwrap_or_default(),
+        )
+    });
+    assert!(
+        matches!(
+            &read,
+            Some((
+                State::Failed,
+                Some((Ending::NotStarted, Reversal::Restore)),
+                Some((Ending::NotReached, Reversal::Rollback)),
+                said,
+            )) if said.contains("sonarr") && said.contains("lemonfiber up")
+        ),
+        "{read:?}"
+    );
+    assert_eq!(
+        machine.started(),
+        vec!["sonarr".to_owned()],
+        "the run went on into the rest of the stack"
+    );
+    assert!(
+        !machine
+            .last()
+            .ends_with(&["up".to_owned(), "--detach".to_owned()]),
+        "a halted run started the rest of the stack anyway: {:?}",
+        machine.last()
+    );
+}
+
+#[tokio::test]
+async fn a_service_that_comes_back_unwell_is_told_apart_from_one_that_never_came_back() {
+    let machine = Machine::coming(Coming::Unwell);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| {
+        (
+            report.state,
+            report
+                .applied
+                .first()
+                .and_then(|one| one.detail.clone())
+                .unwrap_or_default(),
+        )
+    });
+    assert!(
+        matches!(&read, Some((State::Failed, said)) if said.contains("not working")),
+        "{read:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_service_still_starting_is_asked_again_rather_than_written_off() {
+    // Unsettled on the first two listings and answering on the third, which is what a
+    // service that is genuinely starting looks like. Patience is the run's own, so the
+    // wait has somewhere to go rather than expiring on the first look.
+    let machine = Machine::coming(Coming::Slowly(2));
+    let archive = Kept::writing(true);
+    let context =
+        ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive).waiting(Duration::from_secs(600));
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| (report.state, came_to(&report.applied, "sonarr")));
+    assert_eq!(
+        read,
+        Some((State::Updated, Some((Ending::Updated, Reversal::Restore)))),
+        "waiting is the point: the answer changed while it waited"
+    );
+}
+
+#[tokio::test]
+async fn an_engine_that_stops_answering_mid_run_is_reported_rather_than_waited_out() {
+    let machine = Machine::coming(Coming::Silent);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let said = report
+        .and_then(|report| report.applied.first().and_then(|one| one.detail.clone()))
+        .unwrap_or_default();
+    assert!(said.contains("stopped answering"), "{said}");
+}
+
+#[tokio::test]
+async fn a_start_that_could_not_be_run_leaves_the_service_where_it_was() {
+    let machine = Machine::coming(Coming::Answering).refusing(Err(RunFailure::NotFound {
+        program: "docker".to_owned(),
+    }));
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| {
+        (
+            came_to(&report.applied, "sonarr"),
+            report
+                .applied
+                .first()
+                .and_then(|one| one.detail.clone())
+                .unwrap_or_default(),
+        )
+    });
+    assert!(
+        matches!(
+            &read,
+            Some((Some((Ending::NotFetched, Reversal::Rollback)), said)) if said.contains("docker")
+        ),
+        "{read:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_compose_that_refuses_a_start_is_reported_in_composes_own_words() {
+    let machine = Machine::coming(Coming::Answering).refusing(Ok(Output {
+        status: Some(1),
+        stdout: String::new(),
+        stderr: "no such image".to_owned(),
+    }));
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let said = report
+        .and_then(|report| report.applied.first().and_then(|one| one.detail.clone()))
+        .unwrap_or_default();
+    assert_eq!(said, "no such image");
+}
+
+#[tokio::test]
+async fn a_refusal_that_went_to_the_other_stream_is_still_the_operators_only_account() {
+    let machine = Machine::coming(Coming::Answering).refusing(Ok(Output {
+        status: Some(1),
+        stdout: "the compose file names no such service".to_owned(),
+        stderr: String::new(),
+    }));
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let said = report
+        .and_then(|report| report.applied.first().and_then(|one| one.detail.clone()))
+        .unwrap_or_default();
+    assert_eq!(said, "the compose file names no such service");
+}
+
+// ── What is still coming down ─────────────────────────────────────────────────
+
+/// A private environment file recording qBittorrent's password, at a scratch path
+/// unique to this case so concurrent tests do not share one.
+fn env_at(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("lemonfiber-update-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join(".env");
+    assert!(
+        store::set(&path, QBITTORRENT_PASSWORD_KEY, &a_password()).is_ok(),
+        "the scratch environment file is written"
+    );
+    path
+}
+
+/// The same context, reaching the download clients over `http` and holding a key for
+/// the one of them that needs one.
+fn transferring(
+    machine: &Arc<Machine>,
+    archive: &Arc<Kept>,
+    http: Arc<dyn Http>,
+    name: &str,
+) -> Ctx {
+    Ctx::new(
+        Arc::clone(machine) as Arc<dyn Runner>,
+        Arc::clone(machine) as Arc<dyn Engine>,
+        Stopped::today(),
+        Files::empty(),
+        Source::External(project()),
+        Settings {
+            protocols: Protocols::both(),
+            env_file: Some(env_at(name)),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_images(Pulled::holding(behind(&[("sonarr", SONARR.0)])))
+    .with_http(http)
+    .keeping(Archiving {
+        paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),
+        vault: Arc::clone(archive) as Arc<dyn Vault>,
+    })
+    .waiting(Duration::ZERO)
+}
+
+/// A qBittorrent still working on something, answering the same way every time.
+fn still_coming_down() -> Arc<Fake> {
+    Fake::by_path_in_turn(vec![
+        ("/auth/login", vec![Answer::reply(200, "Ok.")]),
+        ("/torrents/info", vec![Answer::reply(200, QBIT_TORRENTS)]),
+        ("", vec![Answer::reply(200, SAB_EMPTY)]),
+    ])
+}
+
+#[tokio::test]
+async fn a_run_that_would_interrupt_a_transfer_is_refused_rather_than_carried_out() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = transferring(&machine, &archive, still_coming_down(), "refused");
+
+    let refused = dispatch(asking(true, Waiting::Never), &context).await;
+
+    let code = refused.err().map(|problem| problem.code.to_string());
+    assert_eq!(code.as_deref(), Some("UPDATE-3"));
+    assert_eq!(archive.written(), 0, "the stack was captured anyway");
+    assert!(machine.started().is_empty(), "a service was moved anyway");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_run_asked_to_wait_lets_what_is_coming_down_finish_first() {
+    // Coming down twice and finished on the third look: something to wait for, a look
+    // with no news, and an end.
+    let http = Fake::by_path_in_turn(vec![
+        ("/auth/login", vec![Answer::reply(200, "Ok.")]),
+        (
+            "/torrents/info",
+            vec![
+                Answer::reply(200, QBIT_TORRENTS),
+                Answer::reply(200, QBIT_TORRENTS),
+                Answer::reply(200, QBIT_FINISHED),
+            ],
+        ),
+        ("", vec![Answer::reply(200, SAB_EMPTY)]),
+    ]);
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = transferring(&machine, &archive, http, "waited");
+
+    let report = reported(dispatch(asking(true, Waiting::ForTheDownloads), &context).await);
+
+    let read = report.map(|report| (report.state, report.in_flight.len()));
+    assert_eq!(
+        read,
+        Some((State::Updated, 1)),
+        "the wait was taken and what it was waiting on is still named"
+    );
+    assert_eq!(machine.started(), vec!["sonarr".to_owned()]);
 }

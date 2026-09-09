@@ -76,6 +76,10 @@ pub const ACTS: &[Reach] = &[
         through: "remove",
     },
     Reach {
+        request: "update",
+        through: "update",
+    },
+    Reach {
         request: "backup",
         through: "backup",
     },
@@ -193,7 +197,7 @@ pub const ASKS: &[Reach] = &[
         through: "/api/clients",
     },
     Reach {
-        request: "update",
+        request: "self-update",
         through: "/api/update",
     },
 ];
