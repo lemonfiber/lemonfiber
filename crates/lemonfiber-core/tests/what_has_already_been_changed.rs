@@ -227,3 +227,136 @@ async fn a_machine_that_changed_nothing_still_states_its_horizon() {
     );
     assert_eq!(report.map(|report| report.changes.len()), Some(0));
 }
+
+/// A resource one of the services now holds, made by an operation.
+fn created(resource: &str, id: &str) -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: "seed".to_owned(),
+        target: "sonarr".to_owned(),
+        kind: Kind::Created {
+            resource: resource.to_owned(),
+            id: id.to_owned(),
+        },
+    }
+}
+
+/// A path lemonfiber itself made on this machine.
+fn made(path: &str) -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: "apply".to_owned(),
+        target: path.to_owned(),
+        kind: Kind::Made {
+            path: path.to_owned(),
+        },
+    }
+}
+
+/// One field of one resource a service holds, changed through that service.
+fn configured(field: &str, previous: Option<&str>, current: &str) -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: "seed".to_owned(),
+        target: "sonarr".to_owned(),
+        kind: Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "3".to_owned(),
+            field: field.to_owned(),
+            previous: previous.map(str::to_owned),
+            current: current.to_owned(),
+        },
+    }
+}
+
+/// Each kind of change is a different event and reads as one. A record that worded
+/// them alike would tell an operator that a directory lemonfiber made and a download
+/// client it registered were the same sort of thing, which is what they consult a
+/// history to tell apart.
+#[tokio::test]
+async fn every_kind_of_change_reads_as_the_sentence_it_was() {
+    let root = scratch("kinds");
+    journalled(
+        &root,
+        &[
+            created("downloadclient", "3"),
+            made("/srv/media"),
+            configured("removeCompletedDownloads", Some("false"), "true"),
+            set("reconfigure", "PUID", Some("1000"), "1001"),
+            set("apply", "TZ", None, "Europe/Amsterdam"),
+        ],
+    );
+
+    let report = recorded(&ctx(&root)).await;
+    let changes = report.map(|report| report.changes).unwrap_or_default();
+    let said: Vec<String> = changes.iter().map(|change| change.did.clone()).collect();
+
+    assert_eq!(
+        said,
+        [
+            "set TZ to Europe/Amsterdam",
+            "changed PUID from 1000 to 1001",
+            "set removeCompletedDownloads on the service",
+            "made /srv/media",
+            "added a downloadclient",
+        ],
+        "newest first, and every kind in the words of what it did"
+    );
+}
+
+/// A service's own record goes back through the service that owns it, so nothing about
+/// it is a setting and the drift question never arises. Reversible in full, and the
+/// record says so without a reason attached to it.
+#[tokio::test]
+async fn a_change_to_a_services_own_record_can_go_back_in_full() {
+    let root = scratch("services");
+    journalled(&root, &[created("downloadclient", "3"), made("/srv/media")]);
+
+    let report = recorded(&ctx(&root)).await;
+    let changes = report.map(|report| report.changes).unwrap_or_default();
+    let verdicts: Vec<String> = changes
+        .iter()
+        .map(|change| change.reversal.clone())
+        .collect();
+
+    assert_eq!(verdicts, ["whole", "whole"]);
+    assert!(
+        changes.iter().all(|change| change.because.is_none()),
+        "nothing stands in the way, so nothing is offered as a reason"
+    );
+}
+
+/// The pointer to the library goes back and the library does not follow it. Said as
+/// partly reversible with what the rest leaves, because an operator told this change
+/// is reversible would expect their files to move back with the setting.
+#[tokio::test]
+async fn putting_the_data_location_back_is_only_partly_possible_and_says_what_stays() {
+    let root = scratch("pointer");
+    journalled(
+        &root,
+        &[set(
+            "reconfigure",
+            "DATA_ROOT",
+            Some("/srv/old"),
+            "/srv/new",
+        )],
+    );
+    holding(&root, &[("DATA_ROOT", "/srv/new")]);
+
+    let report = recorded(&ctx(&root)).await;
+    let changes = report.map(|report| report.changes).unwrap_or_default();
+    let first = changes.first();
+
+    assert_eq!(
+        first.map(|change| change.reversal.clone()),
+        Some("partial".to_owned()),
+        "neither reversible nor refused"
+    );
+    let because = first.and_then(|change| change.because.clone());
+    assert!(
+        because.is_some_and(|said| said.contains("the data does not move with it")),
+        "the record says what putting it back would leave behind"
+    );
+    let instead = first.and_then(|change| change.instead.clone());
+    assert!(instead.is_some_and(|said| said.contains("move the library yourself")));
+}

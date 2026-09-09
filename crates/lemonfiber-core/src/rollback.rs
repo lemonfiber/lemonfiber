@@ -76,21 +76,22 @@ impl Standing {
     }
 }
 
-/// The setting a change is about, where it is about one.
-#[must_use]
-pub fn setting(change: &Change) -> Option<&str> {
+/// The setting a change is about and the value it left there, where it is about one.
+///
+/// One question rather than two. A change that names a setting is the same change that
+/// wrote a value into it, so asking the second half separately would match the same
+/// variant a second time and leave an arm nothing could reach.
+fn touched(change: &Change) -> Option<(&str, &str)> {
     match &change.kind {
-        Kind::Set { key, .. } => Some(key),
+        Kind::Set { key, current, .. } => Some((key, current)),
         _ => None,
     }
 }
 
-/// The value a change left behind, where it left one that can be compared.
-fn wrote(change: &Change) -> Option<&str> {
-    match &change.kind {
-        Kind::Set { current, .. } => Some(current),
-        _ => None,
-    }
+/// The setting a change is about, where it is about one.
+#[must_use]
+pub fn setting(change: &Change) -> Option<&str> {
+    touched(change).map(|(key, _)| key)
 }
 
 /// The key whose reversal moves no data, only the pointer to it.
@@ -146,18 +147,14 @@ pub fn standing(
 
 /// What the setting holds now, where that is not what this change left.
 fn drifted(change: &Change, holds: &dyn Fn(&str) -> Option<String>) -> Option<String> {
-    let key = setting(change)?;
-    let left = wrote(change)?;
+    let (key, left) = touched(change)?;
     let now = holds(key)?;
     (now != left).then_some(now)
 }
 
 /// Whether a later change touched the same setting.
 fn depended_on(key: &str, later: &[Change]) -> bool {
-    later
-        .iter()
-        .filter_map(setting)
-        .any(|touched| touched == key)
+    later.iter().filter_map(setting).any(|named| named == key)
 }
 
 /// Every change of one run of an operation, which rolls back as one unit or not at all.
@@ -192,6 +189,33 @@ mod tests {
                 previous: previous.map(str::to_owned),
                 current: current.to_owned(),
             },
+        }
+    }
+
+    /// A resource a service now holds, made by an operation of ours.
+    fn created(resource: &str) -> Change {
+        Change {
+            at: "1".to_owned(),
+            operation: "seed".to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Created {
+                resource: resource.to_owned(),
+                id: "3".to_owned(),
+            },
+        }
+    }
+
+    /// One field of one resource a service holds, changed through that service.
+    fn configured(field: &str) -> Change {
+        Change {
+            kind: Kind::Configured {
+                resource: "downloadclient".to_owned(),
+                id: "3".to_owned(),
+                field: field.to_owned(),
+                previous: Some("false".to_owned()),
+                current: "true".to_owned(),
+            },
+            ..created("downloadclient")
         }
     }
 
@@ -301,6 +325,28 @@ mod tests {
             keys,
             ["PGID", "UMASK"],
             "and neither the other operation nor the earlier apply"
+        );
+    }
+
+    /// A change to a service's own record is put back through the service that owns it,
+    /// which is reachable — so it goes back whole, and none of the questions a setting
+    /// has to answer are asked of it at all.
+    #[test]
+    fn a_change_to_a_services_own_record_goes_back_whole() {
+        let holds = holding(&[("PUID", "9999")]);
+        assert_eq!(
+            standing(&created("downloadclient"), &[], &holds).reversal,
+            Reversal::Whole
+        );
+        assert_eq!(
+            standing(&configured("removeCompletedDownloads"), &[], &holds).reversal,
+            Reversal::Whole
+        );
+        assert!(
+            standing(&created("rootfolder"), &[], &holds)
+                .refusal
+                .is_none(),
+            "nothing stands in the way, so nothing is offered as a reason"
         );
     }
 }
