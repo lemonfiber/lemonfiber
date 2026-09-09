@@ -241,6 +241,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Word(_)
         | Outcome::Glossary(_)
         | Outcome::Clients(_)
+        // Where this copy stands is a reading too, and one that must never be a
+        // failure: an availability check a script read as a non-zero result would be
+        // this product making its own currency a precondition of running.
+        | Outcome::Update(_)
         // An invitation was made or it was not; a refusal already comes back as a
         // problem, so there is nothing for a code to tell apart here.
         | Outcome::Invited(_)

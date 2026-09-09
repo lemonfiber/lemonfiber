@@ -41,7 +41,8 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
     named, ALERTS, BANDWIDTH, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR, HISTORY,
-    HOSTING, MIGRATION, OUTBOUND, QUALITY, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, VERSION,
+    HOSTING, MIGRATION, OUTBOUND, QUALITY, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE,
+    VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -204,6 +205,13 @@ static AFTER: &[Question] = &[
         name: "what to watch on",
         about: "which app to use on each kind of device, and where to use something else",
         read: CLIENTS,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "where this copy of lemonfiber stands",
+        about: "whether anything newer has been released, and the exact command for whatever \
+                put this copy here",
+        read: UPDATE,
         needs: Needed::Nothing,
     },
     Question {

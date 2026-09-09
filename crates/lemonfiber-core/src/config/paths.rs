@@ -153,6 +153,18 @@ impl Paths {
         self.config.join("accepted.json")
     }
 
+    /// When the release list was last asked which version of lemonfiber is newest,
+    /// how the last few of those went, and what the last one read.
+    ///
+    /// Kept with configuration rather than beside the stack, and it is the one record
+    /// here whose worth is in *not* being regenerated: what it holds is a machine
+    /// having tried and got nothing back, several times over, and a restore that
+    /// threw that away would put a laptop with no route out straight back to asking.
+    #[must_use]
+    pub fn updates(&self) -> PathBuf {
+        self.config.join("updates.json")
+    }
+
     /// The password the web surface asks for, as the verifier that proves it.
     ///
     /// Kept with configuration rather than beside the stack, for the reason the
@@ -264,6 +276,7 @@ mod tests {
             paths.accepted(),
             paths.refusals(),
             paths.admission(),
+            paths.updates(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),
@@ -360,6 +373,19 @@ mod tests {
     }
 
     #[test]
+    fn what_the_update_check_remembers_sits_beside_the_env_file() {
+        // The check derives where it keeps its memory from the environment file it is
+        // handed — `env_file.with_file_name("updates.json")` — the same way the
+        // answered choices are derived. This ties that formula to the layout's own
+        // `updates()`, so a restore carries a machine's record of having given up.
+        let paths = paths();
+        assert_eq!(
+            paths.env_file().with_file_name("updates.json"),
+            paths.updates()
+        );
+    }
+
+    #[test]
     fn every_location_is_distinct() {
         let paths = paths();
         let all = [
@@ -371,6 +397,7 @@ mod tests {
             paths.quality(),
             paths.bandwidth(),
             paths.admission(),
+            paths.updates(),
             paths.stack(),
             paths.service_config(),
             paths.backups(),

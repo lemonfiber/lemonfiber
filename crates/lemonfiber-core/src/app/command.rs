@@ -355,6 +355,16 @@ pub enum Command {
         /// listed and nothing is removed.
         confirm: bool,
     },
+    /// Say where this copy of lemonfiber stands, and what moving it would come to.
+    ///
+    /// A read, and it replaces nothing: what it answers with is the exact command for
+    /// whichever tool owns the copy that is running. Naming a version asks about that
+    /// one instead of the newest, which is how going back is asked for.
+    Update {
+        /// The version to move to, where the operator named one rather than asking
+        /// about whatever is newest.
+        to: Option<String>,
+    },
     /// Take lemonfiber off this machine, at one of four removals.
     ///
     /// One value rather than a table of fields, because a removal is one decision

@@ -415,10 +415,20 @@ impl Ctx {
     /// system directly, so a test can say what time it is and a record written on
     /// one run can be compared with one written on another.
     pub(super) fn stamp(&self) -> String {
+        self.seconds().to_string()
+    }
+
+    /// The same moment as a number, for the records that compare two of them.
+    ///
+    /// Beside the stamp rather than parsed back out of one: what reads this asks
+    /// whether enough time has passed since the last run, and two strings cannot be
+    /// subtracted. A clock that will not answer reads as the epoch, which is a machine
+    /// that has waited long enough for anything.
+    pub(super) fn seconds(&self) -> u64 {
         self.clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_secs().to_string())
+            .map(|elapsed| elapsed.as_secs())
             .unwrap_or_default()
     }
 

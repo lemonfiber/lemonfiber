@@ -1,4 +1,4 @@
-//! The twenty-seven reads: one endpoint per question a command already answers, plus
+//! The twenty-eight reads: one endpoint per question a command already answers, plus
 //! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -20,7 +20,8 @@
 //! endpoints themselves are grouped beside it by what they are about: the stack,
 //! the diagnosis, one item, where the household begins, the choices in force, the
 //! words, the files lemonfiber keeps of its own, where the disk went, and what this
-//! machine keeps running when nobody is watching.
+//! machine keeps running when nobody is watching, and where this copy of the program
+//! itself stands.
 
 mod alerts;
 mod archives;
@@ -40,6 +41,7 @@ mod space;
 mod stack;
 mod stored;
 mod uninstall;
+mod update;
 
 use axum::body::Body;
 use axum::http::StatusCode;
@@ -83,6 +85,7 @@ pub fn routes() -> Router<Serving> {
         .merge(bandwidth::routes())
         .merge(hosting::routes())
         .merge(history::routes())
+        .merge(update::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.
