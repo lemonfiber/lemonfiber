@@ -118,7 +118,10 @@ fn carries_media_type(command: &Command) -> bool {
 fn carries_agreement(command: &Command) -> bool {
     matches!(
         command,
-        Command::Quality(QualityAction::Set { confirm: true, .. })
+        Command::ConfigSet {
+            confirmed: true,
+            ..
+        } | Command::Quality(QualityAction::Set { confirm: true, .. })
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
             | Command::Forget { confirm: true }

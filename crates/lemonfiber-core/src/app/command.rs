@@ -131,11 +131,21 @@ pub enum Command {
         key: String,
     },
     /// Change one setting.
+    ///
+    /// Read twice where the change costs something. Unconfirmed it shows the
+    /// difference between what the setting holds and what it would hold, says what
+    /// changing it affects, and writes nothing; confirmed it applies what was read.
     ConfigSet {
         /// The setting to change.
         key: String,
         /// What to change it to.
         value: String,
+        /// Whether the operator has agreed to what the change costs.
+        ///
+        /// Answers two things, and they are one decision: a change setup catalogued
+        /// as consequential is not applied without it, and a replacement credential
+        /// no service could be reached to prove is not stored without it.
+        confirmed: bool,
     },
     /// Show every setting, with credentials withheld.
     ConfigShow,

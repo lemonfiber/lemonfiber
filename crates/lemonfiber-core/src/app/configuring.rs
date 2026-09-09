@@ -4,10 +4,23 @@
 //! one command that *writes* what every other command then reads, and the writing
 //! carries a duty the reading does not: a change with a consequence has to say so
 //! at the moment it is made, which is the only moment the operator is deciding.
+//!
+//! So a change is weighed before it is written, never after. What the setting holds
+//! now and what it would hold are put side by side; a change setup catalogued as
+//! consequential is staged until somebody says yes to it; and a replacement for one
+//! half of a credential is proven against the live service while the credential it
+//! replaces is still the one on disk. A proposal that does not clear all of that
+//! leaves the file exactly as it was and says which of them it failed.
 
-use crate::config::{port_forward_from_env, store};
+mod proving;
+
+use crate::config::{env::EnvFile, port_forward_from_env, store};
 use crate::error::{Diagnose, Problem};
 use crate::model::{ConfigReport, SettingReport};
+use crate::reconfigure::{Consent, Review, Stance};
+use crate::validate::{Credential, Validation};
+
+use proving::Proving;
 
 use super::{Ctx, Outcome};
 
@@ -16,31 +29,22 @@ use super::{Ctx, Outcome};
 /// A rehearsal reads and reports what it would have written without writing it,
 /// so `--dry-run` means the same thing here as everywhere else.
 ///
-/// The failure is boxed. This is the only fallible path here that is not async,
-/// so it is the only one where a large error variant sits in the returned value
-/// rather than inside a future — and a problem is a rare, cold thing that is
-/// cheaper to move behind a pointer.
-pub(super) fn configuration(
+/// The failure is boxed because a problem is a rare, cold thing that is cheaper to
+/// move behind a pointer than to carry in every returned value.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
+/// settings file that could not be read or written.
+pub(super) async fn configuration(
     ctx: &Ctx,
     key: Option<&str>,
     value: Option<&str>,
+    confirmed: bool,
 ) -> Result<Outcome, Box<Problem>> {
     let Some(path) = ctx.settings.env_file.as_deref() else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
-
-    // Whether this call actually writes. A rehearsal has decided nothing and a read
-    // is not a decision, so neither has a consequence to state.
-    let written = key.is_some() && value.is_some() && !ctx.dry_run;
-
-    // What was forwarding before, read only where a write is about to change it:
-    // a consequence is the difference a change made, and where nothing is being
-    // written there is no difference to state. A read that fails says nothing —
-    // the write that follows reports the failure itself, in its own words.
-    let before = written
-        .then(|| store::read(path).ok())
-        .flatten()
-        .map(|file| port_forward_from_env(&file));
 
     // Trimmed on the way in, for the same reason setup trims what is pasted into it:
     // a key copied from a dashboard carries a trailing newline, it authenticates
@@ -48,21 +52,26 @@ pub(super) fn configuration(
     // parser already trims the name; the value was the half still taken literally.
     let value = value.map(str::trim);
 
-    let changed = match (key, value) {
-        (Some(key), Some(value)) if !ctx.dry_run => {
-            if let Err(err) = store::set(path, key, value) {
-                return Err(Box::new(err.problem()));
-            }
-            true
-        }
-        (_, value) => value.is_some(),
-    };
-
-    let file = match store::read(path) {
+    // Read before anything is decided rather than after the write, because the diff an
+    // operator is shown is the difference between this file and the one proposed, and a
+    // file read afterwards is already the answer to the question.
+    let held = match store::read(path) {
         Ok(file) => file,
         Err(err) => return Err(Box::new(err.problem())),
     };
-    let consequence = stated(ctx, key, written, before.as_ref(), &file);
+
+    let (file, changed, consequence, review) = match (key, value) {
+        (Some(key), Some(value)) => {
+            let proposal = applying(ctx, path, held, key, value, confirmed).await?;
+            (
+                proposal.file,
+                proposal.review.differs(),
+                proposal.consequence,
+                Some(proposal.review),
+            )
+        }
+        _ => (held, false, None, None),
+    };
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
@@ -74,13 +83,125 @@ pub(super) fn configuration(
         changed,
         rehearsed: ctx.dry_run,
         consequence,
+        review,
     }))
 }
 
-/// What the change just made costs, where it costs anything.
+/// A proposed change, the sentence saying what making it costs, and the settings as
+/// they stand once it has been dealt with.
+struct Proposal {
+    /// The difference, and where it stands.
+    review: Review,
+    /// What making it decided, where it decided something worth stating.
+    consequence: Option<String>,
+    /// The file as it now is — changed where the proposal reached it, and exactly as
+    /// it was where it did not.
+    ///
+    /// Carried rather than read back off the disk, because a second read would be a
+    /// second failure to report for one command, and the copy that failed would be
+    /// the one no test could reach.
+    file: EnvFile,
+}
+
+/// The change weighed, proven where a service can prove it, and written where nothing
+/// stands in the way.
 ///
-/// One sentence rather than a list, because one call writes one setting: the change
-/// either has a cost worth stating or it has none.
+/// # Errors
+///
+/// Returns the [`Problem`] for a settings file that could not be written.
+async fn applying(
+    ctx: &Ctx,
+    path: &std::path::Path,
+    held: EnvFile,
+    key: &str,
+    value: &str,
+    confirmed: bool,
+) -> Result<Proposal, Box<Problem>> {
+    let review = weighed(ctx, &held, key, value, confirmed).await;
+    let consequence = stated(ctx, &review, &held, key, value);
+    let mut file = held;
+    if review.writes() {
+        if let Err(err) = store::set(path, key, value) {
+            return Err(Box::new(err.problem()));
+        }
+        file.set(key, value);
+    }
+    Ok(Proposal {
+        review,
+        consequence,
+        file,
+    })
+}
+
+/// Where the proposal stands once everything that could stop it has been asked.
+///
+/// The classification comes first and the service second, deliberately: a change
+/// nobody has agreed to is not going to happen, and reaching a live indexer to
+/// prove a key for it would be spending somebody's rate limit on a decision that
+/// has not been taken.
+async fn weighed(ctx: &Ctx, held: &EnvFile, key: &str, value: &str, confirmed: bool) -> Review {
+    let review = Review::proposed(
+        key,
+        held.get(key),
+        value,
+        &Consent {
+            settled: confirmed,
+            rehearsing: ctx.dry_run,
+        },
+    );
+    if !review.writes() {
+        return review;
+    }
+    match proving::wanted(held, key, value) {
+        Proving::Nothing | Proving::Incomplete => review,
+        Proving::Unreadable(why) => review.blocked(why),
+        Proving::Replacement(replacement) => answered(ctx, review, &replacement, confirmed).await,
+    }
+}
+
+/// The proposal once the live service has answered about the replacement.
+///
+/// A service that answered and *refused* is the one answer no confirmation gets past.
+/// The whole point of proving a replacement first is that a bad paste must not cost the
+/// operator the credential that works, and a blanket yes is exactly what a bad paste
+/// would be waved through by.
+///
+/// Nothing answering at all is a different thing, and it is confirmable: an operator
+/// working offline, or reaching a provider this machine cannot see, may know the
+/// credential is right, and refusing them forever would make the setting unchangeable —
+/// which is the trap reconfiguration exists to close. It is stored unproven and said to
+/// be unproven.
+///
+/// A credential that authenticated but cannot do its job is stored. It is the right
+/// credential; what is wrong is the account behind it, and that is not fixed by keeping
+/// the old one.
+async fn answered(ctx: &Ctx, review: Review, replacement: &Credential, confirmed: bool) -> Review {
+    let proof = ctx.validator.validate(replacement).await.withheld();
+    let refusal = match &proof {
+        Validation::Rejected { detail } => Some(format!(
+            "the service refused the replacement, so the one in force was kept: {detail}"
+        )),
+        Validation::Unreachable { detail } if !confirmed => Some(format!(
+            "the replacement could not be proven, so the one in force was kept: {detail}. \
+             Confirm the change to store it unproven"
+        )),
+        Validation::Valid { .. } | Validation::Degraded { .. } | Validation::Unreachable { .. } => {
+            None
+        }
+    };
+    let review = review.proven(proof);
+    match refusal {
+        Some(why) => review.blocked(why),
+        None => review,
+    }
+}
+
+/// What the proposed change costs, where it costs anything.
+///
+/// One sentence rather than a list, because one call changes one setting: the change
+/// either has a cost worth stating or it has none. Stated for a change that is only
+/// staged as well as for one that landed — a review step that withheld the cost until
+/// after the write would be a review step in name only.
 ///
 /// Naming a front door is the one change whose consequence does not depend on what
 /// the setting was before. Every other answer this product gives about the door is
@@ -90,39 +211,51 @@ pub(super) fn configuration(
 ///
 /// The forwarded port is nothing where the stack does not torrent: a forwarded port
 /// buys it nothing, so the sentence would be about a problem this operator cannot
-/// have.
-fn stated(
-    ctx: &Ctx,
-    key: Option<&str>,
-    written: bool,
-    before: Option<&crate::config::PortForward>,
-    file: &crate::config::env::EnvFile,
-) -> Option<String> {
-    if !written {
+/// have. It is worked out from the difference rather than from the file on disk, so a
+/// rehearsal is told what it would cost as plainly as a write is told what it did.
+fn stated(ctx: &Ctx, review: &Review, held: &EnvFile, key: &str, value: &str) -> Option<String> {
+    if review.stance == Stance::Unchanged {
         return None;
     }
-    if key == Some(crate::config::FRONT_DOOR_KEY) {
+    if key == crate::config::FRONT_DOOR_KEY {
         return Some(crate::door::KEPT.to_owned());
     }
     // Every answer setup wrote says what changing it affects, and the catalogue is the
     // one place that knows. A surface that writes a setting cannot then state a cost
     // the rest of the product disagrees with, and a decision nobody catalogued says
     // nothing rather than a guess.
-    if let Some(entry) = key.and_then(crate::reconfigure::decision) {
+    if let Some(entry) = crate::reconfigure::decision(key) {
         return Some(format!("changing this affects {}", entry.affects));
     }
-    before
-        .and_then(|before| super::seeding::on_change(before, &port_forward_from_env(file)))
-        .filter(|_| ctx.settings.protocols.torrent)
-        .map(str::to_owned)
+    if !ctx.settings.protocols.torrent {
+        return None;
+    }
+    let mut proposed = held.clone();
+    proposed.set(key, value);
+    super::seeding::on_change(
+        &port_forward_from_env(held),
+        &port_forward_from_env(&proposed),
+    )
+    .map(str::to_owned)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::configuration;
-    use crate::app::Outcome;
-    use crate::config::{FRONT_DOOR_KEY, VPN_PORT_FORWARDING_KEY};
+    use crate::app::{Ctx, Outcome};
+    use crate::config::{
+        store, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, PROVIDER_PORT_KEY,
+        PROVIDER_TLS_KEY, VPN_PORT_FORWARDING_KEY,
+    };
+    use crate::error::Diagnose;
+    use crate::reconfigure::{Review, Stance};
     use crate::test_support::a_context;
+    use lemonfiber_fixtures::http::{Answer, Fake};
+
+    /// A search a Torznab indexer answers with, which proves a key.
+    const ANSWERED: &str = "<rss><channel><item/></channel></rss>";
 
     /// A scratch environment file holding the given settings.
     fn env_at(name: &str, contents: &str) -> std::path::PathBuf {
@@ -137,9 +270,9 @@ mod tests {
     }
 
     /// A context over that file, for a stack that torrents.
-    fn ctx(env_file: std::path::PathBuf) -> crate::app::Ctx {
+    fn ctx(env_file: std::path::PathBuf) -> Ctx {
         a_context()
-            .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
+            .runner(Arc::new(crate::test_support::Scripted(Ok(
                 crate::test_support::spoke(""),
             ))))
             .settings(crate::config::Settings {
@@ -150,35 +283,67 @@ mod tests {
             .build()
     }
 
-    /// What a change said it cost, where it said anything.
-    fn consequence(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<String> {
-        outcome.ok().and_then(|outcome| match outcome {
-            Outcome::Config(report) => report.consequence,
-            other => Some(format!("{other:?} is not a configuration answer")),
-        })
+    /// The same, reaching every service through a transport that answers `answer`.
+    ///
+    /// Replacing the transport replaces the validator with one that proves credentials
+    /// over it, so what an indexer says about a replacement key is the test's to say.
+    fn reaching(env_file: std::path::PathBuf, answer: Answer) -> Ctx {
+        ctx(env_file).with_http(Fake::always(answer))
     }
 
-    #[test]
-    fn turning_port_forwarding_off_says_what_it_costs_there_and_then() {
+    /// A file holding a complete Usenet login over TLS.
+    const A_LOGIN: &str = "USENET_HOST=news.example.net\nUSENET_PORT=563\n\
+                           USENET_USER=someone\nUSENET_PASS=old-pass\nUSENET_TLS=on\n";
+
+    /// What a change said it cost, where it said anything.
+    fn consequence(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> Option<String> {
+        match outcome {
+            Ok(Outcome::Config(report)) => report.consequence.clone(),
+            Ok(other) => Some(format!("{other:?} is not a configuration answer")),
+            Err(_) => None,
+        }
+    }
+
+    /// The review a change came back with, where it came back with one.
+    fn reviewed(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> Option<Review> {
+        match outcome {
+            Ok(Outcome::Config(report)) => report.review.clone(),
+            _ => None,
+        }
+    }
+
+    /// Where a change stands, where it proposed one.
+    fn stance(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> Option<Stance> {
+        reviewed(outcome).map(|review| review.stance)
+    }
+
+    /// What a setting holds on disk now.
+    fn on_disk(path: &std::path::Path, key: &str) -> Option<String> {
+        store::read(path)
+            .ok()
+            .and_then(|file| file.get(key).map(str::to_owned))
+    }
+
+    #[tokio::test]
+    async fn turning_port_forwarding_off_says_what_it_costs_there_and_then() {
         // The moment it is decided is the only moment worth saying it: afterwards
         // the check goes quiet, deliberately, because there is nothing to fix.
         let ctx = ctx(env_at("off", "VPN_PORT_FORWARDING=on\n"));
-        let said = consequence(configuration(
-            &ctx,
-            Some(VPN_PORT_FORWARDING_KEY),
-            Some("off"),
-        ));
+        let said = consequence(
+            &configuration(&ctx, Some(VPN_PORT_FORWARDING_KEY), Some("off"), false).await,
+        );
         assert_eq!(said.as_deref(), Some(crate::app::seeding::COST));
     }
 
-    #[test]
-    fn an_unrelated_setting_says_nothing_about_seeding() {
+    #[tokio::test]
+    async fn an_unrelated_setting_says_nothing_about_seeding() {
         // Every setting a stack has passes through here. A sentence about seeding
         // attached to a change that did not touch it reads as a warning nobody
         // caused, which is how operators learn to ignore them.
         let ctx = ctx(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
-        let said = consequence(configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on")))
-            .unwrap_or_default();
+        let said =
+            consequence(&configuration(&ctx, Some("LEMONFIBER_USENET"), Some("on"), false).await)
+                .unwrap_or_default();
         // Turning Usenet on has a consequence of its own — what it opens and what it
         // takes away — and the sentence is that one rather than the seeding sentence
         // sitting next to it.
@@ -186,118 +351,321 @@ mod tests {
         assert!(!said.contains(crate::app::seeding::COST), "{said}");
     }
 
-    #[test]
-    fn moving_the_data_location_says_what_it_affects_as_it_is_written() {
+    #[tokio::test]
+    async fn moving_the_data_location_says_what_it_affects_before_anything_moves() {
         // The sharpest change in the product: every *arr holds absolute paths to its
         // root folders, and an operator told this afterwards has already lost the
-        // library the telling was for.
-        let ctx = ctx(env_at("moved", "DATA_ROOT=/srv/old\n"));
-        let said = consequence(configuration(
+        // library the telling was for. So the sentence arrives while the old location
+        // is still the one on disk.
+        let path = env_at("moved", "DATA_ROOT=/srv/old\n");
+        let ctx = ctx(path.clone());
+        let staged = configuration(
             &ctx,
             Some(crate::config::DATA_ROOT_KEY),
             Some("/srv/new"),
-        ))
-        .unwrap_or_default();
+            false,
+        )
+        .await;
+
+        let said = consequence(&staged).unwrap_or_default();
         assert!(said.contains("points at nothing"), "{said}");
+        assert_eq!(stance(&staged), Some(Stance::Pending));
+        assert_eq!(
+            on_disk(&path, crate::config::DATA_ROOT_KEY).as_deref(),
+            Some("/srv/old"),
+            "a change nobody agreed to reached the file"
+        );
     }
 
-    #[test]
-    fn a_setting_setup_never_asked_about_says_nothing_it_cannot_stand_behind() {
+    #[tokio::test]
+    async fn the_same_move_confirmed_is_the_one_that_lands() {
+        let path = env_at("moved-agreed", "DATA_ROOT=/srv/old\n");
+        let ctx = ctx(path.clone());
+        let applied = configuration(
+            &ctx,
+            Some(crate::config::DATA_ROOT_KEY),
+            Some("/srv/new"),
+            true,
+        )
+        .await;
+
+        assert_eq!(stance(&applied), Some(Stance::Applied));
+        assert_eq!(
+            on_disk(&path, crate::config::DATA_ROOT_KEY).as_deref(),
+            Some("/srv/new")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_setting_already_holding_what_was_asked_for_has_nothing_to_do() {
+        // Writing it again would move the file's own timestamp, which afterwards
+        // reads as an edit somebody made outside lemonfiber.
+        let path = env_at("same", "DATA_ROOT=/srv/media\n");
+        let ctx = ctx(path);
+        let outcome = configuration(
+            &ctx,
+            Some(crate::config::DATA_ROOT_KEY),
+            Some("/srv/media"),
+            false,
+        )
+        .await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Unchanged));
+        assert_eq!(consequence(&outcome), None);
+        let changed = match &outcome {
+            Ok(Outcome::Config(report)) => Some(report.changed),
+            _ => None,
+        };
+        assert_eq!(changed, Some(false));
+    }
+
+    #[tokio::test]
+    async fn a_setting_setup_never_asked_about_says_nothing_it_cannot_stand_behind() {
         // A cost invented for a setting whose consequences nobody worked out is worse
         // than silence: it teaches the operator to dismiss the ones that mean something.
         let ctx = ctx(env_at("unasked", ""));
         assert_eq!(
-            consequence(configuration(
-                &ctx,
-                Some("LEMONFIBER_EXPLANATIONS"),
-                Some("on")
-            )),
+            consequence(
+                &configuration(&ctx, Some("LEMONFIBER_EXPLANATIONS"), Some("on"), false).await
+            ),
             None
         );
     }
 
-    #[test]
-    fn a_key_pasted_with_a_newline_on_it_is_stored_as_the_key() {
+    #[tokio::test]
+    async fn a_key_pasted_with_a_newline_on_it_is_stored_as_the_key() {
         // The same paste error setup already absorbs, on the other way in. A key set
         // here with a newline still on it authenticates nowhere, while reading back
         // as though it were fine — which is the silent failure, not the loud one.
         let env = env_at("pasted", "");
         let ctx = ctx(env.clone());
-        let written = configuration(
-            &ctx,
-            Some(crate::config::INDEXER_APIKEY_KEY),
-            Some("  the-key\n"),
-        );
+        let written =
+            configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("  the-key\n"), false).await;
         assert!(written.is_ok());
-        let file = crate::config::store::read(&env).unwrap_or_default();
-        assert_eq!(file.get(crate::config::INDEXER_APIKEY_KEY), Some("the-key"));
+        assert_eq!(
+            on_disk(&env, INDEXER_APIKEY_KEY).as_deref(),
+            Some("the-key")
+        );
     }
 
-    #[test]
-    fn naming_a_front_door_says_what_naming_one_costs() {
+    #[tokio::test]
+    async fn naming_a_front_door_says_what_naming_one_costs() {
         // The operator is choosing to stop lemonfiber keeping this answer right, and
         // the moment they choose it is the only moment they are weighing it.
         let ctx = ctx(env_at("door", ""));
-        let said = consequence(configuration(&ctx, Some(FRONT_DOOR_KEY), Some("jellyfin")));
+        let said =
+            consequence(&configuration(&ctx, Some(FRONT_DOOR_KEY), Some("jellyfin"), false).await);
         assert_eq!(said.as_deref(), Some(crate::door::KEPT));
     }
 
-    #[test]
-    fn reading_the_named_front_door_back_costs_nothing_to_say() {
-        // Reading is not deciding, and a rehearsal has decided nothing either.
-        let ctx = ctx(env_at("door-read", "LEMONFIBER_FRONT_DOOR=jellyfin\n"));
-        assert_eq!(
-            consequence(configuration(&ctx, Some(FRONT_DOOR_KEY), None)),
-            None
-        );
-
-        let mut rehearsing = ctx;
-        rehearsing.dry_run = true;
-        assert_eq!(
-            consequence(configuration(
-                &rehearsing,
-                Some(FRONT_DOOR_KEY),
-                Some("jellyfin")
-            )),
-            None
-        );
+    #[tokio::test]
+    async fn reading_a_setting_is_never_a_decision() {
+        let ctx = ctx(env_at("reading", "VPN_PORT_FORWARDING=off\n"));
+        let read = configuration(&ctx, Some(VPN_PORT_FORWARDING_KEY), None, false).await;
+        assert_eq!(consequence(&read), None);
+        assert_eq!(reviewed(&read), None);
     }
 
-    #[test]
-    fn a_rehearsal_decides_nothing_and_so_states_nothing() {
-        // It has not changed anything, and a consequence stated for a change that
-        // did not happen is the tool reporting a decision the operator never made.
-        let mut rehearsing = ctx(env_at("rehearsal", "VPN_PORT_FORWARDING=on\n"));
+    #[tokio::test]
+    async fn a_rehearsal_says_what_it_would_cost_and_writes_nothing() {
+        // The review step and the rehearsal are the same thing said two ways, so the
+        // one that changes nothing is the one most owed an account of what it would.
+        let path = env_at("rehearsal", "VPN_PORT_FORWARDING=on\n");
+        let mut rehearsing = ctx(path.clone());
         rehearsing.dry_run = true;
-        let said = consequence(configuration(
+        let said = configuration(
             &rehearsing,
             Some(VPN_PORT_FORWARDING_KEY),
             Some("off"),
-        ));
-        assert_eq!(said, None);
-    }
+            false,
+        )
+        .await;
 
-    #[test]
-    fn reading_a_setting_is_never_a_decision() {
-        let ctx = ctx(env_at("reading", "VPN_PORT_FORWARDING=off\n"));
         assert_eq!(
-            consequence(configuration(&ctx, Some(VPN_PORT_FORWARDING_KEY), None)),
-            None
+            consequence(&said).as_deref(),
+            Some(crate::app::seeding::COST)
+        );
+        assert_eq!(stance(&said), Some(Stance::Pending));
+        assert_eq!(
+            on_disk(&path, VPN_PORT_FORWARDING_KEY).as_deref(),
+            Some("on")
         );
     }
 
-    #[test]
-    fn nothing_but_a_settings_answer_is_read_for_a_consequence() {
-        // The reader above is total, and this is the arm that proves it rather
-        // than a fallback nothing ever reaches.
+    #[tokio::test]
+    async fn nothing_but_a_settings_answer_is_read_for_a_consequence() {
+        // The three readers above are total, and this is the arm that proves each of
+        // them rather than a fallback nothing ever reaches.
         let other = Outcome::Version(crate::model::VersionReport {
             binary: "0".to_owned(),
             supported_schema: Vec::new(),
             stack: String::new(),
             compose: None,
         });
+        let said = consequence(&Ok(other));
+        assert!(said.is_some_and(|said| said.contains("not a configuration answer")));
+
+        let refused = Err(Box::new(store::Failure::Nowhere.problem()));
+        assert_eq!(consequence(&refused), None);
+        assert_eq!(reviewed(&refused), None);
+        assert_eq!(stance(&refused), None);
+    }
+
+    // ── A replacement credential is proven before the one it replaces is dropped ──
+
+    #[tokio::test]
+    async fn a_replacement_key_the_indexer_accepts_is_the_one_that_lands() {
+        let path = env_at(
+            "key-good",
+            "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
+        );
+        let ctx = reaching(path.clone(), Answer::reply(200, ANSWERED));
+        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("new-key"), false).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Applied));
+        assert_eq!(
+            on_disk(&path, INDEXER_APIKEY_KEY).as_deref(),
+            Some("new-key")
+        );
+        let proven = reviewed(&outcome).and_then(|review| review.proof);
         assert!(
-            consequence(Ok(other)).is_some_and(|said| said.contains("not a configuration answer"))
+            matches!(&proven, Some(crate::validate::Validation::Valid { observed })
+                if observed.contains("answered a search")),
+            "{proven:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replacement_key_the_indexer_refuses_never_reaches_the_file() {
+        // The whole point of proving first: a bad paste must not cost the operator the
+        // key that works.
+        let path = env_at(
+            "key-bad",
+            "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
+        );
+        let ctx = reaching(path.clone(), Answer::reply(401, ""));
+        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("mistyped"), false).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Blocked));
+        assert_eq!(
+            on_disk(&path, INDEXER_APIKEY_KEY).as_deref(),
+            Some("old-key")
+        );
+        let why = reviewed(&outcome).and_then(|review| review.refusal);
+        assert!(
+            why.is_some_and(|why| why.contains("the one in force was kept")),
+            "the refusal says nothing about what was kept"
+        );
+    }
+
+    /// A blanket yes is exactly what a bad paste would be waved through by, so the
+    /// one answer that means *this credential is wrong* is not confirmable.
+    #[tokio::test]
+    async fn a_refusal_is_not_something_a_confirmation_gets_past() {
+        let path = env_at(
+            "key-bad-confirmed",
+            "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
+        );
+        let ctx = reaching(path.clone(), Answer::reply(401, ""));
+        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("mistyped"), true).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Blocked));
+        assert_eq!(
+            on_disk(&path, INDEXER_APIKEY_KEY).as_deref(),
+            Some("old-key")
+        );
+    }
+
+    /// A key the indexer authenticated and then rate-limited is the right key. What
+    /// is wrong is the account behind it, and keeping the old one does not fix that.
+    #[tokio::test]
+    async fn a_key_that_authenticated_but_is_limited_is_still_the_right_key() {
+        let path = env_at(
+            "key-limited",
+            "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
+        );
+        let limited = r#"<error code="500" description="Request limit reached"/>"#;
+        let ctx = reaching(path.clone(), Answer::reply(200, limited));
+        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("new-key"), false).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Applied));
+        assert_eq!(
+            on_disk(&path, INDEXER_APIKEY_KEY).as_deref(),
+            Some("new-key")
+        );
+    }
+
+    #[tokio::test]
+    async fn an_address_given_before_a_key_is_not_put_to_a_service_at_all() {
+        // Half a credential proven against an indexer would be refused on the half
+        // nobody has given yet, which would make the first of two changes impossible.
+        let path = env_at("half", "");
+        let ctx = ctx(path.clone());
+        let outcome = configuration(
+            &ctx,
+            Some(INDEXER_URL_KEY),
+            Some("https://indexer.example/api"),
+            false,
+        )
+        .await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Applied));
+        assert_eq!(reviewed(&outcome).and_then(|review| review.proof), None);
+    }
+
+    /// Nothing answering is not the same as a refusal: an operator working offline may
+    /// know the credential is right, and refusing them forever would make the setting
+    /// unchangeable — which is the trap reconfiguration exists to close.
+    #[tokio::test]
+    async fn a_replacement_nothing_could_prove_is_held_until_it_is_confirmed() {
+        let path = env_at("tls-off", A_LOGIN);
+        let ctx = ctx(path.clone());
+        let held = configuration(&ctx, Some(PROVIDER_TLS_KEY), Some("off"), false).await;
+
+        assert_eq!(stance(&held), Some(Stance::Blocked));
+        assert_eq!(on_disk(&path, PROVIDER_TLS_KEY).as_deref(), Some("on"));
+        let why = reviewed(&held).and_then(|review| review.refusal);
+        assert!(
+            why.is_some_and(|why| why.contains("Confirm the change to store it unproven")),
+            "the refusal says nothing about the way past it"
+        );
+
+        let confirmed = configuration(&ctx, Some(PROVIDER_TLS_KEY), Some("off"), true).await;
+        assert_eq!(stance(&confirmed), Some(Stance::Applied));
+        assert_eq!(on_disk(&path, PROVIDER_TLS_KEY).as_deref(), Some("off"));
+    }
+
+    /// A port that is not a port number cannot be dialled and cannot be corrected by
+    /// the provider, so it never reaches the file at all.
+    #[tokio::test]
+    async fn a_replacement_the_product_cannot_read_leaves_the_file_alone() {
+        let path = env_at("port-bad", A_LOGIN);
+        let ctx = ctx(path.clone());
+        let outcome =
+            configuration(&ctx, Some(PROVIDER_PORT_KEY), Some("five-six-three"), true).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Blocked));
+        assert_eq!(on_disk(&path, PROVIDER_PORT_KEY).as_deref(), Some("563"));
+        let why = reviewed(&outcome).and_then(|review| review.refusal);
+        assert!(
+            why.is_some_and(|why| why.contains("1 to 65535")),
+            "the refusal says nothing a port could be corrected to"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_change_to_a_credential_is_withheld_on_both_sides_of_the_difference() {
+        let path = env_at(
+            "withheld",
+            "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
+        );
+        let ctx = reaching(path, Answer::reply(200, ANSWERED));
+        let outcome = configuration(&ctx, Some(INDEXER_APIKEY_KEY), Some("new-key"), false).await;
+
+        let change = reviewed(&outcome).map(|review| review.change);
+        assert_eq!(
+            change.map(|change| (change.from, change.to)),
+            Some((Some(store::REDACTED.to_owned()), store::REDACTED.to_owned()))
         );
     }
 }

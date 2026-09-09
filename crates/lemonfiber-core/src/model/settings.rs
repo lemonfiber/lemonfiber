@@ -77,12 +77,18 @@ pub struct ConfigReport {
     /// Whether this was a rehearsal, so a change that `changed` reports was one
     /// that *would* be made rather than one that was.
     pub rehearsed: bool,
-    /// What this change costs, where making it decided something with a
-    /// consequence — turning port forwarding off, or moving to a provider while it
-    /// is off. Absent for every other change, and for a rehearsal, which decided
-    /// nothing.
+    /// What this change costs, where making it decides something with a
+    /// consequence — moving the library, turning port forwarding off, or naming a
+    /// front door. Stated for a change that is only staged as well as one that
+    /// landed, since the moment before it happens is the moment it is worth reading.
+    /// Absent for a read, and for a change to a setting nobody catalogued a cost for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consequence: Option<String>,
+    /// The difference between the configuration in force and the one proposed, and
+    /// where that proposal stands: applied, staged for a confirmation, turned away,
+    /// or nothing to do. Absent for a read, which proposes nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<crate::reconfigure::Review>,
 }
 
 /// What a quality command did to the stored choice.

@@ -275,6 +275,7 @@ mod tests {
                 changed: false,
                 rehearsed: false,
                 consequence: None,
+                review: None,
             }),
             Outcome::Quality(QualityReport::default()),
             Outcome::Adoption(AdoptReport::default()),

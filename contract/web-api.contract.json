@@ -1541,6 +1541,36 @@
         "data"
       ],
       "$defs": {
+        "Change": {
+          "description": "The difference between the configuration in force and the one proposed.\n\nOne setting, because one call changes one setting. What makes it a diff rather than\na value is `from`: an operator deciding whether to go ahead is deciding between two\nthings, and a report that showed only the new one would be asking them to remember\nthe old one correctly.",
+          "type": "object",
+          "properties": {
+            "cost": {
+              "description": "Whether applying it is cheap or consequential.",
+              "$ref": "#/$defs/Cost"
+            },
+            "from": {
+              "description": "What it holds now, withheld where it is a credential, and absent where the\nsetting holds nothing yet.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "key": {
+              "description": "The setting the change names.",
+              "type": "string"
+            },
+            "to": {
+              "description": "What it would hold, withheld the same way.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "to",
+            "cost"
+          ]
+        },
         "ConfigReport": {
           "description": "The answer to a configuration command.",
           "type": "object",
@@ -1550,7 +1580,7 @@
               "type": "boolean"
             },
             "consequence": {
-              "description": "What this change costs, where making it decided something with a\nconsequence — turning port forwarding off, or moving to a provider while it\nis off. Absent for every other change, and for a rehearsal, which decided\nnothing.",
+              "description": "What this change costs, where making it decides something with a\nconsequence — moving the library, turning port forwarding off, or naming a\nfront door. Stated for a change that is only staged as well as one that\nlanded, since the moment before it happens is the moment it is worth reading.\nAbsent for a read, and for a change to a setting nobody catalogued a cost for.",
               "type": [
                 "string",
                 "null"
@@ -1559,6 +1589,17 @@
             "rehearsed": {
               "description": "Whether this was a rehearsal, so a change that `changed` reports was one\nthat *would* be made rather than one that was.",
               "type": "boolean"
+            },
+            "review": {
+              "description": "The difference between the configuration in force and the one proposed, and\nwhere that proposal stands: applied, staged for a confirmation, turned away,\nor nothing to do. Absent for a read, which proposes nothing.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Review"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "settings": {
               "description": "The settings asked about — one for a lookup, all of them for a listing.",
@@ -1572,6 +1613,57 @@
             "settings",
             "changed",
             "rehearsed"
+          ]
+        },
+        "Cost": {
+          "description": "What changing a decision costs.",
+          "oneOf": [
+            {
+              "description": "Applied with a restart of the services it affects, and nothing else moves.",
+              "type": "string",
+              "const": "cheap"
+            },
+            {
+              "description": "Said and confirmed before it is applied: it may move data, invalidate library\npaths, or take a service away.",
+              "type": "string",
+              "const": "consequential"
+            }
+          ]
+        },
+        "Review": {
+          "description": "A proposed change, read against what is in force, and where it stands.",
+          "type": "object",
+          "properties": {
+            "change": {
+              "description": "The difference, as it would be applied.",
+              "$ref": "#/$defs/Change"
+            },
+            "proof": {
+              "description": "What proving the replacement credential came to, where one was proven.\n\nA replacement is proven against its live service before the credential it\nreplaces is discarded, so this is present for exactly those settings and\nabsent everywhere else.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Validation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "refusal": {
+              "description": "Why nothing was written, where nothing was and the reason is not simply that\nsomebody has yet to say yes.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stance": {
+              "description": "Where the proposal stands.",
+              "$ref": "#/$defs/Stance"
+            }
+          },
+          "required": [
+            "change",
+            "stance"
           ]
         },
         "SettingReport": {
@@ -1595,6 +1687,108 @@
             "key",
             "value",
             "secret"
+          ]
+        },
+        "Stance": {
+          "description": "Where a proposed change stands once it has been read against what is in force.",
+          "oneOf": [
+            {
+              "description": "The setting already holds what was asked for. Nothing to apply, nothing to\nconfirm, and the file is not touched — a write of the same value would move\nthe file's own timestamp and read afterwards as an edit somebody made.",
+              "type": "string",
+              "const": "unchanged"
+            },
+            {
+              "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "Turned away. It cannot be applied safely, the file is exactly as it was, and\nthe refusal says why.",
+              "type": "string",
+              "const": "blocked"
+            },
+            {
+              "description": "Written.",
+              "type": "string",
+              "const": "applied"
+            }
+          ]
+        },
+        "Validation": {
+          "description": "What proving a credential against its live service established — never the\ninput, only the outcome.\n\nRead back as well as built. A surface that is not in this process asks setup to\nprove a credential and is told what came of it, so the four outcomes are tagged\nby name rather than distinguished by which field is present — the same reason an\nanswer carries the step it belongs to.",
+          "oneOf": [
+            {
+              "description": "Proven working, carrying the capability observed while proving it.",
+              "type": "object",
+              "properties": {
+                "observed": {
+                  "description": "The observed fact — what the service did, not that it merely answered.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "valid"
+                }
+              },
+              "required": [
+                "outcome",
+                "observed"
+              ]
+            },
+            {
+              "description": "The service answered and refused: the credential is wrong for it.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "What the service said, in terms the operator can act on.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "rejected"
+                }
+              },
+              "required": [
+                "outcome",
+                "detail"
+              ]
+            },
+            {
+              "description": "Nothing usable answered, so nothing can be concluded about the credential.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "Why nothing usable came back.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "unreachable"
+                }
+              },
+              "required": [
+                "outcome",
+                "detail"
+              ]
+            },
+            {
+              "description": "It authenticated, but cannot do the job it is for — exhausted, limited, or\notherwise unable.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "What it can no longer do, and why where the service says.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "degraded"
+                }
+              },
+              "required": [
+                "outcome",
+                "detail"
+              ]
+            }
           ]
         }
       }

@@ -207,7 +207,15 @@ pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
 pub(crate) fn configuration(action: ConfigAction) -> Command {
     match action {
         ConfigAction::Get { key } => Command::ConfigGet { key },
-        ConfigAction::Set { key, value } => Command::ConfigSet { key, value },
+        ConfigAction::Set {
+            key,
+            value,
+            confirm,
+        } => Command::ConfigSet {
+            key,
+            value,
+            confirmed: confirm,
+        },
         ConfigAction::Show => Command::ConfigShow,
     }
 }
@@ -735,11 +743,28 @@ mod tests {
         assert_eq!(
             configuration(ConfigAction::Set {
                 key: "DATA_ROOT".to_owned(),
-                value: "/srv".to_owned()
+                value: "/srv".to_owned(),
+                confirm: false
             }),
             Command::ConfigSet {
                 key: "DATA_ROOT".to_owned(),
-                value: "/srv".to_owned()
+                value: "/srv".to_owned(),
+                confirmed: false
+            }
+        );
+        // The agreement carried through rather than acted on here: a change staged
+        // for want of one is what the core answers with, not something a translation
+        // could decide.
+        assert_eq!(
+            configuration(ConfigAction::Set {
+                key: "DATA_ROOT".to_owned(),
+                value: "/srv".to_owned(),
+                confirm: true
+            }),
+            Command::ConfigSet {
+                key: "DATA_ROOT".to_owned(),
+                value: "/srv".to_owned(),
+                confirmed: true
             }
         );
         assert_eq!(configuration(ConfigAction::Show), Command::ConfigShow);

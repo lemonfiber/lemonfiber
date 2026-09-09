@@ -40,6 +40,7 @@ pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::{AlertReport, ConfigReport, FormsReport, VersionReport, WizardReport};
+use lemonfiber_core::reconfigure::{Review, Stance};
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
@@ -371,27 +372,61 @@ fn alerts(report: &AlertReport) -> Lines {
     lines
 }
 
-/// What the operator has configured.
+/// What the operator has configured, and what a change to it would do.
 fn settings(report: &ConfigReport) -> Lines {
     let mut lines = Lines::default();
     for setting in &report.settings {
         lines.put(format!("{}={}", setting.key, setting.value));
     }
-    if report.changed {
-        // A rehearsal reports what it would do, so it must not claim it saved.
-        lines.put(if report.rehearsed {
-            "would save"
-        } else {
-            "saved"
-        });
+    if let Some(review) = &report.review {
+        let change = &review.change;
+        lines.put(format!(
+            "{}: {} → {}",
+            change.key,
+            change.from.as_deref().unwrap_or(UNSET),
+            change.to
+        ));
+        for line in verdict(review, report.rehearsed) {
+            lines.put(line);
+        }
     }
-    // Said at the moment the choice was made, and only then — the checks
+    // Said at the moment the choice is being made, and only then — the checks
     // deliberately do not raise it again on every run afterwards.
     if let Some(consequence) = &report.consequence {
         lines.put(String::new());
         lines.put(consequence.clone());
     }
     lines
+}
+
+/// What a setting that has never been written reads as on the left of a difference.
+///
+/// Named rather than blank, because a blank left-hand side reads as a setting whose
+/// value is the empty string — which is a different thing, and one the operator would
+/// act on differently.
+const UNSET: &str = "(not set)";
+
+/// What became of a proposed change, said in the words that follow from it.
+///
+/// A refusal carries its own reason, so the standing line says only that nothing
+/// moved; the sentence underneath is the service's or the file format's, not this
+/// renderer's paraphrase of one.
+fn verdict(review: &Review, rehearsed: bool) -> Vec<String> {
+    match review.stance {
+        Stance::Applied => vec!["saved".to_owned()],
+        // A rehearsal reports what it would do, so it must not claim it saved.
+        Stance::Pending if rehearsed => vec!["would save".to_owned()],
+        Stance::Pending => vec![
+            "not saved: this change has consequences".to_owned(),
+            "run it again with --confirm to apply it".to_owned(),
+        ],
+        Stance::Unchanged => vec!["already set to that — nothing saved".to_owned()],
+        Stance::Blocked => {
+            let mut said = vec!["not saved — nothing was changed".to_owned()];
+            said.extend(review.refusal.clone());
+            said
+        }
+    }
 }
 
 /// One log line, as it should reach a terminal.
@@ -442,6 +477,7 @@ mod tests {
         Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport, UpgradeReport,
         VersionReport, WizardReport,
     };
+    use lemonfiber_core::reconfigure::{Change, Cost, Review, Stance};
     use lemonfiber_core::wizard::{Phase, Step};
 
     /// An archive's own account of itself, holding nothing.
@@ -648,51 +684,112 @@ mod tests {
             .contains("compose not reachable"));
     }
 
+    /// A proposal over `DATA_ROOT`, standing wherever the test needs it to.
+    fn proposal(stance: Stance) -> Review {
+        Review {
+            change: Change {
+                key: "DATA_ROOT".to_owned(),
+                from: Some("/data".to_owned()),
+                to: "/srv/media".to_owned(),
+                cost: Cost::Consequential,
+            },
+            stance,
+            refusal: matches!(stance, Stance::Blocked)
+                .then(|| "the replacement could not be proven".to_owned()),
+            proof: None,
+        }
+    }
+
+    /// A report over that proposal, listing the setting it names.
+    fn proposing(stance: Stance) -> ConfigReport {
+        ConfigReport {
+            settings: vec![SettingReport {
+                key: "DATA_ROOT".to_owned(),
+                value: "/data".to_owned(),
+                secret: false,
+            }],
+            changed: matches!(stance, Stance::Pending | Stance::Applied),
+            consequence: None,
+            rehearsed: false,
+            review: Some(proposal(stance)),
+        }
+    }
+
     #[test]
     fn a_change_that_costs_something_says_so_where_it_was_made() {
         // The only moment it is worth saying: the checks deliberately go quiet
         // about it afterwards, so if it is not here the operator never hears it.
         let report = ConfigReport {
-            settings: vec![SettingReport {
-                key: "VPN_PORT_FORWARDING".to_owned(),
-                value: "off".to_owned(),
-                secret: false,
-            }],
-            changed: true,
-            rehearsed: false,
             consequence: Some("seeding will be slower".to_owned()),
+            ..proposing(Stance::Applied)
         };
         let text = settings(&report).text();
         assert!(text.contains("saved"));
         assert!(text.contains("seeding will be slower"), "{text}");
     }
 
+    /// The difference is the thing an operator decides on, so it is on the screen
+    /// whatever became of it — including the run that decided nothing.
+    #[test]
+    fn a_proposed_change_shows_what_it_would_replace() {
+        let text = settings(&proposing(Stance::Pending)).text();
+        assert!(text.contains("DATA_ROOT: /data → /srv/media"), "{text}");
+        assert!(
+            text.contains("not saved: this change has consequences"),
+            "{text}"
+        );
+        assert!(text.contains("--confirm"), "{text}");
+    }
+
+    /// A setting that has never been written is named as unset rather than left
+    /// blank, which would read as a value that is the empty string.
+    #[test]
+    fn a_setting_with_nothing_in_it_yet_is_named_rather_than_left_blank() {
+        let mut fresh = proposal(Stance::Applied);
+        fresh.change.from = None;
+        let report = ConfigReport {
+            review: Some(fresh),
+            ..proposing(Stance::Applied)
+        };
+        let text = settings(&report).text();
+        assert!(text.contains("DATA_ROOT: (not set) →"), "{text}");
+    }
+
     #[test]
     fn settings_are_listed_and_a_change_says_whether_it_saved() {
-        let report = ConfigReport {
-            settings: vec![SettingReport {
-                key: "DATA_ROOT".to_owned(),
-                value: "/data".to_owned(),
-                secret: false,
-            }],
-            changed: true,
-            consequence: None,
-            rehearsed: false,
-        };
+        let report = proposing(Stance::Applied);
         assert!(settings(&report).text().contains("DATA_ROOT=/data"));
         assert!(settings(&report).text().contains("saved"));
         // A rehearsal must not claim it saved.
         let rehearsed = ConfigReport {
             rehearsed: true,
-            ..report.clone()
+            ..proposing(Stance::Pending)
         };
         assert!(settings(&rehearsed).text().contains("would save"));
-        // Nothing changed, nothing claimed.
-        let unchanged = ConfigReport {
+        // Nothing proposed, nothing claimed.
+        let read = ConfigReport {
             changed: false,
+            review: None,
             ..report
         };
-        assert!(!settings(&unchanged).text().contains("save"));
+        assert!(!settings(&read).text().contains("save"));
+    }
+
+    /// Two ways of writing nothing, and they are not the same thing: one is a
+    /// setting that already says what was asked for, the other a change the product
+    /// would not make. An operator told "nothing saved" for both would have no way
+    /// to tell which happened.
+    #[test]
+    fn nothing_written_says_which_of_the_two_reasons_it_was() {
+        let same = settings(&proposing(Stance::Unchanged)).text();
+        assert!(same.contains("already set to that"), "{same}");
+
+        let refused = settings(&proposing(Stance::Blocked)).text();
+        assert!(refused.contains("nothing was changed"), "{refused}");
+        assert!(
+            refused.contains("the replacement could not be proven"),
+            "{refused}"
+        );
     }
 
     /// An explanation is the word rather than a report that used one, so explaining
@@ -796,6 +893,7 @@ mod tests {
                 }],
                 changed: false,
                 rehearsed: false,
+                review: None,
                 consequence: None,
             }),
             Outcome::Alerts(AlertReport {
