@@ -464,10 +464,12 @@ See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/
 autostart & boot persistence, stack and self updates, rollback, and the service
 catalogue. Notifications are in, and so is part of the change journal `0.14.0`
 locks — that is recorded in the M4 table above, beside the seeding it was built
-for. Uninstall is in, in the row below. Of the rest, nothing is started: no
-command reconfigures, migrates, updates the stack or itself, rolls back, or lists
-a service catalogue, and the web surface is loopback-only by design rather than
-remote control. **Autostart is the one to be careful about**: setup asks the question
+for. Uninstall is in, in the row below, and so now are the two families `0.13.0`
+carries: every setup answer is individually revisable, and a setup already on the
+machine can be surveyed, adopted, stood beside, stood in place of, or carried
+across. Of the rest, nothing is started: no command updates the stack or itself,
+rolls back, or lists a service catalogue, and the web surface is loopback-only by
+design rather than remote control. **Autostart is the one to be careful about**: setup asks the question
 and takes a `--autostart` flag, and the wizard says in as many words that the
 answer has no configuration home and is collected but not written. An answered
 question is not a boot-persistent stack, and nothing here brings the *stack*
