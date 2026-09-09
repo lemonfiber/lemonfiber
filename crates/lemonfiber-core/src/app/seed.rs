@@ -308,6 +308,7 @@ const TEMP_PASSWORD_LOG_LINES: u32 = 200;
 
 #[cfg(test)]
 mod tests {
+    use crate::ports::filesystem::Storage;
     use std::sync::Arc;
 
     use super::applications::{application_kind, prowlarr_source, syncable_arrs};

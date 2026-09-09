@@ -48,7 +48,7 @@ async fn mounted(ctx: &Ctx, seen: &[Container]) -> Vec<(PathBuf, StorageFacts)> 
 
     let mut found = Vec::new();
     for path in paths {
-        found.push((path.clone(), ctx.filesystem.describe(path).await));
+        found.push((path.clone(), ctx.storage().describe(path).await));
     }
     found
 }

@@ -21,7 +21,7 @@ use lemonfiber_core::app::{claimed, dispatch, released, Command, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts,
+    Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
 };
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::support::Reporting;
@@ -83,7 +83,10 @@ impl FileSystem for Remembering {
     async fn ownership(&self, _path: &Path) -> Option<Ownership> {
         None
     }
+}
 
+#[async_trait]
+impl Storage for Remembering {
     async fn describe(&self, _path: &Path) -> StorageFacts {
         StorageFacts {
             point: PathBuf::new(),

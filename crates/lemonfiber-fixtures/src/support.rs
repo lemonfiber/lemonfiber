@@ -390,6 +390,10 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
     ) -> Option<lemonfiber_ports::filesystem::Ownership> {
         None
     }
+}
+
+#[async_trait]
+impl lemonfiber_ports::filesystem::Storage for SeedFs {
     async fn describe(&self, path: &std::path::Path) -> lemonfiber_ports::filesystem::StorageFacts {
         let named = path.to_string_lossy().into_owned();
         self.elsewhere

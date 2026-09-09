@@ -295,7 +295,9 @@ mod tests {
         Check, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
         ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
     };
-    use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, Ownership, StorageFacts};
+    use crate::ports::filesystem::{
+        Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
+    };
 
     /// Room to spare, so a test that is not about space never trips the floor.
     const AMPLE: u64 = 500 * 1024 * 1024 * 1024;
@@ -381,6 +383,10 @@ mod tests {
         async fn ownership(&self, _path: &Path) -> Option<Ownership> {
             self.owner
         }
+    }
+
+    #[async_trait]
+    impl Storage for Bench {
         async fn describe(&self, _path: &Path) -> StorageFacts {
             self.facts.clone()
         }
