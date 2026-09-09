@@ -412,11 +412,8 @@ mod tests {
 
         assert_eq!(stance(&outcome), Some(Stance::Unchanged));
         assert_eq!(consequence(&outcome), None);
-        let changed = match &outcome {
-            Ok(Outcome::Config(report)) => Some(report.changed),
-            _ => None,
-        };
-        assert_eq!(changed, Some(false));
+        let unchanged = matches!(&outcome, Ok(Outcome::Config(report)) if !report.changed);
+        assert!(unchanged, "a change that changes nothing reported one");
     }
 
     #[tokio::test]
