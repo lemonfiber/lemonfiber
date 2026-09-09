@@ -73,6 +73,8 @@ pub const CLIENTS: Kind = Kind("clients");
 
 /// What this machine keeps running for lemonfiber.
 pub const HOSTING: Kind = Kind("hosting");
+/// Everything lemonfiber changed, and how far each could be put back.
+pub const HISTORY: Kind = Kind("history");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
 /// What copying an operator's own records across came to.
@@ -166,6 +168,7 @@ pub const ALL: &[Kind] = &[
     GLOSSARY,
     CLIENTS,
     HOSTING,
+    HISTORY,
     HOUSEHOLD,
     IMPORT,
     INVITATION,

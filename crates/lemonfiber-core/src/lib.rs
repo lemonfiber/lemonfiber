@@ -96,6 +96,7 @@ pub mod reconfigure;
 pub mod recyclarr;
 pub mod repair;
 pub mod retry;
+pub mod rollback;
 pub mod sabnzbd;
 pub mod secret;
 pub mod seed;

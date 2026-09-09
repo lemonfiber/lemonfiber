@@ -1,4 +1,4 @@
-//! The twenty-six reads: one endpoint per question a command already answers, plus
+//! The twenty-seven reads: one endpoint per question a command already answers, plus
 //! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -31,6 +31,7 @@ mod credentials;
 mod diagnosis;
 mod door;
 mod glossary;
+mod history;
 mod hosting;
 mod items;
 mod migration;
@@ -81,6 +82,7 @@ pub fn routes() -> Router<Serving> {
         .merge(space::routes())
         .merge(bandwidth::routes())
         .merge(hosting::routes())
+        .merge(history::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.

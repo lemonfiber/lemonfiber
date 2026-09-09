@@ -119,6 +119,12 @@ pub const ALERTS: &str = "/api/alerts";
 /// on somebody's own stack, so each belongs behind a named action rather than a door.
 pub const MIGRATION: &str = "/api/migration";
 
+/// Everything lemonfiber changed, and how far each could be put back.
+///
+/// The record only. Putting a change back is an act on a running stack, so it belongs
+/// behind a named action rather than a door a browser opens by asking.
+pub const HISTORY: &str = "/api/history";
+
 /// Where the disk stands, where the room went, and what could be got back.
 ///
 /// A read rather than the action of the same name, and the two answer with the same
@@ -206,6 +212,7 @@ pub const OFFERED: &[&str] = &[
     ALERTS,
     CREDENTIALS,
     MIGRATION,
+    HISTORY,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -325,6 +332,9 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // The survey and nothing else, which is the only part of migration that changes
         // nothing.
         MIGRATION => Ok(Command::Migrate(MigrateAction::Survey)),
+        // The record and nothing else. What could be put back is said here; asking for it
+        // to be is an action.
+        HISTORY => Ok(Command::History),
         CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
