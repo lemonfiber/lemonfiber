@@ -24,7 +24,7 @@ use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
-use lemonfiber_core::app::{Command, Ctx, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, Ctx, QualityAction, Setting, Waiting};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::quality::Preset;
@@ -621,6 +621,46 @@ fn an_action_confined_to_our_own_files_is_answered_with_its_outcome() {
     };
     assert_eq!(answering(&config), Answering::Now);
     assert_eq!(answering(&reapply), Answering::Now);
+}
+
+#[test]
+fn a_change_asked_to_wait_for_the_downloads_is_answered_with_a_name_for_the_work() {
+    // The same change, asked to let what is still coming down finish first. That can
+    // last an hour, and a request held open for an hour is a request that has already
+    // failed — so this one is the exception among settings changes rather than the
+    // rule for them.
+    let waiting = Arguments {
+        key: Some("LEMONFIBER_TORRENT".to_owned()),
+        value: Some("off".to_owned()),
+        wait: Waiting::ForTheDownloads,
+        ..Arguments::default()
+    };
+    let Some(dropping) = command("config-set", waiting) else {
+        unreachable!("a setting with both halves reaches a command");
+    };
+    assert_eq!(answering(&dropping), Answering::Later);
+}
+
+#[test]
+fn a_change_carries_both_words_a_refused_one_is_answered_with() {
+    // A change reconfiguration turned away is answered by confirming it or by waiting
+    // for what is in flight, and both have to reach the core from a browser — or the
+    // refusal a browser is shown is one it has no way to answer.
+    let answered = Arguments {
+        key: Some("DATA_ROOT".to_owned()),
+        value: Some("/srv".to_owned()),
+        confirm: true,
+        wait: Waiting::ForTheDownloads,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        command("config-set", answered),
+        Some(Command::ConfigSet(
+            Setting::to("DATA_ROOT", "/srv")
+                .agreed(true)
+                .waiting(Waiting::ForTheDownloads)
+        ))
+    );
 }
 
 #[tokio::test]

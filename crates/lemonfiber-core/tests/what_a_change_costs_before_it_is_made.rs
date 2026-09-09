@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use common::stack::project;
 use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Setting};
 use lemonfiber_core::config::{
     store, Settings, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, PROVIDER_PORT_KEY,
 };
@@ -64,11 +64,7 @@ fn reaching(env_file: PathBuf, answer: Answer) -> Ctx {
 
 /// What a change to one setting came to.
 async fn changing(ctx: &Ctx, key: &str, value: &str, confirmed: bool) -> Option<ConfigReport> {
-    let asked = Command::ConfigSet {
-        key: key.to_owned(),
-        value: value.to_owned(),
-        confirmed,
-    };
+    let asked = Command::ConfigSet(Setting::to(key, value).agreed(confirmed));
     match dispatch(asked, ctx).await {
         Ok(Outcome::Config(report)) => Some(report),
         _ => None,
@@ -130,11 +126,7 @@ async fn the_same_change_confirmed_is_the_one_that_lands() {
 #[tokio::test]
 async fn a_staged_change_serialises_with_its_difference_and_where_it_stands() {
     let path = env_at("envelope", "DATA_ROOT=/srv/old\n");
-    let asked = Command::ConfigSet {
-        key: DATA_ROOT_KEY.to_owned(),
-        value: "/srv/new".to_owned(),
-        confirmed: false,
-    };
+    let asked = Command::ConfigSet(Setting::to(DATA_ROOT_KEY, "/srv/new"));
     let json = dispatch(asked, &ctx(path))
         .await
         .ok()

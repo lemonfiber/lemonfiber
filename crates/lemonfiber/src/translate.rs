@@ -10,7 +10,7 @@ use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, MigrateAction, QualityAction, Removing,
+    Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -220,11 +220,12 @@ pub(crate) fn configuration(action: ConfigAction) -> Command {
             key,
             value,
             confirm,
-        } => Command::ConfigSet {
-            key,
-            value,
-            confirmed: confirm,
-        },
+            wait,
+        } => Command::ConfigSet(
+            Setting::to(&key, &value)
+                .agreed(confirm)
+                .waiting(wait.into()),
+        ),
         ConfigAction::Show => Command::ConfigShow,
     }
 }
@@ -441,7 +442,7 @@ pub(crate) fn credentials(asked: RawCredentials) -> Command {
 
 #[cfg(test)]
 mod tests {
-    use lemonfiber_core::app::{Allowance, Command, QualityAction};
+    use lemonfiber_core::app::{Allowance, Command, QualityAction, Setting, Waiting};
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
@@ -753,13 +754,10 @@ mod tests {
             configuration(ConfigAction::Set {
                 key: "DATA_ROOT".to_owned(),
                 value: "/srv".to_owned(),
-                confirm: false
+                confirm: false,
+                wait: false
             }),
-            Command::ConfigSet {
-                key: "DATA_ROOT".to_owned(),
-                value: "/srv".to_owned(),
-                confirmed: false
-            }
+            Command::ConfigSet(Setting::to("DATA_ROOT", "/srv"))
         );
         // The agreement carried through rather than acted on here: a change staged
         // for want of one is what the core answers with, not something a translation
@@ -768,13 +766,23 @@ mod tests {
             configuration(ConfigAction::Set {
                 key: "DATA_ROOT".to_owned(),
                 value: "/srv".to_owned(),
-                confirm: true
+                confirm: true,
+                wait: false
             }),
-            Command::ConfigSet {
-                key: "DATA_ROOT".to_owned(),
-                value: "/srv".to_owned(),
-                confirmed: true
-            }
+            Command::ConfigSet(Setting::to("DATA_ROOT", "/srv").agreed(true))
+        );
+        // And the offer to wait carried through the same way: what waiting means is
+        // the core's answer for every surface, not something a translation decides.
+        assert_eq!(
+            configuration(ConfigAction::Set {
+                key: "LEMONFIBER_TORRENT".to_owned(),
+                value: "off".to_owned(),
+                confirm: false,
+                wait: true
+            }),
+            Command::ConfigSet(
+                Setting::to("LEMONFIBER_TORRENT", "off").waiting(Waiting::ForTheDownloads)
+            )
         );
         assert_eq!(configuration(ConfigAction::Show), Command::ConfigShow);
     }
@@ -1167,7 +1175,7 @@ mod tests {
     #[test]
     fn asking_a_removal_to_wait_reaches_it_as_a_wait() {
         use lemonfiber::cli::RawRemoval;
-        use lemonfiber_core::app::{Removing, Waiting};
+        use lemonfiber_core::app::Removing;
         use lemonfiber_core::uninstall::Tier;
 
         let stopping = || Removing::surveying(Tier::Stop).confirmed(true);

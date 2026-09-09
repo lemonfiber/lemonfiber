@@ -34,7 +34,7 @@ pub use answers::{
 };
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
 pub use recovery::{described, Choice, Recovery, Resolution, Status};
-pub use steps::{offer_setup, Direction, Phase, Progress, Step};
+pub use steps::{offer_setup, opened_by, Direction, Phase, Progress, Step};
 
 /// The setup wizard: where the operator is, what they have answered, and the
 /// environment that decides which questions apply.
@@ -117,23 +117,21 @@ impl Wizard {
 
     /// Whether a step is presented at all in this environment.
     ///
-    /// Only `ServiceUser` is conditional: the container user is worth asking about
-    /// only where file ownership is real rather than mapped. Everything else is
-    /// asked or shown regardless.
+    /// Only `ServiceUser` is conditional on the machine: the container user is worth
+    /// asking about only where file ownership is real rather than mapped. Everything
+    /// else turns on the protocols chosen, which is [`Step::wanted_by`]'s answer —
+    /// the same one reconfiguration reads to say what adding a protocol opens, so the
+    /// walk and the change cannot come to different lists. Nothing chosen yet reads as
+    /// nothing configured, which is what leaves the three download steps out of a walk
+    /// that has not reached the protocol question.
     #[must_use]
     pub const fn applies(&self, step: Step) -> bool {
         match step {
             Step::ServiceUser => self.environment.ownership_is_real(),
-            // Credentials are for the download services; a library-only run that
-            // chose neither protocol has none to give, so the step is passed over.
-            Step::Credentials => matches!(self.progress.answers.protocols, Some(p) if p.any()),
-            // A Usenet provider is only for a Usenet run; a torrent-only or
-            // library-only one has no provider to give.
-            Step::Provider => matches!(self.progress.answers.protocols, Some(p) if p.usenet),
-            // Only torrents expose the home address to peers, so only a torrent run
-            // has a tunnel worth asking about. Usenet goes to one provider over TLS.
-            Step::Vpn => matches!(self.progress.answers.protocols, Some(p) if p.torrent),
-            _ => true,
+            asked => asked.wanted_by(match self.progress.answers.protocols {
+                Some(protocols) => protocols,
+                None => Protocols::none(),
+            }),
         }
     }
 
@@ -820,6 +818,50 @@ mod tests {
         assert!(
             plan.settings().len() > 10,
             "a plan this small is not exercising the writer"
+        );
+    }
+
+    #[test]
+    fn every_setting_a_step_names_is_one_the_plan_it_belongs_to_writes() {
+        // The other end of the same loop. `Step::settings` is what reconfiguration
+        // reads to say which credentials adding a protocol opens, and a key named
+        // there that setup never writes would send an operator looking for a question
+        // this product does not ask.
+        let mut wizard = on_native_linux();
+        answer_all(&mut wizard);
+        wizard
+            .answer(Answer::Credentials(Some(super::Indexer {
+                url: "http://indexer.test/api".to_owned(),
+                key: "the-key".to_owned(),
+                validated: true,
+            })))
+            .unwrap_or(());
+        wizard
+            .answer(Answer::Provider(Some(super::Provider {
+                host: "news.provider.test".to_owned(),
+                port: 563,
+                user: "person".to_owned(),
+                pass: "the-login".to_owned(),
+                tls: true,
+                validated: true,
+            })))
+            .unwrap_or(());
+
+        let plan = wizard.plan();
+        let written: Vec<&str> = plan
+            .settings()
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
+        let named: Vec<&str> = Step::ORDER
+            .into_iter()
+            .flat_map(|step| step.settings().iter().copied())
+            .collect();
+        assert!(named.len() > 10, "the steps name too little to be a loop");
+        let unwritten: Vec<&&str> = named.iter().filter(|key| !written.contains(key)).collect();
+        assert!(
+            unwritten.is_empty(),
+            "these steps name settings setup never writes: {unwritten:?}"
         );
     }
 

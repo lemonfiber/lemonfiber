@@ -671,13 +671,16 @@ Options:
       --confirm
           Go ahead, having read what the change affects.
 
-          Also stores a replacement credential that nothing could be reached to prove — for a machine that is offline, or a provider it cannot see.
+          Also stores a replacement credential that nothing could be reached to prove — for a machine that is offline, or a provider it cannot see, and writes over an edit made outside lemonfiber, or stops a download that is still coming down.
 
       --json
           Print machine-readable output
 
       --dry-run
           Say what would happen, and change nothing
+
+      --wait
+          Let anything still coming down finish before the change is made
 
       --force
           Take the stack from a run that claimed it and did not give it back

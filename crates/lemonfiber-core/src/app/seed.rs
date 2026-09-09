@@ -25,11 +25,13 @@ pub(super) mod identity;
 mod reset;
 
 use applications::{seed_applications, skipped};
-use arrs::{arr_download_clients, read_servarr_key, seed_arr, servarr_arrs, ArrSeeding};
-use baseline::{
-    escalate_broken_roots, load_baseline, save_baseline, wanted_roots, Loaded, DATA_ROOT,
-    SCHEMA_VERSION_FIELD,
-};
+use arrs::{arr_download_clients, read_servarr_key, seed_arr, ArrSeeding};
+use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FIELD};
+// Reached by reconfiguration as well as by seeding: what the \*arrs that file media
+// are, and the record of what lemonfiber last wrote. One answer to each, rather than a
+// second reader beside this one that could disagree with it.
+pub(in crate::app) use arrs::servarr_arrs;
+pub(in crate::app) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{
     category_for, download_clients, qbittorrent_target, read_sabnzbd_key, seed_qbittorrent_password,
 };

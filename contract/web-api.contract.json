@@ -1639,6 +1639,32 @@
         "data"
       ],
       "$defs": {
+        "Active": {
+          "description": "One download still coming down when a reduction was asked for.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "What it is, as the client names it.",
+              "type": "string"
+            },
+            "progress": {
+              "description": "How far along, from zero to a hundred.",
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "protocol": {
+              "description": "Which client has it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "protocol",
+            "name",
+            "progress"
+          ]
+        },
         "Change": {
           "description": "The difference between the configuration in force and the one proposed.\n\nOne setting, because one call changes one setting. What makes it a diff rather than\na value is `from`: an operator deciding whether to go ahead is deciding between two\nthings, and a report that showed only the new one would be asking them to remember\nthe old one correctly.",
           "type": "object",
@@ -1728,6 +1754,148 @@
             }
           ]
         },
+        "Edited": {
+          "description": "A setting changed outside lemonfiber since it last wrote one.\n\nBoth sides, so the operator chooses between them rather than being told one of\nthem lost. Values a listing withholds are withheld here too — a report a script\ncan log must not be the one place a password is printed.",
+          "type": "object",
+          "properties": {
+            "found": {
+              "description": "What the file holds now.",
+              "type": "string"
+            },
+            "secret": {
+              "description": "Whether either value was withheld rather than shown.",
+              "type": "boolean"
+            },
+            "wrote": {
+              "description": "What lemonfiber last wrote there.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "wrote",
+            "found",
+            "secret"
+          ]
+        },
+        "Findings": {
+          "description": "What a proposed change comes to on this machine.\n\nEmpty on every change that comes to nothing beyond its value, which is most of\nthem: a report full of empty lists about a timezone would teach the operator to\nskip the one that matters.",
+          "type": "object",
+          "properties": {
+            "active": {
+              "description": "What is still coming down, where a reduction would interrupt it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Active"
+              }
+            },
+            "edited": {
+              "description": "The hand-edit found in the configuration file, where one was found.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Edited"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "keeps": {
+              "description": "What this change leaves exactly as it is, said in full — because an operator\ndropping a way of downloading is weighing whether they lose what they built\nwith it.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "library": {
+              "description": "The library paths the services hold, and what moving the data location does\nto each. Empty for every change that does not move it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/LibraryPath"
+              }
+            },
+            "opens": {
+              "description": "What this change newly asks the operator for, in the order they meet it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Opening"
+              }
+            },
+            "stops": {
+              "description": "What this change stops running, by service name.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "opens",
+            "stops",
+            "keeps",
+            "library",
+            "active"
+          ]
+        },
+        "LibraryPath": {
+          "description": "One library path a service files into, and what moving the data location does\nto it.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why it does or does not, in the operator's terms.",
+              "type": "string"
+            },
+            "carried": {
+              "description": "Whether the library at this path survives the move.",
+              "type": "boolean"
+            },
+            "host": {
+              "description": "The host directory it would resolve to after the move, where the move can\nresolve it at all.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The path as that service holds it, which is a path inside its container.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The service holding it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "path",
+            "carried",
+            "because"
+          ]
+        },
+        "Opening": {
+          "description": "One thing a way of downloading newly asks the operator for.\n\nWhat is opened and nothing beside it: an operator adding Usenet is shown the\nUsenet provider and the settings its login is kept in, and never the tunnel,\nwhich they neither need nor asked about.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why this protocol needs it.",
+              "type": "string"
+            },
+            "setting": {
+              "description": "The setting its answer is kept in, where it is kept in one. Absent for an\naccount the operator has to go and obtain, which no setting holds.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "what": {
+              "description": "What it is, in the operator's terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "because"
+          ]
+        },
         "Review": {
           "description": "A proposed change, read against what is in force, and where it stands.",
           "type": "object",
@@ -1735,6 +1903,17 @@
             "change": {
               "description": "The difference, as it would be applied.",
               "$ref": "#/$defs/Change"
+            },
+            "findings": {
+              "description": "What the change comes to on this machine, beyond the value it changes.\n\nFilled by whoever went and asked — the services where they file, the clients\nwhat they are fetching — and empty on every change that comes to nothing\nbeyond its value. Carried on a staged proposal as well as an applied one: a\nreview that withheld this until after the yes would be asking for a yes to\nsomething unstated.",
+              "$ref": "#/$defs/Findings",
+              "default": {
+                "active": [],
+                "keeps": [],
+                "library": [],
+                "opens": [],
+                "stops": []
+              }
             },
             "proof": {
               "description": "What proving the replacement credential came to, where one was proven.\n\nA replacement is proven against its live service before the credential it\nreplaces is discarded, so this is present for exactly those settings and\nabsent everywhere else.",

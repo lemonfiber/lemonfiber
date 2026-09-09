@@ -22,7 +22,7 @@
 use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Waiting, HOSTABLE};
+use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::{Tier, TIERS};
 
@@ -99,17 +99,20 @@ const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 /// Unconfirmed it is the review — the difference between what the setting holds and
 /// what it would hold, and what changing it affects — for every change that costs
 /// something, so what a browser agrees to is what it was shown.
-fn setting(key: Option<String>, value: Option<String>, confirm: bool) -> Result<Command, Refused> {
+fn setting(
+    key: Option<String>,
+    value: Option<String>,
+    confirm: bool,
+    wait: Waiting,
+) -> Result<Command, Refused> {
     let missing = |argument: &str| Refused::Missing {
         action: "config-set".to_owned(),
         argument: argument.to_owned(),
     };
     match (key, value) {
-        (Some(key), Some(value)) => Ok(Command::ConfigSet {
-            key,
-            value,
-            confirmed: confirm,
-        }),
+        (Some(key), Some(value)) => Ok(Command::ConfigSet(
+            Setting::to(&key, &value).agreed(confirm).waiting(wait),
+        )),
         (None, _) => Err(missing("key")),
         (_, None) => Err(missing("value")),
     }
@@ -228,7 +231,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "switch" => Ok(Command::Switch { forms }),
         "restart" => Ok(Command::Restart { forms, services }),
         "pull" => Ok(Command::Pull { forms }),
-        "config-set" => setting(key, value, confirm),
+        "config-set" => setting(key, value, confirm, wait),
         "seed" => Ok(Command::Seed),
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),

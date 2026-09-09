@@ -189,9 +189,14 @@ pub enum ConfigAction {
         /// Go ahead, having read what the change affects.
         ///
         /// Also stores a replacement credential that nothing could be reached to
-        /// prove — for a machine that is offline, or a provider it cannot see.
+        /// prove — for a machine that is offline, or a provider it cannot see, and
+        /// writes over an edit made outside lemonfiber, or stops a download that is
+        /// still coming down.
         #[arg(long)]
         confirm: bool,
+        /// Let anything still coming down finish before the change is made.
+        #[arg(long)]
+        wait: bool,
     },
     /// Show every setting, with credentials withheld.
     Show,

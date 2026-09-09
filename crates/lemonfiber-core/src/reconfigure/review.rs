@@ -20,7 +20,7 @@
 
 use serde::Serialize;
 
-use super::{consequential, cost, Cost};
+use super::{consequential, cost, Cost, Findings};
 use crate::config::store::showing;
 use crate::validate::Validation;
 
@@ -80,6 +80,15 @@ pub struct Review {
     /// absent everywhere else.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proof: Option<Validation>,
+    /// What the change comes to on this machine, beyond the value it changes.
+    ///
+    /// Filled by whoever went and asked — the services where they file, the clients
+    /// what they are fetching — and empty on every change that comes to nothing
+    /// beyond its value. Carried on a staged proposal as well as an applied one: a
+    /// review that withheld this until after the yes would be asking for a yes to
+    /// something unstated.
+    #[serde(default)]
+    pub findings: Findings,
 }
 
 impl Review {
@@ -107,6 +116,7 @@ impl Review {
             stance,
             refusal: None,
             proof: None,
+            findings: Findings::default(),
         }
     }
 
@@ -134,10 +144,23 @@ impl Review {
     }
 
     /// The same proposal, turned away with the file left as it was.
+    ///
+    /// The sentence carries the way past it where there is one — a replacement
+    /// nothing could reach, or work still in flight, are the operator's own call and
+    /// each says how to make it. A refusal nobody may override says what to do
+    /// instead, because a refusal with no way past it is what people go and edit the
+    /// file to get around.
     #[must_use]
     pub fn blocked(mut self, refusal: String) -> Self {
         self.stance = Stance::Blocked;
         self.refusal = Some(refusal);
+        self
+    }
+
+    /// The same proposal, carrying what was found about it on this machine.
+    #[must_use]
+    pub fn finding(mut self, findings: Findings) -> Self {
+        self.findings = findings;
         self
     }
 }

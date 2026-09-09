@@ -26,7 +26,7 @@ use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::{Answer, Chosen, Decision, Keeping};
-use lemonfiber_core::app::{Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, QualityAction, Setting, Waiting};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::ports::service::Unrated;
@@ -66,7 +66,6 @@ fn carries_forms(command: &Command) -> bool {
     }
 }
 
-/// Whether the command has the services it was given in it.
 /// Whether the command has the wait it was asked for in it.
 fn carries_wait(command: &Command) -> bool {
     matches!(
@@ -74,7 +73,10 @@ fn carries_wait(command: &Command) -> bool {
         Command::Down {
             wait: Waiting::ForTheDownloads,
             ..
-        }
+        } | Command::ConfigSet(Setting {
+            waiting: Waiting::ForTheDownloads,
+            ..
+        })
     ) || matches!(command, Command::Uninstall(asked) if asked.waiting == Waiting::ForTheDownloads)
 }
 
@@ -118,10 +120,10 @@ fn carries_media_type(command: &Command) -> bool {
 fn carries_agreement(command: &Command) -> bool {
     matches!(
         command,
-        Command::ConfigSet {
+        Command::ConfigSet(Setting {
             confirmed: true,
             ..
-        } | Command::Quality(QualityAction::Set { confirm: true, .. })
+        }) | Command::Quality(QualityAction::Set { confirm: true, .. })
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
             | Command::Forget { confirm: true }
