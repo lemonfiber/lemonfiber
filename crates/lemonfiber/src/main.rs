@@ -297,6 +297,7 @@ async fn main() -> ExitCode {
             Ok(command) => command,
             Err(code) => return ExitCode::from(code),
         },
+        Request::History => Command::History,
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::Outbound => Command::Outbound,

@@ -31,6 +31,7 @@ Commands:
   household     Show who is in the household, what each may watch and ask for, and what each asked for
   walkthrough   Add one thing, end to end, and watch every step of it happen
   explain       Say what one of this product's words means
+  history       Show everything lemonfiber changed, newest first, and how far each could be put back
   stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door    Name the one address to send somebody who lives here
   outbound      List everything that leaves this machine, and what refusing each of it costs
@@ -1387,6 +1388,32 @@ Usage: lemonfiber explain [OPTIONS] [WORD]...
 Arguments:
   [WORD]...
           The word, as you would say it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber history`
+
+```text
+Show everything lemonfiber changed, newest first, and how far each could be put back.
+
+The record only. Putting one back is asked for by name, because it acts on a running stack, and this says beforehand which of them could be.
+
+Usage: lemonfiber history [OPTIONS]
 
 Options:
       --json

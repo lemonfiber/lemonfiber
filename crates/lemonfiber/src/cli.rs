@@ -308,6 +308,12 @@ pub enum Request {
         /// The word, as you would say it.
         word: Vec<String>,
     },
+    /// Show everything lemonfiber changed, newest first, and how far each could be put
+    /// back.
+    ///
+    /// The record only. Putting one back is asked for by name, because it acts on a
+    /// running stack, and this says beforehand which of them could be.
+    History,
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,

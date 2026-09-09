@@ -22,6 +22,7 @@ mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
+mod history;
 mod hosting;
 mod invitation;
 mod migration;
@@ -220,6 +221,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Preview(plan) => stack::preview(plan),
         Outcome::Config(report) => settings(report),
         Outcome::Alerts(report) => alerts(report),
+        Outcome::History(report) => history::history(report),
         Outcome::Migration(report) => migration::migration(report),
         Outcome::Adoption(report) => migration::adoption(report),
         Outcome::Beside(report) => migration::beside(report),

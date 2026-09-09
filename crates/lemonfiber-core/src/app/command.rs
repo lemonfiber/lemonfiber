@@ -182,6 +182,8 @@ pub enum Command {
     /// Show or change what the operator is told about, which setup asks for once
     /// and nothing else could revise.
     Alerts(AlertAction),
+    /// Show everything lemonfiber changed, and how far each could be put back.
+    History,
     /// Report what is already on this machine, so an operator with a setup of their
     /// own can see what lemonfiber found before deciding anything.
     Migrate(MigrateAction),

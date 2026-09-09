@@ -40,8 +40,8 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
-    named, ALERTS, BANDWIDTH, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR, HOSTING,
-    MIGRATION, OUTBOUND, QUALITY, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, VERSION,
+    named, ALERTS, BANDWIDTH, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR, HISTORY,
+    HOSTING, MIGRATION, OUTBOUND, QUALITY, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -179,6 +179,12 @@ static AFTER: &[Question] = &[
             "the stacks already standing here, the ports they hold, and what could not be taken \
                 over",
         read: MIGRATION,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what has already been changed",
+        about: "every change lemonfiber made, what it did, and how far each could be put back",
+        read: HISTORY,
         needs: Needed::Nothing,
     },
     Question {

@@ -15,10 +15,10 @@ use super::{archives, backup, repair, restore, support};
 
 use crate::model::{
     kind, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
-    FormsReport, FrontDoorReport, HostingReport, HouseholdReport, ImportReport, LifecycleReport,
-    MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport, StatusReport,
-    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport, WalkthroughReport,
-    WizardReport,
+    FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdReport, ImportReport,
+    LifecycleReport, MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport,
+    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
+    WalkthroughReport, WizardReport,
 };
 
 /// What dispatching produced.
@@ -38,6 +38,8 @@ pub enum Outcome {
     Quality(QualityReport),
     /// What the operator is told about, and what changing it came to.
     Alerts(AlertReport),
+    /// Everything lemonfiber changed, and how far each could be put back.
+    History(HistoryReport),
     /// What is already on this machine, before anything is proposed.
     Migration(MigrationReport),
     /// What adopting a setup already here came to, or would come to.
@@ -126,6 +128,7 @@ impl Outcome {
             Self::Config(_) => crate::model::kind::CONFIG,
             Self::Quality(_) => kind::QUALITY,
             Self::Alerts(_) => kind::ALERTS,
+            Self::History(_) => kind::HISTORY,
             Self::Migration(_) => kind::MIGRATION,
             Self::Adoption(_) => kind::ADOPTION,
             Self::Beside(_) => kind::BESIDE,
@@ -178,6 +181,7 @@ impl serde::Serialize for Outcome {
             Self::Config(report) => report.serialize(serializer),
             Self::Quality(report) => report.serialize(serializer),
             Self::Alerts(report) => report.serialize(serializer),
+            Self::History(report) => report.serialize(serializer),
             Self::Migration(report) => report.serialize(serializer),
             Self::Adoption(report) => report.serialize(serializer),
             Self::Beside(report) => report.serialize(serializer),
