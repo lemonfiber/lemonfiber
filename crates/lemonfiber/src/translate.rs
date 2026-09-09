@@ -201,6 +201,9 @@ pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
         Some(MigrateCommand::Adopt { confirm }) => MigrateAction::Adopt {
             confirmed: *confirm,
         },
+        Some(MigrateCommand::Beside { confirm }) => MigrateAction::Beside {
+            confirmed: *confirm,
+        },
     }
 }
 

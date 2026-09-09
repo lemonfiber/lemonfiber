@@ -26,6 +26,7 @@ mod arrangement;
 mod asking;
 pub mod backup;
 mod bandwidth;
+mod beside;
 pub mod bundle;
 mod command;
 pub mod conditions;
@@ -2213,6 +2214,7 @@ mod tests {
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
+                | Outcome::Beside(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2264,6 +2266,7 @@ mod tests {
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
+                | Outcome::Beside(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3097,6 +3100,7 @@ mod tests {
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
+                | Outcome::Beside(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4107,6 +4111,7 @@ mod tests {
                 | Outcome::Alerts(_)
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
+                | Outcome::Beside(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)

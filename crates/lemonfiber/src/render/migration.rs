@@ -10,7 +10,7 @@
 //! bare machine and one of a full stack are the same code taking different turns
 //! rather than one function knowing about every case at once.
 
-use lemonfiber_core::model::{AdoptReport, MigrationReport, UnsupportedReport};
+use lemonfiber_core::model::{AdoptReport, BesideReport, MigrationReport, UnsupportedReport};
 
 use super::Lines;
 
@@ -84,6 +84,34 @@ pub(super) fn adoption(report: &AdoptReport) -> Lines {
     } else {
         lines.put("nothing has been changed; add --confirm to go ahead".to_owned());
     }
+    lines
+}
+
+/// What standing beside a setup already here came to, or would come to.
+pub(super) fn beside(report: &BesideReport) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(refused) = &report.refused {
+        lines.put(format!("not standing beside: {refused}"));
+        return lines;
+    }
+    if report.applied {
+        lines.put("lemonfiber now listens beside what was already here:".to_owned());
+    } else {
+        lines.put("standing beside what is here, lemonfiber would listen on:".to_owned());
+    }
+    for moved in &report.ports {
+        lines.put(format!(
+            "  {} — {} instead of {}",
+            moved.service, moved.to, moved.from
+        ));
+    }
+    lines.put(String::new());
+    if let Some(written) = &report.written {
+        lines.put(format!("written to {written}"));
+    } else {
+        lines.put("nothing has been written; add --confirm to go ahead".to_owned());
+    }
+    lines.put("nothing of the setup already here was touched".to_owned());
     lines
 }
 

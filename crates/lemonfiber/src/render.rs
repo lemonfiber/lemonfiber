@@ -221,6 +221,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Alerts(report) => alerts(report),
         Outcome::Migration(report) => migration::migration(report),
         Outcome::Adoption(report) => migration::adoption(report),
+        Outcome::Beside(report) => migration::beside(report),
         Outcome::Quality(report) => quality::quality(report),
         Outcome::Upgrade(report) => quality::upgrade(report),
         Outcome::Music(report) => quality::music(report),

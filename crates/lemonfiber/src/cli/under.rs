@@ -91,6 +91,15 @@ pub enum MigrateCommand {
         #[arg(long)]
         confirm: bool,
     },
+    /// Run alongside the setup already here, on ports nothing else is using.
+    ///
+    /// Without `--confirm` it says where each service would listen and writes nothing.
+    /// Nothing of the existing setup is touched either way.
+    Beside {
+        /// Go ahead, having seen where each service would listen.
+        #[arg(long)]
+        confirm: bool,
+    },
 }
 
 /// What to do with what you are told about.

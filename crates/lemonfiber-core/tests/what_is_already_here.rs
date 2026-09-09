@@ -17,8 +17,8 @@ use std::sync::Arc;
 use common::stack::project;
 use lemonfiber_core::app::{dispatch, Command, Ctx, MigrateAction, Outcome};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::model::AdoptReport;
 use lemonfiber_core::model::MigrationReport;
+use lemonfiber_core::model::{AdoptReport, BesideReport};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
@@ -349,4 +349,72 @@ async fn adopting_that_cannot_write_its_answer_reports_the_failure() {
     let refused = dispatch(asked, &ctx).await;
     let _ = std::fs::remove_file(&blocked);
     assert!(refused.is_err(), "{refused:?}");
+}
+
+/// What standing beside answered, or nothing where it refused to answer at all.
+async fn standing(ctx: &Ctx, confirmed: bool) -> Option<BesideReport> {
+    match dispatch(Command::Migrate(MigrateAction::Beside { confirmed }), ctx).await {
+        Ok(Outcome::Beside(report)) => Some(report),
+        _ => None,
+    }
+}
+
+#[tokio::test]
+async fn standing_beside_unconfirmed_says_where_it_would_listen_and_writes_nothing() {
+    let env = scratch("beside-rehearsed");
+    let found = standing(&theirs("4.0.15", Some(env.clone())), false).await;
+    assert_eq!(
+        found.as_ref().map(|read| (read.rehearsed, read.applied)),
+        Some((true, false)),
+        "{found:?}"
+    );
+    let moved = found.map(|read| read.ports.len()).unwrap_or_default();
+    assert!(moved > 0, "somewhere to listen was named");
+    assert!(!env.exists(), "a rehearsal wrote {}", env.display());
+}
+
+#[tokio::test]
+async fn confirming_writes_the_layered_file_and_records_where_it_is() {
+    let env = scratch("beside-applied");
+    let images = Pulled::holding(vec![Pulled::image(
+        "lscr.io/linuxserver/sonarr:4.0.15",
+        400,
+        &["media"],
+    )]);
+    let files = Arc::new(SeedFs::keyed(None, None));
+    let mut ctx = over_files(somebody_elses(), images, Arc::clone(&files));
+    ctx.settings.env_file = Some(env.clone());
+
+    let found = standing(&ctx, true).await;
+    assert_eq!(
+        found.as_ref().map(|read| read.applied),
+        Some(true),
+        "{found:?}"
+    );
+
+    // Where it says it wrote, and what actually went through the filesystem, are two
+    // facts; a report claiming a file it never wrote is the bug worth catching.
+    let recorded = std::fs::read_to_string(&env).unwrap_or_default();
+    assert!(recorded.contains("LEMONFIBER_OVERLAY="), "{recorded}");
+
+    let wrote = files.wrote();
+    let layered = wrote
+        .first()
+        .map(|(_, contents)| contents.clone())
+        .unwrap_or_default();
+    assert!(layered.starts_with("services:"), "{layered}");
+    assert!(layered.contains("sonarr:"), "{layered}");
+}
+
+/// A machine it could not read is one whose free ports it would be guessing at.
+#[tokio::test]
+async fn standing_beside_what_could_not_be_read_is_refused() {
+    let images = Pulled::unreachable("no daemon here");
+    let ctx = over(somebody_elses(), images, Source::External(project()));
+    let found = standing(&ctx, true).await;
+    let refused = found.and_then(|read| read.refused);
+    assert!(
+        refused.is_some_and(|said| said.contains("could not be read")),
+        "refused"
+    );
 }

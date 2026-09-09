@@ -100,6 +100,20 @@ pub fn provider_host_from_env(file: &env::EnvFile) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The Compose file layered over the stack's own, where one has been written.
+///
+/// One at most. Layering two would be two answers to where a service listens, and the
+/// last file Compose reads would quietly win.
+#[must_use]
+pub fn overlay_from_env(file: &env::EnvFile) -> Vec<PathBuf> {
+    file.get(super::OVERLAY_KEY)
+        .map(str::trim)
+        .filter(|named| !named.is_empty())
+        .map(PathBuf::from)
+        .into_iter()
+        .collect()
+}
+
 /// The Compose project lemonfiber manages.
 ///
 /// Its own unless a setup already on the machine was adopted, which is what makes
@@ -274,5 +288,27 @@ mod tests {
     fn a_blank_project_is_read_as_none_recorded() {
         let read = super::project_from_env(&env::EnvFile::parse("LEMONFIBER_PROJECT=   \n"));
         assert_eq!(read, crate::PRODUCT);
+    }
+
+    /// Nothing layered is the ordinary stack, standing where its own file says.
+    #[test]
+    fn no_overlay_recorded_layers_nothing() {
+        assert!(super::overlay_from_env(&env::EnvFile::parse("")).is_empty());
+    }
+
+    /// Standing beside an existing setup is the only thing that writes it.
+    #[test]
+    fn a_recorded_overlay_is_layered_over_the_stack() {
+        let read =
+            super::overlay_from_env(&env::EnvFile::parse("LEMONFIBER_OVERLAY=/cfg/beside.yml\n"));
+        assert_eq!(read, vec![std::path::PathBuf::from("/cfg/beside.yml")]);
+    }
+
+    /// Blank reads as unset, the way every other recorded value does.
+    #[test]
+    fn a_blank_overlay_layers_nothing() {
+        assert!(
+            super::overlay_from_env(&env::EnvFile::parse("LEMONFIBER_OVERLAY=  \n")).is_empty()
+        );
     }
 }

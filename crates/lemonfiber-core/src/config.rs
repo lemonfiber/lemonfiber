@@ -22,7 +22,7 @@ pub mod store;
 // would otherwise be a change at every call site that asks.
 pub use reading::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
-    indexer_from_env, ip_echo_from_env, port_forward_from_env, project_from_env,
+    indexer_from_env, ip_echo_from_env, overlay_from_env, port_forward_from_env, project_from_env,
     provider_host_from_env, reads_as_off, reads_as_on, service_user_from_env, PortForward,
 };
 
@@ -89,6 +89,13 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// look for, and somebody who finds the explanations patronising knows exactly what
 /// they want to stop.
 pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
+
+/// A Compose file layered over the stack's own.
+///
+/// Written by standing lemonfiber beside a setup already here: it maps each service to
+/// a port nothing else is using, so a second copy can be evaluated without moving the
+/// first out of the way.
+pub const OVERLAY_KEY: &str = "LEMONFIBER_OVERLAY";
 
 /// The Compose project lemonfiber manages.
 ///
@@ -279,6 +286,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_HOUSEHOLD_KEY,
     EXPLANATIONS_KEY,
     PROJECT_KEY,
+    OVERLAY_KEY,
     EXPOSED_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,

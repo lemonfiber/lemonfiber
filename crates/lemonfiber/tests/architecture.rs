@@ -600,16 +600,17 @@ fn permitted(rest: &str) -> bool {
     seam.is_empty() || ALLOWED.contains(&seam.as_str())
 }
 
-/// Adopting writes one line of lemonfiber's own configuration and nothing else.
+/// Acting on a migration writes lemonfiber's own configuration and nothing else.
 ///
 /// The acting half of migration is where the risk actually is, so it is held to a rule
-/// of its own rather than left to review. It may write settings — that is the whole of
-/// what adopting *is* — but it may not reach the seams that stop a container, delete a
-/// directory, or run a program against somebody's stack. A migration that failed or was
+/// of its own rather than left to review. It may write lemonfiber's own configuration —
+/// that is the whole of what adopting and standing beside *are* — but it may not reach
+/// the seams that stop a container, delete a directory, or run a program against
+/// somebody\'s stack. A migration that failed or was
 /// abandoned has to leave the operator exactly the setup they had, and the only way to
 /// guarantee that is for the code to have no way of touching it.
 #[test]
-fn adopting_cannot_stop_delete_or_run_anything() {
+fn acting_on_a_migration_cannot_stop_delete_or_run_anything() {
     /// The seams that reach the operator's running stack.
     const UNTOUCHABLE: [&str; 3] = ["eraser", "volume", "runner"];
 
@@ -617,7 +618,7 @@ fn adopting_cannot_stop_delete_or_run_anything() {
         .iter()
         .filter(|(path, _)| {
             let named = path.to_string_lossy().replace('\\', "/");
-            named.ends_with("app/adopt.rs")
+            named.ends_with("app/adopt.rs") || named.ends_with("app/beside.rs")
         })
         .flat_map(|(path, text)| {
             production(text)
@@ -630,8 +631,8 @@ fn adopting_cannot_stop_delete_or_run_anything() {
 
     assert!(
         reaching.is_empty(),
-        "adopting records what lemonfiber manages and touches nothing else, so it may \
-         not reach {UNTOUCHABLE:?}: {reaching:?}"
+        "acting on a migration records what lemonfiber runs and touches nothing of \
+         theirs, so it may not reach {UNTOUCHABLE:?}: {reaching:?}"
     );
 }
 

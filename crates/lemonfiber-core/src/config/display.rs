@@ -57,6 +57,11 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the address the leak check asks each container for its public address",
     ),
     (
+        super::OVERLAY_KEY,
+        "a Compose file layered over the stack's own, which standing beside an existing \
+         setup writes so the two do not want the same ports",
+    ),
+    (
         super::PROJECT_KEY,
         "the Compose project lemonfiber manages, which is its own unless a setup that \
          was already here was adopted",

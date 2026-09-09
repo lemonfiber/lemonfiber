@@ -129,6 +129,21 @@ pub struct AdoptReport {
     pub rehearsed: bool,
 }
 
+/// What standing lemonfiber beside an existing setup came to, or would come to.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct BesideReport {
+    /// Where each service would listen instead, lowest original port first.
+    pub ports: Vec<MovedReport>,
+    /// Where the Compose file that says so was written.
+    pub written: Option<String>,
+    /// Whether it was actually written, as against described.
+    pub applied: bool,
+    /// Why it was not, where it was not.
+    pub refused: Option<String>,
+    /// Whether this call only said what it would do.
+    pub rehearsed: bool,
+}
+
 /// What is already on this machine, before anything is proposed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MigrationReport {
