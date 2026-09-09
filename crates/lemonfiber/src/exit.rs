@@ -54,6 +54,18 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
 
 /// The exit code an outcome deserves.
 ///
+/// What a run that stood beside a setup already here exits on.
+///
+/// A refusal is something the operator has to resolve — nowhere left for a service to
+/// listen, or a machine that could not be read — so it earns VALIDATION rather than a
+/// plain failure.
+fn standing(report: &lemonfiber_core::model::BesideReport) -> ExitCode {
+    if report.refused.is_some() {
+        return ExitCode::from(VALIDATION);
+    }
+    ExitCode::SUCCESS
+}
+
 /// What a run that took over a setup already here exits on.
 ///
 /// A refusal is something the operator has to resolve before lemonfiber will act — a
@@ -86,6 +98,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // left skipped or failed may complete on a re-run, so it stays FAILURE. A
         // script can then tell "fix your config" from "wait and retry".
         Outcome::Adoption(report) => adopting(report),
+        Outcome::Beside(report) => standing(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
         // has mended everything it carried out — which is none of it.
@@ -1214,6 +1227,28 @@ mod tests {
             std::process::ExitCode::from(super::FAILURE)
         );
     }
+    /// The same for standing beside: nowhere left to listen is something the operator
+    /// resolves, not a run that fell over.
+    #[test]
+    fn standing_beside_exits_on_whether_it_could() {
+        let refused = lemonfiber_core::model::BesideReport {
+            refused: Some("nowhere left to listen".to_owned()),
+            ..lemonfiber_core::model::BesideReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Beside(refused)),
+            std::process::ExitCode::from(super::VALIDATION)
+        );
+        let stood = lemonfiber_core::model::BesideReport {
+            applied: true,
+            ..lemonfiber_core::model::BesideReport::default()
+        };
+        assert_eq!(
+            settled(&Outcome::Beside(stood)),
+            std::process::ExitCode::SUCCESS
+        );
+    }
+
     /// A refusal is something the operator has to resolve, and a script needs to tell
     /// that from a run that merely failed.
     #[test]

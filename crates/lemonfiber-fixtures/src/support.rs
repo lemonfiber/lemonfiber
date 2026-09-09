@@ -255,6 +255,7 @@ pub struct SeedFs {
     /// dashboard reads as free space unknown.
     facts: lemonfiber_ports::filesystem::StorageFacts,
     elsewhere: Vec<(&'static str, lemonfiber_ports::filesystem::StorageFacts)>,
+    wrote: std::sync::Mutex<Vec<(std::path::PathBuf, String)>>,
 }
 
 impl SeedFs {
@@ -269,6 +270,7 @@ impl SeedFs {
             only_prowlarr: false,
             missing: Vec::new(),
             elsewhere: Vec::new(),
+            wrote: std::sync::Mutex::new(Vec::new()),
             facts: lemonfiber_ports::filesystem::StorageFacts {
                 point: std::path::PathBuf::new(),
                 kind: lemonfiber_ports::filesystem::FsKind::Linking("test".to_owned()),
@@ -305,6 +307,20 @@ impl SeedFs {
     pub fn with_facts(mut self, facts: lemonfiber_ports::filesystem::StorageFacts) -> Self {
         self.facts = facts;
         self
+    }
+
+    /// Every file written through this filesystem, in the order it was written.
+    ///
+    /// Recorded rather than discarded, because a claim about what a command *wrote*
+    /// cannot be made from what it returned: a report saying a file was written and a
+    /// file having been written are two facts, and the gap between them is exactly the
+    /// bug worth catching.
+    #[must_use]
+    pub fn wrote(&self) -> Vec<(std::path::PathBuf, String)> {
+        self.wrote
+            .lock()
+            .map(|wrote| wrote.clone())
+            .unwrap_or_default()
     }
 
     /// The same, answering differently for paths under a named prefix.
@@ -383,7 +399,11 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
         }
         self.servarr.map(str::to_owned)
     }
-    async fn write(&self, _path: &std::path::Path, _contents: &str) {}
+    async fn write(&self, path: &std::path::Path, contents: &str) {
+        if let Ok(mut wrote) = self.wrote.lock() {
+            wrote.push((path.to_path_buf(), contents.to_owned()));
+        }
+    }
     async fn ownership(
         &self,
         _path: &std::path::Path,

@@ -31,6 +31,12 @@ pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<
         MigrateAction::Adopt { confirmed } => super::adopt::taking(ctx, confirmed)
             .await
             .map(Outcome::Adoption),
+        MigrateAction::Beside { confirmed } => {
+            let (survey, _) = looked_with_mounts(ctx).await;
+            super::beside::stand(ctx, &survey, confirmed)
+                .await
+                .map(Outcome::Beside)
+        }
     }
 }
 

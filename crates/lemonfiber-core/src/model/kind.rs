@@ -48,6 +48,8 @@ pub const ARCHIVES: Kind = Kind("archives");
 pub const BACKUP: Kind = Kind("backup");
 /// How the line is shared, what that costs, and whether the clients keep to it.
 pub const BANDWIDTH: Kind = Kind("bandwidth");
+/// What standing lemonfiber beside an existing setup came to.
+pub const BESIDE: Kind = Kind("beside");
 /// What a support bundle would hold, or where one went.
 pub const BUNDLE: Kind = Kind("bundle");
 /// The settings asked about, and what a change did to them.
@@ -148,6 +150,7 @@ pub const ALL: &[Kind] = &[
     ARCHIVES,
     BACKUP,
     BANDWIDTH,
+    BESIDE,
     BUNDLE,
     CONFIG,
     CREDENTIALS,

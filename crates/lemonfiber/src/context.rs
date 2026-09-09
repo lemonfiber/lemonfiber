@@ -139,6 +139,7 @@ pub(crate) fn read_settings() -> Settings {
 
     Settings {
         project: lemonfiber_core::config::project_from_env(&recorded),
+        overlays: lemonfiber_core::config::overlay_from_env(&recorded),
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
@@ -163,7 +164,6 @@ pub(crate) fn read_settings() -> Settings {
         explanations: !recorded.get(EXPLANATIONS_KEY).is_some_and(reads_as_off),
         env_file,
         stack_dir: stack_directory(),
-        ..Settings::default()
     }
 }
 

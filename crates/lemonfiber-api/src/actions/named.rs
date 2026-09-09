@@ -53,6 +53,7 @@ pub const OFFERED: &[&str] = &[
     "seed",
     "adopt",
     "migrate-adopt",
+    "migrate-beside",
     "reset",
     "forget",
     "uninstall",
@@ -178,7 +179,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     // And again, twice: one field and nothing to refuse for the first, two fields and
     // one refusal for the second.
     if migrating::about_a_setup_already_here(action) {
-        return Ok(migrating::asked_for(&given));
+        return Ok(migrating::asked_for(action, &given));
     }
     if choosing::about_the_quality(action) {
         return choosing::asked_for(action, &given);

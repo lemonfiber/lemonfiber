@@ -14,4 +14,11 @@ pub enum MigrateAction {
         /// Whether the operator has confirmed, having been told what to back up.
         confirmed: bool,
     },
+    /// Stand lemonfiber beside the setup already here, on ports nothing else uses.
+    ///
+    /// Unconfirmed it says where each service would listen and writes nothing.
+    Beside {
+        /// Whether the operator has confirmed, having seen where things would listen.
+        confirmed: bool,
+    },
 }
