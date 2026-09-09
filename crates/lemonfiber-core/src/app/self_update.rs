@@ -17,7 +17,7 @@ mod checking;
 mod reading;
 
 use crate::model::UpdateReport;
-use crate::update::{
+use crate::self_update::{
     availability, carries, command, configuration, stands, why_not, Installed, Standing, AFTERWARDS,
 };
 

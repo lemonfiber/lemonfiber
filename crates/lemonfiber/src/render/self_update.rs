@@ -11,7 +11,7 @@
 //! way forward, and will reach for the thing that overwrites the file.
 
 use lemonfiber_core::model::UpdateReport;
-use lemonfiber_core::update::Standing;
+use lemonfiber_core::self_update::Standing;
 
 use super::Lines;
 
@@ -72,8 +72,8 @@ fn provenance(report: &UpdateReport) -> Lines {
 /// How a copy nobody owns got here, in the words the report uses.
 fn unowned(report: &UpdateReport) -> &'static str {
     match report.installed {
-        lemonfiber_core::update::Installed::Installer => "by the shell installer",
-        lemonfiber_core::update::Installed::Elsewhere => "by hand — no tool owns it",
+        lemonfiber_core::self_update::Installed::Installer => "by the shell installer",
+        lemonfiber_core::self_update::Installed::Elsewhere => "by hand — no tool owns it",
         _ => "not known",
     }
 }
@@ -104,7 +104,7 @@ fn heading(report: &UpdateReport) -> String {
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::model::UpdateReport;
-    use lemonfiber_core::update::{carries, configuration, Installed, Standing, AFTERWARDS};
+    use lemonfiber_core::self_update::{carries, configuration, Installed, Standing, AFTERWARDS};
 
     use super::standing;
 
@@ -264,7 +264,8 @@ mod tests {
     #[test]
     fn the_printer_reaches_this_renderer_for_this_outcome() {
         let report = stands(Installed::Homebrew, Standing::ManagedExternally);
-        let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Update(report)).text();
+        let drawn =
+            crate::render::shaped(&lemonfiber_core::app::Outcome::SelfUpdate(report)).text();
         assert!(drawn.contains("0.14.0 has been released"), "{drawn}");
         assert!(drawn.contains("manifest schema 1"), "{drawn}");
     }

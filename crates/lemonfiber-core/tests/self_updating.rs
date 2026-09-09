@@ -22,8 +22,8 @@ use lemonfiber_core::outbound::RELEASE_LIST;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::FileSystem;
+use lemonfiber_core::self_update::{receipt_under, Installed, Standing};
 use lemonfiber_core::stack::Source;
-use lemonfiber_core::update::{receipt_under, Installed, Standing};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Stopped;
 use lemonfiber_fixtures::program::Program;
@@ -86,7 +86,7 @@ fn ctx(files: &Arc<Program>, http: &Arc<Fake>, settings: Settings) -> Ctx {
 /// What the check answered, through the dispatcher rather than by calling it.
 async fn asked(command: Command, ctx: &Ctx) -> UpdateReport {
     match dispatch(command, ctx).await {
-        Ok(Outcome::Update(report)) => report,
+        Ok(Outcome::SelfUpdate(report)) => report,
         other => unreachable!("the check answers with itself: {other:?}"),
     }
 }
@@ -94,7 +94,7 @@ async fn asked(command: Command, ctx: &Ctx) -> UpdateReport {
 /// The ordinary run: a machine, a release list that answers, and nothing named.
 async fn standing(files: &Arc<Program>, http: &Arc<Fake>, program: Option<&str>) -> UpdateReport {
     let ctx = ctx(files, http, settings(program));
-    asked(Command::Update { to: None }, &ctx).await
+    asked(Command::SelfUpdate { to: None }, &ctx).await
 }
 
 /// A copy under a package manager's own tree is that manager's to move, and the
@@ -305,7 +305,7 @@ async fn a_check_the_operator_switched_off_never_reaches_the_release_list() {
         },
     );
 
-    let report = asked(Command::Update { to: None }, &ctx).await;
+    let report = asked(Command::SelfUpdate { to: None }, &ctx).await;
 
     assert!(http.requests().is_empty(), "{:?}", http.requests());
     assert_eq!(report.standing, Standing::CheckFailed);
@@ -329,7 +329,7 @@ async fn an_operator_who_wants_nothing_to_leave_is_not_made_an_exception_of() {
         },
     );
 
-    asked(Command::Update { to: None }, &ctx).await;
+    asked(Command::SelfUpdate { to: None }, &ctx).await;
 
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
@@ -481,7 +481,7 @@ async fn a_machine_with_nowhere_to_keep_a_record_still_asks_and_writes_nothing()
         },
     );
 
-    let report = asked(Command::Update { to: None }, &ctx).await;
+    let report = asked(Command::SelfUpdate { to: None }, &ctx).await;
 
     assert_eq!(http.requests().len(), 1);
     assert_eq!(report.offered.as_deref(), Some("0.99.0"));
@@ -531,7 +531,7 @@ async fn naming_a_version_is_answered_even_where_this_copy_is_the_newest() {
     let ctx = ctx(&files, &http, settings(Some(IN_CARGOS_BIN)));
 
     let report = asked(
-        Command::Update {
+        Command::SelfUpdate {
             to: Some("0.9.0".to_owned()),
         },
         &ctx,
@@ -552,7 +552,7 @@ async fn going_back_is_answered_with_the_command_and_what_that_version_reads() {
     let ctx = ctx(&files, &http, settings(Some(IN_CARGOS_BIN)));
 
     let report = asked(
-        Command::Update {
+        Command::SelfUpdate {
             to: Some("0.9.0".to_owned()),
         },
         &ctx,
@@ -585,7 +585,7 @@ async fn a_manager_that_keeps_an_index_says_it_has_no_form_for_a_named_version()
     );
 
     let report = asked(
-        Command::Update {
+        Command::SelfUpdate {
             to: Some("0.9.0".to_owned()),
         },
         &ctx,
@@ -634,11 +634,11 @@ async fn nothing_here_can_refuse_however_little_could_be_told() {
     let http = Fake::silent();
     let ctx = ctx(&files, &http, Settings::default());
 
-    let answered = dispatch(Command::Update { to: None }, &ctx).await;
+    let answered = dispatch(Command::SelfUpdate { to: None }, &ctx).await;
 
     assert!(answered.is_ok(), "{answered:?}");
     assert_eq!(
         answered.ok().map(|outcome| outcome.envelope().kind),
-        Some(lemonfiber_core::model::kind::UPDATE)
+        Some(lemonfiber_core::model::kind::SELF_UPDATE)
     );
 }

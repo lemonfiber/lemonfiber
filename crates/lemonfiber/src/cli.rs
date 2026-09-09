@@ -361,7 +361,7 @@ pub enum Request {
     /// `--to` asks about one particular version instead of whatever is newest, which
     /// is how going back is asked for — along with whether that version reads the
     /// configuration already on this machine.
-    Update {
+    SelfUpdate {
         /// The version to move to, instead of whatever is newest.
         #[arg(long, value_name = "VERSION")]
         to: Option<String>,

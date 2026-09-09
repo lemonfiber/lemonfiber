@@ -15,17 +15,17 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
-use crate::reads::UPDATE;
+use crate::reads::SELF_UPDATE;
 use crate::router::Serving;
 
 use super::reading;
 
 /// The read about where this copy stands.
 pub(super) fn routes() -> Router<Serving> {
-    Router::new().route(UPDATE, get(update))
+    Router::new().route(SELF_UPDATE, get(update))
 }
 
 /// Where this copy of lemonfiber stands, and what moving it would come to.
 async fn update(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, UPDATE, query.as_deref()).await
+    reading(&serving.ctx, SELF_UPDATE, query.as_deref()).await
 }

@@ -360,7 +360,7 @@ pub enum Command {
     /// A read, and it replaces nothing: what it answers with is the exact command for
     /// whichever tool owns the copy that is running. Naming a version asks about that
     /// one instead of the newest, which is how going back is asked for.
-    Update {
+    SelfUpdate {
         /// The version to move to, where the operator named one rather than asking
         /// about whatever is newest.
         to: Option<String>,

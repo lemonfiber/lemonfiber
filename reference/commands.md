@@ -37,7 +37,7 @@ Commands:
   outbound      List everything that leaves this machine, and what refusing each of it costs
   credentials   Say which credentials this stack holds, or act on one of them
   stored        List what lemonfiber keeps on this machine, where it is, and why
-  update        Say where this copy of lemonfiber stands, and what moving it would come to
+  self-update   Say where this copy of lemonfiber stands, and what moving it would come to
   clients       Say which app to watch on, for each kind of device somebody in the house has
   invite        Offer somebody in the house an account they can claim
   reissue       Let somebody set a new password, without you choosing or seeing it
@@ -1570,7 +1570,7 @@ Options:
           Print help (see a summary with '-h')
 ```
 
-## `lemonfiber update`
+## `lemonfiber self-update`
 
 ```text
 Say where this copy of lemonfiber stands, and what moving it would come to.
@@ -1581,7 +1581,7 @@ The stack is untouched either way: containers run on their own, and this program
 
 `--to` asks about one particular version instead of whatever is newest, which is how going back is asked for — along with whether that version reads the configuration already on this machine.
 
-Usage: lemonfiber update [OPTIONS]
+Usage: lemonfiber self-update [OPTIONS]
 
 Options:
       --json

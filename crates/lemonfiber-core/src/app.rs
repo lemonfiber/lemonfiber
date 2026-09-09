@@ -66,6 +66,7 @@ pub mod restore;
 mod screen;
 mod seed;
 pub mod seeding;
+mod self_update;
 pub mod setup;
 mod space;
 mod stored;
@@ -73,7 +74,6 @@ pub mod support;
 mod targets;
 mod trace;
 mod uninstall;
-mod update;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
@@ -324,7 +324,9 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.
-        Command::Update { to } => Ok(Outcome::Update(update::standing(ctx, to.as_deref()).await)),
+        Command::SelfUpdate { to } => Ok(Outcome::SelfUpdate(
+            self_update::standing(ctx, to.as_deref()).await,
+        )),
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
         Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
@@ -1448,13 +1450,13 @@ mod tests {
                 ..Settings::default()
             })
             .build();
-        let json = dispatch(Command::Update { to: None }, &ctx)
+        let json = dispatch(Command::SelfUpdate { to: None }, &ctx)
             .await
             .ok()
             .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
             .unwrap_or_default();
 
-        assert!(json.contains(r#""kind":"update""#), "{json}");
+        assert!(json.contains(r#""kind":"self-update""#), "{json}");
         assert!(json.contains(r#""standing":"check-failed""#), "{json}");
         assert!(json.contains(r#""installed":"untellable""#), "{json}");
     }
@@ -1470,7 +1472,7 @@ mod tests {
             })
             .build();
         let asked = dispatch(
-            Command::Update {
+            Command::SelfUpdate {
                 to: Some("0.9.0".to_owned()),
             },
             &ctx,
@@ -1479,7 +1481,7 @@ mod tests {
 
         let named = matches!(
             &asked,
-            Ok(Outcome::Update(report))
+            Ok(Outcome::SelfUpdate(report))
                 if report.asked.as_deref() == Some("0.9.0") && report.configuration.is_some()
         );
         assert!(named, "a named version was not asked about: {asked:?}");
@@ -2355,7 +2357,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
-                | Outcome::Update(_)
+                | Outcome::SelfUpdate(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)
@@ -2412,7 +2414,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
-                | Outcome::Update(_)
+                | Outcome::SelfUpdate(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)
@@ -3249,7 +3251,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
-                | Outcome::Update(_)
+                | Outcome::SelfUpdate(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)
@@ -4242,7 +4244,7 @@ mod tests {
                 | Outcome::Outbound(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
-                | Outcome::Update(_)
+                | Outcome::SelfUpdate(_)
                 | Outcome::Space(_)
                 | Outcome::Letting(_)
                 | Outcome::Bandwidth(_)

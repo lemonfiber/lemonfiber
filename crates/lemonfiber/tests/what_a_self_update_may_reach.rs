@@ -16,7 +16,7 @@ use std::path::Path;
 
 use source_tree::{production, sources};
 
-/// The seams the update family may reach, by the name they carry on a context.
+/// The seams the self-update family may reach, by the name they carry on a context.
 ///
 /// Four, and each is there because the check cannot be made without it: the
 /// filesystem says where this binary is and keeps what the last check read, the
@@ -67,7 +67,7 @@ const ESCALATION: [&str; 5] = ["sudo", "doas", "pkexec", "runas", "setuid"];
 /// operator gets instead is the path and what the machine said about it, which is the
 /// thing they can act on — and which is all this family knows how to do.
 #[test]
-fn nothing_in_the_update_family_reaches_for_a_way_to_become_somebody_else() {
+fn nothing_in_the_self_update_family_reaches_for_a_way_to_become_somebody_else() {
     let named: Vec<String> = family(updates, 8)
         .iter()
         .flat_map(|(path, shipped)| {
@@ -112,7 +112,7 @@ fn the_check_holds_no_address_of_its_own() {
     );
 }
 
-/// The shipped half of every file in the update family, asserted to be a family.
+/// The shipped half of every file in the self-update family, asserted to be a family.
 ///
 /// A guard whose subject can vanish silently is the defect this repository keeps
 /// finding: a filter that matches nothing passes every rule beneath it while reading
@@ -128,24 +128,24 @@ fn family(matching: fn(&Path) -> bool, fewest: usize) -> Vec<(std::path::PathBuf
         .collect();
     assert!(
         found.len() >= fewest,
-        "read {} files of the update family, fewer than the {fewest} it has never gone \
+        "read {} files of the self-update family, fewer than the {fewest} it has never gone \
          below — the filter has stopped matching it",
         found.len()
     );
     found
 }
 
-/// Whether this file is part of the update family rather than a test about it.
+/// Whether this file is part of the self-update family rather than a test about it.
 fn updates(path: &Path) -> bool {
     let named = path.to_string_lossy().replace('\\', "/");
-    named.contains("update") && !named.contains("/tests/")
+    named.contains("self_update") && !named.contains("/tests/")
 }
 
 /// Whether this file is the half of the family that reaches the network.
 fn asks(path: &Path) -> bool {
     path.to_string_lossy()
         .replace('\\', "/")
-        .contains("/app/update")
+        .contains("/app/self_update")
 }
 
 /// Every `ctx.` seam one line names, each with whatever follows it.
@@ -163,7 +163,7 @@ fn named(rest: &str) -> String {
         .collect()
 }
 
-/// Whether a seam, with what follows it, is one the update family may reach.
+/// Whether a seam, with what follows it, is one the self-update family may reach.
 fn permitted(rest: &str) -> bool {
     let seam = named(rest);
     seam.is_empty() || ALLOWED.contains(&seam.as_str())

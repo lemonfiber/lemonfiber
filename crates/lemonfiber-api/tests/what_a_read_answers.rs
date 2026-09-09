@@ -796,11 +796,12 @@ async fn where_this_copy_stands_is_the_envelope_the_command_renders() {
     // whichever tool owns the copy that is running, and the whole point of serving
     // it rather than assembling it is that the line is the one a shell would print.
     let expected =
-        as_the_command_renders_it(&world(running(), stack()), Command::Update { to: None }).await;
+        as_the_command_renders_it(&world(running(), stack()), Command::SelfUpdate { to: None })
+            .await;
 
     assert!(expected.is_some(), "the command answered");
     assert_eq!(
-        asked(world(running(), stack()), reads::UPDATE).await,
+        asked(world(running(), stack()), reads::SELF_UPDATE).await,
         expected.map(|body| (StatusCode::OK, body))
     );
 }
@@ -814,7 +815,7 @@ async fn naming_a_version_asks_this_read_about_that_one() {
 
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::OK
-            && body.starts_with(r#"{"api_version":1,"kind":"update","data":{"standing":"#)
+            && body.starts_with(r#"{"api_version":1,"kind":"self-update","data":{"standing":"#)
             && body.contains(r#""asked":"0.9.0""#)
             && body.contains("0.9.0 is behind the copy running")),
         "a named version is asked about rather than dropped"

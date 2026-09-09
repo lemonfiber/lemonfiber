@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::config::REACH_UPDATES_KEY;
 use crate::outbound::RELEASE_LIST;
-use crate::update::{asking, newest, Noticed, Silence};
+use crate::self_update::{asking, newest, Noticed, Silence};
 
 /// What the record of past checks is kept in, beside the settings it belongs with.
 const RECORD: &str = "updates.json";

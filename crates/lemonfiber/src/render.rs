@@ -33,12 +33,12 @@ mod reconfigure;
 mod removal;
 pub(crate) mod repair;
 mod seed;
+mod self_update;
 mod space;
 pub(crate) mod stack;
 mod stored;
 mod trace;
 mod uninstall;
-mod update;
 pub(crate) mod walkthrough;
 
 use lemonfiber_core::app::Outcome;
@@ -244,7 +244,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
-        Outcome::Update(report) => update::standing(report),
+        Outcome::SelfUpdate(report) => self_update::standing(report),
         Outcome::Space(report) => space::reckoning(report),
         Outcome::Letting(offer) => space::letting(offer),
         Outcome::Bandwidth(report) => bandwidth::sharing(report),

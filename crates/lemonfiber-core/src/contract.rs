@@ -171,7 +171,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kind::UNINSTALL,
         schema_for!(Envelope<crate::uninstall::Uninstall>),
     );
-    describing(kinds, kind::UPDATE, schema_for!(Envelope<UpdateReport>));
+    describing(
+        kinds,
+        kind::SELF_UPDATE,
+        schema_for!(Envelope<UpdateReport>),
+    );
     describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
     describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
@@ -474,7 +478,7 @@ mod tests {
             // Every optional half filled, so the shape is compared whole: a version to
             // move to, one asked for, a command, a probe that answered, and the
             // sentence a downgrade is owed.
-            Outcome::Update(where_this_copy_stands()),
+            Outcome::SelfUpdate(where_this_copy_stands()),
         ]
     }
 
@@ -482,10 +486,10 @@ mod tests {
     /// an older one asked about.
     fn where_this_copy_stands() -> UpdateReport {
         UpdateReport {
-            standing: crate::update::Standing::UpdateAvailable,
+            standing: crate::self_update::Standing::UpdateAvailable,
             running: "0.13.0".to_owned(),
             at: Some("/home/op/.cargo/bin/lemonfiber".to_owned()),
-            installed: crate::update::Installed::Installer,
+            installed: crate::self_update::Installed::Installer,
             owner: None,
             offered: Some("0.14.0".to_owned()),
             asked: Some("0.12.0".to_owned()),
@@ -494,9 +498,9 @@ mod tests {
             ),
             instead: None,
             replaceable: Some(true),
-            configuration: Some(crate::update::configuration("0.12.0", "0.13.0")),
-            afterwards: crate::update::AFTERWARDS.to_owned(),
-            carries: crate::update::carries(&[1]),
+            configuration: Some(crate::self_update::configuration("0.12.0", "0.13.0")),
+            afterwards: crate::self_update::AFTERWARDS.to_owned(),
+            carries: crate::self_update::carries(&[1]),
             untold: None,
         }
     }
