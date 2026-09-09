@@ -1,6 +1,6 @@
 //! The engine adapter, driven against an engine written for the purpose.
 //!
-//! This is the one part of `lemonfiber-core` a trait fake cannot exercise. The
+//! This is the one part of this crate a trait fake cannot exercise. The
 //! adapter's whole job is to speak the Engine API over a socket, so a fake
 //! implementing `Engine` would prove only that the fake works. What gets
 //! replaced here is the daemon: a socket answering with whatever a test wants
@@ -11,10 +11,8 @@
 //! rather than product, and because scaffolding that must itself reach full
 //! line coverage grows tests about the scaffolding.
 
-use lemonfiber_core::adapters::Daemon;
-use lemonfiber_core::ports::docker::{
-    Engine as _, Failure, Health, Images as _, Lifecycle, LogQuery,
-};
+use lemonfiber_adapters::Daemon;
+use lemonfiber_ports::docker::{Engine as _, Failure, Health, Images as _, Lifecycle, LogQuery};
 
 /// An engine of our own, answering only what the adapter asks.
 ///
@@ -485,7 +483,7 @@ async fn log_lines_are_tagged_with_the_service_and_the_stream_they_came_from() {
     );
 
     let daemon = Daemon::at(&engine.socket);
-    let query = lemonfiber_core::ports::docker::LogQuery::recent(20);
+    let query = lemonfiber_ports::docker::LogQuery::recent(20);
 
     // Sorted for comparison only. Two services producing at once arrive
     // interleaved, which is the feature, and is why each line carries the
@@ -551,7 +549,7 @@ async fn how_much_output_to_ask_for_reaches_the_engine() {
     );
 
     let daemon = Daemon::at(&engine.socket);
-    let query = lemonfiber_core::ports::docker::LogQuery {
+    let query = lemonfiber_ports::docker::LogQuery {
         tail: 42,
         follow: true,
     };
@@ -597,7 +595,7 @@ async fn a_reader_that_walks_away_stops_the_producer_rather_than_the_process() {
     );
 
     let daemon = Daemon::at(&engine.socket);
-    let query = lemonfiber_core::ports::docker::LogQuery::recent(10);
+    let query = lemonfiber_ports::docker::LogQuery::recent(10);
     let opened = daemon.logs("lemonfiber", &[], query).await;
     assert!(opened.is_ok());
 

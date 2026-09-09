@@ -1,6 +1,6 @@
 //! The operating system's randomness.
 
-use crate::ports::random::Random;
+use lemonfiber_ports::random::Random;
 
 /// The operating system's CSPRNG — the only source trusted to back a secret.
 pub struct Os;
@@ -15,7 +15,7 @@ impl Random for Os {
 #[cfg(test)]
 mod tests {
     use super::Os;
-    use crate::ports::random::Random;
+    use lemonfiber_ports::random::Random;
 
     #[test]
     fn it_returns_the_requested_number_of_bytes() {

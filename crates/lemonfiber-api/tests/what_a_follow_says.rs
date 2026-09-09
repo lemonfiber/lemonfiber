@@ -46,8 +46,8 @@ fn world(engine: Reporting, stack: Source) -> Ctx {
     Ctx::new(
         Arc::new(Idle),
         Arc::new(engine),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         stack,
         Settings::default(),
         Environment::MacOs,

@@ -14,7 +14,7 @@ use bollard::models::{
 };
 
 use super::{PROJECT_LABEL, SERVICE_LABEL};
-use crate::ports::docker::{Container, Health, Lifecycle, Published, Stats};
+use lemonfiber_ports::docker::{Container, Health, Lifecycle, Published, Stats};
 
 /// What the engine calls a container's state, in the port's vocabulary.
 ///

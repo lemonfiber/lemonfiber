@@ -406,8 +406,8 @@ mod tests {
         Ctx::new(
             Arc::new(Answering { status, stdout }),
             Arc::new(Absent),
-            Arc::new(lemonfiber_core::adapters::System),
-            Arc::new(lemonfiber_core::adapters::Disk),
+            Arc::new(lemonfiber_adapters::System),
+            lemonfiber_adapters::live(),
             Source::Embedded(&lemonfiber::cli::STACK),
             settings,
             Environment::MacOs,

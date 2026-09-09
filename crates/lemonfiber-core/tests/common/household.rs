@@ -211,7 +211,7 @@ pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
             Health::Healthy,
         )),
         Stopped::today(),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        lemonfiber_adapters::live(),
         stack(),
         Settings {
             env_file: Some(recorded_admin(name)),

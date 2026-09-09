@@ -159,7 +159,7 @@ mod tests {
         );
         let mut ctx = super::super::fixtures::ctx_with(&super::super::fixtures::Fake::default());
         ctx.settings.env_file = Some(env);
-        ctx.filesystem = std::sync::Arc::new(crate::adapters::Disk);
+        ctx.filesystem = std::sync::Arc::new(lemonfiber_adapters::Disk);
         ctx
     }
 

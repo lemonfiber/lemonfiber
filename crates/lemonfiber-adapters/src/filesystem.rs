@@ -3,7 +3,7 @@
 //! Translation, and no decisions. Each method is one system operation whose
 //! result — success, or the platform's own words for a failure — is handed
 //! straight back; what a sequence of them proves is decided in
-//! [`crate::doctor::storage`], where a fake filesystem can drive every outcome.
+//! the core's own storage diagnosis, where a fake filesystem can drive every outcome.
 //!
 //! The identity a file reports differs by platform — an inode on Unix, a file
 //! index on Windows — so reading it is the one place here that asks what it is
@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
-use crate::ports::filesystem::{
+use lemonfiber_ports::filesystem::{
     Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, Storage, StorageFacts, Volume,
 };
 
@@ -100,7 +100,7 @@ impl Storage for Disk {
                 total: disk.total_space(),
             })
             .collect();
-        crate::ports::filesystem::pick(&mounts, path)
+        lemonfiber_ports::filesystem::pick(&mounts, path)
     }
 }
 
@@ -224,7 +224,7 @@ pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
 
 #[cfg(test)]
 mod tests {
-    use crate::ports::filesystem::Storage;
+    use lemonfiber_ports::filesystem::Storage;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -395,7 +395,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_present_path_reports_its_volume_and_an_absent_one_is_gone() {
-        use crate::ports::filesystem::Presence;
+        use lemonfiber_ports::filesystem::Presence;
 
         let dir = scratch();
         let here = Disk.presence(&dir).await;

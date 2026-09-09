@@ -89,7 +89,10 @@ fn ctx(health: Health) -> Ctx {
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(Reporting::holding(&LIBRARY, Lifecycle::Running, health)),
         Following::started(),
-        Files::empty(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             protocols: Protocols::both(),

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use common::stack::project;
 
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::{
     Reaching, Settings, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
@@ -31,7 +31,10 @@ fn ctx(stack: Source, settings: Settings) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         settings,
         Environment::MacOs,
@@ -297,7 +300,10 @@ async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
             lemonfiber_core::ports::docker::Health::Healthy,
         )),
         lemonfiber_fixtures::ports::Stopped::today(),
-        lemonfiber_fixtures::files::Files::ending(Vec::new()),
+        lemonfiber_ports::seams::Seams {
+            filesystem: lemonfiber_fixtures::files::Files::ending(Vec::new()),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,

@@ -33,10 +33,10 @@ fn ctx(name: &str) -> Ctx {
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     Ctx::new(
-        Arc::new(lemonfiber_core::adapters::Local),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::Local),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         Source::External(project()),
         Settings {
             env_file: Some(dir.join(".env")),
@@ -58,10 +58,10 @@ fn ctx_over(name: &str, engine: Arc<tunnel::Fake>) -> Ctx {
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     Ctx::new(
-        Arc::new(lemonfiber_core::adapters::Local),
+        Arc::new(lemonfiber_adapters::Local),
         engine,
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         Source::External(project()),
         Settings {
             env_file: Some(dir.join(".env")),

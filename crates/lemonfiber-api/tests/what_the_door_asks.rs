@@ -84,7 +84,7 @@ fn world(admission: Option<PathBuf>, random: Chance) -> Ctx {
         Arc::new(Idle),
         Arc::new(Reporting::absent()),
         Stopped::at(NOW),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        lemonfiber_adapters::live(),
         Source::External(Path::new("/lemonfiber/no/such/stack")),
         Settings {
             admission,

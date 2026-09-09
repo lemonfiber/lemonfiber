@@ -159,8 +159,8 @@ fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
             Lifecycle::Running,
             Health::Healthy,
         )),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         stack(),
         Settings {
             env_file: Some(env.to_path_buf()),

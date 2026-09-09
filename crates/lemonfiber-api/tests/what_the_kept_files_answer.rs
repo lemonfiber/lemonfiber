@@ -110,9 +110,9 @@ fn scratch(name: &str) -> PathBuf {
 fn ctx(dir: &Path, kept: Kept) -> lemonfiber_core::app::Ctx {
     lemonfiber_core::app::Ctx::new(
         Arc::new(Idle),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         lemonfiber_core::stack::Source::External(Path::new("/lemonfiber/no/such/stack")),
         Settings::default(),
         Environment::MacOs,
@@ -324,9 +324,9 @@ async fn a_bundle_asked_for_at_a_path_of_its_own_is_no_route_at_all() {
 async fn a_run_with_nowhere_to_keep_its_files_says_so_rather_than_answering_with_nothing() {
     let bare = lemonfiber_core::app::Ctx::new(
         Arc::new(Idle),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         lemonfiber_core::stack::Source::External(Path::new("/lemonfiber/no/such/stack")),
         Settings::default(),
         Environment::MacOs,

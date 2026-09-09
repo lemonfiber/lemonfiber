@@ -50,8 +50,8 @@ fn world(paths: &Paths) -> Ctx {
     Ctx::new(
         Arc::new(Idle),
         Arc::new(Reporting::absent()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         Source::External(Path::new("/lemonfiber/no/such/stack")),
         Settings {
             env_file: Some(paths.env_file()),
@@ -83,8 +83,8 @@ fn homeless() -> Option<axum::Router> {
             Ctx::new(
                 Arc::new(Idle),
                 Arc::new(Reporting::absent()),
-                Arc::new(lemonfiber_core::adapters::System),
-                Arc::new(lemonfiber_core::adapters::Disk),
+                Arc::new(lemonfiber_adapters::System),
+                lemonfiber_adapters::live(),
                 Source::External(Path::new("/lemonfiber/no/such/stack")),
                 Settings::default(),
                 Environment::MacOs,

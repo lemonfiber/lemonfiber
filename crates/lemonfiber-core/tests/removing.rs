@@ -73,13 +73,16 @@ fn running(heard: &Arc<Heard>, runner: Arc<dyn Runner>) -> Ctx {
             Health::Healthy,
         )),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
-            point: PathBuf::from("/srv/media"),
-            kind: FsKind::Linking("apfs".to_owned()),
-            removable: false,
-            available: 100,
-            total: 1_000,
-        })),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
+                point: PathBuf::from("/srv/media"),
+                kind: FsKind::Linking("apfs".to_owned()),
+                removable: false,
+                available: 100,
+                total: 1_000,
+            })),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             project: "lemonfiber".to_owned(),

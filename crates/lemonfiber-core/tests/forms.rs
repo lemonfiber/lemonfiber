@@ -15,7 +15,7 @@ use common::stack::project;
 use std::path::Path;
 use std::sync::Arc;
 
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
@@ -26,7 +26,10 @@ fn ctx(stack: Source) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         Settings::default(),
         Environment::MacOs,
@@ -123,7 +126,10 @@ async fn a_preview_names_what_was_left_out_and_what_it_wanted() {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         usenet_only,
         Environment::MacOs,

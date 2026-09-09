@@ -2,7 +2,7 @@
 
 use std::time::SystemTime;
 
-use crate::ports::time::Clock;
+use lemonfiber_ports::time::Clock;
 
 /// Reads the operating system's wall clock.
 #[derive(Debug, Default, Clone, Copy)]

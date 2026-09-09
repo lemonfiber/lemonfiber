@@ -11,7 +11,7 @@
 
 use std::time::Duration;
 
-use lemonfiber_core::adapters::Dialer;
+use lemonfiber_adapters::Dialer;
 use lemonfiber_core::ports::nntp::{Endpoint, Nntp};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::TcpListener;

@@ -934,7 +934,7 @@ mod tests {
         let _ = std::fs::write(dir.join(".lemonfiber-hardlink-probe.link"), "stale");
 
         let findings = StorageCheck::new(
-            Arc::new(crate::adapters::Disk),
+            Arc::new(lemonfiber_adapters::Disk),
             Some(dir.clone()),
             None,
             Environment::MacOs,

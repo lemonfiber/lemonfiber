@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use common::stack::project;
 
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::archive::{Archive, Archiving, Fault as ArchiveFault, Reader, Space};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
@@ -93,7 +93,10 @@ fn ctx(eraser: Arc<Erasing>) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,
@@ -257,7 +260,10 @@ async fn a_run_that_does_not_know_where_its_files_are_is_refused() {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,

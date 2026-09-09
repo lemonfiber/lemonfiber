@@ -658,9 +658,9 @@ mod tests {
     fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>, settings: Settings) -> Ctx {
         Ctx::new(
             runner,
-            Arc::new(lemonfiber_core::adapters::Daemon::local()),
-            Arc::new(lemonfiber_core::adapters::System),
-            Arc::new(lemonfiber_core::adapters::Disk),
+            Arc::new(lemonfiber_adapters::Daemon::local()),
+            Arc::new(lemonfiber_adapters::System),
+            lemonfiber_adapters::live(),
             lemonfiber_core::stack::Source::Embedded(&lemonfiber::cli::STACK),
             settings,
             Environment::MacOs,

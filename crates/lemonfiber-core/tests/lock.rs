@@ -109,7 +109,10 @@ fn ctx(files: &Arc<Remembering>) -> Ctx {
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::absent()),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Arc::clone(files) as Arc<dyn FileSystem>,
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::clone(files) as Arc<dyn FileSystem>,
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             env_file: Some(PathBuf::from("/tmp/lemonfiber-lock-test/.env")),
@@ -125,7 +128,10 @@ fn ctx_without_settings(files: &Arc<Remembering>) -> Ctx {
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::absent()),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Arc::clone(files) as Arc<dyn FileSystem>,
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::clone(files) as Arc<dyn FileSystem>,
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,

@@ -95,7 +95,7 @@ fn context(env: &std::path::Path, http: Arc<Fake>, rehearsing: bool) -> Ctx {
         // the real clock every date written below would drift out of the window it was
         // chosen to sit inside, and the test would go red on a day nothing changed.
         Stopped::today(),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        lemonfiber_adapters::live(),
         stack(),
         Settings {
             env_file: Some(env.to_path_buf()),

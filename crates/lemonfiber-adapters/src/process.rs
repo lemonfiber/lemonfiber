@@ -7,7 +7,7 @@ use tokio::io::{AsyncBufReadExt as _, AsyncRead, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
 
-use crate::ports::process::{Failure, Output, Progress, Runner};
+use lemonfiber_ports::process::{Failure, Output, Progress, Runner};
 
 /// How many emitted lines may wait unread before the process is made to pause —
 /// a display keeps up with a pull's output, so a small buffer is enough.
