@@ -789,3 +789,34 @@ async fn what_is_already_here_is_answered_under_its_own_kind() {
         "what is already on this machine, under the migration kind"
     );
 }
+
+#[tokio::test]
+async fn where_this_copy_stands_is_the_envelope_the_command_renders() {
+    // A read and never a replacement. What a page is served is the line to copy for
+    // whichever tool owns the copy that is running, and the whole point of serving
+    // it rather than assembling it is that the line is the one a shell would print.
+    let expected =
+        as_the_command_renders_it(&world(running(), stack()), Command::Update { to: None }).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), reads::UPDATE).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn naming_a_version_asks_this_read_about_that_one() {
+    // The one parameter it takes, and the one question a downgrade asks. A browser
+    // that named a version is answered about that version and about whether it reads
+    // the configuration already on this machine.
+    let seen = asked(world(running(), stack()), "/api/update?to=0.9.0").await;
+
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"update","data":{"standing":"#)
+            && body.contains(r#""asked":"0.9.0""#)
+            && body.contains("0.9.0 is behind the copy running")),
+        "a named version is asked about rather than dropped"
+    );
+}

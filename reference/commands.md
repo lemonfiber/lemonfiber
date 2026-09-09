@@ -37,6 +37,7 @@ Commands:
   outbound      List everything that leaves this machine, and what refusing each of it costs
   credentials   Say which credentials this stack holds, or act on one of them
   stored        List what lemonfiber keeps on this machine, where it is, and why
+  update        Say where this copy of lemonfiber stands, and what moving it would come to
   clients       Say which app to watch on, for each kind of device somebody in the house has
   invite        Offer somebody in the house an account they can claim
   reissue       Let somebody set a new password, without you choosing or seeing it
@@ -1555,6 +1556,39 @@ Usage: lemonfiber stored [OPTIONS]
 Options:
       --json
           Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber update`
+
+```text
+Say where this copy of lemonfiber stands, and what moving it would come to.
+
+Replaces nothing. It works out how this copy got onto the machine — Homebrew, Scoop, winget, cargo, the shell installer, or by hand — and prints the exact command for whichever tool owns it, because a binary that overwrote itself underneath a package manager leaves that manager holding a record of something that is no longer there.
+
+The stack is untouched either way: containers run on their own, and this program only starts them. Nothing waits on the check, and a machine that cannot reach the release list is told so rather than stopped.
+
+`--to` asks about one particular version instead of whatever is newest, which is how going back is asked for — along with whether that version reads the configuration already on this machine.
+
+Usage: lemonfiber update [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --to <VERSION>
+          The version to move to, instead of whatever is newest
 
       --dry-run
           Say what would happen, and change nothing

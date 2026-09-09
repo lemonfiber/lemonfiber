@@ -1,6 +1,6 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes six
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes seven
 //! requests on its own account and they are enumerated here in full; the services
 //! in the stack make a great many more, and those are **theirs** — an indexer
 //! query is Prowlarr asking an indexer, a poster is Radarr asking a metadata
@@ -27,12 +27,12 @@ use serde::Serialize;
 use crate::config::Settings;
 use lemonfiber_manifest::Service;
 
-pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER};
+pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RELEASE_LIST};
 pub use theirs::ELSEWHERE;
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Six, and the closed set is the claim. A seventh is a decision somebody makes by
+/// Seven, and the closed set is the claim. An eighth is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
 ///
@@ -43,6 +43,11 @@ pub use theirs::ELSEWHERE;
 /// the others do not owe — it is the only entry whose destination is somebody else's
 /// choice, so the list names the two services it can reach and the sender is handed
 /// them rather than holding addresses of its own.
+///
+/// The seventh is the only one this program makes about *itself*, and it is the one
+/// whose absence used to be the claim. What it costs to allow is the shortest answer
+/// on the list: it carries nothing at all, so the only thing switching it off keeps
+/// from anybody is the knowledge that a version came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Reach {
@@ -58,6 +63,8 @@ pub enum Reach {
     Usenet,
     /// Telling a household member the one thing the request service cannot carry.
     Household,
+    /// Asking which version of lemonfiber itself has been released.
+    Updates,
 }
 
 impl Reach {
@@ -71,6 +78,7 @@ impl Reach {
             Self::Indexer => "indexer",
             Self::Usenet => "usenet",
             Self::Household => "household",
+            Self::Updates => "updates",
         }
     }
 }
@@ -232,7 +240,8 @@ mod tests {
                 "echo",
                 "indexer",
                 "usenet",
-                "household"
+                "household",
+                "updates"
             ]
         );
     }

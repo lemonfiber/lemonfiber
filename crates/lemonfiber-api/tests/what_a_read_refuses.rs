@@ -402,3 +402,15 @@ async fn a_run_that_cannot_say_where_its_files_are_refuses_to_list_them() {
         "a run with nowhere to look answered anyway"
     );
 }
+
+#[tokio::test]
+async fn asking_where_this_copy_stands_about_two_versions_at_once_is_refused() {
+    // One version to move to, and naming two is a request with two answers.
+    // Answering about one of them would drop the other without saying so.
+    let refused = reads::wanted(reads::UPDATE, Some("to=0.9.0&to=0.10.0"));
+
+    assert_eq!(
+        refused.err().map(|problem| problem.code.as_str()),
+        Some("READ-2")
+    );
+}

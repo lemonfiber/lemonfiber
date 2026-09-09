@@ -36,7 +36,8 @@ use crate::model::{
     FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdRemoval, HouseholdReport,
     ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport, QualityReport,
     ReplaceReport, ResetReport, SetupReport, Started, StatusReport, StuckReport, SupervisionReport,
-    TraceReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport, API_VERSION,
+    TraceReport, UpdateReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
+    API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -170,6 +171,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
         kind::UNINSTALL,
         schema_for!(Envelope<crate::uninstall::Uninstall>),
     );
+    describing(kinds, kind::UPDATE, schema_for!(Envelope<UpdateReport>));
     describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
     describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
@@ -221,8 +223,8 @@ mod tests {
         AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, FormsReport,
         FrontDoorReport, HistoryReport, HostingReport, HouseholdReport, ImportReport,
         LifecycleReport, MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport,
-        StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
-        WalkthroughReport, WizardReport,
+        StatusReport, StuckReport, SupervisionReport, TraceReport, UpdateReport, UpgradeReport,
+        VersionReport, WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
 
@@ -234,7 +236,7 @@ mod tests {
     /// The number is what makes it bite either way, so it is the number that has to
     /// move, and the sample beside it is what proves the new kind writes what the
     /// contract says it writes.
-    const OUTCOMES: usize = 45;
+    const OUTCOMES: usize = 46;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -469,7 +471,34 @@ mod tests {
                 stopped: true,
             }),
             Outcome::Walkthrough(a_walk()),
+            // Every optional half filled, so the shape is compared whole: a version to
+            // move to, one asked for, a command, a probe that answered, and the
+            // sentence a downgrade is owed.
+            Outcome::Update(where_this_copy_stands()),
         ]
+    }
+
+    /// A copy of lemonfiber a shell installer put here, with a newer one released and
+    /// an older one asked about.
+    fn where_this_copy_stands() -> UpdateReport {
+        UpdateReport {
+            standing: crate::update::Standing::UpdateAvailable,
+            running: "0.13.0".to_owned(),
+            at: Some("/home/op/.cargo/bin/lemonfiber".to_owned()),
+            installed: crate::update::Installed::Installer,
+            owner: None,
+            offered: Some("0.14.0".to_owned()),
+            asked: Some("0.12.0".to_owned()),
+            command: Some(
+                "curl -LsSf https://example.test/lemonfiber-installer.sh | sh".to_owned(),
+            ),
+            instead: None,
+            replaceable: Some(true),
+            configuration: Some(crate::update::configuration("0.12.0", "0.13.0")),
+            afterwards: crate::update::AFTERWARDS.to_owned(),
+            carries: crate::update::carries(&[1]),
+            untold: None,
+        }
     }
 
     /// A front door with every field filled: a named service, an address to hand

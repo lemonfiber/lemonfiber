@@ -346,6 +346,26 @@ pub enum Request {
     /// names what is *not* lemonfiber's, because your library being absent from the
     /// list is the part worth being sure about.
     Stored,
+    /// Say where this copy of lemonfiber stands, and what moving it would come to.
+    ///
+    /// Replaces nothing. It works out how this copy got onto the machine — Homebrew,
+    /// Scoop, winget, cargo, the shell installer, or by hand — and prints the exact
+    /// command for whichever tool owns it, because a binary that overwrote itself
+    /// underneath a package manager leaves that manager holding a record of something
+    /// that is no longer there.
+    ///
+    /// The stack is untouched either way: containers run on their own, and this
+    /// program only starts them. Nothing waits on the check, and a machine that cannot
+    /// reach the release list is told so rather than stopped.
+    ///
+    /// `--to` asks about one particular version instead of whatever is newest, which
+    /// is how going back is asked for — along with whether that version reads the
+    /// configuration already on this machine.
+    Update {
+        /// The version to move to, instead of whatever is newest.
+        #[arg(long, value_name = "VERSION")]
+        to: Option<String>,
+    },
     /// Say which app to watch on, for each kind of device somebody in the house has.
     ///
     /// The client landscape is uneven and it matters which app is used: some devices

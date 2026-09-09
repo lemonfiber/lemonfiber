@@ -192,6 +192,10 @@ pub const ASKS: &[Reach] = &[
         request: "clients",
         through: "/api/clients",
     },
+    Reach {
+        request: "update",
+        through: "/api/update",
+    },
 ];
 
 /// The requests the dashboard's panels show without being asked.

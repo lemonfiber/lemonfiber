@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 
 pub use reaching::{
     offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
-    REACH_REGISTRY_KEY, REACH_USENET_KEY, SWITCHES,
+    REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY, SWITCHES,
 };
 
 /// Which download protocols the operator actually has accounts for.
@@ -304,6 +304,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_INDEXER_KEY,
     REACH_USENET_KEY,
     REACH_HOUSEHOLD_KEY,
+    REACH_UPDATES_KEY,
     EXPLANATIONS_KEY,
     PROJECT_KEY,
     OVERLAY_KEY,
@@ -477,6 +478,13 @@ pub struct Settings {
     /// could not find the platform's data directory, which is the same absence
     /// every other location here handles.
     pub hosted: Option<PathBuf>,
+    /// This operator's home directory, as the platform reports it.
+    ///
+    /// Read for one thing only: the records the tools that install programs leave
+    /// beneath it, which is how the copy of lemonfiber that is running can say which
+    /// of them put it there. Absent where the platform would not say, which reads as
+    /// a machine with no such record rather than as a failure.
+    pub home: Option<PathBuf>,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -512,6 +520,7 @@ impl Default for Settings {
             provider_host: None,
             program: None,
             hosted: None,
+            home: None,
         }
     }
 }

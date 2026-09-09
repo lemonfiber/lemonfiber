@@ -1,4 +1,4 @@
-//! The six requests lemonfiber makes on its own account.
+//! The seven requests lemonfiber makes on its own account.
 //!
 //! Each answers four questions, and the answers are prose because the reader is a
 //! person deciding whether they are comfortable with it. *Where* it goes is read
@@ -13,13 +13,14 @@
 use super::{Outbound, Reach};
 use crate::config::{
     Settings, IP_ECHO_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
-    REACH_REGISTRY_KEY, REACH_USENET_KEY,
+    REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY,
 };
 use lemonfiber_manifest::Service;
 
 /// Every request lemonfiber makes, in the order an operator meets them: what the
-/// stack is built from, what keeps it current, the three that prove something, and
-/// the one that carries a sentence to somebody who lives here.
+/// stack is built from, what keeps it current, the three that prove something, the
+/// one that carries a sentence to somebody who lives here, and the one this program
+/// makes about itself.
 pub const EVERY: &[Reach] = &[
     Reach::Registry,
     Reach::Guides,
@@ -27,6 +28,7 @@ pub const EVERY: &[Reach] = &[
     Reach::Indexer,
     Reach::Usenet,
     Reach::Household,
+    Reach::Updates,
 ];
 
 /// The repository the community quality guides are synced from, probed for
@@ -50,6 +52,19 @@ pub const PUSHOVER: &str = "https://api.pushover.net/1/messages.json";
 
 /// Where a member who is reached on Pushbullet is reached.
 pub const PUSHBULLET: &str = "https://api.pushbullet.com/v2/pushes";
+
+/// Where the list of lemonfiber's own releases is read.
+///
+/// The list rather than the address that serves "the latest one", and that is forced
+/// rather than chosen: every release of this project is published as a pre-release,
+/// and the latest-release address passes over pre-releases — so it answers with
+/// nothing at all and a check built on it would report, for ever, that there is no
+/// version to move to.
+///
+/// Declared here for the reason the guide source is: the list an operator reads owns
+/// the address, and the check is handed it, so nothing can ask somewhere this page
+/// does not name.
+pub const RELEASE_LIST: &str = "https://api.github.com/repos/lemonfiber/lemonfiber/releases";
 
 /// What an image with no registry in its name is fetched from.
 const DOCKER_HUB: &str = "docker.io";
@@ -87,6 +102,7 @@ fn destination(reach: Reach, settings: &Settings, services: &[Service]) -> Vec<S
             .as_ref()
             .map_or_else(Vec::new, |host| vec![host.clone()]),
         Reach::Household => vec![PUSHOVER.to_owned(), PUSHBULLET.to_owned()],
+        Reach::Updates => vec![RELEASE_LIST.to_owned()],
     }
 }
 
@@ -157,6 +173,11 @@ pub fn purpose(reach: Reach) -> &'static str {
              a reason — so a refusal that reached them alone is the silent one this exists \
              to prevent."
         }
+        Reach::Updates => {
+            "Read which version of lemonfiber has been released, so an operator asking \
+             whether theirs is current gets an answer rather than a shrug. Nothing waits on \
+             it and nothing stops without it."
+        }
     }
 }
 
@@ -194,6 +215,13 @@ pub fn sends(reach: Reach) -> &'static str {
              where that member already told the request service to reach them, and only if \
              they left refusals switched on there."
         }
+        Reach::Updates => {
+            "One unauthenticated request for a list of releases. No credential, no setting, \
+             nothing about this machine and not even the version running — the answer is \
+             compared here rather than there. The one thing that travels is a name, which \
+             the address requires of anybody asking and which is the same word in every \
+             copy of this program."
+        }
     }
 }
 
@@ -206,6 +234,7 @@ pub fn switch(reach: Reach) -> &'static str {
         Reach::Indexer => REACH_INDEXER_KEY,
         Reach::Usenet => REACH_USENET_KEY,
         Reach::Household => REACH_HOUSEHOLD_KEY,
+        Reach::Updates => REACH_UPDATES_KEY,
     }
 }
 
@@ -239,6 +268,11 @@ pub fn cost(reach: Reach) -> &'static str {
              service sends that — so somebody is told no and never told why, and passing the \
              words on becomes yours to do by hand. The reason is still written down here and \
              still said back to you when you turn a request down."
+        }
+        Reach::Updates => {
+            "The version report stops saying whether this copy is the newest, and answers \
+             that it could not tell. Nothing else changes: lemonfiber never replaces itself \
+             and every other thing it does works exactly as well on an old one."
         }
     }
 }

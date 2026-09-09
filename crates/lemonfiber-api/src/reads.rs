@@ -98,6 +98,14 @@ pub const OUTBOUND: &str = "/api/outbound";
 /// in front of it and cannot see the host at all.
 pub const STORED: &str = "/api/stored";
 
+/// Where this copy of lemonfiber stands, and what moving it would come to.
+///
+/// A read and never a replacement: what it answers with is the exact command for
+/// whichever tool owns the copy that is running, which is a thing a browser can put in
+/// front of somebody and never a thing this surface carries out. It takes the version
+/// to move to, which is the one question a downgrade asks.
+pub const UPDATE: &str = "/api/update";
+
 /// Every credential this stack holds, with none of their values.
 ///
 /// The reading half of the word and nothing else: the two things that can be asked
@@ -213,6 +221,7 @@ pub const OFFERED: &[&str] = &[
     CREDENTIALS,
     MIGRATION,
     HISTORY,
+    UPDATE,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -261,6 +270,8 @@ pub struct Wanted {
     pub word: Option<String>,
     /// Which of the four removals to read.
     pub tier: Option<String>,
+    /// The version to move to, instead of whatever is newest.
+    pub to: Option<String>,
 }
 
 /// What a read was given, or why the request cannot be read as it stands.
@@ -292,6 +303,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         only,
         word,
         tier,
+        to,
     } = given;
     match read {
         VERSION => Ok(Command::Version),
@@ -336,6 +348,11 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // to be is an action.
         HISTORY => Ok(Command::History),
         CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
+        // Naming a version asks about that one and naming none asks about whatever is
+        // newest, which is the fork the command line takes on the same word. It reaches
+        // the command either way: this read replaces nothing, so there is no half of it
+        // that belongs behind a named action.
+        UPDATE => Ok(Command::Update { to }),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.
