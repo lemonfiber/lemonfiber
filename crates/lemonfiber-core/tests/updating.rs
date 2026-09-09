@@ -506,6 +506,43 @@ async fn a_copy_with_nothing_newer_is_current_whoever_put_it_here() {
     assert_eq!(report.offered.as_deref(), Some("0.0.1"));
 }
 
+/// A copy that is already the newest is offered nothing to type. The command for the
+/// version it is running is an instruction to reinstall, and it reads as a next step
+/// to whoever was looking for one.
+#[tokio::test]
+async fn a_copy_that_is_already_the_newest_is_offered_nothing_to_type() {
+    let files = Program::ordinary().shared();
+    let http = Fake::always(Answer::reply(200, released("v0.0.1")));
+
+    let report = standing(&files, &http, Some("/opt/lemonfiber/lemonfiber")).await;
+
+    assert_eq!(report.standing, Standing::Current);
+    assert_eq!(report.command, None);
+    assert_eq!(report.instead, None);
+}
+
+/// Naming a version is a different question, and it is answered whatever this copy
+/// already is — otherwise there would be no way to ask for an older one from the
+/// newest release.
+#[tokio::test]
+async fn naming_a_version_is_answered_even_where_this_copy_is_the_newest() {
+    let files = Program::ordinary().shared();
+    let http = Fake::always(Answer::reply(200, released("v0.0.1")));
+    let ctx = ctx(&files, &http, settings(Some(IN_CARGOS_BIN)));
+
+    let report = asked(
+        Command::Update {
+            to: Some("0.9.0".to_owned()),
+        },
+        &ctx,
+    )
+    .await;
+
+    assert_eq!(report.standing, Standing::Current);
+    let typed = report.command.unwrap_or_default();
+    assert!(typed.contains("releases/download/v0.9.0/"), "{typed}");
+}
+
 /// Going back is asked for by naming the version, and is answered with the command
 /// and with whether that version reads what is already on this machine.
 #[tokio::test]
