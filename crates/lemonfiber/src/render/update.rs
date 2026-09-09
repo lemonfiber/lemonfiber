@@ -140,6 +140,7 @@ mod tests {
             "{said}"
         );
         assert!(said.contains("Nothing in the stack is stopped"), "{said}");
+        assert!(!said.contains("To take it:"), "{said}");
     }
 
     /// The whole of what deferring comes to: the tool that owns the copy is named,

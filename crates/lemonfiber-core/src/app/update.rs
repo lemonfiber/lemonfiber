@@ -18,7 +18,7 @@ mod reading;
 
 use crate::model::UpdateReport;
 use crate::update::{
-    availability, carries, command, configuration, stands, why_not, Installed, AFTERWARDS,
+    availability, carries, command, configuration, stands, why_not, Installed, Standing, AFTERWARDS,
 };
 
 use super::Ctx;
@@ -31,29 +31,53 @@ pub(super) async fn standing(ctx: &Ctx, named: Option<&str>) -> UpdateReport {
     let at = reading::at(files, ctx.settings.program.as_ref()).await;
     let installed = reading::installed(files, at.as_deref(), ctx.settings.home.as_ref()).await;
     let read = checking::read(ctx).await;
-    let toward = toward(installed, named, read.offered.as_deref());
+    let standing = stands(
+        read.offered
+            .as_deref()
+            .map(|offered| availability(running, offered))
+            .as_ref(),
+        installed,
+    );
+    let (command, instead) = moving(standing, installed, named, read.offered.as_deref());
     UpdateReport {
-        standing: stands(
-            read.offered
-                .as_deref()
-                .map(|offered| availability(running, offered))
-                .as_ref(),
-            installed,
-        ),
+        standing,
         running: running.to_owned(),
         at: at.as_ref().map(|path| path.display().to_string()),
         installed,
         owner: installed.owner().map(str::to_owned),
         offered: read.offered.clone(),
         asked: named.map(str::to_owned),
-        command: command(installed, toward),
-        instead: why_not(installed, toward).map(str::to_owned),
+        command,
+        instead,
         replaceable: replaceable(ctx, installed, at.as_deref()).await,
         configuration: named.map(|named| configuration(named, running)),
         afterwards: AFTERWARDS.to_owned(),
         carries: carries(lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS),
         untold: read.untold.map(|quiet| quiet.why().to_owned()),
     }
+}
+
+/// What to type, or why there is nothing to type, where there is anything to do.
+///
+/// A copy that is already the newest has nothing to move to, and the command for the
+/// version it is running is an instruction to reinstall — which reads as something
+/// worth doing to whoever is looking for a next step. Naming a version asks a
+/// different question and is answered whatever this copy already is, since that is
+/// how going back is asked for.
+fn moving(
+    standing: Standing,
+    installed: Installed,
+    named: Option<&str>,
+    offered: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    if named.is_none() && standing == Standing::Current {
+        return (None, None);
+    }
+    let toward = toward(installed, named, offered);
+    (
+        command(installed, toward),
+        why_not(installed, toward).map(str::to_owned),
+    )
 }
 
 /// The version to name to whatever would carry out the move.
