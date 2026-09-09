@@ -7,6 +7,7 @@
 //!
 //! Reading only. Nothing here puts a change back.
 
+use crate::config::store::is_secret;
 use crate::journal::{horizon, Change, Kind};
 use crate::model::{ChangeReport, HistoryReport};
 use crate::rollback::{standing, together, Reversal};
@@ -58,6 +59,14 @@ pub fn history(ctx: &Ctx) -> HistoryReport {
 }
 
 /// One change, as an operator reads it.
+///
+/// A secret says what changed and never what to. The rest of this product refuses to
+/// write a credential down a second time; a read that printed one would be the same
+/// leak arriving by a different route, and this is the output an operator pastes into
+/// a forum thread when they are asking why something broke.
+///
+/// That it *had* a value before is still said, because that is what separates a
+/// setting being given one from a setting being changed, and neither is the value.
 fn told(change: &Change, standing: crate::rollback::Standing, alongside: usize) -> ChangeReport {
     let (because, instead) = standing
         .refusal
@@ -84,6 +93,10 @@ fn told(change: &Change, standing: crate::rollback::Standing, alongside: usize) 
 fn did(kind: &Kind) -> String {
     match kind {
         Kind::Created { resource, .. } => format!("added a {resource}"),
+        Kind::Set { key, previous, .. } if is_secret(key) => previous.as_ref().map_or_else(
+            || format!("set {key}"),
+            |_| format!("changed {key}, and it had a value before"),
+        ),
         Kind::Set {
             key,
             previous,
