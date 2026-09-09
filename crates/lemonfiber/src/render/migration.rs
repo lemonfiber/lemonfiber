@@ -10,7 +10,9 @@
 //! bare machine and one of a full stack are the same code taking different turns
 //! rather than one function knowing about every case at once.
 
-use lemonfiber_core::model::{AdoptReport, BesideReport, MigrationReport, UnsupportedReport};
+use lemonfiber_core::model::{
+    AdoptReport, BesideReport, MigrationReport, ReplaceReport, UnsupportedReport,
+};
 
 use super::Lines;
 
@@ -112,6 +114,47 @@ pub(super) fn beside(report: &BesideReport) -> Lines {
         lines.put("nothing has been written; add --confirm to go ahead".to_owned());
     }
     lines.put("nothing of the setup already here was touched".to_owned());
+    lines
+}
+
+/// What standing in place of a setup already here came to, or would come to.
+///
+/// What is still up leads where anything is, because a half-stopped stack is the one
+/// state an operator has to act on before they do anything else.
+pub(super) fn replacement(report: &ReplaceReport) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(refused) = &report.refused {
+        lines.put(format!("not standing in place of it: {refused}"));
+        return lines;
+    }
+    let named = report.project.clone().unwrap_or_default();
+
+    if !report.still_running.is_empty() {
+        lines.put(format!("still running in {named}:"));
+        for service in &report.still_running {
+            lines.put(format!("  {service}"));
+        }
+        lines.put(String::new());
+    }
+
+    if report.applied {
+        lines.put(format!("stopped in {named}:"));
+        for service in &report.stopped {
+            lines.put(format!("  {service}"));
+        }
+    } else {
+        lines.put(format!("standing in place of {named} would stop:"));
+        for service in &report.would_stop {
+            lines.put(format!("  {service}"));
+        }
+    }
+
+    lines.put(String::new());
+    if report.applied {
+        lines.put("nothing was deleted; start them again whenever you like".to_owned());
+    } else {
+        lines.put("nothing has been stopped; add --confirm to go ahead".to_owned());
+    }
     lines
 }
 
@@ -270,12 +313,12 @@ fn listed(items: &[UnsupportedReport], heading: &str, lines: &mut Lines) {
 
 #[cfg(test)]
 mod tests {
-    use super::{adoption, beside, migration};
+    use super::{adoption, beside, migration, replacement};
     use lemonfiber_core::migration::carrying::not_carried;
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
         AdoptReport, BesideReport, CarryingReport, ConflictReport, LinkingReport, MigrationReport,
-        MovedReport, OccupantReport, StandingReport, UnsupportedReport,
+        MovedReport, OccupantReport, ReplaceReport, StandingReport, UnsupportedReport,
     };
 
     /// One survey with something of every kind in it.
@@ -584,5 +627,67 @@ mod tests {
         let text = beside(&refused).text();
         assert!(text.contains("not standing beside:"), "{text}");
         assert!(!text.contains("8990"), "{text}");
+    }
+
+    /// What it would stop, before it stops anything.
+    #[test]
+    fn a_rehearsal_names_what_would_stop_and_stops_nothing() {
+        let rehearsed = ReplaceReport {
+            project: Some("media".to_owned()),
+            would_stop: vec!["sonarr".to_owned()],
+            rehearsed: true,
+            ..ReplaceReport::default()
+        };
+        let text = replacement(&rehearsed).text();
+        assert!(text.contains("would stop:"), "{text}");
+        assert!(text.contains("  sonarr"), "{text}");
+        assert!(text.contains("--confirm"), "{text}");
+    }
+
+    /// The sentence that makes it reversible is the one an operator needs last.
+    #[test]
+    fn having_stopped_it_says_nothing_was_deleted() {
+        let done = ReplaceReport {
+            project: Some("media".to_owned()),
+            would_stop: vec!["sonarr".to_owned()],
+            stopped: vec!["sonarr".to_owned()],
+            applied: true,
+            ..ReplaceReport::default()
+        };
+        let text = replacement(&done).text();
+        assert!(text.contains("stopped in media:"), "{text}");
+        assert!(
+            text.contains("nothing was deleted; start them again"),
+            "{text}"
+        );
+    }
+
+    /// A half-stopped stack leads, because it is the one state to act on first.
+    #[test]
+    fn what_is_still_up_is_said_before_what_stopped() {
+        let partial = ReplaceReport {
+            project: Some("media".to_owned()),
+            stopped: vec!["sonarr".to_owned()],
+            still_running: vec!["radarr".to_owned()],
+            applied: true,
+            ..ReplaceReport::default()
+        };
+        let text = replacement(&partial).text();
+        let still = text.find("still running").unwrap_or(usize::MAX);
+        let stopped = text.find("stopped in").unwrap_or(0);
+        assert!(still < stopped, "{text}");
+    }
+
+    /// A refusal is the whole answer, as it is for the other two.
+    #[test]
+    fn a_refusal_to_stand_in_place_is_the_only_thing_said() {
+        let refused = ReplaceReport {
+            refused: Some("no single setup here".to_owned()),
+            would_stop: vec!["sonarr".to_owned()],
+            ..ReplaceReport::default()
+        };
+        let text = replacement(&refused).text();
+        assert!(text.contains("not standing in place of it:"), "{text}");
+        assert!(!text.contains("sonarr"), "{text}");
     }
 }

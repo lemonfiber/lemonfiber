@@ -16,7 +16,7 @@ use lemonfiber_core::app::{Command, MigrateAction};
 use super::Arguments;
 
 /// Every act about a setup that was already here.
-const ABOUT: [&str; 2] = ["migrate-adopt", "migrate-beside"];
+const ABOUT: [&str; 3] = ["migrate-adopt", "migrate-beside", "migrate-replace"];
 
 /// Whether this action is about a setup that was already on the machine.
 pub(super) fn about_a_setup_already_here(action: &str) -> bool {
@@ -28,12 +28,15 @@ pub(super) fn about_a_setup_already_here(action: &str) -> bool {
 /// Nothing here can be missing: the one field it reads is a confirmation, and not
 /// having confirmed is an answer rather than an omission.
 pub(super) fn asked_for(action: &str, given: &Arguments) -> Command {
-    if action == ABOUT[1] {
-        return Command::Migrate(MigrateAction::Beside {
+    match action {
+        "migrate-beside" => Command::Migrate(MigrateAction::Beside {
             confirmed: given.confirm,
-        });
+        }),
+        "migrate-replace" => Command::Migrate(MigrateAction::Replace {
+            confirmed: given.confirm,
+        }),
+        _ => Command::Migrate(MigrateAction::Adopt {
+            confirmed: given.confirm,
+        }),
     }
-    Command::Migrate(MigrateAction::Adopt {
-        confirmed: given.confirm,
-    })
 }

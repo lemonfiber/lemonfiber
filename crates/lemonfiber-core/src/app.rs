@@ -58,6 +58,7 @@ mod refusals;
 mod remove;
 pub mod repair;
 mod repairs;
+mod replace;
 mod reset;
 pub mod restore;
 mod screen;
@@ -2128,6 +2129,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn asking_to_stand_in_place_of_what_is_here_reaches_the_command_that_would() {
+        let ctx = a_context().build();
+        let asked = Command::Migrate(MigrateAction::Replace { confirmed: false });
+        let read = dispatch(asked, &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Replacement(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    #[tokio::test]
+    async fn asking_to_stand_beside_what_is_here_reaches_the_command_that_would() {
+        let ctx = a_context().build();
+        let asked = Command::Migrate(MigrateAction::Beside { confirmed: false });
+        let read = dispatch(asked, &ctx).await;
+        let answered = matches!(&read, Ok(Outcome::Beside(_)));
+        assert!(answered, "{read:?}");
+    }
+
+    #[tokio::test]
     async fn asking_to_take_over_what_is_here_reaches_the_command_that_would() {
         let ctx = a_context().build();
         let asked = Command::Migrate(MigrateAction::Adopt { confirmed: false });
@@ -2215,6 +2234,7 @@ mod tests {
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
+                | Outcome::Replacement(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Config(_)
@@ -2267,6 +2287,7 @@ mod tests {
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
+                | Outcome::Replacement(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -3101,6 +3122,7 @@ mod tests {
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
+                | Outcome::Replacement(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)
@@ -4112,6 +4134,7 @@ mod tests {
                 | Outcome::Migration(_)
                 | Outcome::Adoption(_)
                 | Outcome::Beside(_)
+                | Outcome::Replacement(_)
                 | Outcome::Forms(_)
                 | Outcome::Preview(_)
                 | Outcome::Lifecycle(_)

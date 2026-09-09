@@ -100,6 +100,8 @@ pub const PULL: Kind = Kind("pull");
 pub const QUALITY: Kind = Kind("quality");
 /// What could be put right, and what became of the ones agreed to.
 pub const REPAIR: Kind = Kind("repair");
+/// What standing in place of a setup already here came to.
+pub const REPLACEMENT: Kind = Kind("replacement");
 /// What a full reset did, or would do.
 pub const RESET: Kind = Kind("reset");
 /// What a restore would overwrite, or what it put back.
@@ -175,6 +177,7 @@ pub const ALL: &[Kind] = &[
     PULL,
     QUALITY,
     REPAIR,
+    REPLACEMENT,
     RESET,
     RESTORE,
     SEED,
