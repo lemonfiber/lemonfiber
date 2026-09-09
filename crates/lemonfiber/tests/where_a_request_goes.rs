@@ -31,7 +31,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use lemonfiber_core::adapters::Web;
+use lemonfiber_adapters::Web;
 use lemonfiber_core::ports::http::{Http, Method, Request};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

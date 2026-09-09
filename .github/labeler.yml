@@ -3,7 +3,7 @@
 # adapters is a part of core, so a change there is labelled both.
 adapters:
   - changed-files:
-      - any-glob-to-any-file: ['crates/lemonfiber-core/src/adapters/**']
+      - any-glob-to-any-file: ['crates/lemonfiber-adapters/**']
 core:
   - changed-files:
       - any-glob-to-any-file: ['crates/lemonfiber-core/**']

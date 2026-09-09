@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use lemonfiber_core::adapters::{Daemon, Local};
+use lemonfiber_adapters::{Daemon, Local};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::{Reaching, Settings, REACH_UPDATES_KEY};
 use lemonfiber_core::model::UpdateReport;
