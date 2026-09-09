@@ -53,14 +53,23 @@ pub(super) fn migration(report: &MigrationReport) -> Lines {
 
 /// What adopting a setup already here came to, or would come to.
 ///
-/// A refusal is the whole answer where there is one: an operator told they cannot do
-/// this needs the reason, and nothing else on the screen is useful to them.
-pub(super) fn adoption(report: &AdoptReport) -> Lines {
+/// What is said instead of everything else, where an act was refused.
+///
+/// A refusal is the whole answer: an operator told they cannot do this needs the reason,
+/// and nothing else on the screen is useful to them. One place rather than one per act,
+/// so the four cannot come to disagree about that.
+fn turned_away(refused: Option<&String>, what: &str) -> Option<Lines> {
+    let refused = refused?;
     let mut lines = Lines::default();
-    if let Some(refused) = &report.refused {
-        lines.put(format!("not adopting: {refused}"));
-        return lines;
+    lines.put(format!("{what}: {refused}"));
+    Some(lines)
+}
+
+pub(super) fn adoption(report: &AdoptReport) -> Lines {
+    if let Some(said) = turned_away(report.refused.as_ref(), "not adopting") {
+        return said;
     }
+    let mut lines = Lines::default();
     let named = report.project.clone().unwrap_or_default();
     if report.adopted {
         lines.put(format!("lemonfiber now manages {named}"));
@@ -92,11 +101,10 @@ pub(super) fn adoption(report: &AdoptReport) -> Lines {
 
 /// What standing beside a setup already here came to, or would come to.
 pub(super) fn beside(report: &BesideReport) -> Lines {
-    let mut lines = Lines::default();
-    if let Some(refused) = &report.refused {
-        lines.put(format!("not standing beside: {refused}"));
-        return lines;
+    if let Some(said) = turned_away(report.refused.as_ref(), "not standing beside") {
+        return said;
     }
+    let mut lines = Lines::default();
     if report.applied {
         lines.put("lemonfiber now listens beside what was already here:".to_owned());
     } else {
@@ -123,11 +131,10 @@ pub(super) fn beside(report: &BesideReport) -> Lines {
 /// What is still up leads where anything is, because a half-stopped stack is the one
 /// state an operator has to act on before they do anything else.
 pub(super) fn replacement(report: &ReplaceReport) -> Lines {
-    let mut lines = Lines::default();
-    if let Some(refused) = &report.refused {
-        lines.put(format!("not standing in place of it: {refused}"));
-        return lines;
+    if let Some(said) = turned_away(report.refused.as_ref(), "not standing in place of it") {
+        return said;
     }
+    let mut lines = Lines::default();
     let named = report.project.clone().unwrap_or_default();
 
     if !report.still_running.is_empty() {
@@ -164,11 +171,10 @@ pub(super) fn replacement(report: &ReplaceReport) -> Lines {
 /// What did not travel leads. A record still on the old stack and not on the new is the
 /// thing an operator has to do something about; what arrived safely needs no action.
 pub(super) fn carried(report: &ImportReport) -> Lines {
-    let mut lines = Lines::default();
-    if let Some(refused) = &report.refused {
-        lines.put(format!("not carrying anything across: {refused}"));
-        return lines;
+    if let Some(said) = turned_away(report.refused.as_ref(), "not carrying anything across") {
+        return said;
     }
+    let mut lines = Lines::default();
 
     listed(&report.not_carried, "could not be carried:", &mut lines);
 

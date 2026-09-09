@@ -98,12 +98,6 @@ fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {
     ctx.settings.env_file.clone()
 }
 
-/// Everything adopting needs from the machine, gathered once.
-pub async fn taking(ctx: &Ctx, confirmed: bool) -> Result<AdoptReport, Box<Problem>> {
-    let found = super::migration::looked(ctx).await;
-    adopt(ctx, &found.survey, &found.mounts, confirmed)
-}
-
 #[cfg(test)]
 mod tests {
     use super::nothing;

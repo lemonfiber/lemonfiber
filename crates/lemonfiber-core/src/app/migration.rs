@@ -16,6 +16,8 @@ use crate::model::MigrationReport;
 use crate::ports::docker::Container;
 use crate::ports::filesystem::StorageFacts;
 
+use crate::migration::mode::Mode;
+
 use super::{Ctx, MigrateAction, Outcome};
 
 /// Answer what is already here.
@@ -28,27 +30,30 @@ use super::{Ctx, MigrateAction, Outcome};
 pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<Problem>> {
     match action {
         MigrateAction::Survey => Ok(Outcome::Migration(looked(ctx).await.survey)),
-        MigrateAction::Adopt { confirmed } => super::adopt::taking(ctx, confirmed)
+        MigrateAction::Act { mode, confirmed } => acting(ctx, mode, confirmed).await,
+    }
+}
+
+/// Carry out one of the four things that may be done about what was found.
+///
+/// Each looks first. What they do about what they found is where they differ, and the
+/// looking is one answer rather than four so that two of them cannot disagree about
+/// what is on the machine.
+async fn acting(ctx: &Ctx, mode: Mode, confirmed: bool) -> Result<Outcome, Box<Problem>> {
+    let found = looked(ctx).await;
+    match mode {
+        Mode::Adopt => {
+            super::adopt::adopt(ctx, &found.survey, &found.mounts, confirmed).map(Outcome::Adoption)
+        }
+        Mode::Import => super::import::carry(ctx, &found.survey, &found.running, confirmed)
             .await
-            .map(Outcome::Adoption),
-        MigrateAction::Import { confirmed } => {
-            let found = looked(ctx).await;
-            super::import::carry(ctx, &found.survey, &found.running, confirmed)
-                .await
-                .map(Outcome::Import)
-        }
-        MigrateAction::Replace { confirmed } => {
-            let found = looked(ctx).await;
-            super::replace::instead(ctx, &found.survey, &found.running, confirmed)
-                .await
-                .map(Outcome::Replacement)
-        }
-        MigrateAction::Beside { confirmed } => {
-            let found = looked(ctx).await;
-            super::beside::stand(ctx, &found.survey, confirmed)
-                .await
-                .map(Outcome::Beside)
-        }
+            .map(Outcome::Import),
+        Mode::Beside => super::beside::stand(ctx, &found.survey, confirmed)
+            .await
+            .map(Outcome::Beside),
+        Mode::Replace => super::replace::instead(ctx, &found.survey, &found.running, confirmed)
+            .await
+            .map(Outcome::Replacement),
     }
 }
 

@@ -17,6 +17,7 @@ use std::sync::Arc;
 use common::stack::project;
 use lemonfiber_core::app::{dispatch, Command, Ctx, MigrateAction, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::model::MigrationReport;
 use lemonfiber_core::model::{AdoptReport, BesideReport, ReplaceReport};
 use lemonfiber_core::platform::Environment;
@@ -252,7 +253,15 @@ fn theirs(version: &str, env: Option<PathBuf>) -> Ctx {
 
 /// What adopting answered, or nothing where it refused to answer at all.
 async fn adopting(ctx: &Ctx, confirmed: bool) -> Option<AdoptReport> {
-    match dispatch(Command::Migrate(MigrateAction::Adopt { confirmed }), ctx).await {
+    match dispatch(
+        Command::Migrate(MigrateAction::Act {
+            mode: Mode::Adopt,
+            confirmed,
+        }),
+        ctx,
+    )
+    .await
+    {
         Ok(Outcome::Adoption(report)) => Some(report),
         _ => None,
     }
@@ -334,7 +343,10 @@ async fn a_machine_with_nothing_of_ours_on_it_has_nothing_to_adopt() {
 /// believing lemonfiber manages a stack it does not.
 #[tokio::test]
 async fn adopting_with_nowhere_to_record_it_says_so_rather_than_claiming_it_worked() {
-    let asked = Command::Migrate(MigrateAction::Adopt { confirmed: true });
+    let asked = Command::Migrate(MigrateAction::Act {
+        mode: Mode::Adopt,
+        confirmed: true,
+    });
     let refused = dispatch(asked, &theirs("4.0.15", None)).await;
     assert!(refused.is_err(), "{refused:?}");
 }
@@ -345,7 +357,10 @@ async fn adopting_with_nowhere_to_record_it_says_so_rather_than_claiming_it_work
 async fn adopting_that_cannot_write_its_answer_reports_the_failure() {
     let blocked = std::env::temp_dir().join(format!("lemonfiber-blocked-{}", std::process::id()));
     let _ = std::fs::write(&blocked, "not a directory");
-    let asked = Command::Migrate(MigrateAction::Adopt { confirmed: true });
+    let asked = Command::Migrate(MigrateAction::Act {
+        mode: Mode::Adopt,
+        confirmed: true,
+    });
     let ctx = theirs("4.0.15", Some(blocked.join(".env")));
     let refused = dispatch(asked, &ctx).await;
     let _ = std::fs::remove_file(&blocked);
@@ -354,7 +369,15 @@ async fn adopting_that_cannot_write_its_answer_reports_the_failure() {
 
 /// What standing beside answered, or nothing where it refused to answer at all.
 async fn standing(ctx: &Ctx, confirmed: bool) -> Option<BesideReport> {
-    match dispatch(Command::Migrate(MigrateAction::Beside { confirmed }), ctx).await {
+    match dispatch(
+        Command::Migrate(MigrateAction::Act {
+            mode: Mode::Beside,
+            confirmed,
+        }),
+        ctx,
+    )
+    .await
+    {
         Ok(Outcome::Beside(report)) => Some(report),
         _ => None,
     }
@@ -424,7 +447,10 @@ async fn standing_beside_what_could_not_be_read_is_refused() {
 /// rather than shrugged off.
 #[tokio::test]
 async fn standing_beside_with_nowhere_to_write_says_so() {
-    let asked = Command::Migrate(MigrateAction::Beside { confirmed: true });
+    let asked = Command::Migrate(MigrateAction::Act {
+        mode: Mode::Beside,
+        confirmed: true,
+    });
     let refused = dispatch(asked, &theirs("4.0.15", None)).await;
     assert!(refused.is_err(), "{refused:?}");
 }
@@ -434,7 +460,10 @@ async fn standing_beside_with_nowhere_to_write_says_so() {
 async fn standing_beside_that_cannot_record_where_it_wrote_reports_the_failure() {
     let blocked = std::env::temp_dir().join(format!("lemonfiber-beside-{}", std::process::id()));
     let _ = std::fs::write(&blocked, "not a directory");
-    let asked = Command::Migrate(MigrateAction::Beside { confirmed: true });
+    let asked = Command::Migrate(MigrateAction::Act {
+        mode: Mode::Beside,
+        confirmed: true,
+    });
     let ctx = theirs("4.0.15", Some(blocked.join(".env")));
     let refused = dispatch(asked, &ctx).await;
     let _ = std::fs::remove_file(&blocked);
@@ -443,7 +472,15 @@ async fn standing_beside_that_cannot_record_where_it_wrote_reports_the_failure()
 
 /// What standing in place of it answered.
 async fn replacing(ctx: &Ctx, confirmed: bool) -> Option<ReplaceReport> {
-    match dispatch(Command::Migrate(MigrateAction::Replace { confirmed }), ctx).await {
+    match dispatch(
+        Command::Migrate(MigrateAction::Act {
+            mode: Mode::Replace,
+            confirmed,
+        }),
+        ctx,
+    )
+    .await
+    {
         Ok(Outcome::Replacement(report)) => Some(report),
         _ => None,
     }
@@ -634,7 +671,15 @@ fn importing(http: Arc<lemonfiber_fixtures::http::Fake>) -> Ctx {
 
 /// What carrying answered.
 async fn carrying(ctx: &Ctx, confirmed: bool) -> Option<lemonfiber_core::model::ImportReport> {
-    match dispatch(Command::Migrate(MigrateAction::Import { confirmed }), ctx).await {
+    match dispatch(
+        Command::Migrate(MigrateAction::Act {
+            mode: Mode::Import,
+            confirmed,
+        }),
+        ctx,
+    )
+    .await
+    {
         Ok(Outcome::Import(report)) => Some(report),
         _ => None,
     }
