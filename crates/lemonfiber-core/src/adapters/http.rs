@@ -27,6 +27,26 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// connection but never sends a reply cannot hang a seed run without end.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Where a request is allowed to end up: at the address it was sent to, and
+/// nowhere else.
+///
+/// reqwest's default follows up to ten hops, and on a cross-host one it strips
+/// `Authorization`, `Cookie` and `Proxy-Authorization`. None of those is the
+/// credential this product sends. A \*arr authenticates by `X-Api-Key` and an
+/// indexer by a parameter in the query, so a service answering `302 Location: …`
+/// hands both to a host of its choosing — as does the `Referer` reqwest adds,
+/// which quotes the original URL and the query with it.
+///
+/// Every service here is somebody else's container image on loopback or on the
+/// stack's own network, and none of them has a reason to redirect; the addresses on
+/// the internet that are asked for anything answer directly. So a hop is refused
+/// rather than filtered, which also makes it visible: the status comes back as the
+/// answer it is, into `outbound.log` and to the caller, instead of being taken
+/// quietly under an address the record still shows as loopback.
+fn no_redirect() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::none()
+}
+
 /// An HTTP client backed by `reqwest`, with rustls so the static Linux build
 /// needs no system TLS library.
 #[derive(Debug, Clone)]
@@ -46,6 +66,11 @@ impl Web {
     /// authenticates a session by a cookie set at login and expected on the calls
     /// that follow. It is [`PerOrigin`] rather than the default one, which would
     /// hand that session to every other service on the machine — see there for why.
+    ///
+    /// A redirect is never followed, and that is a security decision rather than a
+    /// simplification: a request here carries the service's credential in
+    /// `X-Api-Key`, or an indexer's in the query, and a hop would carry both to
+    /// whatever host the answer named. See [`no_redirect`].
     #[must_use]
     pub fn new() -> Self {
         // `build` only fails if the TLS backend cannot initialise, which the bundled
@@ -57,6 +82,7 @@ impl Web {
         Self {
             client: reqwest::Client::builder()
                 .cookie_provider(Arc::new(PerOrigin::default()))
+                .redirect(no_redirect())
                 .connect_timeout(CONNECT_TIMEOUT)
                 .timeout(REQUEST_TIMEOUT)
                 .build()
