@@ -44,11 +44,45 @@ the logic and the rendering must stay separate.
 
 ## Before you open a PR
 
-- `just ci` passes (fmt, clippy `-D warnings`, test, typos, cargo-deny), and
-  `just coverage` holds the 100% line that CI's sonar job enforces.
+- It compiles: `cargo build --workspace --all-targets`. Run this after every rebase.
+  A file that merely *uses* an interface you changed conflicts with nothing and so
+  merges clean, then fails to compile — which is the failure a quiet rebase hides.
+- `cargo fmt --all`, then clippy and the tests for what you actually touched.
 - Your change cites a spec identifier in a commit `Spec:` trailer and the PR body.
 - Behaviour change? The spec PR merged first.
 - The [definition of done](https://github.com/lemonfiber/spec/blob/main/40-quality/definition-of-done.md) is met.
+
+**Push, and let CI run the slow gates.** `just ci` and `just coverage` are the same
+commands CI's own jobs run — `sonar` runs that coverage line character for character
+— and CI runs them on an exclusive build cache, in parallel with twenty-odd other
+checks. Running them here first tells you nothing CI will not tell you sooner, and
+costs ten minutes and more of a shared machine. Reach for one locally only when a
+named check comes back red, and when that check is coverage use
+
+```
+cargo llvm-cov report --ignore-filename-regex '<the skipped regex>' --show-missing-lines
+```
+
+which re-reads the profile already gathered rather than building and running the
+whole workspace a second time.
+
+## Working in a worktree
+
+Every worktree under `~/Development/lemonfiber` shares one build cache, deliberately
+— `.cargo/config.toml` says why, and names the cost. Two things follow from it.
+
+**Remove your worktree once your PR merges.** That cache is sized for a handful of
+them. Cargo hashes a package id relative to the workspace root, so two worktrees
+produce byte-identical artifact names and each build overwrites the last one's work.
+Past a handful, every build in every worktree is a cold build, and nobody can see
+why from inside their own.
+
+**Do not trust a local pass or a local failure while a sibling may be building.** The
+same collision means a test reading a repo file through `CARGO_MANIFEST_DIR` — the
+parity table, the generated-artefact checks — can read *another worktree's* copy of
+it. A red run then names a file that is correct in your tree, and a green run is
+green about somebody else's. Force a rebuild (`touch` the test source, or
+`cargo clean -p <crate>`) and run it again before believing either answer.
 
 ## Commits
 
