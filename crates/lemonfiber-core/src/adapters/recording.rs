@@ -15,10 +15,14 @@
 //! body. A log holding either would be the thing this feature exists to prevent —
 //! an operator who turned every outbound request off would still have a file full
 //! of their own keys. So the line is when, what kind of request, where it went with
-//! the query and any userinfo taken off, and what came back. Never a header, never
+//! the query and any userinfo withheld, and what came back. Never a header, never
 //! a body.
 //!
-//! The address goes through the same scrubber a support bundle's does, so a
+//! Both, and in that order, because a URL carries a credential in two places and
+//! only one of them is a guess. The query goes wholesale — which parameter holds a
+//! key belongs to whoever wrote the service — and the password in front of the host
+//! goes because the URI syntax itself says everything after that colon is one. The
+//! address then goes through the same scrubber a support bundle's text does, so a
 //! credential that reached a URL in spite of all this is withheld here too rather
 //! than only where somebody remembered.
 
@@ -29,7 +33,7 @@ use async_trait::async_trait;
 
 use crate::ports::http::{Http, Request, Response, Unreachable};
 use crate::ports::time::Clock;
-use crate::ports::withheld::withheld;
+use crate::ports::withheld::{withheld, without_credentials};
 
 /// How many lines are kept.
 ///
@@ -62,6 +66,19 @@ impl<H> Recording<H> {
 /// Built here rather than at the write, so what a line contains is one function a
 /// test can put a request to — and so the rule that a header never reaches it is a
 /// property of a value rather than of a habit.
+///
+/// The address goes through [`without_credentials`] and then [`withheld`], and that
+/// order is the whole of it rather than a tidiness. Both places a URL can carry a
+/// credential — the query, and the password in front of the host — are withheld by
+/// the first; the second is the scrubber a support bundle's text takes, kept after
+/// it so a credential shaped like a setting inside the path is caught too. Taking
+/// the query off *before* either of them is what this used to do, and it disabled
+/// them: the general scrubber reaches the address rule only through a token that
+/// still carries a `?…=…`, so a login written in front of the host fell through
+/// both and was written down verbatim.
+///
+/// Withheld rather than deleted, so the line still says a query was sent — a record
+/// that quietly drops the fact reads as a smaller request than the one that left.
 fn line(at: u64, request: &Request, answered: Option<u16>) -> String {
     let outcome = answered.map_or_else(
         || "nothing answered".to_owned(),
@@ -70,18 +87,8 @@ fn line(at: u64, request: &Request, answered: Option<u16>) -> String {
     format!(
         "{at} {:?} {} {outcome}",
         request.method,
-        withheld(bare(&request.url))
+        withheld(&without_credentials(&request.url))
     )
-}
-
-/// The address without the part that carries what was asked for.
-///
-/// A query string is where a search term, a title, or an indexer key ends up, and
-/// none of those is the operator's to have leaked into a file by a check that was
-/// meant to reassure them. What is left is where the request went, which is what
-/// the question is about.
-fn bare(url: &str) -> &str {
-    url.split_once('?').map_or(url, |(before, _)| before)
 }
 
 /// The record as it stands after this line, oldest dropped.
@@ -118,7 +125,7 @@ impl<H: Http + Send + Sync> Http for Recording<H> {
 
 #[cfg(test)]
 mod tests {
-    use super::{bare, kept, line, Recording, KEPT};
+    use super::{kept, line, Recording, KEPT};
     use crate::ports::http::{Http, Method, Request};
     use lemonfiber_fixtures::http::{Answer, Fake};
     use lemonfiber_fixtures::ports::Stopped;
@@ -170,6 +177,52 @@ mod tests {
         );
     }
 
+    /// A login written in front of a host is not written into the record.
+    ///
+    /// Nothing in this stack hands one out — an indexer of the Torznab and Newznab
+    /// families authenticates by a query parameter, which is why the key is a
+    /// setting of its own — but an operator whose indexer sits behind a proxy that
+    /// asks for a login can write one into `INDEXER_URL`, and the client this stack
+    /// sends with will use it. The same address is scrubbed where it is *shown*, on
+    /// the outbound listing; a file the operator is invited to read to check that
+    /// listing is the last place it may survive.
+    ///
+    /// The account keeps its name. An operator whose login is refused needs to see
+    /// which one it was, and a username is not what the URI syntax calls a password.
+    #[test]
+    fn a_login_written_in_front_of_a_host_is_not_written_down() {
+        // Assembled rather than written out: a run that reads as a real password in
+        // this source is a secret scanner's finding for as long as the commit exists.
+        let password = ["hunter", "2"].concat();
+        for url in [
+            format!("https://someone:{password}@indexer.example/api"),
+            format!("https://someone:{password}@indexer.example/api?t=search"),
+        ] {
+            let asked = Request {
+                method: Method::Get,
+                url,
+                headers: Vec::new(),
+                body: None,
+            };
+            let said = line(1_700_000_000, &asked, Some(200));
+
+            // None of these quote the line. A failure message is copied into a CI log,
+            // which is read by more people and kept longer than the machine that wrote
+            // it — so an assertion about a credential not surviving must not be the
+            // thing that carries it onward. Each says which half of the claim broke,
+            // which is what a reader of the failure needs.
+            assert!(
+                !said.contains(&password),
+                "the operator's login survived into the record"
+            );
+            assert!(said.contains("someone"), "the account was not named");
+            assert!(
+                said.contains("indexer.example"),
+                "where the request went did not survive"
+            );
+        }
+    }
+
     /// A request nothing answered is recorded as one.
     ///
     /// The absence is the interesting half: an operator checking what left this
@@ -181,11 +234,39 @@ mod tests {
         assert!(said.contains("nothing answered"), "{said}");
     }
 
-    /// A query is taken off whether or not it holds a credential.
+    /// A query is withheld whether or not it holds a credential, and an address
+    /// carrying none is written exactly as it was.
+    ///
+    /// Withheld rather than cut away: what was asked for is the operator's business
+    /// and not this file's, and a line that dropped the question mark with it would
+    /// describe a request nobody made.
     #[test]
     fn the_part_that_says_what_was_asked_for_is_taken_off() {
-        assert_eq!(bare("https://a.example/x?y=z"), "https://a.example/x");
-        assert_eq!(bare("https://a.example/x"), "https://a.example/x");
+        // Not quoted either, for the same reason as above: which parameter of a query
+        // holds a key belongs to whoever wrote the service, so a recorded line is
+        // treated as though one of them does.
+        let said = line(1, &at("https://a.example/x?y=z"), Some(200));
+        assert!(
+            said.contains("https://a.example/x?"),
+            "the address and the fact a query was sent did not both survive"
+        );
+        assert!(!said.contains("y=z"), "the query survived into the record");
+
+        let plain = line(1, &at("https://a.example/x"), Some(200));
+        assert!(
+            plain.contains("https://a.example/x "),
+            "an address carrying no query was not written exactly as it was"
+        );
+    }
+
+    /// A GET of one address, for the tests that care about the address alone.
+    fn at(url: &str) -> Request {
+        Request {
+            method: Method::Get,
+            url: url.to_owned(),
+            headers: Vec::new(),
+            body: None,
+        }
     }
 
     /// The record is bounded, and it is the oldest that goes.
