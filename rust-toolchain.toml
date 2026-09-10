@@ -1,0 +1,18 @@
+# The toolchain this repository is built with, pinned rather than floating.
+#
+# Every job here and every clone used to take whatever `stable` happened to be that
+# day. That is reproducible only by accident: a release lands unannounced, invalidates
+# every build cache at once, and can turn a branch red for a reason that has nothing to
+# do with what it changed — with no way to tell that from a real failure except by
+# noticing the date.
+#
+# Pinned, a toolchain bump is a commit. It is reviewed, it is bisectable, and the cache
+# it invalidates is invalidated on purpose.
+#
+# `rust-version` in the root manifest is a different promise — the oldest toolchain that
+# can build this from source — and the `msrv` job collects on it. That job sets
+# `RUSTUP_TOOLCHAIN`, which takes precedence over this file, because otherwise this file
+# would quietly hand it the toolchain it exists to not use.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]

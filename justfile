@@ -46,15 +46,40 @@ release-tag VERSION:
     git push origin "v{{VERSION}}"
     echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
 
-# Everything CI runs, and the hooks turned on if they are not already — this is
-# the command run before a push, which is when the pre-push hook matters.
+# Everything CI runs, and the hooks turned on if they are not already.
+#
+# Not the command to run before a push. CI runs all of this on an exclusive build
+# cache, in parallel with twenty-odd other checks, the moment you push — so running
+# it here first learns nothing sooner and holds a machine other worktrees are waiting
+# on. It is here for when you want the whole set locally and know why: a toolchain
+# bump, a dependency change, or a CI failure you are trying to reproduce.
+#
+# The loop to run before a push is `just rebased`, then clippy and the tests for what
+# you touched.
 ci: hooks fmt-check lint test typos deny
 
 build:
     cargo build --workspace
 
+# The inner loop: does it still compile, and do the tests still pass.
+#
+# `nextest` rather than `cargo test`, because it runs the test binaries against each
+# other rather than one after another and this workspace has around a hundred of them
+# — 134s against 391s on the machine this was measured on. It runs no doctests, which
+# costs nothing here: every doctest target in this workspace reports zero.
 test:
-    cargo test --workspace
+    cargo nextest run --workspace
+
+# What a rebase leaves behind, in one word.
+#
+# The stack is a submodule, and a rebase across a commit that moved it leaves the old
+# one checked out — which surfaces as manifest tests failing about a fixture rather
+# than as anything to do with your change. The build after it is the half a conflict
+# never shows you: a file that merely *uses* an interface your branch changed conflicts
+# with nothing, merges clean, and then does not compile.
+rebased:
+    git submodule update --init --recursive
+    cargo build --workspace --all-targets
 
 fmt:
     cargo fmt
@@ -153,5 +178,22 @@ skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lem
 # this the gate says only that a number is below a number, and finding out which line it
 # meant costs a full run somebody has to think to make.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
-        || { cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines; exit 1; }
+    cargo llvm-cov nextest --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
+        || { just uncovered; exit 1; }
+
+# What the gate counted and could not name, from the profile already gathered.
+#
+# Two questions, because one of them answers and the other sometimes does not.
+# `--show-missing-lines` names line numbers and is what you want when it speaks. It has
+# been seen to come back empty against a gate that counted missed lines all the same —
+# so the second half asks the report for functions never entered, which is the shape
+# those misses take: a `map_or_else` default that never fired, an `else` on a parent
+# that is always `Some`, an arm reachable only from a caller that never passes it.
+#
+# Neither builds or runs anything. Both re-read what the gate just wrote.
+uncovered:
+    @echo "── lines the gate could not reach ──"
+    -cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines
+    @echo "── candidates: functions with no count, worth reading when the lines above name nothing ──"
+    @cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --json --output-path /dev/stdout 2>/dev/null \
+        | python3 scripts/never_entered.py
