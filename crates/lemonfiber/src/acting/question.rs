@@ -547,6 +547,26 @@ pub(crate) mod tests {
         );
     }
 
+    /// One read, two questions, and the object each supplies for itself.
+    ///
+    /// Neither is typed and neither is picked: which of the two things can be moved
+    /// forward is part of what the question *is*, so the list carries two entries
+    /// rather than one that would make somebody choose again after choosing.
+    #[test]
+    fn each_question_that_names_its_own_object_reaches_the_command_for_that_object() {
+        assert_eq!(
+            asking(called("where this copy of lemonfiber stands"), &[]),
+            Ok(Command::SelfUpdate { to: None }),
+            "the binary's half, asked with nothing typed"
+        );
+
+        let stack = asking(called("what the stack would move to"), &[]);
+        assert!(
+            matches!(stack, Ok(Command::Update(ref asked)) if !asked.confirm),
+            "the services' half, and a read never confirms: {stack:?}"
+        );
+    }
+
     /// Every question that takes a word fills the argument its own read names, and
     /// each one comes to a different command for the same word typed.
     ///

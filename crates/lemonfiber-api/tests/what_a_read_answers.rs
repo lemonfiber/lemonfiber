@@ -806,6 +806,36 @@ async fn where_this_copy_stands_is_the_envelope_the_command_renders() {
     );
 }
 
+/// The other object at the same door, and the half this surface never served before.
+///
+/// Named rather than defaulted: the two answers do not resemble each other, so a page
+/// that asked about the stack and was handed the binary has been answered a question
+/// it did not ask.
+#[tokio::test]
+async fn naming_the_stack_asks_about_the_services_rather_than_the_binary() {
+    let seen = asked(world(running(), stack()), "/api/update?what=stack").await;
+
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"update","data":{"state":"#)),
+        "the stack's own update answers here, under its own kind"
+    );
+}
+
+/// Neither object is the smaller case of the other, so naming none is refused.
+///
+/// This is where the read parts company with `/api/uninstall`, which has a reading
+/// that removes nothing and can default to it.
+#[tokio::test]
+async fn naming_no_object_is_refused_rather_than_answered_with_either() {
+    let seen = asked(world(running(), stack()), "/api/update").await;
+
+    assert!(
+        seen.is_some_and(|(status, _)| status != StatusCode::OK),
+        "a request naming neither object was answered with one of them"
+    );
+}
+
 #[tokio::test]
 async fn naming_a_version_asks_this_read_about_that_one() {
     // The one parameter it takes, and the one question a downgrade asks. A browser
