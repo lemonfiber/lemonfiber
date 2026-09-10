@@ -17,12 +17,12 @@ const FLOATING_TAGS: &[&str] = &[
     "latest", "stable", "edge", "nightly", "develop", "dev", "main", "master", "rolling",
 ];
 
-/// Kernel capabilities a service may ask for.
+/// The kernel capabilities a service may be granted.
 ///
-/// Deliberately one entry. A capability is a hole in the isolation the stack
-/// otherwise relies on, and the tunnel genuinely needs this one to build an
-/// interface. Anything else should have to argue for itself in a spec change.
-const ALLOWED_CAPABILITIES: &[&str] = &["NET_ADMIN"];
+/// Deliberately one entry. A kernel capability is a hole in the isolation the
+/// stack otherwise relies on, and the tunnel genuinely needs this one to build
+/// an interface. Anything else should have to argue for itself in a spec change.
+const ALLOWED_GRANTS: &[&str] = &["NET_ADMIN"];
 
 /// The OSI-approved identifiers a service licence may use.
 const OSI: &str = include_str!("spdx_osi.txt");
@@ -215,13 +215,13 @@ fn released(service: &Service, today: Date) -> Option<String> {
     }
 }
 
-/// A service asks only for capabilities the stack is willing to grant.
+/// A service asks only for the kernel capabilities the stack is willing to grant.
 fn permitted(service: &Service) -> Vec<String> {
     service
-        .capabilities
+        .grants
         .iter()
-        .filter(|capability| !ALLOWED_CAPABILITIES.contains(&capability.as_str()))
-        .map(|capability| format!("asks for capability {capability}, which is not allowed"))
+        .filter(|granted| !ALLOWED_GRANTS.contains(&granted.as_str()))
+        .map(|granted| format!("asks for kernel capability {granted}, which is not allowed"))
         .collect()
 }
 
@@ -419,14 +419,11 @@ mod tests {
     }
 
     #[test]
-    fn a_capability_outside_the_allow_list_is_caught() {
-        let text = edited(
-            r#"capabilities = ["NET_ADMIN"]"#,
-            r#"capabilities = ["SYS_ADMIN"]"#,
-        );
+    fn a_grant_outside_the_allow_list_is_caught() {
+        let text = edited(r#"grants = ["NET_ADMIN"]"#, r#"grants = ["SYS_ADMIN"]"#);
         assert!(messages(&text)
             .iter()
-            .any(|m| m.contains("capability SYS_ADMIN, which is not allowed")));
+            .any(|m| m.contains("kernel capability SYS_ADMIN, which is not allowed")));
     }
 
     #[test]

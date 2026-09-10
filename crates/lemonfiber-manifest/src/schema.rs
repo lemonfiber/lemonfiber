@@ -176,9 +176,18 @@ pub struct Service {
     /// Same-profile dependencies only.
     #[serde(default)]
     pub depends_on: Vec<String>,
-    /// Extra kernel capabilities, checked against an allow-list.
-    #[serde(default)]
-    pub capabilities: Vec<String>,
+    /// Extra kernel capabilities granted to the container, checked against an allow-list.
+    ///
+    /// Named `grants` rather than `capabilities` because the word is about to mean
+    /// something else entirely: what a service *can do*, which is how a plugin declares
+    /// itself and how wiring asks for a filler. Two meanings under one spelling is how a
+    /// setting that decides what a container may do to the kernel gets read as a
+    /// description of what it offers.
+    ///
+    /// The old spelling is still accepted, because an operator's own stack description is
+    /// theirs and a rename is not a reason to refuse to read it.
+    #[serde(default, alias = "capabilities")]
+    pub grants: Vec<String>,
     /// True where the OS owns the lifecycle rather than Compose.
     #[serde(default)]
     pub host_managed: bool,
@@ -349,6 +358,7 @@ port = 8081
 bind = "loopback"
 health = { kind = "http", path = "/api/v2/app/version", timeout_s = 60 }
 api = { kind = "qbittorrent", key_source = "generated" }
+grants = ["NET_ADMIN"]
 criticality = "core"
 license = "GPL-2.0-only"
 upstream = "https://github.com/qbittorrent/qBittorrent"
@@ -407,6 +417,30 @@ depends_on = ["gluetun"]
                 Some(8081),
                 vec!["gluetun".to_owned()]
             ))
+        );
+    }
+
+    /// A stack description written before the rename is still read.
+    ///
+    /// The field was called `capabilities` and the word is now needed for something
+    /// else. An operator's own stack description is theirs, so the old spelling is
+    /// accepted rather than refused — and because the manifest refuses unknown fields,
+    /// dropping the alias would turn every stack written until now into a parse failure
+    /// rather than a warning.
+    #[test]
+    fn a_stack_written_before_the_rename_still_reads_its_kernel_grants() {
+        let older = MINIMAL.replace("grants = ", "capabilities = ");
+        let granted = service(&older).map(|service| service.grants);
+        let current = service(MINIMAL).map(|service| service.grants);
+
+        assert_eq!(
+            granted,
+            Some(vec!["NET_ADMIN".to_owned()]),
+            "the old spelling reads as what it always meant"
+        );
+        assert_eq!(
+            granted, current,
+            "and reads as the same thing the new one does"
         );
     }
 
