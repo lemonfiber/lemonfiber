@@ -116,6 +116,23 @@ install-path = "CARGO_HOME"
 install-updater = false
 
 # The profile that 'dist' will build with
+# Debug information is line tables and nothing more.
+#
+# The default is full DWARF, and this workspace links around a hundred test binaries
+# against it — so a large part of what a build writes to disk, and much of what a link
+# spends its time on, is debug information for a debugger nobody here attaches. What
+# these tests are actually read beside is a panic naming the file and the line it
+# happened on, and line tables are exactly that.
+#
+# Coverage is unaffected: `cargo llvm-cov` maps counters through the coverage map the
+# instrumentation writes, not through DWARF.
+#
+# What it costs is stepping through a running process with variable inspection. That is
+# worth having when you need it and worth paying for only then — `CARGO_PROFILE_DEV_DEBUG=2`
+# for the one session that needs it, rather than for every build that does not.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dist]
 inherits = "release"
 lto = "thin"
