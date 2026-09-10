@@ -62,14 +62,11 @@ commands CI's own jobs run — `sonar` runs that coverage line character for cha
 — and CI runs them on an exclusive build cache, in parallel with twenty-odd other
 checks. Running them here first tells you nothing CI will not tell you sooner, and
 costs ten minutes and more of a shared machine. Reach for one locally only when a
-named check comes back red, and when that check is coverage use
-
-```
-cargo llvm-cov report --ignore-filename-regex '<the skipped regex>' --show-missing-lines
-```
-
+named check comes back red, and when that check is coverage run `just uncovered`,
 which re-reads the profile already gathered rather than building and running the
-whole workspace a second time.
+whole workspace a second time. It asks twice on purpose: the line numbers first,
+and — for when those come back empty against a gate that counted misses anyway —
+the functions the run never entered, which is the shape an unnamed miss takes.
 
 ## Working in a worktree
 
