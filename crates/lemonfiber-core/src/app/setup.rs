@@ -18,13 +18,12 @@ use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_v
 use std::path::{Path, PathBuf};
 
 use crate::alert::Appetite;
-use crate::app::apply;
+use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
 use crate::error::{Amiss, Code, Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
-use crate::stack::Source;
 use crate::validate::{Validation, Validator};
 use crate::wizard::{
     described, Answer, Choice, Library, Phase, Plan, Progress, Recovery, Rejected, Resolution,
@@ -166,9 +165,7 @@ pub async fn run(
     prompt: &dyn Prompt,
     filesystem: &dyn FileSystem,
     validator: &dyn Validator,
-    paths: &Paths,
-    source: Source,
-    stamp: &str,
+    applying: &Applying<'_>,
 ) -> Result<Outcome, Box<Problem>> {
     // Only a wizard still gathering is driven here. One that has been reviewed,
     // is part-way through an interrupted apply, or is already applied must be
@@ -177,7 +174,7 @@ pub async fn run(
     if wizard.phase() != Phase::InProgress {
         return Err(Box::new(already_underway()));
     }
-    gather(wizard, prompt, filesystem, validator, paths)
+    gather(wizard, prompt, filesystem, validator, applying.paths)
         .await
         .map_err(|rejected| Box::new(does_not_apply(rejected)))?;
 
@@ -190,8 +187,8 @@ pub async fn run(
     // needs — the phase and a complete set of answers — are the guard above and
     // gathering itself, so it always takes here.
     wizard.transition(Phase::Reviewing);
-    apply::apply(wizard, paths, source, stamp)?;
-    clear_progress(paths);
+    apply::apply(wizard, applying)?;
+    clear_progress(applying.paths);
     Ok(Outcome::Applied)
 }
 
@@ -225,15 +222,10 @@ pub fn progress_at(path: &Path) -> Option<Progress> {
 ///
 /// Returns a [`Problem`] where applying the recorded answers fails, leaving the
 /// marker at `applying` for another attempt.
-pub fn resume(
-    wizard: &mut Wizard,
-    paths: &Paths,
-    source: Source,
-    stamp: &str,
-) -> Result<(), Box<Problem>> {
+pub fn resume(wizard: &mut Wizard, applying: &Applying<'_>) -> Result<(), Box<Problem>> {
     wizard.transition(Phase::Reviewing);
-    apply::apply(wizard, paths, source, stamp)?;
-    clear_progress(paths);
+    apply::apply(wizard, applying)?;
+    clear_progress(applying.paths);
     Ok(())
 }
 
@@ -256,18 +248,17 @@ pub fn resume(
 /// asked for directly does.
 pub(super) fn recovered(
     wizard: &mut Wizard,
-    paths: &Paths,
-    source: Source,
-    stamp: &str,
+    applying: &Applying<'_>,
     choice: Choice,
 ) -> Result<(), Box<Problem>> {
+    let paths = applying.paths;
     let journal = crate::app::recover::journal_at(&paths.journal());
     let env = paths.env_file();
     match Recovery::of(&journal).resolve(choice) {
-        Resolution::Resume => resume(wizard, paths, source, stamp),
+        Resolution::Resume => resume(wizard, applying),
         Resolution::RollBack(undos) => {
             crate::app::recover::undo(&undos, &env, Vec::new())?;
-            resume(wizard, paths, source, stamp)
+            resume(wizard, applying)
         }
         Resolution::StartOver(undos) => {
             crate::app::recover::undo(&undos, &env, Vec::new())?;
@@ -462,7 +453,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        progress_at, run, CredentialChoice, Outcome, Prompt, ProviderEntry, StorageWarning,
+        progress_at, run, Applying, CredentialChoice, Outcome, Prompt, ProviderEntry,
+        StorageWarning,
     };
     use crate::alert::Appetite;
     use crate::config::paths::Paths;
@@ -772,6 +764,22 @@ mod tests {
         }
     }
 
+    /// What an apply writes with: a real directory, the stack a test names, and a real
+    /// machine's randomness — which is what the key the journal's credentials are
+    /// sealed under is made from.
+    fn applying<'a>(paths: &'a Paths, stamp: &'a str) -> Applying<'a> {
+        Applying {
+            paths,
+            source: external(),
+            stamp,
+            random: &A_MACHINE,
+        }
+    }
+
+    /// The randomness a real machine supplies.
+    static A_MACHINE: lemonfiber_fixtures::ports::Chance =
+        lemonfiber_fixtures::ports::Chance::cycling();
+
     /// A scratch directory unique to this process and case, cleared first.
     fn scratch(name: &str) -> PathBuf {
         let dir =
@@ -802,9 +810,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -832,9 +838,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -872,9 +876,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -903,9 +905,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -927,9 +927,7 @@ mod tests {
                 &prompt,
                 &ProbeFs::links(),
                 &proving(),
-                &paths,
-                external(),
-                "t"
+                &applying(&paths, "t")
             )
             .await,
             Ok(Outcome::Applied)
@@ -953,9 +951,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -996,9 +992,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1020,9 +1014,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1048,9 +1040,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
         assert!(matches!(outcome, Ok(Outcome::Abandoned)));
@@ -1123,7 +1113,7 @@ mod tests {
         assert!(wizard.transition(Phase::Reviewing));
         assert!(wizard.transition(Phase::Applying));
 
-        assert!(super::resume(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(super::resume(&mut wizard, &applying(&paths, "t")).is_ok());
 
         assert_eq!(wizard.phase(), Phase::Applied);
         let file = store::read(&paths.env_file()).unwrap_or_default();
@@ -1163,9 +1153,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1189,9 +1177,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1225,9 +1211,7 @@ mod tests {
             &prompt,
             &cannot_link(FsKind::ExFat),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1258,9 +1242,7 @@ mod tests {
             &prompt,
             &cannot_link(FsKind::Linking("ext4".to_owned())),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1297,9 +1279,7 @@ mod tests {
             &prompt,
             &filesystem,
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1335,9 +1315,7 @@ mod tests {
             &prompt,
             &filesystem,
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1369,9 +1347,7 @@ mod tests {
             &prompt,
             &filesystem,
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1405,9 +1381,7 @@ mod tests {
             &prompt,
             &filesystem,
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1451,9 +1425,7 @@ mod tests {
             &prompt,
             &filesystem,
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1503,9 +1475,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
         assert!(matches!(outcome, Ok(Outcome::Applied)));
@@ -1541,9 +1511,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1581,9 +1549,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1608,9 +1574,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1637,9 +1601,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1663,9 +1625,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &proving(),
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1705,9 +1665,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1743,9 +1701,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1770,9 +1726,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1797,9 +1751,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 
@@ -1831,9 +1783,7 @@ mod tests {
             &prompt,
             &ProbeFs::links(),
             &validator,
-            &paths,
-            external(),
-            "t",
+            &applying(&paths, "t"),
         )
         .await;
 

@@ -139,10 +139,14 @@ const NAMED: &[(&str, Reach, &str)] = &[
 ///
 /// The question a persistent installation identifier would be the wrong answer to
 /// is *what is this value, and does it outlive the run* — so that is what an entry
-/// says. Three, and none of them is about the installation: two are credentials for
-/// a service on this machine, and the third is a per-bundle salt that exists so a
-/// redacted value cannot be recognised across two bundles, which is the opposite of
-/// an identifier.
+/// says. Five, and none of them is about the installation: two mint credentials for
+/// something on this machine, two are salts that exist precisely so one value cannot
+/// be recognised as another, and the fifth is a key that never leaves the disk it is
+/// written to.
+///
+/// That fifth one is the entry worth reading twice, because it is the only one that is
+/// deliberately *stable* — which is the shape an identifier has. What makes it not one
+/// is the other half of the question: nothing carries it anywhere.
 const MINTING: &[(&str, &str)] = &[
     (
         "crates/lemonfiber-api/src/guard.rs",
@@ -167,6 +171,14 @@ const MINTING: &[(&str, &str)] = &[
         "the salt a support bundle's redaction marks are derived from. Made for one bundle and \
          discarded with it, so the same withheld value carries a different mark in the next \
          one — deliberately not stable, and stability is what an identifier is",
+    ),
+    (
+        "crates/lemonfiber-core/src/journal/sealing.rs",
+        "the key the change journal's credentials are sealed under, and a fresh nonce for each \
+         value sealed with it. The key outlives the run and has to — a key made afresh opens \
+         nothing written before it — and it is written to one file beside the journal and read \
+         from nowhere else: it reaches no request, no report and no bundle, so there is nobody \
+         it could identify this installation to",
     ),
 ];
 

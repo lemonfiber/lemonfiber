@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use lemonfiber_core::app::apply::Applying;
 use lemonfiber_core::app::{setup as core_setup, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
@@ -309,14 +310,19 @@ async fn drive(
         Box::new(Flags::new(flags, default_data_location(paths)))
     };
 
+    let at = stamp();
+    let applying = Applying {
+        paths,
+        source: ctx.stack,
+        stamp: &at,
+        random: ctx.random.as_ref(),
+    };
     match core_setup::run(
         &mut wizard,
         prompt.as_ref(),
         ctx.filesystem.as_ref(),
         validator.as_ref(),
-        paths,
-        ctx.stack,
-        &stamp(),
+        &applying,
     )
     .await
     {

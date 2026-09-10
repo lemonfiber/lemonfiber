@@ -9,12 +9,19 @@
 //! surface stamps the time and persists the log. Reversing is described here and
 //! carried out there, so the whole of the undo logic runs in a test with no
 //! service and no disk.
+//!
+//! What a setting held before and after is exactly what putting it back writes, so
+//! some of these records hold a credential. They are kept sealed on disk and clear
+//! in memory — see [`sealing`] for why that is the boundary, and for what sealing
+//! them does and does not protect against.
 
 mod keeping;
+pub mod sealing;
 
 use serde::{Deserialize, Serialize};
 
 pub use keeping::{horizon, kept, runs, RUNS_KEPT};
+pub use sealing::{is_sealed, Seal, KEY_FILE};
 
 /// A change lemonfiber made, recorded so it can be reversed — exactly this one.
 ///
