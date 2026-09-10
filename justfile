@@ -179,4 +179,21 @@ skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lem
 # meant costs a full run somebody has to think to make.
 coverage:
     cargo llvm-cov nextest --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
-        || { cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines; exit 1; }
+        || { just uncovered; exit 1; }
+
+# What the gate counted and could not name, from the profile already gathered.
+#
+# Two questions, because one of them answers and the other sometimes does not.
+# `--show-missing-lines` names line numbers and is what you want when it speaks. It has
+# been seen to come back empty against a gate that counted missed lines all the same —
+# so the second half asks the report for functions never entered, which is the shape
+# those misses take: a `map_or_else` default that never fired, an `else` on a parent
+# that is always `Some`, an arm reachable only from a caller that never passes it.
+#
+# Neither builds or runs anything. Both re-read what the gate just wrote.
+uncovered:
+    @echo "── lines the gate could not reach ──"
+    -cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines
+    @echo "── candidates: functions with no count, worth reading when the lines above name nothing ──"
+    @cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --json --output-path /dev/stdout 2>/dev/null \
+        | python3 scripts/never_entered.py
