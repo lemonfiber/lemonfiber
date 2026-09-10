@@ -75,7 +75,10 @@ fn ctx(files: &Arc<Program>, http: &Arc<Fake>, settings: Settings) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Stopped::at(NOW),
-        Arc::clone(files) as Arc<dyn FileSystem>,
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::clone(files) as Arc<dyn FileSystem>,
+            ..lemonfiber_adapters::live()
+        },
         Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
         settings,
         Environment::MacOs,

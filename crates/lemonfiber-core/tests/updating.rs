@@ -362,7 +362,10 @@ fn ctx(machine: &Arc<Machine>, images: Vec<Image>, archive: &Arc<Kept>) -> Ctx {
         Arc::clone(machine) as Arc<dyn Runner>,
         Arc::clone(machine) as Arc<dyn Engine>,
         Stopped::today(),
-        Files::empty(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,
@@ -842,7 +845,10 @@ fn transferring(
         Arc::clone(machine) as Arc<dyn Runner>,
         Arc::clone(machine) as Arc<dyn Engine>,
         Stopped::today(),
-        Files::empty(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             protocols: Protocols::both(),
