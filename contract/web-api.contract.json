@@ -12308,7 +12308,7 @@
               "type": "boolean"
             },
             "halted": {
-              "description": "Why the run stopped where it did, where it stopped early.",
+              "description": "Why the stack is not as the run found it, where it is not.\n\nTwo runs end that way and an operator has the same thing to do about either:\none that met a service which would not come back and stopped there, and one\nwhere every step succeeded and the stack would not start again afterwards.\nThe second is not a failure of the update — `state` still says `Updated`,\nbecause it is — but the stack came down for the capture and something has to\nsay that it is still down.",
               "type": [
                 "string",
                 "null"

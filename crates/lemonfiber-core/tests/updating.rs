@@ -89,6 +89,16 @@ struct Machine {
     /// What Compose says to the first whole-stack invocation — the stop in front of
     /// the capture — where a test is about it refusing that.
     stack: Mutex<Option<Result<Output, RunFailure>>>,
+    /// What Compose says to the whole-stack start behind the run, where a test is
+    /// about it refusing that.
+    bringing_back: Mutex<Option<Result<Output, RunFailure>>>,
+    /// How many whole-stack invocations have been asked for.
+    ///
+    /// The stop in front of the capture is the first and the start that puts
+    /// everything back is the last, so a test that wants one of them refused has to
+    /// be able to say which. Refusing "the stack" without saying when would always
+    /// refuse the stop, and the two leave the machine in opposite states.
+    stack_actions: Mutex<usize>,
 }
 
 impl Machine {
@@ -101,6 +111,8 @@ impl Machine {
             coming,
             start: Mutex::new(None),
             stack: Mutex::new(None),
+            bringing_back: Mutex::new(None),
+            stack_actions: Mutex::new(0),
         })
     }
 
@@ -116,6 +128,17 @@ impl Machine {
     fn refusing_the_stack(self: Arc<Self>, said: Result<Output, RunFailure>) -> Arc<Self> {
         if let Ok(mut stack) = self.stack.lock() {
             *stack = Some(said);
+        }
+        self
+    }
+
+    /// The same machine, with Compose refusing the start that puts the stack back.
+    ///
+    /// The run has finished by then and every step of it has succeeded, so this is
+    /// the stack failing to come back rather than the update failing.
+    fn refusing_to_bring_it_back(self: Arc<Self>, said: Result<Output, RunFailure>) -> Arc<Self> {
+        if let Ok(mut back) = self.bringing_back.lock() {
+            *back = Some(said);
         }
         self
     }
@@ -168,11 +191,19 @@ impl Runner for Machine {
             seen.push(argv.to_vec());
         }
         let Some(service) = fenced(argv) else {
-            return self
-                .stack
+            let nth = self.stack_actions.lock().map_or(1, |mut asked| {
+                *asked += 1;
+                *asked
+            });
+            let refusal = if nth == 1 {
+                &self.stack
+            } else {
+                &self.bringing_back
+            };
+            return refusal
                 .lock()
                 .ok()
-                .and_then(|mut stack| stack.take())
+                .and_then(|mut said| said.take())
                 .unwrap_or_else(|| Ok(spoke("")));
         };
         if let Some(said) = self.start.lock().ok().and_then(|mut start| start.take()) {
@@ -504,6 +535,89 @@ async fn a_capture_that_will_not_write_stops_the_run_before_anything_moves() {
     assert!(
         machine.started().is_empty(),
         "a service was started with no archive to go back to"
+    );
+}
+
+/// The capture is refused while anything might be writing, so the stack is stopped
+/// before it is attempted — which means a capture that will not write leaves every
+/// service down. That is not a thing the backup's own words would ever mention, and
+/// it is the only part of this an operator has to act on straight away.
+#[tokio::test]
+async fn a_capture_that_will_not_write_says_the_stack_was_left_down() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(false);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let refused = dispatch(asking(true, Waiting::Never), &context).await;
+
+    let problem = refused.err();
+    assert_eq!(
+        problem.as_ref().map(|one| one.code.to_string()).as_deref(),
+        Some("UPDATE-4"),
+        "the operator was told the capture failed and not that the stack is down"
+    );
+    let remedies: Vec<String> = problem
+        .as_ref()
+        .map(|one| {
+            one.remedies
+                .iter()
+                .filter_map(|remedy| remedy.detail.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert!(
+        remedies
+            .iter()
+            .any(|detail| detail.contains("lemonfiber up")),
+        "nothing offered to bring the stack back up: {remedies:?}"
+    );
+    assert!(
+        problem.and_then(|one| one.cause).is_some(),
+        "what stopped the capture was replaced rather than carried"
+    );
+}
+
+/// A run where every step succeeded and the stack would not come back afterwards.
+///
+/// The update is done and there is nothing here to roll back. Reporting it as a
+/// failure is what would have an operator reverse a database migration that worked,
+/// which is the one move this whole feature exists to make unnecessary — so the
+/// report survives, and where the stack was left is said in it.
+#[tokio::test]
+async fn a_stack_that_will_not_come_back_does_not_undo_the_update_it_reports() {
+    let machine =
+        Machine::coming(Coming::Answering).refusing_to_bring_it_back(Err(RunFailure::NotFound {
+            program: "docker".to_owned(),
+        }));
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.as_ref().map(|report| report.state);
+    assert_eq!(
+        read,
+        Some(State::Updated),
+        "a run whose every step succeeded was reported as the update failing"
+    );
+    assert_eq!(
+        machine.started(),
+        vec!["sonarr".to_owned()],
+        "the service moved and answered its probe"
+    );
+    assert!(
+        report
+            .as_ref()
+            .and_then(|report| report.backup.as_ref())
+            .is_some(),
+        "the backup taken before anything moved was dropped with the error"
+    );
+    let halted = report.and_then(|report| report.halted);
+    assert!(
+        halted
+            .as_deref()
+            .is_some_and(|why| why.contains("lemonfiber up")),
+        "nothing said the stack is down or how to bring it back: {halted:?}"
     );
 }
 

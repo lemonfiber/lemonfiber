@@ -40,6 +40,9 @@ pub const NO_SUCH_SERVICE: Code = Code::new("UPDATE-2");
 /// Raised when transfers are still in flight and the run was not asked to wait.
 pub const STILL_TRANSFERRING: Code = Code::new("UPDATE-3");
 
+/// Raised when the stack came down for the capture and the capture would not write.
+pub const CAPTURE_LEFT_IT_DOWN: Code = Code::new("UPDATE-4");
+
 /// What was asked of an update.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Asked {
@@ -71,7 +74,14 @@ pub struct Report {
     pub stack_edits: Vec<StackEdit>,
     /// What became of each service the run reached, in the order it reached them.
     pub applied: Vec<Applied>,
-    /// Why the run stopped where it did, where it stopped early.
+    /// Why the stack is not as the run found it, where it is not.
+    ///
+    /// Two runs end that way and an operator has the same thing to do about either:
+    /// one that met a service which would not come back and stopped there, and one
+    /// where every step succeeded and the stack would not start again afterwards.
+    /// The second is not a failure of the update — `state` still says `Updated`,
+    /// because it is — but the stack came down for the capture and something has to
+    /// say that it is still down.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub halted: Option<String>,
 }
@@ -192,6 +202,30 @@ fn no_such_service(named: &str, manifest: &Manifest) -> Problem {
         Remedy::new("Name one of the services the stack declares").with_detail(declared.join(", ")),
     )
     .in_state(State::Guided)
+}
+
+/// The refusal for a capture that would not write, once the stack is already down.
+///
+/// A capture is refused while anything might be writing, so the stack is stopped
+/// before one is attempted. That makes the capture the first thing in the run whose
+/// failure leaves the machine somewhere the operator did not put it, and the backup's
+/// own words are about the archive rather than about the stack — true, and not the
+/// part that needs acting on. So what stopped the capture is carried as the cause and
+/// the state of the stack leads.
+fn left_down(cause: Problem) -> Problem {
+    Problem::new(
+        CAPTURE_LEFT_IT_DOWN,
+        Severity::Error,
+        "the stack was stopped for the backup, and the backup would not write",
+        "Nothing was updated and nothing opened its state on a newer image, so there is \
+         nothing to undo. The stack is down, because it was stopped so the capture could \
+         run with nothing writing to a database.",
+        Remedy::new("Bring the stack back up").with_detail("lemonfiber up"),
+    )
+    .or_try(Remedy::new(
+        "Then fix what stopped the capture and ask for the update again",
+    ))
+    .caused_by(cause)
 }
 
 /// The refusal for a run that would interrupt what is still coming down.

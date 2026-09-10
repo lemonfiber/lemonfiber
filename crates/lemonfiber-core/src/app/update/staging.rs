@@ -25,7 +25,7 @@ use crate::stack::compose::Action;
 use crate::update::{self, Applied, Change, Ending};
 
 use super::super::{backup, engine, space, Ctx, Waiting};
-use super::{named, still_transferring, Report};
+use super::{left_down, named, still_transferring, Report};
 
 /// How often a started service is asked whether it is answering yet.
 const POLL: std::time::Duration = std::time::Duration::from_millis(500);
@@ -138,19 +138,33 @@ async fn moved(
     Box<Problem>,
 > {
     let edits = whole(ctx, &Action::Stop(Vec::new())).await?;
+    // From here the stack is down, so anything that fails before it is brought back
+    // has to say so itself: the operator has no other way to learn it.
+    //
     // The safety net, and a precondition rather than an offer: a capture that will
     // not write is a refusal here, so nothing opens its state on a newer binary
     // without something to go back to.
-    let archive = backup::run(ctx, None).await?;
+    let archive = backup::run(ctx, None)
+        .await
+        .map_err(|cause| Box::new(left_down(*cause)))?;
     let (applied, halted) = staged(ctx, manifest, taking).await;
     // Everything the capture took down and this run did not move is still down, so a
     // run that got to the end puts the stack back. One that halted does not: starting
     // the rest after meeting a service that would not come back is the wholesale move
     // taking them one at a time exists to avoid, and what to do next is the
     // operator's, who has the report in front of them.
-    if halted.is_none() {
-        whole(ctx, &Action::Start(Vec::new())).await?;
-    }
+    //
+    // A start that will not run is reported rather than raised. By here every step
+    // the run meant to take has been taken and each service answered its own probe,
+    // so the update is done and there is nothing to undo — and an error in place of
+    // the report is what would have somebody reverse a migration that worked.
+    let halted = match halted {
+        stopped @ Some(_) => stopped,
+        None => whole(ctx, &Action::Start(Vec::new()))
+            .await
+            .err()
+            .map(|cause| unrestored(&cause)),
+    };
     Ok((archive.path.display().to_string(), edits, applied, halted))
 }
 
@@ -184,6 +198,22 @@ fn halt(change: &Change) -> String {
          Everything came down for the backup and only what moved is up again — lemonfiber up \
          brings the rest of the stack back",
         change.service, change.target
+    )
+}
+
+/// Why a run that took every step it meant to has left the stack down anyway.
+///
+/// Said in the report rather than raised as a problem, because the update is not what
+/// failed: every service that was going to move moved, and each answered its own probe
+/// before the next was touched. What did not happen is the stack coming back after the
+/// capture — a second fact about the same run, and the only one left to act on.
+fn unrestored(cause: &Problem) -> String {
+    format!(
+        "The stack would not start again afterwards: {}. Everything came down for the backup \
+         and only what moved is up again — lemonfiber up brings the rest of the stack back. \
+         The update itself is done: every service above moved and answered its own probe, so \
+         there is nothing here to roll back",
+        cause.summary
     )
 }
 
