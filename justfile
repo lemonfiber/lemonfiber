@@ -178,5 +178,5 @@ skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lem
 # this the gate says only that a number is below a number, and finding out which line it
 # meant costs a full run somebody has to think to make.
 coverage:
-    cargo llvm-cov --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
+    cargo llvm-cov nextest --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
         || { cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines; exit 1; }
