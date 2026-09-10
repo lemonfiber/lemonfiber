@@ -23,6 +23,13 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      # This job builds the whole workspace and had no cache at all, so every run of the
+      # slowest gate here started from an empty target directory. Its own key, because
+      # instrumented artifacts are not the ones `check` builds and sharing a key would
+      # have each job evicting the other's work.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: llvm-cov
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@75a348306ce8f67c0b06fc62c32a8546140ba955 # cargo-llvm-cov
       - name: Coverage (100% on applicable code — Q-R61)

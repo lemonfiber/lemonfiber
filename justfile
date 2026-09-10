@@ -53,8 +53,25 @@ ci: hooks fmt-check lint test typos deny
 build:
     cargo build --workspace
 
+# The inner loop: does it still compile, and do the tests still pass.
+#
+# `nextest` rather than `cargo test`, because it runs the test binaries against each
+# other rather than one after another and this workspace has around a hundred of them
+# — 134s against 391s on the machine this was measured on. It runs no doctests, which
+# costs nothing here: every doctest target in this workspace reports zero.
 test:
-    cargo test --workspace
+    cargo nextest run --workspace
+
+# What a rebase leaves behind, in one word.
+#
+# The stack is a submodule, and a rebase across a commit that moved it leaves the old
+# one checked out — which surfaces as manifest tests failing about a fixture rather
+# than as anything to do with your change. The build after it is the half a conflict
+# never shows you: a file that merely *uses* an interface your branch changed conflicts
+# with nothing, merges clean, and then does not compile.
+rebased:
+    git submodule update --init --recursive
+    cargo build --workspace --all-targets
 
 fmt:
     cargo fmt

@@ -44,10 +44,15 @@ the logic and the rendering must stay separate.
 
 ## Before you open a PR
 
-- It compiles: `cargo build --workspace --all-targets`. Run this after every rebase.
-  A file that merely *uses* an interface you changed conflicts with nothing and so
-  merges clean, then fails to compile — which is the failure a quiet rebase hides.
+- `just rebased` after every rebase. It syncs the submodule and builds every target.
+  Both halves are failures a rebase hides rather than reports: the stack is a submodule
+  and a rebase across a commit that moved it leaves the old one checked out, which
+  surfaces as manifest tests failing about a fixture; and a file that merely *uses* an
+  interface you changed conflicts with nothing, so it merges clean and then does not
+  compile.
 - `cargo fmt --all`, then clippy and the tests for what you actually touched.
+  `just test` runs the suite through `nextest`, which is about three times quicker
+  than `cargo test` here.
 - Your change cites a spec identifier in a commit `Spec:` trailer and the PR body.
 - Behaviour change? The spec PR merged first.
 - The [definition of done](https://github.com/lemonfiber/spec/blob/main/40-quality/definition-of-done.md) is met.

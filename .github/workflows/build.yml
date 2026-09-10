@@ -34,8 +34,14 @@ jobs:
         run: cargo fmt --check
       - name: Clippy
         run: cargo clippy --all-targets --workspace -- -D warnings
+      - uses: taiki-e/install-action@75a348306ce8f67c0b06fc62c32a8546140ba955 # nextest
+        with:
+          tool: cargo-nextest
+      # Against each other rather than one after another. Around a hundred test binaries
+      # live here and `cargo test` runs them in series; measured on one machine that is
+      # 134s against 391s. No doctests are lost — every doctest target here reports zero.
       - name: Test
-        run: cargo test --workspace
+        run: cargo nextest run --workspace
   # `rust-version` in the root manifest is a promise about who can build this from
   # source. This is what collects on it, on the exact toolchain that number names:
   # every other job here runs on stable, which compiles plenty the oldest supported
