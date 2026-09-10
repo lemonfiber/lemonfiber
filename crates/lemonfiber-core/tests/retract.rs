@@ -23,6 +23,7 @@ use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::seams::Seams;
+use lemonfiber_core::ports::withheld::REDACTED;
 use lemonfiber_core::repair::OPERATION;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
@@ -88,6 +89,43 @@ fn configured() -> Change {
     }
 }
 
+/// A repair that put a credential back into lemonfiber's own environment file.
+fn a_credential_was_set() -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: OPERATION.to_owned(),
+        target: ".env".to_owned(),
+        kind: Kind::Set {
+            key: "INDEXER_APIKEY".to_owned(),
+            // Assembled rather than written out: a run that reads as a real credential
+            // in this source is a secret scanner's finding for as long as the commit
+            // exists.
+            previous: Some(["old", "-s3cret"].concat()),
+            current: ["new", "-s3cret"].concat(),
+        },
+    }
+}
+
+/// A repair that changed a field inside a service whose name reads as a credential.
+///
+/// Nothing journals one today — the one producer records a download-client category —
+/// so this is the shape rather than a case in the wild, and it is the shape that matters:
+/// the next producer will not think to ask.
+fn a_secret_field_was_configured() -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: OPERATION.to_owned(),
+        target: "sonarr".to_owned(),
+        kind: Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "7".to_owned(),
+            field: "apiKey".to_owned(),
+            previous: Some(["old", "-s3cret"].concat()),
+            current: ["new", "-s3cret"].concat(),
+        },
+    }
+}
+
 /// Write a journal holding these changes where a reversal will read it.
 fn journalled(root: &Path, changes: &[Change]) {
     let path = paths(root).journal();
@@ -108,6 +146,20 @@ fn answering() -> Arc<Fake> {
         Answer::reply(
             200,
             r#"{"id":7,"fields":[{"name":"host","value":"sabnzbd"},{"name":"tvCategory","value":"tv-sonarr"}]}"#,
+        ),
+    )])
+}
+
+/// The same client, holding the field whose name reads as a credential.
+fn answering_with_a_key() -> Arc<Fake> {
+    Fake::by_path(vec![(
+        "downloadclient/7",
+        Answer::reply(
+            200,
+            format!(
+                r#"{{"id":7,"fields":[{{"name":"host","value":"sabnzbd"}},{{"name":"apiKey","value":"{}"}}]}}"#,
+                ["new", "-s3cret"].concat()
+            ),
         ),
     )])
 }
@@ -292,4 +344,94 @@ async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_bac
     // What went back, said as what reversing it does rather than as a count.
     assert!(json.contains(r#""does":"restore""#), "{json}");
     assert!(json.contains(r#""value":"8080""#), "{json}");
+}
+
+/// What a reversal says it put back must not be the credential it put back.
+///
+/// The values are needed to *do* the reversal and must not survive the doing of it:
+/// this list is what `Outcome::Undo` carries, which a terminal prints and `/api/undo`
+/// serves. A record the journal seals and a report that hands the same value to any
+/// caller is the file locked and the door left open.
+#[tokio::test]
+async fn what_a_reversal_reports_carries_no_credential_it_put_back() {
+    let root = scratch("credential-reported");
+    journalled(&root, &[a_credential_was_set()]);
+    // Holding what the repair wrote, so the undo is not refused for drift — a setting
+    // somebody has since changed by hand is left alone, which is a different test.
+    let env = paths(&root).env_file();
+    if let Some(dir) = env.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(
+        &env,
+        format!("INDEXER_APIKEY={}\n", ["new", "-s3cret"].concat()),
+    );
+
+    let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(
+        !said.contains("s3cret"),
+        "the reversal reports the credential it restored: {said}"
+    );
+    assert!(
+        said.contains("INDEXER_APIKEY"),
+        "which setting went back is still said: {said}"
+    );
+    assert!(
+        said.contains(REDACTED),
+        "and it says a value was put back rather than dropping the fact: {said}"
+    );
+}
+
+/// The same withholding, for the half of it nothing produces yet.
+///
+/// A field inside a service is put back through that service rather than on the host,
+/// and the account of it goes to the same places — so a field whose name reads as a
+/// credential is withheld there too. Asked of the name rather than of the producer,
+/// because the producer that would make this live does not exist to be asked.
+#[tokio::test]
+async fn a_service_field_named_like_a_credential_is_withheld_in_the_account_too() {
+    let root = scratch("credential-field");
+    journalled(&root, &[a_secret_field_was_configured()]);
+
+    let put_back = retract(&ctx(&root, answering_with_a_key()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(
+        !said.contains("s3cret"),
+        "the reversal reports the field it restored: {said}"
+    );
+    assert!(
+        said.contains("apiKey") && said.contains(REDACTED),
+        "which field went back is said, and that a value went with it: {said}"
+    );
+}
+
+/// A field that names nothing secret keeps its value, which is the whole point of asking.
+#[tokio::test]
+async fn a_field_naming_nothing_secret_still_says_what_it_went_back_to() {
+    let root = scratch("ordinary-field");
+    journalled(&root, &[configured()]);
+
+    let put_back = retract(&ctx(&root, answering()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(
+        said.contains("mine"),
+        "an ordinary value is still reported: {said}"
+    );
+    assert!(
+        !said.contains(REDACTED),
+        "and nothing was withheld that did not need to be: {said}"
+    );
 }
