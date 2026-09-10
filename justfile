@@ -46,8 +46,16 @@ release-tag VERSION:
     git push origin "v{{VERSION}}"
     echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
 
-# Everything CI runs, and the hooks turned on if they are not already — this is
-# the command run before a push, which is when the pre-push hook matters.
+# Everything CI runs, and the hooks turned on if they are not already.
+#
+# Not the command to run before a push. CI runs all of this on an exclusive build
+# cache, in parallel with twenty-odd other checks, the moment you push — so running
+# it here first learns nothing sooner and holds a machine other worktrees are waiting
+# on. It is here for when you want the whole set locally and know why: a toolchain
+# bump, a dependency change, or a CI failure you are trying to reproduce.
+#
+# The loop to run before a push is `just rebased`, then clippy and the tests for what
+# you touched.
 ci: hooks fmt-check lint test typos deny
 
 build:
