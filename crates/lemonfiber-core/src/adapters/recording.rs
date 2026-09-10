@@ -206,14 +206,19 @@ mod tests {
             };
             let said = line(1_700_000_000, &asked, Some(200));
 
+            // None of these quote the line. A failure message is copied into a CI log,
+            // which is read by more people and kept longer than the machine that wrote
+            // it — so an assertion about a credential not surviving must not be the
+            // thing that carries it onward. Each says which half of the claim broke,
+            // which is what a reader of the failure needs.
             assert!(
                 !said.contains(&password),
-                "the record holds the operator's login: {said}"
+                "the operator's login survived into the record"
             );
-            assert!(said.contains("someone"), "the account is named: {said}");
+            assert!(said.contains("someone"), "the account was not named");
             assert!(
                 said.contains("indexer.example"),
-                "and where it went survives: {said}"
+                "where the request went did not survive"
             );
         }
     }
@@ -237,12 +242,21 @@ mod tests {
     /// describe a request nobody made.
     #[test]
     fn the_part_that_says_what_was_asked_for_is_taken_off() {
+        // Not quoted either, for the same reason as above: which parameter of a query
+        // holds a key belongs to whoever wrote the service, so a recorded line is
+        // treated as though one of them does.
         let said = line(1, &at("https://a.example/x?y=z"), Some(200));
-        assert!(said.contains("https://a.example/x?"), "{said}");
-        assert!(!said.contains("y=z"), "{said}");
+        assert!(
+            said.contains("https://a.example/x?"),
+            "the address and the fact a query was sent did not both survive"
+        );
+        assert!(!said.contains("y=z"), "the query survived into the record");
 
         let plain = line(1, &at("https://a.example/x"), Some(200));
-        assert!(plain.contains("https://a.example/x "), "{plain}");
+        assert!(
+            plain.contains("https://a.example/x "),
+            "an address carrying no query was not written exactly as it was"
+        );
     }
 
     /// A GET of one address, for the tests that care about the address alone.
