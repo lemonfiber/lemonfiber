@@ -71,11 +71,20 @@ fn carrying(report: &lemonfiber_core::model::ImportReport) -> ExitCode {
 /// reading success from it would go on as though everything had moved. What was only
 /// shown exits as the reading it is: nothing was touched, so there is nothing for a
 /// code to report and no reason to make an operator who is deciding read one.
+///
+/// A run where every step succeeded and the stack then would not come back is the
+/// third case, and it is `Updated` — the update did work. The code still reports the
+/// failure, because what a script does next is run against the stack.
 fn moving(report: &lemonfiber_core::app::update::Report) -> ExitCode {
     use lemonfiber_core::update::State;
 
     match report.state {
         State::Partial | State::Failed => ExitCode::from(FAILURE),
+        // `Updated` is the update having succeeded, which is not the same fact as the
+        // stack being up. A run brings back everything it took down for the capture,
+        // and a start that would not run leaves that undone and says so here — so a
+        // script reading this would otherwise go on against services that are down.
+        State::Updated if report.halted.is_some() => ExitCode::from(FAILURE),
         State::Current | State::UpdatesAvailable | State::Updated => ExitCode::SUCCESS,
     }
 }
@@ -1124,6 +1133,31 @@ mod tests {
         let halted = shown(std::process::ExitCode::from(FAILURE));
         assert_eq!(moving(State::Partial), halted);
         assert_eq!(moving(State::Failed), halted);
+    }
+
+    /// A run that moved everything and could not start the stack again.
+    ///
+    /// `Updated` is the truth about the update and success is not the truth about
+    /// the machine: most of the stack came down for the capture and is still down,
+    /// so a script that read success here would go on against services that are not
+    /// answering.
+    #[test]
+    fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
+        use lemonfiber_core::app::update::Report as Moving;
+        use lemonfiber_core::update::State;
+
+        let left_down = shown(settled(&Outcome::Update(Moving {
+            state: State::Updated,
+            changes: Vec::new(),
+            in_flight: Vec::new(),
+            confirmed: true,
+            backup: Some("/var/lib/lemonfiber/backups/before-update".to_owned()),
+            stack_edits: Vec::new(),
+            applied: Vec::new(),
+            halted: Some("the stack would not start again — lemonfiber up".to_owned()),
+        })));
+
+        assert_eq!(left_down, shown(std::process::ExitCode::from(FAILURE)));
     }
 
     #[test]

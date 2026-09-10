@@ -160,6 +160,7 @@ what to do about it, is written for operators at
 - `UPDATE-1`
 - `UPDATE-2`
 - `UPDATE-3`
+- `UPDATE-4`
 - `VPN-1`
 - `VPN-2`
 - `VPN-3`
