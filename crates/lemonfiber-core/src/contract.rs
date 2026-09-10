@@ -88,6 +88,10 @@ impl Contract {
 }
 
 /// The shapes a command's own answer takes, one per [`Outcome`] variant.
+///
+/// The sentence above is checked rather than asserted: the sample set below is compared
+/// against these keys, so a variant added here without one is named, and a sample for
+/// something no answer carries is named too.
 fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ADOPTION, schema_for!(Envelope<AdoptReport>));
     describing(kinds, kind::ALERTS, schema_for!(Envelope<AlertReport>));
@@ -180,6 +184,12 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::UPDATE, schema_for!(Envelope<StackUpdate>));
     describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
     describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
+    describing(
+        kinds,
+        kind::WALKTHROUGH,
+        schema_for!(Envelope<WalkthroughReport>),
+    );
+    describing(kinds, kind::WATCH, schema_for!(Envelope<SupervisionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
     describing(kinds, kind::WORD, schema_for!(Envelope<Term>));
 }
@@ -189,6 +199,10 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 /// A session, a failure, a name for work that outlives its request, and the lines a
 /// long run says while it is still running — none of which any [`Outcome`] carries,
 /// and each of which a caller still has to parse.
+///
+/// The walkthrough and the supervision report sat here and are carried by an outcome,
+/// which is what a count could not tell anybody: the doc said one thing, the code did
+/// another, and the guard compared two integers that agreed.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ADMISSION, schema_for!(Envelope<Admitted>));
     describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
@@ -199,12 +213,6 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
     describing(kinds, kind::START, schema_for!(Envelope<String>));
     describing(kinds, kind::STEP, schema_for!(Envelope<Line>));
-    describing(
-        kinds,
-        kind::WALKTHROUGH,
-        schema_for!(Envelope<WalkthroughReport>),
-    );
-    describing(kinds, kind::WATCH, schema_for!(Envelope<SupervisionReport>));
 }
 
 /// One kind, and the shape of the envelope carrying it.
@@ -233,16 +241,6 @@ mod tests {
         VersionReport, WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
-
-    /// Arms in `Outcome::envelope`, and every one of them is sampled below.
-    ///
-    /// **Bump this when you add one.** The comparison is against how many kinds the
-    /// samples below actually wrote, so a variant added *with* its sample trips this
-    /// and a variant added *without* one slips past — the opposite of what this is for.
-    /// The number is what makes it bite either way, so it is the number that has to
-    /// move, and the sample beside it is what proves the new kind writes what the
-    /// contract says it writes.
-    const OUTCOMES: usize = 47;
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -998,7 +996,28 @@ mod tests {
             seen.insert(kind);
         }
 
-        assert_eq!(seen.len(), OUTCOMES, "{seen:?}");
+        // Against the set rather than against a number. A count could only ever be
+        // compared with itself: a variant added with its sample moved both sides and
+        // tripped, and a variant added without one moved neither and passed — which is
+        // the case this exists to catch. The set names the kind instead of printing two
+        // integers that agree.
+        let mut answering = std::collections::BTreeMap::new();
+        super::answered(&mut answering);
+        let answers: HashSet<String> = answering.into_keys().collect();
+
+        let unsampled: BTreeSet<&String> = answers.difference(&seen).collect();
+        let unanswered: BTreeSet<&String> = seen.difference(&answers).collect();
+
+        assert!(
+            unsampled.is_empty(),
+            "these kinds are answers and nothing samples them, so what each writes is \
+             compared to nothing: {unsampled:?}"
+        );
+        assert!(
+            unanswered.is_empty(),
+            "these kinds are sampled and no answer carries them, so the sample is \
+             describing something this never writes: {unanswered:?}"
+        );
     }
 
     /// Keywords that say something about a schema without constraining what it

@@ -48,6 +48,8 @@ use lemonfiber::cli::Cli;
 use lemonfiber::reaching;
 use lemonfiber_api::actions::OFFERED;
 
+mod spelling;
+
 /// The table, relative to this crate.
 const TABLE: &str = "../../.docs/architecture/surface-parity.md";
 
@@ -326,7 +328,16 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
             "reaches the terminal but for an exception",
         ),
     ] {
-        let said = spelled(number);
+        // Asked before it is used, rather than falling back to the digits. A page
+        // that has grown past what English writes in one word should fail saying so,
+        // not fail saying it does not contain a numeral nobody wrote.
+        let word = spelling::spelled(number);
+        assert!(
+            word.is_some(),
+            "this page carries {number} of something, which is past what a count in \
+             words can say — the speller stops at ninety-nine"
+        );
+        let said = word.unwrap_or_default();
         let what = if number == 1 { one } else { many };
         assert!(
             summary.contains(&format!("{said} {what}")),
@@ -334,61 +345,6 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
         );
     }
     assert_eq!(intrinsic, 1, "one exception, which the page names as `ui`");
-}
-
-/// A number as the page writes it, since it writes them as words.
-fn spelled(number: usize) -> String {
-    const WORDS: [&str; 46] = [
-        "zero",
-        "one",
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
-        "eight",
-        "nine",
-        "ten",
-        "eleven",
-        "twelve",
-        "thirteen",
-        "fourteen",
-        "fifteen",
-        "sixteen",
-        "seventeen",
-        "eighteen",
-        "nineteen",
-        "twenty",
-        "twenty-one",
-        "twenty-two",
-        "twenty-three",
-        "twenty-four",
-        "twenty-five",
-        "twenty-six",
-        "twenty-seven",
-        "twenty-eight",
-        "twenty-nine",
-        "thirty",
-        "thirty-one",
-        "thirty-two",
-        "thirty-three",
-        "thirty-four",
-        "thirty-five",
-        "thirty-six",
-        "thirty-seven",
-        "thirty-eight",
-        "thirty-nine",
-        "forty",
-        "forty-one",
-        "forty-two",
-        "forty-three",
-        "forty-four",
-        "forty-five",
-    ];
-    WORDS
-        .get(number)
-        .map_or_else(|| number.to_string(), |&word| word.to_owned())
 }
 
 #[test]
