@@ -8,7 +8,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request, UpdateCommand};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::update;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
@@ -192,17 +192,29 @@ async fn doctoring(ctx: &Ctx, asked: RawDoctor, json: bool) -> Result<Command, E
     diagnosing(asked.only.as_deref(), asked.disruptive, asked.accept).map_err(ExitCode::from)
 }
 
-/// What moving the stack onto this build's pins was asked for, as the core carries it.
+/// Which of the two things that can be moved forward was named, as the core carries it.
 ///
-/// Apart from the arm that reads it for the reason the bundle beside it is: three
-/// fields spelled out twice is nine lines of the one function that has to stay
+/// Apart from the arm that reads it for the reason the bundle beside it is: the stack's
+/// three fields spelled out twice is nine lines of the one function that has to stay
 /// readable, and the wait is the flag a teardown spells the same way.
-fn updating(service: Option<String>, confirm: bool, wait: bool) -> Command {
-    Command::Update(update::Asked {
-        service,
-        confirm,
-        wait: wait.into(),
-    })
+///
+/// The two go to different commands rather than to one carrying a mode. What each
+/// answers with does not resemble the other — a list of services and the steps they
+/// would take, against where one binary stands and which tool owns it — so a shared
+/// shape would be a shape neither of them fits.
+fn moving(object: UpdateCommand) -> Command {
+    match object {
+        UpdateCommand::Stack {
+            service,
+            confirm,
+            wait,
+        } => Command::Update(update::Asked {
+            service,
+            confirm,
+            wait: wait.into(),
+        }),
+        UpdateCommand::Itself { to } => Command::SelfUpdate { to },
+    }
 }
 
 #[tokio::main]
@@ -317,10 +329,6 @@ async fn main() -> ExitCode {
         Request::Outbound => Command::Outbound,
         Request::Credentials(asked) => translate::credentials(asked),
         Request::Stored => Command::Stored,
-        // Naming a version asks about that one, and naming none asks about whatever is
-        // newest — the same fork the forms listing takes, on a word that replaces
-        // nothing either way.
-        Request::SelfUpdate { to } => Command::SelfUpdate { to },
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },
@@ -333,11 +341,10 @@ async fn main() -> ExitCode {
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },
-        Request::Update {
-            service,
-            confirm,
-            wait,
-        } => updating(service, confirm, wait),
+        // Which of the two was named is the whole of what tells them apart, and clap
+        // has already refused a run that named neither — which is the only place
+        // somebody can be told what the two objects are while they are still typing.
+        Request::Update { object } => moving(object),
         Request::Backup { service } => Command::Backup { service },
         Request::Support(asked) => bundling(asked),
         // The web surface holds the process until it is stopped, and answers many

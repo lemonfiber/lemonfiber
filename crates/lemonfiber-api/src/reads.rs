@@ -31,7 +31,8 @@
 mod asked;
 
 use lemonfiber_core::app::{
-    AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction, Removing,
+    update, AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction,
+    Removing, Waiting,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
@@ -104,7 +105,7 @@ pub const STORED: &str = "/api/stored";
 /// whichever tool owns the copy that is running, which is a thing a browser can put in
 /// front of somebody and never a thing this surface carries out. It takes the version
 /// to move to, which is the one question a downgrade asks.
-pub const SELF_UPDATE: &str = "/api/update";
+pub const UPDATE: &str = "/api/update";
 
 /// Every credential this stack holds, with none of their values.
 ///
@@ -221,7 +222,7 @@ pub const OFFERED: &[&str] = &[
     CREDENTIALS,
     MIGRATION,
     HISTORY,
-    SELF_UPDATE,
+    UPDATE,
 ];
 
 /// What is said to a request that named nothing to follow.
@@ -245,6 +246,14 @@ pub const NO_SUCH_READ: &str = "There is no read by that name.";
 /// What is said to a request naming a removal that is none of the four.
 pub const NO_SUCH_REMOVAL: &str =
     "Which removal must be one of stop, services, configuration or media.";
+
+/// What is said to a request that asked to move something forward and named no object.
+///
+/// Refused rather than answered with either. Neither object is the smaller case of the
+/// other — one moves somebody's services and the other moves this program — so a page
+/// that asked about the stack and was handed the binary has been answered a question it
+/// did not ask.
+pub const NO_UPDATE_OBJECT: &str = "Which of stack or self to move forward must be named.";
 
 /// What a read was given, mirroring the flags its command takes.
 ///
@@ -272,6 +281,8 @@ pub struct Wanted {
     pub tier: Option<String>,
     /// The version to move to, instead of whatever is newest.
     pub to: Option<String>,
+    /// Which of the two things that can be moved forward is being read.
+    pub what: Option<String>,
 }
 
 /// What a read was given, or why the request cannot be read as it stands.
@@ -304,6 +315,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         word,
         tier,
         to,
+        what,
     } = given;
     match read {
         VERSION => Ok(Command::Version),
@@ -348,11 +360,11 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // to be is an action.
         HISTORY => Ok(Command::History),
         CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
-        // Naming a version asks about that one and naming none asks about whatever is
-        // newest, which is the fork the command line takes on the same word. It reaches
-        // the command either way: this read replaces nothing, so there is no half of it
-        // that belongs behind a named action.
-        SELF_UPDATE => Ok(Command::SelfUpdate { to }),
+        // The object is the whole of what tells the two apart, and naming none is
+        // refused. This is where it parts company with the removal above: that one has
+        // a reading which takes nothing, and here neither object is the smaller case of
+        // the other.
+        UPDATE => moving(what.as_deref(), to),
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.
@@ -377,6 +389,23 @@ fn removing(tier: Option<String>) -> Result<Command, &'static str> {
     Tier::named(&named)
         .map(|tier| Command::Uninstall(Removing::surveying(tier)))
         .ok_or(NO_SUCH_REMOVAL)
+}
+
+/// Which of the two things that can be moved forward was asked about.
+///
+/// Naming a version asks the binary about that one and naming none asks about whatever
+/// is newest, which is the fork the command line takes on the same word. Neither half
+/// replaces anything, so both are reads.
+fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, &'static str> {
+    match what {
+        Some("self") => Ok(Command::SelfUpdate { to }),
+        Some("stack") => Ok(Command::Update(update::Asked {
+            service: None,
+            confirm: false,
+            wait: Waiting::Never,
+        })),
+        _ => Err(NO_UPDATE_OBJECT),
+    }
 }
 
 /// A diagnosis, narrowed or whole.

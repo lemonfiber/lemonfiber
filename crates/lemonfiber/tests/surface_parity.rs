@@ -327,6 +327,16 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
             "reach the terminal but for an exception",
             "reaches the terminal but for an exception",
         ),
+        // The same figure said the other way round, and it was the one that drifted:
+        // the paragraph closes by saying how many are *not* whole on a screen, which
+        // no count above it states and nothing here used to read. It sat at `three`
+        // while the column beneath it moved to four and then five, because a sentence
+        // written as a remark rather than as a figure is one nobody thinks to update.
+        (
+            counted.len() - reached,
+            "of them are reachable whole",
+            "of them is reachable whole",
+        ),
     ] {
         // Asked before it is used, rather than falling back to the digits. A page
         // that has grown past what English writes in one word should fail saying so,

@@ -37,11 +37,11 @@ mod hosting;
 mod items;
 mod migration;
 mod outbound;
-mod self_update;
 mod space;
 mod stack;
 mod stored;
 mod uninstall;
+mod update;
 
 use axum::body::Body;
 use axum::http::StatusCode;
@@ -85,7 +85,7 @@ pub fn routes() -> Router<Serving> {
         .merge(bandwidth::routes())
         .merge(hosting::routes())
         .merge(history::routes())
-        .merge(self_update::routes())
+        .merge(update::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.

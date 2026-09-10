@@ -21,7 +21,7 @@ mod under;
 
 pub use under::{
     AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
-    QualityCommand,
+    QualityCommand, UpdateCommand,
 };
 
 // Re-exported rather than reached for through the module they now live in: where a
@@ -328,26 +328,6 @@ pub enum Request {
     /// names what is *not* lemonfiber's, because your library being absent from the
     /// list is the part worth being sure about.
     Stored,
-    /// Say where this copy of lemonfiber stands, and what moving it would come to.
-    ///
-    /// Replaces nothing. It works out how this copy got onto the machine — Homebrew,
-    /// Scoop, winget, cargo, the shell installer, or by hand — and prints the exact
-    /// command for whichever tool owns it, because a binary that overwrote itself
-    /// underneath a package manager leaves that manager holding a record of something
-    /// that is no longer there.
-    ///
-    /// The stack is untouched either way: containers run on their own, and this
-    /// program only starts them. Nothing waits on the check, and a machine that cannot
-    /// reach the release list is told so rather than stopped.
-    ///
-    /// `--to` asks about one particular version instead of whatever is newest, which
-    /// is how going back is asked for — along with whether that version reads the
-    /// configuration already on this machine.
-    SelfUpdate {
-        /// The version to move to, instead of whatever is newest.
-        #[arg(long, value_name = "VERSION")]
-        to: Option<String>,
-    },
     /// Say which app to watch on, for each kind of device somebody in the house has.
     ///
     /// The client landscape is uneven and it matters which app is used: some devices
@@ -476,23 +456,17 @@ pub enum Request {
         #[arg(long)]
         confirm: bool,
     },
-    /// Move the stack onto the image versions this build of lemonfiber pins.
+    /// Move something onto a newer version, naming which.
     ///
-    /// A bare run changes nothing. It says which services would move, from which
-    /// version to which, how large each step is, and which of them migrate state and
-    /// so cannot be walked back. Run it again with `--confirm` to take the steps: a
-    /// backup is taken first, and the services move one at a time with each proven to
-    /// be answering before the next is touched.
+    /// Two things here can be moved forward and the object is the whole of what tells
+    /// them apart: `stack` moves the services somebody watches things on, and `self`
+    /// moves this program. Neither is the smaller case of the other, so the object is
+    /// required rather than defaulted — being handed the wrong one of these is being
+    /// answered a question you did not ask.
     Update {
-        /// Move one service instead of every one that has an update.
-        #[arg(long, value_name = "SERVICE")]
-        service: Option<String>,
-        /// Go ahead and move them, having seen what each step costs.
-        #[arg(long)]
-        confirm: bool,
-        /// Let anything still downloading finish before the services are stopped.
-        #[arg(long)]
-        wait: bool,
+        /// Which of the two to move forward.
+        #[command(subcommand)]
+        object: UpdateCommand,
     },
     /// Back up your configuration to an archive, so it stops being precious.
     Backup {

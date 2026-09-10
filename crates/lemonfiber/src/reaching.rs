@@ -76,10 +76,6 @@ pub const ACTS: &[Reach] = &[
         through: "remove",
     },
     Reach {
-        request: "update",
-        through: "update",
-    },
-    Reach {
         request: "backup",
         through: "backup",
     },
@@ -197,7 +193,7 @@ pub const ASKS: &[Reach] = &[
         through: "/api/clients",
     },
     Reach {
-        request: "self-update",
+        request: "update",
         through: "/api/update",
     },
 ];
@@ -238,7 +234,10 @@ pub const SHOWS: &[&str] = &["ps"];
 /// The requests the dashboard reaches a second way, having already reached them as a
 /// question.
 ///
-/// Three requests, eight actions. `quality` is on [`ASKS`] as a read — the preset in
+/// Four requests, nine actions. `update` is the plainest of them: `/api/update` reads
+/// what moving something forward would come to — the services and their steps, or
+/// where this copy stands — and taking those steps is a write, offered beside the
+/// reading it is decided from. `quality` is on [`ASKS`] as a read — the preset in
 /// force, what each one means and what it costs — and three of these are the writes
 /// offered beside that reading. `doctor` is on [`ASKS`] too, and four more are
 /// the whole of what can be done about what that reading reports: the same diagnosis
@@ -261,7 +260,7 @@ pub const SHOWS: &[&str] = &["ps"];
 /// by is the request, not the key that reaches it. `doctor --undo` is the `doctor`
 /// row's, as `--fix` and `--accept` are.
 ///
-/// None of the seven is an entry in [`ACTS`], because both requests are already
+/// None of the nine is an entry in [`ACTS`], because each request is already
 /// reached: [`reached`] is what the parity table's terminal column is held against in
 /// both directions, and a request named there twice would leave a reader of one row
 /// with two claims to reconcile against it.
@@ -271,6 +270,10 @@ pub const SHOWS: &[&str] = &["ps"];
 /// screen with no row accounting for it fails rather than going unnoticed — which is
 /// the whole of what this list buys and the only thing it is read for.
 pub const ALSO: &[Reach] = &[
+    Reach {
+        request: "update",
+        through: "update",
+    },
     Reach {
         request: "quality",
         through: "quality-set",
