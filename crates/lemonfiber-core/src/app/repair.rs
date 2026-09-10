@@ -13,8 +13,10 @@
 //! surface with no terminal to hold a question open in has to send with the request.
 
 mod consent;
+mod telling;
 
 pub use consent::{Consent, STALE};
+use telling::told;
 
 use crate::condition::Fault;
 use crate::config::paths::{Paths, JOURNAL};
@@ -226,7 +228,7 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
     let (left, unreached) =
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
     super::recover::undo(&left, &paths.env_file(), unreached)?;
-    Ok(undos)
+    Ok(undos.into_iter().map(told).collect())
 }
 
 /// Raised when a run cannot say where lemonfiber's own files are.

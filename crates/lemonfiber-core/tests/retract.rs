@@ -23,6 +23,7 @@ use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::seams::Seams;
+use lemonfiber_core::ports::withheld::REDACTED;
 use lemonfiber_core::repair::OPERATION;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
@@ -84,6 +85,23 @@ fn configured() -> Change {
             field: "tvCategory".to_owned(),
             previous: Some("mine".to_owned()),
             current: "tv-sonarr".to_owned(),
+        },
+    }
+}
+
+/// A repair that put a credential back into lemonfiber's own environment file.
+fn a_credential_was_set() -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: OPERATION.to_owned(),
+        target: ".env".to_owned(),
+        kind: Kind::Set {
+            key: "INDEXER_APIKEY".to_owned(),
+            // Assembled rather than written out: a run that reads as a real credential
+            // in this source is a secret scanner's finding for as long as the commit
+            // exists.
+            previous: Some(["old", "-s3cret"].concat()),
+            current: ["new", "-s3cret"].concat(),
         },
     }
 }
@@ -292,4 +310,45 @@ async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_bac
     // What went back, said as what reversing it does rather than as a count.
     assert!(json.contains(r#""does":"restore""#), "{json}");
     assert!(json.contains(r#""value":"8080""#), "{json}");
+}
+
+/// What a reversal says it put back must not be the credential it put back.
+///
+/// The values are needed to *do* the reversal and must not survive the doing of it:
+/// this list is what `Outcome::Undo` carries, which a terminal prints and `/api/undo`
+/// serves. A record the journal seals and a report that hands the same value to any
+/// caller is the file locked and the door left open.
+#[tokio::test]
+async fn what_a_reversal_reports_carries_no_credential_it_put_back() {
+    let root = scratch("credential-reported");
+    journalled(&root, &[a_credential_was_set()]);
+    // Holding what the repair wrote, so the undo is not refused for drift — a setting
+    // somebody has since changed by hand is left alone, which is a different test.
+    let env = paths(&root).env_file();
+    if let Some(dir) = env.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(
+        &env,
+        format!("INDEXER_APIKEY={}\n", ["new", "-s3cret"].concat()),
+    );
+
+    let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(
+        !said.contains("s3cret"),
+        "the reversal reports the credential it restored: {said}"
+    );
+    assert!(
+        said.contains("INDEXER_APIKEY"),
+        "which setting went back is still said: {said}"
+    );
+    assert!(
+        said.contains(REDACTED),
+        "and it says a value was put back rather than dropping the fact: {said}"
+    );
 }
