@@ -110,7 +110,10 @@ impl Context {
             self.runner,
             self.engine,
             self.clock,
-            std::sync::Arc::new(crate::adapters::Disk),
+            lemonfiber_ports::seams::Seams {
+                filesystem: std::sync::Arc::new(lemonfiber_adapters::Disk),
+                ..lemonfiber_adapters::live()
+            },
             self.stack,
             self.settings,
             self.environment,

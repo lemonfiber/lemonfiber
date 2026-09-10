@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
-use crate::ports::filesystem::Fault;
-use crate::ports::occupancy::{Occupancy, Occupant};
+use lemonfiber_ports::filesystem::Fault;
+use lemonfiber_ports::occupancy::{Occupancy, Occupant};
 
 use super::filesystem::Disk;
 
@@ -93,8 +93,8 @@ fn gathered(entry: &std::fs::DirEntry) -> Option<Result<PathBuf, Occupant>> {
 mod tests {
     use std::path::Path;
 
-    use crate::adapters::Disk;
-    use crate::ports::occupancy::Occupancy;
+    use crate::Disk;
+    use lemonfiber_ports::occupancy::Occupancy;
 
     #[tokio::test]
     async fn a_tree_that_is_not_there_holds_nothing_rather_than_failing() {

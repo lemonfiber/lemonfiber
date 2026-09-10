@@ -8,8 +8,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::ports::nntp::{Endpoint, Nntp, Unreachable};
 use async_trait::async_trait;
+use lemonfiber_ports::nntp::{Endpoint, Nntp, Unreachable};
 use rustls::ClientConfig;
 use rustls_pki_types::ServerName;
 use tokio::io::{
@@ -215,7 +215,7 @@ mod tests {
     use std::time::Duration;
 
     use super::{tls_config, unreachable, Dialer};
-    use crate::ports::nntp::{Endpoint, Nntp};
+    use lemonfiber_ports::nntp::{Endpoint, Nntp};
 
     /// The behaviour of this adapter is proven from `tests/nntp.rs`, against real
     /// sockets — it is the outside world, and that is where the outside world is

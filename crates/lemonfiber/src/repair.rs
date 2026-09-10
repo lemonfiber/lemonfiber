@@ -153,10 +153,10 @@ mod tests {
     /// wrong that lemonfiber could put right, which is the state a healthy machine is in.
     fn ctx() -> Ctx {
         Ctx::new(
-            Arc::new(lemonfiber_core::adapters::Local),
-            Arc::new(lemonfiber_core::adapters::Daemon::local()),
-            Arc::new(lemonfiber_core::adapters::System),
-            Arc::new(lemonfiber_core::adapters::Disk),
+            Arc::new(lemonfiber_adapters::Local),
+            Arc::new(lemonfiber_adapters::Daemon::local()),
+            Arc::new(lemonfiber_adapters::System),
+            lemonfiber_adapters::live(),
             Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
@@ -374,10 +374,10 @@ mod tests {
     #[tokio::test]
     async fn a_stack_that_cannot_be_read_is_refused_rather_than_called_healthy() {
         let nowhere = Ctx::new(
-            Arc::new(lemonfiber_core::adapters::Local),
-            Arc::new(lemonfiber_core::adapters::Daemon::local()),
-            Arc::new(lemonfiber_core::adapters::System),
-            Arc::new(lemonfiber_core::adapters::Disk),
+            Arc::new(lemonfiber_adapters::Local),
+            Arc::new(lemonfiber_adapters::Daemon::local()),
+            Arc::new(lemonfiber_adapters::System),
+            lemonfiber_adapters::live(),
             Source::External(std::path::Path::new("/no/such/stack")),
             Settings::default(),
             Environment::MacOs,

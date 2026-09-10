@@ -76,8 +76,8 @@ pub(crate) fn holding(engine: Reporting, stack: Source, settings: Settings) -> C
     Ctx::new(
         Arc::new(Idle),
         Arc::new(engine),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         stack,
         settings,
         Environment::MacOs,

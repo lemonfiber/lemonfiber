@@ -17,8 +17,8 @@
 
 use async_trait::async_trait;
 
-use crate::ports::http::{Http, Method, Request, Response, Unreachable};
-use crate::retry;
+use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
+use lemonfiber_ports::retry;
 
 /// A transport that retries what is safe to retry.
 pub struct Retrying<H> {
@@ -73,8 +73,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::{Http, Method, Request, Response, Retrying, Unreachable};
-    use crate::retry::ATTEMPTS;
     use async_trait::async_trait;
+    use lemonfiber_ports::retry::ATTEMPTS;
 
     /// A transport that fails the first `failures` times and answers after that,
     /// counting how many times it was asked.

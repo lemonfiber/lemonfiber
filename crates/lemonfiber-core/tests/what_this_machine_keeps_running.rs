@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::stack::project;
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Hostable, Keeping, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Hosting, HostingReport};
@@ -31,7 +31,10 @@ fn ctx(manager: Arc<Fake>) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             program: Some(PathBuf::from("/usr/local/bin/lemonfiber")),
@@ -219,7 +222,10 @@ async fn a_context_nobody_told_hosts_nothing_and_refuses_to_pretend() {
             Arc::new(Local),
             Arc::new(Daemon::local()),
             Arc::new(System),
-            Arc::new(Disk),
+            lemonfiber_ports::seams::Seams {
+                filesystem: Arc::new(Disk),
+                ..lemonfiber_adapters::live()
+            },
             Source::External(project()),
             Settings {
                 program: Some(PathBuf::from("/usr/local/bin/lemonfiber")),

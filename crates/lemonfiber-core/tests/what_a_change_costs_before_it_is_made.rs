@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::stack::project;
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Setting};
 use lemonfiber_core::config::{
     store, Settings, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, PROVIDER_PORT_KEY,
@@ -47,7 +47,10 @@ fn ctx(env_file: PathBuf) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             env_file: Some(env_file),

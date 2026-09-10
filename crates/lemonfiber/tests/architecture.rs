@@ -263,25 +263,40 @@ fn the_fixtures_crate_does_not_depend_on_the_core() {
 /// Without this, "compose invocation and engine access live in separate modules"
 /// is a sentence in a document. With it, a subsystem that grows its own way out
 /// to the network fails the build.
+///
+/// Both crates are read, and it matters which: the strong half of this rule is now
+/// the crate graph rather than this scan — the core cannot reach the network because
+/// it does not depend on anything that can, which the rule below states. What is left
+/// here is the narrow half, that each dependency has one home inside the crate that is
+/// allowed to hold it, and the scan must follow the files to keep saying so.
 #[test]
 fn talking_to_the_outside_world_only_happens_in_adapters() {
     let confined: [(&str, &[&str]); 9] = [
-        ("tokio::process", &["adapters/process.rs"]),
-        ("std::process::Command", &["adapters/process.rs"]),
+        ("tokio::process", &["lemonfiber-adapters/src/process.rs"]),
+        (
+            "std::process::Command",
+            &["lemonfiber-adapters/src/process.rs"],
+        ),
         (
             "bollard",
             &[
-                "adapters/docker.rs",
-                "adapters/docker/translate.rs",
-                "adapters/docker/images.rs",
+                "lemonfiber-adapters/src/docker.rs",
+                "lemonfiber-adapters/src/docker/translate.rs",
+                "lemonfiber-adapters/src/docker/images.rs",
             ],
         ),
-        ("reqwest", &["adapters/http.rs"]),
-        ("sysinfo", &["adapters/filesystem.rs"]),
+        ("reqwest", &["lemonfiber-adapters/src/http.rs"]),
+        ("sysinfo", &["lemonfiber-adapters/src/filesystem.rs"]),
         // The HTTP adapter names it too: it is reqwest's TLS backend, and the
         // reason a static Linux build carries no system TLS. Both are its homes.
-        ("rustls", &["adapters/nntp.rs", "adapters/http.rs"]),
-        ("webpki_roots", &["adapters/nntp.rs"]),
+        (
+            "rustls",
+            &[
+                "lemonfiber-adapters/src/nntp.rs",
+                "lemonfiber-adapters/src/http.rs",
+            ],
+        ),
+        ("webpki_roots", &["lemonfiber-adapters/src/nntp.rs"]),
         // Not an adapter — YAML is a format, and reading one is pure. Confined
         // for the same reason the rest are: the day something else wants to read
         // a compose file, it asks the module that already knows how.
@@ -295,7 +310,9 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
 
     for (crate_name, permitted) in confined {
         for (path, text) in sources() {
-            if !path.starts_with("crates/lemonfiber-core") {
+            let looked_at = path.starts_with("crates/lemonfiber-core")
+                || path.starts_with("crates/lemonfiber-adapters");
+            if !looked_at {
                 continue;
             }
             assert!(
@@ -304,6 +321,45 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
                 path.display()
             );
         }
+    }
+}
+
+/// The core cannot reach the network, and the build is what says so.
+///
+/// This used to be a scan for the names of six crates in the core's own source, which
+/// could only ever be as good as the list and failed on a comment that mentioned one.
+/// The implementations live in `lemonfiber-adapters` now, which the core does not
+/// depend on, so a run that wanted to open a socket from the core would have to add
+/// the dependency here first — and that is the change this refuses.
+///
+/// A dev-dependency on the adapters is allowed and is the point: the core's own tests
+/// mean this machine, a scratch directory on a real disk rather than a fake asserting
+/// its own behaviour. What ships cannot reach anything.
+#[test]
+fn the_core_cannot_reach_the_network() {
+    let root = workspace_root();
+    let Ok(manifest) = fs::read_to_string(root.join("crates/lemonfiber-core/Cargo.toml")) else {
+        unreachable!("the core crate has a manifest");
+    };
+    let declared = declarations(&manifest);
+    let Some((shipped, _)) = declared.split_once("[dev-dependencies]") else {
+        unreachable!("the core crate declares dev-dependencies");
+    };
+
+    for forbidden in [
+        "bollard",
+        "reqwest",
+        "rustls",
+        "tokio-rustls",
+        "webpki-roots",
+        "sysinfo",
+    ] {
+        assert!(
+            !shipped.contains(forbidden),
+            "lemonfiber-core must not depend on `{forbidden}` — reaching the outside \
+             world is the adapters crate's, and a core that could do it is a core that \
+             will"
+        );
     }
 }
 

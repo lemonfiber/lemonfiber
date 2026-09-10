@@ -158,7 +158,10 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
             Health::Healthy,
         )),
         Stopped::today(),
-        Arc::new(SeedFs::keyed(None, None).with_facts(facts)),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(SeedFs::keyed(None, None).with_facts(facts)),
+            ..lemonfiber_adapters::live()
+        },
         stack(),
         Settings {
             env_file: Some(env),

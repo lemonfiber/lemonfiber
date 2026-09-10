@@ -586,8 +586,8 @@ pub(crate) mod tests {
         Ctx::new(
             Arc::new(WorkingRunner),
             Arc::new(FakeEngine::down()),
-            Arc::new(lemonfiber_core::adapters::System),
-            Arc::new(lemonfiber_core::adapters::Disk),
+            Arc::new(lemonfiber_adapters::System),
+            lemonfiber_adapters::live(),
             Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,
@@ -606,8 +606,8 @@ pub(crate) mod tests {
         Ctx::new(
             Arc::new(DeadRunner),
             Arc::new(FakeEngine::down()),
-            Arc::new(lemonfiber_core::adapters::System),
-            Arc::new(lemonfiber_core::adapters::Disk),
+            Arc::new(lemonfiber_adapters::System),
+            lemonfiber_adapters::live(),
             Source::Embedded(&lemonfiber::cli::STACK),
             Settings::default(),
             Environment::MacOs,

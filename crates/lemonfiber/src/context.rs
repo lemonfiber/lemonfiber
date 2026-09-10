@@ -8,8 +8,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use lemonfiber_adapters::{Daemon, Disk, Launchd, Local, System, Systemd, Unhosted};
 use lemonfiber_core::acknowledged::{self, Acknowledged};
-use lemonfiber_core::adapters::{Daemon, Disk, Launchd, Local, System, Systemd, Unhosted};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::archive::Archiving;
 use lemonfiber_core::config::paths::Paths;
@@ -55,7 +55,10 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
         Arc::clone(&runner),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_core::ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         settings,
         environment,

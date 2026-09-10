@@ -80,7 +80,10 @@ fn ctx(env: PathBuf, files: Arc<Files>, http: Arc<dyn Http>) -> Ctx {
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(Reporting::default()),
         lemonfiber_fixtures::ports::Stopped::today(),
-        files,
+        lemonfiber_ports::seams::Seams {
+            filesystem: files,
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             protocols: Protocols::both(),
@@ -642,7 +645,10 @@ async fn a_stack_that_cannot_be_read_refuses_rather_than_reporting_none() {
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(Reporting::default()),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Files::empty(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
         Settings {
             env_file: Some(env),

@@ -8,24 +8,13 @@ rust-version.workspace = true
 repository.workspace = true
 
 [dependencies]
-# Proving a Usenet provider means opening a real, TLS-wrapped NNTP connection —
-# rustls rather than the platform's TLS, so the static musl release stays free of a
-# system TLS library. Bundled Mozilla roots, for the same reason: a static binary
-# carries its own trust anchors. Confined to `adapters/nntp.rs`.
-tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
-rustls-pki-types = "1"
-webpki-roots = "1"
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 lemonfiber-ports = { path = "../lemonfiber-ports" }
 argon2 = { workspace = true }
 async-trait = { workspace = true }
 jiff = { workspace = true }
-bollard = { workspace = true }
 crc32fast = "1"
-getrandom = { workspace = true }
 include_dir = { workspace = true }
-reqwest = { workspace = true }
 form_urlencoded = { workspace = true }
 futures-util = { workspace = true }
 schemars = { workspace = true }
@@ -37,15 +26,18 @@ serde_json = "1"
 # because anchors, merge keys and both volume syntaxes all have to read the way
 # Compose reads them. Confined to `stack/mounts.rs`.
 serde_yaml_ng = "0.10"
-sysinfo = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 
 [dev-dependencies]
 # The fakes both this crate's own tests and its integration tests drive the real code
 # through. It depends on `lemonfiber-ports` alone, so there is no cycle back to here.
 lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
+# The real seams, for the tests that mean this machine — a scratch directory on a real
+# disk rather than a fake that would be asserting its own behaviour. A dev-dependency
+# only: the whole point of the extraction is that a released `lemonfiber-core` cannot
+# reach the network. It depends on `lemonfiber-ports` alone, so this is not a cycle.
+lemonfiber-adapters = { path = "../lemonfiber-adapters" }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
 
 [lints]

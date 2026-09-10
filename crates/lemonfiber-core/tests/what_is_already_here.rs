@@ -57,7 +57,10 @@ fn over_files(engine: Reporting, images: Arc<Pulled>, files: Arc<SeedFs>) -> Ctx
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(engine),
         lemonfiber_fixtures::ports::Stopped::today(),
-        files,
+        lemonfiber_ports::seams::Seams {
+            filesystem: files,
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             project: "lemonfiber".to_owned(),
@@ -77,13 +80,16 @@ fn driven(engine: Reporting, images: Arc<Pulled>, stack: Source, runner: Arc<dyn
         runner,
         Arc::new(engine),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
-            point: PathBuf::from("/srv/media"),
-            kind: FsKind::Linking("apfs".to_owned()),
-            removable: false,
-            available: 100,
-            total: 1_000,
-        })),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
+                point: PathBuf::from("/srv/media"),
+                kind: FsKind::Linking("apfs".to_owned()),
+                removable: false,
+                available: 100,
+                total: 1_000,
+            })),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         Settings {
             project: "lemonfiber".to_owned(),
@@ -658,10 +664,13 @@ fn importing(http: Arc<lemonfiber_fixtures::http::Fake>) -> Ctx {
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(engine),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(SeedFs::keyed(
+                Some("<Config><ApiKey>the-key</ApiKey></Config>"),
+                None,
+            )),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             project: "lemonfiber".to_owned(),
@@ -749,10 +758,13 @@ fn importing_over(
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(engine),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(SeedFs::keyed(
+                Some("<Config><ApiKey>the-key</ApiKey></Config>"),
+                None,
+            )),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         Settings {
             project: "lemonfiber".to_owned(),
@@ -885,7 +897,10 @@ fn importing_with(files: Arc<SeedFs>, http: Arc<lemonfiber_fixtures::http::Fake>
         Arc::new(Scripted(Ok(spoke("")))),
         Arc::new(engine),
         lemonfiber_fixtures::ports::Stopped::today(),
-        files,
+        lemonfiber_ports::seams::Seams {
+            filesystem: files,
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             project: "lemonfiber".to_owned(),

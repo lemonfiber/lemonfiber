@@ -42,6 +42,12 @@ crates/
 │                              and the vocabulary that crosses them. Depends on
 │                              nothing of ours but the manifest.
 │
+├── lemonfiber-adapters/  lib — the implementations of those traits that reach the
+│                              machine: the container runtime, the transport, the
+│                              TLS connection, the disk. Depends on ports only, and
+│                              sits above core rather than below it — the core is
+│                              handed these, and cannot build one.
+│
 ├── lemonfiber-fixtures/  lib — the fakes for those traits, reachable from both
 │                              in-crate tests and `tests/`. Depends on ports only.
 │

@@ -681,9 +681,9 @@ async fn a_declined_action_says_why_rather_than_answering_with_a_status_alone() 
 fn ctx() -> Ctx {
     Ctx::new(
         Arc::new(Idle),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         lemonfiber_core::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
         Settings::default(),
         Environment::MacOs,

@@ -30,7 +30,7 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::OnceCell;
 use tokio_stream::StreamExt as _;
 
-use crate::ports::docker::{
+use lemonfiber_ports::docker::{
     Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, LogLine, LogQuery, Stats,
     Stream,
 };

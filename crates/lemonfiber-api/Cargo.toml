@@ -28,6 +28,8 @@ serde = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
+# The real seams, for the tests that drive a context against this machine.
+lemonfiber-adapters = { path = "../lemonfiber-adapters" }
 # The fakes a command is driven through, so an endpoint is exercised against the
 # same world the core's own tests use rather than against a second one — and so the
 # gather that answers the terminal dashboard is the one these tests watch produce

@@ -74,7 +74,10 @@ fn ctx(http: Arc<dyn Http>, name: &str, heard: &Arc<Heard>) -> Ctx {
             Health::Healthy,
         )),
         lemonfiber_fixtures::ports::Stopped::today(),
-        lemonfiber_fixtures::files::Files::empty(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: lemonfiber_fixtures::files::Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             protocols: Protocols::both(),

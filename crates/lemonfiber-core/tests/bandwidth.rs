@@ -19,7 +19,7 @@ use common::stack::project;
 use std::path::Path;
 use std::sync::Arc;
 
-use lemonfiber_core::adapters::{Daemon, Disk, Local, System};
+use lemonfiber_adapters::{Daemon, Disk, Local, System};
 use lemonfiber_core::app::{dispatch, BandwidthAsked, Command, Ctx, Outcome};
 use lemonfiber_core::bandwidth::{Restraint, NOTHING_TO_LIMIT};
 use lemonfiber_core::config::Settings;
@@ -31,7 +31,10 @@ fn ctx(stack: Source) -> Ctx {
         Arc::new(Local),
         Arc::new(Daemon::local()),
         Arc::new(System),
-        Arc::new(Disk),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(Disk),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         Settings::default(),
         Environment::MacOs,

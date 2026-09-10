@@ -115,7 +115,7 @@ fn context(env: &std::path::Path, http: Arc<Fake>, rehearsing: bool) -> Ctx {
         // Stopped, because everything here turns on a window. Against the real clock the
         // dates above would drift out of the arrangement they were chosen for.
         Stopped::today(),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        lemonfiber_adapters::live(),
         stack(),
         Settings {
             env_file: Some(env.to_path_buf()),

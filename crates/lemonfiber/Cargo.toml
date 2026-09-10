@@ -23,6 +23,7 @@ path = "src/main.rs"
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 
 [dependencies]
+lemonfiber-adapters = { path = "../lemonfiber-adapters" }
 lemonfiber-core = { path = "../lemonfiber-core" }
 # The endpoints and the app the web surface serves. Only this crate starts a
 # server; the core cannot, and the api crate does not choose an address.

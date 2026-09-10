@@ -313,9 +313,9 @@ fn every_repairing_run_is_a_wait_an_operator_can_watch() {
 fn ctx() -> Ctx {
     Ctx::new(
         Arc::new(Idle),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Arc::new(lemonfiber_core::adapters::Disk),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        lemonfiber_adapters::live(),
         lemonfiber_core::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
         Settings::default(),
         Environment::MacOs,

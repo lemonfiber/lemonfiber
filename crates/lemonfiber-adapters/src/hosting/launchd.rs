@@ -16,9 +16,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
-use crate::ports::process::Output;
-use crate::ports::Runner;
+use lemonfiber_ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
+use lemonfiber_ports::process::Output;
+use lemonfiber_ports::Runner;
 
 use super::{complaint, definition, put, take};
 
@@ -262,10 +262,10 @@ fn refused(reason: &str) -> Failure {
 #[cfg(test)]
 mod tests {
     use super::{arguments, escaped, inside, plain, under, Host, Hosted, Launchd, Standing, OUT};
-    use crate::ports::hosting::{Failure, Held, Manager, Program};
-    use crate::ports::process::Output;
-    use crate::ports::Runner;
     use lemonfiber_fixtures::support::Sequenced;
+    use lemonfiber_ports::hosting::{Failure, Held, Manager, Program};
+    use lemonfiber_ports::process::Output;
+    use lemonfiber_ports::Runner;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
@@ -364,7 +364,7 @@ mod tests {
         let placed = launchd.place(&a_command(dir.join("watch.log"))).await;
         assert_eq!(
             placed,
-            Ok(crate::ports::hosting::Placed {
+            Ok(lemonfiber_ports::hosting::Placed {
                 definition: dir.join("com.lemonfiber.watch.plist"),
                 started: true,
             })

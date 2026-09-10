@@ -137,7 +137,10 @@ fn stood_up(settings: Settings, stack: Source, http: Arc<Fake>, missing: Vec<&'s
             Health::Healthy,
         )),
         Stopped::today(),
-        Arc::new(SeedFs::keyed(Some(CONFIG), Some(SAB_KEY_INI)).missing(missing)),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Arc::new(SeedFs::keyed(Some(CONFIG), Some(SAB_KEY_INI)).missing(missing)),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         settings,
         Environment::MacOs,

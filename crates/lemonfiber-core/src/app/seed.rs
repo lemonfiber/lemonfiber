@@ -382,7 +382,7 @@ mod tests {
         // previous choice was a directory that later moved to its own crate, which broke
         // this at a distance with an error naming neither.
         static EMBEDDED: include_dir::Dir<'_> =
-            include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/adapters");
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/config");
         assert_eq!(
             project_directory(&Source::External(std::path::Path::new("/srv/stack")), None)
                 .as_deref(),

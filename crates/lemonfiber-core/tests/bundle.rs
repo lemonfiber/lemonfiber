@@ -60,7 +60,10 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
             Reporting::absent()
         }),
         lemonfiber_fixtures::ports::Stopped::today(),
-        configuration.map_or_else(Files::empty, Files::anywhere),
+        lemonfiber_ports::seams::Seams {
+            filesystem: configuration.map_or_else(Files::empty, Files::anywhere),
+            ..lemonfiber_adapters::live()
+        },
         stack,
         Settings {
             env_file: Some(PathBuf::from("/tmp/lemonfiber-bundle-test/.env")),

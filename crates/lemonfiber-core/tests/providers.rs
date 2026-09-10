@@ -76,10 +76,13 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::holding(&[], Lifecycle::Exited, Health::None)),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Files::ending(vec![
-            ("config/sabnzbd/sabnzbd.ini", SAB_INI),
-            ("config/prowlarr/config.xml", PROWLARR_XML),
-        ]),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::ending(vec![
+                ("config/sabnzbd/sabnzbd.ini", SAB_INI),
+                ("config/prowlarr/config.xml", PROWLARR_XML),
+            ]),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,
@@ -124,10 +127,13 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::holding(&[], Lifecycle::Exited, Health::None)),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Files::ending(vec![
-            ("config/sabnzbd/sabnzbd.ini", SAB_INI),
-            ("config/prowlarr/config.xml", PROWLARR_XML),
-        ]),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::ending(vec![
+                ("config/sabnzbd/sabnzbd.ini", SAB_INI),
+                ("config/prowlarr/config.xml", PROWLARR_XML),
+            ]),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,
@@ -153,7 +159,10 @@ async fn a_stack_whose_services_have_not_started_reports_nothing_to_read() {
         Arc::new(lemonfiber_fixtures::ports::Idle),
         Arc::new(Reporting::holding(&[], Lifecycle::Exited, Health::None)),
         lemonfiber_fixtures::ports::Stopped::today(),
-        Files::empty(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings::default(),
         Environment::MacOs,

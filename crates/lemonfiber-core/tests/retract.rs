@@ -22,6 +22,7 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::seams::Seams;
 use lemonfiber_core::repair::OPERATION;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
@@ -48,15 +49,18 @@ fn paths(root: &Path) -> Paths {
 /// A context over the real stack, answering services from the given transport.
 fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
     Ctx::new(
-        Arc::new(lemonfiber_core::adapters::Local),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
+        Arc::new(lemonfiber_adapters::Local),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
         // SABnzbd's key too: the wirings a diagnosis reads are the clients lemonfiber
         // would write, and without a credential to write there is no client to compare.
-        Files::ending(vec![
-            ("config/sonarr/config.xml", CONFIG),
-            ("config/sabnzbd/sabnzbd.ini", SABNZBD),
-        ]),
+        Seams {
+            filesystem: Files::ending(vec![
+                ("config/sonarr/config.xml", CONFIG),
+                ("config/sabnzbd/sabnzbd.ini", SABNZBD),
+            ]),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(project()),
         Settings {
             env_file: Some(paths(root).env_file()),
@@ -222,10 +226,13 @@ async fn a_stack_that_will_not_read_stops_the_reversal() {
     let root = scratch("no-stack");
     journalled(&root, &[configured()]);
     let nowhere = Ctx::new(
-        Arc::new(lemonfiber_core::adapters::Local),
-        Arc::new(lemonfiber_core::adapters::Daemon::local()),
-        Arc::new(lemonfiber_core::adapters::System),
-        Files::empty(),
+        Arc::new(lemonfiber_adapters::Local),
+        Arc::new(lemonfiber_adapters::Daemon::local()),
+        Arc::new(lemonfiber_adapters::System),
+        Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(Path::new("/lemonfiber/no/such/stack")),
         Settings {
             env_file: Some(paths(&root).env_file()),

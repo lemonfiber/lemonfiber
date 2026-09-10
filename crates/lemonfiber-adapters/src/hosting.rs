@@ -23,8 +23,8 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
-use crate::ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed};
-use crate::ports::process::Output;
+use lemonfiber_ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed};
+use lemonfiber_ports::process::Output;
 
 /// A machine whose platform lemonfiber does not configure.
 ///
@@ -129,8 +129,8 @@ pub(super) fn scratch(name: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{after, complaint, definition, put, status, take, Host, Unhosted};
-    use crate::ports::hosting::{Failure, Hosted};
-    use crate::ports::process::Output;
+    use lemonfiber_ports::hosting::{Failure, Hosted};
+    use lemonfiber_ports::process::Output;
     use std::path::PathBuf;
 
     fn spoke(status: Option<i32>, stdout: &str, stderr: &str) -> Output {
@@ -155,7 +155,7 @@ mod tests {
     async fn a_platform_with_no_manager_refuses_every_operation_the_same_way() {
         assert_eq!(
             Unhosted.manager(),
-            crate::ports::hosting::Manager::Unsupported
+            lemonfiber_ports::hosting::Manager::Unsupported
         );
         assert_eq!(Unhosted.place(&a_command()).await, Err(Failure::Unhostable));
         assert_eq!(Unhosted.standing("watch").await, Err(Failure::Unhostable));

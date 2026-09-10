@@ -160,7 +160,10 @@ fn nowhere() -> Ctx {
         Arc::new(Idle),
         Arc::new(Reporting::absent()),
         Stopped::at(0),
-        Files::empty(),
+        lemonfiber_core::ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
         Source::External(Path::new("/lemonfiber/no/such/stack")),
         Settings::default(),
         Environment::MacOs,

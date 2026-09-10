@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use bollard::models::{ContainerSummary, ImageSummary};
 
-use crate::ports::docker::Image;
+use lemonfiber_ports::docker::Image;
 
 use super::PROJECT_LABEL;
 
@@ -80,7 +80,7 @@ mod tests {
     use bollard::models::{ContainerSummary, ImageSummary};
 
     use super::correlate;
-    use crate::adapters::docker::PROJECT_LABEL;
+    use crate::docker::PROJECT_LABEL;
 
     /// An image summary with an id, its names and its size, which is all this reads.
     fn image(id: &str, tags: &[&str], size: i64) -> ImageSummary {

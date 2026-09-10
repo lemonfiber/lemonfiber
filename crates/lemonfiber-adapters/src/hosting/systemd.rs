@@ -18,9 +18,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
-use crate::ports::process::Output;
-use crate::ports::Runner;
+use lemonfiber_ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
+use lemonfiber_ports::process::Output;
+use lemonfiber_ports::Runner;
 
 use super::{after, complaint, definition, put, take};
 
@@ -231,10 +231,10 @@ fn refused(reason: &str) -> Failure {
 #[cfg(test)]
 mod tests {
     use super::{quoted, quoting, written, Host, Hosted, Standing, Systemd};
-    use crate::ports::hosting::{Failure, Held, Manager, Placed, Program};
-    use crate::ports::process::Output;
-    use crate::ports::Runner;
     use lemonfiber_fixtures::support::Sequenced;
+    use lemonfiber_ports::hosting::{Failure, Held, Manager, Placed, Program};
+    use lemonfiber_ports::process::Output;
+    use lemonfiber_ports::Runner;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 

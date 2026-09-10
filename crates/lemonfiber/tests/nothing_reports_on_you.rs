@@ -182,7 +182,7 @@ const MINTED_BY: (&str, &str) = ("Random", ".bytes(");
 
 /// The one adapter allowed to reach the operating system's randomness, and the call
 /// it reaches it with.
-const OS_RANDOMNESS: (&str, &str) = ("crates/lemonfiber-core/src/adapters/random.rs", "getrandom");
+const OS_RANDOMNESS: (&str, &str) = ("crates/lemonfiber-adapters/src/random.rs", "getrandom");
 
 /// A package this workspace is known to depend on, so a reader of `Cargo.lock` that
 /// found nothing is told apart from a graph that holds nothing.

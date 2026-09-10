@@ -1262,6 +1262,7 @@ dependencies = [
  "etcetera",
  "flate2",
  "include_dir",
+ "lemonfiber-adapters",
  "lemonfiber-api",
  "lemonfiber-core",
  "lemonfiber-fixtures",
@@ -1278,6 +1279,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemonfiber-adapters"
+version = "0.13.0"
+dependencies = [
+ "async-trait",
+ "bollard",
+ "futures-util",
+ "getrandom 0.4.3",
+ "lemonfiber-fixtures",
+ "lemonfiber-ports",
+ "reqwest",
+ "rustls",
+ "rustls-pki-types",
+ "sysinfo",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "webpki-roots",
+]
+
+[[package]]
 name = "lemonfiber-api"
 version = "0.13.0"
 dependencies = [
@@ -1285,6 +1306,7 @@ dependencies = [
  "axum",
  "form_urlencoded",
  "futures-util",
+ "lemonfiber-adapters",
  "lemonfiber-core",
  "lemonfiber-fixtures",
  "serde",
@@ -1299,29 +1321,21 @@ version = "0.13.0"
 dependencies = [
  "argon2",
  "async-trait",
- "bollard",
  "crc32fast",
  "form_urlencoded",
  "futures-util",
- "getrandom 0.4.3",
  "include_dir",
  "jiff",
+ "lemonfiber-adapters",
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
  "lemonfiber-ports",
- "reqwest",
- "rustls",
- "rustls-pki-types",
  "schemars",
  "serde",
  "serde_json",
  "serde_yaml_ng",
- "sysinfo",
  "thiserror",
  "tokio",
- "tokio-rustls",
- "tokio-stream",
- "webpki-roots",
 ]
 
 [[package]]

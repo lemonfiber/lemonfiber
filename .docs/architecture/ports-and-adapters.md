@@ -6,6 +6,40 @@ Why the seam exists is in the spec's
 [component-model](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md).
 This is what it is made of.
 
+## The implementations are a crate too
+
+`lemonfiber-adapters` holds every implementation that reaches the machine — the
+container runtime, the HTTP transport, the TLS connection to a news server, the disk,
+the clock, the program runner. Like the fixtures, it depends on `lemonfiber-ports` and
+on nothing else of ours.
+
+It sits **above** `lemonfiber-core`, not below it. The core does not depend on it, and
+that is the whole point: the core cannot reach the network because it does not depend
+on anything that can. That used to be a test reading source text for the names of six
+crates, which could only ever be as good as the list and failed on a comment that
+mentioned one; it is now a fact about the crate graph, checked at
+`the_core_cannot_reach_the_network`. The narrow half of the old rule survives — each
+external crate has exactly one home *inside* the adapters crate — because a subsystem
+growing its own way out is still worth refusing.
+
+What follows from the direction is that the core is **handed** its seams rather than
+building them. `ports::seams::Seams` is the bundle of them, `adapters::live()` is the
+one place the real ones are chosen, and `Ctx::new` takes the bundle. Nothing holding a
+context can manufacture a socket.
+
+Two kinds of thing stayed in the core, and the line between them is worth stating: an
+implementation written over *another port* is composition, not contact. `network::Here`
+asks this machine its name by running a program — through the runner port — so it is
+core's; `Retrying` and `Recording` wrap a transport rather than being one, and the
+first stayed with the transport only because it is generic over it. Anything that
+names a foreign crate, or touches the filesystem, the clock or a process directly,
+went.
+
+A dev-dependency the other way is allowed and is deliberate: the core's own tests mean
+*this machine* — a scratch directory on a real disk rather than a fake asserting its
+own behaviour. Cargo permits that edge because it is not a cycle: the adapters do not
+depend on the core.
+
 ## The boundary is a crate
 
 `lemonfiber-ports` holds the traits and the vocabulary that crosses them, and

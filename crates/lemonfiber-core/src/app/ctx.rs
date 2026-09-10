@@ -19,8 +19,10 @@ use crate::ports::hosting::Host;
 use crate::ports::http::Http;
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
+use crate::ports::nntp::Nntp;
 use crate::ports::occupancy::Occupancy;
 use crate::ports::random::Random;
+use crate::ports::seams::Seams;
 use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
 use crate::validate::{Live, Validator};
@@ -122,6 +124,12 @@ pub struct Ctx {
     /// silently — so the surface answers, and today it answers with what it can
     /// see until the engine adapter can tell it the rest.
     pub environment: Environment,
+    /// How a Usenet provider is reached, which is a connection rather than a request.
+    ///
+    /// Kept because replacing the transport rebuilds the validator, and a validator
+    /// rebuilt without this would prove an indexer key and report a Usenet login
+    /// unreachable — which reads as a broken provider rather than as a missing seam.
+    pub nntp: Arc<dyn Nntp>,
     /// Where this run keeps archives, and what writes them.
     ///
     /// Optional because where lemonfiber's own files live is the surface's answer
@@ -139,12 +147,9 @@ pub struct Ctx {
 /// pretending it was proven. Wrapped in what the operator permits, so a credential
 /// whose proof would leave this machine against their settings is recorded unproven
 /// instead of being proven anyway.
-fn live(http: &Arc<dyn Http>, reaching: Reaching) -> Arc<dyn Validator> {
+fn live(http: &Arc<dyn Http>, nntp: Arc<dyn Nntp>, reaching: Reaching) -> Arc<dyn Validator> {
     Arc::new(crate::validate::Allowed::new(
-        Arc::new(Live::with_nntp(
-            Arc::clone(http),
-            Arc::new(crate::adapters::Dialer::new()),
-        )),
+        Arc::new(Live::with_nntp(Arc::clone(http), nntp)),
         reaching,
     ))
 }
@@ -166,49 +171,45 @@ impl Ctx {
         runner: Arc<dyn Runner>,
         engine: Arc<dyn Engine>,
         clock: Arc<dyn Clock>,
-        filesystem: Arc<dyn FileSystem>,
+        seams: Seams,
         stack: Source,
         settings: Settings,
         environment: Environment,
     ) -> Self {
-        // The real transport is the only sensible default; the one code path that
-        // needs to answer for a fake service overrides it with `with_http`, so no
-        // test reaches the network to build a context.
-        //
-        // Wrapped so a service that is merely still starting is tried again rather
-        // than reported. Applied here rather than at each caller: a retry policy
-        // written into fifteen call sites is fifteen policies.
-        let http: Arc<dyn Http> = Arc::new(crate::adapters::Retrying::around(
-            crate::adapters::Web::new(),
-        ));
-        // Built before the runner is handed over, since it is asked through the
-        // same one every other program goes through.
-        let site: Arc<dyn Site> = Arc::new(crate::adapters::Here::over(Arc::clone(&runner)));
+        // Handed over rather than built here. The implementations live in a crate this
+        // one does not depend on, so a context cannot manufacture a socket and a caller
+        // that means a fake says so by name.
+        let Seams {
+            filesystem,
+            http,
+            images,
+            volume,
+            eraser,
+            occupancy,
+            hosting,
+            random,
+            nntp,
+        } = seams;
+        // Built here rather than handed over, because it is written over the runner
+        // rather than over the machine: asking this machine its name means running a
+        // program, and which program runner that is, is this context's answer already.
+        let site: Arc<dyn Site> = Arc::new(crate::network::Here::over(Arc::clone(&runner)));
         Self {
             dry_run: false,
             force: false,
             runner,
             engine,
-            // The real one, for the reason the volume below is: a run asked what this
-            // machine has pulled is asking this machine's own engine, and a test that
-            // means something else says so by name.
-            images: Arc::new(crate::adapters::Daemon::local()),
+            images,
             clock,
             filesystem,
-            // The real volume for the same reason the transport is real: the one
-            // command that asks is asking about this machine's drives, and a test
-            // that means something else says so by name.
-            volume: Arc::new(crate::adapters::Disk),
-            // And the real eraser, for the same reason: a run asked to remove what
-            // this machine keeps is asking about this machine.
-            eraser: Arc::new(crate::adapters::Disk),
-            // And the real walk: a run asked where the disk went is asking about
-            // this machine's own.
-            occupancy: Arc::new(crate::adapters::Disk),
-            hosting: Arc::new(crate::adapters::Unhosted),
-            validator: live(&http, settings.reaching.clone()),
+            volume,
+            eraser,
+            occupancy,
+            hosting,
+            validator: live(&http, Arc::clone(&nntp), settings.reaching.clone()),
+            nntp,
             http,
-            random: Arc::new(crate::adapters::Os),
+            random,
             site,
             // Nobody, until a surface says otherwise. A context is built before the
             // thing that would listen exists in both surfaces, and a default that
@@ -273,7 +274,11 @@ impl Ctx {
     /// themselves says so with [`Self::proving`], afterwards.
     #[must_use]
     pub fn with_http(mut self, http: Arc<dyn Http>) -> Self {
-        self.validator = live(&http, self.settings.reaching.clone());
+        self.validator = live(
+            &http,
+            Arc::clone(&self.nntp),
+            self.settings.reaching.clone(),
+        );
         self.http = http;
         self
     }
@@ -305,7 +310,7 @@ impl Ctx {
     /// one request are three things that went, and an operator checking what was
     /// sent is owed all three.
     pub fn recording_at(self, at: std::path::PathBuf) -> Self {
-        let http: Arc<dyn Http> = Arc::new(crate::adapters::recording::Recording::around(
+        let http: Arc<dyn Http> = Arc::new(crate::recording::Recording::around(
             Arc::clone(&self.http),
             Some(at),
             Arc::clone(&self.clock),
