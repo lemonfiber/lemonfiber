@@ -106,6 +106,26 @@ fn a_credential_was_set() -> Change {
     }
 }
 
+/// A repair that changed a field inside a service whose name reads as a credential.
+///
+/// Nothing journals one today — the one producer records a download-client category —
+/// so this is the shape rather than a case in the wild, and it is the shape that matters:
+/// the next producer will not think to ask.
+fn a_secret_field_was_configured() -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: OPERATION.to_owned(),
+        target: "sonarr".to_owned(),
+        kind: Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "7".to_owned(),
+            field: "apiKey".to_owned(),
+            previous: Some(["old", "-s3cret"].concat()),
+            current: ["new", "-s3cret"].concat(),
+        },
+    }
+}
+
 /// Write a journal holding these changes where a reversal will read it.
 fn journalled(root: &Path, changes: &[Change]) {
     let path = paths(root).journal();
@@ -126,6 +146,20 @@ fn answering() -> Arc<Fake> {
         Answer::reply(
             200,
             r#"{"id":7,"fields":[{"name":"host","value":"sabnzbd"},{"name":"tvCategory","value":"tv-sonarr"}]}"#,
+        ),
+    )])
+}
+
+/// The same client, holding the field whose name reads as a credential.
+fn answering_with_a_key() -> Arc<Fake> {
+    Fake::by_path(vec![(
+        "downloadclient/7",
+        Answer::reply(
+            200,
+            format!(
+                r#"{{"id":7,"fields":[{{"name":"host","value":"sabnzbd"}},{{"name":"apiKey","value":"{}"}}]}}"#,
+                ["new", "-s3cret"].concat()
+            ),
         ),
     )])
 }
@@ -350,5 +384,54 @@ async fn what_a_reversal_reports_carries_no_credential_it_put_back() {
     assert!(
         said.contains(REDACTED),
         "and it says a value was put back rather than dropping the fact: {said}"
+    );
+}
+
+/// The same withholding, for the half of it nothing produces yet.
+///
+/// A field inside a service is put back through that service rather than on the host,
+/// and the account of it goes to the same places — so a field whose name reads as a
+/// credential is withheld there too. Asked of the name rather than of the producer,
+/// because the producer that would make this live does not exist to be asked.
+#[tokio::test]
+async fn a_service_field_named_like_a_credential_is_withheld_in_the_account_too() {
+    let root = scratch("credential-field");
+    journalled(&root, &[a_secret_field_was_configured()]);
+
+    let put_back = retract(&ctx(&root, answering_with_a_key()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(
+        !said.contains("s3cret"),
+        "the reversal reports the field it restored: {said}"
+    );
+    assert!(
+        said.contains("apiKey") && said.contains(REDACTED),
+        "which field went back is said, and that a value went with it: {said}"
+    );
+}
+
+/// A field that names nothing secret keeps its value, which is the whole point of asking.
+#[tokio::test]
+async fn a_field_naming_nothing_secret_still_says_what_it_went_back_to() {
+    let root = scratch("ordinary-field");
+    journalled(&root, &[configured()]);
+
+    let put_back = retract(&ctx(&root, answering()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+
+    assert!(
+        said.contains("mine"),
+        "an ordinary value is still reported: {said}"
+    );
+    assert!(
+        !said.contains(REDACTED),
+        "and nothing was withheld that did not need to be: {said}"
     );
 }
