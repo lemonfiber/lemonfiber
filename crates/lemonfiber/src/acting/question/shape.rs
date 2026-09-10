@@ -51,6 +51,13 @@ pub(crate) enum Narrows {
     /// four words, and a list to pick one off would be a list this screen has to
     /// carry a second copy of.
     Removal,
+    /// Which of the two things that can be moved forward is being asked about.
+    ///
+    /// Never typed and never picked. The two are two entries on the list rather than
+    /// one entry an operator narrows, because neither is the smaller case of the
+    /// other and a list that made somebody choose twice would be asking them the
+    /// question it had just asked.
+    Object,
 }
 
 impl Narrows {
@@ -71,6 +78,7 @@ impl Narrows {
             Self::Family => into.only = Some(said),
             Self::Season => into.season = Some(said),
             Self::Removal => into.tier = Some(said),
+            Self::Object => into.what = Some(said),
         }
     }
 
@@ -120,6 +128,13 @@ pub(crate) enum Needed {
         /// Which of that read's arguments the entry fills.
         narrows: Narrows,
     },
+    /// One argument, said by the question rather than by whoever asks it.
+    ///
+    /// Not a narrowing. A narrowing is an operator saying which of many they meant;
+    /// this is part of what the question *is*, which is how one read carries two
+    /// entries on the list. Nothing is typed and nothing is picked, so it is asked as
+    /// it stands exactly like [`Needed::Nothing`] — it simply does not stand empty.
+    Fixed(Narrows, &'static str),
 }
 
 impl Needed {
@@ -131,7 +146,7 @@ impl Needed {
     /// cannot come apart.
     pub(crate) fn asks(&self, said: usize) -> Option<&'static str> {
         match self {
-            Self::Nothing | Self::Picked { .. } => None,
+            Self::Nothing | Self::Picked { .. } | Self::Fixed(..) => None,
             Self::Typed(asking) => asking.get(said).map(|wants| wants.asks),
         }
     }
@@ -142,7 +157,7 @@ impl Needed {
     /// sibling of `question` rather than a child of it.
     pub(in crate::acting) const fn picking(&self) -> Option<(&'static str, Narrows)> {
         match self {
-            Self::Nothing | Self::Typed(_) => None,
+            Self::Nothing | Self::Typed(_) | Self::Fixed(..) => None,
             Self::Picked { at, narrows } => Some((*at, *narrows)),
         }
     }
@@ -173,10 +188,14 @@ impl Question {
     /// written down beside this one; it is this one, given nothing.
     pub(crate) fn command(&self, said: &[String]) -> Result<Command, &'static str> {
         let mut given = Asking::default();
-        if let Needed::Typed(asking) = &self.needs {
-            for (wants, word) in asking.iter().zip(said) {
-                wants.narrows.fill(word, &mut given);
+        match &self.needs {
+            Needed::Typed(asking) => {
+                for (wants, word) in asking.iter().zip(said) {
+                    wants.narrows.fill(word, &mut given);
+                }
             }
+            Needed::Fixed(narrows, word) => narrows.fill(word, &mut given),
+            Needed::Nothing | Needed::Picked { .. } => {}
         }
         named(self.read, given)
     }

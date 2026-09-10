@@ -801,7 +801,7 @@ async fn where_this_copy_stands_is_the_envelope_the_command_renders() {
 
     assert!(expected.is_some(), "the command answered");
     assert_eq!(
-        asked(world(running(), stack()), reads::SELF_UPDATE).await,
+        asked(world(running(), stack()), "/api/update?what=self").await,
         expected.map(|body| (StatusCode::OK, body))
     );
 }
@@ -811,7 +811,7 @@ async fn naming_a_version_asks_this_read_about_that_one() {
     // The one parameter it takes, and the one question a downgrade asks. A browser
     // that named a version is answered about that version and about whether it reads
     // the configuration already on this machine.
-    let seen = asked(world(running(), stack()), "/api/update?to=0.9.0").await;
+    let seen = asked(world(running(), stack()), "/api/update?what=self&to=0.9.0").await;
 
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::OK

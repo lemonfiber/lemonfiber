@@ -197,7 +197,7 @@ pub const ASKS: &[Reach] = &[
         through: "/api/clients",
     },
     Reach {
-        request: "self-update",
+        request: "update",
         through: "/api/update",
     },
 ];

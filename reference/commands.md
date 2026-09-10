@@ -37,7 +37,6 @@ Commands:
   outbound      List everything that leaves this machine, and what refusing each of it costs
   credentials   Say which credentials this stack holds, or act on one of them
   stored        List what lemonfiber keeps on this machine, where it is, and why
-  self-update   Say where this copy of lemonfiber stands, and what moving it would come to
   clients       Say which app to watch on, for each kind of device somebody in the house has
   invite        Offer somebody in the house an account they can claim
   reissue       Let somebody set a new password, without you choosing or seeing it
@@ -50,7 +49,7 @@ Commands:
   seed          Wire the stack's services to each other, idempotently
   adopt         Adopt your current edits as lemonfiber's expected state
   reset         Put the stack back to lemonfiber's own state, reverting every edit you made
-  update        Move the stack onto the image versions this build of lemonfiber pins
+  update        Move something onto a newer version, naming which
   backup        Back up your configuration to an archive, so it stops being precious
   support       Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
   ui            Serve the web interface, for as long as you leave it running
@@ -1571,39 +1570,6 @@ Options:
           Print help (see a summary with '-h')
 ```
 
-## `lemonfiber self-update`
-
-```text
-Say where this copy of lemonfiber stands, and what moving it would come to.
-
-Replaces nothing. It works out how this copy got onto the machine — Homebrew, Scoop, winget, cargo, the shell installer, or by hand — and prints the exact command for whichever tool owns it, because a binary that overwrote itself underneath a package manager leaves that manager holding a record of something that is no longer there.
-
-The stack is untouched either way: containers run on their own, and this program only starts them. Nothing waits on the check, and a machine that cannot reach the release list is told so rather than stopped.
-
-`--to` asks about one particular version instead of whatever is newest, which is how going back is asked for — along with whether that version reads the configuration already on this machine.
-
-Usage: lemonfiber self-update [OPTIONS]
-
-Options:
-      --json
-          Print machine-readable output
-
-      --to <VERSION>
-          The version to move to, instead of whatever is newest
-
-      --dry-run
-          Say what would happen, and change nothing
-
-      --force
-          Take the stack from a run that claimed it and did not give it back
-
-      --stack-dir <PATH>
-          Operate a stack directory of your own instead of the built-in one
-
-  -h, --help
-          Print help (see a summary with '-h')
-```
-
 ## `lemonfiber clients`
 
 ```text
@@ -2019,11 +1985,42 @@ Options:
 ## `lemonfiber update`
 
 ```text
+Move something onto a newer version, naming which.
+
+Two things here can be moved forward and the object is the whole of what tells them apart: `stack` moves the services somebody watches things on, and `self` moves this program. Neither is the smaller case of the other, so the object is required rather than defaulted — being handed the wrong one of these is being answered a question you did not ask.
+
+Usage: lemonfiber update [OPTIONS] <COMMAND>
+
+Commands:
+  stack  Move the stack onto the image versions this build of lemonfiber pins
+  self   Say where this copy of lemonfiber stands, and what moving it would come to
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber update stack`
+
+```text
 Move the stack onto the image versions this build of lemonfiber pins.
 
 A bare run changes nothing. It says which services would move, from which version to which, how large each step is, and which of them migrate state and so cannot be walked back. Run it again with `--confirm` to take the steps: a backup is taken first, and the services move one at a time with each proven to be answering before the next is touched.
 
-Usage: lemonfiber update [OPTIONS]
+Usage: lemonfiber update stack [OPTIONS]
 
 Options:
       --json
@@ -2043,6 +2040,39 @@ Options:
 
       --wait
           Let anything still downloading finish before the services are stopped
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber update self`
+
+```text
+Say where this copy of lemonfiber stands, and what moving it would come to.
+
+Replaces nothing. It works out how this copy got onto the machine — Homebrew, Scoop, winget, cargo, the shell installer, or by hand — and prints the exact command for whichever tool owns it, because a binary that overwrote itself underneath a package manager leaves that manager holding a record of something that is no longer there.
+
+The stack is untouched either way: containers run on their own, and this program only starts them. Nothing waits on the check, and a machine that cannot reach the release list is told so rather than stopped.
+
+`--to` asks about one particular version instead of whatever is newest, which is how going back is asked for — along with whether that version reads the configuration already on this machine.
+
+Usage: lemonfiber update self [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --to <VERSION>
+          The version to move to, instead of whatever is newest
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

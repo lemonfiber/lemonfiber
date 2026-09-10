@@ -243,3 +243,51 @@ pub enum HostingCommand {
         what: Kept,
     },
 }
+
+/// Which of the two things this can move onto a newer version.
+///
+/// One verb with the object beside it, rather than two verbs. Moving something
+/// forward is one word an operator reaches for, and which of the two they meant is
+/// the object — the same shape `migrate` has, and for the same reason.
+#[derive(Debug, Subcommand)]
+pub enum UpdateCommand {
+    /// Move the stack onto the image versions this build of lemonfiber pins.
+    ///
+    /// A bare run changes nothing. It says which services would move, from which
+    /// version to which, how large each step is, and which of them migrate state and
+    /// so cannot be walked back. Run it again with `--confirm` to take the steps: a
+    /// backup is taken first, and the services move one at a time with each proven to
+    /// be answering before the next is touched.
+    Stack {
+        /// Move one service instead of every one that has an update.
+        #[arg(long, value_name = "SERVICE")]
+        service: Option<String>,
+        /// Go ahead and move them, having seen what each step costs.
+        #[arg(long)]
+        confirm: bool,
+        /// Let anything still downloading finish before the services are stopped.
+        #[arg(long)]
+        wait: bool,
+    },
+    /// Say where this copy of lemonfiber stands, and what moving it would come to.
+    ///
+    /// Replaces nothing. It works out how this copy got onto the machine — Homebrew,
+    /// Scoop, winget, cargo, the shell installer, or by hand — and prints the exact
+    /// command for whichever tool owns it, because a binary that overwrote itself
+    /// underneath a package manager leaves that manager holding a record of something
+    /// that is no longer there.
+    ///
+    /// The stack is untouched either way: containers run on their own, and this
+    /// program only starts them. Nothing waits on the check, and a machine that cannot
+    /// reach the release list is told so rather than stopped.
+    ///
+    /// `--to` asks about one particular version instead of whatever is newest, which
+    /// is how going back is asked for — along with whether that version reads the
+    /// configuration already on this machine.
+    #[command(name = "self")]
+    Itself {
+        /// The version to move to, instead of whatever is newest.
+        #[arg(long, value_name = "VERSION")]
+        to: Option<String>,
+    },
+}

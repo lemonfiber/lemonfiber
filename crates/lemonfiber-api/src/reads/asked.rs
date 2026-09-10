@@ -23,8 +23,8 @@ use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
 
 use super::{
     Wanted, ALERTS, BACKUPS, BANDWIDTH, BUNDLE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, EXPLAIN,
-    FORMS, FRONT_DOOR, HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SELF_UPDATE, SERVICES, SPACE,
-    STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, VERSION,
+    FORMS, FRONT_DOOR, HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE, STATUS,
+    STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
 };
 
 /// Raised where a read was given a parameter its answer has nowhere to put.
@@ -69,6 +69,9 @@ const TIER: &str = "tier";
 /// The parameter naming the version to move to.
 const TO: &str = "to";
 
+/// Which of the two things that can be moved forward is being asked about.
+const WHAT: &str = "what";
+
 /// What each read takes, and nothing else.
 ///
 /// In the order the endpoints declare them, so this reads beside the routes rather
@@ -109,7 +112,7 @@ const TAKEN: &[(&str, &[&str])] = &[
     (SPACE, &[]),
     (BANDWIDTH, &[]),
     (BUNDLE, &[]),
-    (SELF_UPDATE, &[TO]),
+    (UPDATE, &[WHAT, TO]),
 ];
 
 /// The parameters that name one of several rather than one thing.
@@ -192,6 +195,7 @@ impl Asked {
             word: self.one(WORD).map(str::to_owned),
             tier: self.one(TIER).map(str::to_owned),
             to: self.one(TO).map(str::to_owned),
+            what: self.one(WHAT).map(str::to_owned),
         }
     }
 }

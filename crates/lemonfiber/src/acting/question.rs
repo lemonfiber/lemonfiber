@@ -1,14 +1,22 @@
 //! What the dashboard can be asked, and what each question comes to.
 //!
-//! Ten reads behind one key, rather than ten keys. The screen already answers
+//! Every read behind one key, rather than a key each. The screen already answers
 //! `q`, `r`, `?` and five actions, and a key per request does not survive being
 //! done twice — so what a person opens is the list of what this stack can be
-//! asked, and the list is where an eleventh read would go without costing anybody a
-//! letter to remember. Fifteen questions sit over those ten, because four of the
-//! reads are asked both whole and narrowed and each of those pairs is two entries
-//! on the list and one request in the parity table either way — and one of them is
-//! narrowed twice over, a trace being asked for a show and then for one season of
-//! that show.
+//! asked, and the list is where the next read goes without costing anybody a
+//! letter to remember.
+//!
+//! There are more questions than reads, because some reads are two questions. Most
+//! of those pairs are a listing and a narrowing of it — every setting and one
+//! setting — and a trace is narrowed twice over, being asked for a show and then for
+//! one season of that show. One pair is not a narrowing at all: moving something
+//! forward is asked once per object, and neither the stack nor this program is the
+//! smaller case of the other. Each pair is two entries here and one request in the
+//! parity table either way.
+//!
+//! No count is written down. Both numbers move whenever a read or a question is
+//! added, they are read off this file by nothing, and a sentence that has to be
+//! kept in step with a list below it is a sentence that quietly stops being true.
 //!
 //! A question is given what it needs a word at a time, on a line for each. One read
 //! takes two words and the rest take one or none, and the number of lines is read off
@@ -41,7 +49,7 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
     named, ALERTS, BANDWIDTH, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR, HISTORY,
-    HOSTING, MIGRATION, OUTBOUND, QUALITY, REQUESTS, SELF_UPDATE, STORED, STUCK, TRACE, UNINSTALL,
+    HOSTING, MIGRATION, OUTBOUND, QUALITY, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE,
     VERSION,
 };
 use lemonfiber_core::app::Command;
@@ -211,8 +219,15 @@ static AFTER: &[Question] = &[
         name: "where this copy of lemonfiber stands",
         about: "whether anything newer has been released, and the exact command for whatever \
                 put this copy here",
-        read: SELF_UPDATE,
-        needs: Needed::Nothing,
+        read: UPDATE,
+        needs: Needed::Fixed(Narrows::Object, "self"),
+    },
+    Question {
+        name: "what the stack would move to",
+        about: "which services have a newer version pinned, how large each step is, and which \
+                of them cannot be walked back",
+        read: UPDATE,
+        needs: Needed::Fixed(Narrows::Object, "stack"),
     },
     Question {
         name: "what leaves this machine",
