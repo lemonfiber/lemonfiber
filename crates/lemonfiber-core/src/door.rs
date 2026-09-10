@@ -192,7 +192,7 @@ pub(crate) mod fixtures {
             without_it: "nothing".to_owned(),
             media_types: Vec::new(),
             depends_on: Vec::new(),
-            capabilities: Vec::new(),
+            grants: Vec::new(),
             host_managed: false,
         }
     }

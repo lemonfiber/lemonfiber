@@ -169,7 +169,7 @@ mod tests {
             without_it: "nothing works".to_owned(),
             media_types: Vec::new(),
             depends_on: Vec::new(),
-            capabilities: Vec::new(),
+            grants: Vec::new(),
             host_managed: false,
         }
     }
