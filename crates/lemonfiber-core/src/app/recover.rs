@@ -14,7 +14,8 @@ use std::path::{Path, PathBuf};
 
 use crate::config::store;
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
-use crate::journal::{kept, Action, Change, Journal, Undo};
+use crate::journal::{is_sealed, kept, Action, Change, Journal, Seal, Undo};
+use crate::ports::random::Random;
 use crate::ports::service::Client as _;
 use crate::repair;
 
@@ -26,12 +27,20 @@ use super::Ctx;
 /// A torn final line — a crash caught mid-write — is dropped rather than failing
 /// the whole read, so a reversal still has every entry that fully landed to work
 /// from; an absent or unreadable file is an empty journal, nothing to reverse.
+///
+/// Credentials are opened here, with the key kept beside the file, because the
+/// record is sealed on disk and clear in memory — see [`crate::journal::sealing`].
+/// A value this machine has no key for is left sealed rather than dropped: which
+/// setting changed is still worth reading where what it changed to is not, and
+/// every reader that could act on the value asks whether it opened first.
 #[must_use]
 pub fn journal_at(path: &Path) -> Journal {
+    let seal = Seal::kept(path);
     let changes = std::fs::read_to_string(path)
         .unwrap_or_default()
         .lines()
         .filter_map(|line| serde_json::from_str::<Change>(line).ok())
+        .map(|change| seal.opening(&change))
         .collect();
     Journal::replay(changes)
 }
@@ -57,15 +66,21 @@ pub fn journal_at(path: &Path) -> Journal {
 /// Silent where it cannot be written. A repair has already changed the thing it was asked
 /// to change by the time this runs, and failing the repair over the record of it would
 /// report a change that did happen as one that did not.
-pub fn journalled(path: &Path, changes: &[Change]) {
+///
+/// `random` is what a credential is sealed under: the key where this machine has yet to
+/// make one, and a fresh nonce for every value. Every change goes out through the seal,
+/// the ones read back included — which is what takes the clear values out of a journal an
+/// older version wrote, on the first change recorded after the upgrade.
+pub fn journalled(path: &Path, changes: &[Change], random: &dyn Random) {
     if changes.is_empty() {
         return;
     }
     let mut held: Vec<Change> = journal_at(path).changes().to_vec();
     held.extend(changes.iter().cloned());
+    let seal = Seal::minted(path, random);
     let written = kept(&held)
         .iter()
-        .filter_map(|change| serde_json::to_string(change).ok())
+        .filter_map(|change| serde_json::to_string(&seal.sealing(change, random)).ok())
         .fold(String::new(), |mut lines, line| {
             lines.push_str(&line);
             lines.push('\n');
@@ -146,6 +161,10 @@ pub async fn reconfigured(
 /// value over one the operator has chosen since would be taking away a decision made
 /// after the repair it is undoing.
 ///
+/// A credential whose sealed record will not open is left alone too, and reported ahead
+/// of both: it is the one of the three an operator cannot fix by looking, since nothing
+/// on this machine still knows what the setting held.
+///
 /// The settings the operator owns are reported ahead of the services that would not
 /// answer, where a reversal meets both. An unreachable service announces itself in every
 /// other reading of the stack; a reversal that deliberately did not write is something an
@@ -153,12 +172,17 @@ pub async fn reconfigured(
 pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(), Box<Problem>> {
     let mut beyond_reach = already;
     let mut theirs = Vec::new();
+    let mut unread = Vec::new();
     for undo in undos {
         match carry_out(&undo.action, env_file).map_err(|fault| Box::new(fault.problem()))? {
             Step::Done => {}
             Step::BeyondReach(resource) => beyond_reach.push(resource),
             Step::TheirsNow(key) => theirs.push(key),
+            Step::StillSealed(key) => unread.push(key),
         }
+    }
+    if !unread.is_empty() {
+        return Err(Box::new(not_opened(&unread)));
     }
     if !theirs.is_empty() {
         return Err(Box::new(not_put_back(&theirs)));
@@ -181,6 +205,9 @@ enum Step {
     /// The setting holds neither what the change put there nor what putting it back
     /// would write, so somebody has chosen it since and it is left alone.
     TheirsNow(String),
+    /// The setting held a credential and the record of it did not open, so what this
+    /// reversal would write is not a value — it is the sealed text itself.
+    StillSealed(String),
 }
 
 /// Carry out one undo against the filesystem or the environment file.
@@ -213,6 +240,13 @@ fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
 /// asking the other way round would have every second reversal accusing the
 /// operator of a change they did not make.
 fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Result<Step, Fault> {
+    // Asked before the file is even read, because neither of the two questions below
+    // means anything against text that is not the value. Writing it would report the
+    // setting restored and leave the operator authenticating with a line of hexadecimal,
+    // which is the one outcome sealing the record is arranged to make impossible.
+    if is_sealed(wrote) || value.is_some_and(is_sealed) {
+        return Ok(Step::StillSealed(key.to_owned()));
+    }
     let file = store::read(env_file).map_err(Fault::Store)?;
     let holds = file.get(key);
     if holds == value {
@@ -324,17 +358,50 @@ pub const NOT_REMOVED: Code = Code::new("SETUP-3");
 /// Raised when reversing needs the service that made a change.
 pub const NEEDS_SERVICE: Code = Code::new("SETUP-4");
 
+/// The problem naming the credentials a reversal could not read back.
+///
+/// Named one by one, for the reason [`not_put_back`] names its settings: an operator told
+/// only that part of a reversal did not happen needs to know which part, and here the
+/// answer decides whether they go and set a password again.
+///
+/// A warning rather than an error. Everything else was put back, and what was not is a
+/// limit of what this machine can still read rather than a failure of this run — the key
+/// the record was sealed under is gone, or the record was edited after it was written.
+fn not_opened(settings: &[String]) -> Problem {
+    Problem::new(
+        NOT_OPENED,
+        Severity::Warning,
+        "Some settings hold credentials this machine can no longer read back",
+        "The journal keeps a credential sealed, under a key kept beside it. These entries \
+         would not open — the key is missing, or the record was changed after it was \
+         written — so what they held is not something to put back, and they were left \
+         exactly as they are. Everything else was put back.",
+        Remedy::new("Set them yourself, from wherever the earlier credential came from"),
+    )
+    .with_detail(settings.join(", "))
+}
+
 /// Raised when a reversal would write over a setting the operator has since chosen.
 pub const NOT_PUT_BACK: Code = Code::new("SETUP-9");
+
+/// Raised when a reversal meets a credential whose sealed record will not open.
+pub const NOT_OPENED: Code = Code::new("SETUP-10");
 
 #[cfg(test)]
 mod tests {
     use crate::test_support::a_fresh_write;
+    use lemonfiber_fixtures::ports::Chance;
     use std::path::{Path, PathBuf};
 
     use super::undo;
     use crate::config::store;
     use crate::journal::{Action, Change, Journal, Kind, Undo};
+
+    /// The randomness a real machine supplies, for the key the journal's credentials
+    /// are sealed under.
+    fn a_machine() -> Chance {
+        Chance::cycling()
+    }
 
     /// A scratch directory unique to this process and case, cleared first.
     fn scratch(name: &str) -> PathBuf {
@@ -399,7 +466,7 @@ mod tests {
         // anybody wrote to it would be.
         assert!(std::fs::write(&path, first).is_ok());
 
-        super::journalled(&path, &[a_fresh_write("TORRENT", "on")]);
+        super::journalled(&path, &[a_fresh_write("TORRENT", "on")], &a_machine());
 
         assert_eq!(
             super::journal_at(&path).changes(),
@@ -427,6 +494,7 @@ mod tests {
                     at: stamp.to_string(),
                     ..a_fresh_write("PUID", "1000")
                 }],
+                &a_machine(),
             );
         }
 
@@ -449,7 +517,7 @@ mod tests {
     fn a_repair_that_changed_nothing_writes_no_journal() {
         let path = scratch("journal-none").join("journal.jsonl");
 
-        super::journalled(&path, &[]);
+        super::journalled(&path, &[], &a_machine());
 
         assert!(!path.exists());
     }
@@ -460,7 +528,7 @@ mod tests {
     fn a_journal_is_written_where_no_directory_has_been_made_yet() {
         let path = scratch("journal-fresh").join("journal.jsonl");
 
-        super::journalled(&path, &[a_fresh_write("USENET", "on")]);
+        super::journalled(&path, &[a_fresh_write("USENET", "on")], &a_machine());
 
         assert_eq!(
             super::journal_at(&path).changes(),
@@ -701,6 +769,41 @@ mod tests {
             port(&env).as_deref(),
             Some("49152"),
             "the value the operator set stands"
+        );
+    }
+
+    /// A credential whose record will not open is named and left alone, rather than put
+    /// back as the text the record now reads as.
+    ///
+    /// Beside the drift refusal above because the two answers must not be confused: that
+    /// one is about a value the operator chose, this one is about a value nobody can read
+    /// any more. Writing the sealed text into the settings file would report the setting
+    /// restored and leave whatever authenticates with it holding a line of hexadecimal.
+    #[test]
+    fn a_credential_whose_record_will_not_open_is_named_rather_than_written() {
+        let dir = scratch("still-sealed");
+        let env = dir.join(".env");
+        assert!(store::set(&env, "INDEXER_APIKEY", "chosen-since").is_ok());
+
+        let refused = undo(
+            &[restore(
+                "INDEXER_APIKEY",
+                Some("sealed:1:00"),
+                "sealed:1:11",
+            )],
+            &env,
+            Vec::new(),
+        );
+
+        assert!(
+            matches!(&refused, Err(problem) if problem.code == super::NOT_OPENED),
+            "{refused:?}"
+        );
+        let file = store::read(&env).unwrap_or_default();
+        assert_eq!(
+            file.get("INDEXER_APIKEY"),
+            Some("chosen-since"),
+            "and the setting is left exactly as it stands"
         );
     }
 

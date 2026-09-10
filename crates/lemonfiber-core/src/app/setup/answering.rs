@@ -19,6 +19,7 @@
 //! all read off the wizard; this reads the file, hands the wizard what arrived,
 //! and writes the file back.
 
+use crate::app::apply::Applying;
 use crate::app::targets::layout;
 use crate::app::Ctx;
 use crate::config::paths::Paths;
@@ -106,7 +107,10 @@ pub async fn setting_up(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, 
         // The same apply a terminal run reaches, at the same gate: review is
         // entered only from a complete set of answers, and applying anything else
         // is refused there rather than judged again here.
-        SetupAction::Apply => super::resume(&mut wizard, &paths, ctx.stack, &ctx.stamp())?,
+        SetupAction::Apply => {
+            let stamp = ctx.stamp();
+            super::resume(&mut wizard, &applying(ctx, &paths, &stamp))?;
+        }
         // Refused where nothing is part-way through: the three ways out are about a
         // half-written apply, and offering them for a run that has not begun one
         // would reverse changes nothing made and discard answers nobody replaced.
@@ -114,7 +118,8 @@ pub async fn setting_up(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, 
             if wizard.phase() != Phase::Applying {
                 return Err(Box::new(nothing_to_recover()));
             }
-            super::recovered(&mut wizard, &paths, ctx.stack, &ctx.stamp(), choice)?;
+            let stamp = ctx.stamp();
+            super::recovered(&mut wizard, &applying(ctx, &paths, &stamp), choice)?;
             // Starting over forgot the answers, so the walk is back at its
             // beginning — and a report still reading them off the wizard in hand
             // would describe a run that no longer exists anywhere.
@@ -125,6 +130,23 @@ pub async fn setting_up(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, 
     }
 
     Ok(reported(&wizard, &paths, proof))
+}
+
+/// What an apply reached from a request writes with.
+///
+/// Built here rather than carried, because everything in it is already on the context
+/// or beside it: a request has no more to say about where these files live, where the
+/// stack comes from, or what time it is than a terminal run does.
+///
+/// The stamp is taken by the caller and lent in. A bundle that stamped itself would
+/// have a value of its own to keep alive, and this is handed to one call and dropped.
+fn applying<'a>(ctx: &'a Ctx, paths: &'a Paths, stamp: &'a str) -> Applying<'a> {
+    Applying {
+        paths,
+        source: ctx.stack,
+        stamp,
+        random: ctx.random.as_ref(),
+    }
 }
 
 /// Whether setup may still be answered or applied on this machine.

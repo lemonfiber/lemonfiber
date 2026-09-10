@@ -27,21 +27,45 @@ use crate::baseline::Baseline;
 use crate::config::paths::Paths;
 use crate::config::store::{self, is_secret};
 use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity};
-use crate::journal::{Change, Journal, Kind};
+use crate::journal::{Change, Journal, Kind, Seal};
+use crate::ports::random::Random;
 use crate::stack::{self, Source};
 use crate::wizard::{Phase, Plan, Wizard};
+
+/// Everything an apply writes *with*, as against the answers it writes.
+///
+/// A bundle rather than four more arguments, and it is the same argument the seams
+/// bundle makes: these four are always supplied together, they are handed unchanged
+/// down through review and recovery to the writes themselves, and named one at a time
+/// they turn every function they pass through into a longer signature than the thing
+/// it does. They are not seams — nothing here reaches the world — they are where this
+/// machine keeps its files, where its stack comes from, what time it is, and what a
+/// credential is sealed under.
+pub struct Applying<'a> {
+    /// Where lemonfiber's own files live.
+    pub paths: &'a Paths,
+    /// Where the stack this apply materialises comes from.
+    pub source: Source,
+    /// The time to stamp the journal with, which the wizard has no clock to do itself.
+    pub stamp: &'a str,
+    /// Where the key the journal's credentials are sealed under is drawn from.
+    pub random: &'a dyn Random,
+}
 
 /// Write a reviewed setup to disk, driving the lifecycle and recording each
 /// reversible write so an interrupted run can be unwound.
 ///
 /// The wizard must be at review — every applicable question answered and
 /// confirmed — or there is nothing settled to apply. Everything lands under the
-/// install `paths`: the settings in the environment file, the lifecycle marker and
-/// the change journal beside it, and the `source` stack where Compose reads it. The
+/// install paths: the settings in the environment file, the lifecycle marker and
+/// the change journal beside it, and the stack where Compose reads it. The
 /// marker reaches `applying` on disk before the first write, and each journal entry
 /// lands before the write it describes, so a stop at any point leaves a state the
-/// next run can recover rather than one it must guess at. The `stamp` times the
-/// journal entries, which the wizard has no clock to do itself.
+/// next run can recover rather than one it must guess at.
+///
+/// A setting whose name says it holds a credential is journalled sealed rather than as
+/// itself, under a key made from the randomness the bundle carries — see
+/// [`crate::journal::sealing`] for what that does and does not protect against.
 ///
 /// # Errors
 ///
@@ -49,19 +73,14 @@ use crate::wizard::{Phase, Plan, Wizard};
 /// be read or written, where the data directory could not be created, or where the
 /// stack could not be materialised — leaving the marker at `applying` and the
 /// journal holding what had been written, which the next run recovers from.
-pub fn apply(
-    wizard: &mut Wizard,
-    paths: &Paths,
-    source: Source,
-    stamp: &str,
-) -> Result<(), Box<Problem>> {
+pub fn apply(wizard: &mut Wizard, applying: &Applying) -> Result<(), Box<Problem>> {
     if !wizard.transition(Phase::Applying) {
         return Err(Box::new(not_reviewed()));
     }
     // Every failure is boxed as one problem on the way out, because a `Problem` is
     // large beside the `()` this returns on success — so the writes themselves stay
     // a plain sequence, each stopping the rest.
-    write(wizard, paths, source, stamp).map_err(|fault| Box::new(fault.problem()))
+    write(wizard, applying).map_err(|fault| Box::new(fault.problem()))
 }
 
 /// A failure part-way through applying, named finely enough to remedy: a file the
@@ -106,8 +125,10 @@ impl Fault {
 /// Ordered for recovery: the applying marker is persisted first, each change is
 /// journalled before it is written, and the applied marker is persisted last — so
 /// a stop at any point leaves the marker and journal a later run reads.
-fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Result<(), Fault> {
+fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
+    let (paths, stamp, random) = (applying.paths, applying.stamp, applying.random);
     let (progress, env_file, journal) = (paths.setup_progress(), paths.env_file(), paths.journal());
+    let seal = Seal::minted(&journal, random);
 
     store::write(&progress, &rendered(wizard)).map_err(Fault::Store)?;
 
@@ -135,7 +156,7 @@ fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Res
         for ancestor in made_by(&root) {
             log.record(made(&ancestor, stamp));
         }
-        store::write(&journal, &lines(&log)).map_err(Fault::Store)?;
+        store::write(&journal, &lines(&log, &seal, random)).map_err(Fault::Store)?;
         std::fs::create_dir_all(&root).map_err(|err| Fault::DirNotMade {
             path: root,
             reason: err.to_string(),
@@ -148,7 +169,8 @@ fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Res
     // undo is simply that the next apply rewrites it, and a directory left behind
     // is a build artifact, not stranded work. An external stack is the operator's,
     // already on disk, and materialising it writes nothing.
-    source
+    applying
+        .source
         .materialise(Some(&paths.stack()))
         .map_err(Fault::Stack)?;
 
@@ -161,7 +183,7 @@ fn write(wizard: &mut Wizard, paths: &Paths, source: Source, stamp: &str) -> Res
         // what was already there — harmless. The reverse would leave a real write
         // with nothing to unwind it.
         log.record(change);
-        store::write(&journal, &lines(&log)).map_err(Fault::Store)?;
+        store::write(&journal, &lines(&log, &seal, random)).map_err(Fault::Store)?;
         store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
 
@@ -268,11 +290,16 @@ fn rendered(wizard: &Wizard) -> String {
 ///
 /// As with the progress, a `Change` cannot fail to serialise, so no line is ever
 /// the empty-string fallback.
-fn lines(journal: &Journal) -> String {
+///
+/// Sealed on the way out rather than where the change was made, so the record this run
+/// holds in memory is exact and only the file is not: an apply that stops part-way
+/// reverses its own writes from what it is holding, credentials and all, and what
+/// outlives the run is what has them taken out of it.
+fn lines(journal: &Journal, seal: &Seal, random: &dyn Random) -> String {
     journal
         .changes()
         .iter()
-        .map(|change| serde_json::to_string(change).unwrap_or_default())
+        .map(|change| serde_json::to_string(&seal.sealing(change, random)).unwrap_or_default())
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -300,7 +327,9 @@ mod tests {
     use crate::test_support::a_fresh_write;
     use std::path::{Path, PathBuf};
 
-    use super::{apply, Baseline, SETTINGS};
+    use lemonfiber_fixtures::ports::Chance;
+
+    use super::{apply, Applying, Baseline, SETTINGS};
     use crate::alert::{Appetite, Wants};
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
@@ -308,6 +337,21 @@ mod tests {
     use crate::platform::Environment;
     use crate::stack::Source;
     use crate::wizard::{Answer, Library, Phase, Vpn, Wizard};
+
+    /// What an apply writes with, over a real directory and a real machine's
+    /// randomness — the key the journal's credentials are sealed under is made from
+    /// the latter.
+    fn applying<'a>(paths: &'a Paths, source: Source, stamp: &'a str) -> Applying<'a> {
+        Applying {
+            paths,
+            source,
+            stamp,
+            random: &A_MACHINE,
+        }
+    }
+
+    /// The randomness a real machine supplies.
+    static A_MACHINE: Chance = Chance::cycling();
 
     /// A journal line for a directory apply created, pinned to the path stated
     /// here.
@@ -387,7 +431,7 @@ mod tests {
         let root = dir.join("data-root");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         // The settings the plan named are on disk, the data directory was created,
         // and the wizard finished applied.
@@ -416,7 +460,7 @@ mod tests {
         let paths = layout(&dir);
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         assert_eq!(
             remembering(&paths)
@@ -441,7 +485,7 @@ mod tests {
         );
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         let held = remembering(&paths);
         assert!(held.entry("sonarr", "rootfolder").is_some());
@@ -458,7 +502,7 @@ mod tests {
         let _ = std::fs::create_dir_all(paths.baseline());
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         assert!(paths.baseline().is_dir(), "left exactly as it was");
     }
@@ -472,7 +516,7 @@ mod tests {
         let _ = store::write(&paths.baseline(), "not json at all");
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         let text = std::fs::read_to_string(paths.baseline()).unwrap_or_default();
         assert_eq!(text, "not json at all");
@@ -484,7 +528,7 @@ mod tests {
         let paths = layout(&dir);
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         let saved = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
         assert!(saved.contains("\"applied\""), "phase is persisted: {saved}");
@@ -501,7 +545,7 @@ mod tests {
         // directory made, then one Set per setting in plan order over a fresh file —
         // pinned to what should land, not to a recomputation of what apply wrote, so
         // a wrong key, a dropped setting, or a missing directory record is caught.
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         let root_shown = root.display().to_string();
         let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
@@ -529,7 +573,7 @@ mod tests {
         let root = parent.join("data");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         assert!(root.is_dir(), "the leaf was made");
         let root_shown = root.display().to_string();
@@ -559,7 +603,7 @@ mod tests {
         assert!(std::fs::create_dir_all(&root).is_ok(), "the library exists");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
         assert!(
@@ -581,7 +625,7 @@ mod tests {
         let root = blocker.join("data");
         let mut wizard = reviewed(&root);
 
-        let stopped = apply(&mut wizard, &paths, external(), "t");
+        let stopped = apply(&mut wizard, &applying(&paths, external(), "t"));
 
         assert!(matches!(stopped, Err(problem) if problem.code == super::DIR_NOT_MADE));
         let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
@@ -607,7 +651,11 @@ mod tests {
         let paths = layout(&dir);
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, Source::Embedded(&EMBEDDED), "t").is_ok());
+        assert!(apply(
+            &mut wizard,
+            &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        )
+        .is_ok());
 
         // The stack is on disk where Compose reads it — its manifest among the
         // files. It is lemonfiber's regenerable output, so it is not recorded in the
@@ -630,7 +678,7 @@ mod tests {
         let paths = layout(&dir);
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
 
         // The operator's own stack stays where it is; nothing is written to the
         // location an embedded stack would land in.
@@ -655,7 +703,10 @@ mod tests {
         );
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        let stopped = apply(&mut wizard, &paths, Source::Embedded(&EMBEDDED), "t");
+        let stopped = apply(
+            &mut wizard,
+            &applying(&paths, Source::Embedded(&EMBEDDED), "t"),
+        );
 
         assert!(stopped.is_err(), "the stack could not be written");
         let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
@@ -669,7 +720,7 @@ mod tests {
         // Still gathering answers — apply has nothing settled to write.
         let mut wizard = Wizard::new(Environment::LinuxNative);
 
-        let refused = apply(&mut wizard, &paths, external(), "t");
+        let refused = apply(&mut wizard, &applying(&paths, external(), "t"));
 
         assert!(matches!(refused, Err(problem) if problem.code == super::NOT_REVIEWED));
         assert!(!paths.env_file().exists(), "nothing was written");
@@ -693,7 +744,7 @@ mod tests {
         let root = dir.join("data-root");
         let mut wizard = reviewed(&root);
 
-        assert!(apply(&mut wizard, &paths, external(), "t").is_err());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_err());
 
         let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
         assert!(marker.contains("\"applying\""), "left mid-apply: {marker}");
@@ -712,7 +763,7 @@ mod tests {
         let paths = layout(&dir);
         let root = dir.join("data-root");
         let mut wizard = reviewed(&root);
-        assert!(apply(&mut wizard, &paths, external(), "1000").is_ok());
+        assert!(apply(&mut wizard, &applying(&paths, external(), "1000")).is_ok());
 
         let written = std::fs::read_to_string(paths.notifications()).unwrap_or_default();
         assert_eq!(
@@ -735,7 +786,7 @@ mod tests {
         );
         let mut wizard = reviewed(&dir.join("data-root"));
 
-        let stopped = apply(&mut wizard, &paths, external(), "t");
+        let stopped = apply(&mut wizard, &applying(&paths, external(), "t"));
 
         assert!(stopped.is_err());
         assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);

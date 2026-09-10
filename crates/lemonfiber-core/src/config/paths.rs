@@ -75,6 +75,17 @@ impl Paths {
         self.config.join(JOURNAL)
     }
 
+    /// The key the journal's credentials are sealed under, beside the journal itself.
+    ///
+    /// Named here as well as derived there, for the reason the update check's memory is:
+    /// both readers of the journal are handed a path to it rather than this layout, so
+    /// the formula lives beside the file it opens — and a restore that took the records
+    /// and left this behind is a restore that can no longer read them.
+    #[must_use]
+    pub fn journal_key(&self) -> PathBuf {
+        self.journal().with_file_name(crate::journal::KEY_FILE)
+    }
+
     /// What left this machine, so the operator can check what was sent rather than
     /// only what the enumeration says would be.
     #[must_use]
@@ -266,6 +277,7 @@ mod tests {
         let config: Vec<PathBuf> = vec![
             paths.env_file(),
             paths.journal(),
+            paths.journal_key(),
             paths.setup_progress(),
             paths.baseline(),
             paths.acknowledged(),
@@ -391,6 +403,7 @@ mod tests {
         let all = [
             paths.env_file(),
             paths.journal(),
+            paths.journal_key(),
             paths.setup_progress(),
             paths.baseline(),
             paths.materialised(),

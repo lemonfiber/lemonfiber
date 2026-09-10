@@ -99,9 +99,22 @@ pub const EVERY: &[Entry] = &[
         accessor: "journal",
         what: "the change journal",
         why: "What the last run wrote, so a repair can be put back. The fields that changed and \
-              what they were — nothing about you and nothing about what you watch.",
+              what they were — nothing about you and nothing about what you watch. Where a \
+              setting held a credential, what it held is sealed rather than written down, and \
+              the key it is sealed with is the file below.",
         secret: false,
         at: Paths::journal,
+    },
+    Entry {
+        accessor: "journal_key",
+        what: "the change journal's key",
+        why: "What the credentials in the change journal are sealed with. It is kept beside the \
+              journal and read nowhere else, so a copy of the journal taken without it says \
+              which settings changed and cannot say what they were changed to — which is the \
+              whole reason it is a file of its own. Anything that can read both can read the \
+              journal, so this protects the journal from travelling, not from this machine.",
+        secret: true,
+        at: Paths::journal_key,
     },
     Entry {
         accessor: "baseline",

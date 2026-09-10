@@ -11,7 +11,7 @@
 //! disk.
 
 use crate::config::store::is_secret;
-use crate::journal::{Change, Kind};
+use crate::journal::{is_sealed, Change, Kind};
 
 /// How far a change can be put back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,14 +77,20 @@ impl Standing {
     }
 }
 
-/// The setting a change is about and the value it left there, where it is about one.
+/// The setting a change is about, the value it left there, and the value it replaced —
+/// where it is about a setting at all.
 ///
-/// One question rather than two. A change that names a setting is the same change that
-/// wrote a value into it, so asking the second half separately would match the same
-/// variant a second time and leave an arm nothing could reach.
-fn touched(change: &Change) -> Option<(&str, &str)> {
+/// One question rather than three. A change that names a setting is the same change that
+/// wrote a value into it and the same one that replaced whatever was there, so asking any
+/// of them separately would match the same variant again and leave an arm nothing could
+/// reach.
+fn touched(change: &Change) -> Option<(&str, &str, Option<&str>)> {
     match &change.kind {
-        Kind::Set { key, current, .. } => Some((key, current)),
+        Kind::Set {
+            key,
+            current,
+            previous,
+        } => Some((key, current, previous.as_deref())),
         _ => None,
     }
 }
@@ -92,7 +98,7 @@ fn touched(change: &Change) -> Option<(&str, &str)> {
 /// The setting a change is about, where it is about one.
 #[must_use]
 pub fn setting(change: &Change) -> Option<&str> {
-    touched(change).map(|(key, _)| key)
+    touched(change).map(|(key, ..)| key)
 }
 
 /// The key whose reversal moves no data, only the pointer to it.
@@ -113,7 +119,26 @@ pub fn standing(
     later: &[Change],
     holds: &dyn Fn(&str) -> Option<String>,
 ) -> Standing {
-    if let Some(key) = setting(change) {
+    if let Some((key, left, replaced)) = touched(change) {
+        // Asked ahead of drift, because a sealed value that will not open is not a value
+        // to compare against: what the setting holds now differs from the sealed text
+        // whatever it holds, so drift would answer yes and blame the operator for an edit
+        // nobody made. The record is there and this machine cannot read it, which is a
+        // different sentence and the true one.
+        //
+        // Either half counts. What was written is what a reversal checks its own work
+        // against and what was there before is what it would put back, so a reversal
+        // missing either one is a reversal that cannot be carried out honestly.
+        if is_sealed(left) || replaced.is_some_and(is_sealed) {
+            return Standing::refused(
+                &format!(
+                    "{key} holds a credential, and the record of what it held is sealed \
+                     under a key this machine no longer has — so there is nothing here it \
+                     can put back"
+                ),
+                Some("set it yourself, from wherever the earlier credential came from"),
+            );
+        }
         if let Some(edited) = drifted(change, holds) {
             // A secret says that it differs and never what it now is. The value here is
             // read live off the environment file, so printing it would put a credential
@@ -156,7 +181,7 @@ pub fn standing(
 
 /// What the setting holds now, where that is not what this change left.
 fn drifted(change: &Change, holds: &dyn Fn(&str) -> Option<String>) -> Option<String> {
-    let (key, left) = touched(change)?;
+    let (key, left, _) = touched(change)?;
     let now = holds(key)?;
     (now != left).then_some(now)
 }
@@ -254,6 +279,50 @@ mod tests {
         let change = set("reconfigure", "PUID", Some("1000"), "1001");
         let read = standing(&change, &[], &holding(&[("PUID", "1001")]));
         assert_eq!(read.reversal, Reversal::Whole);
+    }
+
+    /// A credential whose record will not open is refused for that reason, not for
+    /// drift.
+    ///
+    /// The two read alike from here and they are not alike at all. Drift says somebody
+    /// set this since and putting it back would take away their decision; this says the
+    /// record is there and this machine cannot read it. Told the first, an operator goes
+    /// looking for an edit nobody made — and neither sentence is one they can act on
+    /// unless it is the true one.
+    #[test]
+    fn a_credential_whose_record_will_not_open_is_refused_for_that_reason() {
+        let sealed = "sealed:1:00";
+        let change = set("apply", "INDEXER_APIKEY", None, sealed);
+
+        let read = standing(
+            &change,
+            &[],
+            &holding(&[("INDEXER_APIKEY", "chosen-since")]),
+        );
+
+        let said = read.refusal.map(|why| why.because).unwrap_or_default();
+        assert!(
+            said.contains("INDEXER_APIKEY") && said.contains("no longer has"),
+            "it says the record cannot be read: {said}"
+        );
+        assert!(
+            !said.contains("somebody has set it"),
+            "and not that somebody edited it: {said}"
+        );
+    }
+
+    /// The half that would be silently skipped: the value the change replaced.
+    ///
+    /// A reversal writes `previous`, so a `previous` that will not open is exactly as
+    /// disqualifying as a `current` that will not — and it is the easier one to leave out,
+    /// because the check that matters most is about what is on disk now.
+    #[test]
+    fn a_credential_whose_earlier_value_will_not_open_is_refused_too() {
+        let change = set("reconfigure", "USENET_PASS", Some("sealed:1:00"), "chosen");
+
+        let read = standing(&change, &[], &holding(&[("USENET_PASS", "chosen")]));
+
+        assert_eq!(read.reversal, Reversal::None);
     }
 
     /// The rule that matters most: somebody's own edit is not something to discard while

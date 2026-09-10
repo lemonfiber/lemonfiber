@@ -136,6 +136,7 @@ what to do about it, is written for operators at
 - `SETUP-7`
 - `SETUP-8`
 - `SETUP-9`
+- `SETUP-10`
 - `SPACE-1`
 - `SPACE-2`
 - `SPACE-3`
