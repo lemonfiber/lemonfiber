@@ -8,6 +8,7 @@
 
 mod date;
 mod error;
+mod recognising;
 mod schema;
 mod validate;
 

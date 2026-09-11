@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::recognising::unrecognised;
 use crate::{is_compatible, Error, SUPPORTED_SCHEMA_VERSIONS};
 
 /// A whole stack manifest.
@@ -40,9 +41,10 @@ impl Manifest {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Syntax`] if the text is not a well-formed manifest, and
+    /// Returns [`Error::Syntax`] if the text is not a well-formed manifest,
     /// [`Error::UnsupportedSchema`] if it declares a generation this build does
-    /// not read.
+    /// not read, and [`Error::Unrecognised`] if it declares anything by a name
+    /// this build does not know.
     pub fn from_toml(text: &str) -> Result<Self, Error> {
         // Read only the generation first. A newer generation may add or drop
         // fields the full parse would reject as unknown; reading it alone lets an
@@ -54,6 +56,15 @@ impl Manifest {
                 found: generation.schema_version,
                 supported: SUPPORTED_SCHEMA_VERSIONS.to_vec(),
             });
+        }
+
+        // Names before types. The read below stops at the first word it does not
+        // know and calls it a syntax error; asking each declaration separately
+        // first is what lets a fork be told everything it has to change, in the
+        // vocabulary it wrote rather than the parser's.
+        let unknown = unrecognised(text);
+        if !unknown.is_empty() {
+            return Err(Error::Unrecognised(unknown));
         }
 
         Ok(toml::from_str(text)?)
@@ -542,6 +553,19 @@ depends_on = ["gluetun"]
             Manifest::from_toml(&text),
             Err(Error::UnsupportedSchema { found: 99, .. })
         ));
+    }
+
+    #[test]
+    fn names_every_unrecognised_declaration_in_one_pass() {
+        let text = MINIMAL
+            .replace(r#"kind = "qbittorrent""#, r#"kind = "plex""#)
+            .replace(r#"criticality = "core""#, r#"criticality = "vital""#);
+        let refusal = Manifest::from_toml(&text)
+            .err()
+            .map(|refused| refused.to_string())
+            .unwrap_or_default();
+        assert!(refusal.contains("plex"), "names the first: {refusal}");
+        assert!(refusal.contains("vital"), "names the second too: {refusal}");
     }
 
     #[test]
