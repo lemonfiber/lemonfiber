@@ -74,6 +74,23 @@ jobs:
           persist-credentials: false
           submodules: recursive
 
+      # The identifiers a `Spec:` trailer carries say nothing about which page
+      # defines them, and this repository does not vendor the spec. Same
+      # repository, ref and path the build gate already uses, for one answer to
+      # where the canonical spec is.
+      - name: Check out the canonical spec
+        if: steps.tag.outputs.tag != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lemonfiber/spec
+          ref: main
+          path: .spec-canonical
+          persist-credentials: false
+
+      - name: The entry renderer holds its own claims
+        if: steps.tag.outputs.tag != ''
+        run: python3 scripts/the_requirements_an_entry_names.py --self-test
+
       - name: Generate the changelog (git-cliff)
         if: steps.tag.outputs.tag != ''
         id: cliff
@@ -94,6 +111,12 @@ jobs:
             echo "::error::git-cliff found no commits for this tag."
             exit 1
           fi
+          # Identifiers become the feature they belong to and a link to the page
+          # defining them. It refuses an identifier the spec does not define, so
+          # a changelog that lost its links fails the run rather than shipping.
+          python3 scripts/the_requirements_an_entry_names.py \
+            --spec .spec-canonical < notes/changelog.md > notes/linked.md
+          mv notes/linked.md notes/changelog.md
           echo "generated $(wc -l < notes/changelog.md) lines."
 
       - name: Upload it
