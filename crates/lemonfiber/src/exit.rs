@@ -44,9 +44,15 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
     match problem.code {
         app::NEVER_SETTLED => NEVER_SETTLED,
         ports::process::MISSING_PROGRAM | ports::docker::ENGINE_UNREACHABLE => PREFLIGHT,
-        stack::STACK_INVALID | stack::STACK_UNREADABLE | config::store::CONFIG_UNREADABLE => {
-            VALIDATION
-        }
+        // Everything here is the operator's own input: a stack that cannot be found,
+        // one that will not parse, one declaring words this build does not know, one
+        // that contradicts itself, and a settings file that cannot be read. A script
+        // that gets these back has something to fix and nothing to wait for.
+        stack::STACK_INVALID
+        | stack::STACK_MALFORMED
+        | stack::STACK_UNRECOGNISED
+        | stack::STACK_UNREADABLE
+        | config::store::CONFIG_UNREADABLE => VALIDATION,
         _ => FAILURE,
     }
 }
@@ -544,6 +550,14 @@ mod tests {
             exit_code(&it)
         };
         assert_eq!(coded(lemonfiber_core::stack::STACK_INVALID), VALIDATION);
+        // A file that will not parse and a name this build does not know are both
+        // things the operator wrote, and a script that has to fix its own input
+        // learns nothing from the same code it gets for a service being down.
+        assert_eq!(coded(lemonfiber_core::stack::STACK_MALFORMED), VALIDATION);
+        assert_eq!(
+            coded(lemonfiber_core::stack::STACK_UNRECOGNISED),
+            VALIDATION
+        );
         assert_eq!(
             coded(lemonfiber_core::config::store::CONFIG_UNREADABLE),
             VALIDATION
