@@ -39,8 +39,13 @@ impl Occupancy for Disk {
         let root = root.to_path_buf();
         tokio::task::spawn_blocking(move || walked(&root))
             .await
-            .map_err(|joined| Fault::new(joined.to_string()))?
+            .map_err(fault)?
     }
+}
+
+/// A fault carrying whatever refused, in its own words.
+fn fault(refusal: impl std::fmt::Display) -> Fault {
+    Fault::new(refusal.to_string())
 }
 
 /// Everything under a root, walked on a thread that may block.
@@ -52,7 +57,7 @@ fn walked(root: &Path) -> Result<Vec<Occupant>, Fault> {
     let top = match std::fs::read_dir(root) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(Fault::new(error.to_string())),
+        Err(error) => return Err(fault(error)),
     };
 
     let mut found = Vec::new();
