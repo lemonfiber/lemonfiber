@@ -27,7 +27,7 @@ impl Runner for Local {
         &self,
         argv: &[String],
     ) -> Result<tokio::sync::mpsc::Receiver<Progress>, Failure> {
-        stream(self, argv).await
+        stream(argv)
     }
 }
 
@@ -82,10 +82,9 @@ async fn forward<R: AsyncRead + Unpin + Send + 'static>(reader: R, sender: Sende
     }
 }
 
-async fn stream(
-    local: &Local,
-    argv: &[String],
-) -> Result<tokio::sync::mpsc::Receiver<Progress>, Failure> {
+/// Nothing of the runner's is read: a stream is the child it spawns and the two
+/// readers draining it, and the runner holds nothing that changes either.
+fn stream(argv: &[String]) -> Result<tokio::sync::mpsc::Receiver<Progress>, Failure> {
     let Some((program, arguments)) = argv.split_first() else {
         return Err(Failure::Unusable {
             program: String::new(),
