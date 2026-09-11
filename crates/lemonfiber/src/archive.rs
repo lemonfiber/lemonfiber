@@ -191,6 +191,11 @@ fn listed(dir: &Path) -> Result<Vec<Existing>, Fault> {
     Ok(backups)
 }
 
+/// One archive taken away.
+fn removed(path: &Path) -> Result<(), Fault> {
+    fs::remove_file(path).map_err(fault)
+}
+
 /// The manifest riding inside an archive.
 fn manifest_in(src: &Path) -> Result<Manifest, Fault> {
     let file = File::open(src).map_err(fault)?;
@@ -318,7 +323,7 @@ impl Archive for Tar {
 
     async fn remove(&self, dir: &Path, name: &str) -> Result<(), Fault> {
         let path = dir.join(name);
-        away(move || fs::remove_file(path).map_err(fault)).await
+        away(move || removed(&path)).await
     }
 }
 

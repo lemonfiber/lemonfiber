@@ -41,8 +41,13 @@ impl Narrator for Saying {
     /// what the wait is waiting for now, so a client that was away is caught up
     /// with where the wait got to instead of being replayed every second of it.
     async fn say(&self, said: &str) {
-        if let Some(rendered) = Rendered::of(Nature::State, &Envelope::new(kind::START, said)) {
-            self.live.say(rendered).await;
-        }
+        said_to(&self.live, said).await;
+    }
+}
+
+/// One line, rendered and handed to the listeners — or dropped where it will not render.
+async fn said_to(live: &Live, said: &str) {
+    if let Some(rendered) = Rendered::of(Nature::State, &Envelope::new(kind::START, said)) {
+        live.say(rendered).await;
     }
 }

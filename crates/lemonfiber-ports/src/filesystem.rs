@@ -316,11 +316,7 @@ pub trait FileSystem: Storage + Send + Sync {
     /// and it answers the same question a claim asks: something is there to be read,
     /// or nothing is.
     async fn claim(&self, path: &Path, contents: &str) -> bool {
-        if self.read(path).await.is_some() {
-            return false;
-        }
-        self.write(path, contents).await;
-        true
+        claimed(self, path, contents).await
     }
 
     /// Read a small file lemonfiber wrote itself, or `None` where it is not there
@@ -341,6 +337,15 @@ pub trait FileSystem: Storage + Send + Sync {
     /// Who owns a path and how it may be accessed, or `None` where the platform
     /// does not report it — which is every platform but Unix.
     async fn ownership(&self, path: &Path) -> Option<Ownership>;
+}
+
+/// The default claim: read, and write only where nothing was there to read.
+async fn claimed<F: FileSystem + ?Sized>(filesystem: &F, path: &Path, contents: &str) -> bool {
+    if filesystem.read(path).await.is_some() {
+        return false;
+    }
+    filesystem.write(path, contents).await;
+    true
 }
 
 /// What a filesystem *is*, which is a question about it rather than a change to it.

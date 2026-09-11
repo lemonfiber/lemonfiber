@@ -65,33 +65,50 @@ impl FileSystem for Disk {
     /// `true` between them. Anything built from a separate look-then-write would have
     /// a window in it, and a lock with a window is not a lock.
     async fn claim(&self, path: &Path, contents: &str) -> bool {
-        if let Some(parent) = path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-        let opened = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .await;
-        match opened {
-            Ok(mut file) => {
-                use tokio::io::AsyncWriteExt as _;
-                let _ = file.write_all(contents.as_bytes()).await;
-                true
-            }
-            Err(_) => false,
-        }
+        claimed(path, contents).await
     }
 
     async fn write(&self, path: &Path, contents: &str) {
-        if let Some(parent) = path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-        let _ = tokio::fs::write(path, contents).await;
+        written(path, contents).await;
     }
 
     async fn ownership(&self, path: &Path) -> Option<Ownership> {
         ownership_of(path)
+    }
+}
+
+/// Create the file and write it, or say somebody else got there first.
+async fn claimed(path: &Path, contents: &str) -> bool {
+    made_room_for(path).await;
+    let opened = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .await;
+    match opened {
+        Ok(mut file) => {
+            use tokio::io::AsyncWriteExt as _;
+            let _ = file.write_all(contents.as_bytes()).await;
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// Write the file, making its directory first where it has one.
+async fn written(path: &Path, contents: &str) {
+    made_room_for(path).await;
+    let _ = tokio::fs::write(path, contents).await;
+}
+
+/// The directory a file is about to go in, where the path names one.
+///
+/// Best-effort on purpose: a directory that cannot be made is a write that is about
+/// to fail and say so itself, which is a better answer than one from here about a
+/// directory the caller never mentioned.
+async fn made_room_for(path: &Path) {
+    if let Some(parent) = path.parent() {
+        let _ = tokio::fs::create_dir_all(parent).await;
     }
 }
 
@@ -125,33 +142,44 @@ impl Eraser for Disk {
     /// removed, and anything the metadata read itself refuses is the platform's own
     /// answer about a path nobody can act on.
     async fn erase(&self, path: &Path) -> Result<(), Fault> {
-        let removed = match tokio::fs::symlink_metadata(path).await {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(error) => return Err(fault(&error)),
-            Ok(meta) if meta.is_dir() => tokio::fs::remove_dir_all(path).await,
-            Ok(_) => tokio::fs::remove_file(path).await,
-        };
-        match removed {
-            Ok(()) => Ok(()),
-            // Something else removed it between the reading and the removal, which is
-            // the outcome asked for either way.
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(error) => Err(fault(&error)),
-        }
+        erased(path).await
+    }
+}
+
+/// The reading and the removal that [`Eraser::erase`] is.
+async fn erased(path: &Path) -> Result<(), Fault> {
+    let removed = match tokio::fs::symlink_metadata(path).await {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(fault(&error)),
+        Ok(meta) if meta.is_dir() => tokio::fs::remove_dir_all(path).await,
+        Ok(_) => tokio::fs::remove_file(path).await,
+    };
+    match removed {
+        Ok(()) => Ok(()),
+        // Something else removed it between the reading and the removal, which is
+        // the outcome asked for either way.
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(fault(&error)),
     }
 }
 
 #[async_trait]
 impl Volume for Disk {
     async fn presence(&self, path: &Path) -> Presence {
-        match tokio::fs::metadata(path).await {
-            Ok(meta) => Presence::On(volume_of(&meta)),
-            // Only a plain "not there" is `Gone`. A permission error or an
-            // interrupted call says nothing about whether the volume is still
-            // mounted, so it is `Unknown` and the watch holds rather than acting.
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Presence::Gone,
-            Err(_) => Presence::Unknown,
-        }
+        present(path).await
+    }
+}
+
+/// Whether the volume behind a path is still there, and which one it is.
+///
+/// Only a plain "not there" is `Gone`. A permission error or an interrupted call says
+/// nothing about whether the volume is still mounted, so it is `Unknown` and the watch
+/// holds rather than acting.
+async fn present(path: &Path) -> Presence {
+    match tokio::fs::metadata(path).await {
+        Ok(meta) => Presence::On(volume_of(&meta)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Presence::Gone,
+        Err(_) => Presence::Unknown,
     }
 }
 

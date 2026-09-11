@@ -44,10 +44,15 @@ impl Dashboard {
 #[async_trait]
 impl Gathers for Dashboard {
     async fn gather(&self) -> Option<Rendered> {
-        let mut last = self.last.lock().await;
-        let snapshot = gather(&self.ctx, last.as_ref()).await;
-        let rendered = Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, &snapshot));
-        *last = Some(snapshot);
-        rendered
+        gathered(self).await
     }
+}
+
+/// The dashboard rendered, with the snapshot it was made from kept for the next one.
+async fn gathered(dashboard: &Dashboard) -> Option<Rendered> {
+    let mut last = dashboard.last.lock().await;
+    let snapshot = gather(&dashboard.ctx, last.as_ref()).await;
+    let rendered = Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, &snapshot));
+    *last = Some(snapshot);
+    rendered
 }
