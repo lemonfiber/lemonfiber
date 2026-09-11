@@ -442,6 +442,22 @@ mod tests {
         assert_eq!(said.ok(), Some(String::new()));
     }
 
+    /// An attached exec is read through to the end, which is the arm that joins the two.
+    #[tokio::test]
+    async fn an_attached_exec_is_read_through_to_the_end() {
+        let output = Box::pin(tokio_stream::iter(vec![Ok(
+            bollard::container::LogOutput::StdOut {
+                message: "all of it\n".into(),
+            },
+        )]));
+        let said = spoken(bollard::exec::StartExecResults::Attached {
+            output,
+            input: Box::pin(tokio::io::sink()),
+        })
+        .await;
+        assert_eq!(said.ok(), Some("all of it\n".to_owned()));
+    }
+
     /// What an attached exec said, and what a chunk that will not arrive costs.
     ///
     /// Driven through the stream rather than the exec, because an attached exec needs
