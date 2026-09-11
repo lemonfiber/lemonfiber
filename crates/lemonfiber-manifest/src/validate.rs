@@ -27,6 +27,14 @@ const ALLOWED_GRANTS: &[&str] = &["NET_ADMIN"];
 /// The OSI-approved identifiers a service licence may use.
 const OSI: &str = include_str!("spdx_osi.txt");
 
+/// The identifiers a vendored list holds, ignoring the prose it explains itself with.
+fn identifiers(list: &str) -> BTreeSet<&str> {
+    list.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect()
+}
+
 /// One thing wrong with a manifest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Violation {
@@ -117,11 +125,7 @@ fn check_services(
     today: Date,
     found: &mut Vec<Violation>,
 ) {
-    let osi: BTreeSet<&str> = OSI
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .collect();
+    let osi = identifiers(OSI);
 
     let of_service: BTreeMap<&str, &str> = manifest
         .services
@@ -247,8 +251,34 @@ fn depended(service: &Service, of_service: &BTreeMap<&str, &str>) -> Vec<String>
 
 #[cfg(test)]
 mod tests {
-    use super::{validate, Date, Violation};
+    use super::{identifiers, validate, Date, Violation, OSI};
     use crate::Manifest;
+
+    /// The stack's own copy of the same list, which this one follows.
+    const THEIRS: &str = include_str!("../../../assets/media-stack/scripts/spdx_osi.txt");
+
+    /// Two copies of one list, and a sentence at the top of ours saying they agree.
+    ///
+    /// They do today. Nothing made them, and the drift is silent in the direction it
+    /// would actually happen: the stack adds a licence, ships a service under it, and
+    /// this validator refuses a manifest the stack's own validator accepted — with an
+    /// error naming the licence, which is the one thing that is not wrong.
+    ///
+    /// The submodule is pinned, so this asks at the moment it is worth asking: when
+    /// the stack this binary carries is moved forward.
+    #[test]
+    fn the_licence_list_holds_what_the_stack_s_own_copy_holds() {
+        let ours = identifiers(OSI);
+        let theirs = identifiers(THEIRS);
+        let only_ours: Vec<&str> = ours.difference(&theirs).copied().collect();
+        let only_theirs: Vec<&str> = theirs.difference(&ours).copied().collect();
+        assert!(
+            only_ours.is_empty() && only_theirs.is_empty(),
+            "the two vendored licence lists have drifted, and the stack's copy is the \
+             one a maintainer edits: here and not there {only_ours:?}, there and not \
+             here {only_theirs:?}"
+        );
+    }
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
 
