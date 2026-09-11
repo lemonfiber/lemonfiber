@@ -28,31 +28,46 @@ use super::filesystem::Disk;
 
 #[async_trait]
 impl Occupancy for Disk {
+    /// Handed to a thread that is allowed to block, whole rather than call by call.
+    ///
+    /// A walk of a real library is thousands of `read_dir` and `metadata` calls, and
+    /// every one of them blocks — on the runtime's own thread that is every other task
+    /// waiting. Handed over once because a walk is one long operation: making each
+    /// syscall its own handover would pay for the crossing thousands of times to
+    /// answer a question that was never going to be answered in between.
     async fn beneath(&self, root: &Path) -> Result<Vec<Occupant>, Fault> {
-        // The root is opened on its own, because it is the one refusal an operator
-        // has to hear about: a tree that is not there yet is the ordinary first-run
-        // state and counts as nothing, while one that is there and will not be read
-        // must not be reported as an empty disk.
-        let top = match std::fs::read_dir(root) {
-            Ok(entries) => entries,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => return Err(Fault::new(error.to_string())),
-        };
-
-        let mut found = Vec::new();
-        let mut pending = Vec::new();
-        sort_into(top, &mut pending, &mut found);
-        // Below the root, a directory that will not open is a gap in the count
-        // rather than a failed reading: one unreadable folder must not lose the
-        // answer for everything beside it, so what cannot be opened contributes
-        // nothing and the walk carries on.
-        while let Some(directory) = pending.pop() {
-            let opened = std::fs::read_dir(&directory).into_iter().flatten();
-            sort_into(opened, &mut pending, &mut found);
-        }
-        found.sort_by(|left, right| left.path.cmp(&right.path));
-        Ok(found)
+        let root = root.to_path_buf();
+        tokio::task::spawn_blocking(move || walked(&root))
+            .await
+            .map_err(|joined| Fault::new(joined.to_string()))?
     }
+}
+
+/// Everything under a root, walked on a thread that may block.
+fn walked(root: &Path) -> Result<Vec<Occupant>, Fault> {
+    // The root is opened on its own, because it is the one refusal an operator
+    // has to hear about: a tree that is not there yet is the ordinary first-run
+    // state and counts as nothing, while one that is there and will not be read
+    // must not be reported as an empty disk.
+    let top = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(Fault::new(error.to_string())),
+    };
+
+    let mut found = Vec::new();
+    let mut pending = Vec::new();
+    sort_into(top, &mut pending, &mut found);
+    // Below the root, a directory that will not open is a gap in the count
+    // rather than a failed reading: one unreadable folder must not lose the
+    // answer for everything beside it, so what cannot be opened contributes
+    // nothing and the walk carries on.
+    while let Some(directory) = pending.pop() {
+        let opened = std::fs::read_dir(&directory).into_iter().flatten();
+        sort_into(opened, &mut pending, &mut found);
+    }
+    found.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(found)
 }
 
 /// Put each entry where it belongs: a directory onto the list still to walk, a

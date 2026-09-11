@@ -27,31 +27,37 @@ pub struct Disk;
 #[async_trait]
 impl FileSystem for Disk {
     async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        std::fs::canonicalize(path).map_err(|error| fault(&error))
+        tokio::fs::canonicalize(path)
+            .await
+            .map_err(|error| fault(&error))
     }
 
     async fn touch(&self, path: &Path) -> Result<(), Fault> {
-        std::fs::File::create(path)
+        tokio::fs::File::create(path)
+            .await
             .map(drop)
             .map_err(|error| fault(&error))
     }
 
     async fn link(&self, from: &Path, to: &Path) -> Result<(), Fault> {
-        std::fs::hard_link(from, to).map_err(|error| fault(&error))
+        tokio::fs::hard_link(from, to)
+            .await
+            .map_err(|error| fault(&error))
     }
 
     async fn identify(&self, path: &Path) -> Result<Identity, Fault> {
-        std::fs::metadata(path)
+        tokio::fs::metadata(path)
+            .await
             .map(|meta| identity_of(&meta))
             .map_err(|error| fault(&error))
     }
 
     async fn remove(&self, path: &Path) {
-        let _ = std::fs::remove_file(path);
+        let _ = tokio::fs::remove_file(path).await;
     }
 
     async fn read(&self, path: &Path) -> Option<String> {
-        std::fs::read_to_string(path).ok()
+        tokio::fs::read_to_string(path).await.ok()
     }
 
     /// One syscall, which is the whole point: `create_new` asks the kernel to create
@@ -60,24 +66,28 @@ impl FileSystem for Disk {
     /// a window in it, and a lock with a window is not a lock.
     async fn claim(&self, path: &Path, contents: &str) -> bool {
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            let _ = tokio::fs::create_dir_all(parent).await;
         }
-        std::fs::OpenOptions::new()
+        let opened = tokio::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(path)
-            .map(|mut file| {
-                use std::io::Write as _;
-                let _ = file.write_all(contents.as_bytes());
-            })
-            .is_ok()
+            .await;
+        match opened {
+            Ok(mut file) => {
+                use tokio::io::AsyncWriteExt as _;
+                let _ = file.write_all(contents.as_bytes()).await;
+                true
+            }
+            Err(_) => false,
+        }
     }
 
     async fn write(&self, path: &Path, contents: &str) {
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            let _ = tokio::fs::create_dir_all(parent).await;
         }
-        let _ = std::fs::write(path, contents);
+        let _ = tokio::fs::write(path, contents).await;
     }
 
     async fn ownership(&self, path: &Path) -> Option<Ownership> {
@@ -115,11 +125,11 @@ impl Eraser for Disk {
     /// removed, and anything the metadata read itself refuses is the platform's own
     /// answer about a path nobody can act on.
     async fn erase(&self, path: &Path) -> Result<(), Fault> {
-        let removed = match std::fs::symlink_metadata(path) {
+        let removed = match tokio::fs::symlink_metadata(path).await {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(error) => return Err(fault(&error)),
-            Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(path),
-            Ok(_) => std::fs::remove_file(path),
+            Ok(meta) if meta.is_dir() => tokio::fs::remove_dir_all(path).await,
+            Ok(_) => tokio::fs::remove_file(path).await,
         };
         match removed {
             Ok(()) => Ok(()),
@@ -134,7 +144,7 @@ impl Eraser for Disk {
 #[async_trait]
 impl Volume for Disk {
     async fn presence(&self, path: &Path) -> Presence {
-        match std::fs::metadata(path) {
+        match tokio::fs::metadata(path).await {
             Ok(meta) => Presence::On(volume_of(&meta)),
             // Only a plain "not there" is `Gone`. A permission error or an
             // interrupted call says nothing about whether the volume is still
