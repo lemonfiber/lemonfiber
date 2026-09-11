@@ -179,6 +179,9 @@ fn scope_name(scope: &Scope) -> String {
     match scope {
         Scope::WholeStack => "the whole stack".to_owned(),
         Scope::Service { name } => format!("service {name}"),
+        // Named by the setup rather than by the trees, because the trees are listed
+        // underneath it and the project is what the operator recognises it by.
+        Scope::Existing { project, .. } => format!("the setup {project}, taken over"),
     }
 }
 
@@ -241,6 +244,22 @@ mod tests {
         assert!(said.contains("Backed up the whole stack to"), "{said}");
         assert!(said.contains("credentials"), "{said}");
         assert!(said.contains("Pruned 1 older backup(s)."), "{said}");
+    }
+
+    /// A capture taken before a takeover is named for the setup it holds.
+    ///
+    /// The operator recognises it by the project it was taken from, not by the
+    /// directories underneath it — those are listed for them elsewhere.
+    #[test]
+    fn a_capture_before_a_takeover_names_the_setup_it_was_taken_from() {
+        let said = backup(&Capture {
+            path: PathBuf::from("/data/lemonfiber/backups/existing-media.tar.gz"),
+            scope: Scope::existing("media", &["/srv/their-media".to_owned()]),
+            sensitive: true,
+            pruned: Vec::new(),
+        })
+        .text();
+        assert!(said.contains("the setup media, taken over"), "{said}");
     }
 
     #[test]

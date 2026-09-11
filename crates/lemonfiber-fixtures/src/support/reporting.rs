@@ -120,6 +120,17 @@ impl Reporting {
         self
     }
 
+    /// The same engine, also holding everything another one holds.
+    ///
+    /// For the machine that is running two Compose projects at once, which is the only
+    /// way to tell a question asked about one project from the same question asked
+    /// about the other.
+    #[must_use]
+    pub fn alongside(mut self, other: Self) -> Self {
+        self.containers.extend(other.containers);
+        self
+    }
+
     /// The same containers, with the given host paths mounted into each.
     ///
     /// For the survey that asks where an existing setup keeps its data, which is the
@@ -191,8 +202,8 @@ impl Reporting {
 
 #[async_trait]
 impl Engine for Reporting {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
-        listed(self)
+    async fn list(&self, project: &str) -> Result<Vec<Container>, EngineFailure> {
+        listed(self, project)
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, EngineFailure> {
@@ -231,7 +242,15 @@ pub(super) fn scripted(value: Option<&str>) -> ExecOutput {
 }
 
 /// The containers this fixture holds, with health settled once it has been asked enough.
-fn listed(reporting: &Reporting) -> Result<Vec<Container>, EngineFailure> {
+/// The containers of one Compose project, as the engine would answer.
+///
+/// Narrowed to `project` because the real adapter narrows: it asks the daemon for
+/// containers carrying that project's label, so a fake that answered with every
+/// container it held would let a caller pass a proof it never actually made. The
+/// containers a fake is built with belong to lemonfiber's own project unless a test
+/// said otherwise, so this filter is invisible to every test that never mentioned
+/// one.
+fn listed(reporting: &Reporting, project: &str) -> Result<Vec<Container>, EngineFailure> {
     if !reporting.reachable {
         return Err(EngineFailure::Unreachable {
             reason: "no daemon here".to_owned(),
@@ -246,6 +265,7 @@ fn listed(reporting: &Reporting) -> Result<Vec<Container>, EngineFailure> {
     Ok(reporting
         .containers
         .iter()
+        .filter(|container| container.project == project)
         .map(|container| Container {
             health: if settled {
                 Health::Healthy

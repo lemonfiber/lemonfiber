@@ -127,6 +127,12 @@ pub struct AdoptReport {
     /// The host paths those services keep their data in, so a backup can be taken of
     /// exactly the right thing.
     pub back_up: Vec<String>,
+    /// Where the capture of those paths was written, once one has been taken.
+    ///
+    /// Absent on a rehearsal, which captures nothing, and absent where the setup
+    /// mounted nothing worth capturing. Present on an adoption that went through,
+    /// because an operator told a backup was taken is owed the path to it.
+    pub backed_up: Option<std::path::PathBuf>,
 }
 
 /// What standing lemonfiber beside an existing setup came to, or would come to.

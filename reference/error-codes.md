@@ -121,6 +121,7 @@ what to do about it, is written for operators at
 - `RESTORE-9`
 - `RESTORE-10`
 - `RESTORE-11`
+- `RESTORE-12`
 - `SEED-1`
 - `SEED-2`
 - `SEED-3`

@@ -160,13 +160,7 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
         Some(name) => Scope::Service { name },
         None => Scope::WholeStack,
     };
-    let data_root = ctx
-        .settings
-        .data_root
-        .as_deref()
-        .map(Path::to_string_lossy)
-        .unwrap_or_default()
-        .into_owned();
+    let data_root = data_root(ctx);
 
     capture(
         &archives.paths,
@@ -174,6 +168,61 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
         env!("CARGO_PKG_VERSION"),
         &ctx.stamp(),
         &data_root,
+        Retention::keeping(KEEP),
+        archives.vault.as_ref(),
+    )
+    .await
+}
+
+/// The data root this machine is on, as the manifest records it.
+///
+/// Recorded even for a capture of somebody else's trees, because what it says is
+/// where *this machine* kept its data when the archive was written — which is the
+/// fact a later read needs, whatever the archive turned out to hold.
+fn data_root(ctx: &Ctx) -> String {
+    ctx.settings
+        .data_root
+        .as_deref()
+        .map(Path::to_string_lossy)
+        .unwrap_or_default()
+        .into_owned()
+}
+
+/// Capture an existing setup's own configuration, at the host paths it keeps it in.
+///
+/// The capture taken before a takeover, and the only one whose sources come from
+/// outside lemonfiber's layout. The survey found where that setup keeps its data,
+/// and this copies exactly that — lemonfiber's own tree holds nothing worth
+/// protecting until the takeover has happened, so capturing it would be a backup
+/// that looked like one and protected nothing.
+///
+/// The project named is the one proved still. It is the existing setup's, not
+/// lemonfiber's: those containers are the ones that might be mid-write to the
+/// databases being copied, and lemonfiber's own project does not exist yet.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where that setup is running or cannot be proved stopped,
+/// where this run has nowhere it knows to keep an archive, or for any reason
+/// [`capture`] gives.
+pub async fn existing(
+    ctx: &Ctx,
+    project: &str,
+    host_paths: &[String],
+) -> Result<Report, Box<Problem>> {
+    quiesced::required_of(ctx, project, STILL_RUNNING, "backup").await?;
+
+    let archives = ctx
+        .archives
+        .as_ref()
+        .ok_or_else(|| Box::new(nowhere_to_keep()))?;
+
+    capture(
+        &archives.paths,
+        Scope::existing(project, host_paths),
+        env!("CARGO_PKG_VERSION"),
+        &ctx.stamp(),
+        &data_root(ctx),
         Retention::keeping(KEEP),
         archives.vault.as_ref(),
     )
@@ -203,6 +252,10 @@ fn scope_slug(scope: &Scope) -> String {
     match scope {
         Scope::WholeStack => "full".to_owned(),
         Scope::Service { name } => name.clone(),
+        // Per project, so taking over two setups in turn does not leave the second
+        // capture pruning the first — they protect different machines' worth of
+        // configuration and neither is a spare copy of the other.
+        Scope::Existing { project, .. } => format!("existing-{project}"),
     }
 }
 
@@ -304,7 +357,8 @@ mod tests {
     use lemonfiber_fixtures::support::Reporting;
 
     use super::{
-        capture, run, Report, NOT_MEASURED, NOT_WRITTEN, NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
+        capture, existing as capture_existing, run, Report, NOT_MEASURED, NOT_WRITTEN,
+        NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
     };
     use crate::app::fixtures::{keeping, paths, FakeArchive};
     use crate::app::Ctx;
@@ -635,5 +689,87 @@ mod tests {
             .map(|problem| problem.code);
         assert_eq!(refusal, Some(STILL_RUNNING));
         assert!(vault.writes().is_empty(), "nothing was written");
+    }
+
+    /// A machine whose *other* setup — not lemonfiber's — is in the given state.
+    ///
+    /// The project matters as much as the lifecycle here: a capture taken before a
+    /// takeover has to prove that setup still, and lemonfiber's own project is one
+    /// nothing runs under yet.
+    fn theirs(lifecycle: Lifecycle) -> Ctx {
+        crate::test_support::a_context()
+            .engine(Arc::new(
+                Reporting::holding(&["sonarr"], lifecycle, Health::None).belonging_to("media"),
+            ))
+            .build()
+    }
+
+    /// The trees a setup being taken over keeps its data in.
+    fn trees() -> Vec<String> {
+        vec!["/srv/their-media".to_owned()]
+    }
+
+    #[tokio::test]
+    async fn a_capture_before_a_takeover_records_the_setup_and_the_trees_it_covers() {
+        let vault = Arc::new(FakeArchive::roomy());
+        let ctx = keeping(theirs(Lifecycle::Exited), &vault);
+        let report = capture_existing(&ctx, "media", &trees())
+            .await
+            .map_err(|problem| problem.code);
+
+        assert_eq!(
+            report.as_ref().map(|report| report.scope.clone()),
+            Ok(Scope::existing("media", &trees()))
+        );
+        // Named for the project, so taking over two setups in turn does not leave the
+        // second capture pruning the first.
+        assert!(
+            report.is_ok_and(|report| report
+                .path
+                .to_string_lossy()
+                .contains("lemonfiber-existing-media-")),
+            "the archive is not named for the setup it holds"
+        );
+    }
+
+    /// The proof is about *their* project, so their running setup refuses the capture.
+    #[tokio::test]
+    async fn a_capture_before_a_takeover_is_refused_while_that_setup_is_still_running() {
+        let vault = Arc::new(FakeArchive::roomy());
+        let ctx = keeping(theirs(Lifecycle::Running), &vault);
+        let refusal = capture_existing(&ctx, "media", &trees())
+            .await
+            .err()
+            .map(|problem| problem.code);
+
+        assert_eq!(refusal, Some(STILL_RUNNING));
+        assert!(vault.writes().is_empty(), "it captured a live database");
+    }
+
+    /// And it is *only* about their project: lemonfiber's own containers running says
+    /// nothing about whether the setup being captured is writing to its databases.
+    #[tokio::test]
+    async fn a_capture_before_a_takeover_does_not_ask_about_lemonfibers_own_project() {
+        let vault = Arc::new(FakeArchive::roomy());
+        let mixed = crate::test_support::a_context()
+            .engine(Arc::new(
+                Reporting::holding(&["sonarr"], Lifecycle::Running, Health::None).alongside(
+                    Reporting::holding(&["radarr"], Lifecycle::Exited, Health::None)
+                        .belonging_to("media"),
+                ),
+            ))
+            .build();
+
+        let report = capture_existing(&keeping(mixed, &vault), "media", &trees()).await;
+        assert!(report.is_ok(), "{report:?}");
+    }
+
+    #[tokio::test]
+    async fn a_capture_before_a_takeover_with_nowhere_to_keep_it_refuses_rather_than_guessing() {
+        let refusal = capture_existing(&theirs(Lifecycle::Exited), "media", &trees())
+            .await
+            .err()
+            .map(|problem| problem.code);
+        assert_eq!(refusal, Some(NOWHERE_TO_KEEP));
     }
 }

@@ -2,8 +2,15 @@
 //!
 //! The acting half of migration, and the only part of it that writes anything. What it
 //! writes is one line of lemonfiber's own configuration — the Compose project it
-//! manages. It starts nothing, stops nothing, moves nothing, and deletes nothing, so a
-//! run that fails or is abandoned leaves the operator exactly the stack they had.
+//! manages — and one archive of the setup it is about to take over. It starts nothing,
+//! stops nothing, moves nothing, and deletes nothing, so a run that fails or is
+//! abandoned leaves the operator exactly the stack they had.
+//!
+//! The archive comes first, and is the reason this can refuse where it used to only
+//! write. It covers the existing setup's own host paths, because lemonfiber's layout
+//! holds nothing worth protecting until the takeover has happened — and it is taken
+//! before the project key is recorded, so a capture that fails leaves nothing written
+//! and nothing claimed.
 //!
 //! Two things stop it, and they are the reason it exists as an act rather than a
 //! setting. A database that has been through a **later** version than lemonfiber pins
@@ -11,6 +18,8 @@
 //! what damages it. A database an **earlier** version wrote will be upgraded on first
 //! start, which nothing walks back, so adopting names the services it would happen to
 //! and the paths their data sits in, and will not proceed until the operator confirms.
+
+use std::path::PathBuf;
 
 use crate::config::{store, PROJECT_KEY};
 use crate::error::{Diagnose, Problem};
@@ -24,7 +33,7 @@ use super::Ctx;
 /// # Errors
 ///
 /// Where there is nowhere configured to record the answer, or it cannot be written.
-pub fn adopt(
+pub async fn adopt(
     ctx: &Ctx,
     survey: &MigrationReport,
     mounts: &[String],
@@ -68,7 +77,13 @@ pub fn adopt(
         });
     }
 
+    // Resolved before the capture rather than after it, so a run with nowhere to
+    // record its answer refuses without first spending the time and the disk on an
+    // archive for a takeover that was never going to happen.
     let path = path(ctx).ok_or_else(|| Box::new(store::Failure::Nowhere.problem()))?;
+
+    let backed_up = kept(ctx, &project, mounts).await?;
+
     store::set(&path, PROJECT_KEY, &project).map_err(|failure| Box::new(failure.problem()))?;
 
     Ok(AdoptReport {
@@ -76,8 +91,29 @@ pub fn adopt(
         stance: Stance::Applied,
         upgrades,
         back_up: mounts.to_vec(),
+        backed_up,
         ..AdoptReport::default()
     })
+}
+
+/// Capture the setup about to be taken over, and say where it was written.
+///
+/// Nothing is captured where the setup mounts nothing: there is no tree to copy, and
+/// an empty archive filed as a backup would read as protection that was never there.
+///
+/// Where there is something, a failure to capture it fails the adoption. That is the
+/// whole point of taking it — an operator who is told their configuration was
+/// protected, and finds later that it was not, is worse off than one who was refused.
+async fn kept(
+    ctx: &Ctx,
+    project: &str,
+    mounts: &[String],
+) -> Result<Option<PathBuf>, Box<Problem>> {
+    if mounts.is_empty() {
+        return Ok(None);
+    }
+    let report = super::backup::existing(ctx, project, mounts).await?;
+    Ok(Some(report.path))
 }
 
 /// What is answered where there is no one setup to take over.

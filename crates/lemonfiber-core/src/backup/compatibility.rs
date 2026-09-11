@@ -1,13 +1,13 @@
 //! Whether an archive restores into this installation at all.
 //!
-//! Two questions, asked before anything is unpacked: was the archive written by a
-//! lemonfiber this one can still read, and was it rooted somewhere else. Both are
-//! answered from the manifest alone, so a refusal costs nothing and an operator
-//! learns why before any file is touched.
+//! Three questions, asked before anything is unpacked: does the archive cover a
+//! tree lemonfiber manages, was it written by a lemonfiber this one can still read,
+//! and was it rooted somewhere else. All are answered from the manifest alone, so a
+//! refusal costs nothing and an operator learns why before any file is touched.
 
 use std::path::Path;
 
-use super::Manifest;
+use super::{Manifest, Scope};
 
 /// A three-part version, compared to decide whether an archive restores here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -68,6 +68,14 @@ pub enum Compatibility {
         /// Why it cannot be restored.
         detail: String,
     },
+    /// The archive holds trees lemonfiber does not manage; refuse, and say where
+    /// they came from so the operator can put them back themselves.
+    NotOurs {
+        /// The setup the capture was taken from.
+        project: String,
+        /// The host paths it was taken from, so the refusal can name them.
+        paths: Vec<String>,
+    },
 }
 
 impl Compatibility {
@@ -75,10 +83,19 @@ impl Compatibility {
     ///
     /// The schema is checked first: an archive laid out in a format this build
     /// does not write is refused before its version is even considered, because a
-    /// format it cannot read is one it cannot restore. Then the versions: a newer
-    /// archive is refused with the gap named, since it may hold state this build
-    /// would corrupt; an archive a whole major version behind is allowed but
-    /// warned about; anything else — same major, older or level — is compatible.
+    /// format it cannot read is one it cannot restore — and a scope read out of a
+    /// format this build does not understand is not a scope worth trusting.
+    ///
+    /// The scope comes next, and refuses outright whatever the versions say. A
+    /// capture of a setup lemonfiber does not manage was taken so the operator would
+    /// have it, not so lemonfiber could write it back; the trees it covers are
+    /// somebody else's, and no version agreement makes writing into them something
+    /// lemonfiber may decide.
+    ///
+    /// Then the versions: a newer archive is refused with the gap named, since it
+    /// may hold state this build would corrupt; an archive a whole major version
+    /// behind is allowed but warned about; anything else — same major, older or
+    /// level — is compatible.
     #[must_use]
     pub fn assess(manifest: &Manifest, current_version: &str, current_schema: u32) -> Self {
         if manifest.schema != current_schema {
@@ -87,6 +104,13 @@ impl Compatibility {
                     "the archive is format {} and this lemonfiber reads format {current_schema}",
                     manifest.schema
                 ),
+            };
+        }
+
+        if let Scope::Existing { project, trees } = &manifest.scope {
+            return Self::NotOurs {
+                project: project.clone(),
+                paths: trees.iter().map(|tree| tree.host_path.clone()).collect(),
             };
         }
 
