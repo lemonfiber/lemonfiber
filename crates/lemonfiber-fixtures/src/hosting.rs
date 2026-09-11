@@ -137,61 +137,72 @@ impl Host for Hosting {
     }
 
     async fn place(&self, hosted: &Hosted) -> Result<Placed, Failure> {
-        if let Some(refusal) = self.refusal() {
-            return Err(refusal);
-        }
-        if let Ok(mut placed) = self.placed.lock() {
-            placed.push(hosted.clone());
-        }
-        let definition = definition(&hosted.name);
-        if let Ok(mut held) = self.held.lock() {
-            held.insert(
-                hosted.name.clone(),
-                Held {
-                    standing: Standing::Running,
-                    definition: Some(definition.clone()),
-                    program: Some(Program {
-                        at: hosted.program.clone(),
-                        present: true,
-                    }),
-                    runs: Some(hosted.arguments.join(" ")),
-                    output: Some(hosted.output.clone()),
-                },
-            );
-        }
-        Ok(Placed {
-            definition,
-            started: true,
-        })
+        placed(self, hosted)
     }
 
     async fn standing(&self, name: &str) -> Result<Held, Failure> {
-        if !self.manager.configurable() {
-            return Err(Failure::Unhostable);
-        }
-        Ok(self
-            .held
-            .lock()
-            .ok()
-            .and_then(|held| held.get(name).cloned())
-            .unwrap_or_else(Held::absent))
+        standing_of(self, name)
     }
 
     async fn withdraw(&self, name: &str) -> Result<Vec<PathBuf>, Failure> {
-        if let Some(refusal) = self.refusal() {
-            return Err(refusal);
-        }
-        if let Ok(mut withdrawn) = self.withdrawn.lock() {
-            withdrawn.push(name.to_owned());
-        }
-        let taken = self
-            .held
-            .lock()
-            .ok()
-            .and_then(|mut held| held.remove(name))
-            .and_then(|held| held.definition);
-        Ok(taken.into_iter().collect())
+        withdrawn(self, name)
     }
+}
+
+/// Remember the placement and answer as though it took, unless told to refuse.
+fn placed(hosting: &Hosting, hosted: &Hosted) -> Result<Placed, Failure> {
+    if let Some(refusal) = hosting.refusal() {
+        return Err(refusal);
+    }
+    crate::noted(&hosting.placed, hosted.clone());
+    let definition = definition(&hosted.name);
+    if let Ok(mut held) = hosting.held.lock() {
+        held.insert(
+            hosted.name.clone(),
+            Held {
+                standing: Standing::Running,
+                definition: Some(definition.clone()),
+                program: Some(Program {
+                    at: hosted.program.clone(),
+                    present: true,
+                }),
+                runs: Some(hosted.arguments.join(" ")),
+                output: Some(hosted.output.clone()),
+            },
+        );
+    }
+    Ok(Placed {
+        definition,
+        started: true,
+    })
+}
+
+/// What this fixture is holding under a name, where the manager can hold anything.
+fn standing_of(hosting: &Hosting, name: &str) -> Result<Held, Failure> {
+    if !hosting.manager.configurable() {
+        return Err(Failure::Unhostable);
+    }
+    Ok(hosting
+        .held
+        .lock()
+        .ok()
+        .and_then(|held| held.get(name).cloned())
+        .unwrap_or_else(Held::absent))
+}
+
+/// Forget the name, and hand back the definition it had.
+fn withdrawn(hosting: &Hosting, name: &str) -> Result<Vec<PathBuf>, Failure> {
+    if let Some(refusal) = hosting.refusal() {
+        return Err(refusal);
+    }
+    crate::noted(&hosting.withdrawn, name.to_owned());
+    let taken = hosting
+        .held
+        .lock()
+        .ok()
+        .and_then(|mut held| held.remove(name))
+        .and_then(|held| held.definition);
+    Ok(taken.into_iter().collect())
 }
 
 #[cfg(test)]

@@ -192,59 +192,11 @@ impl Reporting {
 #[async_trait]
 impl Engine for Reporting {
     async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
-        if !self.reachable {
-            return Err(EngineFailure::Unreachable {
-                reason: "no daemon here".to_owned(),
-            });
-        }
-
-        let asked = self
-            .asked
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let settled = self.settles_after.is_some_and(|after| asked >= after);
-
-        Ok(self
-            .containers
-            .iter()
-            .map(|container| Container {
-                health: if settled {
-                    Health::Healthy
-                } else {
-                    container.health
-                },
-                ..container.clone()
-            })
-            .collect())
+        listed(self)
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        let Some(tunnel) = &self.tunnel else {
-            return Err(EngineFailure::NoSuchContainer {
-                name: container.to_owned(),
-            });
-        };
-        if argv.first().is_some_and(|arg| arg == "cat") {
-            return Ok(scripted(tunnel.port));
-        }
-        if argv.last().is_some_and(|arg| arg.ends_with("/country-iso")) {
-            return Ok(ExecOutput {
-                status: Some(0),
-                stdout: tunnel.country.unwrap_or_default().to_owned(),
-            });
-        }
-        let asked_second = argv
-            .last()
-            .is_some_and(|arg| arg.contains("second.example"));
-        let ip = if container.contains(tunnel.gateway) {
-            if asked_second {
-                tunnel.second_opinion.or(tunnel.gateway_ip)
-            } else {
-                tunnel.gateway_ip
-            }
-        } else {
-            tunnel.client_ip
-        };
-        Ok(scripted(ip))
+        executed(self, container, argv)
     }
 
     async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
@@ -297,4 +249,66 @@ pub(super) fn scripted(value: Option<&str>) -> ExecOutput {
             stdout: String::new(),
         },
     }
+}
+
+/// The containers this fixture holds, with health settled once it has been asked enough.
+fn listed(reporting: &Reporting) -> Result<Vec<Container>, EngineFailure> {
+    if !reporting.reachable {
+        return Err(EngineFailure::Unreachable {
+            reason: "no daemon here".to_owned(),
+        });
+    }
+
+    let asked = reporting
+        .asked
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let settled = reporting.settles_after.is_some_and(|after| asked >= after);
+
+    Ok(reporting
+        .containers
+        .iter()
+        .map(|container| Container {
+            health: if settled {
+                Health::Healthy
+            } else {
+                container.health
+            },
+            ..container.clone()
+        })
+        .collect())
+}
+
+/// Which scripted answer a command inside a container gets.
+fn executed(
+    reporting: &Reporting,
+    container: &str,
+    argv: &[String],
+) -> Result<ExecOutput, EngineFailure> {
+    let Some(tunnel) = &reporting.tunnel else {
+        return Err(EngineFailure::NoSuchContainer {
+            name: container.to_owned(),
+        });
+    };
+    if argv.first().is_some_and(|arg| arg == "cat") {
+        return Ok(scripted(tunnel.port));
+    }
+    if argv.last().is_some_and(|arg| arg.ends_with("/country-iso")) {
+        return Ok(ExecOutput {
+            status: Some(0),
+            stdout: tunnel.country.unwrap_or_default().to_owned(),
+        });
+    }
+    let asked_second = argv
+        .last()
+        .is_some_and(|arg| arg.contains("second.example"));
+    let ip = if container.contains(tunnel.gateway) {
+        if asked_second {
+            tunnel.second_opinion.or(tunnel.gateway_ip)
+        } else {
+            tunnel.gateway_ip
+        }
+    } else {
+        tunnel.client_ip
+    };
+    Ok(scripted(ip))
 }

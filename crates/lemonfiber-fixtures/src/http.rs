@@ -245,16 +245,19 @@ impl Fake {
 #[async_trait]
 impl Http for Fake {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(request.clone());
-        }
-        match self.answer(request) {
-            Answer::Reply(status, body) => Ok(Response { status, body }),
-            Answer::Silent => Err(Unreachable {
-                url: request.url.clone(),
-                reason: "connection refused".to_owned(),
-                attempts: 1,
-            }),
-        }
+        crate::noted(&self.seen, request.clone());
+        answered(self.answer(request), request)
+    }
+}
+
+/// The answer this fixture was built to give, as the port carries it.
+fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> {
+    match answer {
+        Answer::Reply(status, body) => Ok(Response { status, body }),
+        Answer::Silent => Err(Unreachable {
+            url: request.url.clone(),
+            reason: "connection refused".to_owned(),
+            attempts: 1,
+        }),
     }
 }

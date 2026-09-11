@@ -48,12 +48,17 @@ impl Pulled {
 #[async_trait]
 impl Images for Pulled {
     async fn images(&self) -> Result<Vec<Image>, Failure> {
-        match &self.unreachable {
-            Some(reason) => Err(Failure::Unreachable {
-                reason: reason.clone(),
-            }),
-            None => Ok(self.held.clone()),
-        }
+        listed(self)
+    }
+}
+
+/// What this fixture holds, or the unreachability it was built to report.
+fn listed(pulled: &Pulled) -> Result<Vec<Image>, Failure> {
+    match &pulled.unreachable {
+        Some(reason) => Err(Failure::Unreachable {
+            reason: reason.clone(),
+        }),
+        None => Ok(pulled.held.clone()),
     }
 }
 

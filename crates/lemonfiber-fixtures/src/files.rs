@@ -126,22 +126,7 @@ impl FileSystem for Files {
     async fn remove(&self, _path: &Path) {}
 
     async fn read(&self, path: &Path) -> Option<String> {
-        match &self.held {
-            Held::Anywhere(text) => text.clone(),
-            Held::At(files) => files
-                .iter()
-                .find(|(at, _)| at == path)
-                .map(|(_, text)| text.clone()),
-            Held::Ending(files) => {
-                // Separators normalised, so a fragment spelled the way the stack spells it
-                // matches on a host that spells paths the other way round.
-                let path = path.to_string_lossy().replace('\\', "/");
-                files
-                    .iter()
-                    .find(|(ending, _)| path.ends_with(ending))
-                    .map(|(_, text)| text.clone())
-            }
-        }
+        held_at(&self.held, path)
     }
 
     async fn write(&self, _path: &Path, _contents: &str) {}
@@ -230,5 +215,25 @@ mod tests {
             "a filesystem that links and is not removable, so the storage probe reads \
              as the ordinary case rather than a warning a test did not ask for"
         );
+    }
+}
+
+/// What this fixture holds at a path, by whichever way it was told to hold it.
+fn held_at(held: &Held, path: &Path) -> Option<String> {
+    match held {
+        Held::Anywhere(text) => text.clone(),
+        Held::At(files) => files
+            .iter()
+            .find(|(at, _)| at == path)
+            .map(|(_, text)| text.clone()),
+        Held::Ending(files) => {
+            // Separators normalised, so a fragment spelled the way the stack spells it
+            // matches on a host that spells paths the other way round.
+            let path = path.to_string_lossy().replace('\\', "/");
+            files
+                .iter()
+                .find(|(ending, _)| path.ends_with(ending))
+                .map(|(_, text)| text.clone())
+        }
     }
 }

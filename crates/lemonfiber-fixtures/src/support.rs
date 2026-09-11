@@ -80,9 +80,7 @@ impl Recording {
 #[async_trait]
 impl Runner for Recording {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(argv.to_vec());
-        }
+        crate::noted(&self.seen, argv.to_vec());
         echoed(&self.answer)
     }
 }
@@ -155,18 +153,8 @@ impl Sequenced {
 #[async_trait]
 impl Runner for Sequenced {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(argv.to_vec());
-        }
-        self.answers
-            .lock()
-            .ok()
-            .and_then(|mut answers| answers.pop_front())
-            .unwrap_or_else(|| {
-                Err(Failure::NotFound {
-                    program: argv.first().cloned().unwrap_or_default(),
-                })
-            })
+        crate::noted(&self.seen, argv.to_vec());
+        next_answer(self, argv)
     }
 }
 
@@ -381,28 +369,10 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
     }
     async fn remove(&self, _path: &std::path::Path) {}
     async fn read(&self, path: &std::path::Path) -> Option<String> {
-        let path = path.to_string_lossy();
-        if path.contains("sabnzbd") {
-            return self.sabnzbd.map(str::to_owned);
-        }
-        // Before the Servarr fall-through, because the finder's key is a YAML of its
-        // own: answering its path with a Servarr XML would read as a service that has
-        // started and written no key, which is a different thing entirely.
-        if path.contains("bazarr") {
-            return self.bazarr.map(str::to_owned);
-        }
-        if path.contains("seerr") {
-            return self.seerr.map(str::to_owned);
-        }
-        if self.only_prowlarr && !path.contains("prowlarr") {
-            return None;
-        }
-        self.servarr.map(str::to_owned)
+        keyed(self, path)
     }
     async fn write(&self, path: &std::path::Path, contents: &str) {
-        if let Ok(mut wrote) = self.wrote.lock() {
-            wrote.push((path.to_path_buf(), contents.to_owned()));
-        }
+        crate::noted(&self.wrote, (path.to_path_buf(), contents.to_owned()));
     }
     async fn ownership(
         &self,
@@ -451,4 +421,39 @@ pub fn refused(stderr: &str) -> Output {
 #[must_use]
 pub fn a_password() -> String {
     ('a'..='p').collect()
+}
+
+/// The next scripted answer, or a not-found for whatever was asked.
+fn next_answer(sequenced: &Sequenced, argv: &[String]) -> Result<Output, Failure> {
+    sequenced
+        .answers
+        .lock()
+        .ok()
+        .and_then(|mut answers| answers.pop_front())
+        .unwrap_or_else(|| {
+            Err(Failure::NotFound {
+                program: argv.first().cloned().unwrap_or_default(),
+            })
+        })
+}
+
+/// Which service's configuration a path is asking for, and what this fixture holds.
+fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
+    let path = path.to_string_lossy();
+    if path.contains("sabnzbd") {
+        return seed.sabnzbd.map(str::to_owned);
+    }
+    // Before the Servarr fall-through, because the finder's key is a YAML of its
+    // own: answering its path with a Servarr XML would read as a service that has
+    // started and written no key, which is a different thing entirely.
+    if path.contains("bazarr") {
+        return seed.bazarr.map(str::to_owned);
+    }
+    if path.contains("seerr") {
+        return seed.seerr.map(str::to_owned);
+    }
+    if seed.only_prowlarr && !path.contains("prowlarr") {
+        return None;
+    }
+    seed.servarr.map(str::to_owned)
 }
