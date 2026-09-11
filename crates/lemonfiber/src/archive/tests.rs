@@ -292,6 +292,38 @@ async fn listing_an_absent_backups_directory_is_empty_not_an_error() {
     assert_eq!(listed.ok(), Some(Vec::new()));
 }
 
+/// Two branches nothing exercised, which the gate only named once the listing moved
+/// out of its `async fn` and became ordinary code.
+///
+/// Whatever the reason the attribution differed — the body was the same body, at the
+/// same lines, reached by the same tests — the branches were untested either way, and
+/// a listing is the wrong place to be guessing: one of them is the difference between
+/// "you have no backups" and "your backups could not be read".
+#[tokio::test]
+async fn a_file_that_is_not_an_archive_is_not_listed_as_one() {
+    let root = scratch("not-an-archive");
+    let paths = install(&root);
+    let backups = paths.backups();
+    let _ = std::fs::create_dir_all(&backups);
+    let _ = std::fs::write(backups.join("notes.txt"), "not a backup");
+    let listed = Tar.existing(&backups).await;
+    assert_eq!(listed.ok(), Some(Vec::new()));
+}
+
+#[tokio::test]
+async fn a_backups_directory_that_will_not_open_is_a_fault_rather_than_none() {
+    let root = scratch("unopenable");
+    let paths = install(&root);
+    let backups = paths.backups();
+    // A file where a directory belongs. The read refuses with something that is not
+    // "not there", which is the difference this reports: an operator whose backups
+    // cannot be read must not be told they have none.
+    let _ = std::fs::create_dir_all(backups.parent().unwrap_or(&root));
+    let _ = std::fs::remove_dir_all(&backups);
+    let _ = std::fs::write(&backups, "in the way");
+    assert!(Tar.existing(&backups).await.is_err());
+}
+
 /// Write a gzip tar at `dest` built by `build`, so a hostile archive can be
 /// forged for the refusal tests. A create that fails leaves `dest` absent, and
 /// the test's own assertions fail on the missing archive rather than here.

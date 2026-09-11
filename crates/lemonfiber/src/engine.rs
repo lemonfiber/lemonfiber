@@ -415,7 +415,6 @@ mod tests {
     }
 
     /// A clean exit, as it reads.
-
     #[tokio::test]
     async fn a_pull_is_refused_while_another_run_holds_the_stack() {
         let mut ctx = ctx(0, "pulled");

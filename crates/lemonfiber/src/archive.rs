@@ -144,144 +144,195 @@ fn held(
     builder.append_data(&mut header, name, body)
 }
 
+/// One archive operation, on a thread that is allowed to block.
+///
+/// Everything below is `tar`, `flate2` and the filesystem, and none of them has an
+/// asynchronous form — nor wants one. An archive is a single long operation over a whole
+/// tree, and the runtime thread it would otherwise sit on is every other task waiting.
+///
+/// Handed over once per operation rather than once per call, because a capture is
+/// thousands of reads and writes and there is nothing to answer in between. Only the
+/// crossing is paid for, and it is paid for once.
+async fn away<T>(work: impl FnOnce() -> Result<T, Fault> + Send + 'static) -> Result<T, Fault>
+where
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(work).await.map_err(fault)?
+}
+
+/// Every archive already in a directory, newest last.
+fn listed(dir: &Path) -> Result<Vec<Existing>, Fault> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        // No backups directory yet is no backups, not a fault.
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(fault(error)),
+    };
+
+    let mut backups = Vec::new();
+    for entry in entries.filter_map(Result::ok) {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.ends_with(".tar.gz") {
+            continue;
+        }
+        // Ordered by the file's own modified time, rendered fixed-width so the
+        // strings sort in the same order the times do — the freshest last.
+        let seconds = entry
+            .metadata()
+            .ok()
+            .and_then(|meta| meta.modified().ok())
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |elapsed| elapsed.as_secs());
+        backups.push(Existing {
+            name,
+            created_at: format!("{seconds:020}"),
+        });
+    }
+    Ok(backups)
+}
+
+/// The manifest riding inside an archive.
+fn manifest_in(src: &Path) -> Result<Manifest, Fault> {
+    let file = File::open(src).map_err(fault)?;
+    let mut archive = tar::Archive::new(GzDecoder::new(file));
+    for entry in archive.entries().map_err(fault)? {
+        let mut entry = entry.map_err(fault)?;
+        let path = entry.path().map_err(fault)?.into_owned();
+        if path == Path::new(MANIFEST) {
+            return serde_json::from_reader(&mut entry).map_err(fault);
+        }
+    }
+    Err(Fault::new("the archive holds no manifest"))
+}
+
+/// Unpack each named area beside its target, and commit only once all of them landed.
+fn extracted(src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+    // Each area is unpacked into a staging sibling of its target first; the
+    // targets are not touched until every entry has been read and found safe,
+    // so a corrupt or hostile archive is refused with nothing overwritten.
+    let plan: Vec<(&str, &Path, PathBuf)> = targets
+        .iter()
+        .map(|(area, target)| (area.as_str(), target.as_path(), staging_for(target)))
+        .collect();
+    // Cleared whatever shape an interrupted run left it in. A stop part-way can
+    // leave a staging that is a file rather than a directory, and clearing only
+    // directories would wedge every later restore of that area: `stage` would
+    // then be creating directories underneath a regular file.
+    for (_, _, staging) in &plan {
+        let _ = remove_any(staging);
+    }
+
+    let staged = stage(src, &plan);
+    if let Err(error) = staged {
+        for (_, _, staging) in &plan {
+            let _ = remove_any(staging);
+        }
+        return Err(error);
+    }
+
+    // Every entry landed safely: commit each staged area over its target, one
+    // top-level child at a time. Replacing children rather than the whole area
+    // directory is what keeps a single-service restore from wiping the other
+    // services — its staging holds only its own service, so only that is
+    // replaced. Each child is committed by moving any existing one aside first
+    // and deleting it only once the new one is in place, so a stop mid-commit
+    // leaves the old copy recoverable rather than deleted outright. The staging
+    // is a sibling of the target, so every rename stays on one filesystem.
+    for (_, target, staging) in &plan {
+        if !staging.exists() {
+            continue;
+        }
+        fs::create_dir_all(target).map_err(fault)?;
+        for child in fs::read_dir(staging).map_err(fault)? {
+            let child = child.map_err(fault)?;
+            let landed = target.join(child.file_name());
+            let aside =
+                landed.with_file_name(format!("{}.replaced", child.file_name().to_string_lossy()));
+            let _ = remove_any(&aside);
+            if landed.symlink_metadata().is_ok() {
+                fs::rename(&landed, &aside).map_err(fault)?;
+            }
+            fs::rename(child.path(), &landed).map_err(fault)?;
+            let _ = remove_any(&aside);
+        }
+        let _ = fs::remove_dir_all(staging);
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl Archive for Tar {
     async fn space(&self, dir: &Path, items: &[Item]) -> Result<Space, Fault> {
-        let needed = items.iter().map(|item| tree_size(&item.source)).sum();
-        Ok(Space {
-            needed,
-            available: free_bytes(dir),
+        let dir = dir.to_path_buf();
+        let sources: Vec<PathBuf> = items.iter().map(|item| item.source.clone()).collect();
+        away(move || {
+            Ok(Space {
+                needed: sources.iter().map(|source| tree_size(source)).sum(),
+                available: free_bytes(&dir),
+            })
         })
+        .await
     }
 
     async fn write(&self, dest: &Path, manifest: &Manifest, items: &[Item]) -> Result<(), Fault> {
-        atomically(dest, "backup", |builder| {
-            let json = serde_json::to_vec(manifest).map_err(std::io::Error::other)?;
-            held(builder, MANIFEST, json.as_slice())?;
+        let dest = dest.to_path_buf();
+        let manifest = manifest.clone();
+        let items = items.to_vec();
+        away(move || {
+            atomically(&dest, "backup", |builder| {
+                let json = serde_json::to_vec(&manifest).map_err(std::io::Error::other)?;
+                held(builder, MANIFEST, json.as_slice())?;
 
-            // A missing source is left out rather than failing the capture: a stack
-            // an operator runs from their own directory, or a service that has not
-            // written its configuration yet, is simply not in the archive.
-            for item in items {
-                if item.source.is_dir() {
-                    builder.append_dir_all(&item.archive_path, &item.source)?;
+                // A missing source is left out rather than failing the capture: a stack
+                // an operator runs from their own directory, or a service that has not
+                // written its configuration yet, is simply not in the archive.
+                for item in &items {
+                    if item.source.is_dir() {
+                        builder.append_dir_all(&item.archive_path, &item.source)?;
+                    }
                 }
-            }
-            Ok(())
+                Ok(())
+            })
         })
+        .await
     }
 
     async fn write_files(&self, dest: &Path, files: &[(String, String)]) -> Result<(), Fault> {
-        atomically(dest, "bundle", |builder| {
-            for (name, body) in files {
-                held(builder, name, body.as_bytes())?;
-            }
-            Ok(())
+        let dest = dest.to_path_buf();
+        let files = files.to_vec();
+        away(move || {
+            atomically(&dest, "bundle", |builder| {
+                for (name, body) in &files {
+                    held(builder, name, body.as_bytes())?;
+                }
+                Ok(())
+            })
         })
+        .await
     }
 
     async fn existing(&self, dir: &Path) -> Result<Vec<Existing>, Fault> {
-        let entries = match fs::read_dir(dir) {
-            Ok(entries) => entries,
-            // No backups directory yet is no backups, not a fault.
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => return Err(fault(error)),
-        };
-
-        let mut backups = Vec::new();
-        for entry in entries.filter_map(Result::ok) {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if !name.ends_with(".tar.gz") {
-                continue;
-            }
-            // Ordered by the file's own modified time, rendered fixed-width so the
-            // strings sort in the same order the times do — the freshest last.
-            let seconds = entry
-                .metadata()
-                .ok()
-                .and_then(|meta| meta.modified().ok())
-                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |elapsed| elapsed.as_secs());
-            backups.push(Existing {
-                name,
-                created_at: format!("{seconds:020}"),
-            });
-        }
-        Ok(backups)
+        let dir = dir.to_path_buf();
+        away(move || listed(&dir)).await
     }
 
     async fn remove(&self, dir: &Path, name: &str) -> Result<(), Fault> {
-        fs::remove_file(dir.join(name)).map_err(fault)
+        let path = dir.join(name);
+        away(move || fs::remove_file(path).map_err(fault)).await
     }
 }
 
 #[async_trait]
 impl Reader for Tar {
     async fn read_manifest(&self, src: &Path) -> Result<Manifest, Fault> {
-        let file = File::open(src).map_err(fault)?;
-        let mut archive = tar::Archive::new(GzDecoder::new(file));
-        for entry in archive.entries().map_err(fault)? {
-            let mut entry = entry.map_err(fault)?;
-            let path = entry.path().map_err(fault)?.into_owned();
-            if path == Path::new(MANIFEST) {
-                return serde_json::from_reader(&mut entry).map_err(fault);
-            }
-        }
-        Err(Fault::new("the archive holds no manifest"))
+        let src = src.to_path_buf();
+        away(move || manifest_in(&src)).await
     }
 
     async fn extract(&self, src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault> {
-        // Each area is unpacked into a staging sibling of its target first; the
-        // targets are not touched until every entry has been read and found safe,
-        // so a corrupt or hostile archive is refused with nothing overwritten.
-        let plan: Vec<(&str, &Path, PathBuf)> = targets
-            .iter()
-            .map(|(area, target)| (area.as_str(), target.as_path(), staging_for(target)))
-            .collect();
-        // Cleared whatever shape an interrupted run left it in. A stop part-way can
-        // leave a staging that is a file rather than a directory, and clearing only
-        // directories would wedge every later restore of that area: `stage` would
-        // then be creating directories underneath a regular file.
-        for (_, _, staging) in &plan {
-            let _ = remove_any(staging);
-        }
-
-        let staged = stage(src, &plan);
-        if let Err(error) = staged {
-            for (_, _, staging) in &plan {
-                let _ = remove_any(staging);
-            }
-            return Err(error);
-        }
-
-        // Every entry landed safely: commit each staged area over its target, one
-        // top-level child at a time. Replacing children rather than the whole area
-        // directory is what keeps a single-service restore from wiping the other
-        // services — its staging holds only its own service, so only that is
-        // replaced. Each child is committed by moving any existing one aside first
-        // and deleting it only once the new one is in place, so a stop mid-commit
-        // leaves the old copy recoverable rather than deleted outright. The staging
-        // is a sibling of the target, so every rename stays on one filesystem.
-        for (_, target, staging) in &plan {
-            if !staging.exists() {
-                continue;
-            }
-            fs::create_dir_all(target).map_err(fault)?;
-            for child in fs::read_dir(staging).map_err(fault)? {
-                let child = child.map_err(fault)?;
-                let landed = target.join(child.file_name());
-                let aside = landed
-                    .with_file_name(format!("{}.replaced", child.file_name().to_string_lossy()));
-                let _ = remove_any(&aside);
-                if landed.symlink_metadata().is_ok() {
-                    fs::rename(&landed, &aside).map_err(fault)?;
-                }
-                fs::rename(child.path(), &landed).map_err(fault)?;
-                let _ = remove_any(&aside);
-            }
-            let _ = fs::remove_dir_all(staging);
-        }
-        Ok(())
+        let src = src.to_path_buf();
+        let targets = targets.to_vec();
+        away(move || extracted(&src, &targets)).await
     }
 }
 

@@ -113,7 +113,7 @@ impl<H: Http + Send + Sync> Http for Recording<H> {
             .map(|since| since.as_secs())
             .unwrap_or_default();
         let status = answer.as_ref().ok().map(|answered| answered.status);
-        let existing = std::fs::read_to_string(at).unwrap_or_default();
+        let existing = tokio::fs::read_to_string(at).await.unwrap_or_default();
         // A record that could not be written is not worth failing a request over:
         // the operator asked for the thing the request does, and telling them it
         // could not be done because a log was unwritable would be this feature
