@@ -18,8 +18,9 @@ pub(crate) use lemonfiber_api::actions::{
     answering, declined, named, Answering, Arguments, Disturbing, Refused, OFFERED, TAKES_AGREED,
     TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME,
-    TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_SERVICE,
-    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_RUN,
+    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_TIER,
+    TAKES_WAITING,
 };
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::guard::Token;
@@ -98,6 +99,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
         archive: takes(TAKES_ARCHIVE).then(|| ARCHIVE.to_owned()),
+        at: takes(TAKES_RUN).then(|| STAMP.to_owned()),
         name: takes(TAKES_NAME).then(|| "ana".to_owned()),
         repoint: takes(TAKES_ARCHIVE),
         write: takes(TAKES_BUNDLING),
@@ -151,6 +153,9 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
 
 /// A backup name, as one is written under.
 pub(crate) const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";
+
+/// The stamp a history entry carries, as a run is named by.
+pub(crate) const STAMP: &str = "1700000000";
 
 /// A log window that is not the one a bundle takes when nothing is asked for, so a
 /// command carrying the default cannot pass for one carrying what was given.

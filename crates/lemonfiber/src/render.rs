@@ -253,7 +253,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
         Outcome::Repair(report) => repair::mended(report),
-        Outcome::Undo(report) => repair::reversed(&report.reversed),
+        Outcome::Undo(report) => repair::reversed(&report.reversed, &report.left),
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Uninstall(report) => uninstall::removal(report),

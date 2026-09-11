@@ -17,8 +17,8 @@ pub use takers::{
     unwanted, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING,
     TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM,
     TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
-    TAKES_REQUEST, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM,
-    TAKES_TIER, TAKES_WAITING,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
+    TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 
 use lemonfiber_core::app::Waiting;
@@ -62,6 +62,8 @@ pub struct Arguments {
     pub media_type: Option<String>,
     /// The backup to restore from, by the name it was written under.
     pub archive: Option<String>,
+    /// The stamp of the run to put back, as the history writes it.
+    pub at: Option<String>,
     /// Whether re-pointing to this machine's data root was accepted.
     pub repoint: bool,
     /// Whether to produce the bundle, rather than say what one would hold.

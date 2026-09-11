@@ -171,11 +171,21 @@ pub fn standing(
     }
 
     match &change.kind {
-        // A service's own record, reversed through the service that owns it — which is
-        // reachable, so the change is whole.
-        Kind::Created { .. } | Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } => {
-            Standing::whole()
-        }
+        // Removing what a service created is that service's own to do, and nothing here
+        // asks it to: the reversal of a creation is worked out, set aside as beyond a
+        // host's reach, and reported — every time, on every surface. Judging it whole
+        // promised an operator a reversal no part of this product carries out.
+        Kind::Created { resource, .. } => Standing::refused(
+            &format!(
+                "removing the {resource} it added is something only {} can be asked to \
+                 do, and lemonfiber does not ask it",
+                change.target
+            ),
+            Some("remove it in that service's own interface"),
+        ),
+        // A setting, a path, or one field of a service's record — each reversed by
+        // something this product actually does.
+        Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } => Standing::whole(),
     }
 }
 
@@ -435,25 +445,41 @@ mod tests {
         );
     }
 
-    /// A change to a service's own record is put back through the service that owns it,
-    /// which is reachable — so it goes back whole, and none of the questions a setting
-    /// has to answer are asked of it at all.
+    /// One field of a service's own record is put back through the service that owns
+    /// it, which this product does ask — so it goes back whole, and none of the
+    /// questions a setting has to answer are asked of it at all.
     #[test]
-    fn a_change_to_a_services_own_record_goes_back_whole() {
+    fn a_field_of_a_services_record_goes_back_whole() {
         let holds = holding(&[("PUID", "9999")]);
-        assert_eq!(
-            standing(&created("downloadclient"), &[], &holds).reversal,
-            Reversal::Whole
-        );
         assert_eq!(
             standing(&configured("removeCompletedDownloads"), &[], &holds).reversal,
             Reversal::Whole
         );
+    }
+
+    /// What a service created does not go back, because nothing here removes it.
+    ///
+    /// The reversal is worked out and then set aside as beyond a host's reach, every
+    /// time: no path in this product asks a service to delete what it made. Judged
+    /// whole, that promised an operator a reversal nothing carries out — and the
+    /// history said so on every surface.
+    #[test]
+    fn what_a_service_created_is_refused_because_nothing_removes_it() {
+        let holds = holding(&[("PUID", "9999")]);
+        let standing = standing(&created("downloadclient"), &[], &holds);
+        assert_eq!(standing.reversal, Reversal::None);
         assert!(
-            standing(&created("rootfolder"), &[], &holds)
+            standing
                 .refusal
-                .is_none(),
-            "nothing stands in the way, so nothing is offered as a reason"
+                .as_ref()
+                .is_some_and(|refusal| refusal.because.contains("downloadclient")),
+            "the reason names what was added: {standing:?}"
+        );
+        assert!(
+            standing
+                .refusal
+                .is_some_and(|refusal| refusal.instead.is_some()),
+            "and says where it can be removed instead"
         );
     }
 }

@@ -181,7 +181,10 @@ fn including_the_checks_that_disturb_is_carried_apart_from_the_consent() {
 
 #[test]
 fn putting_the_last_repair_back_takes_nothing_at_all() {
-    assert_eq!(command("undo", Arguments::default()), Some(Command::Undo));
+    assert_eq!(
+        command("undo", Arguments::default()),
+        Some(Command::Undo { run: None })
+    );
 }
 
 #[test]

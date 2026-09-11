@@ -324,6 +324,7 @@ async fn main() -> ExitCode {
             Err(code) => return ExitCode::from(code),
         },
         Request::History => Command::History,
+        Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::Outbound => Command::Outbound,

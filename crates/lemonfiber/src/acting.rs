@@ -1599,7 +1599,7 @@ mod tests {
 
         assert_eq!(
             acting.pressed(&Press::Typed('y')),
-            Wanted::Carry(Command::Undo)
+            Wanted::Carry(Command::Undo { run: None })
         );
     }
 

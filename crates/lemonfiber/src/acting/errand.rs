@@ -1020,7 +1020,7 @@ pub(crate) mod tests {
                 Ok(Command::Seed),
                 Ok(Command::Adopt),
                 Ok(Command::Backup { service: None }),
-                Ok(Command::Undo),
+                Ok(Command::Undo { run: None }),
             ]
         );
     }
