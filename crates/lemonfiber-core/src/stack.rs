@@ -183,9 +183,28 @@ impl Source {
     /// cannot use it.
     pub fn manifest(self) -> Result<Manifest, Failure> {
         let text = self.manifest_text()?;
-        Manifest::from_toml(&text).map_err(|err| Failure::Unusable {
-            reason: err.to_string(),
-        })
+        Manifest::from_toml(&text).map_err(refused)
+    }
+}
+
+/// A manifest this build cannot read, in the terms the operator needs.
+///
+/// Four refusals with nothing to do with each other, and for a long time one
+/// headline for all of them: an operator who had left out a quotation mark was told
+/// their stack was written for a different version of lemonfiber and sent looking
+/// for a build that would read it. The version headline is true of exactly two of
+/// these, and the other two have answers of their own.
+fn refused(err: lemonfiber_manifest::Error) -> Failure {
+    let reason = err.to_string();
+    match err {
+        lemonfiber_manifest::Error::Syntax(_) => Failure::Malformed { reason },
+        // Kept whole rather than joined here: the list is the point of this refusal,
+        // and the rendering below is what decides how a list is shown.
+        lemonfiber_manifest::Error::Unrecognised(named) => Failure::Unrecognised {
+            names: named.iter().map(ToString::to_string).collect(),
+        },
+        lemonfiber_manifest::Error::UnsupportedSchema { .. }
+        | lemonfiber_manifest::Error::BinaryTooOld { .. } => Failure::Unusable { reason },
     }
 }
 
@@ -255,10 +274,27 @@ pub enum Failure {
         reason: String,
     },
     /// The manifest was read, and this build cannot use it.
+    ///
+    /// The pairing, and only the pairing: a stack that declares a schema generation
+    /// this build does not read, or that requires a newer binary. A file that will
+    /// not parse and a name this build has never heard of are [`Failure::Malformed`]
+    /// and [`Failure::Unrecognised`], because neither is answered by a version.
     #[error("the stack manifest cannot be used: {reason}")]
     Unusable {
         /// The parser's own words.
         reason: String,
+    },
+    /// The manifest is not TOML, so nothing in it has been read.
+    #[error("the stack manifest could not be parsed: {reason}")]
+    Malformed {
+        /// The parser's own words, which name the line it stopped on.
+        reason: String,
+    },
+    /// The manifest is well-formed and declares names this build does not know.
+    #[error("the stack manifest declares {} names this build does not know", names.len())]
+    Unrecognised {
+        /// Every one of them, each naming what declared it.
+        names: Vec<String>,
     },
     /// The embedded stack is not intact, which the build should have prevented.
     #[error("this build has no embedded stack manifest")]
@@ -294,6 +330,12 @@ pub const STACK_NOT_EMBEDDED: Code = Code::new("STACK-3");
 /// Raised when a manifest parses and breaks the contract.
 pub const STACK_INVALID: Code = Code::new("STACK-6");
 
+/// Raised when a manifest is not TOML at all.
+pub const STACK_MALFORMED: Code = Code::new("STACK-7");
+
+/// Raised when a manifest declares names this build does not know.
+pub const STACK_UNRECOGNISED: Code = Code::new("STACK-8");
+
 /// Raised when lemonfiber has nowhere to write the stack.
 pub const STACK_NOT_SET_UP: Code = Code::new("STACK-4");
 
@@ -325,6 +367,28 @@ impl Diagnose for Failure {
             )
             .in_state(State::Guided)
             .with_detail(reason.clone()),
+            Self::Malformed { reason } => Problem::new(
+                STACK_MALFORMED,
+                Severity::Error,
+                "This stack file could not be read",
+                "A stack.toml is written in a strict format, and this one breaks it — so nothing in the file has been read at all. The detail below is where the reader stopped, and that line is where the answer is.",
+                Remedy::new("Fix the file at the line named below"),
+            )
+            .in_state(State::Guided)
+            .with_detail(reason.clone()),
+            // Every name at once, for the reason the contract faults below are given
+            // at once: found by asking each declaration on its own, so the whole list
+            // was knowable in one pass and learning them one run at a time is a
+            // guessing game.
+            Self::Unrecognised { names } => Problem::new(
+                STACK_UNRECOGNISED,
+                Severity::Error,
+                format!("This stack declares {} names this build does not know", names.len()),
+                "The file is well-formed and says things about itself in words this version has no meaning for — usually a stack from a newer lemonfiber, or a fork that has added something of its own. Starting it would quietly leave out whatever was named.",
+                Remedy::new("Update lemonfiber, or change the names listed below to ones it knows"),
+            )
+            .in_state(State::Guided)
+            .with_detail(names.join("\n")),
             // Every fault at once, because fixing them one run at a time is a
             // guessing game — and the whole list was knowable in one pass.
             Self::Invalid { violations } => Problem::new(
@@ -582,6 +646,12 @@ mod tests {
             Failure::Unusable {
                 reason: "schema 99".to_owned(),
             },
+            Failure::Malformed {
+                reason: "expected a value".to_owned(),
+            },
+            Failure::Unrecognised {
+                names: vec!["service jellyfin: api.kind: unknown variant `plex`".to_owned()],
+            },
             Failure::NotEmbedded,
             Failure::NowhereToWrite,
             Failure::NotWritten {
@@ -614,6 +684,80 @@ mod tests {
             .map(|failure| failure.problem())
             .and_then(|problem| problem.detail)
             .unwrap_or_default()
+    }
+
+    /// The headline a stack's refusal is shown under.
+    fn headline(source: Source) -> String {
+        source
+            .checked_manifest(today())
+            .err()
+            .map(|failure| failure.problem().summary)
+            .unwrap_or_default()
+    }
+
+    /// A stack directory holding one `stack.toml`, written for a single test.
+    fn written(named: &str, toml: &str) -> &'static Path {
+        let dir = std::env::temp_dir().join(format!("lemonfiber-{named}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        assert!(std::fs::write(dir.join("stack.toml"), toml).is_ok());
+        // Leaked deliberately, as the split-mount fixture above is and for the same
+        // reason: `Source::External` holds a `&'static Path`.
+        Box::leak(dir.into_boxed_path())
+    }
+
+    /// A typo is a typo, and is not reported as a version the operator does not have.
+    ///
+    /// Every way of failing to read a manifest arrived under one headline, and that
+    /// headline told an operator who had left out a quotation mark to go and find a
+    /// different build of lemonfiber. The file names the line it broke on; the answer
+    /// they need is on their own disk.
+    #[test]
+    fn a_stack_that_is_not_toml_is_not_blamed_on_the_version() {
+        let said = headline(Source::External(written("typo", "version = \n")));
+        assert!(
+            !said.contains("different version"),
+            "a plain syntax error was reported as a version mismatch: {said}"
+        );
+        assert!(said.contains("could not be read"), "{said}");
+    }
+
+    /// A name this build does not know is not a typo either, and says which names.
+    ///
+    /// The manifest crate asks every declaration separately so a fork learns all of
+    /// its mistakes in one run. That list survives to the operator only if this
+    /// keeps it — flattened into a sentence about versions, the one pass was for
+    /// nothing.
+    #[test]
+    fn a_name_this_build_does_not_know_is_named_rather_than_called_a_typo() {
+        let stack = "
+schema_version = 1
+
+[[service]]
+id = \"jellyfin\"
+api = { kind = \"plex\", key_source = \"config-xml\" }
+";
+        let problem = Source::External(written("unknown-name", stack))
+            .checked_manifest(today())
+            .err()
+            .map(|failure| failure.problem());
+        let said = problem
+            .as_ref()
+            .map(|problem| problem.summary.clone())
+            .unwrap_or_default();
+        let detail = problem
+            .and_then(|problem| problem.detail)
+            .unwrap_or_default();
+
+        assert!(
+            !said.contains("different version") && !said.contains("could not be read"),
+            "an unknown name was reported as a version or a typo: {said}"
+        );
+        assert!(said.contains("names this build does not know"), "{said}");
+        assert!(
+            detail.contains("jellyfin") && detail.contains("plex"),
+            "the operator was not told which name, or where: {detail}"
+        );
     }
 
     #[test]
