@@ -134,11 +134,27 @@ pub async fn capture(
 /// Returns a [`Problem`] where the stack is not confirmed stopped, where this run
 /// has nowhere it knows to keep an archive, or for any reason [`capture`] gives.
 pub async fn run(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Problem>> {
+    quiesced::required(ctx, STILL_RUNNING, "backup").await?;
+    behind(ctx, service).await
+}
+
+/// Capture this run's configuration, for a caller that has already stopped the stack.
+///
+/// The whole of [`run`] except the proving, which is the one part a caller that did the
+/// stopping itself has already done. A removal stops every service as its first step and
+/// then destroys what cannot be made again; asking the engine a second time whether the
+/// stack is down would be asking it about the stop this same run just performed, and on a
+/// machine whose engine reports slowly that is a race rather than a check.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where this run has nowhere it knows to keep an archive, or for
+/// any reason [`capture`] gives.
+pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Problem>> {
     let archives = ctx
         .archives
         .as_ref()
         .ok_or_else(|| Box::new(nowhere_to_keep()))?;
-    quiesced::required(ctx, STILL_RUNNING, "backup").await?;
 
     let scope = match service {
         Some(name) => Scope::Service { name },

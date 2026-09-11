@@ -11,13 +11,16 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use common::stack::project;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Removing, Waiting};
+use lemonfiber_core::archive::{Archive, Archiving, Fault as ArchiveFault, Reader, Space, Vault};
+use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
+use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -52,6 +55,66 @@ impl Heard {
     }
 }
 
+/// Somewhere for the backup a destructive tier takes before anything goes.
+///
+/// A removal that destroys configuration captures it after the stop and before the
+/// first path is removed, so every machine here needs one. It writes and remembers
+/// that it did; nothing in this file reads an archive back.
+struct Kept;
+
+#[async_trait]
+impl Archive for Kept {
+    async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, ArchiveFault> {
+        Ok(Space {
+            needed: 0,
+            available: 1 << 30,
+        })
+    }
+    async fn write(
+        &self,
+        _dest: &Path,
+        _manifest: &BackupManifest,
+        _items: &[Item],
+    ) -> Result<(), ArchiveFault> {
+        Ok(())
+    }
+    async fn write_files(
+        &self,
+        _dest: &Path,
+        _files: &[(String, String)],
+    ) -> Result<(), ArchiveFault> {
+        Err(ArchiveFault::new("a removal writes no bundle"))
+    }
+    async fn existing(&self, _dir: &Path) -> Result<Vec<Existing>, ArchiveFault> {
+        Ok(Vec::new())
+    }
+    async fn remove(&self, _dir: &Path, _name: &str) -> Result<(), ArchiveFault> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Reader for Kept {
+    async fn read_manifest(&self, _src: &Path) -> Result<BackupManifest, ArchiveFault> {
+        Err(ArchiveFault::new("a removal never reads an archive back"))
+    }
+    async fn extract(
+        &self,
+        _src: &Path,
+        _targets: &[(String, PathBuf)],
+    ) -> Result<(), ArchiveFault> {
+        Err(ArchiveFault::new("a removal never reads an archive back"))
+    }
+}
+
+/// The same machine, with somewhere to keep what a removal captures first.
+fn kept(ctx: Ctx) -> Ctx {
+    ctx.keeping(Archiving {
+        paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),
+        vault: Arc::new(Kept) as Arc<dyn Vault>,
+    })
+}
+
 /// A context over the stack this repository carries, with every seam a removal
 /// reaches answered by something a test wrote down.
 fn ctx(heard: &Arc<Heard>) -> Ctx {
@@ -65,39 +128,41 @@ fn ctx(heard: &Arc<Heard>) -> Ctx {
 /// answer the same way, so which of them was handed over is only in the argument
 /// vectors.
 fn running(heard: &Arc<Heard>, runner: Arc<dyn Runner>) -> Ctx {
-    Ctx::new(
-        runner,
-        Arc::new(Reporting::holding(
-            &["sonarr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )),
-        lemonfiber_fixtures::ports::Stopped::today(),
-        lemonfiber_ports::seams::Seams {
-            filesystem: Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
-                point: PathBuf::from("/srv/media"),
-                kind: FsKind::Linking("apfs".to_owned()),
-                removable: false,
-                available: 100,
-                total: 1_000,
-            })),
-            ..lemonfiber_adapters::live()
-        },
-        Source::External(project()),
-        Settings {
-            project: "lemonfiber".to_owned(),
-            env_file: Some(PathBuf::from("/cfg/lemonfiber/.env")),
-            stack_dir: Some(PathBuf::from("/data/lemonfiber/stack")),
-            data_root: Some(PathBuf::from("/srv/media")),
-            ..Settings::default()
-        },
-        Environment::MacOs,
+    kept(
+        Ctx::new(
+            runner,
+            Arc::new(Reporting::holding(
+                &["sonarr"],
+                Lifecycle::Running,
+                Health::Healthy,
+            )),
+            lemonfiber_fixtures::ports::Stopped::today(),
+            lemonfiber_ports::seams::Seams {
+                filesystem: Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
+                    point: PathBuf::from("/srv/media"),
+                    kind: FsKind::Linking("apfs".to_owned()),
+                    removable: false,
+                    available: 100,
+                    total: 1_000,
+                })),
+                ..lemonfiber_adapters::live()
+            },
+            Source::External(project()),
+            Settings {
+                project: "lemonfiber".to_owned(),
+                env_file: Some(PathBuf::from("/cfg/lemonfiber/.env")),
+                stack_dir: Some(PathBuf::from("/data/lemonfiber/stack")),
+                data_root: Some(PathBuf::from("/srv/media")),
+                ..Settings::default()
+            },
+            Environment::MacOs,
+        )
+        .with_images(Pulled::holding(Vec::new()))
+        .surveying(Walking::holding(Vec::new()))
+        .erasing(Erasing::willing())
+        .narrating(Arc::clone(heard) as Arc<dyn Narrator>)
+        .waiting(Duration::ZERO),
     )
-    .with_images(Pulled::holding(Vec::new()))
-    .surveying(Walking::holding(Vec::new()))
-    .erasing(Erasing::willing())
-    .narrating(Arc::clone(heard) as Arc<dyn Narrator>)
-    .waiting(Duration::ZERO)
 }
 
 /// The envelope a dispatched command renders, or nothing where it refused.

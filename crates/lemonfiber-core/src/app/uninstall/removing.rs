@@ -18,6 +18,7 @@
 use std::path::Path;
 
 use crate::app::{Ctx, Outcome, Waiting};
+use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::stack::compose::Action;
 use crate::uninstall::{Left, Manifest, Removal, Sort, Tier};
@@ -44,12 +45,23 @@ impl Went {
 }
 
 /// Carry out the removal this manifest describes.
+///
+/// A tier that destroys configuration takes a backup first, and takes it here rather
+/// than before the stop: a capture of a database a service is still writing is the one
+/// thing a backup must never be, and every tier begins by stopping. So the order is
+/// stop, capture, destroy — and a capture that fails stops the run with nothing removed,
+/// which is the rule the staged update already keeps on its own way in.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where a tier that destroys configuration could not have a
+/// backup taken before it. Nothing has been removed when it does.
 pub(super) async fn remove(
     ctx: &Ctx,
     tier: Tier,
     manifest: &Manifest,
     waiting: Waiting,
-) -> Removal {
+) -> Result<Removal, Box<Problem>> {
     if waiting == Waiting::ForTheDownloads {
         crate::app::engine::drained(ctx, &[]).await;
     }
@@ -59,21 +71,49 @@ pub(super) async fn remove(
     match tier {
         Tier::Stop => {}
         Tier::Services => pulled(ctx, manifest, &mut went).await,
-        Tier::Configuration | Tier::Media => paths(ctx, manifest, &mut went).await,
+        Tier::Configuration | Tier::Media => {
+            crate::app::backup::behind(ctx, None)
+                .await
+                .map_err(|problem| Box::new(not_backed_up(&problem)))?;
+            paths(ctx, manifest, &mut went).await;
+        }
     }
 
     let credentials = destroyed(manifest);
     if went.left.is_empty() {
-        return Removal::Complete {
+        return Ok(Removal::Complete {
             gone: went.gone,
             credentials,
-        };
+        });
     }
-    Removal::Partial {
+    Ok(Removal::Partial {
         gone: went.gone,
         credentials,
         left: went.left,
-    }
+    })
+}
+
+/// Raised when the backup a destructive removal takes first could not be taken.
+pub const NOT_BACKED_UP: Code = Code::new("GONE-3");
+
+/// The refusal for a removal whose backup would not be taken.
+///
+/// Carrying the reason the capture gave rather than restating it: a stack that is still
+/// running, a disk with no room and a machine with nowhere to keep an archive are three
+/// different things to go and do, and only the capture knows which of them it met.
+fn not_backed_up(cause: &Problem) -> Problem {
+    Problem::new(
+        NOT_BACKED_UP,
+        Severity::Error,
+        "The backup that comes before a removal could not be taken",
+        format!(
+            "Nothing has been removed. What this destroys cannot be made again, so it is \
+             taken behind a backup or not at all — and the backup did not happen: {}",
+            cause.summary
+        ),
+        Remedy::new("Deal with what stopped the backup, then ask for the removal again"),
+    )
+    .in_state(State::Actionable)
 }
 
 /// The credentials this removal destroyed, named rather than left to be inferred.

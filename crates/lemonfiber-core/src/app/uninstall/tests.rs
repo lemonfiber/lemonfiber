@@ -89,13 +89,25 @@ fn over(kind: FsKind, removable: bool) -> Arc<SeedFs> {
 /// A machine with a stack the engine is holding, one image pulled for it, and
 /// nothing but the stack's own files on the disk.
 fn a_machine() -> Ctx {
-    running(Lifecycle::Running, Health::Healthy)
-        .with_images(Pulled::holding(vec![Pulled::image(
-            SONARR,
-            400,
-            &["lemonfiber"],
-        )]))
-        .erasing(Erasing::willing())
+    kept(
+        running(Lifecycle::Running, Health::Healthy)
+            .with_images(Pulled::holding(vec![Pulled::image(
+                SONARR,
+                400,
+                &["lemonfiber"],
+            )]))
+            .erasing(Erasing::willing()),
+    )
+}
+
+/// The same machine, with somewhere to put the backup a destructive tier takes first.
+///
+/// Every reading here is of a machine that has one: a removal that destroys
+/// configuration captures it before anything goes, so a fixture with nowhere to keep an
+/// archive would be testing the refusal rather than the removal. The refusal has a test
+/// of its own, which is the machine without this.
+fn kept(ctx: Ctx) -> Ctx {
+    crate::app::fixtures::keeping(ctx, &Arc::new(crate::app::fixtures::FakeArchive::roomy()))
 }
 
 /// The same machine, with its services in a given state.
@@ -491,18 +503,38 @@ async fn a_removal_that_took_no_credential_names_none() {
     assert_eq!(removal.as_ref().map(credentials), Some(Vec::new()));
 }
 
-/// A backup is offered before anything that cannot be made again goes, and
-/// only by the tier that destroys it.
+/// A backup is taken before anything that cannot be made again goes, and the reading
+/// says so — only for the tier that destroys it.
 #[tokio::test]
-async fn a_backup_is_offered_before_configuration_is_destroyed() {
-    let ctx = a_machine();
-    let offered = read(&ctx, Tier::Configuration)
+async fn a_backup_is_taken_before_configuration_is_destroyed() {
+    let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
+    let ctx = crate::app::fixtures::keeping(
+        running(Lifecycle::Running, Health::Healthy)
+            .with_images(Pulled::holding(vec![Pulled::image(
+                SONARR,
+                400,
+                &["lemonfiber"],
+            )]))
+            .erasing(Erasing::willing()),
+        &vault,
+    );
+    let said = read(&ctx, Tier::Configuration)
         .await
         .and_then(|manifest| manifest.backup);
 
     assert!(
-        offered.is_some_and(|said| said.contains("lemonfiber backup")),
-        "no backup was offered before the configuration goes"
+        said.is_some_and(|said| said.contains("A backup is taken")),
+        "the reading does not say a backup is taken before the configuration goes"
+    );
+
+    // And it is taken, rather than only said: the tier that destroys configuration
+    // writes an archive before anything of it goes.
+    let removal = confirmed(&ctx, Tier::Configuration).await;
+    assert!(removal.is_some(), "the removal ran");
+    assert_eq!(
+        vault.written.lock().map(|written| written.len()).ok(),
+        Some(1),
+        "no archive was written before the configuration went"
     );
     assert_eq!(
         read(&ctx, Tier::Services)
@@ -636,12 +668,12 @@ async fn a_run_that_cannot_say_where_its_files_go_names_the_usual_places_and_tak
         .surveying(Walking::holding(only_ours()))
         .erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
 
-    let answered = answer(
-        &ctx,
-        Removing::surveying(Tier::Configuration).confirmed(true),
-    )
-    .await
-    .map(|answered| answered.manifest);
+    // The reading, which is what names the usual places. A confirmed run on this
+    // machine is refused below: with nowhere it can say its files are, there is
+    // nowhere to put the backup a destructive tier takes first.
+    let answered = answer(&ctx, Removing::surveying(Tier::Configuration))
+        .await
+        .map(|answered| answered.manifest);
 
     assert_eq!(
         answered
@@ -661,6 +693,16 @@ async fn a_run_that_cannot_say_where_its_files_go_names_the_usual_places_and_tak
             .all(|item| item.name.starts_with("~/"))),
         "the usual places are not named"
     );
+
+    // And a confirmed run takes none of them, because the backup that comes first
+    // has nowhere to go on a machine that cannot say where its own files are.
+    let refused = answer(
+        &ctx,
+        Removing::surveying(Tier::Configuration).confirmed(true),
+    )
+    .await;
+
+    assert!(refused.is_none(), "a confirmed run was not refused");
     assert_eq!(eraser.asked(), Vec::<PathBuf>::new());
 }
 
@@ -1022,13 +1064,15 @@ async fn a_stop_that_compose_refused_is_reported_rather_than_read_as_done() {
 #[tokio::test]
 async fn nothing_it_runs_or_hands_back_about_its_own_files_escalates() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let ctx = watching(&runner)
-        .with_images(Pulled::holding(vec![Pulled::image(
-            SONARR,
-            400,
-            &["lemonfiber"],
-        )]))
-        .erasing(Erasing::refusing("permission denied"));
+    let ctx = kept(
+        watching(&runner)
+            .with_images(Pulled::holding(vec![Pulled::image(
+                SONARR,
+                400,
+                &["lemonfiber"],
+            )]))
+            .erasing(Erasing::refusing("permission denied")),
+    );
 
     let mut instructions = Vec::new();
     for tier in [Tier::Stop, Tier::Services, Tier::Configuration] {

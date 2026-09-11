@@ -53,7 +53,7 @@ pub(super) async fn uninstalled(ctx: &Ctx, asked: Removing) -> Result<Outcome, B
         return Ok(answered(manifest, Removal::Confirmed));
     }
 
-    let removal = removing::remove(ctx, asked.tier, &manifest, asked.waiting).await;
+    let removal = removing::remove(ctx, asked.tier, &manifest, asked.waiting).await?;
     Ok(answered(manifest, removal))
 }
 
@@ -120,11 +120,17 @@ async fn survey(ctx: &Ctx, tier: Tier) -> Manifest {
     }
 }
 
-/// The offer made before anything that cannot be made again is destroyed.
-const BACKUP: &str = "Take a backup first if you may want this machine set up like this again: \
-     `lemonfiber backup` writes an archive of everything below, and `lemonfiber \
-     restore` puts it back — which is a great deal less work than answering setup \
-     again.";
+/// What is said about the backup taken before anything that cannot be made again goes.
+///
+/// A statement rather than the advice it used to be. Telling somebody to run `lemonfiber
+/// backup` first put the one step that makes a removal survivable on the far side of a
+/// sentence they had to read, agree with and act on — and the run went ahead either way.
+/// It is taken now, after the stop and before the destruction, and a capture that fails
+/// stops the removal.
+const BACKUP: &str = "A backup is taken before any of this goes — after the services stop \
+     and before anything is removed — so this machine can be set up like it is now again. \
+     `lemonfiber restore` puts it back, which is a great deal less work than answering \
+     setup again. If that backup cannot be taken, nothing is removed.";
 
 /// The tier that takes the library was confirmed without an agreement.
 fn needs_agreeing(agreement: &str, bytes: u64) -> Problem {
