@@ -124,9 +124,13 @@ fn where_it_is(kind: &str, at: usize, entry: &Value) -> String {
 }
 
 /// What the owning type says about a word, when it does not accept it.
+///
+/// Only a string is a name. A field holding a number or a table is a type error and
+/// a different question from the one asked here — and one the read that follows
+/// answers better, with the line it is on.
 fn refused<T: DeserializeOwned>(value: &Value) -> Option<String> {
-    value
-        .clone()
+    let word = value.as_str()?;
+    Value::from(word)
         .try_into::<T>()
         .err()
         .map(|said| said.to_string().trim_end().to_owned())
@@ -173,6 +177,21 @@ protocol = \"carrier-pigeon\"
         assert!(
             found.first().is_some_and(|one| one.location == "profile 0"),
             "got: {found:?}"
+        );
+    }
+
+    #[test]
+    fn a_field_holding_something_other_than_a_name_is_left_to_the_reader() {
+        let found = unrecognised(
+            "
+[[service]]
+id = \"q\"
+criticality = 3
+",
+        );
+        assert!(
+            found.is_empty(),
+            "a number is not a name it refused: {found:?}"
         );
     }
 
