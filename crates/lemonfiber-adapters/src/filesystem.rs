@@ -278,6 +278,19 @@ mod tests {
 
     use super::{gone, Disk, Eraser, FileSystem, Volume};
 
+    /// A path with no directory above it, which is where the making has nothing to do.
+    ///
+    /// The write then fails on its own and says so, which is a better answer than one
+    /// from here about a directory the caller never named.
+    #[tokio::test]
+    async fn a_path_with_no_parent_is_written_without_making_one() {
+        Disk.write(Path::new(""), "nowhere").await;
+        assert!(
+            Disk.read(Path::new("")).await.is_none(),
+            "nothing was written and nothing was made"
+        );
+    }
+
     /// A removal that said it did not happen, and what each answer means.
     ///
     /// Driven here rather than through `erase`, because the middle one is a race: the

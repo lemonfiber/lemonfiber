@@ -239,31 +239,17 @@ async fn executed(
         ..Default::default()
     };
 
-    // A container that is not there is the one refusal an operator can act
-    // on differently, so it keeps its own variant all the way up.
-    let created = match docker.create_exec(container, config).await {
-        Ok(created) => created,
-        Err(bollard::errors::Error::DockerResponseServerError {
-            status_code: 404, ..
-        }) => {
-            return Err(Failure::NoSuchContainer {
-                name: container.to_owned(),
-            })
-        }
-        Err(error) => return Err(unreachable(error)),
-    };
+    let created = docker
+        .create_exec(container, config)
+        .await
+        .map_err(|error| refused_exec(error, container))?;
 
     let started = docker
         .start_exec(&created.id, None)
         .await
         .map_err(unreachable)?;
 
-    let mut stdout = String::new();
-    if let bollard::exec::StartExecResults::Attached { mut output, .. } = started {
-        while let Some(chunk) = output.next().await {
-            stdout.push_str(&chunk.map_err(unreachable)?.to_string());
-        }
-    }
+    let stdout = spoken(started).await?;
 
     let inspected = docker
         .inspect_exec(&created.id)
@@ -276,6 +262,34 @@ async fn executed(
             .and_then(|code| i32::try_from(code).ok()),
         stdout,
     })
+}
+
+/// What a refusal to start an exec means.
+///
+/// A container that is not there is the one refusal an operator can act on differently,
+/// so it keeps its own variant all the way up. Its own function because the other arm
+/// needs a daemon that answers badly, which no test here has — handed the error
+/// directly, both arms are ordinary.
+fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
+    match error {
+        bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        } => Failure::NoSuchContainer {
+            name: container.to_owned(),
+        },
+        other => unreachable(other),
+    }
+}
+
+/// Everything an attached exec wrote, and nothing at all where it was not attached.
+async fn spoken(started: bollard::exec::StartExecResults) -> Result<String, Failure> {
+    let mut stdout = String::new();
+    if let bollard::exec::StartExecResults::Attached { mut output, .. } = started {
+        while let Some(chunk) = output.next().await {
+            stdout.push_str(&chunk.map_err(unreachable)?.to_string());
+        }
+    }
+    Ok(stdout)
 }
 
 /// One sampling task per running container, feeding one channel.
@@ -368,5 +382,49 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
                 return;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{refused_exec, spoken, Failure};
+
+    /// Both refusals, one of which needs a daemon that answers badly.
+    ///
+    /// The 404 is the only one an operator can act on differently, and it is the one a
+    /// real run produces. Everything else is the daemon being unreachable in some way,
+    /// which is reachable here and nowhere else.
+    #[test]
+    fn a_container_that_is_not_there_is_told_apart_from_a_daemon_that_is_not_well() {
+        let missing = refused_exec(
+            bollard::errors::Error::DockerResponseServerError {
+                status_code: 404,
+                message: "no such container".to_owned(),
+            },
+            "sonarr",
+        );
+        assert!(
+            matches!(missing, Failure::NoSuchContainer { ref name } if name == "sonarr"),
+            "got: {missing:?}"
+        );
+
+        let otherwise = refused_exec(
+            bollard::errors::Error::DockerResponseServerError {
+                status_code: 500,
+                message: "it is not well".to_owned(),
+            },
+            "sonarr",
+        );
+        assert!(
+            !matches!(otherwise, Failure::NoSuchContainer { .. }),
+            "a daemon fault is not a missing container: {otherwise:?}"
+        );
+    }
+
+    /// An exec nobody attached to wrote nothing, which is not the same as an error.
+    #[tokio::test]
+    async fn an_exec_that_was_not_attached_to_says_nothing() {
+        let said = spoken(bollard::exec::StartExecResults::Detached).await;
+        assert_eq!(said.ok(), Some(String::new()));
     }
 }
