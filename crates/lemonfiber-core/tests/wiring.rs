@@ -18,6 +18,7 @@ use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck, DRIFTED};
 use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::journal::{Change, Kind};
+use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::{ClientKind, Credential, DownloadClient};
 use lemonfiber_core::repair::{Attempt, Repair, Writing, OPERATION};
 use lemonfiber_fixtures::files::Files;
@@ -305,6 +306,25 @@ fn changes(attempt: Option<&Attempt>) -> Option<&[Change]> {
     }
 }
 
+/// What a stopped attempt left behind, on the same terms — the operator's own words for
+/// why nothing changed.
+fn stopped(attempt: Option<&Attempt>) -> Option<&str> {
+    match attempt {
+        Some(Attempt::Stopped { leaving }) => Some(leaving),
+        _ => None,
+    }
+}
+
+/// A repair naming a wiring this mender does not hold.
+fn for_something_else() -> Repair {
+    Repair {
+        check: "wiring:radarr:deluge".to_owned(),
+        does: "Put something back that nobody here manages".to_owned(),
+        effects: Vec::new(),
+        reversible: false,
+    }
+}
+
 /// A check over a wiring lemonfiber wrote and lemonfiber has since moved on from.
 fn stale() -> WiringCheck {
     checking(
@@ -427,4 +447,133 @@ async fn a_client_the_service_no_longer_holds_is_not_written_afresh() {
     };
 
     assert!(changes(attempt.as_ref()).is_none(), "nothing was written");
+}
+
+/// A repair naming a wiring lemonfiber no longer manages writes nothing.
+///
+/// Offering a repair and carrying it out are two commands apart, and the manifest can
+/// change in between. A repair the operator agreed to before a wiring was taken out of
+/// their stack would otherwise write a category into a service nobody asked lemonfiber to
+/// manage — and it is refused twice, once when asked whether it may and once when asked
+/// to, because either can be reached on its own.
+#[tokio::test]
+async fn a_repair_naming_a_wiring_no_longer_managed_writes_nothing() {
+    let check = stale();
+    let stranger = for_something_else();
+
+    assert_eq!(
+        permission(&check, &stranger).await,
+        Some(Writing::TheirsAlone),
+        "a wiring nobody manages was treated as lemonfiber's to write"
+    );
+
+    let attempt = carried(&check, &stranger).await;
+    assert!(changes(attempt.as_ref()).is_none(), "something was written");
+    assert!(
+        stopped(attempt.as_ref())
+            .is_some_and(|why| why.contains("no longer one lemonfiber manages")),
+        "{:?}",
+        stopped(attempt.as_ref())
+    );
+}
+
+/// A service whose key is not on disk yet is left exactly as it was.
+///
+/// The key is written by the service itself on first start, so a stack part-way through
+/// coming up has wirings that cannot be authenticated to. Writing to one unauthenticated
+/// would be refused by the service and reported to the operator as their wiring being
+/// broken, which it is not.
+#[tokio::test]
+async fn a_service_whose_key_is_not_written_yet_is_left_as_it_was() {
+    let check = stale();
+    let repair = offer(&check).await;
+
+    let unreadable = WiringCheck::new(
+        answering(Some("old-sonarr")),
+        Files::at(Vec::new()),
+        vec![managed(Some(recorded("old-sonarr", Origin::Written)))],
+        "2000".to_owned(),
+    );
+    let attempt = match &repair {
+        Some(repair) => carried(&unreadable, repair).await,
+        None => None,
+    };
+
+    assert!(changes(attempt.as_ref()).is_none(), "something was written");
+    assert!(
+        stopped(attempt.as_ref()).is_some_and(|why| why.contains("could not be authenticated to")),
+        "{:?}",
+        stopped(attempt.as_ref())
+    );
+}
+
+/// A service that will not say what it holds is not written to blind.
+///
+/// The repair writes a client by the id the service assigned it, and an id it will not
+/// read back is an id that may have been removed since. The counterpart of the permission
+/// this already refuses — asked separately, because carrying out a repair is reachable
+/// without asking again.
+#[tokio::test]
+async fn a_service_that_will_not_say_what_it_holds_is_not_written_to() {
+    let check = stale();
+    let repair = offer(&check).await;
+
+    let quiet = checking(
+        Some(recorded("old-sonarr", Origin::Written)),
+        Fake::silent(),
+    );
+    let attempt = match &repair {
+        Some(repair) => carried(&quiet, repair).await,
+        None => None,
+    };
+
+    assert!(changes(attempt.as_ref()).is_none(), "something was written");
+    assert!(
+        stopped(attempt.as_ref()).is_some_and(|why| why.contains("would not say what it holds")),
+        "{:?}",
+        stopped(attempt.as_ref())
+    );
+}
+
+/// A service that refuses the write keeps the category it had, in its own words.
+///
+/// The one outcome where lemonfiber did everything right and the service still said no.
+/// Reported as the service's refusal rather than as a repair carried out, because an
+/// operator told their wiring was mended and finding it unchanged has been lied to.
+#[tokio::test]
+async fn a_service_that_refuses_the_write_keeps_the_category_it_had() {
+    let check = stale();
+    let repair = offer(&check).await;
+
+    // The write is listed first: routed by what the URL contains, a table that put the
+    // client list first would answer the update with the list and call it taken.
+    let refusing = checking(
+        Some(recorded("old-sonarr", Origin::Written)),
+        Fake::by_rules(vec![
+            (
+                Some(Method::Put),
+                "downloadclient",
+                Answer::reply(403, "not allowed"),
+            ),
+            (
+                None,
+                "downloadclient",
+                Answer::reply(200, holding(Some("old-sonarr"))),
+            ),
+        ]),
+    );
+    let attempt = match &repair {
+        Some(repair) => carried(&refusing, repair).await,
+        None => None,
+    };
+
+    assert!(
+        changes(attempt.as_ref()).is_none(),
+        "it reported a change it did not make"
+    );
+    assert!(
+        stopped(attempt.as_ref()).is_some_and(|why| why.contains("kept the one it had")),
+        "{:?}",
+        stopped(attempt.as_ref())
+    );
 }

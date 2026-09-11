@@ -8,10 +8,15 @@ mod common;
 
 use common::tunnel::*;
 
+use lemonfiber_core::doctor::vpn::VpnCheck;
 use lemonfiber_core::doctor::vpn::NO_FORWARDED_PORT;
 use lemonfiber_core::doctor::{Check, Verdict};
 use lemonfiber_core::error::Severity;
+use lemonfiber_core::qbittorrent::Qbittorrent;
 use lemonfiber_core::repair::{Attempt, Repair};
+// The engine fake above and the transport fake are both called `Fake`, and this file is
+// full of the first — so the transport comes in under a name that says which it is.
+use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 #[tokio::test]
 async fn a_granted_port_is_a_verified_forward() {
@@ -477,4 +482,120 @@ async fn a_check_that_cannot_mend_anything_offers_no_mender() {
     assert!(check_with(vec![gateway_with_port("51413")], off)
         .mender()
         .is_none());
+}
+
+/// A download client on a fake transport, answering the sign-in and the two port reads.
+///
+/// The second preferences answer is what the client says after the write: `set_listen_port`
+/// reads back rather than trusting the write, because qBittorrent accepts a port it then
+/// declines to use — so a fake that answered the old port twice would be a client that
+/// refused the move, which is a different test.
+fn client_on(first: &str, after: &str, takes_the_write: bool) -> Qbittorrent {
+    let written = if takes_the_write {
+        Answer::reply(200, "")
+    } else {
+        Answer::reply(403, "Forbidden")
+    };
+    let http = Transport::by_path_in_turn(vec![
+        ("auth/login", vec![Answer::reply(200, "Ok.")]),
+        ("app/setPreferences", vec![written]),
+        (
+            "app/preferences",
+            vec![
+                Answer::reply(200, format!(r#"{{"listen_port":{first}}}"#)),
+                Answer::reply(200, format!(r#"{{"listen_port":{after}}}"#)),
+            ],
+        ),
+    ]);
+    Qbittorrent::authenticated(http, "http://127.0.0.1:8080", "the-password")
+}
+
+/// The repair every other one in this category is measured against: a port granted, a
+/// client somewhere else, and a write that lands.
+fn moving_a_client(behaviors: Vec<Behavior>, client: Qbittorrent) -> VpnCheck {
+    asking(Fake::new(behaviors))
+        .forwarding(forwarding("protonvpn"))
+        .moving(client)
+        .check()
+}
+
+/// The repair this category exists for, carried out: the client is moved onto the port the
+/// provider granted, and says so.
+///
+/// The grant is read again rather than taken from the diagnosis — a provider can take a
+/// port back between an operator being asked and answering, and pushing one they no longer
+/// hold leaves the client on a port nothing forwards.
+#[tokio::test]
+async fn a_client_on_the_wrong_port_is_moved_onto_the_one_granted() {
+    let subject = moving_a_client(
+        vec![gateway_with_port("51413")],
+        client_on("6881", "51413", true),
+    );
+
+    let attempt = match subject.mender() {
+        Some(mender) => Some(mender.mend(&a_move()).await),
+        None => None,
+    };
+    assert!(
+        matches!(attempt, Some(Attempt::Carried { .. })),
+        "{attempt:?}"
+    );
+}
+
+/// A client already where the grant says, or a provider granting nothing, is left alone.
+///
+/// Moving it would be a write that changes nothing, and this write restarts the client's
+/// listener — so transfers in flight would pause for no reason at all.
+#[tokio::test]
+async fn a_client_with_nowhere_else_to_be_is_left_where_it_is() {
+    let subject = moving_a_client(
+        vec![Behavior::up("gluetun", Some("185.65.1.1"))],
+        client_on("6881", "6881", true),
+    );
+
+    let attempt = match subject.mender() {
+        Some(mender) => Some(mender.mend(&a_move()).await),
+        None => None,
+    };
+    assert!(
+        left(attempt.as_ref()).is_some_and(|why| why.contains("nowhere else to be")),
+        "{attempt:?}"
+    );
+}
+
+/// A client that will not take the port stays where it was, and the operator is told which
+/// of the two refused.
+#[tokio::test]
+async fn a_client_that_will_not_take_the_port_is_reported_rather_than_assumed_moved() {
+    let subject = moving_a_client(
+        vec![gateway_with_port("51413")],
+        client_on("6881", "6881", false),
+    );
+
+    let attempt = match subject.mender() {
+        Some(mender) => Some(mender.mend(&a_move()).await),
+        None => None,
+    };
+    assert!(
+        left(attempt.as_ref()).is_some_and(|why| why.contains("would not take port 51413")),
+        "{attempt:?}"
+    );
+}
+
+/// The repair this check offers, as the runner would hand it back.
+fn a_move() -> Repair {
+    Repair {
+        check: "vpn.port-forward-client".to_owned(),
+        does: "move it".to_owned(),
+        effects: Vec::new(),
+        reversible: false,
+    }
+}
+
+/// What a stopped attempt left behind, or nothing where it carried.
+fn left(attempt: Option<&Attempt>) -> Option<&str> {
+    match attempt {
+        Some(Attempt::Stopped { leaving }) => Some(leaving),
+        _ => None,
+    }
 }
