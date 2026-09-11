@@ -5,14 +5,20 @@ What is built in **this repo** versus what the
 still asks for. Read this before reconstructing state from the source — it exists
 so a new contributor (human or agent) does not have to.
 
-This tracks the `lemonfiber` binary's milestones, **M2–M10**. A milestone is not
+This tracks the `lemonfiber` binary's milestones, **M2–M15**. A milestone is not
 one version: M4 spans `0.3.0` and `0.4.0`, M5 spans three, M6 spans `0.8.0` and
 `1.0.0` with seven versions in between, and M10 is scoped by no version manifest at
-all. M0–M1 live in the `spec` and `lemonfiber-media-stack` repos and are
-recorded here only for context. Milestone M8 is not started — its section is a stub
-pointing at the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
+all. Nor do the numbers run in ship order — M14 ships at `0.16.0`–`0.17.0`, ahead of
+M11's `0.18.0`. M0–M1 live in the `spec` and `lemonfiber-media-stack` repos and are
+recorded here only for context. Milestones M8, M11, M12, M13 and M15 are not started
+— their sections are stubs pointing at the
+[spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
 Every other milestone has a table, and several hold rows that landed ahead of the
 rest of their milestone because something already built needed them.
+
+**This file used to stop at M10**, which read as though the roadmap did. It does not:
+`1.0.0` means everything specced is built, so M11–M15 are on the way to it rather than
+after it, and one of them already has work landed.
 
 - Update this file **in the same PR** as the work it describes. A tracker in a
   separate change drifts; one that moves with the code cannot.
@@ -537,3 +543,72 @@ now, on the rows that owe them.
 **Exit criteria:** a non-contributor installs and runs lemonfiber on macOS,
 Linux and Windows following only the README (`L1-R8`). Unverified, and one third
 of it impossible today: there is no Windows artifact to install.
+
+---
+
+## M11 — Ecosystem glue · ☐
+
+`0.18.0` and `0.19.0`. Cross-seeding, announce-driven grabbing, quality-profile sync,
+subtitles, queue self-healing, library cleanup, transcoding, playback statistics. Not
+started. See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m11--ecosystem-glue).
+
+Worth saying plainly, because this repository does hold code with these words in it:
+the stack's subtitle and cleanup services are *wired* — credentials read, health
+checked, seeded — and M11 asks for something else. Its exit criteria are that each
+integration "proves its effect on a live stack, not its presence in a configuration
+file", and nothing here proves an effect.
+
+---
+
+## M12 — Safely reachable · ☐
+
+`0.20.0`. Remote access over a self-hosted overlay, and one account across the services
+the household touches. Not started.
+See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m12--safely-reachable).
+
+---
+
+## M13 — See everything · ☐
+
+`0.21.0`. Exported metrics and dashboards, and uptime monitoring the stack raises
+against itself. Not started.
+See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m13--see-everything).
+
+---
+
+## M14 — The platform · ◐
+
+`0.16.0` and `0.17.0`. Plugin manifests and recipes, capabilities and substitution, the
+catalogue, the lifecycle, provenance, mobile handoff. Draft in the roadmap, and the
+first milestone past M10 with anything landed — which is the reason this file stopping
+at M10 was worth correcting.
+
+| Deliverable | Reqs | Status | What is true today |
+|-------------|------|--------|-----------------|
+| Plugin manifests and recipes | `F3` | ☐ | Not started. |
+| Capabilities and substitution | `F4-R14` | ◐ | Half of one requirement, landed ahead of its milestone because the manifest reader needed it. `F4-R14` has two clauses. The second — an unrecognised declaration is refused **by name rather than by parse failure** — is built: `lemonfiber-manifest` walks the untyped tree and asks each closed field's own type about the word it was given, so a fork adapting the manifest is told every name this build does not know in one run instead of one per run. The first clause is not: extending what a service may declare still means editing a closed enumeration in first-party source, because there is no capability registry to declare into. The groundwork is visible — the manifest's `grants` field was renamed from `capabilities` and says in its own doc comment that the word is needed for something else — and the registry itself is untouched. |
+| The plugin catalogue | `F5` | ☐ | Not started. |
+| Plugin lifecycle | `F6` | ☐ | Not started. |
+| Plugin provenance | `F7` | ☐ | Not started. |
+| Mobile client handoff | `G9` | ☐ | Not started. |
+
+**Exit criteria:** a plugin authored outside this project installs, proves itself, and
+substitutes for a bundled service with no change to lemonfiber — and removing it puts
+the stack back. Nothing approaching this exists.
+
+---
+
+## M15 — Runs anywhere · ☐
+
+`0.22.0`. The container engine behind an abstraction rather than an assumption, Podman
+as a first-class alternative, services as plain processes, and an existing install
+moving across keeping its configuration and data. Not started.
+See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m15--runs-anywhere).
+
+Stated as not started rather than partial, and the distinction is worth the sentence.
+There *is* a port and an adapter behind it, and the vocabulary above the port is the
+neutral one — `Engine`, `Container`, not Docker's. What M15 asks for is that nothing
+above the port names an engine, and two things still do: the port is `ports::docker`
+and lifecycle goes through Compose as a subprocess, which is Docker's tool by name.
+One implementation behind a port named for it is the assumption the milestone exists
+to lift, not a first step into it.
