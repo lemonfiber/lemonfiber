@@ -17,6 +17,14 @@ on:
       - "crates/lemonfiber-manifest/**"
       - "fuzz/**"
       - ".github/workflows/fuzz.yml"
+      # Everything these targets are built from, not only the crate they exercise.
+      # The compiler is not the one the repository pins, and the parser they drive is
+      # mostly somebody else's code — so a toolchain pin or a `toml` bump is a change
+      # to whether these build and to what they are testing. Left off this list, that
+      # break lands and waits for the next manifest change to surface it, which is
+      # exactly how it happened. `fuzz/Cargo.lock` needs no entry; `fuzz/**` has it.
+      - "rust-toolchain.toml"
+      - "Cargo.lock"
   schedule:
     - cron: "0 4 * * 0"
   workflow_dispatch:
@@ -33,6 +41,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # Beats `rust-toolchain.toml`, which would otherwise hand every step below the
+    # pinned stable compiler — the action installs nightly, the file overrides it,
+    # and the sanitiser flags are refused by a compiler that never had to accept
+    # them. Quiet, because a job running the wrong compiler still reports normally.
+    env:
+      RUSTUP_TOOLCHAIN: nightly
     strategy:
       fail-fast: false
       matrix:

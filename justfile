@@ -56,7 +56,7 @@ release-tag VERSION:
 #
 # The loop to run before a push is `just rebased`, then clippy and the tests for what
 # you touched.
-ci: hooks fmt-check lint test typos deny
+ci: hooks fmt-check lint test typos deny toolchain
 
 build:
     cargo build --workspace
@@ -104,6 +104,17 @@ lint:
 
 deny:
     cargo deny check
+
+# Whether the compiler each CI job asks for is the one it would actually run.
+#
+# In `ci` for the same reason `typos` is: it costs a second, needs no toolchain, and
+# the failure it catches is one nothing else would report. `rust-toolchain.toml` wins
+# over what a job installs, so a job needing a different compiler — the oldest one the
+# workspace promises, or the nightly the fuzzers need — has to say so twice or run on
+# the pinned one and pass for the wrong reason.
+toolchain:
+    python3 scripts/the_toolchain_a_job_gets.py
+    python3 scripts/the_toolchain_a_job_gets.py --self-test
 
 # Spell-check comments and docs, the way CI's hygiene job does — same tool, same
 # `typos.toml`, run from the same place, so a pass here means a pass there.

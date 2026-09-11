@@ -44,28 +44,63 @@ jobs:
   # source. This is what collects on it, on the exact toolchain that number names:
   # every other job here runs on stable, which compiles plenty the oldest supported
   # version will not.
+  # Before anything builds, because it needs no toolchain and answers the question
+  # every job below depends on: whether the compiler each one asks for is the one it
+  # will actually run.
+  toolchain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install the yaml reader
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check \
+            --require-hashes -r .github/requirements/yaml.txt
+      - name: Every job runs the compiler it asks for
+        run: python3 scripts/the_toolchain_a_job_gets.py
+      # A claim nobody has watched fail is a claim nobody knows works.
+      - name: Every claim refuses the tree that has lost it
+        run: python3 scripts/the_toolchain_a_job_gets.py --self-test
+
   msrv:
     runs-on: ubuntu-latest
-    # Takes precedence over `rust-toolchain.toml`, which would otherwise hand this job
-    # the pinned toolchain — and a job that silently checks the version everything else
-    # already checks is a job that passes for the wrong reason forever.
-    env:
-      RUSTUP_TOOLCHAIN: "1.95.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           submodules: recursive
+      # Read rather than restated. The version this job collects on is the one the
+      # workspace promises, and a copy of it here is a copy that can disagree — which
+      # is invisible, because a job checking the wrong compiler still passes.
+      - name: The version the workspace promises
+        id: promised
+        run: |
+          version="$(sed -n 's/^rust-version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)"
+          if [ -z "$version" ]; then
+            echo "::error file=Cargo.toml::no rust-version is declared, so there is no promise to collect on"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # The pin names the tag the commit was resolved from; what gets installed is
+      # the input, and what gets *run* is the override below.
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.95.0
         with:
-          toolchain: "1.95.0"
+          toolchain: ${{ steps.promised.outputs.version }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      # Printed, because the failure this job can have is being handed a different
-      # toolchain and passing quietly. A version in the log is what makes that visible.
-      - name: The toolchain this job is actually holding
-        run: rustc --version
-      - name: The workspace builds on the version it claims
-        run: cargo check --workspace --locked
+      # `RUSTUP_TOOLCHAIN` takes precedence over `rust-toolchain.toml`, which would
+      # otherwise hand this job the pinned toolchain — and a job silently checking the
+      # version everything else already checks passes for the wrong reason forever.
+      # Printed for the same reason: the version in the log is what makes it visible.
+      - name: The workspace builds on the version it promises
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.promised.outputs.version }}
+        run: |
+          rustc --version
+          cargo check --workspace --locked
   deny:
     runs-on: ubuntu-latest
     steps:
