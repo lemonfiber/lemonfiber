@@ -342,7 +342,7 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
         &self,
         path: &std::path::Path,
     ) -> Result<std::path::PathBuf, lemonfiber_ports::filesystem::Fault> {
-        resolved(self, path).await
+        resolved(self, path)
     }
     async fn touch(
         &self,
@@ -454,7 +454,7 @@ fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
     seed.servarr.map(str::to_owned)
 }
 
-async fn resolved(
+fn resolved(
     seed: &SeedFs,
     path: &std::path::Path,
 ) -> Result<std::path::PathBuf, lemonfiber_ports::filesystem::Fault> {
