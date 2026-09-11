@@ -10,8 +10,8 @@ one version: M4 spans `0.3.0` and `0.4.0`, M5 spans three, M6 spans `0.8.0` and
 `1.0.0` with seven versions in between, and M10 is scoped by no version manifest at
 all. Nor do the numbers run in ship order — M14 ships at `0.16.0`–`0.17.0`, ahead of
 M11's `0.18.0`. M0–M1 live in the `spec` and `lemonfiber-media-stack` repos and are
-recorded here only for context. Milestones M8, M11, M12, M13 and M15 are not started
-— their sections are stubs pointing at the
+recorded here only for context. Milestones M11, M12, M13 and M15 are not started — their
+sections are stubs pointing at the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
 Every other milestone has a table, and several hold rows that landed ahead of the
 rest of their milestone because something already built needed them.
@@ -458,11 +458,38 @@ served beside them where a build carries one. What the browser draws lives in
 
 ---
 
-## M8 — Household & content · ☐
+## M8 — Household & content · ✅
 
-`0.11.0` and `0.12.0`. The request flow, one-account identity, approval quotas, parental
-controls, disk-space and bandwidth management, client-app guidance. Not started.
-See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m8--household--content).
+`0.11.0` and `0.12.0`, both released. Every feature either version locks is `shipped`:
+the request flow, household identity, the front door and client-app guidance in
+`0.11.0`; approval quotas, parental controls, disk-space management, bandwidth and
+scheduling, and service auto-wiring in `0.12.0`.
+
+**This section read "Not started" for both of those releases.** It was written when M8
+was ahead of the work and never revisited when the work landed — the failure the note at
+the top of this file warns about, in the one milestone that had no table to keep honest.
+It has one now.
+
+| Deliverable | Reqs | Status | Landed |
+|-------------|------|--------|--------|
+| Household request flow | `D4` | ✅ | `0.11.0` |
+| Household identity & invitations | `D6` | ✅ | `0.11.0` |
+| The front door | `G5` | ✅ | `0.11.0` |
+| Client app guidance | `G6` | ✅ | `0.11.0` |
+| Service auto-wiring | `D1` | ✅ | `0.12.0` |
+| Disk space management | `D5` | ✅ | `0.12.0` |
+| Request approval & quotas | `D7` | ✅ | `0.12.0` |
+| Parental controls | `D8` | ✅ | `0.12.0` |
+| Bandwidth & scheduling | `D10` | ✅ | `0.12.0` |
+
+Cited by feature rather than by requirement range: each of these is `maturity: shipped`
+in the feature catalogue against a version whose manifest is `status = "released"`, which
+is the pair of facts a reader can check without trusting this file.
+
+**Exit criteria:** a household member's request flows end to end, and content management
+acts without reverting an operator's manual choices. Met — `0.11.0` and `0.12.0` released
+against the gate that refuses a version while a feature it locks is unbuilt
+([OPS-R54](https://github.com/lemonfiber/spec/blob/main/70-operations/staging.md)).
 
 ---
 
