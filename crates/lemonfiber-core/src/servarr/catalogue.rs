@@ -181,32 +181,37 @@ async fn add(
     entry: &CatalogueEntry,
     plan: &AddPlan,
 ) -> Result<Added, Failure> {
-    let mut body = serde_json::json!({
-        "title": entry.title,
-        "qualityProfileId": plan.quality_profile,
-        "rootFolderPath": plan.root_folder,
-        "monitored": true,
-        "addOptions": { kind.search_option(): true },
-    });
-    // The external identifier and the two fields only one of the services takes are
-    // set by kind rather than sent to both: a field a service does not know is a
-    // field it rejects the whole body over.
-    if let Some(object) = body.as_object_mut() {
-        object.insert(
-            kind.reference_field().to_owned(),
-            serde_json::json!(entry.reference),
-        );
-        match kind {
-            Kind::Sonarr => object.insert("seasonFolder".to_owned(), serde_json::json!(true)),
-            Kind::Radarr => object.insert(
-                "minimumAvailability".to_owned(),
-                serde_json::json!("released"),
-            ),
-        };
-    }
+    // The external identifier and the one field only that service takes are set by
+    // kind rather than sent to both: a field a service does not know is a field it
+    // rejects the whole body over.
+    //
+    // Chosen as a value and put in with the rest, rather than reached in and added
+    // afterwards. Reaching inside a literal object carries a branch for the object
+    // not being one, which cannot happen and so can never be shown working.
+    let only = match kind {
+        Kind::Sonarr => ("seasonFolder", serde_json::json!(true)),
+        Kind::Radarr => ("minimumAvailability", serde_json::json!("released")),
+    };
+    let fields: serde_json::Map<String, serde_json::Value> = [
+        ("title", serde_json::json!(entry.title)),
+        ("qualityProfileId", serde_json::json!(plan.quality_profile)),
+        ("rootFolderPath", serde_json::json!(plan.root_folder)),
+        ("monitored", serde_json::json!(true)),
+        (
+            "addOptions",
+            serde_json::json!({ kind.search_option(): true }),
+        ),
+        (kind.reference_field(), serde_json::json!(entry.reference)),
+        only,
+    ]
+    .into_iter()
+    .map(|(at, value)| (at.to_owned(), value))
+    .collect();
+
     let path = format!("/{}", kind.library_endpoint());
+    let body = serde_json::Value::Object(fields).to_string();
     let response = servarr
-        .probe(&servarr.request(Method::Post, &path, Some(body.to_string())))
+        .probe(&servarr.request(Method::Post, &path, Some(body)))
         .await?;
     servarr.endpoint.expect_success(&response)?;
     let added: LookupResult = servarr

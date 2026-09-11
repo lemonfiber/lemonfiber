@@ -12,9 +12,11 @@ use std::sync::Arc;
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Http, Method, Request};
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientKind, Credential, DownloadClient, Failure, Maintenance, MusicQuality,
-    QueueDepth, Queued, Queues, RegisteredClient, RegisteredFolder, RootFolder,
+    AddPlan, Added, Catalogue, CatalogueEntry, Category, Client, ClientKind, Credential,
+    DownloadClient, Failure, Maintenance, MusicQuality, QueueDepth, Queued, Queues,
+    RegisteredClient, RegisteredFolder, RootFolder,
 };
+use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::{api_key, Servarr};
 use lemonfiber_fixtures::http::{Answer, Fake};
 
@@ -1100,5 +1102,93 @@ async fn a_root_folder_for_a_service_without_metadata_profiles_carries_only_its_
     assert!(
         !body.contains("defaultMetadataProfileId") && !body.contains("defaultQualityProfileId"),
         "a service that files no music was sent the music fields: {body}"
+    );
+}
+
+/// A \*arr of the given kind over the fake, at the endpoint that kind answers on.
+fn of_kind(fake: &Arc<Fake>, kind: Kind) -> Servarr {
+    let http: Arc<dyn Http> = fake.clone();
+    match kind {
+        Kind::Sonarr => Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr", 3),
+        Kind::Radarr => Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3),
+    }
+}
+
+/// Ask one kind to take something on, and hand back the request that went out.
+async fn taking_on(kind: Kind) -> Option<Request> {
+    let fake = Fake::always(Answer::reply(201, r#"{"id":9,"title":"Sintel"}"#));
+    let entry = CatalogueEntry {
+        title: "Sintel".to_owned(),
+        year: Some(2010),
+        reference: 45745,
+        held_as: None,
+    };
+    let plan = AddPlan {
+        root_folder: "/data/media".to_owned(),
+        quality_profile: 4,
+    };
+    let took = of_kind(&fake, kind).add(kind, &entry, &plan).await;
+    assert_eq!(
+        took.ok(),
+        Some(Added {
+            id: 9,
+            title: "Sintel".to_owned()
+        }),
+        "the service said what it took on and the client did not read it back"
+    );
+    fake.requests().into_iter().next()
+}
+
+/// Each \*arr is asked in its own vocabulary, and never in the other's.
+///
+/// The two services take the same request under different names — a different external
+/// identifier, a different search option, and one extra field each that the other has
+/// never heard of. A field a service does not know is not a field it ignores: it refuses
+/// the whole body, so a single shape sent to both takes nothing on anywhere.
+#[tokio::test]
+async fn each_kind_is_asked_in_the_vocabulary_its_own_service_answers_to() {
+    let television = taking_on(Kind::Sonarr)
+        .await
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(television.contains(r#""tvdbId":45745"#), "{television}");
+    assert!(
+        television.contains("searchForMissingEpisodes") && television.contains("seasonFolder"),
+        "{television}"
+    );
+    assert!(
+        !television.contains("tmdbId") && !television.contains("minimumAvailability"),
+        "television was asked in the film service's words: {television}"
+    );
+
+    let film = taking_on(Kind::Radarr)
+        .await
+        .and_then(|request| request.body)
+        .unwrap_or_default();
+    assert!(film.contains(r#""tmdbId":45745"#), "{film}");
+    assert!(
+        film.contains("searchForMovie") && film.contains(r#""minimumAvailability":"released""#),
+        "{film}"
+    );
+    assert!(
+        !film.contains("tvdbId") && !film.contains("seasonFolder"),
+        "a film was asked in television's words: {film}"
+    );
+}
+
+/// And it is put to the library each kind keeps its own things in.
+#[tokio::test]
+async fn each_kind_is_asked_at_its_own_library() {
+    assert!(
+        taking_on(Kind::Sonarr)
+            .await
+            .is_some_and(|request| request.url.ends_with("/series")),
+        "television was not put to the series library"
+    );
+    assert!(
+        taking_on(Kind::Radarr)
+            .await
+            .is_some_and(|request| request.url.ends_with("/movie")),
+        "a film was not put to the film library"
     );
 }
