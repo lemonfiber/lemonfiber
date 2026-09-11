@@ -1,30 +1,38 @@
+# When this repository asks for its supply-chain posture check.
+#
+# The check itself is lemonfiber/spec's, called rather than copied — `Q-R56`
+# asks for that, and six byte-identical copies of a 29-line file were what it
+# had instead. Only the triggers live here, because only they are about this
+# repository: `branch_protection_rule` and `push` are events that arrive at a
+# repository, and a reusable workflow is not a place events arrive.
+#
+# `secrets: inherit` passes `SCORECARD_TOKEN`, which is an org secret with no
+# write scope. Scorecard publishes its result so somebody outside the org can
+# read it without being trusted with anything, which is the point of `Q-R59`.
 name: scorecard
+
 on:
   workflow_dispatch:
+  # A change to this repository's protection is a change to its posture, and it
+  # is the one event that says so without waiting for the week to turn.
   branch_protection_rule:
   schedule:
     - cron: "0 6 * * 1"
   push:
     branches: [main]
+
 permissions:
   contents: read
+
 jobs:
-  analysis:
-    runs-on: ubuntu-latest
+  scorecard:
     permissions:
+      # Writing the SARIF back is what puts findings in the security tab.
       security-events: write
+      # Scorecard signs its result, so the published entry traces to this run.
       id-token: write
       contents: read
+      # Reading the workflow list is how it judges the pipeline itself.
       actions: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
-        with:
-          repo_token: ${{ secrets.SCORECARD_TOKEN }}
-          results_file: results.sarif
-          results_format: sarif
-          publish_results: true
-      - uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
-        with:
-          sarif_file: results.sarif
+    secrets: inherit
+    uses: lemonfiber/spec/.github/workflows/scorecard.yml@30ae524aea425cc66cdbfe2329e0914031b9d4e4 # main
