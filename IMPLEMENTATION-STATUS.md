@@ -612,4 +612,3 @@ above the port names an engine, and two things still do: the port is `ports::doc
 and lifecycle goes through Compose as a subprocess, which is Docker's tool by name.
 One implementation behind a port named for it is the assumption the milestone exists
 to lift, not a first step into it.
-
