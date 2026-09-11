@@ -110,20 +110,25 @@ impl Check for HeadroomCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let verdict = match &self.data_root {
-            None => Verdict::Skipped {
-                reason: "no data location is configured, so there is nothing to project against"
-                    .to_owned(),
-            },
-            Some(root) => self.project(root).await,
-        };
-        vec![Finding::in_category(
-            Category::Storage,
-            "storage.quality-headroom",
-            "Room for the chosen quality",
-            verdict,
-        )]
+        ran(self).await
     }
+}
+
+/// Whether the free space holds enough at the quality in force.
+async fn ran(check: &HeadroomCheck) -> Vec<Finding> {
+    let verdict = match &check.data_root {
+        None => Verdict::Skipped {
+            reason: "no data location is configured, so there is nothing to project against"
+                .to_owned(),
+        },
+        Some(root) => check.project(root).await,
+    };
+    vec![Finding::in_category(
+        Category::Storage,
+        "storage.quality-headroom",
+        "Room for the chosen quality",
+        verdict,
+    )]
 }
 
 /// The free space holds too little at the chosen quality: a risk to warn on, not a

@@ -53,44 +53,49 @@ impl Check for GuidesCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        if !self.allowed {
-            return vec![Finding::in_category(
-                Category::Services,
-                "services.quality-guides",
-                "Quality guide source",
-                Verdict::Skipped {
-                    reason: format!(
-                        "reaching the quality guide source is switched off in {}, so it was \
-                         not asked; the profiles already in place are unaffected",
-                        crate::config::REACH_GUIDES_KEY
-                    ),
-                },
-            )];
-        }
-        let request = Request {
-            method: Method::Get,
-            url: GUIDE_SOURCE.to_owned(),
-            headers: Vec::new(),
-            body: None,
-        };
-        let verdict = match self.http.send(&request).await {
-            Ok(response) if response.is_success() => Verdict::Pass {
-                note: Some("the quality guide source is reachable from here".to_owned()),
-            },
-            // Reached but not serving, or not reached at all: either way the probe
-            // established only that it could not confirm the source is available, not
-            // that the stack is degraded — so it is unverified, never a warning. The
-            // profiles in place are untouched meanwhile.
-            Ok(response) => cannot_confirm(&format!("the source answered {}", response.status)),
-            Err(unreachable) => cannot_confirm(&unreachable.reason),
-        };
-        vec![Finding::in_category(
+        ran(self).await
+    }
+}
+
+/// Where the quality guides come from, and whether it can be read.
+async fn ran(check: &GuidesCheck) -> Vec<Finding> {
+    if !check.allowed {
+        return vec![Finding::in_category(
             Category::Services,
             "services.quality-guides",
             "Quality guide source",
-            verdict,
-        )]
+            Verdict::Skipped {
+                reason: format!(
+                    "reaching the quality guide source is switched off in {}, so it was \
+                     not asked; the profiles already in place are unaffected",
+                    crate::config::REACH_GUIDES_KEY
+                ),
+            },
+        )];
     }
+    let request = Request {
+        method: Method::Get,
+        url: GUIDE_SOURCE.to_owned(),
+        headers: Vec::new(),
+        body: None,
+    };
+    let verdict = match check.http.send(&request).await {
+        Ok(response) if response.is_success() => Verdict::Pass {
+            note: Some("the quality guide source is reachable from here".to_owned()),
+        },
+        // Reached but not serving, or not reached at all: either way the probe
+        // established only that it could not confirm the source is available, not
+        // that the stack is degraded — so it is unverified, never a warning. The
+        // profiles in place are untouched meanwhile.
+        Ok(response) => cannot_confirm(&format!("the source answered {}", response.status)),
+        Err(unreachable) => cannot_confirm(&unreachable.reason),
+    };
+    vec![Finding::in_category(
+        Category::Services,
+        "services.quality-guides",
+        "Quality guide source",
+        verdict,
+    )]
 }
 
 /// The verdict when the probe could not get a clean answer: whether the profiles can

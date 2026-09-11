@@ -120,20 +120,25 @@ impl Check for ProvidersCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let mut findings = self.usenet().await;
-        findings.extend(self.indexers().await);
-        if findings.is_empty() {
-            findings.push(Finding::in_category(
-                Category::Providers,
-                "providers",
-                "Providers",
-                Verdict::Skipped {
-                    reason: "there are no accounts in use to read — no Usenet account the download client is pulling through, and no indexer being queried".to_owned(),
-                },
-            ));
-        }
-        findings
+        ran(self).await
     }
+}
+
+/// Whether each declared provider is configured and reachable.
+async fn ran(check: &ProvidersCheck) -> Vec<Finding> {
+    let mut findings = check.usenet().await;
+    findings.extend(check.indexers().await);
+    if findings.is_empty() {
+        findings.push(Finding::in_category(
+            Category::Providers,
+            "providers",
+            "Providers",
+            Verdict::Skipped {
+                reason: "there are no accounts in use to read — no Usenet account the download client is pulling through, and no indexer being queried".to_owned(),
+            },
+        ));
+    }
+    findings
 }
 
 /// A source that could not be read at all.

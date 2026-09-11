@@ -110,28 +110,33 @@ impl Check for EnvironmentCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let engine = self.engine().await;
-        let compose = match &engine {
-            // With no client there is nothing to run Compose through, so it is
-            // skipped with the same reason the operator will act on first.
-            Engine::Absent => Verdict::Skipped {
-                reason: "Docker is not installed".to_owned(),
-            },
-            Engine::Unusable(_) => Verdict::Skipped {
-                reason: "the Docker client would not start".to_owned(),
-            },
-            Engine::Up(_) | Engine::DaemonDown(_) => self.compose().await,
-        };
-
-        vec![
-            finding(
-                "environment.engine",
-                "Docker engine",
-                engine_verdict(engine),
-            ),
-            finding("environment.compose", "Docker Compose", compose),
-        ]
+        ran(self).await
     }
+}
+
+/// Whether this machine has what the stack needs to run at all.
+async fn ran(check: &EnvironmentCheck) -> Vec<Finding> {
+    let engine = check.engine().await;
+    let compose = match &engine {
+        // With no client there is nothing to run Compose through, so it is
+        // skipped with the same reason the operator will act on first.
+        Engine::Absent => Verdict::Skipped {
+            reason: "Docker is not installed".to_owned(),
+        },
+        Engine::Unusable(_) => Verdict::Skipped {
+            reason: "the Docker client would not start".to_owned(),
+        },
+        Engine::Up(_) | Engine::DaemonDown(_) => check.compose().await,
+    };
+
+    vec![
+        finding(
+            "environment.engine",
+            "Docker engine",
+            engine_verdict(engine),
+        ),
+        finding("environment.compose", "Docker Compose", compose),
+    ]
 }
 
 /// The command that asks the client for the version of the daemon it fronts.

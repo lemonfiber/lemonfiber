@@ -200,19 +200,24 @@ impl Check for StorageCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let Some(root) = &self.root else {
-            return vec![skipped(
-                "no data location is configured yet — run setup to choose one",
-            )];
-        };
+        ran(self).await
+    }
+}
 
-        // Resolved first so the probe runs against the filesystem the data
-        // actually lives on: a symlinked root would otherwise be tested on the
-        // filesystem holding the link, which is not the one that matters.
-        match self.filesystem.canonicalize(root).await {
-            Err(fault) => absent(root, &fault.message),
-            Ok(real) => self.probe(&real).await,
-        }
+/// Whether the data location is there, writable, and on one filesystem.
+async fn ran(check: &StorageCheck) -> Vec<Finding> {
+    let Some(root) = &check.root else {
+        return vec![skipped(
+            "no data location is configured yet — run setup to choose one",
+        )];
+    };
+
+    // Resolved first so the probe runs against the filesystem the data
+    // actually lives on: a symlinked root would otherwise be tested on the
+    // filesystem holding the link, which is not the one that matters.
+    match check.filesystem.canonicalize(root).await {
+        Err(fault) => absent(root, &fault.message),
+        Ok(real) => check.probe(&real).await,
     }
 }
 

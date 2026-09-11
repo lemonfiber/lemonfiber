@@ -183,16 +183,21 @@ impl Check for WiringCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let mut findings = Vec::new();
-        for managed in self.managed.iter() {
-            findings.extend(self.examine(managed).await);
-        }
-        findings
+        ran(self).await
     }
 
     fn mender(&self) -> Option<&dyn Mend> {
         Some(&self.mender)
     }
+}
+
+/// Every service that should be wired to another, and whether it is.
+async fn ran(check: &WiringCheck) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    for managed in check.managed.iter() {
+        findings.extend(check.examine(managed).await);
+    }
+    findings
 }
 
 /// The ids of the edited clients this service can no longer reach.
