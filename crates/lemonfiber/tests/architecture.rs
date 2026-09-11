@@ -805,7 +805,7 @@ fn every_disturbing_check_says_how_long_it_disturbs_for() {
             continue;
         }
         let shipped = production(&text);
-        if !refuses_unless_asked(&shipped) {
+        if !refuses_unless_asked(shipped) {
             continue;
         }
         seen += 1;
