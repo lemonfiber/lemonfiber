@@ -17,6 +17,7 @@ use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats,
 };
+use lemonfiber_core::qbittorrent::Qbittorrent;
 use lemonfiber_manifest::Manifest;
 use tokio::sync::mpsc::Receiver;
 
@@ -399,6 +400,17 @@ impl Asking {
     #[must_use]
     pub fn without_leak_detection(mut self) -> Self {
         self.asked.echo = Vec::new();
+        self
+    }
+
+    /// A download client the repair can actually move.
+    ///
+    /// Distinct from `listening`, which is a number the caller read earlier and handed
+    /// in: this is the client itself, and only a repair has any use for one. A check
+    /// that reads it reads it afresh, which is the whole reason the repair holds it.
+    #[must_use]
+    pub fn moving(mut self, client: Qbittorrent) -> Self {
+        self.asked.client = Some(client);
         self
     }
 
