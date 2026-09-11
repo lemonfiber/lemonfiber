@@ -140,35 +140,40 @@ impl Check for BindingsCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let Ok(containers) = self.engine.list(&self.project).await else {
-            return vec![unverified()];
-        };
-        let running: Vec<&Container> = containers
-            .iter()
-            .filter(|container| !container.published.is_empty())
-            .collect();
-        if running.is_empty() {
-            return vec![nothing_listening()];
-        }
-        let wrong: Vec<Finding> = running
-            .iter()
-            .flat_map(|container| {
-                beyond(container, self.tier(&container.service))
-                    .into_iter()
-                    .map(|where_| match self.said_so(&container.service) {
-                        Some(why) => acknowledged(&container.service, &where_, why),
-                        None => violation(&container.service, &where_),
-                    })
-            })
-            .collect();
-        let mut found = if wrong.is_empty() {
-            vec![kept(running.len())]
-        } else {
-            wrong
-        };
-        found.extend(around_the_firewall(self.environment, &running));
-        found
+        ran(self).await
     }
+}
+
+/// Which ports are published, and to whom.
+async fn ran(check: &BindingsCheck) -> Vec<Finding> {
+    let Ok(containers) = check.engine.list(&check.project).await else {
+        return vec![unverified()];
+    };
+    let running: Vec<&Container> = containers
+        .iter()
+        .filter(|container| !container.published.is_empty())
+        .collect();
+    if running.is_empty() {
+        return vec![nothing_listening()];
+    }
+    let wrong: Vec<Finding> = running
+        .iter()
+        .flat_map(|container| {
+            beyond(container, check.tier(&container.service))
+                .into_iter()
+                .map(|where_| match check.said_so(&container.service) {
+                    Some(why) => acknowledged(&container.service, &where_, why),
+                    None => violation(&container.service, &where_),
+                })
+        })
+        .collect();
+    let mut found = if wrong.is_empty() {
+        vec![kept(running.len())]
+    } else {
+        wrong
+    };
+    found.extend(around_the_firewall(check.environment, &running));
+    found
 }
 
 /// Where a published port is reached without the host's firewall being consulted.

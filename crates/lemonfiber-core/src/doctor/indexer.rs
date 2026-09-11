@@ -80,19 +80,24 @@ impl Check for IndexerCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let verdict = match &self.indexer {
-            None => Verdict::Skipped {
-                reason: "no indexer is configured, so there is none to prove".to_owned(),
-            },
-            Some(indexer) => self.prove(indexer).await,
-        };
-        vec![Finding::in_category(
-            Category::Credentials,
-            "credentials.indexer",
-            "Indexer credential",
-            verdict,
-        )]
+        ran(self).await
     }
+}
+
+/// Whether the indexer's credential is there and answers.
+async fn ran(check: &IndexerCheck) -> Vec<Finding> {
+    let verdict = match &check.indexer {
+        None => Verdict::Skipped {
+            reason: "no indexer is configured, so there is none to prove".to_owned(),
+        },
+        Some(indexer) => check.prove(indexer).await,
+    };
+    vec![Finding::in_category(
+        Category::Credentials,
+        "credentials.indexer",
+        "Indexer credential",
+        verdict,
+    )]
 }
 
 /// The indexer answered and refused the key: the key is wrong for it, which no

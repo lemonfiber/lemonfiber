@@ -224,105 +224,110 @@ impl Check for VpnCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        // Read now rather than where the killswitch needs it: what it has to know is
-        // how much of the run is already spent, and only the start of the run can say.
-        let deadline = tokio::time::Instant::now() + self.budget();
-        let pair = match &self.target {
-            Target::Skip(reason) => return vec![skipped(reason.clone())],
-            Target::Unprotected => return vec![unprotected()],
-            Target::Pair(pair) => pair,
-        };
-
-        // The engine being unreachable is a reason the checks could not run,
-        // never a report that the stack is safe. Leak detection being switched off
-        // is an opt-out that still holds here: the operator asked not to be told
-        // about egress, so it stays skipped rather than becoming an unverified
-        // engine finding — while port forwarding, which they did ask for, reports.
-        let Ok(containers) = self.engine.list(&self.project).await else {
-            return if self.echo.is_empty() {
-                vec![
-                    skipped("leak detection is switched off".to_owned()),
-                    port_forward_offline(&self.port_forward),
-                ]
-            } else {
-                unreachable_engine(pair, &self.port_forward, self.disruptive)
-            };
-        };
-        // Nothing is running, so the whole VPN check collapses to one line rather
-        // than repeating "cannot check, nothing is up" for each finding — the
-        // port-forward finding included, since its port lives in a container that
-        // is not there either.
-        if containers.is_empty() {
-            return vec![skipped("the stack is not running".to_owned())];
-        }
-
-        let gateway_container = find(&containers, &pair.gateway);
-
-        // Port forwarding is read from the gateway's own status file rather than
-        // from the IP-echo comparison, so it is established even where the operator
-        // has switched leak detection off.
-        let port_forward = self.port_forward_finding(gateway_container).await;
-        // A client on the wrong port is a separate fact from a port having been
-        // granted, and fails separately — so it is its own finding rather than a
-        // clause inside that one.
-        let mismatch = match (
-            read_grant(self.engine.as_ref(), gateway_container).await,
-            self.listening,
-        ) {
-            (Grant::Port(granted), Some(listening)) if granted != listening => {
-                Some(port_mismatch(granted, listening))
-            }
-            _ => None,
-        };
-
-        if self.echo.is_empty() {
-            return vec![
-                skipped("leak detection is switched off".to_owned()),
-                port_forward,
-            ];
-        }
-        // The first source is what the single-answer reads still use — the country
-        // and the killswitch probe, neither of which is a comparison and so neither
-        // of which gains anything from a second opinion.
-        let echo = self.echo.first().map_or("", String::as_str);
-
-        let client_container = find(&containers, &pair.client);
-
-        // Every configured source is asked, so a single one that is wrong cannot
-        // make the check say `pass` while traffic leaves in the clear.
-        let (gateway, gateway_seen) =
-            addresses(self.engine.as_ref(), gateway_container, &self.echo).await;
-        let (client, client_seen) =
-            addresses(self.engine.as_ref(), client_container, &self.echo).await;
-
-        // The exit country only means anything where the tunnel answered, and is
-        // one extra request, so it is asked for only then. Awaited into a plain
-        // value first: a block whose last statement is an await leaves its own
-        // closing brace unmarked by coverage.
-        let country = match (&gateway, gateway_container) {
-            (Reach::Address(_), Some(container)) => self.country(container, echo).await,
-            _ => None,
-        };
-        let note = match &gateway {
-            Reach::Address(ip) => Some(labelled(ip, country)),
-            _ => None,
-        };
-
-        let held = self
-            .killswitch_held(gateway_container, client_container, echo, &client, deadline)
-            .await;
-        let mut findings = assemble(pair, &gateway, &client, note, killswitch_findings(&held));
-        // A disagreement is reported rather than resolved: there is no basis to
-        // prefer one stranger's account over another's, and a check that quietly
-        // chose would be least trustworthy exactly when it mattered most.
-        findings.extend(
-            [&gateway_seen, &client_seen]
-                .into_iter()
-                .filter_map(Seen::said)
-                .map(disagreeing),
-        );
-        findings.push(port_forward);
-        findings.extend(mismatch);
-        findings
+        ran(self).await
     }
+}
+
+/// Whether the tunnel is up, and whether traffic is actually inside it.
+async fn ran(check: &VpnCheck) -> Vec<Finding> {
+    // Read now rather than where the killswitch needs it: what it has to know is
+    // how much of the run is already spent, and only the start of the run can say.
+    let deadline = tokio::time::Instant::now() + check.budget();
+    let pair = match &check.target {
+        Target::Skip(reason) => return vec![skipped(reason.clone())],
+        Target::Unprotected => return vec![unprotected()],
+        Target::Pair(pair) => pair,
+    };
+
+    // The engine being unreachable is a reason the checks could not run,
+    // never a report that the stack is safe. Leak detection being switched off
+    // is an opt-out that still holds here: the operator asked not to be told
+    // about egress, so it stays skipped rather than becoming an unverified
+    // engine finding — while port forwarding, which they did ask for, reports.
+    let Ok(containers) = check.engine.list(&check.project).await else {
+        return if check.echo.is_empty() {
+            vec![
+                skipped("leak detection is switched off".to_owned()),
+                port_forward_offline(&check.port_forward),
+            ]
+        } else {
+            unreachable_engine(pair, &check.port_forward, check.disruptive)
+        };
+    };
+    // Nothing is running, so the whole VPN check collapses to one line rather
+    // than repeating "cannot check, nothing is up" for each finding — the
+    // port-forward finding included, since its port lives in a container that
+    // is not there either.
+    if containers.is_empty() {
+        return vec![skipped("the stack is not running".to_owned())];
+    }
+
+    let gateway_container = find(&containers, &pair.gateway);
+
+    // Port forwarding is read from the gateway's own status file rather than
+    // from the IP-echo comparison, so it is established even where the operator
+    // has switched leak detection off.
+    let port_forward = check.port_forward_finding(gateway_container).await;
+    // A client on the wrong port is a separate fact from a port having been
+    // granted, and fails separately — so it is its own finding rather than a
+    // clause inside that one.
+    let mismatch = match (
+        read_grant(check.engine.as_ref(), gateway_container).await,
+        check.listening,
+    ) {
+        (Grant::Port(granted), Some(listening)) if granted != listening => {
+            Some(port_mismatch(granted, listening))
+        }
+        _ => None,
+    };
+
+    if check.echo.is_empty() {
+        return vec![
+            skipped("leak detection is switched off".to_owned()),
+            port_forward,
+        ];
+    }
+    // The first source is what the single-answer reads still use — the country
+    // and the killswitch probe, neither of which is a comparison and so neither
+    // of which gains anything from a second opinion.
+    let echo = check.echo.first().map_or("", String::as_str);
+
+    let client_container = find(&containers, &pair.client);
+
+    // Every configured source is asked, so a single one that is wrong cannot
+    // make the check say `pass` while traffic leaves in the clear.
+    let (gateway, gateway_seen) =
+        addresses(check.engine.as_ref(), gateway_container, &check.echo).await;
+    let (client, client_seen) =
+        addresses(check.engine.as_ref(), client_container, &check.echo).await;
+
+    // The exit country only means anything where the tunnel answered, and is
+    // one extra request, so it is asked for only then. Awaited into a plain
+    // value first: a block whose last statement is an await leaves its own
+    // closing brace unmarked by coverage.
+    let country = match (&gateway, gateway_container) {
+        (Reach::Address(_), Some(container)) => check.country(container, echo).await,
+        _ => None,
+    };
+    let note = match &gateway {
+        Reach::Address(ip) => Some(labelled(ip, country)),
+        _ => None,
+    };
+
+    let held = check
+        .killswitch_held(gateway_container, client_container, echo, &client, deadline)
+        .await;
+    let mut findings = assemble(pair, &gateway, &client, note, killswitch_findings(&held));
+    // A disagreement is reported rather than resolved: there is no basis to
+    // prefer one stranger's account over another's, and a check that quietly
+    // chose would be least trustworthy exactly when it mattered most.
+    findings.extend(
+        [&gateway_seen, &client_seen]
+            .into_iter()
+            .filter_map(Seen::said)
+            .map(disagreeing),
+    );
+    findings.push(port_forward);
+    findings.extend(mismatch);
+    findings
 }

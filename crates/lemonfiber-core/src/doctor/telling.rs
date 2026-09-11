@@ -61,36 +61,41 @@ impl Check for TellingCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let Some(seerr) = self.seerr.as_ref() else {
-            return vec![finding(Verdict::Skipped {
-                reason: "this stack has no request service, so there is nothing to ask \
-                         and nobody asking"
-                    .to_owned(),
-            })];
-        };
-
-        let held = match seerr.telling().await {
-            Ok(held) => held,
-            // Nobody could find out. Said as its own thing rather than dressed as a
-            // verdict about the household, which is the distinction between not
-            // knowing and knowing something is wrong.
-            Err(failure) => {
-                return vec![finding(Verdict::Unverified {
-                    reason: format!(
-                        "the request service could not be asked what it tells the \
-                         household: {failure}"
-                    ),
-                    remedy: Remedy::new("Check the service is up and has finished starting")
-                        .with_detail("lemonfiber status"),
-                })]
-            }
-        };
-
-        vec![finding(verdict(
-            observed_telling(self.recorded.as_ref(), held),
-            held.enabled,
-        ))]
+        ran(self).await
     }
+}
+
+/// Whether the operator can be told anything, and by which route.
+async fn ran(check: &TellingCheck) -> Vec<Finding> {
+    let Some(seerr) = check.seerr.as_ref() else {
+        return vec![finding(Verdict::Skipped {
+            reason: "this stack has no request service, so there is nothing to ask \
+                     and nobody asking"
+                .to_owned(),
+        })];
+    };
+
+    let held = match seerr.telling().await {
+        Ok(held) => held,
+        // Nobody could find out. Said as its own thing rather than dressed as a
+        // verdict about the household, which is the distinction between not
+        // knowing and knowing something is wrong.
+        Err(failure) => {
+            return vec![finding(Verdict::Unverified {
+                reason: format!(
+                    "the request service could not be asked what it tells the \
+                     household: {failure}"
+                ),
+                remedy: Remedy::new("Check the service is up and has finished starting")
+                    .with_detail("lemonfiber status"),
+            })]
+        }
+    };
+
+    vec![finding(verdict(
+        observed_telling(check.recorded.as_ref(), held),
+        held.enabled,
+    ))]
 }
 
 /// The one finding this check produces, under the name anything answering it shares.

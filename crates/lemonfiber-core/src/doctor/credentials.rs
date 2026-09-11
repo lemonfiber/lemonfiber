@@ -128,22 +128,27 @@ impl Check for CredentialsCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let mut findings = Vec::with_capacity(self.targets.len());
-        for target in &self.targets {
-            findings.push(
-                Finding::in_category(
-                    Category::Credentials,
-                    &format!("credentials.{}", target.id),
-                    &format!("{} credential", target.name),
-                    self.prove(target).await,
-                )
-                // Said so that a service which cannot answer because the thing underneath
-                // it is down reads as one problem rather than as two.
-                .about(&target.id),
-            );
-        }
-        findings
+        ran(self).await
     }
+}
+
+/// Whether every service that needs a key has one that works.
+async fn ran(check: &CredentialsCheck) -> Vec<Finding> {
+    let mut findings = Vec::with_capacity(check.targets.len());
+    for target in &check.targets {
+        findings.push(
+            Finding::in_category(
+                Category::Credentials,
+                &format!("credentials.{}", target.id),
+                &format!("{} credential", target.name),
+                check.prove(target).await,
+            )
+            // Said so that a service which cannot answer because the thing underneath
+            // it is down reads as one problem rather than as two.
+            .about(&target.id),
+        );
+    }
+    findings
 }
 
 /// There is no key to read yet: the ordinary case is a service still completing

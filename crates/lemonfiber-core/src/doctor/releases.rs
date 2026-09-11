@@ -142,56 +142,60 @@ impl Check for ReleasesCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        let resolution: Vec<(&Target, Kind)> = self
-            .targets
-            .iter()
-            .filter_map(|target| Kind::for_section(&target.id).map(|kind| (target, kind)))
-            .collect();
-
-        if resolution.is_empty() {
-            return vec![Finding::in_category(
-                Category::Services,
-                NONE,
-                "Releases for the chosen quality",
-                Verdict::Skipped {
-                    reason:
-                        "no television or film service is configured, so there are no releases \
-                             to check"
-                            .to_owned(),
-                },
-            )];
-        }
-
-        if !self.disruptive {
-            return vec![Finding::in_category(
-                Category::Services,
-                NONE,
-                "Releases for the chosen quality",
-                Verdict::Unverified {
-                    reason: not_asked_for(),
-                    remedy: how_to_ask(),
-                },
-            )];
-        }
-
-        let mut findings = Vec::new();
-        for (target, kind) in resolution {
-            let verdict = self.probe(target, kind).await;
-            findings.push(
-                Finding::in_category(
-                    Category::Services,
-                    &format!("services.releases.{}", target.id),
-                    &format!("Releases for {} at the chosen quality", kind.media_type()),
-                    verdict,
-                )
-                // Named, so a service that cannot search because the indexer beneath it
-                // is down reads as one problem rather than two — and so a failure here
-                // is quoted with what the service itself said about it.
-                .about(&target.id),
-            );
-        }
-        findings
+        ran(self).await
     }
+}
+
+/// Whether anything is actually available at the quality in force.
+async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
+    let resolution: Vec<(&Target, Kind)> = check
+        .targets
+        .iter()
+        .filter_map(|target| Kind::for_section(&target.id).map(|kind| (target, kind)))
+        .collect();
+
+    if resolution.is_empty() {
+        return vec![Finding::in_category(
+            Category::Services,
+            NONE,
+            "Releases for the chosen quality",
+            Verdict::Skipped {
+                reason: "no television or film service is configured, so there are no releases \
+                         to check"
+                    .to_owned(),
+            },
+        )];
+    }
+
+    if !check.disruptive {
+        return vec![Finding::in_category(
+            Category::Services,
+            NONE,
+            "Releases for the chosen quality",
+            Verdict::Unverified {
+                reason: not_asked_for(),
+                remedy: how_to_ask(),
+            },
+        )];
+    }
+
+    let mut findings = Vec::new();
+    for (target, kind) in resolution {
+        let verdict = check.probe(target, kind).await;
+        findings.push(
+            Finding::in_category(
+                Category::Services,
+                &format!("services.releases.{}", target.id),
+                &format!("Releases for {} at the chosen quality", kind.media_type()),
+                verdict,
+            )
+            // Named, so a service that cannot search because the indexer beneath it
+            // is down reads as one problem rather than two — and so a failure here
+            // is quoted with what the service itself said about it.
+            .about(&target.id),
+        );
+    }
+    findings
 }
 
 /// Releases came back but the profile wants none of them: they exist, they just do not
