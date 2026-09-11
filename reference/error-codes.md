@@ -150,6 +150,8 @@ what to do about it, is written for operators at
 - `STACK-4`
 - `STACK-5`
 - `STACK-6`
+- `STACK-7`
+- `STACK-8`
 - `STORAGE-1`
 - `STORAGE-2`
 - `STORAGE-3`
