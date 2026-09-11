@@ -10,4 +10,4 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/labeler.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@36315d8edbda398bca06f752a904bca981263de8 # main

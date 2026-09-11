@@ -101,6 +101,17 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@718ef921411ed5823745aeb2e4efb7d842cca06e # main
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@36315d8edbda398bca06f752a904bca981263de8 # main
+    with:
+      # What this repository is carrying, declared here so it can be read without a
+      # SonarCloud login (Q-R67). Twenty-eight, and not one of them written here: an
+      # analyser enabled `rust:S7493` and backdated every finding to the commit that
+      # introduced the line. They are blocking calls inside `async fn` bodies and they
+      # are real; what was not real was the zero this file declared while they stood.
+      #
+      # It is a ceiling and not an allowance. It may not rise past what actually stands
+      # against `main`, so it falls on its own as they are fixed — and it is meant to
+      # reach zero again in the pull request that clears them.
+      allowed-open: 28
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
