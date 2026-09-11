@@ -46,16 +46,21 @@ impl Walking {
 #[async_trait]
 impl Occupancy for Walking {
     async fn beneath(&self, root: &Path) -> Result<Vec<Occupant>, Fault> {
-        if let Some(why) = &self.refuses {
-            return Err(Fault::new(why.clone()));
-        }
-        Ok(self
-            .held
-            .iter()
-            .filter(|occupant| occupant.path.starts_with(root))
-            .cloned()
-            .collect())
+        beneath(self, root)
     }
+}
+
+/// What this fixture holds under a root, or the refusal it was built to give.
+fn beneath(walking: &Walking, root: &Path) -> Result<Vec<Occupant>, Fault> {
+    if let Some(why) = &walking.refuses {
+        return Err(Fault::new(why.clone()));
+    }
+    Ok(walking
+        .held
+        .iter()
+        .filter(|occupant| occupant.path.starts_with(root))
+        .cloned()
+        .collect())
 }
 
 #[cfg(test)]

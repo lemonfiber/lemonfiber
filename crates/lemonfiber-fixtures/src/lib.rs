@@ -23,6 +23,19 @@
 //! test, and what they are for — counting how many times a blip was retried — is the thing
 //! under test rather than a service standing in for another.
 
+/// Record one thing a fake was asked to do, where the lock is still good.
+///
+/// A poisoned lock means a test already failed somewhere else and is unwinding; a
+/// second failure raised here would point at the recording rather than at the fault,
+/// so the record is dropped instead. Shared because every fake that remembers what it
+/// was asked keeps it this way, and a branch repeated eight times is eight places for
+/// it to be written differently.
+pub(crate) fn noted<T>(into: &std::sync::Mutex<Vec<T>>, what: T) {
+    if let Ok(mut held) = into.lock() {
+        held.push(what);
+    }
+}
+
 pub mod downloads;
 pub mod erasing;
 pub mod files;

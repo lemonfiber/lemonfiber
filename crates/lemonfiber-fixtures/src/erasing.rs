@@ -51,12 +51,15 @@ impl Erasing {
 #[async_trait]
 impl Eraser for Erasing {
     async fn erase(&self, path: &Path) -> Result<(), Fault> {
-        if let Ok(mut asked) = self.asked.lock() {
-            asked.push(path.to_path_buf());
-        }
-        match &self.refuses {
-            None => Ok(()),
-            Some(why) => Err(Fault::new(why.clone())),
-        }
+        crate::noted(&self.asked, path.to_path_buf());
+        refusal(self.refuses.as_ref())
+    }
+}
+
+/// The refusal this fixture was built to give, or none.
+fn refusal(refuses: Option<&String>) -> Result<(), Fault> {
+    match refuses {
+        None => Ok(()),
+        Some(why) => Err(Fault::new(why.clone())),
     }
 }

@@ -107,21 +107,11 @@ impl Program {
 #[async_trait]
 impl FileSystem for Program {
     async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        if !self.resolves {
-            return Err(Fault::new("no such file or directory"));
-        }
-        Ok(self
-            .links
-            .iter()
-            .find(|(from, _)| from == path)
-            .map_or_else(|| path.to_path_buf(), |(_, to)| to.clone()))
+        resolved(self, path)
     }
 
     async fn touch(&self, path: &Path) -> Result<(), Fault> {
-        if self.writable {
-            return Ok(());
-        }
-        Err(Fault::new(format!("permission denied: {}", path.display())))
+        touched(self, path)
     }
 
     async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
@@ -133,9 +123,7 @@ impl FileSystem for Program {
     }
 
     async fn remove(&self, path: &Path) {
-        if let Ok(mut removed) = self.removed.lock() {
-            removed.push(path.to_path_buf());
-        }
+        crate::noted(&self.removed, path.to_path_buf());
     }
 
     async fn read(&self, path: &Path) -> Option<String> {
@@ -146,9 +134,7 @@ impl FileSystem for Program {
     }
 
     async fn write(&self, path: &Path, contents: &str) {
-        if let Ok(mut written) = self.written.lock() {
-            written.push((path.to_path_buf(), contents.to_owned()));
-        }
+        crate::noted(&self.written, (path.to_path_buf(), contents.to_owned()));
     }
 
     async fn ownership(&self, _path: &Path) -> Option<Ownership> {
@@ -167,6 +153,26 @@ impl Storage for Program {
             total: 0,
         }
     }
+}
+
+/// The link a path resolves through, or the refusal a fixture was built to give.
+fn resolved(program: &Program, path: &Path) -> Result<PathBuf, Fault> {
+    if !program.resolves {
+        return Err(Fault::new("no such file or directory"));
+    }
+    Ok(program
+        .links
+        .iter()
+        .find(|(from, _)| from == path)
+        .map_or_else(|| path.to_path_buf(), |(_, to)| to.clone()))
+}
+
+/// Whether this fixture lets a file be created.
+fn touched(program: &Program, path: &Path) -> Result<(), Fault> {
+    if program.writable {
+        return Ok(());
+    }
+    Err(Fault::new(format!("permission denied: {}", path.display())))
 }
 
 #[cfg(test)]
