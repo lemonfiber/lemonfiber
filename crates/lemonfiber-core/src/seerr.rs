@@ -316,140 +316,27 @@ impl Requests for Seerr {
     }
 
     async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure> {
-        // The owner's session sees every member's requests; a member's own would see
-        // only theirs. Read newest first, so a household with more than the horizon
-        // keeps the requests still worth asking about rather than its oldest.
-        let mut requests = Vec::new();
-        let mut skip = 0;
-        loop {
-            let path =
-                format!("/request?take={REQUEST_PAGE}&skip={skip}&sort=added&sortDirection=desc");
-            let response = self
-                .endpoint
-                .send(&self.request(Method::Get, &path, None))
-                .await?;
-            let page: RequestPage = self
-                .endpoint
-                .decode(&response, "the household's requests could not be read")?;
-            let on_this_page = page.results.len();
-            requests.extend(page.results.into_iter().map(RequestRecord::into_request));
-            if on_this_page < REQUEST_PAGE || requests.len() >= page.page_info.results {
-                break;
-            }
-            skip += REQUEST_PAGE;
-        }
-        Ok(requests)
+        requests(self).await
     }
 
     async fn fulfilment_targets(&self) -> Result<Vec<RegisteredTarget>, Failure> {
-        let mut held = Vec::new();
-        for (path, television) in [(FILM, false), (TELEVISION, true)] {
-            let response = self
-                .endpoint
-                .send(&self.request(Method::Get, path, None))
-                .await?;
-            let listed: Vec<TargetResource> = self.endpoint.decode(
-                &response,
-                "the request service's fulfilment targets could not be read",
-            )?;
-            held.extend(
-                listed
-                    .into_iter()
-                    .map(|target| target.registered(television)),
-            );
-        }
-        Ok(held)
+        fulfilment_targets(self).await
     }
 
     async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure> {
-        let mut body = serde_json::json!({
-            "name": target.name,
-            "hostname": target.host,
-            "port": target.port,
-            "apiKey": target.key,
-            "useSsl": false,
-            "activeProfileId": target.profile.id,
-            "activeProfileName": target.profile.name,
-            "activeDirectory": target.folder,
-            "is4k": false,
-            "isDefault": true,
-        });
-
-        // The last field is the one the two lists do not share, and each requires its
-        // own: television is filed in folders per season, and a film has a point before
-        // which there is nothing to fetch. Sending the wrong one is not a field ignored
-        // — the service refuses the registration for the one that is missing.
-        if let Some(fields) = body.as_object_mut() {
-            let (name, value) = if target.television {
-                // Seasons in folders of their own, because that is how the media server
-                // reads a series and how anybody browsing one expects to find it.
-                ("enableSeasonFolders", serde_json::json!(true))
-            } else {
-                ("minimumAvailability", serde_json::json!(WHEN_RELEASED))
-            };
-            fields.insert(name.to_owned(), value);
-        }
-        let body = body.to_string();
-        let path = if target.television { TELEVISION } else { FILM };
-        let written = self
-            .endpoint
-            .send(&self.request(Method::Post, path, Some(body)))
-            .await?;
-        self.endpoint.expect_success(&written)
+        add_fulfilment_target(self, target).await
     }
 
     async fn link_members(&self, members: &[String]) -> Result<(), Failure> {
-        // Nothing to say rather than an empty import: a request naming nobody is one
-        // the service has no reason to answer, and a run with no members is ordinary
-        // on a stack whose media server could not be read.
-        if members.is_empty() {
-            return Ok(());
-        }
-        let body = serde_json::json!({ "jellyfinUserIds": members }).to_string();
-        let written = self
-            .endpoint
-            .send(&self.request(Method::Post, LINK_MEMBERS, Some(body)))
-            .await?;
-        self.endpoint.expect_success(&written)
+        link_members(self, members).await
     }
 
     async fn member_for(&self, media_server_id: &str) -> Result<Option<String>, Failure> {
-        let path = format!("{MEMBERS}/jellyfin/{media_server_id}");
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        // Never having heard of somebody is an answer, not a fault: a member who has
-        // not signed in here has no account to take away. Any other refusal is a
-        // refusal, and is reported as one.
-        if response.status == NOT_FOUND {
-            return Ok(None);
-        }
-        let held: MemberResource = self.endpoint.decode(
-            &response,
-            "the account this service holds could not be read",
-        )?;
-        Ok(Some(held.id.to_string()))
+        member_for(self, media_server_id).await
     }
 
     async fn requesting(&self, media_server_id: &str) -> Result<Option<Requesting>, Failure> {
-        let path = format!("{MEMBERS}/jellyfin/{media_server_id}");
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        // Never having heard of somebody is an answer here too: a member who has not
-        // signed in has no account for a restriction to disagree with.
-        if response.status == NOT_FOUND {
-            return Ok(None);
-        }
-        let held: MemberResource = self
-            .endpoint
-            .decode(&response, "what this member may ask for could not be read")?;
-        Ok(Some(Requesting {
-            id: held.id.to_string(),
-            approves_own: approves_own(held.permissions),
-        }))
+        requesting(self, media_server_id).await
     }
 
     async fn approval_first(&self, id: &str) -> Result<(), Failure> {
@@ -494,4 +381,141 @@ impl Requests for Seerr {
             .await?;
         self.endpoint.expect_success(&written)
     }
+}
+
+async fn requests(seerr: &Seerr) -> Result<Vec<HouseholdRequest>, Failure> {
+    // The owner's session sees every member's requests; a member's own would see
+    // only theirs. Read newest first, so a household with more than the horizon
+    // keeps the requests still worth asking about rather than its oldest.
+    let mut requests = Vec::new();
+    let mut skip = 0;
+    loop {
+        let path =
+            format!("/request?take={REQUEST_PAGE}&skip={skip}&sort=added&sortDirection=desc");
+        let response = seerr
+            .endpoint
+            .send(&seerr.request(Method::Get, &path, None))
+            .await?;
+        let page: RequestPage = seerr
+            .endpoint
+            .decode(&response, "the household's requests could not be read")?;
+        let on_this_page = page.results.len();
+        requests.extend(page.results.into_iter().map(RequestRecord::into_request));
+        if on_this_page < REQUEST_PAGE || requests.len() >= page.page_info.results {
+            break;
+        }
+        skip += REQUEST_PAGE;
+    }
+    Ok(requests)
+}
+
+async fn fulfilment_targets(seerr: &Seerr) -> Result<Vec<RegisteredTarget>, Failure> {
+    let mut held = Vec::new();
+    for (path, television) in [(FILM, false), (TELEVISION, true)] {
+        let response = seerr
+            .endpoint
+            .send(&seerr.request(Method::Get, path, None))
+            .await?;
+        let listed: Vec<TargetResource> = seerr.endpoint.decode(
+            &response,
+            "the request service's fulfilment targets could not be read",
+        )?;
+        held.extend(
+            listed
+                .into_iter()
+                .map(|target| target.registered(television)),
+        );
+    }
+    Ok(held)
+}
+
+async fn add_fulfilment_target(seerr: &Seerr, target: &FulfilmentTarget) -> Result<(), Failure> {
+    let mut body = serde_json::json!({
+        "name": target.name,
+        "hostname": target.host,
+        "port": target.port,
+        "apiKey": target.key,
+        "useSsl": false,
+        "activeProfileId": target.profile.id,
+        "activeProfileName": target.profile.name,
+        "activeDirectory": target.folder,
+        "is4k": false,
+        "isDefault": true,
+    });
+
+    // The last field is the one the two lists do not share, and each requires its
+    // own: television is filed in folders per season, and a film has a point before
+    // which there is nothing to fetch. Sending the wrong one is not a field ignored
+    // — the service refuses the registration for the one that is missing.
+    if let Some(fields) = body.as_object_mut() {
+        let (name, value) = if target.television {
+            // Seasons in folders of their own, because that is how the media server
+            // reads a series and how anybody browsing one expects to find it.
+            ("enableSeasonFolders", serde_json::json!(true))
+        } else {
+            ("minimumAvailability", serde_json::json!(WHEN_RELEASED))
+        };
+        fields.insert(name.to_owned(), value);
+    }
+    let body = body.to_string();
+    let path = if target.television { TELEVISION } else { FILM };
+    let written = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, path, Some(body)))
+        .await?;
+    seerr.endpoint.expect_success(&written)
+}
+
+async fn link_members(seerr: &Seerr, members: &[String]) -> Result<(), Failure> {
+    // Nothing to say rather than an empty import: a request naming nobody is one
+    // the service has no reason to answer, and a run with no members is ordinary
+    // on a stack whose media server could not be read.
+    if members.is_empty() {
+        return Ok(());
+    }
+    let body = serde_json::json!({ "jellyfinUserIds": members }).to_string();
+    let written = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, LINK_MEMBERS, Some(body)))
+        .await?;
+    seerr.endpoint.expect_success(&written)
+}
+
+async fn member_for(seerr: &Seerr, media_server_id: &str) -> Result<Option<String>, Failure> {
+    let path = format!("{MEMBERS}/jellyfin/{media_server_id}");
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, &path, None))
+        .await?;
+    // Never having heard of somebody is an answer, not a fault: a member who has
+    // not signed in here has no account to take away. Any other refusal is a
+    // refusal, and is reported as one.
+    if response.status == NOT_FOUND {
+        return Ok(None);
+    }
+    let held: MemberResource = seerr.endpoint.decode(
+        &response,
+        "the account this service holds could not be read",
+    )?;
+    Ok(Some(held.id.to_string()))
+}
+
+async fn requesting(seerr: &Seerr, media_server_id: &str) -> Result<Option<Requesting>, Failure> {
+    let path = format!("{MEMBERS}/jellyfin/{media_server_id}");
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, &path, None))
+        .await?;
+    // Never having heard of somebody is an answer here too: a member who has not
+    // signed in has no account for a restriction to disagree with.
+    if response.status == NOT_FOUND {
+        return Ok(None);
+    }
+    let held: MemberResource = seerr
+        .endpoint
+        .decode(&response, "what this member may ask for could not be read")?;
+    Ok(Some(Requesting {
+        id: held.id.to_string(),
+        approves_own: approves_own(held.permissions),
+    }))
 }

@@ -66,19 +66,7 @@ impl Throttling for Sabnzbd {
     }
 
     async fn restrain(&self, wanted: &Wanted) -> Result<Throttled, Failure> {
-        let turns = turns(wanted);
-        let scheduled = !turns.is_empty();
-        self.keeping(&turns).await?;
-        if !scheduled {
-            // Nothing switches the rate, so the rate is this client's standing one.
-            self.set_rate(kilobytes(wanted.active.down).as_str())
-                .await?;
-        }
-
-        // Read back rather than trusting that answer, the same as every other
-        // write here: a client that took the request and did not apply it looks
-        // like one that did, from out here.
-        self.throttled().await
+        restrain(self, wanted).await
     }
 
     async fn moving(&self) -> Result<Rates, Failure> {
@@ -160,6 +148,23 @@ fn kilobytes(limit: Option<u64>) -> String {
         || "0".to_owned(),
         |bytes| format!("{}k", bytes.div_ceil(1024).max(1)),
     )
+}
+
+async fn restrain(sabnzbd: &Sabnzbd, wanted: &Wanted) -> Result<Throttled, Failure> {
+    let turns = turns(wanted);
+    let scheduled = !turns.is_empty();
+    sabnzbd.keeping(&turns).await?;
+    if !scheduled {
+        // Nothing switches the rate, so the rate is this client's standing one.
+        sabnzbd
+            .set_rate(kilobytes(wanted.active.down).as_str())
+            .await?;
+    }
+
+    // Read back rather than trusting that answer, the same as every other
+    // write here: a client that took the request and did not apply it looks
+    // like one that did, from out here.
+    sabnzbd.throttled().await
 }
 
 #[cfg(test)]

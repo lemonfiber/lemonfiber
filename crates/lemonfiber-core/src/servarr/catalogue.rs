@@ -33,29 +33,7 @@ impl Catalogue for Servarr {
     }
 
     async fn add_plan(&self, kind: Kind) -> Result<AddPlan, Failure> {
-        let folders = self
-            .read::<RootFolderResource>("/rootfolder", "no root folder")
-            .await?;
-        let profiles = self
-            .read::<ProfileResource>("/qualityprofile", "no quality profile")
-            .await?;
-        // The first of each, because that is what setup wired: a stack with several is
-        // one the operator has arranged themselves, and the walkthrough's first item
-        // belongs wherever the rest of the library is rather than somewhere of its own.
-        let root_folder = folders.into_iter().map(|folder| folder.path).next();
-        let quality_profile = profiles.into_iter().map(|profile| profile.id).next();
-        match root_folder.zip(quality_profile) {
-            Some((root_folder, quality_profile)) => Ok(AddPlan {
-                root_folder,
-                quality_profile,
-            }),
-            // Not a transport failure but a stack that was never finished, and it is
-            // reported as such rather than as the service refusing something.
-            None => Err(self.endpoint.unsupported(&format!(
-                "{} has no root folder or no quality profile configured yet",
-                kind.noun()
-            ))),
-        }
+        add_plan(self, kind).await
     }
 
     async fn add(
@@ -203,6 +181,32 @@ struct IndexerResource {
     enable_automatic_search: bool,
     #[serde(default)]
     enable_interactive_search: bool,
+}
+
+async fn add_plan(servarr: &Servarr, kind: Kind) -> Result<AddPlan, Failure> {
+    let folders = servarr
+        .read::<RootFolderResource>("/rootfolder", "no root folder")
+        .await?;
+    let profiles = servarr
+        .read::<ProfileResource>("/qualityprofile", "no quality profile")
+        .await?;
+    // The first of each, because that is what setup wired: a stack with several is
+    // one the operator has arranged themselves, and the walkthrough's first item
+    // belongs wherever the rest of the library is rather than somewhere of its own.
+    let root_folder = folders.into_iter().map(|folder| folder.path).next();
+    let quality_profile = profiles.into_iter().map(|profile| profile.id).next();
+    match root_folder.zip(quality_profile) {
+        Some((root_folder, quality_profile)) => Ok(AddPlan {
+            root_folder,
+            quality_profile,
+        }),
+        // Not a transport failure but a stack that was never finished, and it is
+        // reported as such rather than as the service refusing something.
+        None => Err(servarr.endpoint.unsupported(&format!(
+            "{} has no root folder or no quality profile configured yet",
+            kind.noun()
+        ))),
+    }
 }
 
 #[cfg(test)]

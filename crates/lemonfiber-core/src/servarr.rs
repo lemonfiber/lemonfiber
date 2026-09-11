@@ -131,26 +131,7 @@ struct Status {
 #[async_trait]
 impl Client for Servarr {
     async fn identity(&self) -> Result<Identity, Failure> {
-        let response = self
-            .probe(&self.request(Method::Get, "/system/status", None))
-            .await?;
-        let status: Status = self
-            .endpoint
-            .decode(&response, "the status response could not be read")?;
-        let name = if status.instance_name.is_empty() {
-            status.app_name
-        } else {
-            status.instance_name
-        };
-        if name.is_empty() || status.version.is_empty() {
-            return Err(self
-                .endpoint
-                .refused("the service named neither itself nor its version"));
-        }
-        Ok(Identity {
-            name,
-            version: status.version,
-        })
+        identity(self).await
     }
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
@@ -241,40 +222,7 @@ impl Client for Servarr {
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
-        let mut body = serde_json::json!({ "path": folder.path });
-
-        // One of these services wants more than a path. Lidarr files by artist and
-        // album rather than by title, so a root folder of its own carries a name and
-        // the two profiles anything found beneath it is fetched at — and it refuses a
-        // registration that names none of them, rather than filling them in.
-        //
-        // Which service that is comes from asking rather than from its name: only the
-        // one that needs them has metadata profiles to offer, so an empty answer is
-        // both "this service has none" and "this service does not want them". The ids
-        // are read rather than assumed, because they are numbered per installation.
-        if let Some(metadata) = self.first_metadata_profile().await {
-            let quality = self
-                .quality_profiles()
-                .await
-                .ok()
-                .and_then(|profiles| profiles.first().map(|profile| profile.id));
-            if let (Some(quality), Some(fields)) = (quality, body.as_object_mut()) {
-                fields.insert("name".to_owned(), serde_json::json!(folder.media_type));
-                fields.insert(
-                    "defaultQualityProfileId".to_owned(),
-                    serde_json::json!(quality),
-                );
-                fields.insert(
-                    "defaultMetadataProfileId".to_owned(),
-                    serde_json::json!(metadata),
-                );
-            }
-        }
-
-        let response = self
-            .probe(&self.request(Method::Post, "/rootfolder", Some(body.to_string())))
-            .await?;
-        self.endpoint.expect_success(&response)
+        register_root_folder(self, folder).await
     }
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
@@ -418,4 +366,64 @@ fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
         object.insert("id".to_owned(), serde_json::json!(id));
     }
     document.to_string()
+}
+
+async fn identity(servarr: &Servarr) -> Result<Identity, Failure> {
+    let response = servarr
+        .probe(&servarr.request(Method::Get, "/system/status", None))
+        .await?;
+    let status: Status = servarr
+        .endpoint
+        .decode(&response, "the status response could not be read")?;
+    let name = if status.instance_name.is_empty() {
+        status.app_name
+    } else {
+        status.instance_name
+    };
+    if name.is_empty() || status.version.is_empty() {
+        return Err(servarr
+            .endpoint
+            .refused("the service named neither itself nor its version"));
+    }
+    Ok(Identity {
+        name,
+        version: status.version,
+    })
+}
+
+async fn register_root_folder(servarr: &Servarr, folder: &RootFolder) -> Result<(), Failure> {
+    let mut body = serde_json::json!({ "path": folder.path });
+
+    // One of these services wants more than a path. Lidarr files by artist and
+    // album rather than by title, so a root folder of its own carries a name and
+    // the two profiles anything found beneath it is fetched at — and it refuses a
+    // registration that names none of them, rather than filling them in.
+    //
+    // Which service that is comes from asking rather than from its name: only the
+    // one that needs them has metadata profiles to offer, so an empty answer is
+    // both "this service has none" and "this service does not want them". The ids
+    // are read rather than assumed, because they are numbered per installation.
+    if let Some(metadata) = servarr.first_metadata_profile().await {
+        let quality = servarr
+            .quality_profiles()
+            .await
+            .ok()
+            .and_then(|profiles| profiles.first().map(|profile| profile.id));
+        if let (Some(quality), Some(fields)) = (quality, body.as_object_mut()) {
+            fields.insert("name".to_owned(), serde_json::json!(folder.media_type));
+            fields.insert(
+                "defaultQualityProfileId".to_owned(),
+                serde_json::json!(quality),
+            );
+            fields.insert(
+                "defaultMetadataProfileId".to_owned(),
+                serde_json::json!(metadata),
+            );
+        }
+    }
+
+    let response = servarr
+        .probe(&servarr.request(Method::Post, "/rootfolder", Some(body.to_string())))
+        .await?;
+    servarr.endpoint.expect_success(&response)
 }

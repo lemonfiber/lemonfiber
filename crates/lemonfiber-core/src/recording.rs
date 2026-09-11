@@ -102,25 +102,32 @@ fn kept(existing: &str, added: &str) -> String {
 #[async_trait]
 impl<H: Http + Send + Sync> Http for Recording<H> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let answer = self.inner.send(request).await;
-        let Some(at) = self.at.as_ref() else {
-            return answer;
-        };
-        let when = self
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|since| since.as_secs())
-            .unwrap_or_default();
-        let status = answer.as_ref().ok().map(|answered| answered.status);
-        let existing = tokio::fs::read_to_string(at).await.unwrap_or_default();
-        // A record that could not be written is not worth failing a request over:
-        // the operator asked for the thing the request does, and telling them it
-        // could not be done because a log was unwritable would be this feature
-        // getting in the way of the product it is meant to make trustworthy.
-        let _ = crate::config::store::write(at, &kept(&existing, &line(when, request, status)));
-        answer
+        send(self, request).await
     }
+}
+
+async fn send<H: Http + Send + Sync>(
+    recording: &Recording<H>,
+    request: &Request,
+) -> Result<Response, Unreachable> {
+    let answer = recording.inner.send(request).await;
+    let Some(at) = recording.at.as_ref() else {
+        return answer;
+    };
+    let when = recording
+        .clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default();
+    let status = answer.as_ref().ok().map(|answered| answered.status);
+    let existing = tokio::fs::read_to_string(at).await.unwrap_or_default();
+    // A record that could not be written is not worth failing a request over:
+    // the operator asked for the thing the request does, and telling them it
+    // could not be done because a log was unwritable would be this feature
+    // getting in the way of the product it is meant to make trustworthy.
+    let _ = crate::config::store::write(at, &kept(&existing, &line(when, request, status)));
+    answer
 }
 
 #[cfg(test)]

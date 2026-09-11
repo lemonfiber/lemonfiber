@@ -154,24 +154,28 @@ fn given(field: Option<&str>) -> Option<String> {
 #[async_trait]
 impl Addressing for Seerr {
     async fn reachable(&self, request: i64) -> Result<Vec<Address>, Failure> {
-        let path = format!("{REQUESTS}/{request}");
-        let filed = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        let asked: Asked = self
-            .endpoint
-            .decode(&filed, "who asked for this request could not be read")?;
-        let path = format!("{MEMBERS}/{}/{NOTIFICATIONS}", asked.requested_by.id);
-        let settings = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        let held: Reachable = self
-            .endpoint
-            .decode(&settings, "where this member is reached could not be read")?;
-        Ok(held.addresses())
+        reachable(self, request).await
     }
+}
+
+async fn reachable(seerr: &Seerr, request: i64) -> Result<Vec<Address>, Failure> {
+    let path = format!("{REQUESTS}/{request}");
+    let filed = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, &path, None))
+        .await?;
+    let asked: Asked = seerr
+        .endpoint
+        .decode(&filed, "who asked for this request could not be read")?;
+    let path = format!("{MEMBERS}/{}/{NOTIFICATIONS}", asked.requested_by.id);
+    let settings = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, &path, None))
+        .await?;
+    let held: Reachable = seerr
+        .endpoint
+        .decode(&settings, "where this member is reached could not be read")?;
+    Ok(held.addresses())
 }
 
 #[cfg(test)]

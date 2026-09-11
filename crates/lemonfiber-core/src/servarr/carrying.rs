@@ -63,38 +63,7 @@ impl Carrying for Servarr {
     }
 
     async fn carry(&self, kind: Record, item: &Carried) -> Result<(), Failure> {
-        let Ok(Value::Object(mut body)) = serde_json::from_str::<Value>(&item.rest) else {
-            return Err(Failure::Unsupported {
-                service: self.service().to_owned(),
-                detail: format!("a {} record that could not be read back", kind.plural()),
-            });
-        };
-
-        // Its id here is not its id there, and a body carrying the old one asks this
-        // service to replace a record it has never seen.
-        body.remove("id");
-        for field in NUMBERED {
-            body.remove(field);
-        }
-
-        if let Some(wanted) = &item.profile {
-            let id = self.profile_named(wanted).await?;
-            body.insert("qualityProfileId".to_owned(), Value::from(id));
-        }
-        if let Some(folder) = &item.folder {
-            body.insert("rootFolderPath".to_owned(), Value::from(folder.clone()));
-        }
-
-        let asked = self.request(
-            Method::Post,
-            kind.path(),
-            Some(Value::Object(body).to_string()),
-        );
-        // A service that would not take it is not a service that took it. Without this
-        // a refusal comes back as a record carried, and the operator is told their
-        // library crossed when it did not.
-        let answered = self.probe(&asked).await?;
-        self.expect_success(&answered)
+        carry(self, kind, item).await
     }
 }
 
@@ -127,6 +96,41 @@ impl Servarr {
                 detail: format!("no quality profile called {wanted}"),
             })
     }
+}
+
+async fn carry(servarr: &Servarr, kind: Record, item: &Carried) -> Result<(), Failure> {
+    let Ok(Value::Object(mut body)) = serde_json::from_str::<Value>(&item.rest) else {
+        return Err(Failure::Unsupported {
+            service: servarr.service().to_owned(),
+            detail: format!("a {} record that could not be read back", kind.plural()),
+        });
+    };
+
+    // Its id here is not its id there, and a body carrying the old one asks this
+    // service to replace a record it has never seen.
+    body.remove("id");
+    for field in NUMBERED {
+        body.remove(field);
+    }
+
+    if let Some(wanted) = &item.profile {
+        let id = servarr.profile_named(wanted).await?;
+        body.insert("qualityProfileId".to_owned(), Value::from(id));
+    }
+    if let Some(folder) = &item.folder {
+        body.insert("rootFolderPath".to_owned(), Value::from(folder.clone()));
+    }
+
+    let asked = servarr.request(
+        Method::Post,
+        kind.path(),
+        Some(Value::Object(body).to_string()),
+    );
+    // A service that would not take it is not a service that took it. Without this
+    // a refusal comes back as a record carried, and the operator is told their
+    // library crossed when it did not.
+    let answered = servarr.probe(&asked).await?;
+    servarr.expect_success(&answered)
 }
 
 #[cfg(test)]

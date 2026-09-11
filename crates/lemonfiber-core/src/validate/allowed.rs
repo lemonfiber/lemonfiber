@@ -45,20 +45,24 @@ fn not_asked(switch: &str, service: &str) -> Validation {
 #[async_trait]
 impl Validator for Allowed {
     async fn validate(&self, credential: &Credential) -> Validation {
-        match credential {
-            Credential::Indexer { .. } if !self.reaching.allows(REACH_INDEXER_KEY) => {
-                not_asked(REACH_INDEXER_KEY, "the indexer")
-            }
-            Credential::Usenet { .. } if !self.reaching.allows(REACH_USENET_KEY) => {
-                not_asked(REACH_USENET_KEY, "the Usenet provider")
-            }
-            // A service the operator asked lemonfiber to adopt is part of the stack
-            // this product operates rather than a third party on the internet, and
-            // reaching it is the same reach as every other call lemonfiber makes to
-            // the services it manages. See `crate::outbound` for where that line is
-            // drawn and why.
-            other => self.inner.validate(other).await,
+        validated(self, credential).await
+    }
+}
+
+async fn validated(allowed: &Allowed, credential: &Credential) -> Validation {
+    match credential {
+        Credential::Indexer { .. } if !allowed.reaching.allows(REACH_INDEXER_KEY) => {
+            not_asked(REACH_INDEXER_KEY, "the indexer")
         }
+        Credential::Usenet { .. } if !allowed.reaching.allows(REACH_USENET_KEY) => {
+            not_asked(REACH_USENET_KEY, "the Usenet provider")
+        }
+        // A service the operator asked lemonfiber to adopt is part of the stack
+        // this product operates rather than a third party on the internet, and
+        // reaching it is the same reach as every other call lemonfiber makes to
+        // the services it manages. See `crate::outbound` for where that line is
+        // drawn and why.
+        other => allowed.inner.validate(other).await,
     }
 }
 

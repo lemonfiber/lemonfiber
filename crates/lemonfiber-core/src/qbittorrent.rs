@@ -336,24 +336,7 @@ struct TorrentInfo {
 #[async_trait]
 impl Transfers for Qbittorrent {
     async fn transfers(&self) -> Result<Vec<Download>, Failure> {
-        let Some(password) = self.password.as_deref() else {
-            return Err(self.endpoint.unauthorised());
-        };
-        self.login(password).await?;
-
-        let request = Request {
-            method: Method::Get,
-            url: self
-                .endpoint
-                .url("/api/v2/torrents/info?filter=downloading"),
-            headers: Vec::new(),
-            body: None,
-        };
-        let response = self.endpoint.send(&request).await?;
-        let torrents: Vec<TorrentInfo> = self
-            .endpoint
-            .decode(&response, "the torrent list could not be read")?;
-        Ok(torrents.into_iter().map(download_of).collect())
+        transfers(self).await
     }
 }
 
@@ -381,12 +364,7 @@ struct CompletedInfo {
 #[async_trait]
 impl Seeding for Qbittorrent {
     async fn seeding(&self) -> Result<Vec<Seeded>, Failure> {
-        let Some(password) = self.password.as_deref() else {
-            return Err(self.endpoint.unauthorised());
-        };
-        self.login(password).await?;
-        let torrents = self.completed().await?;
-        Ok(torrents.into_iter().map(seeded_of).collect())
+        seeding(self).await
     }
 }
 
@@ -430,6 +408,36 @@ fn download_of(torrent: TorrentInfo) -> Download {
 
 mod fetching;
 mod throttling;
+
+async fn transfers(qbittorrent: &Qbittorrent) -> Result<Vec<Download>, Failure> {
+    let Some(password) = qbittorrent.password.as_deref() else {
+        return Err(qbittorrent.endpoint.unauthorised());
+    };
+    qbittorrent.login(password).await?;
+
+    let request = Request {
+        method: Method::Get,
+        url: qbittorrent
+            .endpoint
+            .url("/api/v2/torrents/info?filter=downloading"),
+        headers: Vec::new(),
+        body: None,
+    };
+    let response = qbittorrent.endpoint.send(&request).await?;
+    let torrents: Vec<TorrentInfo> = qbittorrent
+        .endpoint
+        .decode(&response, "the torrent list could not be read")?;
+    Ok(torrents.into_iter().map(download_of).collect())
+}
+
+async fn seeding(qbittorrent: &Qbittorrent) -> Result<Vec<Seeded>, Failure> {
+    let Some(password) = qbittorrent.password.as_deref() else {
+        return Err(qbittorrent.endpoint.unauthorised());
+    };
+    qbittorrent.login(password).await?;
+    let torrents = qbittorrent.completed().await?;
+    Ok(torrents.into_iter().map(seeded_of).collect())
+}
 
 #[cfg(test)]
 mod tests {
