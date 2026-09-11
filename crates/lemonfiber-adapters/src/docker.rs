@@ -207,68 +207,11 @@ impl Engine for Daemon {
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, Failure> {
-        let docker = self.client().await?;
-
-        let config = bollard::models::ExecConfig {
-            cmd: Some(argv.to_vec()),
-            attach_stdout: Some(true),
-            attach_stderr: Some(true),
-            ..Default::default()
-        };
-
-        // A container that is not there is the one refusal an operator can act
-        // on differently, so it keeps its own variant all the way up.
-        let created = match docker.create_exec(container, config).await {
-            Ok(created) => created,
-            Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) => {
-                return Err(Failure::NoSuchContainer {
-                    name: container.to_owned(),
-                })
-            }
-            Err(error) => return Err(unreachable(error)),
-        };
-
-        let started = docker
-            .start_exec(&created.id, None)
-            .await
-            .map_err(unreachable)?;
-
-        let mut stdout = String::new();
-        if let bollard::exec::StartExecResults::Attached { mut output, .. } = started {
-            while let Some(chunk) = output.next().await {
-                stdout.push_str(&chunk.map_err(unreachable)?.to_string());
-            }
-        }
-
-        let inspected = docker
-            .inspect_exec(&created.id)
-            .await
-            .map_err(unreachable)?;
-
-        Ok(ExecOutput {
-            status: inspected
-                .exit_code
-                .and_then(|code| i32::try_from(code).ok()),
-            stdout,
-        })
+        executed(self, container, argv).await
     }
 
     async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
-        let containers = self.containers(project).await?;
-        let docker = self.client().await?.clone();
-        let (sender, receiver) = channel(BACKLOG);
-
-        // A container that is not running is not using anything, and asking it
-        // how busy it is would be one open stream per stopped service.
-        for described in containers.into_iter().map(describe) {
-            if described.lifecycle == Lifecycle::Running {
-                tokio::spawn(sample_into(docker.clone(), described, sender.clone()));
-            }
-        }
-
-        Ok(receiver)
+        sampling(self, project).await
     }
 
     async fn logs(
@@ -277,20 +220,101 @@ impl Engine for Daemon {
         services: &[String],
         query: LogQuery,
     ) -> Result<Receiver<LogLine>, Failure> {
-        let containers = self.containers(project).await?;
-        let docker = self.client().await?.clone();
-        let (sender, receiver) = channel(BACKLOG);
-
-        // Stopped services are included: their scrollback is usually the reason
-        // the operator opened the log viewer at all.
-        for described in containers.into_iter().map(describe) {
-            if services.is_empty() || services.contains(&described.service) {
-                tokio::spawn(read_into(docker.clone(), described, query, sender.clone()));
-            }
-        }
-
-        Ok(receiver)
+        read(self, project, services, query).await
     }
+}
+
+/// Run one command inside a container and collect what it said.
+async fn executed(
+    daemon: &Daemon,
+    container: &str,
+    argv: &[String],
+) -> Result<ExecOutput, Failure> {
+    let docker = daemon.client().await?;
+
+    let config = bollard::models::ExecConfig {
+        cmd: Some(argv.to_vec()),
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        ..Default::default()
+    };
+
+    // A container that is not there is the one refusal an operator can act
+    // on differently, so it keeps its own variant all the way up.
+    let created = match docker.create_exec(container, config).await {
+        Ok(created) => created,
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) => {
+            return Err(Failure::NoSuchContainer {
+                name: container.to_owned(),
+            })
+        }
+        Err(error) => return Err(unreachable(error)),
+    };
+
+    let started = docker
+        .start_exec(&created.id, None)
+        .await
+        .map_err(unreachable)?;
+
+    let mut stdout = String::new();
+    if let bollard::exec::StartExecResults::Attached { mut output, .. } = started {
+        while let Some(chunk) = output.next().await {
+            stdout.push_str(&chunk.map_err(unreachable)?.to_string());
+        }
+    }
+
+    let inspected = docker
+        .inspect_exec(&created.id)
+        .await
+        .map_err(unreachable)?;
+
+    Ok(ExecOutput {
+        status: inspected
+            .exit_code
+            .and_then(|code| i32::try_from(code).ok()),
+        stdout,
+    })
+}
+
+/// One sampling task per running container, feeding one channel.
+async fn sampling(daemon: &Daemon, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
+    let containers = daemon.containers(project).await?;
+    let docker = daemon.client().await?.clone();
+    let (sender, receiver) = channel(BACKLOG);
+
+    // A container that is not running is not using anything, and asking it
+    // how busy it is would be one open stream per stopped service.
+    for described in containers.into_iter().map(describe) {
+        if described.lifecycle == Lifecycle::Running {
+            tokio::spawn(sample_into(docker.clone(), described, sender.clone()));
+        }
+    }
+
+    Ok(receiver)
+}
+
+/// One reading task per named container, feeding one channel.
+async fn read(
+    daemon: &Daemon,
+    project: &str,
+    services: &[String],
+    query: LogQuery,
+) -> Result<Receiver<LogLine>, Failure> {
+    let containers = daemon.containers(project).await?;
+    let docker = daemon.client().await?.clone();
+    let (sender, receiver) = channel(BACKLOG);
+
+    // Stopped services are included: their scrollback is usually the reason
+    // the operator opened the log viewer at all.
+    for described in containers.into_iter().map(describe) {
+        if services.is_empty() || services.contains(&described.service) {
+            tokio::spawn(read_into(docker.clone(), described, query, sender.clone()));
+        }
+    }
+
+    Ok(receiver)
 }
 
 /// Sample one container until the reader goes away.
