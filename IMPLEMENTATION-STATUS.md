@@ -583,7 +583,7 @@ of it impossible today: there is no Windows artifact to install.
 
 ## M11 — Ecosystem glue · ☐
 
-`0.18.0` and `0.19.0`. Cross-seeding, announce-driven grabbing, quality-profile sync,
+`0.19.0` and `0.20.0`. Cross-seeding, announce-driven grabbing, quality-profile sync,
 subtitles, queue self-healing, library cleanup, transcoding, playback statistics. Not
 started. See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m11--ecosystem-glue).
 
@@ -597,7 +597,7 @@ file", and nothing here proves an effect.
 
 ## M12 — Safely reachable · ☐
 
-`0.20.0`. Remote access over a self-hosted overlay, and one account across the services
+`0.21.0`. Remote access over a self-hosted overlay, and one account across the services
 the household touches. Not started.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m12--safely-reachable).
 
@@ -605,7 +605,7 @@ See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/
 
 ## M13 — See everything · ☐
 
-`0.21.0`. Exported metrics and dashboards, and uptime monitoring the stack raises
+`0.22.0`. Exported metrics and dashboards, and uptime monitoring the stack raises
 against itself. Not started.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m13--see-everything).
 
@@ -613,7 +613,7 @@ See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/
 
 ## M14 — The platform · ◐
 
-`0.16.0` and `0.17.0`. Plugin manifests and recipes, capabilities and substitution, the
+`0.16.0`, `0.17.0` and `0.18.0`. Plugin manifests and recipes, capabilities and substitution, the
 catalogue, the lifecycle, provenance, mobile handoff. Draft in the roadmap, and the
 first milestone past M10 with anything landed — which is the reason this file stopping
 at M10 was worth correcting.
@@ -635,7 +635,7 @@ the stack back. Nothing approaching this exists.
 
 ## M15 — Runs anywhere · ☐
 
-`0.22.0`. The container engine behind an abstraction rather than an assumption, Podman
+`0.23.0`. The container engine behind an abstraction rather than an assumption, Podman
 as a first-class alternative, services as plain processes, and an existing install
 moving across keeping its configuration and data. Not started.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m15--runs-anywhere).
