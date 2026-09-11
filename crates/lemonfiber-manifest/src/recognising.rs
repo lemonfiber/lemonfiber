@@ -55,22 +55,31 @@ const ON_SERVICE: &[Closed] = &[
     },
 ];
 
+/// Every kind of entry a manifest declares, and what each of them declares by name.
+const DECLARED: &[(&str, &[Closed])] = &[("profile", ON_PROFILE), ("service", ON_SERVICE)];
+
 /// Everything the manifest declares that this build does not recognise.
-///
-/// Silent on a file that is not TOML at all: there is nothing to walk, and the
-/// read that follows describes that failure far better than a scan could.
 pub(crate) fn unrecognised(text: &str) -> Vec<Violation> {
+    scan(text, DECLARED)
+}
+
+/// The same, against a given table, which is what lets the table be tested short.
+///
+/// Silent on a file that is not TOML at all: there is nothing to walk, and the read
+/// that follows describes that failure far better than a scan could.
+fn scan(text: &str, declared: &[(&str, &[Closed])]) -> Vec<Violation> {
     toml::from_str::<Value>(text)
         .map(|tree| {
-            let mut found = entries(&tree, "profile", ON_PROFILE);
-            found.append(&mut entries(&tree, "service", ON_SERVICE));
-            found
+            declared
+                .iter()
+                .flat_map(|(kind, closed)| entries(&tree, kind, closed))
+                .collect()
         })
         .unwrap_or_default()
 }
 
 /// Every declared entry of one kind, asked about each of its closed fields.
-fn entries(tree: &Value, kind: &str, closed: &'static [Closed]) -> Vec<Violation> {
+fn entries(tree: &Value, kind: &str, closed: &[Closed]) -> Vec<Violation> {
     tree.get(kind)
         .and_then(Value::as_array)
         .map_or_else(Vec::new, |declared| {
@@ -83,7 +92,7 @@ fn entries(tree: &Value, kind: &str, closed: &'static [Closed]) -> Vec<Violation
 }
 
 /// One entry's refusals, each naming the field it came from.
-fn asked(kind: &str, at: usize, entry: &Value, closed: &'static [Closed]) -> Vec<Violation> {
+fn asked(kind: &str, at: usize, entry: &Value, closed: &[Closed]) -> Vec<Violation> {
     closed
         .iter()
         .filter_map(|field| {
@@ -127,8 +136,8 @@ fn refused<T: DeserializeOwned>(value: &Value) -> Option<String> {
 mod tests {
     use toml::Value;
 
-    use super::unrecognised;
-    use crate::{Error, Manifest};
+    use super::{scan, unrecognised, Closed, DECLARED, ON_PROFILE, ON_SERVICE};
+    use crate::Manifest;
 
     /// A word no enumeration in the contract will ever hold.
     const UNKNOWABLE: &str = "zzz-not-a-name";
@@ -189,25 +198,40 @@ protocol = \"carrier-pigeon\"
         }
     }
 
-    /// What the reader said about one swapped word, where it said it as a parse failure.
-    fn escaped_at(tree: &Value, nth: usize) -> Option<String> {
+    /// What the typed read said about one swapped word the scan did not name.
+    ///
+    /// Asked of the read rather than of `from_toml`, because `from_toml` consults the
+    /// whole table and would name what a short one missed — which is the answer this
+    /// is trying to tell apart.
+    fn escaped_at(tree: &Value, nth: usize, declared: &[(&str, &[Closed])]) -> Option<String> {
         let mut copy = tree.clone();
         nth_word(&mut copy, nth, &mut 0);
         let text = toml::to_string(&copy).ok()?;
-        match Manifest::from_toml(&text) {
-            Err(Error::Syntax(said)) if said.to_string().contains("unknown variant") => {
-                Some(said.to_string())
-            }
-            _ => None,
+        if !scan(&text, declared).is_empty() {
+            return None;
         }
+        toml::from_str::<Manifest>(&text)
+            .err()
+            .map(|said| said.to_string())
+            .filter(|said| said.contains("unknown variant"))
     }
 
     /// Every word in a manifest, swapped in turn for one no enumeration holds.
-    fn swept(tree: &Value) -> (usize, Vec<String>) {
+    fn swept(tree: &Value, declared: &[(&str, &[Closed])]) -> (usize, Vec<String>) {
         let mut words = 0;
         nth_word(&mut tree.clone(), usize::MAX, &mut words);
-        let escaped = (0..words).filter_map(|nth| escaped_at(tree, nth)).collect();
+        let escaped = (0..words)
+            .filter_map(|nth| escaped_at(tree, nth, declared))
+            .collect();
         (words, escaped)
+    }
+
+    /// The shipped stack, and what a sweep of it found a given table failing to name.
+    fn sweeping(declared: &[(&str, &[Closed])]) -> (usize, Vec<String>) {
+        let embedded = include_str!("../../../assets/media-stack/stack.toml");
+        toml::from_str::<Value>(embedded)
+            .map(|tree| swept(&tree, declared))
+            .unwrap_or_default()
     }
 
     /// The table above is a list of paths, and a list is a thing that goes stale.
@@ -219,15 +243,28 @@ protocol = \"carrier-pigeon\"
     /// allowed is a refusal that named it — never one that failed to parse.
     #[test]
     fn no_closed_field_in_the_shipped_stack_is_left_off_the_table() {
-        let embedded = include_str!("../../../assets/media-stack/stack.toml");
-        let (words, escaped) = toml::from_str::<Value>(embedded)
-            .map(|tree| swept(&tree))
-            .unwrap_or_default();
+        let (words, escaped) = sweeping(DECLARED);
         assert!(words > 100, "the shipped stack was read and swept: {words}");
         assert!(
             escaped.is_empty(),
             "a closed field is missing from the table above, so an unknown name \
              came back as a parse failure: {escaped:?}"
+        );
+    }
+
+    /// And the sweep can fail, which is the half a passing sweep says nothing about.
+    ///
+    /// A gate nobody has watched refuse is a gate nobody knows works: run against a
+    /// table with the last service field taken off it, every service declaring that
+    /// field has to come back unnamed.
+    #[test]
+    fn a_field_left_off_the_table_is_what_the_sweep_refuses() {
+        let short = ON_SERVICE.split_last().map_or(&[][..], |(_, rest)| rest);
+        let (_, escaped) = sweeping(&[("profile", ON_PROFILE), ("service", short)]);
+        assert!(
+            escaped.iter().any(|said| said.contains("key_source")),
+            "a table missing api.key_source lets it through as a parse failure: \
+             {escaped:?}"
         );
     }
 }
