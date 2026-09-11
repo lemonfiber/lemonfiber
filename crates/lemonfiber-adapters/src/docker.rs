@@ -283,13 +283,27 @@ fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
 
 /// Everything an attached exec wrote, and nothing at all where it was not attached.
 async fn spoken(started: bollard::exec::StartExecResults) -> Result<String, Failure> {
-    let mut stdout = String::new();
-    if let bollard::exec::StartExecResults::Attached { mut output, .. } = started {
-        while let Some(chunk) = output.next().await {
-            stdout.push_str(&chunk.map_err(unreachable)?.to_string());
-        }
+    match started {
+        bollard::exec::StartExecResults::Attached { output, .. } => gathered(output).await,
+        bollard::exec::StartExecResults::Detached => Ok(String::new()),
     }
-    Ok(stdout)
+}
+
+/// Everything a stream of exec output said, joined in the order it arrived.
+///
+/// Takes the stream rather than the exec, because an attached exec needs a daemon and
+/// a stream does not — so what it does with a chunk, and with a chunk that will not
+/// arrive, is drivable here.
+async fn gathered<S>(mut output: S) -> Result<String, Failure>
+where
+    S: tokio_stream::Stream<Item = Result<bollard::container::LogOutput, bollard::errors::Error>>
+        + Unpin,
+{
+    let mut said = String::new();
+    while let Some(chunk) = output.next().await {
+        said.push_str(&chunk.map_err(unreachable)?.to_string());
+    }
+    Ok(said)
 }
 
 /// One sampling task per running container, feeding one channel.
@@ -387,7 +401,7 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
 
 #[cfg(test)]
 mod tests {
-    use super::{refused_exec, spoken, Failure};
+    use super::{gathered, refused_exec, spoken, Failure};
 
     /// Both refusals, one of which needs a daemon that answers badly.
     ///
@@ -426,5 +440,37 @@ mod tests {
     async fn an_exec_that_was_not_attached_to_says_nothing() {
         let said = spoken(bollard::exec::StartExecResults::Detached).await;
         assert_eq!(said.ok(), Some(String::new()));
+    }
+
+    /// What an attached exec said, and what a chunk that will not arrive costs.
+    ///
+    /// Driven through the stream rather than the exec, because an attached exec needs
+    /// a daemon and this needs only the chunks.
+    #[tokio::test]
+    async fn every_chunk_an_exec_sent_is_gathered_in_order() {
+        let chunks = vec![
+            Ok(bollard::container::LogOutput::StdOut {
+                message: "one\n".into(),
+            }),
+            Ok(bollard::container::LogOutput::StdErr {
+                message: "two\n".into(),
+            }),
+        ];
+        let said = gathered(tokio_stream::iter(chunks)).await;
+        assert_eq!(said.ok(), Some("one\ntwo\n".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn a_chunk_that_will_not_arrive_ends_the_gathering() {
+        let chunks = vec![
+            Ok(bollard::container::LogOutput::StdOut {
+                message: "some of it\n".into(),
+            }),
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 500,
+                message: "the stream stopped".to_owned(),
+            }),
+        ];
+        assert!(gathered(tokio_stream::iter(chunks)).await.is_err());
     }
 }
