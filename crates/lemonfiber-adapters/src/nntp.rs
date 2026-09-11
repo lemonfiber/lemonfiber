@@ -59,15 +59,7 @@ impl Nntp for Dialer {
         endpoint: &Endpoint,
         commands: &[String],
     ) -> Result<Vec<String>, Unreachable> {
-        // Bounded, so a provider that never answers is reported unreachable rather
-        // than waited on forever.
-        match tokio::time::timeout(self.budget, self.dial(endpoint, commands)).await {
-            Ok(result) => result,
-            Err(_) => Err(unreachable(
-                &endpoint.host,
-                format!("no reply within {}s", self.budget.as_secs()),
-            )),
-        }
+        converse(self, endpoint, commands).await
     }
 }
 
@@ -208,6 +200,22 @@ fn tls_config() -> Result<Arc<ClientConfig>, String> {
             .with_root_certificates(roots)
             .with_no_client_auth();
     Ok(Arc::new(config))
+}
+
+async fn converse(
+    dialer: &Dialer,
+    endpoint: &Endpoint,
+    commands: &[String],
+) -> Result<Vec<String>, Unreachable> {
+    // Bounded, so a provider that never answers is reported unreachable rather
+    // than waited on forever.
+    match tokio::time::timeout(dialer.budget, dialer.dial(endpoint, commands)).await {
+        Ok(result) => result,
+        Err(_) => Err(unreachable(
+            &endpoint.host,
+            format!("no reply within {}s", dialer.budget.as_secs()),
+        )),
+    }
 }
 
 #[cfg(test)]

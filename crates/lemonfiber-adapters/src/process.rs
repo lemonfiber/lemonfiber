@@ -27,41 +27,7 @@ impl Runner for Local {
         &self,
         argv: &[String],
     ) -> Result<tokio::sync::mpsc::Receiver<Progress>, Failure> {
-        let Some((program, arguments)) = argv.split_first() else {
-            return Err(Failure::Unusable {
-                program: String::new(),
-                reason: "no program was given".to_owned(),
-            });
-        };
-
-        let mut child = Command::new(program)
-            .args(arguments)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|err| started(program, &err))?;
-
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
-        let (sender, receiver) = channel(BACKLOG);
-        // One task owns the child; a reader task per stream sends lines as they
-        // land, so stderr (where compose writes its progress) is not held back
-        // until stdout closes. The exit follows once both streams are spent.
-        tokio::spawn(async move {
-            let mut readers = Vec::new();
-            if let Some(out) = stdout {
-                readers.push(tokio::spawn(forward(out, sender.clone())));
-            }
-            if let Some(err) = stderr {
-                readers.push(tokio::spawn(forward(err, sender.clone())));
-            }
-            for reader in readers {
-                let _ = reader.await;
-            }
-            let status = child.wait().await.ok().and_then(|exit| exit.code());
-            let _ = sender.send(Progress::Ended(status)).await;
-        });
-        Ok(receiver)
+        stream(argv)
     }
 }
 
@@ -114,6 +80,46 @@ async fn forward<R: AsyncRead + Unpin + Send + 'static>(reader: R, sender: Sende
     while let Ok(Some(line)) = lines.next_line().await {
         let _ = sender.send(Progress::Line(line)).await;
     }
+}
+
+/// Nothing of the runner's is read: a stream is the child it spawns and the two
+/// readers draining it, and the runner holds nothing that changes either.
+fn stream(argv: &[String]) -> Result<tokio::sync::mpsc::Receiver<Progress>, Failure> {
+    let Some((program, arguments)) = argv.split_first() else {
+        return Err(Failure::Unusable {
+            program: String::new(),
+            reason: "no program was given".to_owned(),
+        });
+    };
+
+    let mut child = Command::new(program)
+        .args(arguments)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| started(program, &err))?;
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let (sender, receiver) = channel(BACKLOG);
+    // One task owns the child; a reader task per stream sends lines as they
+    // land, so stderr (where compose writes its progress) is not held back
+    // until stdout closes. The exit follows once both streams are spent.
+    tokio::spawn(async move {
+        let mut readers = Vec::new();
+        if let Some(out) = stdout {
+            readers.push(tokio::spawn(forward(out, sender.clone())));
+        }
+        if let Some(err) = stderr {
+            readers.push(tokio::spawn(forward(err, sender.clone())));
+        }
+        for reader in readers {
+            let _ = reader.await;
+        }
+        let status = child.wait().await.ok().and_then(|exit| exit.code());
+        let _ = sender.send(Progress::Ended(status)).await;
+    });
+    Ok(receiver)
 }
 
 #[cfg(test)]

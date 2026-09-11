@@ -210,28 +210,7 @@ impl Engine for Reporting {
         services: &[String],
         _query: LogQuery,
     ) -> Result<Receiver<LogLine>, EngineFailure> {
-        // Opening a stream means finding the containers first, so an engine
-        // that cannot be reached refuses this as surely as it refuses a
-        // listing. A fake that answered anyway would be a fake that made
-        // the health gate's own failure path untestable.
-        if !self.reachable {
-            return Err(EngineFailure::Unreachable {
-                reason: "no daemon here".to_owned(),
-            });
-        }
-
-        let wanted: Vec<LogLine> = self
-            .said
-            .iter()
-            .filter(|line| services.is_empty() || services.contains(&line.service))
-            .cloned()
-            .collect();
-
-        let (sender, receiver) = tokio::sync::mpsc::channel(wanted.len().max(1));
-        for line in wanted {
-            let _ = sender.send(line).await;
-        }
-        Ok(receiver)
+        logs(self, _project, services, _query).await
     }
 }
 
@@ -311,4 +290,34 @@ fn executed(
         tunnel.client_ip
     };
     Ok(scripted(ip))
+}
+
+async fn logs(
+    reporting: &Reporting,
+    _project: &str,
+    services: &[String],
+    _query: LogQuery,
+) -> Result<Receiver<LogLine>, EngineFailure> {
+    // Opening a stream means finding the containers first, so an engine
+    // that cannot be reached refuses this as surely as it refuses a
+    // listing. A fake that answered anyway would be a fake that made
+    // the health gate's own failure path untestable.
+    if !reporting.reachable {
+        return Err(EngineFailure::Unreachable {
+            reason: "no daemon here".to_owned(),
+        });
+    }
+
+    let wanted: Vec<LogLine> = reporting
+        .said
+        .iter()
+        .filter(|line| services.is_empty() || services.contains(&line.service))
+        .cloned()
+        .collect();
+
+    let (sender, receiver) = tokio::sync::mpsc::channel(wanted.len().max(1));
+    for line in wanted {
+        let _ = sender.send(line).await;
+    }
+    Ok(receiver)
 }

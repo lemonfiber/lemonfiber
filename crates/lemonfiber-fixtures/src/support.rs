@@ -342,11 +342,7 @@ impl lemonfiber_ports::filesystem::FileSystem for SeedFs {
         &self,
         path: &std::path::Path,
     ) -> Result<std::path::PathBuf, lemonfiber_ports::filesystem::Fault> {
-        let text = path.to_string_lossy();
-        if self.missing.iter().any(|fragment| text.contains(fragment)) {
-            return Err(lemonfiber_ports::filesystem::Fault::new("no such path"));
-        }
-        Ok(path.to_path_buf())
+        resolved(self, path)
     }
     async fn touch(
         &self,
@@ -456,4 +452,15 @@ fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
         return None;
     }
     seed.servarr.map(str::to_owned)
+}
+
+fn resolved(
+    seed: &SeedFs,
+    path: &std::path::Path,
+) -> Result<std::path::PathBuf, lemonfiber_ports::filesystem::Fault> {
+    let text = path.to_string_lossy();
+    if seed.missing.iter().any(|fragment| text.contains(fragment)) {
+        return Err(lemonfiber_ports::filesystem::Fault::new("no such path"));
+    }
+    Ok(path.to_path_buf())
 }
