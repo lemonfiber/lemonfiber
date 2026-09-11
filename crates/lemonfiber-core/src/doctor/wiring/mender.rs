@@ -97,95 +97,82 @@ impl Mend for WiringMender {
     /// about to write — and answering from the older reading would write over the change
     /// they made while being asked.
     async fn may_proceed(&self, repair: &Repair) -> Writing {
-        may_proceed(self, repair).await
+        let Some((managed, wired)) = self.named(repair) else {
+            return Writing::TheirsAlone;
+        };
+        let Some(held) = self.reading.held(managed).await else {
+            // The service will not say what it holds, so nothing can establish the value
+            // is still lemonfiber's. Silence is not permission.
+            return Writing::TheirsAlone;
+        };
+        let holds = holding(&held, &wired.want)
+            .and_then(|have| have.category.as_ref())
+            .map(|category| category.value.as_str());
+        may_write(wired.recorded.as_ref(), holds)
     }
 
     async fn mend(&self, repair: &Repair) -> Attempt {
-        mend(self, repair).await
-    }
-}
-
-/// Whether this field is lemonfiber's to write.
-///
-/// Read from the service rather than from what the diagnosis saw. A run that looked,
-/// asked, and was answered gives the operator time to change the very thing it is
-/// about to write — and answering from the older reading would write over the change
-/// they made while being asked.
-async fn may_proceed(mender: &WiringMender, repair: &Repair) -> Writing {
-    let Some((managed, wired)) = mender.named(repair) else {
-        return Writing::TheirsAlone;
-    };
-    let Some(held) = mender.reading.held(managed).await else {
-        // The service will not say what it holds, so nothing can establish the value
-        // is still lemonfiber's. Silence is not permission.
-        return Writing::TheirsAlone;
-    };
-    let holds = holding(&held, &wired.want)
-        .and_then(|have| have.category.as_ref())
-        .map(|category| category.value.as_str());
-    may_write(wired.recorded.as_ref(), holds)
-}
-
-async fn mend(mender: &WiringMender, repair: &Repair) -> Attempt {
-    let Some((managed, wired)) = mender.named(repair) else {
-        return Attempt::Stopped {
-            leaving: "the wiring this repair names is no longer one lemonfiber manages".to_owned(),
+        let Some((managed, wired)) = self.named(repair) else {
+            return Attempt::Stopped {
+                leaving: "the wiring this repair names is no longer one lemonfiber manages"
+                    .to_owned(),
+            };
         };
-    };
-    let Some(client) = mender.reading.open(managed).await else {
-        return Attempt::Stopped {
-            leaving: format!(
-                "{} could not be authenticated to, so it was left as it was",
-                managed.target.name
-            ),
+        let Some(client) = self.reading.open(managed).await else {
+            return Attempt::Stopped {
+                leaving: format!(
+                    "{} could not be authenticated to, so it was left as it was",
+                    managed.target.name
+                ),
+            };
         };
-    };
-    // Read again rather than trusting what the diagnosis saw: the client is written by
-    // the id the service assigned it, and an id read a moment ago is an id that may
-    // have been removed since.
-    let Ok(held) = client.download_clients().await else {
-        return Attempt::Stopped {
-            leaving: format!(
-                "{} would not say what it holds, so nothing was written",
-                managed.target.name
-            ),
+        // Read again rather than trusting what the diagnosis saw: the client is written by
+        // the id the service assigned it, and an id read a moment ago is an id that may
+        // have been removed since.
+        let Ok(held) = client.download_clients().await else {
+            return Attempt::Stopped {
+                leaving: format!(
+                    "{} would not say what it holds, so nothing was written",
+                    managed.target.name
+                ),
+            };
         };
-    };
-    let Some(have) = holding(&held, &wired.want) else {
-        return Attempt::Stopped {
-            leaving: format!(
-                "{} no longer holds {}, so there was nothing to put back",
-                managed.target.name, wired.want.name
-            ),
+        let Some(have) = holding(&held, &wired.want) else {
+            return Attempt::Stopped {
+                leaving: format!(
+                    "{} no longer holds {}, so there was nothing to put back",
+                    managed.target.name, wired.want.name
+                ),
+            };
         };
-    };
-    let previous = have
-        .category
-        .as_ref()
-        .map(|category| category.value.clone());
-    match client.update_download_client(&have.id, &wired.want).await {
-        // Recorded as a change *inside the service*, not as a setting in
-        // lemonfiber's environment file. The two read alike and are reversed nothing
-        // alike, and a reversal that took this for a `Set` would write the field's
-        // name into the environment file and leave the service exactly as it was.
-        Ok(()) => Attempt::recorded(vec![Change {
-            at: mender.stamp.clone(),
-            operation: OPERATION.to_owned(),
-            target: managed.target.id.clone(),
-            kind: Kind::Configured {
-                resource: CLIENT.to_owned(),
-                id: have.id.clone(),
-                field: wired.want.category.field.clone(),
-                previous,
-                current: wired.want.category.value.clone(),
+        let previous = have
+            .category
+            .as_ref()
+            .map(|category| category.value.clone());
+        match client.update_download_client(&have.id, &wired.want).await {
+            // Recorded as a change *inside the service*, not as a setting in
+            // lemonfiber's environment file. The two read alike and are reversed nothing
+            // alike, and a reversal that took this for a `Set` would write the field's
+            // name into the environment file and leave the service exactly as it was.
+            Ok(()) => Attempt::recorded(vec![Change {
+                at: self.stamp.clone(),
+                operation: OPERATION.to_owned(),
+                target: managed.target.id.clone(),
+                kind: Kind::Configured {
+                    resource: CLIENT.to_owned(),
+                    id: have.id.clone(),
+                    field: wired.want.category.field.clone(),
+                    previous,
+                    current: wired.want.category.value.clone(),
+                },
+            }]),
+            Err(failure) => Attempt::Stopped {
+                leaving: format!(
+                    "{} would not take the category, and kept the one it had — {}",
+                    managed.target.name,
+                    failure.problem().summary
+                ),
             },
-        }]),
-        Err(failure) => Attempt::Stopped {
-            leaving: format!(
-                "{} would not take the category, and kept the one it had — {}",
-                managed.target.name,
-                failure.problem().summary
-            ),
-        },
+        }
     }
 }

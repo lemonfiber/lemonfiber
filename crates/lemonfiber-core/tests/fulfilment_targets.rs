@@ -185,3 +185,26 @@ async fn the_targets_it_holds_are_read_from_both_lists() {
         "film and television were not told apart: {held:?}"
     );
 }
+
+/// A list that will not read back is refused, rather than taken for an empty one.
+///
+/// The read is what tells this run which targets are already registered, and an
+/// unreadable answer treated as "none" is the one mistake that cannot be undone from
+/// here: every target is registered again on top of the ones already there, and the
+/// household's requests are then fulfilled twice.
+#[tokio::test]
+async fn a_target_list_that_will_not_read_back_is_refused_rather_than_taken_as_empty() {
+    let (seerr, _) = holding("not a list of targets", &format!("[{}]", registered()));
+
+    let said = seerr
+        .fulfilment_targets()
+        .await
+        .err()
+        .map(|failure| failure.to_string())
+        .unwrap_or_default();
+
+    assert!(
+        said.contains("fulfilment targets could not be read"),
+        "an unreadable list did not say so: {said}"
+    );
+}

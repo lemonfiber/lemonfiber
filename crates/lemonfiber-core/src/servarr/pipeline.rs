@@ -91,28 +91,7 @@ impl Pipeline for Servarr {
         id: i64,
         season: Option<u32>,
     ) -> Result<Vec<ItemPart>, Failure> {
-        // A film is the whole item — there is nothing to aggregate, and asking a service
-        // that files nothing per part would be a request with no answer.
-        let Some(endpoint) = kind.parts_endpoint() else {
-            return Ok(Vec::new());
-        };
-        let season = season.map_or_else(String::new, |number| format!("&seasonNumber={number}"));
-        let path = format!("/{endpoint}?{}={id}{season}", kind.parts_filter());
-        let response = self.probe(&self.request(Method::Get, &path, None)).await?;
-        let parts: Vec<PartResource> = self
-            .endpoint
-            .decode(&response, "the episodes could not be read")?;
-        Ok(parts
-            .into_iter()
-            .map(|part| ItemPart {
-                id: part.id,
-                season: part.season_number,
-                number: part.episode_number,
-                title: part.title,
-                monitored: part.monitored,
-                has_file: part.has_file,
-            })
-            .collect())
+        item_parts(self, kind, id, season).await
     }
 
     async fn stuck_items(&self, kind: Kind) -> Result<Vec<StuckItem>, Failure> {
@@ -225,4 +204,36 @@ struct HistoryRecord {
 /// the service's own words for a download that needs attention.
 fn is_stuck(status: &str) -> bool {
     status.eq_ignore_ascii_case("warning") || status.eq_ignore_ascii_case("error")
+}
+
+async fn item_parts(
+    servarr: &Servarr,
+    kind: Kind,
+    id: i64,
+    season: Option<u32>,
+) -> Result<Vec<ItemPart>, Failure> {
+    // A film is the whole item — there is nothing to aggregate, and asking a service
+    // that files nothing per part would be a request with no answer.
+    let Some(endpoint) = kind.parts_endpoint() else {
+        return Ok(Vec::new());
+    };
+    let season = season.map_or_else(String::new, |number| format!("&seasonNumber={number}"));
+    let path = format!("/{endpoint}?{}={id}{season}", kind.parts_filter());
+    let response = servarr
+        .probe(&servarr.request(Method::Get, &path, None))
+        .await?;
+    let parts: Vec<PartResource> = servarr
+        .endpoint
+        .decode(&response, "the episodes could not be read")?;
+    Ok(parts
+        .into_iter()
+        .map(|part| ItemPart {
+            id: part.id,
+            season: part.season_number,
+            number: part.episode_number,
+            title: part.title,
+            monitored: part.monitored,
+            has_file: part.has_file,
+        })
+        .collect())
 }

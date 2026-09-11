@@ -267,4 +267,46 @@ mod tests {
         assert!(client.carry(Record::Series, &broken).await.is_err());
         assert!(http.requests().is_empty(), "nothing was put");
     }
+
+    /// A record naming no profile crosses as it came, and asks for nothing on the way.
+    ///
+    /// Not every record has a profile to carry — an indexer and a download client have
+    /// none — so naming none is not a record this service cannot take. Looking the
+    /// profiles up anyway would be a call made for a number nobody wanted, on a
+    /// service that can refuse it.
+    #[tokio::test]
+    async fn a_record_naming_no_profile_crosses_without_asking_for_one() {
+        let http = holding("[]");
+        let client = Servarr::new(
+            Arc::clone(&http) as Arc<dyn crate::ports::http::Http>,
+            "http://x",
+            "k",
+            "sonarr",
+            3,
+        );
+
+        let bare = Carried {
+            name: "Taskmaster".to_owned(),
+            profile: None,
+            folder: None,
+            rest: r#"{"id":5,"title":"Taskmaster"}"#.to_owned(),
+        };
+        let put = client.carry(Record::Series, &bare).await;
+        assert!(put.is_ok(), "{put:?}");
+
+        let asked = http.requests();
+        assert!(
+            asked
+                .iter()
+                .all(|request| !request.url.contains("qualityprofile")),
+            "a record naming no profile still asked which profiles there were"
+        );
+        let body = asked
+            .into_iter()
+            .find(|request| request.method == crate::ports::http::Method::Post)
+            .and_then(|request| request.body)
+            .unwrap_or_default();
+        assert!(!body.contains("qualityProfileId"), "{body}");
+        assert!(!body.contains("rootFolderPath"), "{body}");
+    }
 }

@@ -150,24 +150,7 @@ impl Client for Servarr {
         id: &str,
         client: &DownloadClient,
     ) -> Result<(), Failure> {
-        // Servarr updates a client with a PUT to its own id, carrying the same
-        // registration document a create does but with the id set, so it rewrites the
-        // one that is there rather than adding a second. An id the service did not
-        // assign as an integer is one this cannot address, so it is refused rather than
-        // guessed at.
-        let Ok(numeric) = id.parse::<i64>() else {
-            return Err(self
-                .endpoint
-                .refused("the download client's id is not one this service assigns"));
-        };
-        let response = self
-            .probe(&self.request(
-                Method::Put,
-                &format!("/downloadclient/{id}"),
-                Some(download_client_body(client, Some(numeric))),
-            ))
-            .await?;
-        self.endpoint.expect_success(&response)
+        update_download_client(self, id, client).await
     }
 
     async fn set_client_field(
@@ -176,33 +159,7 @@ impl Client for Servarr {
         field: &str,
         value: Option<&str>,
     ) -> Result<(), Failure> {
-        // Read, change the one field, write back. Servarr takes a whole resource document
-        // on a PUT, so putting one field back means sending the rest of the document
-        // exactly as the service gave it — which is also what keeps a reversal from having
-        // to know the client's credential to restore its category.
-        let response = self
-            .probe(&self.request(Method::Get, &format!("/downloadclient/{id}"), None))
-            .await?;
-        let mut document: serde_json::Value = self
-            .endpoint
-            .decode(&response, "the download client could not be read")?;
-        let Some(fields) = document
-            .get_mut("fields")
-            .and_then(serde_json::Value::as_array_mut)
-        else {
-            return Err(self
-                .endpoint
-                .refused("the download client has no settings to put back"));
-        };
-        set_field(fields, field, value);
-        let response = self
-            .probe(&self.request(
-                Method::Put,
-                &format!("/downloadclient/{id}"),
-                Some(document.to_string()),
-            ))
-            .await?;
-        self.endpoint.expect_success(&response)
+        set_client_field(self, id, field, value).await
     }
 
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
@@ -424,6 +381,66 @@ async fn register_root_folder(servarr: &Servarr, folder: &RootFolder) -> Result<
 
     let response = servarr
         .probe(&servarr.request(Method::Post, "/rootfolder", Some(body.to_string())))
+        .await?;
+    servarr.endpoint.expect_success(&response)
+}
+
+async fn update_download_client(
+    servarr: &Servarr,
+    id: &str,
+    client: &DownloadClient,
+) -> Result<(), Failure> {
+    // Servarr updates a client with a PUT to its own id, carrying the same
+    // registration document a create does but with the id set, so it rewrites the
+    // one that is there rather than adding a second. An id the service did not
+    // assign as an integer is one this cannot address, so it is refused rather than
+    // guessed at.
+    let Ok(numeric) = id.parse::<i64>() else {
+        return Err(servarr
+            .endpoint
+            .refused("the download client's id is not one this service assigns"));
+    };
+    let response = servarr
+        .probe(&servarr.request(
+            Method::Put,
+            &format!("/downloadclient/{id}"),
+            Some(download_client_body(client, Some(numeric))),
+        ))
+        .await?;
+    servarr.endpoint.expect_success(&response)
+}
+
+async fn set_client_field(
+    servarr: &Servarr,
+    id: &str,
+    field: &str,
+    value: Option<&str>,
+) -> Result<(), Failure> {
+    // Read, change the one field, write back. Servarr takes a whole resource document
+    // on a PUT, so putting one field back means sending the rest of the document
+    // exactly as the service gave it — which is also what keeps a reversal from having
+    // to know the client's credential to restore its category.
+    let response = servarr
+        .probe(&servarr.request(Method::Get, &format!("/downloadclient/{id}"), None))
+        .await?;
+    let mut document: serde_json::Value = servarr
+        .endpoint
+        .decode(&response, "the download client could not be read")?;
+    let Some(fields) = document
+        .get_mut("fields")
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return Err(servarr
+            .endpoint
+            .refused("the download client has no settings to put back"));
+    };
+    set_field(fields, field, value);
+    let response = servarr
+        .probe(&servarr.request(
+            Method::Put,
+            &format!("/downloadclient/{id}"),
+            Some(document.to_string()),
+        ))
         .await?;
     servarr.endpoint.expect_success(&response)
 }

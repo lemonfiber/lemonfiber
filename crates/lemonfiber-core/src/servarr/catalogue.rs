@@ -42,41 +42,7 @@ impl Catalogue for Servarr {
         entry: &CatalogueEntry,
         plan: &AddPlan,
     ) -> Result<Added, Failure> {
-        let mut body = serde_json::json!({
-            "title": entry.title,
-            "qualityProfileId": plan.quality_profile,
-            "rootFolderPath": plan.root_folder,
-            "monitored": true,
-            "addOptions": { kind.search_option(): true },
-        });
-        // The external identifier and the two fields only one of the services takes are
-        // set by kind rather than sent to both: a field a service does not know is a
-        // field it rejects the whole body over.
-        if let Some(object) = body.as_object_mut() {
-            object.insert(
-                kind.reference_field().to_owned(),
-                serde_json::json!(entry.reference),
-            );
-            match kind {
-                Kind::Sonarr => object.insert("seasonFolder".to_owned(), serde_json::json!(true)),
-                Kind::Radarr => object.insert(
-                    "minimumAvailability".to_owned(),
-                    serde_json::json!("released"),
-                ),
-            };
-        }
-        let path = format!("/{}", kind.library_endpoint());
-        let response = self
-            .probe(&self.request(Method::Post, &path, Some(body.to_string())))
-            .await?;
-        self.endpoint.expect_success(&response)?;
-        let added: LookupResult = self
-            .endpoint
-            .decode(&response, "the service did not say what it took on")?;
-        Ok(Added {
-            id: added.id,
-            title: added.title,
-        })
+        add(self, kind, entry, plan).await
     }
 
     async fn indexer_count(&self) -> Result<usize, Failure> {
@@ -207,6 +173,49 @@ async fn add_plan(servarr: &Servarr, kind: Kind) -> Result<AddPlan, Failure> {
             kind.noun()
         ))),
     }
+}
+
+async fn add(
+    servarr: &Servarr,
+    kind: Kind,
+    entry: &CatalogueEntry,
+    plan: &AddPlan,
+) -> Result<Added, Failure> {
+    let mut body = serde_json::json!({
+        "title": entry.title,
+        "qualityProfileId": plan.quality_profile,
+        "rootFolderPath": plan.root_folder,
+        "monitored": true,
+        "addOptions": { kind.search_option(): true },
+    });
+    // The external identifier and the two fields only one of the services takes are
+    // set by kind rather than sent to both: a field a service does not know is a
+    // field it rejects the whole body over.
+    if let Some(object) = body.as_object_mut() {
+        object.insert(
+            kind.reference_field().to_owned(),
+            serde_json::json!(entry.reference),
+        );
+        match kind {
+            Kind::Sonarr => object.insert("seasonFolder".to_owned(), serde_json::json!(true)),
+            Kind::Radarr => object.insert(
+                "minimumAvailability".to_owned(),
+                serde_json::json!("released"),
+            ),
+        };
+    }
+    let path = format!("/{}", kind.library_endpoint());
+    let response = servarr
+        .probe(&servarr.request(Method::Post, &path, Some(body.to_string())))
+        .await?;
+    servarr.endpoint.expect_success(&response)?;
+    let added: LookupResult = servarr
+        .endpoint
+        .decode(&response, "the service did not say what it took on")?;
+    Ok(Added {
+        id: added.id,
+        title: added.title,
+    })
 }
 
 #[cfg(test)]

@@ -430,34 +430,40 @@ async fn fulfilment_targets(seerr: &Seerr) -> Result<Vec<RegisteredTarget>, Fail
 }
 
 async fn add_fulfilment_target(seerr: &Seerr, target: &FulfilmentTarget) -> Result<(), Failure> {
-    let mut body = serde_json::json!({
-        "name": target.name,
-        "hostname": target.host,
-        "port": target.port,
-        "apiKey": target.key,
-        "useSsl": false,
-        "activeProfileId": target.profile.id,
-        "activeProfileName": target.profile.name,
-        "activeDirectory": target.folder,
-        "is4k": false,
-        "isDefault": true,
-    });
-
     // The last field is the one the two lists do not share, and each requires its
     // own: television is filed in folders per season, and a film has a point before
     // which there is nothing to fetch. Sending the wrong one is not a field ignored
     // — the service refuses the registration for the one that is missing.
-    if let Some(fields) = body.as_object_mut() {
-        let (name, value) = if target.television {
-            // Seasons in folders of their own, because that is how the media server
-            // reads a series and how anybody browsing one expects to find it.
-            ("enableSeasonFolders", serde_json::json!(true))
-        } else {
-            ("minimumAvailability", serde_json::json!(WHEN_RELEASED))
-        };
-        fields.insert(name.to_owned(), value);
-    }
-    let body = body.to_string();
+    let differs = if target.television {
+        // Seasons in folders of their own, because that is how the media server
+        // reads a series and how anybody browsing one expects to find it.
+        ("enableSeasonFolders", serde_json::json!(true))
+    } else {
+        ("minimumAvailability", serde_json::json!(WHEN_RELEASED))
+    };
+
+    // Built as the map it is rather than assembled through an option that is always
+    // full: a field added by reaching inside a literal object carries a branch for
+    // the object not being one, which is a case that cannot arise and so can never
+    // be shown working.
+    let fields: serde_json::Map<String, serde_json::Value> = [
+        ("name", serde_json::json!(target.name)),
+        ("hostname", serde_json::json!(target.host)),
+        ("port", serde_json::json!(target.port)),
+        ("apiKey", serde_json::json!(target.key)),
+        ("useSsl", serde_json::json!(false)),
+        ("activeProfileId", serde_json::json!(target.profile.id)),
+        ("activeProfileName", serde_json::json!(target.profile.name)),
+        ("activeDirectory", serde_json::json!(target.folder)),
+        ("is4k", serde_json::json!(false)),
+        ("isDefault", serde_json::json!(true)),
+        differs,
+    ]
+    .into_iter()
+    .map(|(at, value)| (at.to_owned(), value))
+    .collect();
+
+    let body = serde_json::Value::Object(fields).to_string();
     let path = if target.television { TELEVISION } else { FILM };
     let written = seerr
         .endpoint
