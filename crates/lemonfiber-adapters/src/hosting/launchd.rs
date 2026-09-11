@@ -189,66 +189,81 @@ impl Host for Launchd {
     }
 
     async fn place(&self, hosted: &Hosted) -> Result<Placed, Failure> {
-        let at = self.plist(&hosted.name);
-        put(&at, &written(&Self::label(&hosted.name), hosted))?;
-        let Some(uid) = self.session().await else {
-            let _ = take(&at);
-            return Err(refused("this login session could not be identified"));
-        };
-        // Anything already loaded under the name goes first, so installing twice
-        // replaces rather than leaves two agents running the same command.
-        self.unload(&hosted.name).await;
-        let domain = format!("gui/{uid}");
-        let path = at.to_string_lossy().into_owned();
-        match self
-            .spoke(&["launchctl", "bootstrap", &domain, &path])
-            .await
-        {
-            Some(output) if output.succeeded() => Ok(Placed {
-                definition: at,
-                started: true,
-            }),
-            Some(output) => {
-                let _ = take(&at);
-                Err(refused(&complaint(&output)))
-            }
-            None => {
-                let _ = take(&at);
-                Err(refused("launchctl could not be run"))
-            }
-        }
+        placed(self, hosted).await
     }
 
     async fn standing(&self, name: &str) -> Result<Held, Failure> {
-        let at = self.plist(name);
-        let Some(text) = definition(&at) else {
-            return Ok(Held::absent());
-        };
-        let arguments = arguments(&text);
-        Ok(Held {
-            standing: self.says(name).await,
-            definition: Some(at),
-            program: arguments.first().map(|at| Program {
-                at: PathBuf::from(at),
-                present: Path::new(at).exists(),
-            }),
-            runs: (!arguments.is_empty()).then(|| arguments.join(" ")),
-            output: under(&text, OUT).map(PathBuf::from),
-        })
+        standing_of(self, name).await
     }
 
     async fn withdraw(&self, name: &str) -> Result<Vec<PathBuf>, Failure> {
-        let at = self.plist(name);
-        if definition(&at).is_none() {
-            return Ok(Vec::new());
-        }
-        self.unload(name).await;
-        if matches!(self.says(name).await, Standing::Running) {
-            return Err(refused("it is still running"));
-        }
-        take(&at)?;
-        Ok(vec![at])
+        withdrawn(self, name).await
     }
+}
+
+/// Write the definition, load it, and take it away again if the load refuses.
+async fn placed(launchd: &Launchd, hosted: &Hosted) -> Result<Placed, Failure> {
+    let at = launchd.plist(&hosted.name);
+    put(&at, &written(&Launchd::label(&hosted.name), hosted))?;
+    let Some(uid) = launchd.session().await else {
+        let _ = take(&at);
+        return Err(refused("this login session could not be identified"));
+    };
+    // Anything already loaded under the name goes first, so installing twice
+    // replaces rather than leaves two agents running the same command.
+    launchd.unload(&hosted.name).await;
+    let domain = format!("gui/{uid}");
+    let path = at.to_string_lossy().into_owned();
+    match launchd
+        .spoke(&["launchctl", "bootstrap", &domain, &path])
+        .await
+    {
+        Some(output) if output.succeeded() => Ok(Placed {
+            definition: at,
+            started: true,
+        }),
+        Some(output) => {
+            let _ = take(&at);
+            Err(refused(&complaint(&output)))
+        }
+        None => {
+            let _ = take(&at);
+            Err(refused("launchctl could not be run"))
+        }
+    }
+}
+
+/// What the definition on disk says, and what launchd says about it.
+async fn standing_of(launchd: &Launchd, name: &str) -> Result<Held, Failure> {
+    let at = launchd.plist(name);
+    let Some(text) = definition(&at) else {
+        return Ok(Held::absent());
+    };
+    let arguments = arguments(&text);
+    Ok(Held {
+        standing: launchd.says(name).await,
+        definition: Some(at),
+        program: arguments.first().map(|at| Program {
+            at: PathBuf::from(at),
+            present: Path::new(at).exists(),
+        }),
+        runs: (!arguments.is_empty()).then(|| arguments.join(" ")),
+        output: under(&text, OUT).map(PathBuf::from),
+    })
+}
+
+/// Unload it and remove the definition, refusing while it is still running.
+async fn withdrawn(launchd: &Launchd, name: &str) -> Result<Vec<PathBuf>, Failure> {
+    let at = launchd.plist(name);
+    if definition(&at).is_none() {
+        return Ok(Vec::new());
+    }
+    launchd.unload(name).await;
+    if matches!(launchd.says(name).await, Standing::Running) {
+        return Err(refused("it is still running"));
+    }
+    take(&at)?;
+    Ok(vec![at])
 }
 
 /// A refusal in launchd's name.

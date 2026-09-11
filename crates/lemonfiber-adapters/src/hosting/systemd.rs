@@ -155,69 +155,84 @@ impl Host for Systemd {
     }
 
     async fn place(&self, hosted: &Hosted) -> Result<Placed, Failure> {
-        let at = self.at(&hosted.name);
-        put(&at, &written(hosted))?;
-        self.reread().await;
-        let unit = Self::unit(&hosted.name);
-        // Enabling and starting in one act, so a name that was already installed
-        // is replaced rather than joined by a second under a different unit.
-        let told = self
-            .spoke(&["systemctl", "--user", "enable", "--now", &unit])
-            .await;
-        match told {
-            Some(output) if output.succeeded() => Ok(Placed {
-                definition: at,
-                started: true,
-            }),
-            Some(output) => {
-                let _ = take(&at);
-                self.reread().await;
-                Err(refused(&complaint(&output)))
-            }
-            None => {
-                let _ = take(&at);
-                Err(refused("systemctl could not be run"))
-            }
-        }
+        placed(self, hosted).await
     }
 
     async fn standing(&self, name: &str) -> Result<Held, Failure> {
-        let at = self.at(name);
-        let Some(text) = definition(&at) else {
-            return Ok(Held::absent());
-        };
-        let arguments = after(&text, RUNS)
-            .map(|line| quoted(&line))
-            .unwrap_or_default();
-        Ok(Held {
-            standing: self.says(name).await,
-            definition: Some(at),
-            program: arguments.first().map(|at| Program {
-                at: PathBuf::from(at),
-                present: Path::new(at).exists(),
-            }),
-            runs: (!arguments.is_empty()).then(|| arguments.join(" ")),
-            output: after(&text, WRITES)
-                .and_then(|value| value.strip_prefix(APPEND).map(PathBuf::from)),
-        })
+        standing_of(self, name).await
     }
 
     async fn withdraw(&self, name: &str) -> Result<Vec<PathBuf>, Failure> {
-        let at = self.at(name);
-        if definition(&at).is_none() {
-            return Ok(Vec::new());
-        }
-        let unit = Self::unit(name);
-        let _ = self
-            .spoke(&["systemctl", "--user", "disable", "--now", &unit])
-            .await;
-        if matches!(self.says(name).await, Standing::Running) {
-            return Err(refused("it is still running"));
-        }
-        take(&at)?;
-        self.reread().await;
-        Ok(vec![at])
+        withdrawn(self, name).await
     }
+}
+
+/// Write the unit, enable and start it, and take it away again if that refuses.
+async fn placed(systemd: &Systemd, hosted: &Hosted) -> Result<Placed, Failure> {
+    let at = systemd.at(&hosted.name);
+    put(&at, &written(hosted))?;
+    systemd.reread().await;
+    let unit = Systemd::unit(&hosted.name);
+    // Enabling and starting in one act, so a name that was already installed
+    // is replaced rather than joined by a second under a different unit.
+    let told = systemd
+        .spoke(&["systemctl", "--user", "enable", "--now", &unit])
+        .await;
+    match told {
+        Some(output) if output.succeeded() => Ok(Placed {
+            definition: at,
+            started: true,
+        }),
+        Some(output) => {
+            let _ = take(&at);
+            systemd.reread().await;
+            Err(refused(&complaint(&output)))
+        }
+        None => {
+            let _ = take(&at);
+            Err(refused("systemctl could not be run"))
+        }
+    }
+}
+
+/// What the unit on disk says, and what systemd says about it.
+async fn standing_of(systemd: &Systemd, name: &str) -> Result<Held, Failure> {
+    let at = systemd.at(name);
+    let Some(text) = definition(&at) else {
+        return Ok(Held::absent());
+    };
+    let arguments = after(&text, RUNS)
+        .map(|line| quoted(&line))
+        .unwrap_or_default();
+    Ok(Held {
+        standing: systemd.says(name).await,
+        definition: Some(at),
+        program: arguments.first().map(|at| Program {
+            at: PathBuf::from(at),
+            present: Path::new(at).exists(),
+        }),
+        runs: (!arguments.is_empty()).then(|| arguments.join(" ")),
+        output: after(&text, WRITES)
+            .and_then(|value| value.strip_prefix(APPEND).map(PathBuf::from)),
+    })
+}
+
+/// Disable and stop it and remove the unit, refusing while it is still running.
+async fn withdrawn(systemd: &Systemd, name: &str) -> Result<Vec<PathBuf>, Failure> {
+    let at = systemd.at(name);
+    if definition(&at).is_none() {
+        return Ok(Vec::new());
+    }
+    let unit = Systemd::unit(name);
+    let _ = systemd
+        .spoke(&["systemctl", "--user", "disable", "--now", &unit])
+        .await;
+    if matches!(systemd.says(name).await, Standing::Running) {
+        return Err(refused("it is still running"));
+    }
+    take(&at)?;
+    systemd.reread().await;
+    Ok(vec![at])
 }
 
 /// A refusal in systemd's name.

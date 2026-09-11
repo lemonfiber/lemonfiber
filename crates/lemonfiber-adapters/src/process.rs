@@ -20,24 +20,7 @@ pub struct Local;
 #[async_trait]
 impl Runner for Local {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        let Some((program, arguments)) = argv.split_first() else {
-            return Err(Failure::Unusable {
-                program: String::new(),
-                reason: "no program was given".to_owned(),
-            });
-        };
-
-        let output = Command::new(program)
-            .args(arguments)
-            .output()
-            .await
-            .map_err(|err| started(program, &err))?;
-
-        Ok(Output {
-            status: output.status.code(),
-            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        })
+        ran(argv).await
     }
 
     async fn stream(
@@ -80,6 +63,28 @@ impl Runner for Local {
         });
         Ok(receiver)
     }
+}
+
+/// Spawn the program and wait for it, or say why it could not be spawned.
+async fn ran(argv: &[String]) -> Result<Output, Failure> {
+    let Some((program, arguments)) = argv.split_first() else {
+        return Err(Failure::Unusable {
+            program: String::new(),
+            reason: "no program was given".to_owned(),
+        });
+    };
+
+    let output = Command::new(program)
+        .args(arguments)
+        .output()
+        .await
+        .map_err(|err| started(program, &err))?;
+
+    Ok(Output {
+        status: output.status.code(),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    })
 }
 
 /// Turn an I/O error from spawning a program into the failure that names its

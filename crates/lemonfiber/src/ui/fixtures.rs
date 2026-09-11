@@ -14,12 +14,17 @@ pub(crate) struct Ran(Result<Output, Failure>);
 #[async_trait]
 impl Runner for Ran {
     async fn run(&self, _: &[String]) -> Result<Output, Failure> {
-        match &self.0 {
-            Ok(output) => Ok(output.clone()),
-            Err(_) => Err(Failure::NotFound {
-                program: "xdg-open".to_owned(),
-            }),
-        }
+        ran(&self.0)
+    }
+}
+
+/// What the fake was built to answer with, as a fresh answer each time.
+fn ran(answer: &Result<Output, Failure>) -> Result<Output, Failure> {
+    match answer {
+        Ok(output) => Ok(output.clone()),
+        Err(_) => Err(Failure::NotFound {
+            program: "xdg-open".to_owned(),
+        }),
     }
 }
 

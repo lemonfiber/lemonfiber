@@ -43,27 +43,32 @@ const fn is_idempotent(method: Method) -> bool {
 #[async_trait]
 impl<H: Http> Http for Retrying<H> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let mut attempt = 1;
-        loop {
-            let failure = match self.inner.send(request).await {
-                Ok(response) => return Ok(response),
-                Err(failure) => failure,
-            };
-            let Some(wait) = is_idempotent(request.method)
-                .then(|| retry::again(attempt))
-                .flatten()
-            else {
-                // Either not safe to repeat, or the attempts are spent. The count
-                // travels with the failure so what reports it can tell a service
-                // that was busy from one that is down.
-                return Err(Unreachable {
-                    attempts: attempt,
-                    ..failure
-                });
-            };
-            tokio::time::sleep(wait).await;
-            attempt = attempt.saturating_add(1);
-        }
+        sent(&self.inner, request).await
+    }
+}
+
+/// Ask again while it is safe to and there are attempts left.
+async fn sent<H: Http + ?Sized>(inner: &H, request: &Request) -> Result<Response, Unreachable> {
+    let mut attempt = 1;
+    loop {
+        let failure = match inner.send(request).await {
+            Ok(response) => return Ok(response),
+            Err(failure) => failure,
+        };
+        let Some(wait) = is_idempotent(request.method)
+            .then(|| retry::again(attempt))
+            .flatten()
+        else {
+            // Either not safe to repeat, or the attempts are spent. The count
+            // travels with the failure so what reports it can tell a service
+            // that was busy from one that is down.
+            return Err(Unreachable {
+                attempts: attempt,
+                ..failure
+            });
+        };
+        tokio::time::sleep(wait).await;
+        attempt = attempt.saturating_add(1);
     }
 }
 

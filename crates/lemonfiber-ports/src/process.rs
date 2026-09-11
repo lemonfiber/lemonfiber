@@ -120,16 +120,24 @@ pub trait Runner: Send + Sync {
     /// Returns [`Failure`] when the program cannot be spawned at all. A non-zero
     /// exit arrives as a [`Progress::Ended`] on the stream, not an error here.
     async fn stream(&self, argv: &[String]) -> Result<Receiver<Progress>, Failure> {
-        let output = self.run(argv).await?;
-        let (sender, receiver) = channel(64);
-        tokio::spawn(async move {
-            for line in output.stdout.lines().chain(output.stderr.lines()) {
-                let _ = sender.send(Progress::Line(line.to_owned())).await;
-            }
-            let _ = sender.send(Progress::Ended(output.status)).await;
-        });
-        Ok(receiver)
+        streamed(self, argv).await
     }
+}
+
+/// The default stream: run to completion, then replay what was buffered.
+async fn streamed<R: Runner + ?Sized>(
+    runner: &R,
+    argv: &[String],
+) -> Result<Receiver<Progress>, Failure> {
+    let output = runner.run(argv).await?;
+    let (sender, receiver) = channel(64);
+    tokio::spawn(async move {
+        for line in output.stdout.lines().chain(output.stderr.lines()) {
+            let _ = sender.send(Progress::Line(line.to_owned())).await;
+        }
+        let _ = sender.send(Progress::Ended(output.status)).await;
+    });
+    Ok(receiver)
 }
 
 #[cfg(test)]

@@ -207,68 +207,11 @@ impl Engine for Daemon {
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, Failure> {
-        let docker = self.client().await?;
-
-        let config = bollard::models::ExecConfig {
-            cmd: Some(argv.to_vec()),
-            attach_stdout: Some(true),
-            attach_stderr: Some(true),
-            ..Default::default()
-        };
-
-        // A container that is not there is the one refusal an operator can act
-        // on differently, so it keeps its own variant all the way up.
-        let created = match docker.create_exec(container, config).await {
-            Ok(created) => created,
-            Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) => {
-                return Err(Failure::NoSuchContainer {
-                    name: container.to_owned(),
-                })
-            }
-            Err(error) => return Err(unreachable(error)),
-        };
-
-        let started = docker
-            .start_exec(&created.id, None)
-            .await
-            .map_err(unreachable)?;
-
-        let mut stdout = String::new();
-        if let bollard::exec::StartExecResults::Attached { mut output, .. } = started {
-            while let Some(chunk) = output.next().await {
-                stdout.push_str(&chunk.map_err(unreachable)?.to_string());
-            }
-        }
-
-        let inspected = docker
-            .inspect_exec(&created.id)
-            .await
-            .map_err(unreachable)?;
-
-        Ok(ExecOutput {
-            status: inspected
-                .exit_code
-                .and_then(|code| i32::try_from(code).ok()),
-            stdout,
-        })
+        executed(self, container, argv).await
     }
 
     async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
-        let containers = self.containers(project).await?;
-        let docker = self.client().await?.clone();
-        let (sender, receiver) = channel(BACKLOG);
-
-        // A container that is not running is not using anything, and asking it
-        // how busy it is would be one open stream per stopped service.
-        for described in containers.into_iter().map(describe) {
-            if described.lifecycle == Lifecycle::Running {
-                tokio::spawn(sample_into(docker.clone(), described, sender.clone()));
-            }
-        }
-
-        Ok(receiver)
+        sampling(self, project).await
     }
 
     async fn logs(
@@ -277,20 +220,129 @@ impl Engine for Daemon {
         services: &[String],
         query: LogQuery,
     ) -> Result<Receiver<LogLine>, Failure> {
-        let containers = self.containers(project).await?;
-        let docker = self.client().await?.clone();
-        let (sender, receiver) = channel(BACKLOG);
-
-        // Stopped services are included: their scrollback is usually the reason
-        // the operator opened the log viewer at all.
-        for described in containers.into_iter().map(describe) {
-            if services.is_empty() || services.contains(&described.service) {
-                tokio::spawn(read_into(docker.clone(), described, query, sender.clone()));
-            }
-        }
-
-        Ok(receiver)
+        read(self, project, services, query).await
     }
+}
+
+/// Run one command inside a container and collect what it said.
+async fn executed(
+    daemon: &Daemon,
+    container: &str,
+    argv: &[String],
+) -> Result<ExecOutput, Failure> {
+    let docker = daemon.client().await?;
+
+    let config = bollard::models::ExecConfig {
+        cmd: Some(argv.to_vec()),
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        ..Default::default()
+    };
+
+    let created = docker
+        .create_exec(container, config)
+        .await
+        .map_err(|error| refused_exec(error, container))?;
+
+    let started = docker
+        .start_exec(&created.id, None)
+        .await
+        .map_err(unreachable)?;
+
+    let stdout = spoken(started).await?;
+
+    let inspected = docker
+        .inspect_exec(&created.id)
+        .await
+        .map_err(unreachable)?;
+
+    Ok(ExecOutput {
+        status: inspected
+            .exit_code
+            .and_then(|code| i32::try_from(code).ok()),
+        stdout,
+    })
+}
+
+/// What a refusal to start an exec means.
+///
+/// A container that is not there is the one refusal an operator can act on differently,
+/// so it keeps its own variant all the way up. Its own function because the other arm
+/// needs a daemon that answers badly, which no test here has — handed the error
+/// directly, both arms are ordinary.
+fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
+    match error {
+        bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        } => Failure::NoSuchContainer {
+            name: container.to_owned(),
+        },
+        other => unreachable(other),
+    }
+}
+
+/// Everything an attached exec wrote, and nothing at all where it was not attached.
+async fn spoken(started: bollard::exec::StartExecResults) -> Result<String, Failure> {
+    match started {
+        bollard::exec::StartExecResults::Attached { output, .. } => gathered(output).await,
+        bollard::exec::StartExecResults::Detached => Ok(String::new()),
+    }
+}
+
+/// Everything a stream of exec output said, joined in the order it arrived.
+///
+/// Takes the stream rather than the exec, because an attached exec needs a daemon and
+/// a stream does not — so what it does with a chunk, and with a chunk that will not
+/// arrive, is drivable here.
+async fn gathered<S>(mut output: S) -> Result<String, Failure>
+where
+    S: tokio_stream::Stream<Item = Result<bollard::container::LogOutput, bollard::errors::Error>>
+        + Unpin,
+{
+    let mut said = String::new();
+    while let Some(chunk) = output.next().await {
+        said.push_str(&chunk.map_err(unreachable)?.to_string());
+    }
+    Ok(said)
+}
+
+/// One sampling task per running container, feeding one channel.
+async fn sampling(daemon: &Daemon, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
+    let containers = daemon.containers(project).await?;
+    let docker = daemon.client().await?.clone();
+    let (sender, receiver) = channel(BACKLOG);
+
+    // A container that is not running is not using anything, and asking it
+    // how busy it is would be one open stream per stopped service.
+    for described in containers.into_iter().map(describe) {
+        if described.lifecycle == Lifecycle::Running {
+            tokio::spawn(sample_into(docker.clone(), described, sender.clone()));
+        }
+    }
+
+    Ok(receiver)
+}
+
+/// One reading task per named container, feeding one channel.
+async fn read(
+    daemon: &Daemon,
+    project: &str,
+    services: &[String],
+    query: LogQuery,
+) -> Result<Receiver<LogLine>, Failure> {
+    let containers = daemon.containers(project).await?;
+    let docker = daemon.client().await?.clone();
+    let (sender, receiver) = channel(BACKLOG);
+
+    // Stopped services are included: their scrollback is usually the reason
+    // the operator opened the log viewer at all.
+    for described in containers.into_iter().map(describe) {
+        if services.is_empty() || services.contains(&described.service) {
+            tokio::spawn(read_into(docker.clone(), described, query, sender.clone()));
+        }
+    }
+
+    Ok(receiver)
 }
 
 /// Sample one container until the reader goes away.
@@ -344,5 +396,97 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
                 return;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{gathered, refused_exec, spoken, Failure};
+
+    /// Both refusals, one of which needs a daemon that answers badly.
+    ///
+    /// The 404 is the only one an operator can act on differently, and it is the one a
+    /// real run produces. Everything else is the daemon being unreachable in some way,
+    /// which is reachable here and nowhere else.
+    #[test]
+    fn a_container_that_is_not_there_is_told_apart_from_a_daemon_that_is_not_well() {
+        let missing = refused_exec(
+            bollard::errors::Error::DockerResponseServerError {
+                status_code: 404,
+                message: "no such container".to_owned(),
+            },
+            "sonarr",
+        );
+        assert!(
+            matches!(missing, Failure::NoSuchContainer { ref name } if name == "sonarr"),
+            "got: {missing:?}"
+        );
+
+        let otherwise = refused_exec(
+            bollard::errors::Error::DockerResponseServerError {
+                status_code: 500,
+                message: "it is not well".to_owned(),
+            },
+            "sonarr",
+        );
+        assert!(
+            !matches!(otherwise, Failure::NoSuchContainer { .. }),
+            "a daemon fault is not a missing container: {otherwise:?}"
+        );
+    }
+
+    /// An exec nobody attached to wrote nothing, which is not the same as an error.
+    #[tokio::test]
+    async fn an_exec_that_was_not_attached_to_says_nothing() {
+        let said = spoken(bollard::exec::StartExecResults::Detached).await;
+        assert_eq!(said.ok(), Some(String::new()));
+    }
+
+    /// An attached exec is read through to the end, which is the arm that joins the two.
+    #[tokio::test]
+    async fn an_attached_exec_is_read_through_to_the_end() {
+        let output = Box::pin(tokio_stream::iter(vec![Ok(
+            bollard::container::LogOutput::StdOut {
+                message: "all of it\n".into(),
+            },
+        )]));
+        let said = spoken(bollard::exec::StartExecResults::Attached {
+            output,
+            input: Box::pin(tokio::io::sink()),
+        })
+        .await;
+        assert_eq!(said.ok(), Some("all of it\n".to_owned()));
+    }
+
+    /// What an attached exec said, and what a chunk that will not arrive costs.
+    ///
+    /// Driven through the stream rather than the exec, because an attached exec needs
+    /// a daemon and this needs only the chunks.
+    #[tokio::test]
+    async fn every_chunk_an_exec_sent_is_gathered_in_order() {
+        let chunks = vec![
+            Ok(bollard::container::LogOutput::StdOut {
+                message: "one\n".into(),
+            }),
+            Ok(bollard::container::LogOutput::StdErr {
+                message: "two\n".into(),
+            }),
+        ];
+        let said = gathered(tokio_stream::iter(chunks)).await;
+        assert_eq!(said.ok(), Some("one\ntwo\n".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn a_chunk_that_will_not_arrive_ends_the_gathering() {
+        let chunks = vec![
+            Ok(bollard::container::LogOutput::StdOut {
+                message: "some of it\n".into(),
+            }),
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 500,
+                message: "the stream stopped".to_owned(),
+            }),
+        ];
+        assert!(gathered(tokio_stream::iter(chunks)).await.is_err());
     }
 }

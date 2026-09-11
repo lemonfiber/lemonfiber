@@ -100,40 +100,45 @@ impl Default for Web {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let mut builder = match request.method {
-            Method::Get => self.client.get(&request.url),
-            Method::Post => self.client.post(&request.url),
-            Method::Put => self.client.put(&request.url),
-            Method::Delete => self.client.delete(&request.url),
-        };
-        for (name, value) in &request.headers {
-            builder = builder.header(name, value);
-        }
-        if let Some(body) = &request.body {
-            builder = builder.body(body.clone());
-        }
-
-        // A transport error's own words can quote the URL it failed on, and a URL can
-        // carry a credential in its query — an indexer authenticates by a query
-        // parameter, not a header. Which parameter holds it is not a question this code
-        // can answer, so it does not ask: the query goes wholesale, out of the URL kept
-        // on the failure and out of the reason read from the error.
-        let query = query_of(&request.url);
-        let unreachable = |error: &reqwest::Error| Unreachable {
-            url: without_credentials(&request.url),
-            reason: withheld_query(&error.to_string(), query),
-            attempts: 1,
-        };
-
-        // The status is read before the body, because a body that fails to arrive
-        // still leaves the status known — but the port reports one Response or
-        // none, so a truncated body is a failure to reach rather than a partial
-        // answer.
-        let response = builder.send().await.map_err(|error| unreachable(&error))?;
-        let status = response.status().as_u16();
-        let body = response.text().await.map_err(|error| unreachable(&error))?;
-        Ok(Response { status, body })
+        sent(&self.client, request).await
     }
+}
+
+/// The request built, sent, and read back — or the one failure that says why not.
+async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, Unreachable> {
+    let mut builder = match request.method {
+        Method::Get => client.get(&request.url),
+        Method::Post => client.post(&request.url),
+        Method::Put => client.put(&request.url),
+        Method::Delete => client.delete(&request.url),
+    };
+    for (name, value) in &request.headers {
+        builder = builder.header(name, value);
+    }
+    if let Some(body) = &request.body {
+        builder = builder.body(body.clone());
+    }
+
+    // A transport error's own words can quote the URL it failed on, and a URL can
+    // carry a credential in its query — an indexer authenticates by a query
+    // parameter, not a header. Which parameter holds it is not a question this code
+    // can answer, so it does not ask: the query goes wholesale, out of the URL kept
+    // on the failure and out of the reason read from the error.
+    let query = query_of(&request.url);
+    let unreachable = |error: &reqwest::Error| Unreachable {
+        url: without_credentials(&request.url),
+        reason: withheld_query(&error.to_string(), query),
+        attempts: 1,
+    };
+
+    // The status is read before the body, because a body that fails to arrive
+    // still leaves the status known — but the port reports one Response or
+    // none, so a truncated body is a failure to reach rather than a partial
+    // answer.
+    let response = builder.send().await.map_err(|error| unreachable(&error))?;
+    let status = response.status().as_u16();
+    let body = response.text().await.map_err(|error| unreachable(&error))?;
+    Ok(Response { status, body })
 }
 
 /// The whole of a URL's query, where it carries one.
