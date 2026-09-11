@@ -32,7 +32,7 @@ else
 	comparable=no
 fi
 
-while read -r _ pushing onto _; do
+while read -r _ pushing onto existing; do
 	# A deletion pushes the empty object; there is nothing to check.
 	if [ "$pushing" = "$empty" ]; then
 		continue
@@ -52,6 +52,18 @@ while read -r _ pushing onto _; do
 
 	case "$onto" in
 	refs/heads/main | refs/heads/master)
+		# One push to the trunk cannot go through a pull request: the one that
+		# creates it. There is no branch to open a request against, and nothing
+		# on the remote for this to overwrite, so neither reason for the refusal
+		# below applies. Git names what is on the remote now as the fourth field,
+		# and for a ref the remote does not have it is the empty object — which
+		# is what separates seeding a repository from every later push to a trunk
+		# that already exists.
+		if [ "$existing" = "$empty" ]; then
+			echo "pre-push: ${branch} does not exist on the remote; creating it." >&2
+			echo "          This is the one push to it that cannot be reviewed first." >&2
+			continue
+		fi
 		echo "pre-push: refusing to push straight to ${branch}." >&2
 		echo "          Branch, push that, and open a pull request." >&2
 		exit 1
