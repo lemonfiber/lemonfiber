@@ -154,6 +154,16 @@ async fn erased(path: &Path) -> Result<(), Fault> {
         Ok(meta) if meta.is_dir() => tokio::fs::remove_dir_all(path).await,
         Ok(_) => tokio::fs::remove_file(path).await,
     };
+    gone(removed)
+}
+
+/// What a removal's answer means, once it has been given.
+///
+/// Its own function because one of its three answers cannot be staged: a path that was
+/// there when the metadata was read and gone when the removal ran is a race with
+/// whatever else removed it. Handed the answer directly, that case is an ordinary test
+/// rather than a thing nobody can reach.
+fn gone(removed: std::io::Result<()>) -> Result<(), Fault> {
     match removed {
         Ok(()) => Ok(()),
         // Something else removed it between the reading and the removal, which is
@@ -266,7 +276,28 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use super::{Disk, Eraser, FileSystem, Volume};
+    use super::{gone, Disk, Eraser, FileSystem, Volume};
+
+    /// A removal that said it did not happen, and what each answer means.
+    ///
+    /// Driven here rather than through `erase`, because the middle one is a race: the
+    /// path was there when the metadata was read and gone when the removal ran, which
+    /// is another process getting there first. Asked of the answer directly, it is an
+    /// ordinary case.
+    #[test]
+    fn a_removal_that_did_not_happen_is_read_by_why() {
+        use std::io::{Error, ErrorKind};
+        assert!(gone(Ok(())).is_ok(), "it was removed");
+        assert!(
+            gone(Err(Error::from(ErrorKind::NotFound))).is_ok(),
+            "somebody else removed it, which is the outcome asked for"
+        );
+        let refused = gone(Err(Error::from(ErrorKind::PermissionDenied)));
+        assert!(
+            refused.is_err(),
+            "a refusal that is not absence is reported: {refused:?}"
+        );
+    }
 
     /// A fresh, empty directory of its own, so tests cannot collide over a file
     /// name. Built from the process id and a counter rather than a random name,
