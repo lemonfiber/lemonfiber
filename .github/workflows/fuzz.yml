@@ -17,11 +17,14 @@ on:
       - "crates/lemonfiber-manifest/**"
       - "fuzz/**"
       - ".github/workflows/fuzz.yml"
-      # The compiler this needs is not the one the repository pins, so a change to
-      # the pin is a change to whether these targets can be built at all. Left off
-      # this list, that break lands and waits for the next manifest change to
-      # surface it — which is exactly how it happened.
+      # Everything these targets are built from, not only the crate they exercise.
+      # The compiler is not the one the repository pins, and the parser they drive is
+      # mostly somebody else's code — so a toolchain pin or a `toml` bump is a change
+      # to whether these build and to what they are testing. Left off this list, that
+      # break lands and waits for the next manifest change to surface it, which is
+      # exactly how it happened. `fuzz/Cargo.lock` needs no entry; `fuzz/**` has it.
       - "rust-toolchain.toml"
+      - "Cargo.lock"
   schedule:
     - cron: "0 4 * * 0"
   workflow_dispatch:
