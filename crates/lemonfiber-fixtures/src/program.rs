@@ -155,6 +155,26 @@ impl Storage for Program {
     }
 }
 
+/// The link a path resolves through, or the refusal a fixture was built to give.
+fn resolved(program: &Program, path: &Path) -> Result<PathBuf, Fault> {
+    if !program.resolves {
+        return Err(Fault::new("no such file or directory"));
+    }
+    Ok(program
+        .links
+        .iter()
+        .find(|(from, _)| from == path)
+        .map_or_else(|| path.to_path_buf(), |(_, to)| to.clone()))
+}
+
+/// Whether this fixture lets a file be created.
+fn touched(program: &Program, path: &Path) -> Result<(), Fault> {
+    if program.writable {
+        return Ok(());
+    }
+    Err(Fault::new(format!("permission denied: {}", path.display())))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{FileSystem as _, Path, PathBuf, Program, Storage as _};
@@ -232,24 +252,4 @@ mod tests {
         assert!(machine.ownership(path).await.is_none());
         assert_eq!(machine.describe(path).await.available, 0);
     }
-}
-
-/// The link a path resolves through, or the refusal a fixture was built to give.
-fn resolved(program: &Program, path: &Path) -> Result<PathBuf, Fault> {
-    if !program.resolves {
-        return Err(Fault::new("no such file or directory"));
-    }
-    Ok(program
-        .links
-        .iter()
-        .find(|(from, _)| from == path)
-        .map_or_else(|| path.to_path_buf(), |(_, to)| to.clone()))
-}
-
-/// Whether this fixture lets a file be created.
-fn touched(program: &Program, path: &Path) -> Result<(), Fault> {
-    if program.writable {
-        return Ok(());
-    }
-    Err(Fault::new(format!("permission denied: {}", path.display())))
 }
