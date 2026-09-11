@@ -769,6 +769,21 @@ fn every_check_is_given_something_to_ask() {
     );
 }
 
+/// The gate a disturbing check puts in front of itself, whatever its receiver is called.
+///
+/// `!self.disruptive` was the whole pattern, and it stopped matching the day the bodies
+/// moved out of their `#[async_trait]` methods so the coverage gate could see them: the
+/// receiver is a parameter there and is not called `self`. The rule did not change and
+/// neither did the code it is about, so the reading is by shape — a negation in front of
+/// whatever holds the field — rather than by one spelling of it.
+fn refuses_unless_asked(shipped: &str) -> bool {
+    shipped.match_indices(".disruptive").any(|(at, _)| {
+        let before = &shipped[..at];
+        let holder = before.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_');
+        holder.ends_with('!')
+    })
+}
+
 /// A check that disturbs the running system says how long it disturbs it for.
 ///
 /// Opting in is a decision an operator makes about a cost, and half the cost is the
@@ -790,7 +805,7 @@ fn every_disturbing_check_says_how_long_it_disturbs_for() {
             continue;
         }
         let shipped = production(&text);
-        if !shipped.contains("!self.disruptive") {
+        if !refuses_unless_asked(&shipped) {
             continue;
         }
         seen += 1;
