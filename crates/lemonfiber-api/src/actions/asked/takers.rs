@@ -280,6 +280,14 @@ pub const TAKES_TIER: &[&str] = &["uninstall"];
 /// command touches, and neither of these is a lifecycle command.
 pub const TAKES_SERVICE: &[&str] = &["backup", "update"];
 
+/// The action whose command carries the run it was given.
+///
+/// Putting a run back is the only action about one. The stamp names an entry in the
+/// history and, through it, the whole run that entry belongs to; nothing else here reads
+/// the record at all, and an action that accepted a stamp it could not act on would be
+/// offering a reversal it has no way to carry out.
+pub const TAKES_RUN: &[&str] = &["undo"];
+
 /// The action whose command carries the setting it was given.
 ///
 /// One setting is read or written by name, and no other action is about a setting
@@ -429,7 +437,7 @@ pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 42] = [
+    let carried: [(&str, bool, &[&str]); 43] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -443,6 +451,7 @@ pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Ref
         ("preset", given.preset.is_some(), TAKES_PRESET),
         ("media_type", given.media_type.is_some(), TAKES_PRESET),
         ("archive", given.archive.is_some(), TAKES_ARCHIVE),
+        ("at", given.at.is_some(), TAKES_RUN),
         ("name", given.name.is_some(), TAKES_NAME),
         ("libraries", !given.libraries.is_empty(), TAKES_ALLOWANCE),
         ("age_limit", given.age_limit.is_some(), TAKES_ALLOWANCE),

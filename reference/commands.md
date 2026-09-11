@@ -32,6 +32,7 @@ Commands:
   walkthrough   Add one thing, end to end, and watch every step of it happen
   explain       Say what one of this product's words means
   history       Show everything lemonfiber changed, newest first, and how far each could be put back
+  undo          Put back one run of changes, named by the stamp `lemonfiber history` shows
   stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door    Name the one address to send somebody who lives here
   outbound      List everything that leaves this machine, and what refusing each of it costs
@@ -1415,6 +1416,36 @@ Show everything lemonfiber changed, newest first, and how far each could be put 
 The record only. Putting one back is asked for by name, because it acts on a running stack, and this says beforehand which of them could be.
 
 Usage: lemonfiber history [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber undo`
+
+```text
+Put back one run of changes, named by the stamp `lemonfiber history` shows.
+
+The whole run and never half of one: a seed or a reconfigure is the unit an operator agreed to, and the history says beside each entry how many changes would go with it. Nothing is put back unless all of it can be.
+
+Usage: lemonfiber undo [OPTIONS] <AT>
+
+Arguments:
+  <AT>
+          The stamp of the run to put back, copied from `lemonfiber history`
 
 Options:
       --json

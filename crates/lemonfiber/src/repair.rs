@@ -89,7 +89,13 @@ fn answered(outcome: &Outcome, json: bool) -> ExitCode {
 /// takes, and which of those need a service to reach. What is here is the saying.
 async fn undone(ctx: &Ctx, paths: &Paths, json: bool) -> ExitCode {
     match retract(ctx, paths).await {
-        Ok(reversed) => answered(&Outcome::Undo(Reversal { reversed }), json),
+        Ok(reversed) => answered(
+            &Outcome::Undo(Reversal {
+                reversed,
+                left: Vec::new(),
+            }),
+            json,
+        ),
         Err(problem) => crate::complain(&problem),
     }
 }

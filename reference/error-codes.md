@@ -160,6 +160,10 @@ what to do about it, is written for operators at
 - `STORAGE-6`
 - `TELLING-1`
 - `TUI-1`
+- `UNDO-1`
+- `UNDO-2`
+- `UNDO-3`
+- `UNDO-4`
 - `UPDATE-1`
 - `UPDATE-2`
 - `UPDATE-3`

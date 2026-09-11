@@ -19,7 +19,7 @@ mod acting;
 use acting::{
     exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CARRIES, DOWNLOAD, FOLLOWED, HOURS, ITEM,
     KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, REMOVAL,
-    SEASON, SHARE, UNRATED, WAITING, WARNED,
+    SEASON, SHARE, STAMP, UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::bundle::Wanted;
@@ -250,6 +250,11 @@ fn carries_archive(command: &Command) -> bool {
     matches!(command, Command::Restore { archive: Kept::Named(name), .. } if name == ARCHIVE)
 }
 
+/// Whether the command names the run it was given.
+fn carries_at(command: &Command) -> bool {
+    matches!(command, Command::Undo { run: Some(at) } if at == STAMP)
+}
+
 /// Whether the command has the accepted re-point in it.
 fn carries_repoint(command: &Command) -> bool {
     matches!(command, Command::Restore { repoint: true, .. })
@@ -322,6 +327,10 @@ fn give_service(given: &mut Arguments) {
 
 fn give_archive(given: &mut Arguments) {
     given.archive = Some(ARCHIVE.to_owned());
+}
+
+fn give_at(given: &mut Arguments) {
+    given.at = Some(STAMP.to_owned());
 }
 
 fn give_repoint(given: &mut Arguments) {
@@ -610,7 +619,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-const SWEEPS: [Sweep; 41] = [
+const SWEEPS: [Sweep; 42] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -620,6 +629,7 @@ const SWEEPS: [Sweep; 41] = [
     ("preset", give_preset, carries_preset),
     ("media_type", give_media_type, carries_media_type),
     ("archive", give_archive, carries_archive),
+    ("at", give_at, carries_at),
     ("repoint", give_repoint, carries_repoint),
     ("write", give_write, carries_write),
     ("logs", give_logs, carries_logs),

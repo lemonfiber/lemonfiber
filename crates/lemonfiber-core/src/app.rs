@@ -50,6 +50,7 @@ mod migration;
 mod music;
 mod notify;
 mod outbox;
+pub mod putting_back;
 mod quality;
 pub mod queue;
 mod quiesced;
@@ -323,7 +324,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
             consent,
             disruptive,
         } => mended(ctx, &consent, disruptive).await,
-        Command::Undo => repair::reversing(ctx).await.map(Outcome::Undo),
+        Command::Undo { run } => putting_back::undo(ctx, run).await,
         Command::Credentials(asked) => credentials::answer(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         // The one read here that cannot fail, and the requirement is that it cannot:
@@ -1681,11 +1682,14 @@ mod tests {
             stack_dir: Some(dir.join("data").join("stack")),
             ..Settings::default()
         };
-        let json = dispatch(Command::Undo, &a_context().settings(settings).build())
-            .await
-            .ok()
-            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
-            .unwrap_or_default();
+        let json = dispatch(
+            Command::Undo { run: None },
+            &a_context().settings(settings).build(),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
         assert!(json.contains(r#""kind":"undo""#), "{json}");
         assert!(
             json.contains(r#""reversed":[]"#),

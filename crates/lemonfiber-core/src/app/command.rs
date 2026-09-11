@@ -172,12 +172,20 @@ pub enum Command {
         /// is a decision apart from consenting to any repair they turn up.
         disruptive: bool,
     },
-    /// Put back what the last repair changed, and nothing else.
+    /// Put back what one run of changes did.
     ///
-    /// Its own command rather than an argument to [`Command::Repair`]: which repair
-    /// was last, what reversing it takes and which of those need a service to reach
-    /// are the core's to decide, so this carries no subject at all.
-    Undo,
+    /// Its own command rather than an argument to [`Command::Repair`]: what reversing a
+    /// run takes and which of its changes need a service to reach are the core's to
+    /// decide, so the surface carries only which run.
+    ///
+    /// `None` is the last repair and nothing else, which is what `doctor --undo` asks
+    /// and what this command meant before a run could be named. `Some` is the stamp an
+    /// entry in the history carries, and names the whole run that entry belongs to — the
+    /// unit an operator agreed to, never half of one.
+    Undo {
+        /// The stamp of the run to put back, or `None` for the last repair.
+        run: Option<String>,
+    },
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.
     Quality(QualityAction),

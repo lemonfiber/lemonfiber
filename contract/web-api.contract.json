@@ -11638,10 +11638,35 @@
             }
           ]
         },
-        "Reversal": {
-          "description": "What putting back the last repair came to.\n\nA report rather than a bare list, because it is what an envelope carries and an\nenvelope carries a document. The list is the whole of it: what went back, and\nagainst what.",
+        "Left": {
+          "description": "One change a reversal did not put back, and why it did not.",
           "type": "object",
           "properties": {
+            "because": {
+              "description": "Why it is still standing, in the operator's terms.",
+              "type": "string"
+            },
+            "target": {
+              "description": "What the change was against — a service, or lemonfiber's own environment file.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "because"
+          ]
+        },
+        "Reversal": {
+          "description": "What putting a run back came to.\n\nA report rather than a bare list, because it is what an envelope carries and an\nenvelope carries a document. Two lists, and the second is the one that matters when\nit is not empty: what went back, and what did not with the reason it did not.",
+          "type": "object",
+          "properties": {
+            "left": {
+              "description": "What was not put back, each with the reason it was not.\n\nA reversal an operator asked for by name has to say what it did *not* do. Five\nchanges asked back and three carried out is a machine in a state nobody has been\ntold about, and \"some of it worked\" is the sentence that makes somebody go\nlooking by hand. Empty where everything went back, which is the common case.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Left"
+              }
+            },
             "reversed": {
               "description": "What was put back, in the order it was.",
               "type": "array",
@@ -11651,7 +11676,8 @@
             }
           },
           "required": [
-            "reversed"
+            "reversed",
+            "left"
           ]
         },
         "Undo": {

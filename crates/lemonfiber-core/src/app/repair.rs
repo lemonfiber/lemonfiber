@@ -225,9 +225,9 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
     let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let (left, unreached) =
+    let reached =
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
-    super::recover::undo(&left, &paths.env_file(), unreached)?;
+    super::recover::undo(&reached.left, &paths.env_file(), reached.unreached)?;
     Ok(undos.into_iter().map(told).collect())
 }
 
@@ -237,16 +237,7 @@ pub const NOWHERE_TO_LOOK: Code = Code::new("REPAIR-2");
 /// Raised when a run that may not act was asked for the checks that disturb.
 pub const OFFER_CANNOT_DISTURB: Code = Code::new("REPAIR-3");
 
-/// What putting back the last repair came to.
-///
-/// A report rather than a bare list, because it is what an envelope carries and an
-/// envelope carries a document. The list is the whole of it: what went back, and
-/// against what.
-#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, schemars::JsonSchema)]
-pub struct Reversal {
-    /// What was put back, in the order it was.
-    pub reversed: Vec<Undo>,
-}
+pub use super::putting_back::{Left, Reversal};
 
 /// Offer or carry out the repairs, at whatever this run was given consent for.
 ///
@@ -283,9 +274,10 @@ pub async fn putting_right(
 /// files are, and every reason [`retract`] gives.
 pub async fn reversing(ctx: &Ctx) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
-    retract(ctx, &paths)
-        .await
-        .map(|reversed| Reversal { reversed })
+    retract(ctx, &paths).await.map(|reversed| Reversal {
+        reversed,
+        left: Vec::new(),
+    })
 }
 
 /// The refusal for an offer that was asked to include the checks that disturb.

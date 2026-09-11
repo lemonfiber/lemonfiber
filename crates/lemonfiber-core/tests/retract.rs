@@ -334,7 +334,7 @@ async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_bac
         lemonfiber_core::config::store::set(&paths(&root).env_file(), "QBITTORRENT_PORT", "51413");
     assert!(set.is_ok(), "the repair's own value was written");
 
-    let json = dispatch(Command::Undo, &ctx(&root, Fake::silent()))
+    let json = dispatch(Command::Undo { run: None }, &ctx(&root, Fake::silent()))
         .await
         .ok()
         .map(|outcome| outcome.envelope().to_json().unwrap_or_default())

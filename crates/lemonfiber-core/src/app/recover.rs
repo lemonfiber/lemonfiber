@@ -105,9 +105,8 @@ pub async fn reconfigured(
     undos: &[Undo],
     services: &[lemonfiber_manifest::Service],
     project: Option<&Path>,
-) -> (Vec<Undo>, Vec<String>) {
-    let mut left = Vec::new();
-    let mut unreached = Vec::new();
+) -> Reached {
+    let mut reached = Reached::default();
     for undo in undos {
         let Action::Reconfigure {
             resource,
@@ -116,25 +115,43 @@ pub async fn reconfigured(
             value,
         } = &undo.action
         else {
-            left.push(undo.clone());
+            reached.left.push(undo.clone());
             continue;
         };
-        let reached = match super::targets::target_named(services, project, &undo.target) {
+        let open = match super::targets::target_named(services, project, &undo.target) {
             Some(target) => target.open(&ctx.http, ctx.filesystem.as_ref()).await,
             None => None,
         };
-        let put_back = match reached {
+        let put_back = match open {
             Some(client) => client
                 .set_client_field(id, field, value.as_deref())
                 .await
                 .is_ok(),
             None => false,
         };
-        if !put_back {
-            unreached.push(format!("{resource} in {}", undo.target));
+        if put_back {
+            reached.put_back.push(undo.clone());
+        } else {
+            reached
+                .unreached
+                .push(format!("{resource} in {}", undo.target));
         }
     }
-    (left, unreached)
+    reached
+}
+
+/// What the service half of a reversal came to.
+///
+/// The ones it put back are kept rather than counted, because a reversal asked for by
+/// name reports what went back and a number cannot be read as a list.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Reached {
+    /// The undos this step does not handle, for the host half to carry out.
+    pub left: Vec<Undo>,
+    /// The undos put back through the service that owned them.
+    pub put_back: Vec<Undo>,
+    /// Resources whose service would not answer, named for the report.
+    pub unreached: Vec<String>,
 }
 
 /// Carry out a reversal, undo by undo, in the order given.
@@ -170,28 +187,67 @@ pub async fn reconfigured(
 /// other reading of the stack; a reversal that deliberately did not write is something an
 /// operator can find out no other way.
 pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(), Box<Problem>> {
-    let mut beyond_reach = already;
-    let mut theirs = Vec::new();
-    let mut unread = Vec::new();
-    for undo in undos {
-        match carry_out(&undo.action, env_file).map_err(|fault| Box::new(fault.problem()))? {
-            Step::Done => {}
-            Step::BeyondReach(resource) => beyond_reach.push(resource),
-            Step::TheirsNow(key) => theirs.push(key),
-            Step::StillSealed(key) => unread.push(key),
-        }
+    let carried = carrying_out(undos, env_file, already)?;
+    if !carried.unread.is_empty() {
+        return Err(Box::new(not_opened(&carried.unread)));
     }
-    if !unread.is_empty() {
-        return Err(Box::new(not_opened(&unread)));
+    if !carried.theirs.is_empty() {
+        return Err(Box::new(not_put_back(&carried.theirs)));
     }
-    if !theirs.is_empty() {
-        return Err(Box::new(not_put_back(&theirs)));
-    }
-    if beyond_reach.is_empty() {
+    if carried.beyond_reach.is_empty() {
         Ok(())
     } else {
-        Err(Box::new(needs_service(&beyond_reach)))
+        Err(Box::new(needs_service(&carried.beyond_reach)))
     }
+}
+
+/// What a reversal came to, kept apart from whether it is worth refusing over.
+///
+/// The three ways a change can be left standing, each naming what was left. A reversal
+/// asked for by name has to *report* them — an operator who asked for five things back
+/// and got three needs to know which three — where the one a repair earns refuses over
+/// the first of them it meets. Same work, two readings, so the reading is the caller's.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Carried {
+    /// The undos carried out, kept rather than counted so the report can name them.
+    pub done: Vec<Undo>,
+    /// Resources whose change only the service that made it can undo, where that
+    /// service did not answer.
+    pub beyond_reach: Vec<String>,
+    /// Settings holding neither what the change wrote nor what putting it back would,
+    /// so somebody has chosen them since and they were left exactly as they are.
+    pub theirs: Vec<String>,
+    /// Settings whose sealed record would not open, so there is nothing to put back.
+    pub unread: Vec<String>,
+}
+
+/// Carry out every undo that can be, answering with what was left standing.
+///
+/// A real I/O failure still stops it — a setting or a directory that will not budge is
+/// not a change deliberately left, and reporting it as one would tell an operator their
+/// machine is in a state it is not.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where a reversal could not be carried out at all.
+pub fn carrying_out(
+    undos: &[Undo],
+    env_file: &Path,
+    already: Vec<String>,
+) -> Result<Carried, Box<Problem>> {
+    let mut carried = Carried {
+        beyond_reach: already,
+        ..Carried::default()
+    };
+    for undo in undos {
+        match carry_out(&undo.action, env_file).map_err(|fault| Box::new(fault.problem()))? {
+            Step::Done => carried.done.push(undo.clone()),
+            Step::BeyondReach(resource) => carried.beyond_reach.push(resource),
+            Step::TheirsNow(key) => carried.theirs.push(key),
+            Step::StillSealed(key) => carried.unread.push(key),
+        }
+    }
+    Ok(carried)
 }
 
 /// What one undo amounted to: carried out, beyond a filesystem-and-config

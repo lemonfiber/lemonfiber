@@ -296,6 +296,15 @@ pub enum Request {
     /// The record only. Putting one back is asked for by name, because it acts on a
     /// running stack, and this says beforehand which of them could be.
     History,
+    /// Put back one run of changes, named by the stamp `lemonfiber history` shows.
+    ///
+    /// The whole run and never half of one: a seed or a reconfigure is the unit an
+    /// operator agreed to, and the history says beside each entry how many changes
+    /// would go with it. Nothing is put back unless all of it can be.
+    Undo {
+        /// The stamp of the run to put back, copied from `lemonfiber history`.
+        at: String,
+    },
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,

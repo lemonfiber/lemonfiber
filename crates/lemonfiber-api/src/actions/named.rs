@@ -203,6 +203,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         key,
         value,
         archive,
+        at,
         repoint,
         write,
         logs,
@@ -267,10 +268,11 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
             consent,
             disruptive: disruptive.included(),
         }),
-        // No subject at all. Which repair was last, what reversing it takes and
-        // which of those need a service to reach are the core's to decide, so
-        // there is nothing here for a caller to name.
-        "undo" => Ok(Command::Undo),
+        // The stamp, or nothing. Naming one asks for that run back; naming none asks
+        // for the last repair, which is what this action meant before a run could be
+        // named and what the dashboard's errand still sends. What reversing a run takes
+        // and which of its changes need a service to reach stay the core's to decide.
+        "undo" => Ok(Command::Undo { run: at }),
         "accept" => accepting(check, disruptive),
         // The bundle goes where lemonfiber keeps its own files. A browser has no
         // filesystem in front of it and no path it could name that would mean

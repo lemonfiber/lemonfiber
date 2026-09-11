@@ -3,7 +3,7 @@
 //! The outcome leads every line, because that is the question being answered: not whether
 //! lemonfiber ran something, but whether the fault is gone.
 
-use lemonfiber_core::app::repair::Report;
+use lemonfiber_core::app::repair::{Left, Report};
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::repair::{Outcome, ASK_FOR_REPAIRS};
 
@@ -47,15 +47,26 @@ pub(crate) fn mended(report: &Report) -> Lines {
 }
 
 /// What was put back, or that there was nothing to put back.
-pub(crate) fn reversed(undos: &[Undo]) -> Lines {
+pub(crate) fn reversed(undos: &[Undo], left: &[Left]) -> Lines {
     let mut lines = Lines::default();
-    if undos.is_empty() {
+    if undos.is_empty() && left.is_empty() {
         lines.put("There is no repair to put back.");
         return lines;
     }
-    lines.put("Put back what the last repair changed:");
-    for undo in undos {
-        lines.put(format!("  {} — {}", undo.target, restoring(&undo.action)));
+    if !undos.is_empty() {
+        lines.put("Put back:");
+        for undo in undos {
+            lines.put(format!("  {} — {}", undo.target, restoring(&undo.action)));
+        }
+    }
+    // Said even when everything went back would be noise; said when anything did not is
+    // the whole point of the report. An operator who asked for five things and got three
+    // finds out here rather than by going and looking.
+    if !left.is_empty() {
+        lines.put("Still as it was:");
+        for standing in left {
+            lines.put(format!("  {} — {}", standing.target, standing.because));
+        }
     }
     lines
 }
@@ -110,7 +121,7 @@ mod tests {
     use lemonfiber_core::error::Remedy;
     use lemonfiber_core::repair::{agreement, Outcome, Repair};
 
-    use super::{mended, reversed};
+    use super::{mended, reversed, Left};
     use lemonfiber_core::journal::{Action, Undo};
 
     fn repair() -> Repair {
@@ -276,7 +287,7 @@ mod tests {
             },
         ];
 
-        let said = reversed(&undos).text();
+        let said = reversed(&undos, &[]).text();
 
         assert!(said.contains("PORT back to 8080"), "{said}");
         assert!(said.contains("PROXY removed, as it was"), "{said}");
@@ -296,6 +307,49 @@ mod tests {
     /// reads as a command that did not work.
     #[test]
     fn nothing_to_put_back_is_said_plainly() {
-        assert!(reversed(&[]).text().contains("no repair"));
+        assert!(reversed(&[], &[]).text().contains("no repair"));
+    }
+
+    /// What did not go back is said beside what did, and named one at a time.
+    ///
+    /// The half an operator cannot find out any other way. Five changes asked back and
+    /// three carried out is a machine in a state nobody has been told about, and a
+    /// report that showed only the three would read as a reversal that worked.
+    #[test]
+    fn what_was_left_standing_is_said_beside_what_went_back() {
+        let undos = vec![Undo {
+            target: ".env".to_owned(),
+            action: Action::Restore {
+                key: "PORT".to_owned(),
+                value: Some("8080".to_owned()),
+                wrote: "6881".to_owned(),
+            },
+        }];
+        let left = vec![Left {
+            target: "downloadclient in sonarr".to_owned(),
+            because: "the service that made it did not answer".to_owned(),
+        }];
+
+        let said = reversed(&undos, &left).text();
+
+        assert!(said.contains("PORT back to 8080"), "{said}");
+        assert!(said.contains("Still as it was:"), "{said}");
+        assert!(said.contains("downloadclient in sonarr"), "{said}");
+        assert!(said.contains("did not answer"), "{said}");
+    }
+
+    /// A reversal that put nothing back still says what stopped it, rather than reading
+    /// as a run with no repair to reverse.
+    #[test]
+    fn a_reversal_that_carried_nothing_still_names_what_stopped_it() {
+        let left = vec![Left {
+            target: ".env".to_owned(),
+            because: "it holds something chosen since".to_owned(),
+        }];
+
+        let said = reversed(&[], &left).text();
+
+        assert!(!said.contains("no repair"), "{said}");
+        assert!(said.contains("chosen since"), "{said}");
     }
 }

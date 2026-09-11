@@ -343,6 +343,7 @@ mod tests {
                         wrote: "6881".to_owned(),
                     },
                 }],
+                left: Vec::new(),
             }),
             Outcome::Seed(crate::seed::Report::default()),
             Outcome::Reset(ResetReport::default()),

@@ -68,6 +68,10 @@ pub const ACTS: &[Reach] = &[
         through: "invite",
     },
     Reach {
+        request: "undo",
+        through: "undo",
+    },
+    Reach {
         request: "reissue",
         through: "reissue",
     },
@@ -254,13 +258,13 @@ pub const SHOWS: &[&str] = &["ps"];
 /// of its own — the read is `trace`, and one word answering at two doors is the
 /// arrangement every read on this surface is kept out of.
 ///
-/// The last of them is offered from a different place on the screen — it is on the
-/// list of errands rather than beside the other two, because it reads nothing before
-/// it acts — and it is published here all the same, because what this list is keyed
-/// by is the request, not the key that reaches it. `doctor --undo` is the `doctor`
-/// row's, as `--fix` and `--accept` are.
+/// Putting one run back used to be here too, under the `doctor` row, because
+/// `doctor --undo` was the only way to ask for it. It has a request of its own now and
+/// so an entry of its own in [`ACTS`]: the screen's errand still asks the question it
+/// always asked — the last repair, no run named — and that is one form of a request
+/// rather than a second request, which is exactly what this list exists to keep apart.
 ///
-/// None of the nine is an entry in [`ACTS`], because each request is already
+/// None of the eight is an entry in [`ACTS`], because each request is already
 /// reached: [`reached`] is what the parity table's terminal column is held against in
 /// both directions, and a request named there twice would leave a reader of one row
 /// with two claims to reconcile against it.
@@ -297,10 +301,6 @@ pub const ALSO: &[Reach] = &[
     Reach {
         request: "doctor",
         through: "accept",
-    },
-    Reach {
-        request: "doctor",
-        through: "undo",
     },
     Reach {
         request: "trace",
