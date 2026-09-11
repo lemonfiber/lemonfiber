@@ -245,56 +245,11 @@ impl MemberSettings {
 #[async_trait]
 impl Approving for Seerr {
     async fn asking(&self) -> Result<Asking, Failure> {
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, MAIN, None))
-            .await?;
-        let held: MainSettings = self.endpoint.decode(
-            &response,
-            "what the household may ask for could not be read",
-        )?;
-        // Films and television carry a setting each and a household chooses one figure,
-        // so the one that is set is the one reported. Both are written together below,
-        // which is what makes reading either of them the same answer.
-        Ok(Asking {
-            approves_own: held.default_permissions & AUTO_APPROVE != 0,
-            quota: held
-                .default_quotas
-                .movie
-                .quota()
-                .or_else(|| held.default_quotas.tv.quota()),
-        })
+        asking(self).await
     }
 
     async fn set_asking(&self, asking: &Asking) -> Result<(), Failure> {
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, MAIN, None))
-            .await?;
-        let held: MainSettings = self.endpoint.decode(
-            &response,
-            "what the household may ask for could not be read",
-        )?;
-        let permissions = if asking.approves_own {
-            with_approval(held.default_permissions)
-        } else {
-            without_approval(held.default_permissions)
-        };
-        // Two fields into a document of several dozen. This write merges rather than
-        // assigns, so everything the household has settled elsewhere stays settled.
-        let body = serde_json::json!({
-            "defaultPermissions": permissions,
-            "defaultQuotas": DefaultQuotas {
-                movie: QuotaSetting::of(asking.quota),
-                tv: QuotaSetting::of(asking.quota),
-            },
-        })
-        .to_string();
-        let written = self
-            .endpoint
-            .send(&self.request(Method::Post, MAIN, Some(body)))
-            .await?;
-        self.endpoint.expect_success(&written)
+        set_asking(self, asking).await
     }
 
     async fn left(&self, id: &str) -> Result<Headroom, Failure> {
@@ -332,53 +287,19 @@ impl Approving for Seerr {
     }
 
     async fn approves_own(&self, id: &str, may: bool) -> Result<(), Failure> {
-        let path = format!("{MEMBERS}/{id}/{PERMISSIONS}");
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        let held: PermissionsResource = self
-            .endpoint
-            .decode(&response, "what this member may ask for could not be read")?;
-        let permissions = if may {
-            with_approval(held.permissions)
-        } else {
-            without_approval(held.permissions)
-        };
-        self.set_permissions(id, permissions).await
+        approves_own(self, id, may).await
     }
 
     async fn decide(&self, request: i64, approve: bool) -> Result<(), Failure> {
-        // The decision is the last segment of the path and the body is empty: the
-        // service reads nothing else, which is why a reason cannot travel with it.
-        let said = if approve { APPROVE } else { DECLINE };
-        let path = format!("/request/{request}/{said}");
-        let ruled = self
-            .endpoint
-            .send(&self.request(Method::Post, &path, None))
-            .await?;
-        self.endpoint.expect_success(&ruled)
+        decide(self, request, approve).await
     }
 
     async fn hold_requests(&self, id: &str) -> Result<Holding, Failure> {
-        let Some(held) = self.asking_of(id).await? else {
-            return Ok(Holding::default());
-        };
-        let (left, taken) = without_asking(held);
-        let holding = Holding { taken };
-        if !holding.anything() {
-            return Ok(holding);
-        }
-        self.set_permissions(id, left).await?;
-        Ok(holding)
+        hold_requests(self, id).await
     }
 
     async fn release_requests(&self, id: &str, holding: Holding) -> Result<(), Failure> {
-        let Some(held) = self.asking_of(id).await? else {
-            return Ok(());
-        };
-        self.set_permissions(id, with_asking(held, holding.taken))
-            .await
+        release_requests(self, id, holding).await
     }
 }
 
@@ -419,6 +340,110 @@ impl Seerr {
             .await?;
         self.endpoint.expect_success(&written)
     }
+}
+
+async fn asking(seerr: &Seerr) -> Result<Asking, Failure> {
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, MAIN, None))
+        .await?;
+    let held: MainSettings = seerr.endpoint.decode(
+        &response,
+        "what the household may ask for could not be read",
+    )?;
+    // Films and television carry a setting each and a household chooses one figure,
+    // so the one that is set is the one reported. Both are written together below,
+    // which is what makes reading either of them the same answer.
+    Ok(Asking {
+        approves_own: held.default_permissions & AUTO_APPROVE != 0,
+        quota: held
+            .default_quotas
+            .movie
+            .quota()
+            .or_else(|| held.default_quotas.tv.quota()),
+    })
+}
+
+async fn set_asking(seerr: &Seerr, asking: &Asking) -> Result<(), Failure> {
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, MAIN, None))
+        .await?;
+    let held: MainSettings = seerr.endpoint.decode(
+        &response,
+        "what the household may ask for could not be read",
+    )?;
+    let permissions = if asking.approves_own {
+        with_approval(held.default_permissions)
+    } else {
+        without_approval(held.default_permissions)
+    };
+    // Two fields into a document of several dozen. This write merges rather than
+    // assigns, so everything the household has settled elsewhere stays settled.
+    let body = serde_json::json!({
+        "defaultPermissions": permissions,
+        "defaultQuotas": DefaultQuotas {
+            movie: QuotaSetting::of(asking.quota),
+            tv: QuotaSetting::of(asking.quota),
+        },
+    })
+    .to_string();
+    let written = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, MAIN, Some(body)))
+        .await?;
+    seerr.endpoint.expect_success(&written)
+}
+
+async fn approves_own(seerr: &Seerr, id: &str, may: bool) -> Result<(), Failure> {
+    let path = format!("{MEMBERS}/{id}/{PERMISSIONS}");
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, &path, None))
+        .await?;
+    let held: PermissionsResource = seerr
+        .endpoint
+        .decode(&response, "what this member may ask for could not be read")?;
+    let permissions = if may {
+        with_approval(held.permissions)
+    } else {
+        without_approval(held.permissions)
+    };
+    seerr.set_permissions(id, permissions).await
+}
+
+async fn decide(seerr: &Seerr, request: i64, approve: bool) -> Result<(), Failure> {
+    // The decision is the last segment of the path and the body is empty: the
+    // service reads nothing else, which is why a reason cannot travel with it.
+    let said = if approve { APPROVE } else { DECLINE };
+    let path = format!("/request/{request}/{said}");
+    let ruled = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, &path, None))
+        .await?;
+    seerr.endpoint.expect_success(&ruled)
+}
+
+async fn hold_requests(seerr: &Seerr, id: &str) -> Result<Holding, Failure> {
+    let Some(held) = seerr.asking_of(id).await? else {
+        return Ok(Holding::default());
+    };
+    let (left, taken) = without_asking(held);
+    let holding = Holding { taken };
+    if !holding.anything() {
+        return Ok(holding);
+    }
+    seerr.set_permissions(id, left).await?;
+    Ok(holding)
+}
+
+async fn release_requests(seerr: &Seerr, id: &str, holding: Holding) -> Result<(), Failure> {
+    let Some(held) = seerr.asking_of(id).await? else {
+        return Ok(());
+    };
+    seerr
+        .set_permissions(id, with_asking(held, holding.taken))
+        .await
 }
 
 #[cfg(test)]

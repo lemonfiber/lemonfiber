@@ -26,34 +26,7 @@ impl Importing for Servarr {
     }
 
     async fn set_hardlinks(&self, hardlink: bool) -> Result<(), Failure> {
-        // Read first: the service replaces the whole document on a write, so
-        // sending only the one field would silently reset every other setting on
-        // it — including ones the operator chose themselves.
-        let response = self
-            .probe(&self.request(Method::Get, "/config/mediamanagement", None))
-            .await?;
-        let mut document: serde_json::Value = self
-            .endpoint
-            .decode(&response, "the media-management settings could not be read")?;
-        let Some(fields) = document.as_object_mut() else {
-            return Err(self
-                .endpoint
-                .refused("the media-management settings were not an object"));
-        };
-        fields.insert("copyUsingHardlinks".to_owned(), hardlink.into());
-
-        let id = fields
-            .get("id")
-            .and_then(serde_json::Value::as_i64)
-            .unwrap_or(1);
-        let response = self
-            .probe(&self.request(
-                Method::Put,
-                &format!("/config/mediamanagement/{id}"),
-                Some(document.to_string()),
-            ))
-            .await?;
-        self.endpoint.expect_success(&response)
+        set_hardlinks(self, hardlink).await
     }
 }
 
@@ -66,4 +39,35 @@ impl Importing for Servarr {
 struct MediaManagement {
     #[serde(default)]
     copy_using_hardlinks: bool,
+}
+
+async fn set_hardlinks(servarr: &Servarr, hardlink: bool) -> Result<(), Failure> {
+    // Read first: the service replaces the whole document on a write, so
+    // sending only the one field would silently reset every other setting on
+    // it — including ones the operator chose themselves.
+    let response = servarr
+        .probe(&servarr.request(Method::Get, "/config/mediamanagement", None))
+        .await?;
+    let mut document: serde_json::Value = servarr
+        .endpoint
+        .decode(&response, "the media-management settings could not be read")?;
+    let Some(fields) = document.as_object_mut() else {
+        return Err(servarr
+            .endpoint
+            .refused("the media-management settings were not an object"));
+    };
+    fields.insert("copyUsingHardlinks".to_owned(), hardlink.into());
+
+    let id = fields
+        .get("id")
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or(1);
+    let response = servarr
+        .probe(&servarr.request(
+            Method::Put,
+            &format!("/config/mediamanagement/{id}"),
+            Some(document.to_string()),
+        ))
+        .await?;
+    servarr.endpoint.expect_success(&response)
 }

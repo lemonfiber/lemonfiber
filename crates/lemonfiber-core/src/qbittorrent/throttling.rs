@@ -105,69 +105,11 @@ impl Qbittorrent {
 #[async_trait]
 impl Throttling for Qbittorrent {
     async fn throttled(&self) -> Result<Throttled, Failure> {
-        self.signed_in().await?;
-        let held = self.limits().await?;
-        let alternative = self.on_the_alternative().await?;
-        let (down, up) = if alternative {
-            (held.alt_dl_limit, held.alt_up_limit)
-        } else {
-            (held.dl_limit, held.up_limit)
-        };
-        Ok(Throttled {
-            rates: Rates {
-                down: holding(down),
-                up: holding(up),
-            },
-            uploads: true,
-            hours: held.scheduler_enabled.then_some(if alternative {
-                Hours::Active
-            } else {
-                Hours::Quiet
-            }),
-        })
+        throttled(self).await
     }
 
     async fn restrain(&self, wanted: &Wanted) -> Result<Throttled, Failure> {
-        self.signed_in().await?;
-
-        // Without a window there is nothing to switch between, so both sides get
-        // the constrained rates and the scheduler is switched off — the household
-        // is protected around the clock rather than at no point in it.
-        let (ordinary, alternative) = match wanted.window {
-            Some(_) => (wanted.quiet, wanted.active),
-            None => (wanted.active, wanted.active),
-        };
-        // Built as a map rather than indexed into. Indexing a `Value` by name
-        // panics where the value is not an object, so the shape would be trusted at
-        // every one of these lines rather than stated once here.
-        let mut asked = serde_json::Map::from_iter([
-            ("dl_limit".to_owned(), figure(ordinary.down).into()),
-            ("up_limit".to_owned(), figure(ordinary.up).into()),
-            ("alt_dl_limit".to_owned(), figure(alternative.down).into()),
-            ("alt_up_limit".to_owned(), figure(alternative.up).into()),
-            (
-                "scheduler_enabled".to_owned(),
-                wanted.window.is_some().into(),
-            ),
-        ]);
-        if let Some(window) = wanted.window {
-            asked.extend([
-                ("schedule_from_hour".to_owned(), window.from_hour.into()),
-                ("schedule_from_min".to_owned(), window.from_minute.into()),
-                ("schedule_to_hour".to_owned(), window.to_hour.into()),
-                ("schedule_to_min".to_owned(), window.to_minute.into()),
-                ("scheduler_days".to_owned(), EVERY_DAY.into()),
-            ]);
-        }
-        let asked = serde_json::Value::Object(asked).to_string();
-
-        let request = self.post("/app/setPreferences", &[("json", &asked)]);
-        let response = self.endpoint.send(&request).await?;
-        self.endpoint.expect_success(&response)?;
-
-        // Read back rather than echoed. A client that accepted the write and did
-        // not apply it looks exactly like one that did, from here.
-        self.throttled().await
+        restrain(self, wanted).await
     }
 
     async fn moving(&self) -> Result<Rates, Failure> {
@@ -211,6 +153,72 @@ fn holding(figure: i64) -> Option<u64> {
 /// small one — which would be the one failure worse than not applying it.
 fn figure(limit: Option<u64>) -> i64 {
     limit.map_or(0, |bytes| i64::try_from(bytes).unwrap_or(i64::MAX))
+}
+
+async fn throttled(qbittorrent: &Qbittorrent) -> Result<Throttled, Failure> {
+    qbittorrent.signed_in().await?;
+    let held = qbittorrent.limits().await?;
+    let alternative = qbittorrent.on_the_alternative().await?;
+    let (down, up) = if alternative {
+        (held.alt_dl_limit, held.alt_up_limit)
+    } else {
+        (held.dl_limit, held.up_limit)
+    };
+    Ok(Throttled {
+        rates: Rates {
+            down: holding(down),
+            up: holding(up),
+        },
+        uploads: true,
+        hours: held.scheduler_enabled.then_some(if alternative {
+            Hours::Active
+        } else {
+            Hours::Quiet
+        }),
+    })
+}
+
+async fn restrain(qbittorrent: &Qbittorrent, wanted: &Wanted) -> Result<Throttled, Failure> {
+    qbittorrent.signed_in().await?;
+
+    // Without a window there is nothing to switch between, so both sides get
+    // the constrained rates and the scheduler is switched off — the household
+    // is protected around the clock rather than at no point in it.
+    let (ordinary, alternative) = match wanted.window {
+        Some(_) => (wanted.quiet, wanted.active),
+        None => (wanted.active, wanted.active),
+    };
+    // Built as a map rather than indexed into. Indexing a `Value` by name
+    // panics where the value is not an object, so the shape would be trusted at
+    // every one of these lines rather than stated once here.
+    let mut asked = serde_json::Map::from_iter([
+        ("dl_limit".to_owned(), figure(ordinary.down).into()),
+        ("up_limit".to_owned(), figure(ordinary.up).into()),
+        ("alt_dl_limit".to_owned(), figure(alternative.down).into()),
+        ("alt_up_limit".to_owned(), figure(alternative.up).into()),
+        (
+            "scheduler_enabled".to_owned(),
+            wanted.window.is_some().into(),
+        ),
+    ]);
+    if let Some(window) = wanted.window {
+        asked.extend([
+            ("schedule_from_hour".to_owned(), window.from_hour.into()),
+            ("schedule_from_min".to_owned(), window.from_minute.into()),
+            ("schedule_to_hour".to_owned(), window.to_hour.into()),
+            ("schedule_to_min".to_owned(), window.to_minute.into()),
+            ("scheduler_days".to_owned(), EVERY_DAY.into()),
+        ]);
+    }
+    let asked = serde_json::Value::Object(asked).to_string();
+
+    let request = qbittorrent.post("/app/setPreferences", &[("json", &asked)]);
+    let response = qbittorrent.endpoint.send(&request).await?;
+    qbittorrent.endpoint.expect_success(&response)?;
+
+    // Read back rather than echoed. A client that accepted the write and did
+    // not apply it looks exactly like one that did, from here.
+    qbittorrent.throttled().await
 }
 
 #[cfg(test)]

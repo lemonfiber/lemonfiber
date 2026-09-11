@@ -102,25 +102,32 @@ fn kept(existing: &str, added: &str) -> String {
 #[async_trait]
 impl<H: Http + Send + Sync> Http for Recording<H> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let answer = self.inner.send(request).await;
-        let Some(at) = self.at.as_ref() else {
-            return answer;
-        };
-        let when = self
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|since| since.as_secs())
-            .unwrap_or_default();
-        let status = answer.as_ref().ok().map(|answered| answered.status);
-        let existing = tokio::fs::read_to_string(at).await.unwrap_or_default();
-        // A record that could not be written is not worth failing a request over:
-        // the operator asked for the thing the request does, and telling them it
-        // could not be done because a log was unwritable would be this feature
-        // getting in the way of the product it is meant to make trustworthy.
-        let _ = crate::config::store::write(at, &kept(&existing, &line(when, request, status)));
-        answer
+        send(self, request).await
     }
+}
+
+async fn send<H: Http + Send + Sync>(
+    recording: &Recording<H>,
+    request: &Request,
+) -> Result<Response, Unreachable> {
+    let answer = recording.inner.send(request).await;
+    let Some(at) = recording.at.as_ref() else {
+        return answer;
+    };
+    let when = recording
+        .clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default();
+    let status = answer.as_ref().ok().map(|answered| answered.status);
+    let existing = tokio::fs::read_to_string(at).await.unwrap_or_default();
+    // A record that could not be written is not worth failing a request over:
+    // the operator asked for the thing the request does, and telling them it
+    // could not be done because a log was unwritable would be this feature
+    // getting in the way of the product it is meant to make trustworthy.
+    let _ = crate::config::store::write(at, &kept(&existing, &line(when, request, status)));
+    answer
 }
 
 #[cfg(test)]
@@ -282,6 +289,49 @@ mod tests {
         assert_eq!(lines.len(), KEPT);
         assert_eq!(lines.last(), Some(&"the newest"));
         assert!(!after.contains("line 0\n"), "the oldest went");
+    }
+
+    /// What went out is written down where the run was told to write it.
+    ///
+    /// The other half of the pair below, and the half that had never been driven from
+    /// here: the module's own tests watched a run with nowhere to write and never
+    /// watched one that had somewhere. A decorator is generic over what it wraps, so
+    /// "somewhere else drives it" is not the same as this being measured — each
+    /// instantiation is counted on its own.
+    ///
+    /// **The record goes in a directory of its own.** Writing a private file makes its
+    /// *parent* owner-only, so a test pointing at the shared temporary directory would
+    /// take everyone else's out from under them.
+    #[tokio::test]
+    async fn a_request_that_went_somewhere_is_written_down_there() {
+        let dir = std::env::temp_dir().join(format!("lemonfiber-recorded-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let at = dir.join("outbound.log");
+
+        let transport = Recording::around(
+            Shared(Fake::always(Answer::Reply(200, String::new()))),
+            Some(at.clone()),
+            Stopped::at(1),
+        );
+
+        let answered = transport.send(&asking()).await;
+        assert_eq!(answered.map(|response| response.status), Ok(200));
+
+        let written = std::fs::read_to_string(&at).unwrap_or_default();
+        assert!(
+            written.starts_with("1 Get "),
+            "the stamp and the verb: {written}"
+        );
+        assert!(
+            written.trim_end().ends_with(" 200"),
+            "what came back: {written}"
+        );
+        assert!(
+            !written.contains("the-indexer-key"),
+            "the credential reached the record: {written}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Nowhere to write is not somewhere to fail.

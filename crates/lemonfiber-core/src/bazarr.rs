@@ -161,26 +161,7 @@ fn field(section: &str, name: &str) -> String {
 #[async_trait]
 impl Subtitles for Bazarr {
     async fn watching(&self, which: Subtitled) -> Result<Watching, Failure> {
-        let response = self.endpoint.send(&self.request(Method::Get, None)).await?;
-        let held: Settings = self.endpoint.decode(
-            &response,
-            "the subtitle finder's settings could not be read",
-        )?;
-        let (enabled, arr) = match which {
-            Subtitled::Sonarr => (held.general.use_sonarr, held.sonarr),
-            Subtitled::Radarr => (held.general.use_radarr, held.radarr),
-        };
-        let arr = arr.unwrap_or(ArrSettings {
-            ip: String::new(),
-            port: 0,
-            apikey: String::new(),
-        });
-        Ok(Watching {
-            enabled,
-            host: arr.ip,
-            port: arr.port,
-            keyed: !arr.apikey.is_empty(),
-        })
+        watching(self, which).await
     }
 
     async fn watch(&self, watched: &Watched) -> Result<(), Failure> {
@@ -202,4 +183,30 @@ impl Subtitles for Bazarr {
             .await?;
         self.endpoint.expect_success(&written)
     }
+}
+
+async fn watching(bazarr: &Bazarr, which: Subtitled) -> Result<Watching, Failure> {
+    let response = bazarr
+        .endpoint
+        .send(&bazarr.request(Method::Get, None))
+        .await?;
+    let held: Settings = bazarr.endpoint.decode(
+        &response,
+        "the subtitle finder's settings could not be read",
+    )?;
+    let (enabled, arr) = match which {
+        Subtitled::Sonarr => (held.general.use_sonarr, held.sonarr),
+        Subtitled::Radarr => (held.general.use_radarr, held.radarr),
+    };
+    let arr = arr.unwrap_or(ArrSettings {
+        ip: String::new(),
+        port: 0,
+        apikey: String::new(),
+    });
+    Ok(Watching {
+        enabled,
+        host: arr.ip,
+        port: arr.port,
+        keyed: !arr.apikey.is_empty(),
+    })
 }

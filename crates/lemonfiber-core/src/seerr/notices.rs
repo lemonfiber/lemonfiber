@@ -151,41 +151,45 @@ impl Seerr {
 #[async_trait]
 impl Noticing for Seerr {
     async fn set_notices(&self, notices: &[String]) -> Result<(), Failure> {
-        let held = self.rows().await?;
-        let showing: Vec<String> = held
-            .iter()
-            .filter(|row| row.ours())
-            .map(Row::sentence)
-            .collect();
-        // Nothing to do is the ordinary case: this is asked every time the household is
-        // read and the house has usually not changed its mind since. Writing anyway
-        // would rearrange somebody's home page on every glance at it.
-        if showing == notices {
-            return Ok(());
-        }
-        for row in held.iter().filter(|row| row.ours()) {
-            let path = format!("{SLIDERS}/{}", row.id);
-            let removed = self
-                .endpoint
-                .send(&self.request(Method::Delete, &path, None))
-                .await?;
-            self.endpoint.expect_success(&removed)?;
-        }
-        for notice in notices {
-            let body = serde_json::json!({
-                "type": SEARCHING,
-                "title": notice,
-                "data": OURS,
-            })
-            .to_string();
-            let added = self
-                .endpoint
-                .send(&self.request(Method::Post, ADD, Some(body)))
-                .await?;
-            self.endpoint.expect_success(&added)?;
-        }
-        self.shown().await
+        set_notices(self, notices).await
     }
+}
+
+async fn set_notices(seerr: &Seerr, notices: &[String]) -> Result<(), Failure> {
+    let held = seerr.rows().await?;
+    let showing: Vec<String> = held
+        .iter()
+        .filter(|row| row.ours())
+        .map(Row::sentence)
+        .collect();
+    // Nothing to do is the ordinary case: this is asked every time the household is
+    // read and the house has usually not changed its mind since. Writing anyway
+    // would rearrange somebody's home page on every glance at it.
+    if showing == notices {
+        return Ok(());
+    }
+    for row in held.iter().filter(|row| row.ours()) {
+        let path = format!("{SLIDERS}/{}", row.id);
+        let removed = seerr
+            .endpoint
+            .send(&seerr.request(Method::Delete, &path, None))
+            .await?;
+        seerr.endpoint.expect_success(&removed)?;
+    }
+    for notice in notices {
+        let body = serde_json::json!({
+            "type": SEARCHING,
+            "title": notice,
+            "data": OURS,
+        })
+        .to_string();
+        let added = seerr
+            .endpoint
+            .send(&seerr.request(Method::Post, ADD, Some(body)))
+            .await?;
+        seerr.endpoint.expect_success(&added)?;
+    }
+    seerr.shown().await
 }
 
 #[cfg(test)]

@@ -131,26 +131,7 @@ struct Status {
 #[async_trait]
 impl Client for Servarr {
     async fn identity(&self) -> Result<Identity, Failure> {
-        let response = self
-            .probe(&self.request(Method::Get, "/system/status", None))
-            .await?;
-        let status: Status = self
-            .endpoint
-            .decode(&response, "the status response could not be read")?;
-        let name = if status.instance_name.is_empty() {
-            status.app_name
-        } else {
-            status.instance_name
-        };
-        if name.is_empty() || status.version.is_empty() {
-            return Err(self
-                .endpoint
-                .refused("the service named neither itself nor its version"));
-        }
-        Ok(Identity {
-            name,
-            version: status.version,
-        })
+        identity(self).await
     }
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
@@ -169,24 +150,7 @@ impl Client for Servarr {
         id: &str,
         client: &DownloadClient,
     ) -> Result<(), Failure> {
-        // Servarr updates a client with a PUT to its own id, carrying the same
-        // registration document a create does but with the id set, so it rewrites the
-        // one that is there rather than adding a second. An id the service did not
-        // assign as an integer is one this cannot address, so it is refused rather than
-        // guessed at.
-        let Ok(numeric) = id.parse::<i64>() else {
-            return Err(self
-                .endpoint
-                .refused("the download client's id is not one this service assigns"));
-        };
-        let response = self
-            .probe(&self.request(
-                Method::Put,
-                &format!("/downloadclient/{id}"),
-                Some(download_client_body(client, Some(numeric))),
-            ))
-            .await?;
-        self.endpoint.expect_success(&response)
+        update_download_client(self, id, client).await
     }
 
     async fn set_client_field(
@@ -195,33 +159,7 @@ impl Client for Servarr {
         field: &str,
         value: Option<&str>,
     ) -> Result<(), Failure> {
-        // Read, change the one field, write back. Servarr takes a whole resource document
-        // on a PUT, so putting one field back means sending the rest of the document
-        // exactly as the service gave it — which is also what keeps a reversal from having
-        // to know the client's credential to restore its category.
-        let response = self
-            .probe(&self.request(Method::Get, &format!("/downloadclient/{id}"), None))
-            .await?;
-        let mut document: serde_json::Value = self
-            .endpoint
-            .decode(&response, "the download client could not be read")?;
-        let Some(fields) = document
-            .get_mut("fields")
-            .and_then(serde_json::Value::as_array_mut)
-        else {
-            return Err(self
-                .endpoint
-                .refused("the download client has no settings to put back"));
-        };
-        set_field(fields, field, value);
-        let response = self
-            .probe(&self.request(
-                Method::Put,
-                &format!("/downloadclient/{id}"),
-                Some(document.to_string()),
-            ))
-            .await?;
-        self.endpoint.expect_success(&response)
+        set_client_field(self, id, field, value).await
     }
 
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
@@ -241,40 +179,7 @@ impl Client for Servarr {
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
-        let mut body = serde_json::json!({ "path": folder.path });
-
-        // One of these services wants more than a path. Lidarr files by artist and
-        // album rather than by title, so a root folder of its own carries a name and
-        // the two profiles anything found beneath it is fetched at — and it refuses a
-        // registration that names none of them, rather than filling them in.
-        //
-        // Which service that is comes from asking rather than from its name: only the
-        // one that needs them has metadata profiles to offer, so an empty answer is
-        // both "this service has none" and "this service does not want them". The ids
-        // are read rather than assumed, because they are numbered per installation.
-        if let Some(metadata) = self.first_metadata_profile().await {
-            let quality = self
-                .quality_profiles()
-                .await
-                .ok()
-                .and_then(|profiles| profiles.first().map(|profile| profile.id));
-            if let (Some(quality), Some(fields)) = (quality, body.as_object_mut()) {
-                fields.insert("name".to_owned(), serde_json::json!(folder.media_type));
-                fields.insert(
-                    "defaultQualityProfileId".to_owned(),
-                    serde_json::json!(quality),
-                );
-                fields.insert(
-                    "defaultMetadataProfileId".to_owned(),
-                    serde_json::json!(metadata),
-                );
-            }
-        }
-
-        let response = self
-            .probe(&self.request(Method::Post, "/rootfolder", Some(body.to_string())))
-            .await?;
-        self.endpoint.expect_success(&response)
+        register_root_folder(self, folder).await
     }
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
@@ -418,4 +323,124 @@ fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
         object.insert("id".to_owned(), serde_json::json!(id));
     }
     document.to_string()
+}
+
+async fn identity(servarr: &Servarr) -> Result<Identity, Failure> {
+    let response = servarr
+        .probe(&servarr.request(Method::Get, "/system/status", None))
+        .await?;
+    let status: Status = servarr
+        .endpoint
+        .decode(&response, "the status response could not be read")?;
+    let name = if status.instance_name.is_empty() {
+        status.app_name
+    } else {
+        status.instance_name
+    };
+    if name.is_empty() || status.version.is_empty() {
+        return Err(servarr
+            .endpoint
+            .refused("the service named neither itself nor its version"));
+    }
+    Ok(Identity {
+        name,
+        version: status.version,
+    })
+}
+
+async fn register_root_folder(servarr: &Servarr, folder: &RootFolder) -> Result<(), Failure> {
+    let mut body = serde_json::json!({ "path": folder.path });
+
+    // One of these services wants more than a path. Lidarr files by artist and
+    // album rather than by title, so a root folder of its own carries a name and
+    // the two profiles anything found beneath it is fetched at — and it refuses a
+    // registration that names none of them, rather than filling them in.
+    //
+    // Which service that is comes from asking rather than from its name: only the
+    // one that needs them has metadata profiles to offer, so an empty answer is
+    // both "this service has none" and "this service does not want them". The ids
+    // are read rather than assumed, because they are numbered per installation.
+    if let Some(metadata) = servarr.first_metadata_profile().await {
+        let quality = servarr
+            .quality_profiles()
+            .await
+            .ok()
+            .and_then(|profiles| profiles.first().map(|profile| profile.id));
+        if let (Some(quality), Some(fields)) = (quality, body.as_object_mut()) {
+            fields.insert("name".to_owned(), serde_json::json!(folder.media_type));
+            fields.insert(
+                "defaultQualityProfileId".to_owned(),
+                serde_json::json!(quality),
+            );
+            fields.insert(
+                "defaultMetadataProfileId".to_owned(),
+                serde_json::json!(metadata),
+            );
+        }
+    }
+
+    let response = servarr
+        .probe(&servarr.request(Method::Post, "/rootfolder", Some(body.to_string())))
+        .await?;
+    servarr.endpoint.expect_success(&response)
+}
+
+async fn update_download_client(
+    servarr: &Servarr,
+    id: &str,
+    client: &DownloadClient,
+) -> Result<(), Failure> {
+    // Servarr updates a client with a PUT to its own id, carrying the same
+    // registration document a create does but with the id set, so it rewrites the
+    // one that is there rather than adding a second. An id the service did not
+    // assign as an integer is one this cannot address, so it is refused rather than
+    // guessed at.
+    let Ok(numeric) = id.parse::<i64>() else {
+        return Err(servarr
+            .endpoint
+            .refused("the download client's id is not one this service assigns"));
+    };
+    let response = servarr
+        .probe(&servarr.request(
+            Method::Put,
+            &format!("/downloadclient/{id}"),
+            Some(download_client_body(client, Some(numeric))),
+        ))
+        .await?;
+    servarr.endpoint.expect_success(&response)
+}
+
+async fn set_client_field(
+    servarr: &Servarr,
+    id: &str,
+    field: &str,
+    value: Option<&str>,
+) -> Result<(), Failure> {
+    // Read, change the one field, write back. Servarr takes a whole resource document
+    // on a PUT, so putting one field back means sending the rest of the document
+    // exactly as the service gave it — which is also what keeps a reversal from having
+    // to know the client's credential to restore its category.
+    let response = servarr
+        .probe(&servarr.request(Method::Get, &format!("/downloadclient/{id}"), None))
+        .await?;
+    let mut document: serde_json::Value = servarr
+        .endpoint
+        .decode(&response, "the download client could not be read")?;
+    let Some(fields) = document
+        .get_mut("fields")
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return Err(servarr
+            .endpoint
+            .refused("the download client has no settings to put back"));
+    };
+    set_field(fields, field, value);
+    let response = servarr
+        .probe(&servarr.request(
+            Method::Put,
+            &format!("/downloadclient/{id}"),
+            Some(document.to_string()),
+        ))
+        .await?;
+    servarr.endpoint.expect_success(&response)
 }

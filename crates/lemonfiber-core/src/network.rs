@@ -32,16 +32,20 @@ impl Here {
 #[async_trait]
 impl Site for Here {
     async fn name(&self) -> Option<String> {
-        let output = self.runner.run(&[HOSTNAME.to_owned()]).await.ok()?;
-        if !output.succeeded() {
-            return None;
-        }
-        let said = output.stdout.trim().trim_end_matches('.');
-        if said.is_empty() {
-            return None;
-        }
-        Some(said.to_owned())
+        hostname(self).await
     }
+}
+
+async fn hostname(here: &Here) -> Option<String> {
+    let output = here.runner.run(&[HOSTNAME.to_owned()]).await.ok()?;
+    if !output.succeeded() {
+        return None;
+    }
+    let said = output.stdout.trim().trim_end_matches('.');
+    if said.is_empty() {
+        return None;
+    }
+    Some(said.to_owned())
 }
 
 #[cfg(test)]

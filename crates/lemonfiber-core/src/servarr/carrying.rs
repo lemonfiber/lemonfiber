@@ -63,38 +63,7 @@ impl Carrying for Servarr {
     }
 
     async fn carry(&self, kind: Record, item: &Carried) -> Result<(), Failure> {
-        let Ok(Value::Object(mut body)) = serde_json::from_str::<Value>(&item.rest) else {
-            return Err(Failure::Unsupported {
-                service: self.service().to_owned(),
-                detail: format!("a {} record that could not be read back", kind.plural()),
-            });
-        };
-
-        // Its id here is not its id there, and a body carrying the old one asks this
-        // service to replace a record it has never seen.
-        body.remove("id");
-        for field in NUMBERED {
-            body.remove(field);
-        }
-
-        if let Some(wanted) = &item.profile {
-            let id = self.profile_named(wanted).await?;
-            body.insert("qualityProfileId".to_owned(), Value::from(id));
-        }
-        if let Some(folder) = &item.folder {
-            body.insert("rootFolderPath".to_owned(), Value::from(folder.clone()));
-        }
-
-        let asked = self.request(
-            Method::Post,
-            kind.path(),
-            Some(Value::Object(body).to_string()),
-        );
-        // A service that would not take it is not a service that took it. Without this
-        // a refusal comes back as a record carried, and the operator is told their
-        // library crossed when it did not.
-        let answered = self.probe(&asked).await?;
-        self.expect_success(&answered)
+        carry(self, kind, item).await
     }
 }
 
@@ -127,6 +96,41 @@ impl Servarr {
                 detail: format!("no quality profile called {wanted}"),
             })
     }
+}
+
+async fn carry(servarr: &Servarr, kind: Record, item: &Carried) -> Result<(), Failure> {
+    let Ok(Value::Object(mut body)) = serde_json::from_str::<Value>(&item.rest) else {
+        return Err(Failure::Unsupported {
+            service: servarr.service().to_owned(),
+            detail: format!("a {} record that could not be read back", kind.plural()),
+        });
+    };
+
+    // Its id here is not its id there, and a body carrying the old one asks this
+    // service to replace a record it has never seen.
+    body.remove("id");
+    for field in NUMBERED {
+        body.remove(field);
+    }
+
+    if let Some(wanted) = &item.profile {
+        let id = servarr.profile_named(wanted).await?;
+        body.insert("qualityProfileId".to_owned(), Value::from(id));
+    }
+    if let Some(folder) = &item.folder {
+        body.insert("rootFolderPath".to_owned(), Value::from(folder.clone()));
+    }
+
+    let asked = servarr.request(
+        Method::Post,
+        kind.path(),
+        Some(Value::Object(body).to_string()),
+    );
+    // A service that would not take it is not a service that took it. Without this
+    // a refusal comes back as a record carried, and the operator is told their
+    // library crossed when it did not.
+    let answered = servarr.probe(&asked).await?;
+    servarr.expect_success(&answered)
 }
 
 #[cfg(test)]
@@ -262,5 +266,47 @@ mod tests {
         };
         assert!(client.carry(Record::Series, &broken).await.is_err());
         assert!(http.requests().is_empty(), "nothing was put");
+    }
+
+    /// A record naming no profile crosses as it came, and asks for nothing on the way.
+    ///
+    /// Not every record has a profile to carry — an indexer and a download client have
+    /// none — so naming none is not a record this service cannot take. Looking the
+    /// profiles up anyway would be a call made for a number nobody wanted, on a
+    /// service that can refuse it.
+    #[tokio::test]
+    async fn a_record_naming_no_profile_crosses_without_asking_for_one() {
+        let http = holding("[]");
+        let client = Servarr::new(
+            Arc::clone(&http) as Arc<dyn crate::ports::http::Http>,
+            "http://x",
+            "k",
+            "sonarr",
+            3,
+        );
+
+        let bare = Carried {
+            name: "Taskmaster".to_owned(),
+            profile: None,
+            folder: None,
+            rest: r#"{"id":5,"title":"Taskmaster"}"#.to_owned(),
+        };
+        let put = client.carry(Record::Series, &bare).await;
+        assert!(put.is_ok(), "{put:?}");
+
+        let asked = http.requests();
+        assert!(
+            asked
+                .iter()
+                .all(|request| !request.url.contains("qualityprofile")),
+            "a record naming no profile still asked which profiles there were"
+        );
+        let body = asked
+            .into_iter()
+            .find(|request| request.method == crate::ports::http::Method::Post)
+            .and_then(|request| request.body)
+            .unwrap_or_default();
+        assert!(!body.contains("qualityProfileId"), "{body}");
+        assert!(!body.contains("rootFolderPath"), "{body}");
     }
 }

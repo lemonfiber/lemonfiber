@@ -225,43 +225,7 @@ impl Prowlarr {
 #[async_trait]
 impl Indexers for Prowlarr {
     async fn indexers(&self, now: SystemTime) -> Result<Vec<IndexerUse>, Failure> {
-        let listed: Vec<IndexerResource> = self
-            .read("/indexer", "the indexers could not be read")
-            .await?;
-        let standing: Vec<IndexerStatusResource> = self
-            .read("/indexerstatus", "the indexer standings could not be read")
-            .await?;
-        // One read per window in use rather than one per indexer: an aggregator whose
-        // indexers are all counted by the day asks once, and the most any stack can need
-        // is the two windows there are.
-        let mut counted: BTreeMap<u64, IndexerStatsResource> = BTreeMap::new();
-        for window in windows_in_use(&listed) {
-            let stats = self.counts_since(&window_start(now, window)).await?;
-            counted.insert(window.as_secs(), stats);
-        }
-        // The times are only wanted to date a reset, so they are only read where there is
-        // an allowance for anything to reset against.
-        let first = self.first_calls(now, &listed).await?;
-        Ok(listed
-            .into_iter()
-            .map(|indexer| {
-                let limits = limits_of(&indexer);
-                let counts = counted
-                    .get(&window_of(&indexer).as_secs())
-                    .and_then(|stats| {
-                        stats
-                            .indexers
-                            .iter()
-                            .find(|counts| counts.indexer_id == indexer.id)
-                    });
-                let rested = standing
-                    .iter()
-                    .find(|status| status.indexer_id == indexer.id)
-                    .and_then(|status| status.disabled_till.clone());
-                let calls = first.get(&indexer.id).copied().unwrap_or_default();
-                indexer_use(indexer, counts, rested, limits, calls)
-            })
-            .collect())
+        indexers(self, now).await
     }
 }
 
@@ -378,6 +342,46 @@ fn indexer_use(
         searched_from: calls.searched,
         grabbed_from: calls.grabbed,
     }
+}
+
+async fn indexers(prowlarr: &Prowlarr, now: SystemTime) -> Result<Vec<IndexerUse>, Failure> {
+    let listed: Vec<IndexerResource> = prowlarr
+        .read("/indexer", "the indexers could not be read")
+        .await?;
+    let standing: Vec<IndexerStatusResource> = prowlarr
+        .read("/indexerstatus", "the indexer standings could not be read")
+        .await?;
+    // One read per window in use rather than one per indexer: an aggregator whose
+    // indexers are all counted by the day asks once, and the most any stack can need
+    // is the two windows there are.
+    let mut counted: BTreeMap<u64, IndexerStatsResource> = BTreeMap::new();
+    for window in windows_in_use(&listed) {
+        let stats = prowlarr.counts_since(&window_start(now, window)).await?;
+        counted.insert(window.as_secs(), stats);
+    }
+    // The times are only wanted to date a reset, so they are only read where there is
+    // an allowance for anything to reset against.
+    let first = prowlarr.first_calls(now, &listed).await?;
+    Ok(listed
+        .into_iter()
+        .map(|indexer| {
+            let limits = limits_of(&indexer);
+            let counts = counted
+                .get(&window_of(&indexer).as_secs())
+                .and_then(|stats| {
+                    stats
+                        .indexers
+                        .iter()
+                        .find(|counts| counts.indexer_id == indexer.id)
+                });
+            let rested = standing
+                .iter()
+                .find(|status| status.indexer_id == indexer.id)
+                .and_then(|status| status.disabled_till.clone());
+            let calls = first.get(&indexer.id).copied().unwrap_or_default();
+            indexer_use(indexer, counts, rested, limits, calls)
+        })
+        .collect())
 }
 
 #[cfg(test)]

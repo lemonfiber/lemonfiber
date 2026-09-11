@@ -327,29 +327,33 @@ use reading::{interpret_indexer, interpret_service, interpret_usenet, persisting
 #[async_trait]
 impl Validator for Live {
     async fn validate(&self, credential: &Credential) -> Validation {
-        let came_to = match credential {
-            Credential::Indexer { url, key } => self.indexer(url, key).await,
-            Credential::Service { url, key } => self.service(url, key).await,
-            Credential::Usenet {
-                host,
-                port,
-                secure,
-                user,
-                pass,
-            } => self.usenet(host, *port, *secure, user, pass).await,
-        };
-        // Withheld as the service's words cross into the model, which is the one point
-        // every one of them passes. What reads an outcome afterwards — a report that is
-        // serialised to a caller, a prompt that prints it to a terminal — is reading text
-        // the rule has already been applied to rather than remembering to apply it.
-        // Anything that was answered — proven, refused, or answered and unusable — is
-        // proof the network is back, so an outage after it is a new one to explain in
-        // full rather than the one already reported.
-        if !matches!(came_to, Validation::Unreachable { .. }) {
-            self.network_said.store(false, Ordering::Relaxed);
-        }
-        came_to.withheld()
+        validated(self, credential).await
     }
+}
+
+async fn validated(live: &Live, credential: &Credential) -> Validation {
+    let came_to = match credential {
+        Credential::Indexer { url, key } => live.indexer(url, key).await,
+        Credential::Service { url, key } => live.service(url, key).await,
+        Credential::Usenet {
+            host,
+            port,
+            secure,
+            user,
+            pass,
+        } => live.usenet(host, *port, *secure, user, pass).await,
+    };
+    // Withheld as the service's words cross into the model, which is the one point
+    // every one of them passes. What reads an outcome afterwards — a report that is
+    // serialised to a caller, a prompt that prints it to a terminal — is reading text
+    // the rule has already been applied to rather than remembering to apply it.
+    // Anything that was answered — proven, refused, or answered and unusable — is
+    // proof the network is back, so an outage after it is a new one to explain in
+    // full rather than the one already reported.
+    if !matches!(came_to, Validation::Unreachable { .. }) {
+        live.network_said.store(false, Ordering::Relaxed);
+    }
+    came_to.withheld()
 }
 
 #[cfg(test)]

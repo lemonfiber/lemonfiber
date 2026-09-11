@@ -301,46 +301,7 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
-        // The account's own policy, read first, with what was chosen written over it.
-        // **A body naming only what changed is refused.** Driven against
-        // `jellyfin/jellyfin:10.10.3`: this endpoint answers `400` to one, naming
-        // `AuthenticationProviderId` and `PasswordResetProviderId` as required — and a
-        // body carrying those two and nothing else is accepted and puts every other
-        // field back to the server's own default, which is every setting made in the
-        // media server's own screens undone by an age limit.
-        let request = self
-            .as_admin(Method::Get, &format!("/Users/{id}"), None)
-            .await?;
-        let response = self.endpoint.send(&request).await?;
-        let held: AccountResource = self
-            .endpoint
-            .decode(&response, "what the account is allowed could not be read")?;
-
-        let mut policy = held.policy;
-        // Only what was chosen. Every other key travels back as it came, and the two
-        // this call may write are left alone where nothing was said about them —
-        // naming libraries is not saying there is no age limit.
-        if let Some(libraries) = &allowed.libraries {
-            policy.insert(EVERY_LIBRARY.to_owned(), false.into());
-            policy.insert(CHOSEN_LIBRARIES.to_owned(), libraries.clone().into());
-        }
-        if let Some(limit) = allowed.age_limit {
-            policy.insert(AGE_LIMIT.to_owned(), limit.into());
-        }
-        if let Some(unrated) = allowed.unrated {
-            let kinds = match unrated {
-                Unrated::HeldBack => UNRATED_KINDS.to_vec(),
-                Unrated::LetThrough => Vec::new(),
-            };
-            policy.insert(UNRATED.to_owned(), kinds.into());
-        }
-
-        let body = serde_json::Value::Object(policy).to_string();
-        let request = self
-            .as_admin(Method::Post, &format!("/Users/{id}/Policy"), Some(body))
-            .await?;
-        let response = self.endpoint.send(&request).await?;
-        self.endpoint.expect_success(&response)
+        allow(self, id, allowed).await
     }
 
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
@@ -360,4 +321,47 @@ impl crate::ports::service::Household for Jellyfin {
             })
             .collect())
     }
+}
+
+async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), Failure> {
+    // The account's own policy, read first, with what was chosen written over it.
+    // **A body naming only what changed is refused.** Driven against
+    // `jellyfin/jellyfin:10.10.3`: this endpoint answers `400` to one, naming
+    // `AuthenticationProviderId` and `PasswordResetProviderId` as required — and a
+    // body carrying those two and nothing else is accepted and puts every other
+    // field back to the server's own default, which is every setting made in the
+    // media server's own screens undone by an age limit.
+    let request = jellyfin
+        .as_admin(Method::Get, &format!("/Users/{id}"), None)
+        .await?;
+    let response = jellyfin.endpoint.send(&request).await?;
+    let held: AccountResource = jellyfin
+        .endpoint
+        .decode(&response, "what the account is allowed could not be read")?;
+
+    let mut policy = held.policy;
+    // Only what was chosen. Every other key travels back as it came, and the two
+    // this call may write are left alone where nothing was said about them —
+    // naming libraries is not saying there is no age limit.
+    if let Some(libraries) = &allowed.libraries {
+        policy.insert(EVERY_LIBRARY.to_owned(), false.into());
+        policy.insert(CHOSEN_LIBRARIES.to_owned(), libraries.clone().into());
+    }
+    if let Some(limit) = allowed.age_limit {
+        policy.insert(AGE_LIMIT.to_owned(), limit.into());
+    }
+    if let Some(unrated) = allowed.unrated {
+        let kinds = match unrated {
+            Unrated::HeldBack => UNRATED_KINDS.to_vec(),
+            Unrated::LetThrough => Vec::new(),
+        };
+        policy.insert(UNRATED.to_owned(), kinds.into());
+    }
+
+    let body = serde_json::Value::Object(policy).to_string();
+    let request = jellyfin
+        .as_admin(Method::Post, &format!("/Users/{id}/Policy"), Some(body))
+        .await?;
+    let response = jellyfin.endpoint.send(&request).await?;
+    jellyfin.endpoint.expect_success(&response)
 }

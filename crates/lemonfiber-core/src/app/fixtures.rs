@@ -148,10 +148,7 @@ impl Archive for FakeArchive {
         self.existing.clone()
     }
     async fn remove(&self, _dir: &Path, name: &str) -> Result<(), Fault> {
-        if let Ok(mut removed) = self.removed.lock() {
-            removed.push(name.to_owned());
-        }
-        self.remove.clone()
+        remove(self, _dir, name)
     }
 }
 
@@ -161,10 +158,7 @@ impl Reader for FakeArchive {
         self.manifest.clone()
     }
     async fn extract(&self, src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
-        if let Ok(mut extracted) = self.extracted.lock() {
-            extracted.push(src.to_path_buf());
-        }
-        self.extract.clone()
+        extract(self, src, _targets)
     }
 }
 
@@ -207,4 +201,18 @@ pub(crate) fn ctx_at(name: &str) -> crate::app::Ctx {
         ))))
         .settings(settings)
         .build()
+}
+
+fn remove(archive: &FakeArchive, _dir: &Path, name: &str) -> Result<(), Fault> {
+    if let Ok(mut removed) = archive.removed.lock() {
+        removed.push(name.to_owned());
+    }
+    archive.remove.clone()
+}
+
+fn extract(archive: &FakeArchive, src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+    if let Ok(mut extracted) = archive.extracted.lock() {
+        extracted.push(src.to_path_buf());
+    }
+    archive.extract.clone()
 }

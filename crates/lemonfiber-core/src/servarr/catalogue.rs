@@ -33,29 +33,7 @@ impl Catalogue for Servarr {
     }
 
     async fn add_plan(&self, kind: Kind) -> Result<AddPlan, Failure> {
-        let folders = self
-            .read::<RootFolderResource>("/rootfolder", "no root folder")
-            .await?;
-        let profiles = self
-            .read::<ProfileResource>("/qualityprofile", "no quality profile")
-            .await?;
-        // The first of each, because that is what setup wired: a stack with several is
-        // one the operator has arranged themselves, and the walkthrough's first item
-        // belongs wherever the rest of the library is rather than somewhere of its own.
-        let root_folder = folders.into_iter().map(|folder| folder.path).next();
-        let quality_profile = profiles.into_iter().map(|profile| profile.id).next();
-        match root_folder.zip(quality_profile) {
-            Some((root_folder, quality_profile)) => Ok(AddPlan {
-                root_folder,
-                quality_profile,
-            }),
-            // Not a transport failure but a stack that was never finished, and it is
-            // reported as such rather than as the service refusing something.
-            None => Err(self.endpoint.unsupported(&format!(
-                "{} has no root folder or no quality profile configured yet",
-                kind.noun()
-            ))),
-        }
+        add_plan(self, kind).await
     }
 
     async fn add(
@@ -64,41 +42,7 @@ impl Catalogue for Servarr {
         entry: &CatalogueEntry,
         plan: &AddPlan,
     ) -> Result<Added, Failure> {
-        let mut body = serde_json::json!({
-            "title": entry.title,
-            "qualityProfileId": plan.quality_profile,
-            "rootFolderPath": plan.root_folder,
-            "monitored": true,
-            "addOptions": { kind.search_option(): true },
-        });
-        // The external identifier and the two fields only one of the services takes are
-        // set by kind rather than sent to both: a field a service does not know is a
-        // field it rejects the whole body over.
-        if let Some(object) = body.as_object_mut() {
-            object.insert(
-                kind.reference_field().to_owned(),
-                serde_json::json!(entry.reference),
-            );
-            match kind {
-                Kind::Sonarr => object.insert("seasonFolder".to_owned(), serde_json::json!(true)),
-                Kind::Radarr => object.insert(
-                    "minimumAvailability".to_owned(),
-                    serde_json::json!("released"),
-                ),
-            };
-        }
-        let path = format!("/{}", kind.library_endpoint());
-        let response = self
-            .probe(&self.request(Method::Post, &path, Some(body.to_string())))
-            .await?;
-        self.endpoint.expect_success(&response)?;
-        let added: LookupResult = self
-            .endpoint
-            .decode(&response, "the service did not say what it took on")?;
-        Ok(Added {
-            id: added.id,
-            title: added.title,
-        })
+        add(self, kind, entry, plan).await
     }
 
     async fn indexer_count(&self) -> Result<usize, Failure> {
@@ -203,6 +147,80 @@ struct IndexerResource {
     enable_automatic_search: bool,
     #[serde(default)]
     enable_interactive_search: bool,
+}
+
+async fn add_plan(servarr: &Servarr, kind: Kind) -> Result<AddPlan, Failure> {
+    let folders = servarr
+        .read::<RootFolderResource>("/rootfolder", "no root folder")
+        .await?;
+    let profiles = servarr
+        .read::<ProfileResource>("/qualityprofile", "no quality profile")
+        .await?;
+    // The first of each, because that is what setup wired: a stack with several is
+    // one the operator has arranged themselves, and the walkthrough's first item
+    // belongs wherever the rest of the library is rather than somewhere of its own.
+    let root_folder = folders.into_iter().map(|folder| folder.path).next();
+    let quality_profile = profiles.into_iter().map(|profile| profile.id).next();
+    match root_folder.zip(quality_profile) {
+        Some((root_folder, quality_profile)) => Ok(AddPlan {
+            root_folder,
+            quality_profile,
+        }),
+        // Not a transport failure but a stack that was never finished, and it is
+        // reported as such rather than as the service refusing something.
+        None => Err(servarr.endpoint.unsupported(&format!(
+            "{} has no root folder or no quality profile configured yet",
+            kind.noun()
+        ))),
+    }
+}
+
+async fn add(
+    servarr: &Servarr,
+    kind: Kind,
+    entry: &CatalogueEntry,
+    plan: &AddPlan,
+) -> Result<Added, Failure> {
+    // The external identifier and the one field only that service takes are set by
+    // kind rather than sent to both: a field a service does not know is a field it
+    // rejects the whole body over.
+    //
+    // Chosen as a value and put in with the rest, rather than reached in and added
+    // afterwards. Reaching inside a literal object carries a branch for the object
+    // not being one, which cannot happen and so can never be shown working.
+    let only = match kind {
+        Kind::Sonarr => ("seasonFolder", serde_json::json!(true)),
+        Kind::Radarr => ("minimumAvailability", serde_json::json!("released")),
+    };
+    let fields: serde_json::Map<String, serde_json::Value> = [
+        ("title", serde_json::json!(entry.title)),
+        ("qualityProfileId", serde_json::json!(plan.quality_profile)),
+        ("rootFolderPath", serde_json::json!(plan.root_folder)),
+        ("monitored", serde_json::json!(true)),
+        (
+            "addOptions",
+            serde_json::json!({ kind.search_option(): true }),
+        ),
+        (kind.reference_field(), serde_json::json!(entry.reference)),
+        only,
+    ]
+    .into_iter()
+    .map(|(at, value)| (at.to_owned(), value))
+    .collect();
+
+    let path = format!("/{}", kind.library_endpoint());
+    let body = serde_json::Value::Object(fields).to_string();
+    let response = servarr
+        .probe(&servarr.request(Method::Post, &path, Some(body)))
+        .await?;
+    servarr.endpoint.expect_success(&response)?;
+    let added: LookupResult = servarr
+        .endpoint
+        .decode(&response, "the service did not say what it took on")?;
+    Ok(Added {
+        id: added.id,
+        title: added.title,
+    })
 }
 
 #[cfg(test)]
