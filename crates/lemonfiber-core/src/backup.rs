@@ -163,6 +163,66 @@ use crate::config::paths::Paths;
 /// a backup that restores into a subtly wrong state is worse than none.
 pub const SCHEMA: u32 = 1;
 
+/// The time a capture of a typical configuration is meant to finish inside.
+///
+/// A `SHOULD` in the specification, and it is treated as one here: nothing refuses a
+/// capture for being large, and nothing reports a failure for one that takes longer.
+/// What the number is good for is being said beforehand. A capture that will take ten
+/// minutes is not a fault — it is a library nobody warned the operator about — and the
+/// difference between "this is taking a while" and "this has hung" is the whole of
+/// what somebody watching it needs.
+pub const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The slowest disk this is willing to reason about, in bytes a second.
+///
+/// Not a measurement of any machine in particular, and deliberately not one: it is a
+/// floor picked to sit under anything this product plausibly runs on, including a USB
+/// 2.0 enclosure and the spinning disk in a repurposed desktop. Reasoning from a floor
+/// is what makes the answer safe in the direction that matters — a capture this calls
+/// comfortable finishes comfortably everywhere, and one it calls large may still be
+/// quick on an `NVMe`, which is the error worth making.
+const FLOOR_BYTES_PER_SECOND: u64 = 10 * 1024 * 1024;
+
+/// The bytes a capture can move and still be expected to finish inside [`WITHIN`].
+///
+/// Derived rather than written down, so the two numbers behind it are the only ones
+/// anybody has to keep true. A third, stated separately, is a third chance to disagree
+/// with the other two.
+pub const BUDGET: u64 = FLOOR_BYTES_PER_SECOND * WITHIN.as_secs();
+
+/// What a capture came to, against the time a capture is meant to take.
+///
+/// Reported and never enforced. The room check already walks the trees to decide
+/// whether the archive fits, so the bytes are in hand before anything is written and
+/// cost nothing extra to say — and what they are measured against is the work, not a
+/// clock. A wall-clock gate on a machine whose disk throughput varies by more than the
+/// margin either passes for reasons unrelated to this product or fails for them, and
+/// neither reading is worth having.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Pace {
+    /// The bytes the captured trees came to, as the room check measured them.
+    pub moved: u64,
+    /// The bytes a capture may move and still be expected to finish in time.
+    ///
+    /// Carried with the reading rather than left for a reader to look up, so a surface
+    /// showing this does not need a second copy of the number to compare against.
+    pub budget: u64,
+    /// Whether this capture is inside it.
+    pub brisk: bool,
+}
+
+impl Pace {
+    /// How a capture of `moved` bytes stands against the budget.
+    #[must_use]
+    pub const fn of(moved: u64) -> Self {
+        Self {
+            moved,
+            budget: BUDGET,
+            brisk: moved <= BUDGET,
+        }
+    }
+}
+
 /// What a capture will copy, decided from the layout and the scope alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
@@ -361,8 +421,8 @@ mod tests {
 
     use super::compatibility::Version;
     use super::{
-        area, plan, relocation, Compatibility, Existing, Item, Manifest, Member, Plan, Retention,
-        Scope, SCHEMA,
+        area, plan, relocation, Compatibility, Existing, Item, Manifest, Member, Pace, Plan,
+        Retention, Scope, SCHEMA,
     };
     use crate::config::paths::Paths;
 
@@ -862,5 +922,37 @@ mod tests {
             },
             "a scope read out of a format we do not understand is not one to act on"
         );
+    }
+
+    /// The budget is derived from two numbers rather than written down as a third,
+    /// and this is what holds that true: a floor throughput and a minute, multiplied.
+    #[test]
+    fn the_budget_is_what_a_minute_at_the_floor_comes_to() {
+        assert_eq!(
+            super::BUDGET,
+            super::FLOOR_BYTES_PER_SECOND * super::WITHIN.as_secs()
+        );
+    }
+
+    /// Inclusive at the edge: a capture that exactly fills the budget is one the
+    /// budget says it has time for.
+    #[test]
+    fn a_capture_is_brisk_up_to_the_budget_and_not_past_it() {
+        assert_eq!(
+            (
+                Pace::of(0).brisk,
+                Pace::of(super::BUDGET).brisk,
+                Pace::of(super::BUDGET + 1).brisk,
+            ),
+            (true, true, false)
+        );
+    }
+
+    /// The reading carries the number it was judged against, so nothing showing it
+    /// needs a second copy of the budget to compare against.
+    #[test]
+    fn a_reading_carries_what_it_was_judged_against() {
+        let pace = Pace::of(7);
+        assert_eq!((pace.moved, pace.budget), (7, super::BUDGET));
     }
 }

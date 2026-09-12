@@ -1022,6 +1022,7 @@ mod tests {
                 scope: Scope::WholeStack,
                 sensitive: false,
                 pruned: Vec::new(),
+                pace: lemonfiber_core::backup::Pace::of(1_024),
             }),
             // Nothing gathered, nothing revealed and nothing written: the answer a
             // bare run gives, which is the one with every optional paragraph absent.

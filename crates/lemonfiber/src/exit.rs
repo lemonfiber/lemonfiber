@@ -1109,6 +1109,7 @@ mod tests {
                 scope: Scope::WholeStack,
                 sensitive: true,
                 pruned: Vec::new(),
+                pace: lemonfiber_core::backup::Pace::of(1_024),
             }))),
             success()
         );

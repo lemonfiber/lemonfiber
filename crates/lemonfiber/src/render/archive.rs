@@ -39,6 +39,18 @@ pub(crate) fn backup(report: &Capture) -> Lines {
     if !report.pruned.is_empty() {
         lines.put(format!("Pruned {} older backup(s).", report.pruned.len()));
     }
+    // Said only where there is something to say. A capture inside the budget is done
+    // while somebody is still reading the line above it, and announcing that on every
+    // backup anybody ever takes would be noise. A capture past it is the one an
+    // operator wonders about afterwards, and the answer is its size.
+    if !report.pace.brisk {
+        lines.put(format!(
+            "This moved {} — past the {} a capture is reckoned to manage in a minute, so a \
+             wait here is the size of what you keep rather than a fault.",
+            humanize(report.pace.moved),
+            humanize(report.pace.budget)
+        ));
+    }
     lines
 }
 
@@ -232,6 +244,30 @@ mod tests {
         }
     }
 
+    /// A capture past the budget explains itself, and one inside it says nothing —
+    /// the line is for the operator who wonders why a backup took a while, and on
+    /// every ordinary capture it would be noise.
+    #[test]
+    fn a_large_capture_explains_the_wait_and_a_small_one_stays_quiet() {
+        let said = |moved: u64| {
+            backup(&Capture {
+                path: PathBuf::from("/data/lemonfiber/backups/full.tar.gz"),
+                scope: Scope::WholeStack,
+                sensitive: false,
+                pruned: Vec::new(),
+                pace: lemonfiber_core::backup::Pace::of(moved),
+            })
+            .text()
+        };
+
+        let large = said(lemonfiber_core::backup::BUDGET + 1);
+        assert!(large.contains("size of what you keep"), "{large}");
+        assert!(
+            !said(lemonfiber_core::backup::BUDGET).contains("size of what you keep"),
+            "a capture inside the budget says nothing about it"
+        );
+    }
+
     #[test]
     fn a_capture_says_where_it_went_and_how_private_it_is() {
         let said = backup(&Capture {
@@ -239,6 +275,7 @@ mod tests {
             scope: Scope::WholeStack,
             sensitive: true,
             pruned: vec!["older.tar.gz".to_owned()],
+            pace: lemonfiber_core::backup::Pace::of(1_024),
         })
         .text();
         assert!(said.contains("Backed up the whole stack to"), "{said}");
@@ -257,6 +294,7 @@ mod tests {
             scope: Scope::existing("media", &["/srv/their-media".to_owned()]),
             sensitive: true,
             pruned: Vec::new(),
+            pace: lemonfiber_core::backup::Pace::of(1_024),
         })
         .text();
         assert!(said.contains("the setup media, taken over"), "{said}");
@@ -271,6 +309,7 @@ mod tests {
             },
             sensitive: false,
             pruned: Vec::new(),
+            pace: lemonfiber_core::backup::Pace::of(1_024),
         })
         .text();
         assert!(said.contains("service sonarr"), "{said}");

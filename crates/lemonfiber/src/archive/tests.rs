@@ -659,3 +659,96 @@ async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
         "and so is the directory it is kept in"
     );
 }
+
+/// What a typical configuration comes to, in bytes.
+///
+/// Declared here rather than measured, because "typical" is a judgement and not a
+/// reading: it is lemonfiber's own configuration plus a service directory for each
+/// of the stack's services, and the weight in those is the \*arr databases — single
+/// -digit megabytes each for a household library, and tens of megabytes for a large
+/// one. Fifty megabytes is the generous end of that.
+///
+/// It is a number worth disagreeing with, which is why it is one line with a reason
+/// attached rather than an assumption inside a sentence about seconds. If a typical
+/// configuration is ever found to be far larger than this, the assertion below fails
+/// and the promise gets revisited — which is the whole job of writing it down.
+const A_TYPICAL_CONFIGURATION: u64 = 50 * 1024 * 1024;
+
+/// The promise is reasoned from a floor, so a typical configuration has to sit inside
+/// the budget that floor allows — with a great deal of room, or the promise is being
+/// kept by luck.
+#[test]
+fn a_typical_configuration_is_well_inside_what_a_minute_allows() {
+    let pace = backup::Pace::of(A_TYPICAL_CONFIGURATION);
+    assert!(
+        pace.brisk,
+        "a typical configuration moves {} against a budget of {}",
+        pace.moved, pace.budget
+    );
+    assert!(
+        A_TYPICAL_CONFIGURATION * 4 <= pace.budget,
+        "the margin is thin enough to be worth rechecking: {} against {}",
+        A_TYPICAL_CONFIGURATION,
+        pace.budget
+    );
+}
+
+/// What the capture says it moved is what is actually on the disk, not an estimate
+/// that drifts from it.
+///
+/// The whole promise rests on this number, so it is worth one test of its own: the
+/// room check walks the trees before writing, and a reading taken from anywhere else
+/// would be a second answer to the same question.
+#[tokio::test]
+async fn the_room_check_counts_the_bytes_that_are_really_there() {
+    let root = scratch("weighed");
+    let paths = install(&root);
+    let plan = backup::plan(&paths, &Scope::WholeStack);
+
+    let measured = Tar.space(&paths.backups(), &plan.items).await;
+    let on_disk: u64 = ["DATA_ROOT=/srv/media\n", "<Config/>", "services: {}"]
+        .iter()
+        .map(|written| written.len() as u64)
+        .sum();
+
+    assert_eq!(
+        measured.ok().map(|space| space.needed),
+        Some(on_disk),
+        "the bytes reported are the bytes written"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// How long a real capture actually took, reported and never asserted.
+///
+/// A wall-clock threshold here would be worth nothing. Disk throughput on a shared
+/// runner varies by more than the margin being claimed, so a gate on seconds either
+/// goes green for reasons that have nothing to do with this code or goes red for
+/// them — and a test that fails for reasons outside the thing it tests gets muted,
+/// which costs more than it ever caught.
+///
+/// So this writes a real archive through the real writer and prints what it cost.
+/// The number is in the run's output where somebody chasing a slow backup can read
+/// it, and no build is ever failed by it.
+#[tokio::test]
+async fn what_a_capture_costs_is_reported_for_the_record() {
+    let root = scratch("timed");
+    let paths = install(&root);
+    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let dest = paths.backups().join("timed.tar.gz");
+
+    let started = std::time::Instant::now();
+    let written = Tar.write(&dest, &manifest, &plan.items).await;
+    let took = started.elapsed();
+
+    assert!(written.is_ok(), "the capture has to have happened");
+    println!(
+        "observation: a capture of {} item(s) took {took:?}; the budget is {} bytes \
+         against {:?}",
+        plan.items.len(),
+        backup::BUDGET,
+        backup::WITHIN
+    );
+    let _ = fs::remove_dir_all(&root);
+}
