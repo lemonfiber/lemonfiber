@@ -20,6 +20,17 @@ use lemonfiber_ports::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 /// names to read, so it goes through `withheld_by` with that same list.
 pub use lemonfiber_ports::withheld::{is_secret, withheld, withheld_by, withheld_text, REDACTED};
 
+/// The setting recording which lemonfiber last wrote this file.
+///
+/// Kept in the settings file itself rather than beside it, because it is a fact
+/// about that file and has to travel with it — a marker in a second file is one a
+/// restore, a copy to another machine, or an operator moving their configuration
+/// by hand leaves behind, and a marker that goes missing reads as permission.
+pub const WRITTEN_BY_KEY: &str = "LEMONFIBER_CONFIG_VERSION";
+
+/// The build doing the writing, which is what a marker is compared against.
+const RUNNING: &str = env!("CARGO_PKG_VERSION");
+
 /// One setting, as it is safe to display.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shown {
@@ -58,7 +69,9 @@ pub fn read(path: &Path) -> Result<EnvFile, Failure> {
 /// Returns [`Failure`] when the file cannot be read or written.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
     let mut file = read(path)?;
+    refuse_if_newer(path, &file)?;
     file.set(key, value);
+    stamped(&mut file);
     write(path, &file.render())
 }
 
@@ -70,8 +83,48 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
 /// Returns [`Failure`] when the file cannot be read or written.
 pub fn unset(path: &Path, key: &str) -> Result<(), Failure> {
     let mut file = read(path)?;
+    refuse_if_newer(path, &file)?;
     file.remove(key);
+    stamped(&mut file);
     write(path, &file.render())
+}
+
+/// Refuse to change settings a newer lemonfiber wrote.
+///
+/// A newer build may have written keys this one has never heard of, and keys it
+/// reads may have changed what they mean. Rewriting such a file would not lose
+/// those lines — the file is held as the lines it is made of, so everything this
+/// build does not recognise survives untouched — but it would stamp this older
+/// build over a file it does not understand, and an operator who downgraded to
+/// test something would have no way back to the configuration they had.
+///
+/// So the modification is refused and the file is left exactly as it was. Reading
+/// is not refused with it: an older build that cannot safely *change* this file can
+/// still say what is in it and what it is running, and an operator who has just
+/// been refused needs precisely that.
+///
+/// A file with no marker is one written before this was recorded, or by hand. It is
+/// changed, and gains a marker in the doing — refusing everything of unknown
+/// provenance would refuse every configuration written before this existed.
+fn refuse_if_newer(path: &Path, file: &EnvFile) -> Result<(), Failure> {
+    let wrote = file.get(WRITTEN_BY_KEY).unwrap_or_default();
+    if crate::version::Version::is_newer(wrote, RUNNING) {
+        return Err(Failure::TooNew {
+            path: path.to_path_buf(),
+            wrote: wrote.to_owned(),
+            running: RUNNING.to_owned(),
+        });
+    }
+    Ok(())
+}
+
+/// Record this build as the one that last wrote the file.
+///
+/// Every change goes through [`set`] or [`unset`], so stamping in both is stamping
+/// on every path that writes settings — setup, reconfiguration, restore, seeding
+/// and a rollback putting a value back all arrive here.
+fn stamped(file: &mut EnvFile) {
+    file.set(WRITTEN_BY_KEY, RUNNING);
 }
 
 /// Write `text` to `path`, creating the directory for it where needed and
@@ -239,6 +292,16 @@ pub enum Failure {
     /// There is nowhere to keep configuration.
     #[error("no configuration file has been chosen")]
     Nowhere,
+    /// The configuration was written by a newer lemonfiber than the one running.
+    #[error("the configuration at {path} was written by lemonfiber {wrote} and this is {running}")]
+    TooNew {
+        /// The file, in full.
+        path: PathBuf,
+        /// The version that wrote it.
+        wrote: String,
+        /// The version being asked to change it.
+        running: String,
+    },
 }
 
 /// Raised when configuration exists and cannot be read.
@@ -249,6 +312,9 @@ pub const CONFIG_NOT_WRITTEN: Code = Code::new("CONFIG-2");
 
 /// Raised when there is nowhere to keep configuration.
 pub const CONFIG_NOWHERE: Code = Code::new("CONFIG-3");
+
+/// Raised when configuration was written by a newer lemonfiber.
+pub const CONFIG_TOO_NEW: Code = Code::new("CONFIG-5");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {
@@ -279,6 +345,20 @@ impl Diagnose for Failure {
                 Remedy::new("Run setup").with_detail("lemonfiber setup"),
             )
             .in_state(State::Guided),
+            Self::TooNew {
+                path,
+                wrote,
+                running,
+            } => Problem::new(
+                CONFIG_TOO_NEW,
+                Severity::Error,
+                format!("Your settings were written by lemonfiber {wrote}, and this is {running}"),
+                "Nothing has been changed. An older lemonfiber writing over settings a newer one wrote would leave you with a file neither version can make sense of, and no way back to the one you had.",
+                Remedy::new(format!("Run this with lemonfiber {wrote} or newer"))
+                    .with_detail("lemonfiber update self"),
+            )
+            .in_state(State::Guided)
+            .with_detail(format!("the settings are at {}", path.display())),
         }
     }
 }
@@ -287,7 +367,9 @@ impl Diagnose for Failure {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{is_secret, read, set, shown, unset, Diagnose, Failure, REDACTED};
+    use super::{
+        is_secret, read, set, shown, unset, Diagnose, Failure, REDACTED, RUNNING, WRITTEN_BY_KEY,
+    };
     use crate::config::env::EnvFile;
 
     fn scratch(name: &str) -> PathBuf {
@@ -348,8 +430,8 @@ mod tests {
         assert!(unset(&path, "A").is_ok());
 
         assert_eq!(
-            std::fs::read_to_string(&path).ok().as_deref(),
-            Some("B=2\n")
+            std::fs::read_to_string(&path).ok(),
+            Some(format!("B=2\n{WRITTEN_BY_KEY}={RUNNING}\n"))
         );
         let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
     }
@@ -362,8 +444,8 @@ mod tests {
         assert!(set(&path, "A", "3").is_ok());
 
         assert_eq!(
-            std::fs::read_to_string(&path).ok().as_deref(),
-            Some("A=3\nB=2\n")
+            std::fs::read_to_string(&path).ok(),
+            Some(format!("A=3\nB=2\n{WRITTEN_BY_KEY}={RUNNING}\n"))
         );
         let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
     }
@@ -536,10 +618,145 @@ mod tests {
                 reason: "full".to_owned(),
             },
             Failure::Nowhere,
+            Failure::TooNew {
+                path: "/tmp/x/.env".into(),
+                wrote: "9.0.0".to_owned(),
+                running: "0.1.0".to_owned(),
+            },
         ];
         for failure in &failures {
             assert!(!failure.to_string().is_empty());
             assert!(!failure.problem().remedies.is_empty());
         }
+    }
+
+    /// The file a newer build left behind, written by hand rather than through
+    /// [`set`] — which would stamp it with the running version and so could not
+    /// produce the situation being tested.
+    fn written_by(path: &Path, version: &str) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(
+            path,
+            format!("DATA_ROOT=/media\n{WRITTEN_BY_KEY}={version}\n"),
+        );
+    }
+
+    #[test]
+    fn settings_a_newer_lemonfiber_wrote_are_refused_rather_than_changed() {
+        let path = scratch("too-new");
+        written_by(&path, "99.0.0");
+        let before = std::fs::read_to_string(&path).unwrap_or_default();
+
+        let refusal = set(&path, "DATA_ROOT", "/elsewhere").err();
+        assert_eq!(
+            refusal.as_ref().map(|failure| matches!(
+                failure,
+                Failure::TooNew { wrote, running, .. }
+                    if wrote == "99.0.0" && running == RUNNING
+            )),
+            Some(true),
+            "the refusal names both versions"
+        );
+        assert_eq!(
+            refusal.map(|failure| failure.problem().remedies.is_empty()),
+            Some(false),
+            "and offers something to do about it"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&path).ok(),
+            Some(before),
+            "the file is exactly as it was"
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    #[test]
+    fn removing_a_setting_a_newer_lemonfiber_wrote_is_refused_too() {
+        let path = scratch("too-new-unset");
+        written_by(&path, "99.0.0");
+        let before = std::fs::read_to_string(&path).unwrap_or_default();
+
+        assert!(matches!(
+            unset(&path, "DATA_ROOT"),
+            Err(Failure::TooNew { .. })
+        ));
+        assert_eq!(
+            std::fs::read_to_string(&path).ok(),
+            Some(before),
+            "removing is a change, and is refused the same way"
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    #[test]
+    fn settings_an_older_lemonfiber_wrote_are_changed_and_the_marker_moves_on() {
+        let path = scratch("older");
+        written_by(&path, "0.0.1");
+
+        assert!(set(&path, "DATA_ROOT", "/elsewhere").is_ok());
+        assert_eq!(
+            read(&path)
+                .ok()
+                .and_then(|file| file.get(WRITTEN_BY_KEY).map(ToOwned::to_owned)),
+            Some(RUNNING.to_owned()),
+            "the build that wrote it last is the one recorded"
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    #[test]
+    fn settings_with_no_marker_are_changed_and_gain_one() {
+        let path = scratch("unmarked");
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&path, "DATA_ROOT=/media\n");
+
+        assert!(set(&path, "TZ", "Pacific/Auckland").is_ok());
+        assert_eq!(
+            read(&path)
+                .ok()
+                .and_then(|file| file.get(WRITTEN_BY_KEY).map(ToOwned::to_owned)),
+            Some(RUNNING.to_owned()),
+            "a file written before the marker existed is not refused over not having one"
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    /// A hand-edited marker is not grounds to refuse. Nothing can be concluded from
+    /// a version that will not parse, and concluding "newer" from one would lock an
+    /// operator out of their own settings over a typo.
+    #[test]
+    fn a_marker_that_cannot_be_read_is_not_treated_as_newer() {
+        let path = scratch("unreadable-marker");
+        written_by(&path, "tomorrow's build");
+
+        assert!(set(&path, "TZ", "Pacific/Auckland").is_ok());
+        assert_eq!(
+            read(&path)
+                .ok()
+                .and_then(|file| file.get(WRITTEN_BY_KEY).map(ToOwned::to_owned)),
+            Some(RUNNING.to_owned())
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    /// The marker is a version number, and a version number is not a credential —
+    /// an operator who has just been refused has to be able to read the one thing
+    /// the refusal is about.
+    #[test]
+    fn the_marker_is_shown_rather_than_withheld() {
+        let file = EnvFile::parse(&format!("{WRITTEN_BY_KEY}=9.9.9\n"));
+        assert_eq!(
+            shown(&file).first().map(|entry| entry.value.clone()),
+            Some("9.9.9".to_owned())
+        );
     }
 }

@@ -76,6 +76,12 @@ pub const SHOWN: &[(&str, &str)] = &[
         "whether the plain-language explanations are on, which is a display choice",
     ),
     (
+        super::store::WRITTEN_BY_KEY,
+        "which lemonfiber last wrote these settings, which is the marker an older \
+         build reads before it refuses to write over them — and so the one an \
+         operator who has just been refused needs to be able to read",
+    ),
+    (
         super::OFFLINE_KEY,
         "whether anything at all may leave this machine, which an operator who set it \
          has every reason to be able to confirm from here",
