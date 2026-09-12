@@ -791,25 +791,26 @@ mod tests {
         let path = scratch("both-versions");
         written_by(&path, "99.0.0");
 
-        let problem = set(&path, "DATA_ROOT", "/elsewhere")
-            .err()
-            .map(|failure| failure.problem());
+        let said = set(&path, "DATA_ROOT", "/elsewhere").err().map(|failure| {
+            let problem = failure.problem();
+            (
+                problem.summary.clone(),
+                problem.remedies.first().map(|remedy| remedy.action.clone()),
+            )
+        });
+
+        // Asserted whole rather than by two `contains` with a formatted message
+        // between them. A closure in an assertion's *message* only runs when the
+        // assertion fails, which makes it a function no passing test enters and a
+        // line the coverage gate counts against this file — and asking for the
+        // exact sentence is the stronger claim anyway.
         assert_eq!(
-            problem
-                .as_ref()
-                .map(|problem| problem.summary.contains("99.0.0")
-                    && problem.summary.contains(RUNNING)),
-            Some(true),
-            "the refusal states both versions: {:?}",
-            problem.as_ref().map(|problem| problem.summary.clone())
-        );
-        assert_eq!(
-            problem.map(|problem| problem
-                .remedies
-                .first()
-                .is_some_and(|remedy| remedy.action.contains("99.0.0"))),
-            Some(true),
-            "and what to do about it names the one that can read the file"
+            said,
+            Some((
+                format!("Your settings were written by lemonfiber 99.0.0, and this is {RUNNING}"),
+                Some("Run this with lemonfiber 99.0.0 or newer".to_owned()),
+            )),
+            "the refusal names the version that wrote the file and the one refusing it"
         );
 
         let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
