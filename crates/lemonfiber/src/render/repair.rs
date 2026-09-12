@@ -95,6 +95,7 @@ fn restoring(action: &Action) -> String {
             resource, field, ..
         } => format!("{resource}'s {field} cleared, as it was"),
         Action::Delete { path } => format!("{path} removed"),
+        Action::Repin { previous, .. } => format!("the version pinned back to {previous}"),
     }
 }
 
@@ -269,6 +270,13 @@ mod tests {
             },
             Undo {
                 target: "sonarr".to_owned(),
+                action: Action::Repin {
+                    previous: "4.0.14".to_owned(),
+                    current: "4.0.15".to_owned(),
+                },
+            },
+            Undo {
+                target: "sonarr".to_owned(),
                 action: Action::Reconfigure {
                     resource: "downloadclient".to_owned(),
                     id: "7".to_owned(),
@@ -293,6 +301,7 @@ mod tests {
         assert!(said.contains("PROXY removed, as it was"), "{said}");
         assert!(said.contains("downloadclient 3 removed"), "{said}");
         assert!(said.contains("/tmp/lemonfiber-scratch removed"), "{said}");
+        assert!(said.contains("the version pinned back to 4.0.14"), "{said}");
         assert!(
             said.contains("downloadclient's tvCategory back to old-sonarr"),
             "{said}"

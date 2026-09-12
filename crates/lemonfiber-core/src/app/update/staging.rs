@@ -21,11 +21,20 @@ use lemonfiber_manifest::Manifest;
 
 use crate::docker::survey;
 use crate::error::{Diagnose, Problem};
+use crate::journal::{Change as Journalled, Kind};
 use crate::stack::compose::Action;
-use crate::update::{self, Applied, Change, Ending};
+use crate::update::{self, Applied, Change, Ending, Reversal};
 
 use super::super::{backup, engine, space, Ctx, Waiting};
 use super::{left_down, named, still_transferring, Report};
+
+/// The operation a stack update is recorded under.
+///
+/// One word for the whole run rather than one per service, because that is what the
+/// operator did and what putting it back would mean: the services were moved as one
+/// step and they come back as one, which is also how a run is found again in the
+/// history.
+pub(crate) const OPERATION: &str = "update";
 
 /// How often a started service is asked whether it is answering yet.
 const POLL: std::time::Duration = std::time::Duration::from_millis(500);
@@ -64,6 +73,18 @@ pub(super) async fn apply(
     engine::released(ctx, claim).await;
     let (backup, edits, applied, halted) = run?;
 
+    // Recorded before the report is built, so a run that is reported is a run that is
+    // in the record. Until this, the largest change this product makes to a machine
+    // was the one it wrote nothing about: the history could not show that a service
+    // had moved, and nothing could be asked about it afterwards.
+    if let Some(paths) = super::super::targets::layout(ctx) {
+        super::super::recover::journalled(
+            &paths.journal(),
+            &recorded(&applied, &backup, &ctx.stamp()),
+            ctx.random.as_ref(),
+        );
+    }
+
     Ok(Report {
         state: update::state(&changes, &applied),
         changes,
@@ -74,6 +95,35 @@ pub(super) async fn apply(
         applied,
         halted,
     })
+}
+
+/// One entry per service this run actually moved.
+///
+/// A service is recorded where it ran on the new version — which is exactly where the
+/// run changed something that outlives it. One whose image never arrived, and one the
+/// run halted before reaching, are standing on the version they started the day on:
+/// writing an entry for either would put a change in the history that nobody made and
+/// offer a reversal of it.
+///
+/// That question is [`Ending::reversal`]'s already, and it is asked of it rather than
+/// of the endings by name. The two readings would otherwise be free to drift, and the
+/// one that decides what a report offers is the one that must decide what is written
+/// down.
+fn recorded(applied: &[Applied], backup: &str, at: &str) -> Vec<Journalled> {
+    applied
+        .iter()
+        .filter(|one| one.reversal == Reversal::Restore)
+        .map(|one| Journalled {
+            at: at.to_owned(),
+            operation: OPERATION.to_owned(),
+            target: one.service.clone(),
+            kind: Kind::Pinned {
+                previous: one.from.clone(),
+                current: one.to.clone(),
+                backup: Some(backup.to_owned()),
+            },
+        })
+        .collect()
 }
 
 /// The changes worth taking, in the order the manifest declares their services.

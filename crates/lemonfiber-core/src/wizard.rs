@@ -1129,6 +1129,16 @@ mod tests {
             })),
             "a root folder"
         );
+        // An update's own record, found for the same reason as a repair's: the journal
+        // is one file, and what a recovery offers to leave alone has to have a name.
+        assert_eq!(
+            described(&change(Kind::Pinned {
+                previous: "4.0.14".to_owned(),
+                current: "4.0.15".to_owned(),
+                backup: None,
+            })),
+            "the move to 4.0.15"
+        );
         // A repair's own record. Not something a first run writes, but the journal
         // is shared, so an interrupted setup can find one — and whoever is deciding
         // whether to roll back is owed a name for it rather than silence.

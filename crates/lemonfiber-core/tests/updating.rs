@@ -818,6 +818,80 @@ async fn a_refusal_that_went_to_the_other_stream_is_still_the_operators_only_acc
     assert_eq!(said, "the compose file names no such service");
 }
 
+// ── What the run writes down ──────────────────────────────────────────────────
+
+/// The same context, with somewhere to keep a record.
+///
+/// A whole layout is an environment file and a stack directory, and the contexts
+/// above carry neither — so an update run against one has nowhere to write what it
+/// did and writes nothing, which is what every case before this one is about.
+fn recording(machine: &Arc<Machine>, archive: &Arc<Kept>, name: &str) -> (Ctx, PathBuf) {
+    let dir =
+        std::env::temp_dir().join(format!("lemonfiber-journal-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let stack = dir.join("data").join("stack");
+    let _ = std::fs::create_dir_all(&stack);
+
+    let context = Ctx::new(
+        Arc::clone(machine) as Arc<dyn Runner>,
+        Arc::clone(machine) as Arc<dyn Engine>,
+        Stopped::today(),
+        lemonfiber_ports::seams::Seams {
+            filesystem: Files::empty(),
+            ..lemonfiber_adapters::live()
+        },
+        Source::External(project()),
+        Settings {
+            env_file: Some(dir.join(".env")),
+            stack_dir: Some(stack),
+            ..Settings::default()
+        },
+        Environment::MacOs,
+    )
+    .with_images(Pulled::holding(behind(&[("sonarr", SONARR.0)])))
+    .with_http(Fake::silent())
+    .keeping(Archiving {
+        paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),
+        vault: Arc::clone(archive) as Arc<dyn Vault>,
+    })
+    .waiting(Duration::ZERO);
+
+    (context, dir.join("journal.jsonl"))
+}
+
+/// Moving a service from one pinned version to another is the largest change this
+/// product makes to a machine, and it was the one the record said nothing about.
+#[tokio::test]
+async fn a_confirmed_run_records_what_it_moved_and_where_the_capture_went() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let (context, journal) = recording(&machine, &archive, "moved");
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+    assert_eq!(
+        report.map(|report| report.state),
+        Some(State::Updated),
+        "the run has to have worked for its record to be worth reading"
+    );
+
+    let written = std::fs::read_to_string(&journal).unwrap_or_default();
+    for held in [
+        r#""operation":"update""#.to_owned(),
+        r#""target":"sonarr""#.to_owned(),
+        r#""action":"pinned""#.to_owned(),
+        format!(r#""previous":"{}""#, SONARR.0),
+        format!(r#""current":"{}""#, SONARR.1),
+    ] {
+        assert!(written.contains(&held), "{held} is missing from {written}");
+    }
+    // Where to go instead, for the one reversal this cannot perform — named by path,
+    // since the run that took the capture is the only thing that knows which it is.
+    assert!(
+        !written.contains(r#""backup":null"#),
+        "the capture is not named: {written}"
+    );
+}
+
 // ── What is still coming down ─────────────────────────────────────────────────
 
 /// A private environment file recording qBittorrent's password, at a scratch path

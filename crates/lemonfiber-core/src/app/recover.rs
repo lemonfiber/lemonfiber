@@ -255,8 +255,9 @@ pub fn carrying_out(
 enum Step {
     /// The undo was carried out, or there was nothing left of it to carry out.
     Done,
-    /// The change was made through a service, named by the resource it created,
-    /// and only that service can undo it.
+    /// The change is not one a reversal of settings and files carries out — a
+    /// resource only the service that created it can remove, or a version pin only
+    /// the engine could move — named by what was left standing.
     BeyondReach(String),
     /// The setting holds neither what the change put there nor what putting it back
     /// would write, so somebody has chosen it since and it is left alone.
@@ -278,6 +279,10 @@ fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
         Action::Remove { resource, .. } | Action::Reconfigure { resource, .. } => {
             Ok(Step::BeyondReach(resource.clone()))
         }
+        // Nothing here moves a version. What runs is what the materialised stack says
+        // and what Compose was told to start, so a reversal reaching only the
+        // environment file and the filesystem leaves this standing and says so.
+        Action::Repin { previous, .. } => Ok(Step::BeyondReach(format!("version {previous}"))),
     }
 }
 
@@ -703,6 +708,30 @@ mod tests {
             "every setting was restored to absent",
         );
         assert!(!made.exists(), "the directory was removed");
+    }
+
+    /// A version pin is left standing and named, not quietly skipped. Nothing here
+    /// moves a version, and a reversal that reported success over one would tell an
+    /// operator their stack is on a release it is not.
+    #[test]
+    fn a_version_move_is_left_standing_and_reported() {
+        let env = scratch("repin").join(".env");
+        let carried = super::carrying_out(
+            &[Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Repin {
+                    previous: "4.0.15".to_owned(),
+                    current: "4.1.0".to_owned(),
+                },
+            }],
+            &env,
+            Vec::new(),
+        )
+        .ok();
+        assert_eq!(
+            carried.map(|carried| (carried.done.len(), carried.beyond_reach)),
+            Some((0, vec!["version 4.0.15".to_owned()]))
+        );
     }
 
     #[test]

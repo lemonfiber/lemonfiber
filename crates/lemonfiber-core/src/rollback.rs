@@ -183,6 +183,19 @@ pub fn standing(
             ),
             Some("remove it in that service's own interface"),
         ),
+        // Putting a version pin back is not something this product does. Which
+        // version runs is decided by the materialised stack and by what Compose was
+        // told to start, and nothing in a reversal of settings and files reaches
+        // either — so saying so is the whole of the answer, the way it is for a
+        // resource only the service that made it can remove.
+        Kind::Pinned { previous, .. } => Standing::refused(
+            &format!(
+                "putting {} back to {previous} means pinning that version again, and \
+                 lemonfiber does not move a service's version on the way back",
+                change.target
+            ),
+            Some("restore from the capture taken before the update"),
+        ),
         // A setting, a path, or one field of a service's record — each reversed by
         // something this product actually does.
         Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } => Standing::whole(),
@@ -274,6 +287,20 @@ mod tests {
         }
     }
 
+    /// A service moved from one pinned version to another.
+    fn pinned(previous: &str, current: &str) -> Change {
+        Change {
+            at: "1".to_owned(),
+            operation: "update".to_owned(),
+            target: "sonarr".to_owned(),
+            kind: Kind::Pinned {
+                previous: previous.to_owned(),
+                current: current.to_owned(),
+                backup: Some("/var/lemonfiber/backups/before.tar".to_owned()),
+            },
+        }
+    }
+
     /// What the machine holds, for a test that chooses.
     fn holding(pairs: &'static [(&'static str, &'static str)]) -> impl Fn(&str) -> Option<String> {
         move |key| {
@@ -282,6 +309,27 @@ mod tests {
                 .find(|(named, _)| *named == key)
                 .map(|(_, value)| (*value).to_owned())
         }
+    }
+
+    /// Offering a reversal nothing carries out is the one thing worse than refusing:
+    /// an operator acts on it, and finds out in the middle.
+    #[test]
+    fn a_version_move_is_refused_with_something_to_do_instead() {
+        let read = standing(&pinned("4.0.15", "4.1.0"), &[], &holding(&[]));
+        assert_eq!(read.reversal, Reversal::None);
+        assert_eq!(
+            read.refusal
+                .as_ref()
+                .map(|refusal| refusal.instead.is_some()),
+            Some(true),
+            "a refusal with nothing to do instead leaves an operator where they were"
+        );
+        assert_eq!(
+            read.refusal
+                .map(|refusal| refusal.because.contains("4.0.15")),
+            Some(true),
+            "and it names the version that cannot be gone back to"
+        );
     }
 
     #[test]

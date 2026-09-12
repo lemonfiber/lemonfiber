@@ -269,7 +269,7 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             previous: Some(current.clone()),
             current: previous.clone().unwrap_or_default(),
         }),
-        Kind::Created { .. } | Kind::Made { .. } => None,
+        Kind::Created { .. } | Kind::Made { .. } | Kind::Pinned { .. } => None,
     }
 }
 
