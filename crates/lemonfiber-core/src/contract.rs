@@ -14,6 +14,30 @@
 //! no variant name around it, so the union's own shape is never what reaches a
 //! client — and a schema derived from it would describe a document nothing writes.
 //!
+//! # Names, and the direction a change to them travels
+//!
+//! A `$defs` key is not a type's identity. `schemars` names a definition after the
+//! bare Rust type and describes each kind on its own, so two unrelated types called
+//! `Left` become one name over two shapes, and two `Panel<T>` inside one kind become
+//! `Panel` and `Panel2` — a number recording where the type was reached rather than
+//! anything about it. The sweeps in this module's tests hold both where they are.
+//!
+//! Settling that takes two changes, and **they travel in opposite directions**. Each
+//! one done the wrong way round fails silently rather than loudly, which is the whole
+//! reason this is written here rather than left in a pull request.
+//!
+//! **Renaming the types goes producer first.** `sdk-ts` compensates for the clashes
+//! today, prefixing every divergent name with the kind that carries it. That
+//! compensation may only be deleted once this artefact guarantees the names are
+//! unique. The other order keys four different `Left`s to one name and keeps
+//! whichever kind was written last, and nothing anywhere reports it.
+//!
+//! **Hoisting `$defs` to the document root goes consumers first.** Both SDKs resolve
+//! a reference against the kind carrying it, so a root `$defs` leaves every reference
+//! unresolvable — and `sdk-php` answers an unresolvable reference with `mixed` and
+//! exits successfully. Every consumer has to resolve against the root, and be
+//! released, before anything moves here.
+//!
 //! [`Outcome`]: crate::app::Outcome
 
 use std::collections::BTreeMap;
@@ -1151,6 +1175,11 @@ mod tests {
     /// those fields renumbers all of them. The number reaches a published SDK type
     /// name — `DashboardState2` is one today — so one arriving unremarked renames
     /// something no reviewer saw being renamed.
+    ///
+    /// What this cannot reach: `json-schema-to-typescript` adds positional suffixes of
+    /// its own further downstream — `Remedy1`, `Counted3`, `BandwidthHeld1` — and no
+    /// name chosen here removes them. This holds the artefact's own numbering, which
+    /// is the only numbering anything in this repository decides.
     const NUMBERED_APART: &[&str] = &[
         "Panel2",
         "Panel3",
@@ -1205,22 +1234,24 @@ mod tests {
             holding.entry(name).or_default().insert(kind);
         }
 
-        let clashing: BTreeSet<String> = shapes
-            .into_iter()
-            .filter_map(|(name, given)| (given.len() > 1).then_some(name))
-            .collect();
-        let known: BTreeSet<String> = DESCRIBED_TWO_WAYS
-            .iter()
-            .map(|&name| name.to_owned())
-            .collect();
+        let known: BTreeSet<&str> = DESCRIBED_TWO_WAYS.iter().copied().collect();
+
+        // Narrowed by retaining rather than gathered through a closure only a failure
+        // would enter. A reporting path nothing walks while the sweep passes is a path
+        // nobody has watched work, and it is the half that has to be right on the one
+        // day it is read.
+        let mut clashing = holding;
+        clashing.retain(|name, _| shapes.get(name).is_some_and(|given| given.len() > 1));
 
         // Valued by the kinds that disagree, so a failure names where to look rather
         // than only the word the two of them are fighting over.
-        let arrived: BTreeMap<&String, &BTreeSet<String>> = clashing
-            .difference(&known)
-            .filter_map(|name| holding.get_key_value(name))
+        let mut arrived = clashing.clone();
+        arrived.retain(|name, _| !known.contains(name.as_str()));
+        let settled: BTreeSet<&str> = known
+            .iter()
+            .copied()
+            .filter(|name| !clashing.contains_key(*name))
             .collect();
-        let settled: BTreeSet<&String> = known.difference(&clashing).collect();
 
         assert!(
             arrived.is_empty(),
