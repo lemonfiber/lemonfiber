@@ -86,6 +86,22 @@ it. A red run then names a file that is correct in your tree, and a green run is
 green about somebody else's. Force a rebuild (`touch` the test source, or
 `cargo clean -p <crate>`) and run it again before believing either answer.
 
+**A whole-suite run can hang before it runs anything, and `--test <name>` is the way
+through.** The same collision has a second shape that does not look like a collision
+at all. `cargo nextest run` enumerates every test binary first, and enumerating sixty
+of them at once while a sibling worktree is writing the same artefact names leaves
+processes parked at 0% CPU that never exit. It is not a slow test and not a test at
+all: `sample <pid>` on one shows it stopped in `_dyld_start`, inside the dynamic
+linker, before `main` — the loader mapping a file that is being rewritten underneath
+it. It reproduces on binaries your branch never touched, which is what makes it read
+as the tree being broken.
+
+Naming one binary avoids it, because one file is a far smaller target than sixty:
+`cargo nextest run -p lemonfiber --test withholding`. That is the loop to reach for
+when a suite run stops producing output, and it is worth knowing before spending
+twenty minutes deciding your change broke something. `-p <crate> --lib` works the
+same way for the unit tests, which live in one binary rather than dozens.
+
 ## Commits
 
 Conventional-commit style, a `Spec:` trailer, and **no AI attribution** — no
