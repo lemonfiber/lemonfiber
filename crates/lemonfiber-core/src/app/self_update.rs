@@ -53,7 +53,7 @@ pub(super) async fn standing(ctx: &Ctx, named: Option<&str>) -> UpdateReport {
         replaceable: replaceable(ctx, installed, at.as_deref()).await,
         configuration: named.map(|named| configuration(named, running)),
         afterwards: AFTERWARDS.to_owned(),
-        carries: carries(lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS),
+        carries: carries(lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS, read.schema),
         untold: read.untold.map(|quiet| quiet.why().to_owned()),
     }
 }

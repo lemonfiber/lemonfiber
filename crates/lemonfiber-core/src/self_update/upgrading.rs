@@ -107,15 +107,43 @@ pub const AFTERWARDS: &str = "Nothing in the stack is stopped, restarted or chan
 /// taking one: the copy that is installed materialises its own stack the next time it
 /// is asked to start one, and where that stack pins newer service images, starting it
 /// is what fetches them.
+///
+/// The second half is conditional and has to be, because the requirement is. Saying
+/// "a release brings its own stack" is true of every release and therefore tells an
+/// operator nothing about the one in front of them; what they are deciding about is
+/// whether *this* update brings a stack description their current copy cannot read,
+/// and what that implies for the services. So the generation the offered release
+/// declares is compared against the ones this copy reads, and the three answers are
+/// different sentences rather than one hedged one.
+///
+/// `offered` is absent where the release declared nothing — published before the
+/// declaration existed, or by a fork that publishes none. That is said plainly rather
+/// than guessed at: claiming a release brings no newer schema when nobody asked it is
+/// how an operator ends up surprised by the thing this sentence exists to prevent.
 #[must_use]
-pub fn carries(reads: &[u32]) -> String {
+pub fn carries(reads: &[u32], offered: Option<u32>) -> String {
     let generations: Vec<String> = reads.iter().map(u32::to_string).collect();
+    let generations = generations.join(", ");
+    let brings = match offered {
+        Some(offered) if !reads.contains(&offered) => format!(
+            " The release on offer declares manifest schema {offered}, which this copy does not \
+             read — so it brings a newer stack description as well as a newer program, and the \
+             service versions pinned inside it move with it. Starting the stack after the update \
+             is what fetches those images."
+        ),
+        Some(offered) => format!(
+            " The release on offer declares manifest schema {offered}, which this copy already \
+             reads, so the update brings no newer stack description."
+        ),
+        None => " The release on offer declares no manifest schema, so whether it brings a newer \
+                 stack description than this copy reads cannot be told from here."
+            .to_owned(),
+    };
     format!(
         "A release carries its own pinned stack as well as the program, and this copy reads \
-         manifest schema {}. Updating writes none of it: the copy you install materialises \
-         its own stack the next time you start one, and where that stack pins newer service \
-         images, starting it is what fetches them.",
-        generations.join(", ")
+         manifest schema {generations}. Updating writes none of it: the copy you install \
+         materialises its own stack the next time you start one, and where that stack pins newer \
+         service images, starting it is what fetches them.{brings}"
     )
 }
 
@@ -255,10 +283,49 @@ mod tests {
 
     #[test]
     fn what_a_release_brings_besides_the_program_is_said_with_what_this_copy_reads() {
-        let said = carries(&[1, 2]);
+        let said = carries(&[1, 2], Some(1));
         assert!(said.contains("manifest schema 1, 2"), "{said}");
         assert!(said.contains("newer service images"), "{said}");
         assert!(said.contains("Updating writes none of it"), "{said}");
+    }
+
+    /// The conditional half, which is the whole point of reading a declaration at
+    /// all. Three situations, three sentences: a generation this copy cannot read, one
+    /// it can, and a release that said nothing.
+    #[test]
+    fn a_release_bringing_a_newer_stack_description_says_so_and_says_what_follows() {
+        let said = carries(&[1], Some(2));
+        assert!(said.contains("declares manifest schema 2"), "{said}");
+        assert!(said.contains("which this copy does not read"), "{said}");
+        assert!(
+            said.contains("service versions pinned inside it move with it"),
+            "the implied service updates are stated: {said}"
+        );
+    }
+
+    #[test]
+    fn a_release_on_the_generation_already_read_says_it_brings_no_newer_description() {
+        let said = carries(&[1, 2], Some(2));
+        assert!(
+            said.contains("this copy already \n         reads") || said.contains("already reads"),
+            "{said}"
+        );
+        assert!(said.contains("no newer stack description"), "{said}");
+    }
+
+    /// Not a claim that it brings nothing. A release published before the declaration
+    /// existed, or by a fork that publishes none, is one nobody can answer for — and
+    /// saying "no newer schema" about it would be the surprise this sentence exists
+    /// to prevent.
+    #[test]
+    fn a_release_declaring_nothing_says_it_cannot_be_told_rather_than_guessing() {
+        let said = carries(&[1], None);
+        assert!(said.contains("declares no manifest schema"), "{said}");
+        assert!(said.contains("cannot be told"), "{said}");
+        assert!(
+            !said.contains("no newer stack description"),
+            "silence must not read as an answer: {said}"
+        );
     }
 
     /// The question a downgrade asks, and the one the specification says is

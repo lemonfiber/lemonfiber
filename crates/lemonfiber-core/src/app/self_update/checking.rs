@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::config::REACH_UPDATES_KEY;
 use crate::outbound::RELEASE_LIST;
-use crate::self_update::{asking, changed, newest, Noticed, Silence};
+use crate::self_update::{asking, changed, newest, schema, Noticed, Silence};
 
 /// What the record of past checks is kept in, beside the settings it belongs with.
 const RECORD: &str = "updates.json";
@@ -27,6 +27,8 @@ pub(super) struct Read {
     pub(super) offered: Option<String>,
     /// What that version's release page said it changed, where it said anything.
     pub(super) changed: Option<String>,
+    /// The manifest generation that version's stack carries, where it declared one.
+    pub(super) schema: Option<u32>,
     /// Why none is known, where none is.
     pub(super) untold: Option<Silence>,
 }
@@ -41,11 +43,13 @@ impl Read {
             Some(offered) => Self {
                 offered: Some(offered.to_owned()),
                 changed: noticed.changed().map(str::to_owned),
+                schema: noticed.schema(),
                 untold: None,
             },
             None => Self {
                 offered: None,
                 changed: None,
+                schema: None,
                 untold: Some(quiet),
             },
         }
@@ -83,7 +87,10 @@ async fn asked(ctx: &Ctx, noticed: &mut Noticed, now: u64) {
             let notes = offered
                 .as_deref()
                 .and_then(|offered| changed(&answer.body, offered));
-            noticed.answered(now, offered, notes);
+            let carried = offered
+                .as_deref()
+                .and_then(|offered| schema(&answer.body, offered));
+            noticed.answered(now, offered, notes, carried);
         }
         Ok(_) | Err(_) => noticed.silent(now),
     }
