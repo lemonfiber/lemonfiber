@@ -95,7 +95,15 @@ jobs:
             exit 1
           fi
 
+          # The number, rather than nothing. Only the name is read — the reader
+          # strips the prefix off the asset name and never opens the file — so an
+          # empty one was the honest shape and it is the one shape that cannot be
+          # uploaded: GitHub answers a zero-length body with `HTTP 400: Bad
+          # Content-Length`, which is what happened on v0.14.0 and left the
+          # release declaring nothing at all. A release that says nothing is
+          # answered as unknown rather than as an error, so nobody downstream
+          # would have reported it either.
           marker="stack-schema-$schema"
-          : > "$marker"
+          printf '%s\n' "$schema" > "$marker"
           gh release upload "$TAG" "$marker" --clobber --repo "$REPO"
           echo "declared $marker on $TAG"
