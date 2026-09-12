@@ -197,6 +197,22 @@ mod tests {
     }
 
     #[test]
+    fn an_entry_whose_requirement_the_record_does_not_hold_keeps_its_line() {
+        // A record written by an older generator can cite an identifier its own index
+        // never gained. The change still shipped, so the summary stands on its own
+        // rather than the line being dropped or carrying an empty dash.
+        let said = read("0.4.0");
+        assert!(
+            said.contains("• One the record keeps no requirement for\n"),
+            "{said}"
+        );
+        assert!(
+            !said.contains("One the record keeps no requirement for —"),
+            "{said}"
+        );
+    }
+
+    #[test]
     fn maintenance_is_counted_and_the_count_reads_as_english() {
         let said = read("0.4.0");
         assert!(

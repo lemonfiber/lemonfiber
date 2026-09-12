@@ -110,6 +110,10 @@ pub(super) fn a_version() -> VersionReport {
 /// rather than taken from the record this build carries, because a renderer test
 /// asserting against the real history would be a test that has to be rewritten
 /// every time a release is cut.
+///
+/// One entry of `0.4.0` cites an identifier the index does not hold. A record
+/// written by an older generator can do that, and what a renderer does with it is
+/// worth pinning: the change still shipped, so the line stays and says what it said.
 const THREE: &str = r##"{
   "releases": [
     {
@@ -119,7 +123,9 @@ const THREE: &str = r##"{
       "groups": [
         {"title": "New", "entries": [
           {"summary": "The panel shows the forwarded port",
-           "requirements": ["C2-R4", "C2-R9"], "reference": "#42"}
+           "requirements": ["C2-R4", "C2-R9"], "reference": "#42"},
+          {"summary": "One the record keeps no requirement for",
+           "requirements": ["Z9-R1"]}
         ]},
         {"title": "Maintenance", "entries": [
           {"summary": "Bump a dependency", "requirements": []}

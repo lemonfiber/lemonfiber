@@ -328,13 +328,23 @@ mod tests {
         assert!(carried.is_some(), "the carried record did not parse");
         assert!(Record::read(CARRIED).is_some());
         assert_eq!(RECORD_PATH, "reference/changelog.json");
-        let Some(record) = carried else { return };
-        assert!(!record.releases.is_empty());
+        // Destructured with a combinator rather than a `let ... else`: the arm for
+        // a record that is certainly there is a line no test can ever run.
         assert_eq!(
-            record.release("0.1.0").map(|one| one.tag.clone()),
+            carried.as_ref().map(|record| record.releases.is_empty()),
+            Some(false)
+        );
+        assert_eq!(
+            carried
+                .as_ref()
+                .and_then(|record| record.release("0.1.0"))
+                .map(|one| one.tag.clone()),
             Some("v0.1.0".to_owned())
         );
-        assert_eq!(record.release("9.9.9"), None);
+        assert_eq!(
+            carried.and_then(|record| record.release("9.9.9").cloned()),
+            None
+        );
     }
 
     #[test]
@@ -416,14 +426,44 @@ mod tests {
     }
 
     #[test]
+    fn every_state_the_record_can_be_in_is_a_word_on_the_wire() {
+        // The three are part of what a surface reads, so what each serialises to is
+        // checked rather than left to the derive — a renamed variant would otherwise
+        // change the contract without anything saying so.
+        let words: Vec<String> = [State::Current, State::Pending, State::Stale]
+            .iter()
+            .map(|state| serde_json::to_string(state).unwrap_or_default())
+            .collect();
+        assert_eq!(
+            words,
+            vec![
+                "\"current\"".to_owned(),
+                "\"pending\"".to_owned(),
+                "\"stale\"".to_owned()
+            ]
+        );
+    }
+
+    #[test]
     fn a_listing_entry_keeps_what_a_reader_chooses_by_and_drops_the_rest() {
-        let Some(record) = two() else { return };
-        let Some(release) = record.release("0.2.0") else {
-            return;
-        };
-        let summary = Summary::from(release);
-        assert_eq!(summary.delivers, Some("The setup wizard".to_owned()));
-        assert_eq!(summary.released_on, Some("2026-02-01".to_owned()));
-        assert_eq!(summary.patches, None);
+        // Asserted whole rather than field by field, for the reason above: what a
+        // listing keeps and what it drops is one claim, and reading it out a field
+        // at a time is three assertions that can each be true while the shape is
+        // wrong.
+        let summary = two()
+            .as_ref()
+            .and_then(|record| record.release("0.2.0"))
+            .map(Summary::from);
+        assert_eq!(
+            summary,
+            Some(Summary {
+                version: "0.2.0".to_owned(),
+                released_on: Some("2026-02-01".to_owned()),
+                delivers: Some("The setup wizard".to_owned()),
+                patches: None,
+                withdrawn: Some("the installer shipped a broken pin".to_owned()),
+                user_facing: true,
+            })
+        );
     }
 }
