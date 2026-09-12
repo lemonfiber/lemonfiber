@@ -28,3 +28,18 @@ jobs:
       contents: read
       pull-requests: write
     uses: lemonfiber/spec/.github/workflows/labeler.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+  # OPS-R39, OPS-R40 and OPS-R42: label a PR that advances the staged version,
+  # put it in that version's milestone, comment which goals it moves, and route
+  # one that cites only out-of-scope requirements to the next version. The
+  # reusable workflow has existed for some time and this repository never called
+  # it, so none of those three rules has ever run anywhere.
+  #
+  # `issues: write` is what the milestone half needs: a milestone is an
+  # issues-API object even when it sits on a pull request, and granting less
+  # gets the label and a warning instead.
+  goals:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
