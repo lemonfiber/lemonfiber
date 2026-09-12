@@ -358,12 +358,12 @@ pub use retention::Retention;
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::compatibility::Version;
     use super::{
         area, plan, relocation, Compatibility, Existing, Item, Manifest, Member, Plan, Retention,
         Scope, SCHEMA,
     };
     use crate::config::paths::Paths;
+    use crate::version::Version;
 
     fn paths() -> Paths {
         Paths::rooted(

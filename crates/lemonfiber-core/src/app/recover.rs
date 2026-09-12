@@ -697,9 +697,16 @@ mod tests {
         // Read back through a readable file, so a read failure could not pass this
         // off as "no settings" — every setting is restored to absent, the directory
         // gone.
+        //
+        // Asked of the settings rather than of how many keys the file holds. Writing
+        // it is what records the build that wrote it, so a file every setting has
+        // been taken out of still holds that marker and counting would read it as a
+        // setting that survived.
         assert_eq!(
-            store::read(&env).ok().map(|file| file.keys().len()),
-            Some(0),
+            store::read(&env)
+                .ok()
+                .map(|file| ["USENET", "TORRENT"].map(|key| file.get(key).is_some())),
+            Some([false, false]),
             "every setting was restored to absent",
         );
         assert!(!made.exists(), "the directory was removed");
