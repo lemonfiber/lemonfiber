@@ -43,6 +43,9 @@ jobs:
         with:
           ref: ${{ steps.tag.outputs.tag }}
           persist-credentials: false
+          # The stack is a submodule and its manifest is what the step below reads,
+          # so a checkout without it would leave the declaration unwritable.
+          submodules: true
 
       - name: Attach the contract
         env:
@@ -64,3 +67,35 @@ jobs:
 
           gh release upload "$TAG" "$contract" --clobber --repo "$REPO"
           echo "attached $contract to $TAG"
+
+      # A release says which manifest generation its stack carries, so that a copy
+      # reading the release list can tell whether an update brings one it cannot read.
+      # The declaration is the *name*: names arrive in the same reply the version is
+      # read out of, so an older copy learns this without a second request and without
+      # sending anything it was not already sending.
+      - name: Declare the stack generation this release carries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          manifest="assets/media-stack/stack.toml"
+
+          # Read off the stack that actually ships rather than restated here. A number
+          # copied into this file is one that goes stale the first time the stack
+          # moves, and it would go stale silently.
+          if [ ! -s "$manifest" ]; then
+            echo "::error::$manifest is missing at $TAG — the submodule was not checked out"
+            exit 1
+          fi
+          schema=$(sed -n 's/^[[:space:]]*schema_version[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$manifest" | head -n 1)
+          if [ -z "$schema" ]; then
+            echo "::error::$manifest declares no schema_version"
+            exit 1
+          fi
+
+          marker="stack-schema-$schema"
+          : > "$marker"
+          gh release upload "$TAG" "$marker" --clobber --repo "$REPO"
+          echo "declared $marker on $TAG"

@@ -145,7 +145,7 @@ mod tests {
             replaceable: None,
             configuration: None,
             afterwards: AFTERWARDS.to_owned(),
-            carries: carries(&[1]),
+            carries: carries(&[1], Some(1)),
             untold: None,
         }
     }

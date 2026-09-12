@@ -43,6 +43,14 @@ pub struct Noticed {
     /// it exists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     changed: Option<String>,
+    /// The manifest generation that version's stack carries, where it declared one.
+    ///
+    /// Remembered with the version for the same reason the notes are: a machine that
+    /// has gone quiet should still be able to say what the update it knows about would
+    /// bring, and re-asking to learn it would be a second request for an answer that
+    /// has already arrived once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    schema: Option<u32>,
     /// How many checks in a row have not been answered.
     quiet: u32,
 }
@@ -79,12 +87,19 @@ impl Noticed {
     /// The notes move with the version they belong to and never on their own: a
     /// version remembered from one check beside notes from another would be a report
     /// describing a release nobody is being offered.
-    pub fn answered(&mut self, now: u64, offered: Option<String>, changed: Option<String>) {
+    pub fn answered(
+        &mut self,
+        now: u64,
+        offered: Option<String>,
+        changed: Option<String>,
+        schema: Option<u32>,
+    ) {
         self.asked = Some(now);
         self.quiet = 0;
         if offered.is_some() {
             self.offered = offered;
             self.changed = changed;
+            self.schema = schema;
         }
     }
 
@@ -104,6 +119,12 @@ impl Noticed {
     #[must_use]
     pub fn changed(&self) -> Option<&str> {
         self.changed.as_deref()
+    }
+
+    /// The manifest generation that version's stack carries, where it declared one.
+    #[must_use]
+    pub const fn schema(&self) -> Option<u32> {
+        self.schema
     }
 
     /// Whether asking has been given up on, which is worth saying rather than
@@ -171,7 +192,7 @@ mod tests {
     fn answered(at: u64, offered: Option<&str>) -> Noticed {
         let mut noticed = Noticed::default();
         let notes = offered.map(|offered| format!("what {offered} changed"));
-        noticed.answered(at, offered.map(str::to_owned), notes);
+        noticed.answered(at, offered.map(str::to_owned), notes, None);
         noticed
     }
 
@@ -210,7 +231,7 @@ mod tests {
     #[test]
     fn an_answer_holding_no_version_leaves_the_one_already_known_alone() {
         let mut noticed = answered(1_000, Some("0.13.0"));
-        noticed.answered(2_000, None, None);
+        noticed.answered(2_000, None, None, None);
         assert_eq!(noticed.remembered(), Some("0.13.0"));
         // And the notes stay with it, rather than being cleared by a check that
         // learned nothing — a version with no notes beside it would read as a
@@ -247,7 +268,7 @@ mod tests {
     fn a_check_that_answers_puts_the_wait_back_to_where_it_started() {
         let mut noticed = silent(GIVEN_UP - 1, 0);
         assert!(!noticed.due(APART));
-        noticed.answered(APART * 100, Some("0.13.0".to_owned()), None);
+        noticed.answered(APART * 100, Some("0.13.0".to_owned()), None, None);
         assert!(!noticed.due(APART * 100));
         assert!(noticed.due(APART * 101));
     }

@@ -46,6 +46,20 @@ const CALLED: &str = "lemonfiber";
 /// nothing rather than with the boilerplate.
 const BOUNDARY: &str = "<!-- the changelog is above; cargo-dist wrote what follows -->";
 
+/// The prefix a release publishes its stack's manifest generation under.
+///
+/// The declaration is the asset's *name*, and its contents are never read. That is
+/// what makes this free: names arrive in the same reply the version is read out of,
+/// so nothing is fetched a second time and nothing new is sent to learn it.
+const DECLARED: &str = "stack-schema-";
+
+/// One file published with a release. Only the name is read.
+#[derive(Debug, Deserialize)]
+struct Asset {
+    /// What the file is called, which is where the declaration lives.
+    name: String,
+}
+
 /// One release, as much of it as this reads.
 #[derive(Debug, Deserialize)]
 struct Release {
@@ -53,6 +67,12 @@ struct Release {
     tag_name: String,
     /// Whether it is still a draft, and so not released at all.
     draft: bool,
+    /// The files published with it.
+    ///
+    /// Defaulted rather than required: a reply that omits them is a reply that
+    /// declares nothing, which is a thing this has an answer for.
+    #[serde(default)]
+    assets: Vec<Asset>,
     /// What the release page says, where it says anything.
     #[serde(default)]
     body: Option<String>,
@@ -116,6 +136,29 @@ pub fn changed(answered: &str, version: &str) -> Option<String> {
     (!notes.is_empty()).then(|| notes.to_owned())
 }
 
+/// The manifest generation the release for `version` says its stack carries.
+///
+/// Read out of the same answer `newest` and `changed` are read out of, so what is
+/// available, what it changed and what it carries are one request rather than three.
+///
+/// Nothing where the release declares none. That is not the same as declaring zero
+/// and must not read like it: a release published before this was declared, or by a
+/// fork that publishes none, is one whose stack generation is unknown — and a caller
+/// that guessed would say something false about an update rather than say it cannot
+/// tell.
+#[must_use]
+pub fn schema(answered: &str, version: &str) -> Option<u32> {
+    let released: Vec<Release> = serde_json::from_str(answered).ok()?;
+    let release = released
+        .into_iter()
+        .find(|release| !release.draft && release.tag_name.trim_start_matches('v') == version)?;
+    release
+        .assets
+        .iter()
+        .find_map(|asset| asset.name.strip_prefix(DECLARED))
+        .and_then(|declared| declared.parse().ok())
+}
+
 /// Whether a version is one this can order at all.
 ///
 /// Asked of the first candidate, because a list holding one unorderable tag would
@@ -148,7 +191,7 @@ pub fn standing(running: &str, offered: &str) -> Availability {
 
 #[cfg(test)]
 mod tests {
-    use super::{asking, changed, newest, standing, Availability, BOUNDARY, HOW_MANY};
+    use super::{asking, changed, newest, schema, standing, Availability, BOUNDARY, HOW_MANY};
     use crate::ports::http::Method;
 
     /// The shape the address answers with, with a release page's body on each.
@@ -307,5 +350,69 @@ mod tests {
     #[test]
     fn two_versions_that_cannot_be_ordered_claim_nothing_about_either() {
         assert_eq!(standing("0.13.0-rc1", "0.13.0"), Availability::Untellable);
+    }
+
+    /// The same reply shape, with the files a release publishes beside each entry.
+    fn publishing(tag: &str, assets: &[&str]) -> String {
+        let named: Vec<String> = assets
+            .iter()
+            .map(|name| format!(r#"{{"name":"{name}"}}"#))
+            .collect();
+        format!(
+            r#"[{{"tag_name":"{tag}","draft":false,"assets":[{}]}}]"#,
+            named.join(",")
+        )
+    }
+
+    /// The declaration is a name in a reply already fetched, which is what makes
+    /// reading it free — no second request, and nothing new sent to learn it.
+    #[test]
+    fn a_release_declares_its_stack_generation_in_the_name_of_a_published_file() {
+        let answered = publishing(
+            "v0.15.0",
+            &["lemonfiber-installer.sh", "stack-schema-2", "sha256.sum"],
+        );
+        assert_eq!(schema(&answered, "0.15.0"), Some(2));
+    }
+
+    /// Absent, not zero. A release that declares nothing is one whose generation is
+    /// unknown, and a number would be an answer nobody gave.
+    #[test]
+    fn a_release_publishing_no_declaration_reads_as_nothing_rather_than_a_generation() {
+        let answered = publishing("v0.15.0", &["lemonfiber-installer.sh", "sha256.sum"]);
+        assert_eq!(schema(&answered, "0.15.0"), None);
+    }
+
+    /// Read for the release asked about, not for whichever one happens to declare one.
+    #[test]
+    fn the_declaration_read_is_the_one_belonging_to_the_version_asked_about() {
+        let answered = r#"[{"tag_name":"v0.15.0","draft":false,"assets":[{"name":"stack-schema-2"}]},{"tag_name":"v0.14.0","draft":false,"assets":[{"name":"stack-schema-1"}]}]"#;
+        assert_eq!(
+            (schema(answered, "0.15.0"), schema(answered, "0.14.0")),
+            (Some(2), Some(1))
+        );
+    }
+
+    /// A name that is not a number is not a generation. Anything unreadable answers
+    /// the same way a missing declaration does rather than being guessed at.
+    #[test]
+    fn a_declaration_that_is_not_a_number_reads_as_nothing() {
+        let answered = publishing("v0.15.0", &["stack-schema-next"]);
+        assert_eq!(schema(&answered, "0.15.0"), None);
+    }
+
+    /// A reply with no assets at all still parses. The field is defaulted precisely so
+    /// that a shape without it is a release declaring nothing rather than an error.
+    #[test]
+    fn a_reply_with_no_files_at_all_is_a_release_declaring_nothing() {
+        assert_eq!(schema(&published(&[("v0.15.0", "notes")]), "0.15.0"), None);
+    }
+
+    /// A draft is not a release, here as everywhere else in this module.
+    #[test]
+    fn a_draft_declares_nothing_because_it_is_not_released() {
+        let answered =
+            r#"[{"tag_name":"v0.15.0","draft":true,"assets":[{"name":"stack-schema-2"}]}]"#;
+        assert_eq!(schema(answered, "0.15.0"), None);
     }
 }

@@ -567,7 +567,7 @@ mod tests {
             replaceable: Some(true),
             configuration: Some(crate::self_update::configuration("0.12.0", "0.13.0")),
             afterwards: crate::self_update::AFTERWARDS.to_owned(),
-            carries: crate::self_update::carries(&[1]),
+            carries: crate::self_update::carries(&[1], Some(1)),
             untold: None,
         }
     }
