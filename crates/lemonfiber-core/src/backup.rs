@@ -834,11 +834,12 @@ mod tests {
             Compatibility::Compatible,
             "the same versions restore an archive of our own"
         );
-        assert!(
-            matches!(
-                Compatibility::assess(&manifest, "0.3.0", SCHEMA),
-                Compatibility::NotOurs { .. }
-            ),
+        assert_eq!(
+            Compatibility::assess(&manifest, "0.3.0", SCHEMA),
+            Compatibility::NotOurs {
+                project: "media".to_owned(),
+                paths: vec!["/srv/their-media".to_owned()],
+            },
             "but not one of somebody else's"
         );
     }
@@ -850,11 +851,14 @@ mod tests {
         let mut manifest = Manifest::describe(&plan(&paths(), &scope), "0.3.0", "t", "/srv/media");
         manifest.schema = SCHEMA + 1;
 
-        assert!(
-            matches!(
-                Compatibility::assess(&manifest, "0.3.0", SCHEMA),
-                Compatibility::Incompatible { .. }
-            ),
+        assert_eq!(
+            Compatibility::assess(&manifest, "0.3.0", SCHEMA),
+            Compatibility::Incompatible {
+                detail: format!(
+                    "the archive is format {} and this lemonfiber reads format {SCHEMA}",
+                    SCHEMA + 1
+                ),
+            },
             "a scope read out of a format we do not understand is not one to act on"
         );
     }
