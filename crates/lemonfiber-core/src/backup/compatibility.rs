@@ -8,40 +8,7 @@
 use std::path::Path;
 
 use super::{Manifest, Scope};
-
-/// A three-part version, compared to decide whether an archive restores here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Version {
-    pub(crate) major: u32,
-    pub(crate) minor: u32,
-    pub(crate) patch: u32,
-}
-
-impl Version {
-    /// Parse a `major.minor.patch` string, ignoring any pre-release suffix, and
-    /// return nothing for anything that is not three numbers.
-    ///
-    /// Lenient about a trailing `-rc.1` because a release candidate restores like
-    /// the release it precedes; strict about the three numbers because a version
-    /// that cannot be read is a corrupt archive, not a guess to make.
-    pub(crate) fn parse(text: &str) -> Option<Self> {
-        // `split` always yields at least the whole string, so a version with no
-        // `-` suffix is its own first segment — `unwrap_or(text)` says that plainly.
-        let core = text.split('-').next().unwrap_or(text);
-        let mut parts = core.split('.');
-        let major = parts.next()?.parse().ok()?;
-        let minor = parts.next()?.parse().ok()?;
-        let patch = parts.next()?.parse().ok()?;
-        if parts.next().is_some() {
-            return None;
-        }
-        Some(Self {
-            major,
-            minor,
-            patch,
-        })
-    }
-}
+use crate::version::Version;
 
 /// Whether an archive read back can be restored by the running build.
 #[derive(Debug, Clone, PartialEq, Eq)]
