@@ -86,6 +86,13 @@
                 "type": "string"
               }
             },
+            "backed_up": {
+              "description": "Where the capture of those paths was written, once one has been taken.\n\nAbsent on a rehearsal, which captures nothing, and absent where the setup\nmounted nothing worth capturing. Present on an adoption that went through,\nbecause an operator told a backup was taken is owed the path to it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "project": {
               "description": "The project lemonfiber would manage, where exactly one could be adopted.",
               "type": [
@@ -407,7 +414,51 @@
                 "scope",
                 "name"
               ]
+            },
+            {
+              "description": "An existing setup's own configuration, at the host paths it keeps it in.\n\nThe one scope whose sources are not lemonfiber's layout. A capture taken\nbefore a takeover has to cover the tree that is already there — lemonfiber's\nown holds nothing worth protecting until the takeover has happened — so the\nhost path each tree was read from is recorded here, in the manifest, rather\nthan inferred from a layout that does not describe it.\n\nRecording those paths is also what makes putting one back an ordinary\nextraction the operator performs deliberately, rather than something\nlemonfiber does on their behalf into a tree it does not manage.",
+              "type": "object",
+              "properties": {
+                "project": {
+                  "description": "The Compose project the capture was taken from.",
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "const": "existing"
+                },
+                "trees": {
+                  "description": "The host trees captured, in the order the survey reported them.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Tree"
+                  }
+                }
+              },
+              "required": [
+                "scope",
+                "project",
+                "trees"
+              ]
             }
+          ]
+        },
+        "Tree": {
+          "description": "One host tree captured from a setup lemonfiber does not manage.\n\nBoth halves are needed to find it again: the archive path says where it sits\ninside the archive, and the host path says where it was read from. Nothing\nderives the second from the first, because a tree outside lemonfiber's layout\nhas no layout to derive it from.",
+          "type": "object",
+          "properties": {
+            "archive_path": {
+              "description": "Where it sits inside the archive.",
+              "type": "string"
+            },
+            "host_path": {
+              "description": "Where it was read from, on the machine whose setup was taken over.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "host_path",
+            "archive_path"
           ]
         }
       }
@@ -9074,7 +9125,51 @@
                 "scope",
                 "name"
               ]
+            },
+            {
+              "description": "An existing setup's own configuration, at the host paths it keeps it in.\n\nThe one scope whose sources are not lemonfiber's layout. A capture taken\nbefore a takeover has to cover the tree that is already there — lemonfiber's\nown holds nothing worth protecting until the takeover has happened — so the\nhost path each tree was read from is recorded here, in the manifest, rather\nthan inferred from a layout that does not describe it.\n\nRecording those paths is also what makes putting one back an ordinary\nextraction the operator performs deliberately, rather than something\nlemonfiber does on their behalf into a tree it does not manage.",
+              "type": "object",
+              "properties": {
+                "project": {
+                  "description": "The Compose project the capture was taken from.",
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "const": "existing"
+                },
+                "trees": {
+                  "description": "The host trees captured, in the order the survey reported them.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Tree"
+                  }
+                }
+              },
+              "required": [
+                "scope",
+                "project",
+                "trees"
+              ]
             }
+          ]
+        },
+        "Tree": {
+          "description": "One host tree captured from a setup lemonfiber does not manage.\n\nBoth halves are needed to find it again: the archive path says where it sits\ninside the archive, and the host path says where it was read from. Nothing\nderives the second from the first, because a tree outside lemonfiber's layout\nhas no layout to derive it from.",
+          "type": "object",
+          "properties": {
+            "archive_path": {
+              "description": "Where it sits inside the archive.",
+              "type": "string"
+            },
+            "host_path": {
+              "description": "Where it was read from, on the machine whose setup was taken over.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "host_path",
+            "archive_path"
           ]
         }
       }

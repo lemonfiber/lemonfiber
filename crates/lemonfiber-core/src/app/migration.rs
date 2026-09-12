@@ -42,9 +42,9 @@ pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<
 async fn acting(ctx: &Ctx, mode: Mode, confirmed: bool) -> Result<Outcome, Box<Problem>> {
     let found = looked(ctx).await;
     match mode {
-        Mode::Adopt => {
-            super::adopt::adopt(ctx, &found.survey, &found.mounts, confirmed).map(Outcome::Adoption)
-        }
+        Mode::Adopt => super::adopt::adopt(ctx, &found.survey, &found.mounts, confirmed)
+            .await
+            .map(Outcome::Adoption),
         Mode::Import => super::import::carry(ctx, &found.survey, &found.running, confirmed)
             .await
             .map(Outcome::Import),

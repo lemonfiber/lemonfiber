@@ -60,6 +60,9 @@ pub const NOWHERE_KEPT: Code = Code::new("RESTORE-9");
 /// Raised when the restored settings could not be pointed at this machine's data root.
 pub const NOT_REPOINTED: Code = Code::new("RESTORE-10");
 
+/// Raised when the archive holds trees lemonfiber does not manage.
+pub const NOT_OURS: Code = Code::new("RESTORE-12");
+
 /// What a restore would do, shown before anything is overwritten.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Preview {
@@ -301,6 +304,9 @@ pub async fn inspect(
             return Err(Box::new(too_new(&archive, &current)))
         }
         Compatibility::Incompatible { detail } => return Err(Box::new(incompatible(&detail))),
+        Compatibility::NotOurs { project, paths } => {
+            return Err(Box::new(not_ours(&project, &paths)))
+        }
     };
 
     let relocation = backup::relocation(&manifest, current_root);
@@ -343,6 +349,13 @@ fn agreement(manifest: &Manifest, downgrade: bool, relocation: Option<&Relocatio
         Scope::Service { name } => {
             words.push("one service");
             words.push(name);
+        }
+        Scope::Existing { project, trees } => {
+            words.push("a setup lemonfiber does not manage");
+            words.push(project);
+            for tree in trees {
+                words.push(&tree.host_path);
+            }
         }
     }
     words.push(&manifest.product_version);
@@ -462,6 +475,32 @@ fn incompatible(detail: &str) -> Problem {
     .with_detail(detail.to_owned())
 }
 
+/// The refusal for an archive of a setup lemonfiber does not manage.
+///
+/// Deliberately not a failure of the archive: it is a good capture of exactly what
+/// it says it holds, and the operator may well want it back. What lemonfiber will
+/// not do is write it back for them. Every other refusal here protects the archive
+/// from this machine; this one protects a tree on this machine that was never
+/// lemonfiber's to write to, so the remedy hands the work over rather than
+/// suggesting another way to ask.
+fn not_ours(project: &str, paths: &[String]) -> Problem {
+    Problem::new(
+        NOT_OURS,
+        Severity::Error,
+        "This backup holds a setup lemonfiber does not manage",
+        "It was captured before lemonfiber took over, so what is inside it belongs to the setup \
+         that was already here rather than to lemonfiber's own layout. Putting it back means \
+         writing into directories lemonfiber does not manage, which is not something it will do \
+         on your behalf. Nothing was touched.",
+        Remedy::new("Unpack it yourself with `tar -xzf`, into the paths it names"),
+    )
+    .in_state(State::Guided)
+    .with_detail(format!(
+        "taken from the project {project}, covering {}",
+        paths.join(", ")
+    ))
+}
+
 /// The problem for an archive whose members would escape their area.
 fn unsafe_paths(escaping: &[String]) -> Problem {
     Problem::new(
@@ -508,7 +547,8 @@ mod tests {
 
     use super::{
         inspect, restore, run, Consent, Kept, CORRUPT, INCOMPATIBLE, MOVED_ON, NEEDS_REPOINT,
-        NOT_KEPT_HERE, NOT_REPOINTED, NOT_RESTORED, NOWHERE_KEPT, STILL_RUNNING, TOO_NEW, UNSAFE,
+        NOT_KEPT_HERE, NOT_OURS, NOT_REPOINTED, NOT_RESTORED, NOWHERE_KEPT, STILL_RUNNING, TOO_NEW,
+        UNSAFE,
     };
     use crate::app::fixtures::{keeping, paths, scratch, FakeArchive, CURRENT};
     use crate::app::Ctx;
@@ -596,6 +636,30 @@ mod tests {
         let reader = FakeArchive::holding(CURRENT, SCHEMA + 1);
         let refusal = restoring(&reader).await.err().map(|problem| problem.code);
         assert_eq!(refusal, Some(INCOMPATIBLE));
+    }
+
+    /// An archive of a setup lemonfiber does not manage is refused, and says where
+    /// its trees came from so the operator can put them back themselves.
+    ///
+    /// The refusal is not a complaint about the archive — it is a good capture of
+    /// exactly what it says it holds. What lemonfiber will not do is write it back
+    /// into directories that were never its to write to.
+    #[tokio::test]
+    async fn an_archive_of_a_setup_we_do_not_manage_is_refused_and_nothing_is_unpacked() {
+        let mut reader = FakeArchive::holding(CURRENT, SCHEMA);
+        if let Ok(manifest) = &mut reader.manifest {
+            manifest.scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
+        }
+
+        let refusal = restoring(&reader).await.err();
+        assert_eq!(refusal.as_ref().map(|problem| problem.code), Some(NOT_OURS));
+        assert!(
+            refusal
+                .and_then(|problem| problem.detail.clone())
+                .is_some_and(|said| said.contains("/srv/their-media")),
+            "the refusal did not say where to put it back"
+        );
+        assert!(reader.extractions().is_empty(), "it unpacked it anyway");
     }
 
     #[tokio::test]
@@ -914,6 +978,14 @@ mod tests {
                     Vec::new(),
                 ),
                 "what it covers",
+            ),
+            (
+                an_archive(
+                    Scope::existing("media", &["/srv/their-media".to_owned()]),
+                    true,
+                    Vec::new(),
+                ),
+                "a setup lemonfiber does not manage is not the whole stack",
             ),
             (
                 an_archive(Scope::WholeStack, false, Vec::new()),

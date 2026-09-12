@@ -31,6 +31,62 @@ pub enum Scope {
         /// The service whose configuration this covers.
         name: String,
     },
+    /// An existing setup's own configuration, at the host paths it keeps it in.
+    ///
+    /// The one scope whose sources are not lemonfiber's layout. A capture taken
+    /// before a takeover has to cover the tree that is already there — lemonfiber's
+    /// own holds nothing worth protecting until the takeover has happened — so the
+    /// host path each tree was read from is recorded here, in the manifest, rather
+    /// than inferred from a layout that does not describe it.
+    ///
+    /// Recording those paths is also what makes putting one back an ordinary
+    /// extraction the operator performs deliberately, rather than something
+    /// lemonfiber does on their behalf into a tree it does not manage.
+    Existing {
+        /// The Compose project the capture was taken from.
+        project: String,
+        /// The host trees captured, in the order the survey reported them.
+        trees: Vec<Tree>,
+    },
+}
+
+/// One host tree captured from a setup lemonfiber does not manage.
+///
+/// Both halves are needed to find it again: the archive path says where it sits
+/// inside the archive, and the host path says where it was read from. Nothing
+/// derives the second from the first, because a tree outside lemonfiber's layout
+/// has no layout to derive it from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct Tree {
+    /// Where it was read from, on the machine whose setup was taken over.
+    pub host_path: String,
+    /// Where it sits inside the archive.
+    pub archive_path: String,
+}
+
+impl Scope {
+    /// The scope of a capture covering an existing setup's own trees.
+    ///
+    /// The archive paths are assigned here, in one place, so a capture and anything
+    /// reading the archive back cannot disagree about them. They are positional
+    /// rather than worked out from the host path: two setups mounting `/srv/media`
+    /// and `/mnt/srv/media` would otherwise land on one name inside a single
+    /// archive, and a capture that silently dropped a tree is precisely the failure
+    /// this scope exists to prevent.
+    #[must_use]
+    pub fn existing(project: &str, host_paths: &[String]) -> Self {
+        Self::Existing {
+            project: project.to_owned(),
+            trees: host_paths
+                .iter()
+                .enumerate()
+                .map(|(index, host_path)| Tree {
+                    host_path: host_path.clone(),
+                    archive_path: format!("{}/{index}", area::EXISTING),
+                })
+                .collect(),
+        }
+    }
 }
 
 /// One thing a capture copies into the archive.
@@ -128,6 +184,12 @@ mod area {
     pub const SERVICES: &str = "services";
     /// The materialised compose files.
     pub const STACK: &str = "stack";
+    /// The trees of a setup lemonfiber does not manage, captured before a takeover.
+    ///
+    /// Absent from [`super::destinations`] on purpose: there is no place on this
+    /// machine lemonfiber may write these back to, so the area a restore would need
+    /// to aim at simply does not exist.
+    pub const EXISTING: &str = "existing";
 }
 
 /// Decide what a capture of `scope` copies, from the install layout.
@@ -168,6 +230,17 @@ pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
             archive_path: format!("{}/{name}", area::SERVICES),
             label: format!("{name} configuration"),
         }],
+        // The only scope that reads nothing from `paths`: an existing setup keeps
+        // its configuration where it keeps it, and the survey is what found out
+        // where that is.
+        Scope::Existing { trees, .. } => trees
+            .iter()
+            .map(|tree| Item {
+                source: PathBuf::from(&tree.host_path),
+                archive_path: tree.archive_path.clone(),
+                label: tree.host_path.clone(),
+            })
+            .collect(),
     };
 
     // Every scope captures credential-bearing configuration — the `.env`'s VPN key
@@ -658,5 +731,135 @@ mod tests {
             let read = serde_json::from_str::<Scope>(&line).ok();
             assert_eq!(read.as_ref(), Some(&scope), "{line}");
         }
+    }
+
+    /// A capture taken before a takeover reads the setup's own host paths.
+    ///
+    /// The whole point of the scope: nothing in the plan comes from `paths`, which
+    /// describes lemonfiber's layout and would describe the wrong machine's worth of
+    /// configuration entirely.
+    #[test]
+    fn a_capture_of_an_existing_setup_reads_the_host_paths_it_was_given() {
+        let scope = Scope::existing(
+            "media",
+            &["/srv/their-media".to_owned(), "/mnt/tv".to_owned()],
+        );
+        let made = plan(&paths(), &scope);
+
+        assert_eq!(
+            made.items
+                .iter()
+                .map(|item| item.source.clone())
+                .collect::<Vec<_>>(),
+            vec![PathBuf::from("/srv/their-media"), PathBuf::from("/mnt/tv")]
+        );
+        assert!(
+            made.sensitive,
+            "somebody else's configuration holds keys too"
+        );
+        assert!(
+            made.items
+                .iter()
+                .all(|item| item.archive_path.starts_with(area::EXISTING)),
+            "{:?}",
+            made.items
+        );
+    }
+
+    /// Two trees ending in the same name still land on separate places in the archive.
+    ///
+    /// Archive paths are positional rather than worked out from the host path, because
+    /// a capture that silently dropped one of two trees is the failure this scope
+    /// exists to prevent.
+    #[test]
+    fn two_trees_with_the_same_last_name_do_not_land_on_one_archive_path() {
+        let scope = Scope::existing(
+            "media",
+            &["/srv/config".to_owned(), "/mnt/other/config".to_owned()],
+        );
+        let made = plan(&paths(), &scope);
+        let mut seen: Vec<&str> = made
+            .items
+            .iter()
+            .map(|item| item.archive_path.as_str())
+            .collect();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), 2, "{:?}", made.items);
+    }
+
+    /// There is nowhere on this machine an existing setup's trees may be written back
+    /// to, so the area a restore would aim at is absent from the destinations.
+    #[test]
+    fn the_existing_area_is_not_somewhere_a_restore_can_write() {
+        let targets = super::destinations(&paths());
+        assert!(
+            !targets.iter().any(|(area, _)| area == area::EXISTING),
+            "{targets:?}"
+        );
+    }
+
+    /// An archive of a setup lemonfiber does not manage is refused, with the trees it
+    /// holds named so the operator can put them back themselves.
+    #[test]
+    fn an_archive_of_a_setup_we_do_not_manage_is_refused_with_its_paths_named() {
+        let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
+        let made = plan(&paths(), &scope);
+        let manifest = Manifest::describe(&made, "0.3.0", "t", "/srv/media");
+
+        assert_eq!(
+            Compatibility::assess(&manifest, "0.3.0", SCHEMA),
+            Compatibility::NotOurs {
+                project: "media".to_owned(),
+                paths: vec!["/srv/their-media".to_owned()],
+            }
+        );
+    }
+
+    /// The refusal outranks the versions: an archive of somebody else's trees is not
+    /// made restorable by having been written by this very build.
+    #[test]
+    fn a_foreign_archive_is_refused_even_where_every_version_agrees() {
+        let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
+        let manifest = Manifest::describe(&plan(&paths(), &scope), "0.3.0", "t", "/srv/media");
+        let whole = Manifest::describe(
+            &plan(&paths(), &Scope::WholeStack),
+            "0.3.0",
+            "t",
+            "/srv/media",
+        );
+
+        assert_eq!(
+            Compatibility::assess(&whole, "0.3.0", SCHEMA),
+            Compatibility::Compatible,
+            "the same versions restore an archive of our own"
+        );
+        assert_eq!(
+            Compatibility::assess(&manifest, "0.3.0", SCHEMA),
+            Compatibility::NotOurs {
+                project: "media".to_owned(),
+                paths: vec!["/srv/their-media".to_owned()],
+            },
+            "but not one of somebody else's"
+        );
+    }
+
+    /// A format this build cannot read is refused before its scope is trusted.
+    #[test]
+    fn a_foreign_archive_in_an_unreadable_format_is_refused_for_the_format() {
+        let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
+        let mut manifest = Manifest::describe(&plan(&paths(), &scope), "0.3.0", "t", "/srv/media");
+        manifest.schema = SCHEMA + 1;
+
+        assert_eq!(
+            Compatibility::assess(&manifest, "0.3.0", SCHEMA),
+            Compatibility::Incompatible {
+                detail: format!(
+                    "the archive is format {} and this lemonfiber reads format {SCHEMA}",
+                    SCHEMA + 1
+                ),
+            },
+            "a scope read out of a format we do not understand is not one to act on"
+        );
     }
 }
