@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::config::REACH_UPDATES_KEY;
 use crate::outbound::RELEASE_LIST;
-use crate::self_update::{asking, newest, Noticed, Silence};
+use crate::self_update::{asking, changed, newest, Noticed, Silence};
 
 /// What the record of past checks is kept in, beside the settings it belongs with.
 const RECORD: &str = "updates.json";
@@ -25,6 +25,8 @@ const RECORD: &str = "updates.json";
 pub(super) struct Read {
     /// The newest version known, from this check or from an earlier one.
     pub(super) offered: Option<String>,
+    /// What that version's release page said it changed, where it said anything.
+    pub(super) changed: Option<String>,
     /// Why none is known, where none is.
     pub(super) untold: Option<Silence>,
 }
@@ -34,14 +36,16 @@ impl Read {
     ///
     /// The two are exclusive by construction: a report carrying both a version and a
     /// sentence saying none could be read would be two answers to one question.
-    fn of(offered: Option<&str>, quiet: Silence) -> Self {
-        match offered {
+    fn of(noticed: &Noticed, quiet: Silence) -> Self {
+        match noticed.remembered() {
             Some(offered) => Self {
                 offered: Some(offered.to_owned()),
+                changed: noticed.changed().map(str::to_owned),
                 untold: None,
             },
             None => Self {
                 offered: None,
+                changed: None,
                 untold: Some(quiet),
             },
         }
@@ -53,18 +57,18 @@ pub(super) async fn read(ctx: &Ctx) -> Read {
     let record = record(ctx);
     let mut noticed = remembered(ctx, record.as_deref()).await;
     if !ctx.settings.reaching.allows(REACH_UPDATES_KEY) {
-        return Read::of(noticed.remembered(), Silence::Refused);
+        return Read::of(&noticed, Silence::Refused);
     }
     if noticed.given_up() {
-        return Read::of(noticed.remembered(), Silence::GivenUp);
+        return Read::of(&noticed, Silence::GivenUp);
     }
     let now = ctx.seconds();
     if !noticed.due(now) {
-        return Read::of(noticed.remembered(), Silence::NotYet);
+        return Read::of(&noticed, Silence::NotYet);
     }
     asked(ctx, &mut noticed, now).await;
     keep(ctx, record.as_deref(), &noticed).await;
-    Read::of(noticed.remembered(), Silence::Unanswered)
+    Read::of(&noticed, Silence::Unanswered)
 }
 
 /// Ask the release list, and write down how it went.
@@ -74,7 +78,13 @@ pub(super) async fn read(ctx: &Ctx) -> Read {
 /// the same thing to a caller as nothing answering at all.
 async fn asked(ctx: &Ctx, noticed: &mut Noticed, now: u64) {
     match ctx.http.send(&asking(RELEASE_LIST)).await {
-        Ok(answer) if answer.is_success() => noticed.answered(now, newest(&answer.body)),
+        Ok(answer) if answer.is_success() => {
+            let offered = newest(&answer.body);
+            let notes = offered
+                .as_deref()
+                .and_then(|offered| changed(&answer.body, offered));
+            noticed.answered(now, offered, notes);
+        }
         Ok(_) | Err(_) => noticed.silent(now),
     }
 }

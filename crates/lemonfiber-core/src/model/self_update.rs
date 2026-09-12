@@ -29,6 +29,14 @@ pub struct UpdateReport {
     pub owner: Option<String>,
     /// The newest version released, where the check could read one.
     pub offered: Option<String>,
+    /// What the version on offer says it changed, as its release page words it.
+    ///
+    /// The question an operator is actually weighing. Carried as the notes were
+    /// written rather than taken apart here, because what a surface does with them
+    /// is a surface's business — a terminal flattens them, a browser renders them,
+    /// and a script wants them as they came.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changed: Option<String>,
     /// The version the operator asked to move to, where they asked for one.
     pub asked: Option<String>,
     /// Exactly what to type, where there is something exact to type.

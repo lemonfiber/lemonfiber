@@ -32,6 +32,10 @@ pub(crate) fn update(report: &Report) -> Lines {
     if report.confirmed {
         lines.extend(carried(report));
     } else {
+        // Before the agreement and not after it. What the pins came from is what
+        // somebody deciding is weighing; somebody reading a finished run wants to
+        // know which services moved, and this would be between them and it.
+        lines.extend(super::changelog::brought(&report.changelog));
         lines.spaced("Take them with:  lemonfiber update --confirm");
     }
     lines
@@ -200,6 +204,7 @@ mod tests {
             stack_edits: Vec::new(),
             applied,
             halted: None,
+            changelog: crate::render::fixtures::notes("0.4.0"),
         }
     }
 

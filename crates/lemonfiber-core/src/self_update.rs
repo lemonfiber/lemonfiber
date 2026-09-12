@@ -28,7 +28,7 @@ use serde::Serialize;
 
 pub use installed::{Installed, Signs, EVERY_WAY};
 pub use noticing::{Noticed, Silence};
-pub use offered::{asking, newest, standing as availability, Availability};
+pub use offered::{asking, changed, newest, standing as availability, Availability};
 pub use upgrading::{carries, command, configuration, why_not, AFTERWARDS};
 
 /// The name a probe file is given, so a run interrupted between creating it and

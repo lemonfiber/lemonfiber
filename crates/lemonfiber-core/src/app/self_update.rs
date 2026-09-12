@@ -46,6 +46,7 @@ pub(super) async fn standing(ctx: &Ctx, named: Option<&str>) -> UpdateReport {
         installed,
         owner: installed.owner().map(str::to_owned),
         offered: read.offered.clone(),
+        changed: read.changed.clone(),
         asked: named.map(str::to_owned),
         command,
         instead,

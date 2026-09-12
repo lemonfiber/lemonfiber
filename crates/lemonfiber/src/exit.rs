@@ -1139,6 +1139,7 @@ mod tests {
                 stack_edits: Vec::new(),
                 applied: Vec::new(),
                 halted: None,
+                changelog: lemonfiber_core::changelog::Notes::unread(),
             })))
         };
 
@@ -1170,6 +1171,7 @@ mod tests {
             stack_edits: Vec::new(),
             applied: Vec::new(),
             halted: Some("the stack would not start again — lemonfiber up".to_owned()),
+            changelog: lemonfiber_core::changelog::Notes::unread(),
         })));
 
         assert_eq!(left_down, shown(std::process::ExitCode::from(FAILURE)));

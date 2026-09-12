@@ -426,6 +426,7 @@ mod tests {
             changes: vec![change],
             in_flight: vec!["Ubuntu.iso (94%)".to_owned()],
             confirmed: true,
+            changelog: crate::changelog::Notes::unread(),
             backup: Some("/home/op/.local/share/lemonfiber/backups/one.tar.gz".to_owned()),
             stack_edits: vec![crate::model::StackEdit {
                 path: "compose.yml".to_owned(),
@@ -529,6 +530,7 @@ mod tests {
             installed: crate::self_update::Installed::Installer,
             owner: None,
             offered: Some("0.14.0".to_owned()),
+            changed: Some("### New\n- The panel shows the forwarded port".to_owned()),
             asked: Some("0.12.0".to_owned()),
             command: Some(
                 "curl -LsSf https://example.test/lemonfiber-installer.sh | sh".to_owned(),
