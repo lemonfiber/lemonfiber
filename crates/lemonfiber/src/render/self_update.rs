@@ -19,6 +19,7 @@ use super::Lines;
 pub(crate) fn standing(report: &UpdateReport) -> Lines {
     let mut lines = Lines::default();
     lines.put(headline(report));
+    lines.extend(brought(report));
     lines.extend(provenance(report));
     if let Some(untold) = &report.untold {
         lines.spaced(untold.clone());
@@ -49,6 +50,26 @@ fn headline(report: &UpdateReport) -> String {
             report.running
         ),
     }
+}
+
+/// What the version on offer changed, where the check read it.
+///
+/// Above the provenance rather than below it, because it is the thing the operator is
+/// deciding on. Where this copy is and what put it there answers the question after —
+/// how to take the update — and is no use to somebody who has not decided to.
+///
+/// Nothing where the check read nothing: a release published before the notes came
+/// back has none, and a machine that has never reached the address has not read any.
+/// Saying so is [`UpdateReport::untold`]'s job and this stays quiet rather than
+/// printing a heading over an empty space.
+fn brought(report: &UpdateReport) -> Lines {
+    let mut lines = Lines::default();
+    let (Some(changed), Some(offered)) = (&report.changed, &report.offered) else {
+        return lines;
+    };
+    lines.spaced(format!("What {offered} changed:"));
+    lines.extend(super::changelog::flattened(changed));
+    lines
 }
 
 /// Which file was run, and what put it there.
@@ -117,6 +138,7 @@ mod tests {
             installed,
             owner: installed.owner().map(str::to_owned),
             offered: Some("0.14.0".to_owned()),
+            changed: None,
             asked: None,
             command: None,
             instead: None,
@@ -141,6 +163,38 @@ mod tests {
         );
         assert!(said.contains("Nothing in the stack is stopped"), "{said}");
         assert!(!said.contains("To take it:"), "{said}");
+    }
+
+    #[test]
+    fn what_the_version_on_offer_changed_is_shown_before_where_this_copy_lives() {
+        let report = UpdateReport {
+            changed: Some(concat!(
+                "## [0.14.0](https://example.test/tag/v0.14.0) — released 2026-09-20\n",
+                "\n",
+                "### New\n",
+                "\n",
+                "- The panel shows the forwarded port — [VPN verification · C2-R4](https://example.test/c2) (#42)\n",
+            ).to_owned()),
+            ..stands(Installed::Installer, Standing::UpdateAvailable)
+        };
+        let said = standing(&report).text();
+        assert!(said.contains("What 0.14.0 changed:"), "{said}");
+        assert!(
+            said.contains("  • The panel shows the forwarded port — VPN verification · C2-R4"),
+            "{said}"
+        );
+        // The decision comes before how to act on it. A half that was not rendered at
+        // all fails here too: one end of the comparison goes to the far end of the
+        // report and the other to the start of it.
+        let changed = said.find("What 0.14.0 changed").unwrap_or(usize::MAX);
+        let provenance = said.find("run from").unwrap_or_default();
+        assert!(changed < provenance, "{said}");
+    }
+
+    #[test]
+    fn a_release_the_check_read_no_notes_for_gets_no_empty_heading() {
+        let said = standing(&stands(Installed::Installer, Standing::UpdateAvailable)).text();
+        assert!(!said.contains("changed:"), "{said}");
     }
 
     /// The whole of what deferring comes to: the tool that owns the copy is named,

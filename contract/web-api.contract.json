@@ -9588,6 +9588,13 @@
               "description": "What a release brings besides the program, and when any of it is fetched.",
               "type": "string"
             },
+            "changed": {
+              "description": "What the version on offer says it changed, as its release page words it.\n\nThe question an operator is actually weighing. Carried as the notes were\nwritten rather than taken apart here, because what a surface does with them\nis a surface's business — a terminal flattens them, a browser renders them,\nand a script wants them as they came.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "command": {
               "description": "Exactly what to type, where there is something exact to type.",
               "type": [
@@ -12397,6 +12404,55 @@
             }
           ]
         },
+        "Entry": {
+          "description": "One change, as a reader meets it.",
+          "type": "object",
+          "properties": {
+            "reference": {
+              "description": "Where it was reviewed, where it was reviewed anywhere.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "requirements": {
+              "description": "The requirements it served, which are the link rather than the headline.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "summary": {
+              "description": "What changed, in the words it was written in.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "summary",
+            "requirements"
+          ]
+        },
+        "Group": {
+          "description": "The entries of one kind, under the name an operator reads them by.",
+          "type": "object",
+          "properties": {
+            "entries": {
+              "description": "The changes, in the order they were made.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Entry"
+              }
+            },
+            "title": {
+              "description": "What this group of changes is: new, fixed, faster, or maintenance.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "entries"
+          ]
+        },
         "Jump": {
           "description": "How large a step from one version to another is.\n\nNamed after the part of the version that moved rather than after a size, because\nthat is the fact an operator weighs: a first-number change is where a project puts\nthe work that breaks configurations, and the two behind it are where it puts the\nwork that does not.",
           "oneOf": [
@@ -12422,6 +12478,117 @@
             }
           ]
         },
+        "Notes": {
+          "description": "What a surface shows about the record, given the version asking.",
+          "type": "object",
+          "properties": {
+            "releases": {
+              "description": "Every release the record holds, newest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Summary"
+              }
+            },
+            "requirements": {
+              "description": "What each requirement the running release cites is, and where it is defined.",
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/Requirement"
+              }
+            },
+            "running": {
+              "description": "What the running version changed, where the record holds its release.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Release"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "description": "Whether the record describes what this build could have shipped.",
+              "$ref": "#/$defs/State2"
+            }
+          },
+          "required": [
+            "state",
+            "releases",
+            "requirements"
+          ]
+        },
+        "Release": {
+          "description": "One release, and everything the record holds about it.",
+          "type": "object",
+          "properties": {
+            "carried": {
+              "description": "The version whose goals this tag carried, where that is not its own.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "delivers": {
+              "description": "What it set out to deliver, in the words the version was staged under.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "groups": {
+              "description": "The changes, gathered by what kind of change each is.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Group"
+              }
+            },
+            "patches": {
+              "description": "The version this one patched, where it is a patch.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "released_on": {
+              "description": "The day it was published, where the record of it says.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "tag": {
+              "description": "The tag it was cut from.",
+              "type": "string"
+            },
+            "user_facing": {
+              "description": "Whether anything in it is a change an operator would notice.",
+              "type": "boolean"
+            },
+            "version": {
+              "description": "The version, without the tag's leading letter.",
+              "type": "string"
+            },
+            "withdrawn": {
+              "description": "Why it was withdrawn, where it was.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "version",
+            "tag",
+            "user_facing",
+            "groups"
+          ]
+        },
         "Report": {
           "description": "What updating the stack would change, or what a run of it came to.",
           "type": "object",
@@ -12439,6 +12606,10 @@
                 "string",
                 "null"
               ]
+            },
+            "changelog": {
+              "description": "What the release that brought these pins changed.\n\nThe stack this would move to is the one this build carries, and the release\nthat carried this build is what says why it moved. An operator weighing a\nstack update is weighing that, and being shown only which image numbers go up\nis being shown the arithmetic rather than the reason.",
+              "$ref": "#/$defs/Notes"
             },
             "changes": {
               "description": "What would move, and what taking each step means.",
@@ -12483,7 +12654,41 @@
             "in_flight",
             "confirmed",
             "stack_edits",
-            "applied"
+            "applied",
+            "changelog"
+          ]
+        },
+        "Requirement": {
+          "description": "One requirement, and every release that shipped something citing it.",
+          "type": "object",
+          "properties": {
+            "feature": {
+              "description": "The feature it belongs to, in words.",
+              "type": "string"
+            },
+            "shipped_in": {
+              "description": "Every version that shipped something citing it, newest first.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "url": {
+              "description": "Where it is defined, unless it has since been withdrawn.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withdrawn": {
+              "description": "Whether it was withdrawn after it shipped.",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "feature",
+            "shipped_in"
           ]
         },
         "Reversal": {
@@ -12547,6 +12752,72 @@
               "type": "string",
               "const": "failed"
             }
+          ]
+        },
+        "State2": {
+          "description": "Whether the record describes what this build could have shipped.\n\nThe three the specification names, and the distinction between the last two is\nthe one worth keeping: being behind the tags is a lag, and contradicting them is\na fault.",
+          "oneOf": [
+            {
+              "description": "The record holds this build's release, and claims nothing later.",
+              "type": "string",
+              "const": "current"
+            },
+            {
+              "description": "This build's release has no notes yet, which is where a tag leaves things.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "The record and what this build could have shipped disagree.",
+              "type": "string",
+              "const": "stale"
+            }
+          ]
+        },
+        "Summary": {
+          "description": "One release as a listing shows it: everything but what it changed.\n\nKept apart from [`Release`] rather than being it with the entries left out,\nbecause the two are read for different things. A listing answers which releases\nthere have been and which of them was taken back; only the one being read needs\nto carry every line of what it changed.",
+          "type": "object",
+          "properties": {
+            "delivers": {
+              "description": "What it set out to deliver.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "patches": {
+              "description": "The version this one patched, where it is a patch.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "released_on": {
+              "description": "The day it was published, where the record of it says.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "user_facing": {
+              "description": "Whether anything in it is a change an operator would notice.",
+              "type": "boolean"
+            },
+            "version": {
+              "description": "The version.",
+              "type": "string"
+            },
+            "withdrawn": {
+              "description": "Why it was withdrawn, where it was.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "version",
+            "user_facing"
           ]
         }
       }

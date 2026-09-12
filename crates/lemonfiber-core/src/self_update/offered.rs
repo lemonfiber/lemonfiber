@@ -37,6 +37,15 @@ const HOW_MANY: usize = 10;
 /// already know from being asked.
 const CALLED: &str = "lemonfiber";
 
+/// Where the release page puts the boundary between what changed and how to install it.
+///
+/// `release-changelog.yml` writes the notes above this line and leaves what cargo-dist
+/// wrote below it. Splitting on the marker rather than taking the whole body is what
+/// keeps install boilerplate out of an answer about what changed — and a release whose
+/// body has no marker is one written before the notes came back, which is answered with
+/// nothing rather than with the boilerplate.
+const BOUNDARY: &str = "<!-- the changelog is above; cargo-dist wrote what follows -->";
+
 /// One release, as much of it as this reads.
 #[derive(Debug, Deserialize)]
 struct Release {
@@ -44,6 +53,9 @@ struct Release {
     tag_name: String,
     /// Whether it is still a draft, and so not released at all.
     draft: bool,
+    /// What the release page says, where it says anything.
+    #[serde(default)]
+    body: Option<String>,
 }
 
 /// The request that asks what has been released.
@@ -86,6 +98,24 @@ pub fn newest(answered: &str) -> Option<String> {
     best
 }
 
+/// What the release for one version says changed, where it says anything.
+///
+/// Read out of the same answer `newest` is read out of, so learning what is available
+/// and learning what it brought are one request rather than two. An operator weighing
+/// an update is asking both questions at once, and the second is the one they decide
+/// on.
+#[must_use]
+pub fn changed(answered: &str, version: &str) -> Option<String> {
+    let released: Vec<Release> = serde_json::from_str(answered).ok()?;
+    let release = released
+        .into_iter()
+        .find(|release| !release.draft && release.tag_name.trim_start_matches('v') == version)?;
+    let body = release.body?;
+    let (notes, _) = body.split_once(BOUNDARY)?;
+    let notes = notes.trim();
+    (!notes.is_empty()).then(|| notes.to_owned())
+}
+
 /// Whether a version is one this can order at all.
 ///
 /// Asked of the first candidate, because a list holding one unorderable tag would
@@ -118,8 +148,78 @@ pub fn standing(running: &str, offered: &str) -> Availability {
 
 #[cfg(test)]
 mod tests {
-    use super::{asking, newest, standing, Availability, HOW_MANY};
+    use super::{asking, changed, newest, standing, Availability, BOUNDARY, HOW_MANY};
     use crate::ports::http::Method;
+
+    /// The shape the address answers with, with a release page's body on each.
+    fn published(tags: &[(&str, &str)]) -> String {
+        let entries: Vec<String> = tags
+            .iter()
+            .map(|(tag, body)| {
+                let body = serde_json::to_string(body).unwrap_or_default();
+                format!(r#"{{"tag_name":"{tag}","draft":false,"body":{body}}}"#)
+            })
+            .collect();
+        format!("[{}]", entries.join(","))
+    }
+
+    /// A release page as this project writes one: the notes, the marker, the installers.
+    fn page(notes: &str) -> String {
+        format!("{notes}\n\n{BOUNDARY}\n\ncurl -LsSf https://example.test/install.sh | sh\n")
+    }
+
+    #[test]
+    fn the_notes_for_the_version_asked_about_are_read_out_of_the_same_answer() {
+        let answered = published(&[
+            (
+                "v0.14.0",
+                &page("### New\n- The panel shows the forwarded port"),
+            ),
+            ("v0.13.0", &page("### Fixed\n- Something older")),
+        ]);
+        assert_eq!(
+            changed(&answered, "0.14.0").as_deref(),
+            Some("### New\n- The panel shows the forwarded port")
+        );
+        assert_eq!(
+            changed(&answered, "0.13.0").as_deref(),
+            Some("### Fixed\n- Something older")
+        );
+    }
+
+    #[test]
+    fn install_boilerplate_is_never_answered_as_what_changed() {
+        // A release published before the notes came back has a body and none of it
+        // is a changelog; the marker is what separates the two, and there is none.
+        let answered = published(&[("v0.5.0", "curl -LsSf https://example.test/install.sh | sh")]);
+        assert_eq!(changed(&answered, "0.5.0"), None);
+    }
+
+    #[test]
+    fn a_release_with_nothing_above_the_marker_is_answered_with_nothing() {
+        let answered = published(&[("v0.5.0", &page("   "))]);
+        assert_eq!(changed(&answered, "0.5.0"), None);
+    }
+
+    #[test]
+    fn a_version_the_answer_does_not_hold_has_no_notes_and_is_not_a_failure() {
+        let answered = published(&[("v0.14.0", &page("### New\n- Something"))]);
+        assert_eq!(changed(&answered, "0.12.0"), None);
+        assert_eq!(changed("not a release list at all", "0.14.0"), None);
+    }
+
+    #[test]
+    fn a_draft_is_no_more_a_source_of_notes_than_it_is_of_a_version() {
+        let notes = serde_json::to_string(&page("### New\n- Not out yet")).unwrap_or_default();
+        let answered = format!(r#"[{{"tag_name":"v0.14.0","draft":true,"body":{notes}}}]"#);
+        assert_eq!(changed(&answered, "0.14.0"), None);
+    }
+
+    #[test]
+    fn a_release_that_says_nothing_at_all_is_read_without_complaint() {
+        let answered = r#"[{"tag_name":"v0.14.0","draft":false}]"#;
+        assert_eq!(changed(answered, "0.14.0"), None);
+    }
 
     /// The shape the address answers with, cut down to the two fields read.
     fn released(tags: &[(&str, bool)]) -> String {

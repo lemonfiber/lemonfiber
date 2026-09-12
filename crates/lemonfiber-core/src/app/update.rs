@@ -84,6 +84,22 @@ pub struct Report {
     /// say that it is still down.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub halted: Option<String>,
+    /// What the release that brought these pins changed.
+    ///
+    /// The stack this would move to is the one this build carries, and the release
+    /// that carried this build is what says why it moved. An operator weighing a
+    /// stack update is weighing that, and being shown only which image numbers go up
+    /// is being shown the arithmetic rather than the reason.
+    pub changelog: crate::changelog::Notes,
+}
+
+/// What the release carrying this build changed, as every update report says it.
+///
+/// One reading rather than one per constructor: a run that only proposed and a run
+/// that applied are moving the stack onto the same pins, so they owe the same answer
+/// about where those pins came from.
+fn brought() -> crate::changelog::Notes {
+    crate::changelog::notes(env!("CARGO_PKG_VERSION"))
 }
 
 impl Report {
@@ -99,6 +115,7 @@ impl Report {
             stack_edits: Vec::new(),
             applied: Vec::new(),
             halted: None,
+            changelog: brought(),
         }
     }
 }

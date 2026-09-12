@@ -94,6 +94,7 @@ pub(super) async fn apply(
         stack_edits: edits,
         applied,
         halted,
+        changelog: super::brought(),
     })
 }
 

@@ -728,6 +728,7 @@ pub(crate) mod tests {
             stack_edits: Vec::new(),
             applied: Vec::new(),
             halted: None,
+            changelog: lemonfiber_core::changelog::Notes::unread(),
         })
     }
 
