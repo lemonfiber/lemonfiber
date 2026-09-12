@@ -12,4 +12,20 @@ Servarr = "Servarr"
 # The embedded app is lemonfiber-web's built output: minified JavaScript whose
 # identifiers are generated, not written. Its prose is spell-checked in the repo
 # that authors it, before it is built.
-extend-exclude = ["assets/web"]
+# The architecture notes live under `.docs/`, and this checker skips hidden
+# directories by default — so twelve documents were going unread with the gate
+# green, which is the failure a spell check exists to prevent rather than an
+# acceptable gap in one.
+#
+# `.git` has to come back out by hand once hidden files are in: its object files
+# are compressed binary, and the checker reads them as a long list of
+# misspellings that no edit can ever fix. `target` is Cargo's build directory,
+# which is not hidden but is reached the same way — through a directory this
+# would otherwise start walking.
+ignore-hidden = false
+extend-exclude = ["assets/web", ".git/"]
+
+[default.extend-identifiers]
+# A crate name, not a misspelling of "flat". Found the moment the checker could
+# read `.docs/` for the first time, which is the point of letting it.
+flate2 = "flate2"
