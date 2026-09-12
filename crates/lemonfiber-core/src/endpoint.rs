@@ -199,20 +199,36 @@ impl Endpoint {
 }
 
 /// The most of a service's error body carried into a refusal — enough to diagnose,
-/// capped so a large or verbose response (which could echo a field the request
-/// submitted) is not dumped wholesale into operator-facing output.
+/// and short enough to read.
+///
+/// A cap is not what keeps a credential out of this. It was the only thing doing so,
+/// and it never could: a key is a few dozen characters and every limit worth having
+/// is larger than one.
 const DETAIL_LIMIT: usize = 200;
 
 /// A non-success response as the detail of a refusal: the service's own words
-/// where it gave any — shortened to a diagnostic length — its status code alone
-/// otherwise.
+/// where it gave any — withheld, then shortened to a diagnostic length — its status
+/// code alone otherwise.
+///
+/// **The body is scrubbed here because this is where it is copied.** lemonfiber asks
+/// these services to accept a credential, and it sends the credential in the request
+/// body to do it; a service that refuses commonly quotes the submitted field back.
+/// Every other road a service's words take out of this crate passes through the same
+/// funnel — a `Problem`'s detail, a condition's fault, a log excerpt — and this one
+/// did not, which left `HTTP 400: …` printed verbatim on the terminal, serialised
+/// into `--json`, and served from the API.
+///
+/// Before shortening rather than after. `fitted` elides the middle, so a key cut in
+/// half stops reading as a setting and survives the scrubber it would otherwise be
+/// caught by, leaving half of it on the screen.
 ///
 /// Shortened by [`fitted`], which elides the middle and keeps both ends. A
 /// service's error text commonly opens with boilerplate and closes with the
 /// specific failure, so the end is the half that names the cause, and a body cut
 /// at the tail keeps the half every such body shares.
 pub(crate) fn describe(response: &Response) -> String {
-    let body = response.body.trim();
+    let body = crate::config::store::withheld_text(response.body.trim());
+    let body = body.trim();
     if body.is_empty() {
         format!("HTTP {}", response.status)
     } else {
@@ -224,6 +240,71 @@ pub(crate) fn describe(response: &Response) -> String {
 mod tests {
     use super::describe;
     use crate::ports::http::Response;
+
+    /// A refusal quoting the key it was sent, as the services this drives write one.
+    ///
+    /// Pinned as a whole string rather than asserted absent. "Does not contain the
+    /// key" is true of the empty string and of every sentence that lost its meaning
+    /// on the way here, and what has to hold is that the diagnosis survives the
+    /// scrubbing — the status, the field, and the service's own complaint.
+    #[test]
+    fn a_service_quoting_the_key_back_has_it_withheld_and_keeps_its_diagnosis() {
+        let response = Response {
+            status: 400,
+            body: "invalid request: apiKey=a-fixture-and-not-a-key rejected".to_owned(),
+        };
+        assert_eq!(
+            describe(&response),
+            "HTTP 400: invalid request: apiKey=(set, not shown) rejected"
+        );
+    }
+
+    /// The same, for the address form: a service quoting back the URL it failed on
+    /// quotes whatever was configured into it, query string and all.
+    #[test]
+    fn a_service_quoting_an_address_back_loses_the_query_and_keeps_the_host() {
+        let response = Response {
+            status: 502,
+            body: "upstream https://indexer.example/api?t=search&apikey=the-indexer-key failed"
+                .to_owned(),
+        };
+        assert_eq!(
+            describe(&response),
+            "HTTP 502: upstream https://indexer.example/api?(set, not shown) failed"
+        );
+    }
+
+    /// Scrubbed before shortening, not after.
+    ///
+    /// `fitted` elides the middle, so a password cut in half stops reading as a
+    /// setting, survives the scrubber that would have caught it whole, and leaves
+    /// half of itself on the screen. This body is 201 characters and is cut; the
+    /// same body scrubbed is 187 and is not, so the order is what decides both the
+    /// credential and the diagnosis, and the whole line is pinned rather than
+    /// searched. Asserting only that the password is absent would pass on the empty
+    /// string and on every sentence that lost its meaning getting here.
+    #[test]
+    fn a_password_is_withheld_before_the_body_is_shortened_rather_than_after() {
+        let body = format!(
+            "{} password=a-fixture-and-not-a-password-x {}",
+            "x".repeat(80),
+            "y".repeat(80)
+        );
+        assert_eq!(
+            body.chars().count(),
+            201,
+            "the body must be long enough to cut"
+        );
+        let response = Response { status: 500, body };
+        assert_eq!(
+            describe(&response),
+            format!(
+                "HTTP 500: {} password=(set, not shown) {}",
+                "x".repeat(80),
+                "y".repeat(80)
+            )
+        );
+    }
 
     #[test]
     fn a_short_error_body_is_carried_whole() {
