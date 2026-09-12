@@ -1,6 +1,508 @@
 {
   "releases": [
     {
+      "version": "0.14.0",
+      "tag": "v0.14.0",
+      "released_on": "2026-09-12",
+      "delivers": "Keeping it running — updates, backup, rollback, the journal",
+      "patches": null,
+      "carried": null,
+      "withdrawn": null,
+      "user_facing": true,
+      "groups": [
+        {
+          "title": "New",
+          "entries": [
+            {
+              "summary": "Read back every change, and what putting one back would meet",
+              "requirements": [
+                "E4-R11",
+                "E4-R14"
+              ],
+              "reference": "#564"
+            },
+            {
+              "summary": "Say where this copy stands, and defer to whatever installed it",
+              "requirements": [
+                "E2-R1"
+              ],
+              "reference": "#567"
+            },
+            {
+              "summary": "Bound the record, and say what the bound leaves",
+              "requirements": [
+                "E4-R13"
+              ],
+              "reference": "#565"
+            },
+            {
+              "summary": "Move the stack forward one service at a time, behind a backup nothing skips",
+              "requirements": [
+                "E2-R1",
+                "E1-R6"
+              ],
+              "reference": "#566"
+            },
+            {
+              "summary": "Every name a manifest got wrong, said at once",
+              "requirements": [
+                "F4-R14",
+                "F3-R22",
+                "Q-R66"
+              ],
+              "reference": "#581"
+            },
+            {
+              "summary": "The feature an entry serves, and a link to its requirement",
+              "requirements": [
+                "E5-R3"
+              ],
+              "reference": "#597"
+            },
+            {
+              "summary": "Put back one run of changes, chosen out of the history",
+              "requirements": [
+                "E4-R2",
+                "E4-R4",
+                "E4-R6",
+                "E4-R10",
+                "E4-R12",
+                "E4-R14"
+              ],
+              "reference": "#600"
+            },
+            {
+              "summary": "Take the backup a removal promised, rather than advising it",
+              "requirements": [
+                "E3-R5"
+              ],
+              "reference": "#601"
+            },
+            {
+              "summary": "Capture the setup being taken over, not our own",
+              "requirements": [
+                "E3-R5",
+                "E3-R16",
+                "Q-R59"
+              ],
+              "reference": "#607"
+            },
+            {
+              "summary": "Put the stack update in the record it was missing from",
+              "requirements": [
+                "E4-R1"
+              ],
+              "reference": "#614"
+            },
+            {
+              "summary": "One record across every release, not a page per tag",
+              "requirements": [
+                "E5-R4",
+                "E5-R5",
+                "E5-R7",
+                "E5-R8",
+                "E5-R9",
+                "E5-R10",
+                "E5-R12"
+              ],
+              "reference": "#611"
+            },
+            {
+              "summary": "The record travels with the binary, and says where it stands",
+              "requirements": [
+                "E5-R11",
+                "E5-R13"
+              ],
+              "reference": "#612"
+            },
+            {
+              "summary": "Say why a migrated service cannot be pinned back, and name the capture",
+              "requirements": [
+                "E4-R5"
+              ],
+              "reference": "#615"
+            },
+            {
+              "summary": "What changed, where the operator is deciding",
+              "requirements": [
+                "E5-R6"
+              ],
+              "reference": "#616"
+            },
+            {
+              "summary": "Refuse settings a newer build wrote rather than write over them",
+              "requirements": [
+                "E2-R11"
+              ],
+              "reference": "#613"
+            },
+            {
+              "summary": "Say what a capture moved, against what a minute allows for",
+              "requirements": [
+                "E3-R15"
+              ],
+              "reference": "#619"
+            },
+            {
+              "summary": "Say which stack description a release brings, and what follows from it",
+              "requirements": [
+                "E2-R9",
+                "ARCH-R98"
+              ],
+              "reference": "#622"
+            }
+          ]
+        },
+        {
+          "title": "Fixed",
+          "entries": [
+            {
+              "summary": "Nothing to take is nothing to type",
+              "requirements": [
+                "E2-R2"
+              ],
+              "reference": "#569"
+            },
+            {
+              "summary": "A credential goes into the record and never comes out of it",
+              "requirements": [
+                "G7-R2"
+              ],
+              "reference": "#571"
+            },
+            {
+              "summary": "A request arrives where it was addressed, or not at all",
+              "requirements": [
+                "G8-R3"
+              ],
+              "reference": "#572"
+            },
+            {
+              "summary": "Keep the report when the stack will not come back",
+              "requirements": [
+                "E1-R5",
+                "E1-R7",
+                "Q-R66"
+              ],
+              "reference": "#574"
+            },
+            {
+              "summary": "Put the address through the scrubber the file says it does",
+              "requirements": [
+                "A7-R3",
+                "Q-R26"
+              ],
+              "reference": "#575"
+            },
+            {
+              "summary": "The record keeps what a reversal needs, and the file keeps none of it",
+              "requirements": [
+                "E4-R1",
+                "A7-R9"
+              ],
+              "reference": "#578"
+            },
+            {
+              "summary": "A reversal says which setting went back, not what it went back to",
+              "requirements": [
+                "A7-R3",
+                "E4-R1",
+                "Q-R26",
+                "Q-R61"
+              ],
+              "reference": "#580"
+            },
+            {
+              "summary": "Run the compiler each job asks for, not the one the file pins",
+              "requirements": [
+                "Q-R63",
+                "Q-R66",
+                "L1-R6"
+              ],
+              "reference": "#582"
+            },
+            {
+              "summary": "A disk does not hold the thread every other task is waiting on",
+              "requirements": [
+                "B3-R4",
+                "Q-R64",
+                "Q-R61"
+              ],
+              "reference": "#584"
+            },
+            {
+              "summary": "A typo is a typo, not a version the operator does not have",
+              "requirements": [
+                "Q-R64",
+                "GOV-R7"
+              ],
+              "reference": "#591"
+            },
+            {
+              "summary": "The two new codes a script could not branch on",
+              "requirements": [
+                "Q-R64"
+              ],
+              "reference": "#594"
+            },
+            {
+              "summary": "The deferral that ticked itself",
+              "requirements": [
+                "OPS-R34"
+              ],
+              "reference": "#598"
+            },
+            {
+              "summary": "Permit the one push to the trunk that cannot be reviewed",
+              "requirements": [
+                "GOV-R12"
+              ],
+              "reference": "#602"
+            },
+            {
+              "summary": "Take the wordmark colour the brand actually uses",
+              "requirements": [
+                "GOV-R12"
+              ],
+              "reference": "#608"
+            }
+          ]
+        },
+        {
+          "title": "Maintenance",
+          "entries": [
+            {
+              "summary": "Bump the cargo group across 1 directory with 4 updates",
+              "requirements": [],
+              "reference": "#541"
+            },
+            {
+              "summary": "The release gate as OPS-R54 now words it",
+              "requirements": [
+                "OPS-R54"
+              ],
+              "reference": "#570"
+            },
+            {
+              "summary": "Compare the lists rather than count them from a second file",
+              "requirements": [
+                "Q-R66"
+              ],
+              "reference": "#573"
+            },
+            {
+              "summary": "Make the core unable to reach the network",
+              "requirements": [
+                "ARCH-R11"
+              ],
+              "reference": "#568"
+            },
+            {
+              "summary": "Free the word capabilities for what a service can do",
+              "requirements": [
+                "F4-R13"
+              ],
+              "reference": "#576"
+            },
+            {
+              "summary": "One word for moving forward, and the object that says which",
+              "requirements": [
+                "E1-R3",
+                "E2-R1",
+                "ARCH-R54",
+                "Q-R66",
+                "Q-R61"
+              ],
+              "reference": "#577"
+            },
+            {
+              "summary": "Carry line tables rather than a debugger's worth of DWARF",
+              "requirements": [
+                "Q-R61"
+              ],
+              "reference": "#579"
+            },
+            {
+              "summary": "Declare the twenty-eight this repository is carrying",
+              "requirements": [
+                "Q-R67",
+                "Q-R64"
+              ],
+              "reference": "#585"
+            },
+            {
+              "summary": "Hold the two licence lists to the sentence that says they agree",
+              "requirements": [
+                "F3-R22",
+                "Q-R66"
+              ],
+              "reference": "#583"
+            },
+            {
+              "summary": "The fakes branch where the gate can see it",
+              "requirements": [
+                "Q-R61",
+                "Q-R62"
+              ],
+              "reference": "#587"
+            },
+            {
+              "summary": "Every check decides where the gate can see it",
+              "requirements": [
+                "Q-R61",
+                "Q-R62",
+                "Q-R66"
+              ],
+              "reference": "#588"
+            },
+            {
+              "summary": "Move logic out of the bodies the gate cannot see",
+              "requirements": [
+                "Q-R61",
+                "Q-R62",
+                "Q-R67"
+              ],
+              "reference": "#586"
+            },
+            {
+              "summary": "The methods whose signatures span lines",
+              "requirements": [
+                "Q-R61",
+                "Q-R62"
+              ],
+              "reference": "#590"
+            },
+            {
+              "summary": "The tracker stopped at M10 and the roadmap does not",
+              "requirements": [
+                "OPS-R34"
+              ],
+              "reference": "#593"
+            },
+            {
+              "summary": "The two menders, and the repairs nobody had watched run",
+              "requirements": [
+                "Q-R61",
+                "Q-R62",
+                "Q-R66",
+                "Q-R64"
+              ],
+              "reference": "#592"
+            },
+            {
+              "summary": "The service clients decide where the gate can see it",
+              "requirements": [
+                "Q-R61",
+                "Q-R62"
+              ],
+              "reference": "#589"
+            },
+            {
+              "summary": "The rule that keeps the gate able to see",
+              "requirements": [
+                "Q-R61",
+                "Q-R62",
+                "Q-R66",
+                "OPS-R34"
+              ],
+              "reference": "#595"
+            },
+            {
+              "summary": "The eighteen requirements the tracker never named",
+              "requirements": [
+                "OPS-R34"
+              ],
+              "reference": "#596"
+            },
+            {
+              "summary": "Say where the goals nothing can cite landed",
+              "requirements": [
+                "OPS-R34"
+              ],
+              "reference": "#599"
+            },
+            {
+              "summary": "Give the citation gate the scope it needs to close",
+              "requirements": [
+                "GOV-R3"
+              ],
+              "reference": "#603"
+            },
+            {
+              "summary": "Pin the gate that closes, not the one that only refused",
+              "requirements": [
+                "GOV-R3"
+              ],
+              "reference": "#604"
+            },
+            {
+              "summary": "The milestones follow the version train",
+              "requirements": [
+                "OPS-R54"
+              ],
+              "reference": "#606"
+            },
+            {
+              "summary": "Call the posture check instead of copying it",
+              "requirements": [
+                "Q-R59"
+              ],
+              "reference": "#605"
+            },
+            {
+              "summary": "Ask the SDKs to take it, not to judge it",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#609"
+            },
+            {
+              "summary": "The spell and link checks read .docs, which they never did",
+              "requirements": [
+                "Q-R54"
+              ],
+              "reference": "#610"
+            },
+            {
+              "summary": "Name the hang a shared build cache causes, and the way through it",
+              "requirements": [
+                "GOV-R26"
+              ],
+              "reference": "#617"
+            },
+            {
+              "summary": "Hold a definition name to one shape, and to no number",
+              "requirements": [
+                "ARCH-R58"
+              ],
+              "reference": "#618"
+            },
+            {
+              "summary": "Give every described type a name of its own",
+              "requirements": [
+                "ARCH-R58"
+              ],
+              "reference": "#620"
+            },
+            {
+              "summary": "Hold the installer to what is claimed of the binary it places",
+              "requirements": [
+                "E2-R6"
+              ],
+              "reference": "#621"
+            },
+            {
+              "summary": "Carry fourteen, and say what it brought",
+              "requirements": [
+                "OPS-R30"
+              ],
+              "reference": "#623"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.13.0",
       "tag": "v0.13.0",
       "released_on": "2026-09-09",
@@ -5331,6 +5833,7 @@
     "A7-R3": {
       "feature": "Credential management & rotation",
       "shipped_in": [
+        "0.14.0",
         "0.13.0",
         "0.9.0"
       ],
@@ -5374,6 +5877,7 @@
     "A7-R9": {
       "feature": "Credential management & rotation",
       "shipped_in": [
+        "0.14.0",
         "0.13.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"
@@ -5381,6 +5885,7 @@
     "ARCH-R11": {
       "feature": "Component model",
       "shipped_in": [
+        "0.14.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"
@@ -5508,6 +6013,7 @@
     "ARCH-R54": {
       "feature": "Contract: the web API",
       "shipped_in": [
+        "0.14.0",
         "0.11.0",
         "0.10.0"
       ],
@@ -5517,6 +6023,13 @@
       "feature": "Contract: the web API",
       "shipped_in": [
         "0.9.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"
+    },
+    "ARCH-R58": {
+      "feature": "Contract: the web API",
+      "shipped_in": [
+        "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"
     },
@@ -5591,6 +6104,13 @@
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"
+    },
+    "ARCH-R98": {
+      "feature": "Contract: versioning & compatibility",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"
     },
     "B1-R1": {
       "feature": "Forms & partial stacks",
@@ -5957,6 +6477,7 @@
     "B3-R4": {
       "feature": "Live dashboard",
       "shipped_in": [
+        "0.14.0",
         "0.6.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"
@@ -8164,6 +8685,69 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e1-stack-updates/#acceptance-criteria"
     },
+    "E1-R3": {
+      "feature": "Stack updates",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e1-stack-updates/#acceptance-criteria"
+    },
+    "E1-R5": {
+      "feature": "Stack updates",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e1-stack-updates/#acceptance-criteria"
+    },
+    "E1-R6": {
+      "feature": "Stack updates",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e1-stack-updates/#acceptance-criteria"
+    },
+    "E1-R7": {
+      "feature": "Stack updates",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e1-stack-updates/#acceptance-criteria"
+    },
+    "E2-R1": {
+      "feature": "Self-update",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e2-self-update/#acceptance-criteria"
+    },
+    "E2-R11": {
+      "feature": "Self-update",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e2-self-update/#acceptance-criteria"
+    },
+    "E2-R2": {
+      "feature": "Self-update",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e2-self-update/#acceptance-criteria"
+    },
+    "E2-R6": {
+      "feature": "Self-update",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e2-self-update/#acceptance-criteria"
+    },
+    "E2-R9": {
+      "feature": "Self-update",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e2-self-update/#acceptance-criteria"
+    },
     "E3-R1": {
       "feature": "Backup & restore",
       "shipped_in": [
@@ -8208,6 +8792,20 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"
     },
+    "E3-R15": {
+      "feature": "Backup & restore",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"
+    },
+    "E3-R16": {
+      "feature": "Backup & restore",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"
+    },
     "E3-R2": {
       "feature": "Backup & restore",
       "shipped_in": [
@@ -8227,6 +8825,13 @@
       "feature": "Backup & restore",
       "shipped_in": [
         "0.4.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"
+    },
+    "E3-R5": {
+      "feature": "Backup & restore",
+      "shipped_in": [
+        "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"
     },
@@ -8263,16 +8868,151 @@
     "E4-R1": {
       "feature": "Rollback",
       "shipped_in": [
+        "0.14.0",
         "0.2.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R10": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R11": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R12": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R13": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R14": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
     },
     "E4-R2": {
       "feature": "Rollback",
       "shipped_in": [
+        "0.14.0",
         "0.2.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R4": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R5": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E4-R6": {
+      "feature": "Rollback",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
+    },
+    "E5-R10": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R11": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R12": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R13": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R3": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R4": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R5": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R6": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R7": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R8": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
+    "E5-R9": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
     },
     "F1-R2": {
       "feature": "Customisation & escape hatches",
@@ -8322,6 +9062,27 @@
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F3-R22": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F4-R13": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R14": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
     },
     "G1-R1": {
       "feature": "Interface tiers",
@@ -8913,6 +9674,7 @@
     "G7-R2": {
       "feature": "Overall health summary",
       "shipped_in": [
+        "0.14.0",
         "0.5.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"
@@ -9014,6 +9776,7 @@
     "G8-R3": {
       "feature": "Privacy stance",
       "shipped_in": [
+        "0.14.0",
         "0.12.0",
         "0.10.0"
       ],
@@ -9059,6 +9822,7 @@
     "GOV-R12": {
       "feature": "Canonical spec",
       "shipped_in": [
+        "0.14.0",
         "0.13.0",
         "0.12.0",
         "0.11.0",
@@ -9073,6 +9837,20 @@
         "0.3.0",
         "0.2.0",
         "0.1.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"
+    },
+    "GOV-R26": {
+      "feature": "Working with AI agents",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/50-governance/ai-contributors/#requirements"
+    },
+    "GOV-R3": {
+      "feature": "Canonical spec",
+      "shipped_in": [
+        "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"
     },
@@ -9097,10 +9875,24 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"
     },
+    "GOV-R7": {
+      "feature": "Canonical spec",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"
+    },
     "L1-R1": {
       "feature": "v1 release engineering",
       "shipped_in": [
         "0.3.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/l-release/l1-release-engineering/#acceptance-criteria"
+    },
+    "L1-R6": {
+      "feature": "v1 release engineering",
+      "shipped_in": [
+        "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/l-release/l1-release-engineering/#acceptance-criteria"
     },
@@ -9205,6 +9997,7 @@
     "OPS-R30": {
       "feature": "Release staging — the version train",
       "shipped_in": [
+        "0.14.0",
         "0.13.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
@@ -9212,6 +10005,7 @@
     "OPS-R34": {
       "feature": "Release staging — the version train",
       "shipped_in": [
+        "0.14.0",
         "0.10.0",
         "0.9.1",
         "0.9.0"
@@ -9231,6 +10025,13 @@
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"
+    },
+    "OPS-R54": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
     },
     "OPS-R7": {
       "feature": "Setup registry",
@@ -9278,6 +10079,7 @@
     "Q-R26": {
       "feature": "Testing strategy",
       "shipped_in": [
+        "0.14.0",
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"
@@ -9316,6 +10118,7 @@
     "Q-R54": {
       "feature": "Tooling",
       "shipped_in": [
+        "0.14.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
@@ -9335,9 +10138,17 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
     },
+    "Q-R59": {
+      "feature": "Tooling",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
+    },
     "Q-R61": {
       "feature": "Testing strategy",
       "shipped_in": [
+        "0.14.0",
         "0.11.0",
         "0.9.0",
         "0.7.0",
@@ -9348,6 +10159,7 @@
     "Q-R62": {
       "feature": "Testing strategy",
       "shipped_in": [
+        "0.14.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"
@@ -9355,6 +10167,7 @@
     "Q-R63": {
       "feature": "Security",
       "shipped_in": [
+        "0.14.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/security/#requirements"
@@ -9362,6 +10175,7 @@
     "Q-R64": {
       "feature": "CI/CD",
       "shipped_in": [
+        "0.14.0",
         "0.11.0",
         "0.9.0",
         "0.5.0",
@@ -9372,14 +10186,23 @@
     "Q-R66": {
       "feature": "Testing strategy",
       "shipped_in": [
+        "0.14.0",
         "0.10.0",
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"
     },
+    "Q-R67": {
+      "feature": "CI/CD",
+      "shipped_in": [
+        "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"
+    },
     "Q-R68": {
       "feature": "Tooling",
       "shipped_in": [
+        "0.14.0",
         "0.10.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
