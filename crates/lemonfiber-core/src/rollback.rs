@@ -101,6 +101,37 @@ pub fn setting(change: &Change) -> Option<&str> {
     touched(change).map(|(key, ..)| key)
 }
 
+/// Why a service that has been started on a newer version cannot be pinned back.
+///
+/// The domain rule rather than a statement about lemonfiber: it is the service's own
+/// binary that migrates its database, on first start, and nothing about lemonfiber
+/// having recorded the move changes what that leaves behind.
+///
+/// The rule itself is recorded in [`crate::migration::version`], which is where it is
+/// *acted* on — it is why a pin behind what a project already runs is refused rather
+/// than attempted. This is the same rule said to an operator instead of to the
+/// comparison, and the two are deliberately linked: if the reason a downgrade is
+/// refused there ever stops being true, the sentence here stops being true with it.
+fn migrated(target: &str, previous: &str, current: &str) -> String {
+    format!(
+        "{target} was started on {current} and migrated its database doing it — a \
+         database is carried forward by whichever version opened it last, so \
+         {previous} can no longer open what it left behind"
+    )
+}
+
+/// Where to go instead, naming the capture where the record kept one.
+///
+/// A journal written before the update recorded its capture, or one whose entry lost
+/// it, still has the right answer to give — it just cannot give the path, and saying
+/// so plainly beats naming a file that may not be there.
+fn capture(backup: Option<&str>) -> String {
+    match backup {
+        Some(path) => format!("restore from the capture taken before the update, at {path}"),
+        None => "restore from the capture taken before the update".to_owned(),
+    }
+}
+
 /// The key whose reversal moves no data, only the pointer to it.
 ///
 /// Named rather than inferred: an operator putting the data location back has to be told
@@ -183,18 +214,25 @@ pub fn standing(
             ),
             Some("remove it in that service's own interface"),
         ),
-        // Putting a version pin back is not something this product does. Which
-        // version runs is decided by the materialised stack and by what Compose was
-        // told to start, and nothing in a reversal of settings and files reaches
-        // either — so saying so is the whole of the answer, the way it is for a
-        // resource only the service that made it can remove.
-        Kind::Pinned { previous, .. } => Standing::refused(
-            &format!(
-                "putting {} back to {previous} means pinning that version again, and \
-                 lemonfiber does not move a service's version on the way back",
-                change.target
-            ),
-            Some("restore from the capture taken before the update"),
+        // Not "lemonfiber does not repin", which is true and is the smaller half of
+        // the answer. A service recorded this way ran on the newer version, and a
+        // database is migrated forward by whichever binary opened it last — so the
+        // older one cannot open what it left behind, and moving the pin back would
+        // produce a service that will not start rather than the stack they had.
+        //
+        // Which makes the capture the answer rather than a consolation, and the
+        // reason it is named by path: it is the one taken while the stack was down
+        // and before anything opened its state on the new version, so it holds the
+        // database from before the migration. An operator told only "restore from a
+        // backup" has to work out which of five on the machine that is, in the
+        // moment they are least able to.
+        Kind::Pinned {
+            previous,
+            current,
+            backup,
+        } => Standing::refused(
+            &migrated(&change.target, previous, current),
+            Some(&capture(backup.as_deref())),
         ),
         // A setting, a path, or one field of a service's record — each reversed by
         // something this product actually does.
@@ -329,6 +367,49 @@ mod tests {
                 .map(|refusal| refusal.because.contains("4.0.15")),
             Some(true),
             "and it names the version that cannot be gone back to"
+        );
+    }
+
+    /// The reason and the way out, which are the two halves the requirement asks
+    /// for. The reason is about the service rather than about lemonfiber — an
+    /// operator told only that this program will not move a version is free to
+    /// conclude they could do it by hand, which is the attempt being prevented.
+    #[test]
+    fn a_migrated_service_says_what_migrated_and_which_capture_to_go_back_to() {
+        let refusal = standing(&pinned("4.0.15", "4.1.0"), &[], &holding(&[])).refusal;
+        assert_eq!(
+            refusal
+                .as_ref()
+                .map(|refusal| refusal.because.contains("migrated its database")),
+            Some(true),
+            "the reason is the migration rather than the repin"
+        );
+        assert_eq!(
+            refusal.and_then(|refusal| refusal.instead).as_deref(),
+            Some(
+                "restore from the capture taken before the update, at \
+                 /var/lemonfiber/backups/before.tar"
+            ),
+            "the capture is named by path rather than described"
+        );
+    }
+
+    /// An entry from before the update was journalled has no capture recorded. It
+    /// still gets the right answer and simply cannot name the file, which beats
+    /// naming one that may not be there.
+    #[test]
+    fn a_record_with_no_capture_still_says_where_to_go() {
+        let mut change = pinned("4.0.15", "4.1.0");
+        change.kind = Kind::Pinned {
+            previous: "4.0.15".to_owned(),
+            current: "4.1.0".to_owned(),
+            backup: None,
+        };
+        assert_eq!(
+            standing(&change, &[], &holding(&[]))
+                .refusal
+                .and_then(|refusal| refusal.instead),
+            Some("restore from the capture taken before the update".to_owned())
         );
     }
 
