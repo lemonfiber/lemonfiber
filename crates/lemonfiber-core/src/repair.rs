@@ -177,6 +177,7 @@ impl Attempt {
 /// that cannot tell them apart will eventually report the first as the second.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
+#[schemars(rename = "RepairOutcome")]
 pub enum Outcome {
     /// It ran, and the check now passes.
     Fixed,

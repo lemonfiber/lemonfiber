@@ -111,6 +111,7 @@ pub struct Item {
 /// it is sensitive, and the contents to list. Round-trips through JSON so the same
 /// value the capture wrote is the value the restore reads.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[schemars(rename = "BackupManifest")]
 pub struct Manifest {
     /// The archive format, checked before anything inside is trusted.
     pub schema: u32,

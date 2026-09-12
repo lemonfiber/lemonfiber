@@ -32,6 +32,7 @@ pub struct Respite {
 /// Where a respite stands against the clock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case", tag = "standing", content = "seconds")]
+#[schemars(rename = "RespiteStanding")]
 pub enum Standing {
     /// None was asked for.
     None,

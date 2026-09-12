@@ -65,6 +65,7 @@ pub enum Stage {
     Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "TraceConfidence")]
 pub enum Confidence {
     /// Joined on identifiers the services agree on.
     #[default]
@@ -323,6 +324,7 @@ impl SeasonCoverage {
 /// worth seeing, not something a single furthest-stage reading can show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "TraceOutcome")]
 pub enum Outcome {
     /// A release was sent to the download client.
     Grabbed,

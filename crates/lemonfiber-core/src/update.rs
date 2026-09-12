@@ -31,6 +31,7 @@ use crate::ports::docker::Image;
 /// rather than the answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "UpdateState")]
 pub enum State {
     /// Every service is standing on the version pinned for it.
     Current,
@@ -52,6 +53,7 @@ pub enum State {
 /// worse than offering nothing, because it is acted on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "UpdateReversal")]
 pub enum Reversal {
     /// Nothing opened its state on the newer image, so the previous one runs again
     /// exactly as it did.
@@ -94,6 +96,7 @@ impl Ending {
 
 /// What updating one service would change.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UpdateChange")]
 pub struct Change {
     /// The service, by its manifest id, which is also its Compose service name.
     pub service: String,
@@ -113,6 +116,7 @@ pub struct Change {
 
 /// What one service's update came to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UpdateApplied")]
 pub struct Applied {
     /// The service it is about.
     pub service: String,

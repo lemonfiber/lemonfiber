@@ -53,6 +53,7 @@ pub struct Root {
 
 /// Something on this machine that lemonfiber neither keeps nor removes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "StoredBeside")]
 pub struct Beside {
     /// What it is.
     pub what: String,
@@ -62,6 +63,7 @@ pub struct Beside {
 
 /// Something a removal could not take away.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "StoredLeft")]
 pub struct Left {
     /// The path that is still there.
     pub at: String,
@@ -72,6 +74,7 @@ pub struct Left {
 /// Whether anything was removed on this run, and what became of it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case")]
+#[schemars(rename = "StoredRemoval")]
 pub enum Removal {
     /// Nobody asked. This is a listing.
     NotAsked,

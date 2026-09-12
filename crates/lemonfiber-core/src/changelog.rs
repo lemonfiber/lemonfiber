@@ -42,6 +42,7 @@ const CARRIED: &str = include_str!("../../../reference/changelog.json");
 /// a fault.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "ChangelogState")]
 pub enum State {
     /// The record holds this build's release, and claims nothing later.
     Current,
@@ -122,6 +123,7 @@ pub struct Release {
 /// there have been and which of them was taken back; only the one being read needs
 /// to carry every line of what it changed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "ReleaseSummary")]
 pub struct Summary {
     /// The version.
     pub version: String,

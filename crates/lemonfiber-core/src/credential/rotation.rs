@@ -55,6 +55,7 @@ pub enum Settled {
 /// How far a rotation reached one consumer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "reach", rename_all = "kebab-case")]
+#[schemars(rename = "CredentialReach")]
 pub enum Reach {
     /// It now holds the replacement.
     Updated,

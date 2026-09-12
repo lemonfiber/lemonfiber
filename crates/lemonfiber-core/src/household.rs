@@ -20,6 +20,7 @@ use serde::Serialize;
 /// where that detail stays, and a request names the item so it can be asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "RequestState")]
 pub enum State {
     /// Asked for, and nobody has approved or refused it yet.
     WaitingForApproval,

@@ -39,6 +39,7 @@ pub const RATIO_CONSEQUENCE: &str =
 /// Where one completed download stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "standing")]
+#[schemars(rename = "SeedingStanding")]
 pub enum Standing {
     /// Nothing ever linked it into a library: it was never imported, and removing
     /// it loses nothing.

@@ -34,6 +34,7 @@ use crate::health::{Reach, Summary};
 /// them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "reading", content = "value")]
+#[schemars(rename = "DashboardReading")]
 pub enum Reading<T> {
     /// The source answered this refresh with a value — which may legitimately be
     /// zero.
@@ -89,6 +90,7 @@ impl<T: Clone> Reading<T> {
 /// zero — and the panels beside it stay live.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "panel", content = "data")]
+#[schemars(rename = "Panel{T}")]
 pub enum Panel<T> {
     /// The source answered; here is the panel.
     Ready(T),
@@ -119,6 +121,7 @@ impl<T> Panel<T> {
 /// differently on each — a Usenet download has no peers, a torrent has no server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
+#[schemars(rename = "DashboardProtocol")]
 pub enum Protocol {
     /// A Usenet download.
     Usenet,

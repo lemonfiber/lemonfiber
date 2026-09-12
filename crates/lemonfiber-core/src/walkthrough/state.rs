@@ -14,6 +14,7 @@ use super::Step;
     Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "WalkthroughState")]
 pub enum State {
     /// Presented at the end of setup, not yet answered.
     #[default]

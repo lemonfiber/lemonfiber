@@ -56,6 +56,7 @@ pub struct Asked {
 
 /// What updating the stack would change, or what a run of it came to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "StackUpdateReport")]
 pub struct Report {
     /// The one word the run comes to.
     pub state: Standing,

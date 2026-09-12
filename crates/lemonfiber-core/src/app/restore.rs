@@ -83,6 +83,7 @@ pub struct Preview {
 
 /// What a restore did.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "RestoreReport")]
 pub struct Report {
     /// What was restored.
     pub scope: Scope,

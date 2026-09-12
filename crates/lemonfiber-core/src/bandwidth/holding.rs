@@ -27,6 +27,7 @@ pub const TOLERANCE: u64 = 10;
 /// What became of one limit, in one direction, on one client.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "BandwidthVerdict")]
 pub enum Verdict {
     /// Nothing was asked for, so there is nothing to hold to.
     Unasked,
@@ -73,6 +74,7 @@ impl Verdict {
 
 /// One direction on one client: what it was asked for, took, and is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "BandwidthHeld")]
 pub struct Held {
     /// What it was asked to hold to, in bytes a second, where anything was.
     pub asked: Option<u64>,

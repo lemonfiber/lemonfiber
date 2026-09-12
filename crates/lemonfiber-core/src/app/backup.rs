@@ -51,6 +51,7 @@ pub const KEEP: usize = 5;
 
 /// What a capture produced.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "BackupReport")]
 pub struct Report {
     /// Where the archive was written.
     pub path: PathBuf,

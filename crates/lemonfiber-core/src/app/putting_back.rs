@@ -29,6 +29,7 @@ use super::Ctx;
 /// envelope carries a document. Two lists, and the second is the one that matters when
 /// it is not empty: what went back, and what did not with the reason it did not.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UndoReversal")]
 pub struct Reversal {
     /// What was put back, in the order it was.
     pub reversed: Vec<Undo>,
@@ -43,6 +44,7 @@ pub struct Reversal {
 
 /// One change a reversal did not put back, and why it did not.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UndoLeft")]
 pub struct Left {
     /// What the change was against — a service, or lemonfiber's own environment file.
     pub target: String,

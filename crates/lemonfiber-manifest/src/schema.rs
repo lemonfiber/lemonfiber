@@ -119,6 +119,7 @@ pub struct Profile {
     schemars::JsonSchema,
 )]
 #[serde(rename_all = "lowercase")]
+#[schemars(rename = "StackProtocol")]
 pub enum Protocol {
     /// Needs a Usenet provider.
     Usenet,

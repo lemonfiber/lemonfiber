@@ -234,6 +234,7 @@ impl Declared {
 
 /// One direction's limit, as declared and as it comes to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "BandwidthReading")]
 pub struct Reading {
     /// The limit as it was expressed.
     pub limit: Limit,

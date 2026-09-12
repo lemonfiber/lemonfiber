@@ -50,6 +50,7 @@ pub use theirs::ELSEWHERE;
 /// from anybody is the knowledge that a version came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "OutboundReach")]
 pub enum Reach {
     /// Fetching the service images the stack runs.
     Registry,

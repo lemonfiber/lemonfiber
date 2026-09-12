@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "WizardStep")]
 pub enum Step {
     /// States what is about to happen and roughly how long it takes. Informs.
     #[default]

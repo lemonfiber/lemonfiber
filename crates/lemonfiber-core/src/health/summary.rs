@@ -24,6 +24,7 @@ pub const STEADY: u64 = 30;
 
 /// The one-line summary, and what it expands to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[schemars(rename = "HealthSummary")]
 pub struct Summary {
     /// The one word.
     pub standing: Standing,

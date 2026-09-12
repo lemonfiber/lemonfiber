@@ -37,6 +37,7 @@ use serde::Serialize;
 /// interrupted half-way through a replacement is legible rather than mysterious.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
+#[schemars(rename = "CredentialState")]
 pub enum State {
     /// Required by what this stack runs, and not supplied.
     Absent,
@@ -82,6 +83,7 @@ impl State {
 /// There is deliberately no value here, and no field a value could be put in later
 /// without the change being visible in review.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "CredentialHeld")]
 pub struct Held {
     /// What it is, in the operator's words — `qBittorrent web UI password`.
     pub name: String,

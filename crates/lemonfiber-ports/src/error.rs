@@ -43,6 +43,7 @@ impl std::fmt::Display for Code {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
+#[schemars(rename = "ProblemSeverity")]
 pub enum Severity {
     /// Informational; nothing is required.
     Advisory,
@@ -81,6 +82,7 @@ pub enum Amiss {
 /// Where a problem stands with respect to being fixed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
+#[schemars(rename = "ProblemState")]
 pub enum State {
     /// A remedy is available here.
     Actionable,
