@@ -1,15 +1,19 @@
-# Tell the SDKs when the contract they vendor has moved.
+# Ask the SDKs to take the contract that has moved.
 #
 # Each SDK keeps a copy of `contract/web-api.contract.json` and generates its
 # types from that copy. A copy goes stale in silence, so both repos carry a
 # `contract-drift` check that compares what they hold against what this repo
-# serves. That check runs weekly, which means a contract change is unnoticed for
-# up to seven days — and the SDK that is wrong for those seven days is the one a
-# consumer is installing.
+# serves — and it now runs on their pull requests rather than weekly.
 #
-# The gap is cadence, not correctness: driven by hand against a real change, both
-# drift checks refused it and named the reason. So this fires them on the change
-# instead of on the calendar.
+# That closed the cadence gap and opened a different one. A verdict is a red
+# check somebody else has to clear, and because the check runs on pull requests,
+# that somebody is whoever next opens one over there, about anything. An author
+# who came to fix a logo file is handed a contract sync.
+#
+# So this asks each SDK to *take* the contract rather than to judge what it
+# holds. `contract-bump` there does the sync, regenerates, runs the suite, and
+# opens one pull request that merges itself where the result is clean — the
+# arrangement `sdk-ts` and `lemonfiber-web` already have between them.
 #
 # Only the artefact matters here. A commit that touches nothing else in this
 # repo still moves what every SDK is generated from; a commit that touches
@@ -44,7 +48,7 @@ jobs:
             sdk-ts
             sdk-php
 
-      - name: Ask each SDK to compare what it holds against what we serve
+      - name: Ask each SDK to take what we serve
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           OWNER: ${{ github.repository_owner }}
@@ -58,12 +62,12 @@ jobs:
           unreachable=""
           for sdk in "${sdks[@]}"; do
             if gh api --method POST \
-              "repos/${OWNER}/${sdk}/actions/workflows/contract-drift.yml/dispatches" \
+              "repos/${OWNER}/${sdk}/actions/workflows/contract-bump.yml/dispatches" \
               -f ref=main
             then
-              echo "asked ${sdk} to check what it holds."
+              echo "asked ${sdk} to take this contract."
             else
-              echo "::error::could not ask ${sdk} to check its vendored contract"
+              echo "::error::could not ask ${sdk} to take the contract"
               unreachable="${unreachable} ${sdk}"
             fi
           done
