@@ -1,0 +1,19 @@
+# Link checking, for the hygiene gate the spec repo defines (Q-R54).
+#
+# The gate runs `lychee .` over this tree, and lychee skips hidden directories
+# unless told otherwise — so the links in `.docs/` were not being checked, and
+# the check was green because it had found nothing to check.
+#
+# `.git` is excluded because turning hidden files on lets lychee walk it, and
+# what it holds is compressed objects rather than documents.
+hidden = true
+exclude_path = [".git"]
+
+# Retries, because a link check that fails on one slow host teaches people to
+# re-run it rather than to read it.
+max_retries = 2
+
+# 206 is a partial response and 429 is a host asking to be asked less often.
+# Neither says the link is wrong.
+accept = ["200", "206", "429"]
+exclude_loopback = true
