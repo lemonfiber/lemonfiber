@@ -3,6 +3,7 @@
 //! Shared because several renderers are proven against the same shapes, and a
 //! fixture copied per module is a fixture that drifts per module.
 
+use lemonfiber_core::changelog::{told, Notes, Record};
 use lemonfiber_core::docker::{Criticality, Service, State};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::glossary::{explain, Term};
@@ -98,7 +99,63 @@ pub(super) fn a_version() -> VersionReport {
         supported_schema: vec![1],
         stack: "1.2.3".to_owned(),
         compose: Some("2.29".to_owned()),
+        changelog: notes("0.4.0"),
     }
+}
+
+/// A record of three releases, which is enough for every shape one can take.
+///
+/// `0.4.0` changed something somebody asked for; `0.3.1` is a patch, withdrawn,
+/// with the reason; `0.3.0` changed nothing an operator would notice. Written here
+/// rather than taken from the record this build carries, because a renderer test
+/// asserting against the real history would be a test that has to be rewritten
+/// every time a release is cut.
+const THREE: &str = r##"{
+  "releases": [
+    {
+      "version": "0.4.0", "tag": "v0.4.0", "released_on": "2026-04-01",
+      "delivers": "Seeing what is happening", "patches": null, "carried": null,
+      "withdrawn": null, "user_facing": true,
+      "groups": [
+        {"title": "New", "entries": [
+          {"summary": "The panel shows the forwarded port",
+           "requirements": ["C2-R4", "C2-R9"], "reference": "#42"}
+        ]},
+        {"title": "Maintenance", "entries": [
+          {"summary": "Bump a dependency", "requirements": []}
+        ]}
+      ]
+    },
+    {
+      "version": "0.3.1", "tag": "v0.3.1", "released_on": "2026-03-14",
+      "delivers": null, "patches": "0.3.0", "carried": null,
+      "withdrawn": "the installer shipped a broken pin", "user_facing": true,
+      "groups": [{"title": "Fixed", "entries": [
+        {"summary": "Put the broken pin back", "requirements": ["A1-R2"]}
+      ]}]
+    },
+    {
+      "version": "0.3.0", "tag": "v0.3.0", "released_on": "2026-03-01",
+      "delivers": null, "patches": null, "carried": null, "withdrawn": null,
+      "user_facing": false,
+      "groups": [{"title": "Maintenance", "entries": [
+        {"summary": "Move the modules about", "requirements": []}
+      ]}]
+    }
+  ],
+  "requirements": {
+    "A1-R2": {"feature": "Prerequisites", "url": "https://example.test/a1",
+              "shipped_in": ["0.3.1"]},
+    "C2-R4": {"feature": "VPN verification", "url": "https://example.test/c2",
+              "shipped_in": ["0.4.0"]},
+    "C2-R9": {"feature": "VPN verification", "withdrawn": true,
+              "shipped_in": ["0.4.0"]}
+  }
+}"##;
+
+/// What that record tells a build of the named version.
+pub(super) fn notes(running: &str) -> Notes {
+    told(Record::read(THREE).as_ref(), running)
 }
 
 /// One glossary entry, with every part of one filled.

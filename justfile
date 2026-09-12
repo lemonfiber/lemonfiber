@@ -96,34 +96,42 @@ reference:
 codes:
     cargo run --quiet --example codes -p lemonfiber > reference/error-codes.md
 
-# The record every release leaves, from the commits that made them.
+# Rewrite the release record from the commits that made each release.
 #
-# The same two readings the release pipeline makes, in the same order, so what is
-# printed here is what the release page gets: `git-cliff` parses the history, and
-# the record turns that into releases, entries and the requirements each served.
+# `git-cliff` parses the history and the script turns that into releases, entries
+# and the requirements each served — the same two readings, in the same order, the
+# release pipeline makes, so the file this writes is the one a release page is
+# rendered from and the one the binary carries.
 #
 # The spec has to be a checkout beside this one, because an identifier says nothing
 # about which page defines it and this repository does not vendor the spec — the
 # same `--spec` convention the contract check uses.
 #
-#   just record 0.13.0          the notes for one release
-#   just record '' A5-R3        every release that shipped something for one requirement
-record VERSION='' REQUIREMENT='' SPEC='../spec':
+# It changes only when a release is tagged. A pull request that adds commits to the
+# trunk does not move it, which is why it can be a committed artefact at all.
+changelog SPEC='../spec':
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v git-cliff > /dev/null; then
         echo "git-cliff is not installed (cargo install git-cliff)" >&2
         exit 1
     fi
-    held=$(mktemp)
     git-cliff --config cliff.toml --context \
-        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} > "$held"
+        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} > reference/changelog.json
+
+# Read the committed record the way the release page and the binary read it.
+#
+#   just record 0.13.0          the notes for one release
+#   just record '' A5-R3        every release that shipped something for one requirement
+record VERSION='' REQUIREMENT='':
+    #!/usr/bin/env bash
+    set -euo pipefail
     if [ -n "{{VERSION}}" ]; then
-        python3 scripts/the_record_a_release_leaves.py --markdown {{VERSION}} < "$held"
+        python3 scripts/the_record_a_release_leaves.py --markdown {{VERSION}} < reference/changelog.json
     elif [ -n "{{REQUIREMENT}}" ]; then
-        python3 scripts/the_record_a_release_leaves.py --requirement {{REQUIREMENT}} < "$held"
+        python3 scripts/the_record_a_release_leaves.py --requirement {{REQUIREMENT}} < reference/changelog.json
     else
-        cat "$held"
+        cat reference/changelog.json
     fi
 
 fmt-check:

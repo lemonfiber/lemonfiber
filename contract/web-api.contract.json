@@ -12711,13 +12711,276 @@
         "data"
       ],
       "$defs": {
+        "Entry": {
+          "description": "One change, as a reader meets it.",
+          "type": "object",
+          "properties": {
+            "reference": {
+              "description": "Where it was reviewed, where it was reviewed anywhere.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "requirements": {
+              "description": "The requirements it served, which are the link rather than the headline.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "summary": {
+              "description": "What changed, in the words it was written in.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "summary",
+            "requirements"
+          ]
+        },
+        "Group": {
+          "description": "The entries of one kind, under the name an operator reads them by.",
+          "type": "object",
+          "properties": {
+            "entries": {
+              "description": "The changes, in the order they were made.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Entry"
+              }
+            },
+            "title": {
+              "description": "What this group of changes is: new, fixed, faster, or maintenance.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "entries"
+          ]
+        },
+        "Notes": {
+          "description": "What a surface shows about the record, given the version asking.",
+          "type": "object",
+          "properties": {
+            "releases": {
+              "description": "Every release the record holds, newest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Summary"
+              }
+            },
+            "requirements": {
+              "description": "What each requirement the running release cites is, and where it is defined.",
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/Requirement"
+              }
+            },
+            "running": {
+              "description": "What the running version changed, where the record holds its release.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Release"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "description": "Whether the record describes what this build could have shipped.",
+              "$ref": "#/$defs/State"
+            }
+          },
+          "required": [
+            "state",
+            "releases",
+            "requirements"
+          ]
+        },
+        "Release": {
+          "description": "One release, and everything the record holds about it.",
+          "type": "object",
+          "properties": {
+            "carried": {
+              "description": "The version whose goals this tag carried, where that is not its own.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "delivers": {
+              "description": "What it set out to deliver, in the words the version was staged under.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "groups": {
+              "description": "The changes, gathered by what kind of change each is.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Group"
+              }
+            },
+            "patches": {
+              "description": "The version this one patched, where it is a patch.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "released_on": {
+              "description": "The day it was published, where the record of it says.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "tag": {
+              "description": "The tag it was cut from.",
+              "type": "string"
+            },
+            "user_facing": {
+              "description": "Whether anything in it is a change an operator would notice.",
+              "type": "boolean"
+            },
+            "version": {
+              "description": "The version, without the tag's leading letter.",
+              "type": "string"
+            },
+            "withdrawn": {
+              "description": "Why it was withdrawn, where it was.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "version",
+            "tag",
+            "user_facing",
+            "groups"
+          ]
+        },
+        "Requirement": {
+          "description": "One requirement, and every release that shipped something citing it.",
+          "type": "object",
+          "properties": {
+            "feature": {
+              "description": "The feature it belongs to, in words.",
+              "type": "string"
+            },
+            "shipped_in": {
+              "description": "Every version that shipped something citing it, newest first.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "url": {
+              "description": "Where it is defined, unless it has since been withdrawn.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withdrawn": {
+              "description": "Whether it was withdrawn after it shipped.",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "feature",
+            "shipped_in"
+          ]
+        },
+        "State": {
+          "description": "Whether the record describes what this build could have shipped.\n\nThe three the specification names, and the distinction between the last two is\nthe one worth keeping: being behind the tags is a lag, and contradicting them is\na fault.",
+          "oneOf": [
+            {
+              "description": "The record holds this build's release, and claims nothing later.",
+              "type": "string",
+              "const": "current"
+            },
+            {
+              "description": "This build's release has no notes yet, which is where a tag leaves things.",
+              "type": "string",
+              "const": "pending"
+            },
+            {
+              "description": "The record and what this build could have shipped disagree.",
+              "type": "string",
+              "const": "stale"
+            }
+          ]
+        },
+        "Summary": {
+          "description": "One release as a listing shows it: everything but what it changed.\n\nKept apart from [`Release`] rather than being it with the entries left out,\nbecause the two are read for different things. A listing answers which releases\nthere have been and which of them was taken back; only the one being read needs\nto carry every line of what it changed.",
+          "type": "object",
+          "properties": {
+            "delivers": {
+              "description": "What it set out to deliver.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "patches": {
+              "description": "The version this one patched, where it is a patch.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "released_on": {
+              "description": "The day it was published, where the record of it says.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "user_facing": {
+              "description": "Whether anything in it is a change an operator would notice.",
+              "type": "boolean"
+            },
+            "version": {
+              "description": "The version.",
+              "type": "string"
+            },
+            "withdrawn": {
+              "description": "Why it was withdrawn, where it was.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "version",
+            "user_facing"
+          ]
+        },
         "VersionReport": {
-          "description": "What versions are in play: the binary, and the stack it can operate.",
+          "description": "What versions are in play: the binary, the stack it operates, and what changed.\n\nThe changelog is here rather than behind a request of its own because it answers\nthe second half of the same question. \"Which version am I on\" is asked by\nsomebody deciding whether to move, and what they need next is what the version\nthey are on actually brought — so every surface that already reaches this read\nreaches both halves, and none of the three had to learn a new question.",
           "type": "object",
           "properties": {
             "binary": {
               "description": "The running binary's version.",
               "type": "string"
+            },
+            "changelog": {
+              "description": "What this build's release changed, and every release there has been.",
+              "$ref": "#/$defs/Notes"
             },
             "compose": {
               "description": "What the container engine reports, when it could be asked.",
@@ -12743,7 +13006,8 @@
           "required": [
             "binary",
             "supported_schema",
-            "stack"
+            "stack",
+            "changelog"
           ]
         }
       }

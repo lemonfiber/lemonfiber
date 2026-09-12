@@ -400,11 +400,17 @@ pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
+    let binary = env!("CARGO_PKG_VERSION").to_owned();
     Ok(VersionReport {
-        binary: env!("CARGO_PKG_VERSION").to_owned(),
         supported_schema: lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS.to_vec(),
         stack: stack.stack_version,
         compose,
+        // Read from what this build carries rather than from anything outside it,
+        // for the same reason the engine's absence does not fail this read: asking
+        // what is in play is what an operator does when something is wrong, and an
+        // answer that needed a network would be missing exactly then.
+        changelog: crate::changelog::notes(&binary),
+        binary,
     })
 }
 

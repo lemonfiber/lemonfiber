@@ -155,6 +155,7 @@ mod tests {
             supported_schema: Vec::new(),
             stack: String::new(),
             compose: None,
+            changelog: lemonfiber_core::changelog::Notes::unread(),
         };
         assert_eq!(condition(&Outcome::Version(report)), None);
     }

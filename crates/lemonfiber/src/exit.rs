@@ -1033,6 +1033,7 @@ mod tests {
                 supported_schema: vec![1],
                 stack: "1".to_owned(),
                 compose: None,
+                changelog: lemonfiber_core::changelog::Notes::unread(),
             }),
             Outcome::Status(StatusReport {
                 forms: Vec::new(),

@@ -2114,6 +2114,7 @@ mod tests {
             supported_schema: vec![1],
             stack: "0.1.0".to_owned(),
             compose: compose.map(str::to_owned),
+            changelog: crate::changelog::notes(env!("CARGO_PKG_VERSION")),
         })
     }
 
@@ -2198,15 +2199,22 @@ mod tests {
         let rendered = dispatch(Command::Version, &ctx)
             .await
             .ok()
-            .and_then(|outcome| outcome.envelope().to_json());
-        assert_eq!(
-            rendered.as_deref(),
-            Some(concat!(
+            .and_then(|outcome| outcome.envelope().to_json())
+            .unwrap_or_default();
+        // The envelope is what this is about: the wire version, the kind, and the
+        // report nested under `data` rather than spread beside it. What the report
+        // itself holds is its own tests' business — the changelog of every release
+        // this project has cut is in there now, and a literal of it here would be a
+        // test that has to be rewritten every time one is tagged.
+        assert!(
+            rendered.starts_with(concat!(
                 r#"{"api_version":1,"kind":"version","data":{"binary":""#,
                 env!("CARGO_PKG_VERSION"),
-                r#"","supported_schema":[1],"stack":"0.1.0","compose":"v2.32.1"}}"#
-            ))
+                r#"","supported_schema":[1],"stack":"0.1.0","compose":"v2.32.1","#
+            )),
+            "{rendered}"
         );
+        assert!(rendered.ends_with("}}"), "{rendered}");
     }
 
     #[tokio::test]

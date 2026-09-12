@@ -16,6 +16,7 @@ pub(crate) mod fixtures;
 
 mod archive;
 mod bandwidth;
+mod changelog;
 mod clients;
 mod credentials;
 mod doctor;
@@ -315,7 +316,12 @@ fn machine_readable(outcome: &Outcome) -> Lines {
     lines
 }
 
-/// What versions are in play.
+/// What versions are in play, and what the one this build is brought.
+///
+/// The numbers first and in four lines, because somebody checking which version
+/// they are on wants that answer and not a paragraph before it. What changed goes
+/// underneath, where it is the second half of the same question rather than a
+/// separate command somebody has to know exists.
 fn versions(report: &VersionReport) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("{PRODUCT} {}", report.binary));
@@ -325,6 +331,7 @@ fn versions(report: &VersionReport) -> Lines {
         Some(version) => lines.put(format!("compose {version}")),
         None => lines.put("compose not reachable"),
     }
+    lines.extend(changelog::notes(&report.changelog, &report.binary));
     lines
 }
 

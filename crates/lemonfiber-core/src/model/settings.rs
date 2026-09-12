@@ -6,7 +6,13 @@
 
 use serde::Serialize;
 
-/// What versions are in play: the binary, and the stack it can operate.
+/// What versions are in play: the binary, the stack it operates, and what changed.
+///
+/// The changelog is here rather than behind a request of its own because it answers
+/// the second half of the same question. "Which version am I on" is asked by
+/// somebody deciding whether to move, and what they need next is what the version
+/// they are on actually brought — so every surface that already reaches this read
+/// reaches both halves, and none of the three had to learn a new question.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct VersionReport {
     /// The running binary's version.
@@ -17,6 +23,8 @@ pub struct VersionReport {
     pub stack: String,
     /// What the container engine reports, when it could be asked.
     pub compose: Option<String>,
+    /// What this build's release changed, and every release there has been.
+    pub changelog: crate::changelog::Notes,
 }
 
 /// One form the stack declares, as a listing shows it.

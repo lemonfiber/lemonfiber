@@ -606,6 +606,7 @@ mod tests {
             supported_schema: vec![1],
             stack: "0.1.0".to_owned(),
             compose: None,
+            changelog: crate::changelog::Notes::unread(),
         });
         assert!(seeded(Ok(version)).is_none());
     }

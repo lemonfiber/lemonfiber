@@ -81,13 +81,16 @@ mod tests {
             supported_schema: vec![1],
             stack: "0.1.0".to_owned(),
             compose: Some("Docker Compose version v2.32.1".to_owned()),
+            changelog: crate::changelog::Notes::unread(),
         };
         assert_eq!(
             json(&Envelope::new(kind::VERSION, report)),
             concat!(
                 r#"{"api_version":1,"kind":"version","data":{"binary":"0.1.0","#,
                 r#""supported_schema":[1],"stack":"0.1.0","#,
-                r#""compose":"Docker Compose version v2.32.1"}}"#
+                r#""compose":"Docker Compose version v2.32.1","#,
+                r#""changelog":{"state":"stale","running":null,"releases":[],"#,
+                r#""requirements":{}}}}"#
             )
         );
     }
@@ -99,6 +102,7 @@ mod tests {
             supported_schema: vec![1],
             stack: "0.1.0".to_owned(),
             compose: None,
+            changelog: crate::changelog::Notes::unread(),
         };
         assert!(json(&Envelope::new(kind::VERSION, report)).contains(r#""compose":null"#));
     }
