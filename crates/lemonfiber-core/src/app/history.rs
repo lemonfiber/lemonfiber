@@ -106,6 +106,9 @@ fn did(kind: &Kind) -> String {
             |was| format!("changed {key} from {was} to {current}"),
         ),
         Kind::Made { path } => format!("made {path}"),
+        Kind::Pinned {
+            previous, current, ..
+        } => format!("moved from {previous} to {current}"),
         Kind::Configured { field, .. } => format!("set {field} on the service"),
     }
 }

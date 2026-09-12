@@ -11697,6 +11697,29 @@
               ]
             },
             {
+              "description": "Pin a service back to the version it was standing on.\n\nThe one reversal nothing in this product carries out. Which version runs is\ndecided by the materialised stack and by what Compose was told to start, and\na reversal of settings and files reaches neither — so this is worked out,\nreported, and left for the operator rather than attempted.",
+              "type": "object",
+              "properties": {
+                "current": {
+                  "description": "The version this run moved it to, which has to still be the one running\nfor putting the old one back to be putting anything back.",
+                  "type": "string"
+                },
+                "does": {
+                  "type": "string",
+                  "const": "repin"
+                },
+                "previous": {
+                  "description": "The version to put back.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "previous",
+                "current"
+              ]
+            },
+            {
               "description": "Put one field of a service's own resource back to what it held.\n\nThe only reversal that needs the service itself: the value lives inside it,\nand nothing on the host can write it. A reversal that cannot reach the\nservice says so rather than reporting the field restored.",
               "type": "object",
               "properties": {

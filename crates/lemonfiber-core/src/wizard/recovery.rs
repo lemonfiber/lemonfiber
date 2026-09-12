@@ -139,6 +139,7 @@ pub fn described(change: &Change) -> String {
     match &change.kind {
         Kind::Set { key, .. } => format!("the setting {key}"),
         Kind::Made { path } => format!("the directory {path}"),
+        Kind::Pinned { current, .. } => format!("the move to {current}"),
         Kind::Created { resource, .. } => format!("a {resource}"),
         // Not something a first run writes — a repair does — but the journal is
         // shared, so an interrupted setup could find one a repair left. Named the

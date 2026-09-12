@@ -71,6 +71,31 @@ pub enum Kind {
         /// The path that was created.
         path: String,
     },
+    /// A service was moved from one pinned version to another.
+    ///
+    /// The largest change this product makes to a machine, and the only one whose
+    /// reversal turns on something no later reading can recover. Which version a
+    /// service is standing on can be asked of the engine at any time; whether *this*
+    /// run is what moved it there, and what it was standing on before, cannot be —
+    /// so both are written down as it happens.
+    ///
+    /// Only a service that actually ran on the new version is recorded this way. One
+    /// whose image never arrived, or that the run halted before reaching, is standing
+    /// exactly where it was, and an entry claiming it moved would be a reversal
+    /// offered for a change nobody made.
+    Pinned {
+        /// The version it was standing on before the run.
+        previous: String,
+        /// The version it was moved to.
+        current: String,
+        /// Where the capture taken before anything was started was written.
+        ///
+        /// Kept with the change rather than looked up afterwards, because the run
+        /// that took it is the only thing that knows which capture belongs to this
+        /// move — a later reader would find the newest one, which may have been
+        /// taken for something else entirely.
+        backup: Option<String>,
+    },
     /// A setting *inside a service* was changed — one field of one resource the
     /// service holds. Undoing puts the field back through the service's own API.
     ///
@@ -112,6 +137,12 @@ impl Change {
                 wrote: current.clone(),
             },
             Kind::Made { path } => Action::Delete { path: path.clone() },
+            Kind::Pinned {
+                previous, current, ..
+            } => Action::Repin {
+                previous: previous.clone(),
+                current: current.clone(),
+            },
             Kind::Configured {
                 resource,
                 id,
@@ -174,6 +205,19 @@ pub enum Action {
     Delete {
         /// The path to remove.
         path: String,
+    },
+    /// Pin a service back to the version it was standing on.
+    ///
+    /// The one reversal nothing in this product carries out. Which version runs is
+    /// decided by the materialised stack and by what Compose was told to start, and
+    /// a reversal of settings and files reaches neither — so this is worked out,
+    /// reported, and left for the operator rather than attempted.
+    Repin {
+        /// The version to put back.
+        previous: String,
+        /// The version this run moved it to, which has to still be the one running
+        /// for putting the old one back to be putting anything back.
+        current: String,
     },
     /// Put one field of a service's own resource back to what it held.
     ///
@@ -309,6 +353,35 @@ mod tests {
                 path: path.to_owned(),
             },
         }
+    }
+
+    fn pinned(service: &str, previous: &str, current: &str) -> Change {
+        Change {
+            at: "t".to_owned(),
+            operation: "update".to_owned(),
+            target: service.to_owned(),
+            kind: Kind::Pinned {
+                previous: previous.to_owned(),
+                current: current.to_owned(),
+                backup: Some("/var/lemonfiber/backups/before.tar".to_owned()),
+            },
+        }
+    }
+
+    /// The capture is not part of putting it back — it is where to go instead — so
+    /// the reversal carries the two versions and leaves it behind.
+    #[test]
+    fn undoing_a_version_move_asks_for_the_previous_pin() {
+        assert_eq!(
+            pinned("sonarr", "4.0.15", "4.1.0").undo(),
+            Undo {
+                target: "sonarr".to_owned(),
+                action: Action::Repin {
+                    previous: "4.0.15".to_owned(),
+                    current: "4.1.0".to_owned(),
+                },
+            },
+        );
     }
 
     #[test]
@@ -523,6 +596,7 @@ mod tests {
             set(Some("/old/media")),
             set(Some("")),
             made("/srv/media"),
+            pinned("sonarr", "4.0.15", "4.1.0"),
         ] {
             let line = serde_json::to_string(&change).unwrap_or_default();
             let read = serde_json::from_str::<Change>(&line).ok();
@@ -533,7 +607,7 @@ mod tests {
     /// A reversal is read by a surface that never touches this machine, so its wire
     /// shape is pinned here rather than left to whatever a derive happens to write.
     ///
-    /// All four, because each carries different keys and a reader branches on the
+    /// All five, because each carries different keys and a reader branches on the
     /// word rather than on which of them are present.
     #[test]
     fn every_reversal_writes_itself_as_what_it_does() {
@@ -584,6 +658,13 @@ mod tests {
                 value: Some("8080".to_owned()),
             }),
             r#"{"target":"qbittorrent","action":{"does":"reconfigure","resource":"downloadclient","id":"7","field":"port","value":"8080"}}"#
+        );
+        assert_eq!(
+            written(Action::Repin {
+                previous: "4.0.15".to_owned(),
+                current: "4.1.0".to_owned(),
+            }),
+            r#"{"target":"qbittorrent","action":{"does":"repin","previous":"4.0.15","current":"4.1.0"}}"#
         );
     }
 }

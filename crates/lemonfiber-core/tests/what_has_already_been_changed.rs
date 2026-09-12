@@ -257,6 +257,20 @@ fn made(path: &str) -> Change {
     }
 }
 
+/// A service moved from one pinned version to another by an update.
+fn pinned(service: &str, previous: &str, current: &str) -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: "update".to_owned(),
+        target: service.to_owned(),
+        kind: Kind::Pinned {
+            previous: previous.to_owned(),
+            current: current.to_owned(),
+            backup: Some("/var/lemonfiber/backups/before.tar".to_owned()),
+        },
+    }
+}
+
 /// One field of one resource a service holds, changed through that service.
 fn configured(field: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
@@ -288,6 +302,7 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
             configured("removeCompletedDownloads", Some("false"), "true"),
             set("reconfigure", "PUID", Some("1000"), "1001"),
             set("apply", "TZ", None, "Europe/Amsterdam"),
+            pinned("sonarr", "4.0.14", "4.0.15"),
         ],
     );
 
@@ -298,6 +313,7 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
     assert_eq!(
         said,
         [
+            "moved from 4.0.14 to 4.0.15",
             "set TZ to Europe/Amsterdam",
             "changed PUID from 1000 to 1001",
             "set removeCompletedDownloads on the service",
