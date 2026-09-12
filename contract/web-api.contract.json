@@ -354,6 +354,10 @@
           "description": "What a capture produced.",
           "type": "object",
           "properties": {
+            "pace": {
+              "description": "What the capture moved, against what a capture is meant to stay inside.\n\nRead off the room check that already ran, so saying it costs nothing: the trees\nwere walked to decide whether the archive would fit, and this is the same number\nput to a second use.",
+              "$ref": "#/$defs/Pace"
+            },
             "path": {
               "description": "Where the archive was written.",
               "type": "string"
@@ -378,7 +382,35 @@
             "path",
             "scope",
             "sensitive",
-            "pruned"
+            "pruned",
+            "pace"
+          ]
+        },
+        "Pace": {
+          "description": "What a capture came to, against the time a capture is meant to take.\n\nReported and never enforced. The room check already walks the trees to decide\nwhether the archive fits, so the bytes are in hand before anything is written and\ncost nothing extra to say — and what they are measured against is the work, not a\nclock. A wall-clock gate on a machine whose disk throughput varies by more than the\nmargin either passes for reasons unrelated to this product or fails for them, and\nneither reading is worth having.",
+          "type": "object",
+          "properties": {
+            "brisk": {
+              "description": "Whether this capture is inside it.",
+              "type": "boolean"
+            },
+            "budget": {
+              "description": "The bytes a capture may move and still be expected to finish in time.\n\nCarried with the reading rather than left for a reader to look up, so a surface\nshowing this does not need a second copy of the number to compare against.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "moved": {
+              "description": "The bytes the captured trees came to, as the room check measured them.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "moved",
+            "budget",
+            "brisk"
           ]
         },
         "Scope": {

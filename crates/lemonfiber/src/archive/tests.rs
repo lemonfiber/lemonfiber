@@ -10,6 +10,20 @@
 //! Still `#[cfg(test)]` and still inside this crate: the coverage gate counts in-crate
 //! test code, and moving these out of the crate would change which mapping they are
 //! counted from.
+//!
+//! **Nothing here times a capture, and that is deliberate twice over.** A wall-clock
+//! threshold would be worth nothing: disk throughput on a shared runner varies by more
+//! than the margin being claimed, so a gate on seconds either goes green for reasons
+//! unrelated to this code or goes red for them, and a check that fails for reasons
+//! outside the thing it checks gets muted. The fallback — measure it, print it, assert
+//! nothing — is not available either, because the real writer lives in this crate's
+//! `src/` and nothing under `src/` may reach a terminal except through the one funnel
+//! that decides how output is rendered. A test file is not exempt from that, so there
+//! is no channel here for a number nobody is failed by.
+//!
+//! What is held instead is the work rather than the time: a declared typical
+//! configuration inside a budget derived from a floor throughput, and the bytes that
+//! budget is checked against proven to be the bytes really on the disk.
 
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -715,40 +729,6 @@ async fn the_room_check_counts_the_bytes_that_are_really_there() {
         measured.ok().map(|space| space.needed),
         Some(on_disk),
         "the bytes reported are the bytes written"
-    );
-    let _ = fs::remove_dir_all(&root);
-}
-
-/// How long a real capture actually took, reported and never asserted.
-///
-/// A wall-clock threshold here would be worth nothing. Disk throughput on a shared
-/// runner varies by more than the margin being claimed, so a gate on seconds either
-/// goes green for reasons that have nothing to do with this code or goes red for
-/// them — and a test that fails for reasons outside the thing it tests gets muted,
-/// which costs more than it ever caught.
-///
-/// So this writes a real archive through the real writer and prints what it cost.
-/// The number is in the run's output where somebody chasing a slow backup can read
-/// it, and no build is ever failed by it.
-#[tokio::test]
-async fn what_a_capture_costs_is_reported_for_the_record() {
-    let root = scratch("timed");
-    let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
-    let dest = paths.backups().join("timed.tar.gz");
-
-    let started = std::time::Instant::now();
-    let written = Tar.write(&dest, &manifest, &plan.items).await;
-    let took = started.elapsed();
-
-    assert!(written.is_ok(), "the capture has to have happened");
-    println!(
-        "observation: a capture of {} item(s) took {took:?}; the budget is {} bytes \
-         against {:?}",
-        plan.items.len(),
-        backup::BUDGET,
-        backup::WITHIN
     );
     let _ = fs::remove_dir_all(&root);
 }
