@@ -126,7 +126,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         }),
     }
 
-    match ctx.engine.list(&project(ctx)).await {
+    match ctx.engine.list(&ctx.settings.project).await {
         Err(_) => missing.push("the container engine could not be reached".to_owned()),
         Ok(containers) => pieces.push(Piece {
             name: "services.txt".to_owned(),
@@ -188,16 +188,6 @@ async fn logs(ctx: &Ctx, lines: u32) -> Result<String, Box<Problem>> {
         held.push(format!("{} | {}", line.service, line.line));
     }
     Ok(held.join("\n"))
-}
-
-/// The Compose project the containers belong to, as every other read of them names it.
-fn project(ctx: &Ctx) -> String {
-    ctx.settings
-        .stack_dir
-        .as_deref()
-        .and_then(|dir| dir.file_name())
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default()
 }
 
 /// The diagnosis as a person reads it: one line per finding, worst first, which is the
