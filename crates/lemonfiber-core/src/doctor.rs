@@ -49,6 +49,7 @@ pub use narrowing::Narrowing;
 /// can yet establish.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "DoctorCategory")]
 pub enum Category {
     /// Docker present, the daemon reachable, the platform understood.
     Environment,
@@ -117,6 +118,7 @@ impl Category {
 /// passed — the dishonesty this whole subsystem exists to prevent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
+#[schemars(rename = "DoctorVerdict")]
 pub enum Verdict {
     /// Verified working, with the evidence worth showing.
     Pass {

@@ -11,6 +11,7 @@ use crate::door::{Address, Chosen, Facing};
 /// Where the household's one front door stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "FrontDoorStanding")]
 pub enum Standing {
     /// The door is the request surface, and it is running.
     Established,
@@ -43,6 +44,7 @@ pub enum Standing {
 /// who can see that the index over every service was considered and refused has been
 /// told something, where one shown a single name has only been given an answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "FrontDoorBeside")]
 pub struct Beside {
     /// The service, by the name it shows itself under.
     pub service: String,

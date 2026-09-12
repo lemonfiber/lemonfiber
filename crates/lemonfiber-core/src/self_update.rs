@@ -77,6 +77,7 @@ pub fn probe_beside(binary: &Path) -> Option<PathBuf> {
 /// default that said so would be a claim made by an empty value.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "SelfUpdateStanding")]
 pub enum Standing {
     /// The version running is the newest known.
     Current,

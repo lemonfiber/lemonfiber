@@ -72,6 +72,7 @@ pub struct Beyond {
 
 /// What a repairing run offered, and what it did.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "RepairReport")]
 pub struct Report {
     /// What could be put right, whether or not it was.
     pub offered: Vec<Repair>,

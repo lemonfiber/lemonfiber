@@ -10,6 +10,7 @@ use serde::Serialize;
 /// How one connection turned out after a seed pass.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case")]
+#[schemars(rename = "SeedState")]
 pub enum State {
     /// Written and read back.
     Wired,
@@ -95,6 +96,7 @@ impl State {
 /// so a warning always names both what broke and what to do about it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "severity", rename_all = "kebab-case")]
+#[schemars(rename = "SeedSeverity")]
 pub enum Severity {
     /// Nothing is broken: the connection is settled, or its drift is the operator's
     /// own edit that still works.
@@ -169,6 +171,7 @@ pub enum Assessment {
 
 /// What a seed pass amounted to.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "SeedReport")]
 pub struct Report {
     /// Every connection attempted, and how each turned out.
     pub wirings: Vec<Wiring>,

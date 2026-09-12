@@ -53,6 +53,7 @@ impl Source {
 /// How much a measurement can be relied on now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case", tag = "reading", content = "days")]
+#[schemars(rename = "CapacityStanding")]
 pub enum Standing {
     /// Recent enough to set a share against.
     Fresh,

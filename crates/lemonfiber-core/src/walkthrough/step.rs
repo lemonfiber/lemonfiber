@@ -27,6 +27,7 @@ use crate::trace::Stage;
     schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "WalkthroughStep")]
 pub enum Step {
     /// Picking something to add, and confirming it is not already here.
     #[default]

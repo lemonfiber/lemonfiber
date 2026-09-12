@@ -82,6 +82,7 @@ impl Item {
 
 /// How much of a manifest was read and how much stood in for what could not be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UninstallConfidence")]
 pub struct Confidence {
     /// Whether every source this tier needed answered.
     pub complete: bool,
@@ -122,6 +123,7 @@ pub struct Coming {
 
 /// What removing would come to, shown before anything is removed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UninstallManifest")]
 pub struct Manifest {
     /// Which removal this is.
     pub tier: Tier,
@@ -157,6 +159,7 @@ pub struct Manifest {
 
 /// Something a removal could not take.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UninstallLeft")]
 pub struct Left {
     /// What is still there.
     pub name: String,
@@ -175,6 +178,7 @@ pub struct Left {
 /// pretending to be a value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case")]
+#[schemars(rename = "UninstallRemoval")]
 pub enum Removal {
     /// Everything is enumerated with its size, and nothing has been removed.
     Surveyed,

@@ -53,6 +53,7 @@ pub enum Stance {
 /// things, and a report that showed only the new one would be asking them to remember
 /// the old one correctly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "ConfigChange")]
 pub struct Change {
     /// The setting the change names.
     pub key: String,

@@ -138,6 +138,7 @@ impl Policy {
 /// feature exists to avoid handing anybody.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "AskingStanding")]
 pub enum Standing {
     /// Nothing is counted against them.
     Unlimited,

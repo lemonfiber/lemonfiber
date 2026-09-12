@@ -106,6 +106,7 @@ pub struct Reclaimed {
 
 /// Something a cleanup could not take.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "SpaceLeft")]
 pub struct Left {
     /// Where it is.
     pub at: String,

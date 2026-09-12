@@ -76,6 +76,7 @@ pub enum Linked {
 /// than in the invitation's own spelling: one setting named two ways across two shapes
 /// is two shapes a client has to be told are about the same thing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "InvitationApplied")]
 pub struct Applied {
     /// How far up the ratings they may watch, in the words and the certificates this
     /// media server names in the operator's own country. Absent where no limit was set.

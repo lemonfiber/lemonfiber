@@ -12,6 +12,7 @@ use crate::error::Severity;
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "HealthStanding")]
 pub enum Standing {
     /// Nothing is wrong.
     Healthy,

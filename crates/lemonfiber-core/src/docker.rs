@@ -32,6 +32,7 @@ use crate::ports::docker::{Container, Health, Lifecycle};
 /// load-bearing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "ServiceState")]
 pub enum State {
     /// Exited without being asked to, and is not coming back on its own.
     Failed,
