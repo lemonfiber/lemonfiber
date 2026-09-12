@@ -238,8 +238,15 @@ pub fn withheld_by(line: &str, vouched_for: &dyn Fn(&str) -> bool) -> String {
 /// the whole line as one setting.
 ///
 /// A query string is taken wholesale, because that is where the key nobody spotted
-/// actually lives, riding inside something that reads as an address. The rest are a
-/// *field* written out mid-sentence, and that is what those rules look for. The two
+/// actually lives, riding inside something that reads as an address. An address with no
+/// query is asked the other question the URI syntax answers — whether it carries a
+/// password in front of its host — because [`queried`] reaches that only as a
+/// side-effect of there being a query to strip, and an address without one went through
+/// here whole. `https://user:hunter2@indexer.example/api` was printed exactly as
+/// written. No guessing is involved either way: the syntax says everything after the
+/// first colon of a userinfo is a password, so `http://host:8080/path`, which has no
+/// userinfo, is left alone. The rest are a *field* written out mid-sentence, and that is
+/// what those rules look for. The two
 /// joined shapes need nothing more: prose does not put an equals sign or an internal
 /// colon inside a word, so finding one is already finding a setting. The spaced shape
 /// does need more, because a word followed by a colon is how English introduces a
@@ -261,7 +268,10 @@ fn withheld_within(line: &str) -> String {
             safe.push(marked(token));
             continue;
         }
-        if let Some(named) = joined(token).or_else(|| queried(token)) {
+        if let Some(named) = joined(token)
+            .or_else(|| queried(token))
+            .or_else(|| password_withheld(token))
+        {
             safe.push(named);
             continue;
         }
@@ -346,6 +356,36 @@ mod tests {
     /// that reads as one sits in this source.
     fn a_credential() -> String {
         ["abcdef", "1234", "567890"].concat()
+    }
+
+    #[test]
+    fn a_login_in_front_of_a_host_is_withheld_even_where_the_address_carries_no_query() {
+        // The gap this closes: the query rule reached the password only as a
+        // side-effect of there being a query to strip, so an address with none went
+        // through whole — printed on the terminal, in `--json`, and from the API.
+        // Pinned whole rather than asserted absent: what has to hold is that the host
+        // and the account survive, and "does not contain the password" is true of the
+        // empty string.
+        let secret = a_credential();
+        assert_eq!(
+            withheld(&format!(
+                "upstream https://ana:{secret}@indexer.example/api refused"
+            )),
+            format!("upstream https://ana:{REDACTED}@indexer.example/api refused"),
+        );
+    }
+
+    #[test]
+    fn a_port_after_a_host_is_not_a_password() {
+        // The rule is a fact about URI syntax, not a guess: everything after the first
+        // colon of a *userinfo* is a password, and an address with no userinfo has
+        // none. Reading a port as one would delete the number an operator needs most.
+        for line in [
+            "the service at http://localhost:8989/api did not answer",
+            "https://indexer.example:8443/ refused the connection",
+        ] {
+            assert_eq!(withheld(line), line, "a port was read as a password");
+        }
     }
 
     #[test]
