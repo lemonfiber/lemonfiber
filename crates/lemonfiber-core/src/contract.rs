@@ -14,6 +14,30 @@
 //! no variant name around it, so the union's own shape is never what reaches a
 //! client — and a schema derived from it would describe a document nothing writes.
 //!
+//! # Names, and the direction a change to them travels
+//!
+//! A `$defs` key is not a type's identity. `schemars` names a definition after the
+//! bare Rust type and describes each kind on its own, so two unrelated types called
+//! `Left` become one name over two shapes, and two `Panel<T>` inside one kind become
+//! `Panel` and `Panel2` — a number recording where the type was reached rather than
+//! anything about it. The sweeps in this module's tests hold both where they are.
+//!
+//! Settling that takes two changes, and **they travel in opposite directions**. Each
+//! one done the wrong way round fails silently rather than loudly, which is the whole
+//! reason this is written here rather than left in a pull request.
+//!
+//! **Renaming the types goes producer first.** `sdk-ts` compensates for the clashes
+//! today, prefixing every divergent name with the kind that carries it. That
+//! compensation may only be deleted once this artefact guarantees the names are
+//! unique. The other order keys four different `Left`s to one name and keeps
+//! whichever kind was written last, and nothing anywhere reports it.
+//!
+//! **Hoisting `$defs` to the document root goes consumers first.** Both SDKs resolve
+//! a reference against the kind carrying it, so a root `$defs` leaves every reference
+//! unresolvable — and `sdk-php` answers an unresolvable reference with `mixed` and
+//! exits successfully. Every consumer has to resolve against the root, and be
+//! released, before anything moves here.
+//!
 //! [`Outcome`]: crate::app::Outcome
 
 use std::collections::BTreeMap;
@@ -226,7 +250,7 @@ fn describing(kinds: &mut BTreeMap<String, Schema>, kind: Kind, shape: Schema) {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeSet, HashSet};
+    use std::collections::{BTreeMap, BTreeSet, HashSet};
 
     use serde_json::Value;
 
@@ -1102,6 +1126,180 @@ mod tests {
         references_beside_constraints(&contract, "", &mut found);
 
         assert!(found.is_empty(), "{}", found.join(", "));
+    }
+
+    /// Definition names more than one kind describes differently.
+    ///
+    /// `schemars` names a definition after the bare Rust type, and each kind's schema
+    /// is generated on its own, so two unrelated types both called `Left` become one
+    /// name carrying two shapes. Every kind still resolves against its own copy, so
+    /// nothing reading a single kind is misled — but a generator that keys types by
+    /// name across kinds has to tell the two apart itself, and both SDKs are readers
+    /// of that sort.
+    ///
+    /// Written down as the debt that exists rather than as a rule nothing breaks. The
+    /// sweep below lets the list shrink and refuses to let it grow.
+    const DESCRIBED_TWO_WAYS: &[&str] = &[
+        "Applied",
+        "Beside",
+        "Category",
+        "Change",
+        "Confidence",
+        "FrontDoorReport",
+        "Held",
+        "Left",
+        "Manifest",
+        "MemberAsking",
+        "MemberRequest",
+        "Notes",
+        "Outcome",
+        "Protocol",
+        "Reach",
+        "Reading",
+        "Removal",
+        "Report",
+        "Reversal",
+        "Severity",
+        "Standing",
+        "State",
+        "State2",
+        "Step",
+        "Summary",
+        "Verdict",
+    ];
+
+    /// Definition names `schemars` numbered to keep two types apart inside one kind.
+    ///
+    /// The number says where the type was reached rather than what it is: `Panel4` is
+    /// the fourth `Panel<T>` the dashboard's fields happen to mention, and reordering
+    /// those fields renumbers all of them. The number reaches a published SDK type
+    /// name — `DashboardState2` is one today — so one arriving unremarked renames
+    /// something no reviewer saw being renamed.
+    ///
+    /// What this cannot reach: `json-schema-to-typescript` adds positional suffixes of
+    /// its own further downstream — `Remedy1`, `Counted3`, `BandwidthHeld1` — and no
+    /// name chosen here removes them. This holds the artefact's own numbering, which
+    /// is the only numbering anything in this repository decides.
+    const NUMBERED_APART: &[&str] = &[
+        "Panel2",
+        "Panel3",
+        "Panel4",
+        "Panel5",
+        "Panel6",
+        "Panel7",
+        "Standing2",
+        "Standing3",
+        "State2",
+    ];
+
+    /// Every definition the artefact carries: the kind holding it, its name, and the
+    /// shape that kind gives it.
+    ///
+    /// The shape is rendered to text so two copies compare as one value. `serde_json`
+    /// orders a map's keys, so a definition renders the same way wherever it was found.
+    fn definitions(contract: &Value) -> Vec<(String, String, String)> {
+        contract
+            .get("kinds")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter_map(|(kind, schema)| {
+                schema
+                    .get("$defs")
+                    .and_then(Value::as_object)
+                    .map(|named| (kind, named))
+            })
+            .flat_map(|(kind, named)| {
+                named
+                    .iter()
+                    .map(move |(name, shape)| (kind.clone(), name.clone(), shape.to_string()))
+            })
+            .collect()
+    }
+
+    /// A definition name describes one shape, or is a clash already known about.
+    ///
+    /// Held against the list in both directions on purpose. A name that starts
+    /// clashing has to be disambiguated or written down; a name that stops clashing
+    /// has to leave the list, or the list stops describing the artefact. Comparing it
+    /// this way is also what keeps the sweep from passing by looking at nothing — an
+    /// empty reading leaves every known clash unaccounted for, and says so.
+    #[test]
+    fn a_definition_name_describes_one_shape_or_a_known_clash() {
+        let contract = serde_json::to_value(Contract::describe()).unwrap_or_default();
+        let mut shapes: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut holding: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for (kind, name, shape) in definitions(&contract) {
+            shapes.entry(name.clone()).or_default().insert(shape);
+            holding.entry(name).or_default().insert(kind);
+        }
+
+        let known: BTreeSet<&str> = DESCRIBED_TWO_WAYS.iter().copied().collect();
+
+        // Narrowed by retaining rather than gathered through a closure only a failure
+        // would enter. A reporting path nothing walks while the sweep passes is a path
+        // nobody has watched work, and it is the half that has to be right on the one
+        // day it is read.
+        let mut clashing = holding;
+        clashing.retain(|name, _| shapes.get(name).is_some_and(|given| given.len() > 1));
+
+        // Valued by the kinds that disagree, so a failure names where to look rather
+        // than only the word the two of them are fighting over.
+        let mut arrived = clashing.clone();
+        arrived.retain(|name, _| !known.contains(name.as_str()));
+        let settled: BTreeSet<&str> = known
+            .iter()
+            .copied()
+            .filter(|name| !clashing.contains_key(*name))
+            .collect();
+
+        assert!(
+            arrived.is_empty(),
+            "these definition names now describe two different shapes, so anything keying \
+             types by name across kinds has to pick one of them: {arrived:?} — give the types \
+             schema names of their own, or name them in DESCRIBED_TWO_WAYS to say the clash is \
+             known about"
+        );
+        assert!(
+            settled.is_empty(),
+            "these definition names describe one shape again, so DESCRIBED_TWO_WAYS no longer \
+             describes the artefact — take them out of it: {settled:?}"
+        );
+    }
+
+    /// A numbered definition is one already named here.
+    ///
+    /// The same two directions, for the same reason: a number that appears is a rename
+    /// nobody asked for, and a number that goes away leaves a list describing something
+    /// the artefact no longer does.
+    #[test]
+    fn a_numbered_definition_is_one_already_named_here() {
+        let contract = serde_json::to_value(Contract::describe()).unwrap_or_default();
+        let numbered: BTreeSet<String> = definitions(&contract)
+            .into_iter()
+            .map(|(_, name, _)| name)
+            .filter(|name| {
+                name.chars()
+                    .next_back()
+                    .is_some_and(|last| last.is_ascii_digit())
+            })
+            .collect();
+        let known: BTreeSet<String> = NUMBERED_APART.iter().map(|&name| name.to_owned()).collect();
+
+        let arrived: BTreeSet<&String> = numbered.difference(&known).collect();
+        let settled: BTreeSet<&String> = known.difference(&numbered).collect();
+
+        assert!(
+            arrived.is_empty(),
+            "`schemars` numbered these to keep two types apart inside one kind, and the number \
+             is where the type was reached rather than anything about it: {arrived:?} — give \
+             the types schema names of their own, or name them in NUMBERED_APART"
+        );
+        assert!(
+            settled.is_empty(),
+            "these definitions are no longer numbered, so NUMBERED_APART no longer describes \
+             the artefact — take them out of it: {settled:?}"
+        );
     }
 
     #[test]
