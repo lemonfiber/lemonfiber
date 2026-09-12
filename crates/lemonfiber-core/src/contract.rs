@@ -381,6 +381,7 @@ mod tests {
                 scope: crate::backup::Scope::WholeStack,
                 sensitive: true,
                 pruned: Vec::new(),
+                pace: crate::backup::Pace::of(0),
             }),
             Outcome::Update(an_update()),
             Outcome::Support(crate::app::support::Bundle {

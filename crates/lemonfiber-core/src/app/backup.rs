@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::archive::{Archive, Fault, Space};
-use crate::backup::{self, Manifest, Retention, Scope};
+use crate::backup::{self, Manifest, Pace, Retention, Scope};
 use crate::config::paths::Paths;
 use crate::error::{Code, Problem, Remedy, Severity, State};
 
@@ -61,6 +61,12 @@ pub struct Report {
     pub sensitive: bool,
     /// The older backups retention pruned, oldest first.
     pub pruned: Vec<String>,
+    /// What the capture moved, against what a capture is meant to stay inside.
+    ///
+    /// Read off the room check that already ran, so saying it costs nothing: the trees
+    /// were walked to decide whether the archive would fit, and this is the same number
+    /// put to a second use.
+    pub pace: Pace,
 }
 
 /// Capture a configuration to a backup archive under `paths`, pruning older ones
@@ -117,6 +123,7 @@ pub async fn capture(
         scope: manifest.scope,
         sensitive: manifest.sensitive,
         pruned,
+        pace: Pace::of(space.needed),
     })
 }
 

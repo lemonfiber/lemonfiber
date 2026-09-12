@@ -10,6 +10,20 @@
 //! Still `#[cfg(test)]` and still inside this crate: the coverage gate counts in-crate
 //! test code, and moving these out of the crate would change which mapping they are
 //! counted from.
+//!
+//! **Nothing here times a capture, and that is deliberate twice over.** A wall-clock
+//! threshold would be worth nothing: disk throughput on a shared runner varies by more
+//! than the margin being claimed, so a gate on seconds either goes green for reasons
+//! unrelated to this code or goes red for them, and a check that fails for reasons
+//! outside the thing it checks gets muted. The fallback — measure it, print it, assert
+//! nothing — is not available either, because the real writer lives in this crate's
+//! `src/` and nothing under `src/` may reach a terminal except through the one funnel
+//! that decides how output is rendered. A test file is not exempt from that, so there
+//! is no channel here for a number nobody is failed by.
+//!
+//! What is held instead is the work rather than the time: a declared typical
+//! configuration inside a budget derived from a floor throughput, and the bytes that
+//! budget is checked against proven to be the bytes really on the disk.
 
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -658,4 +672,63 @@ async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
         Some(0o700),
         "and so is the directory it is kept in"
     );
+}
+
+/// What a typical configuration comes to, in bytes.
+///
+/// Declared here rather than measured, because "typical" is a judgement and not a
+/// reading: it is lemonfiber's own configuration plus a service directory for each
+/// of the stack's services, and the weight in those is the \*arr databases — single
+/// -digit megabytes each for a household library, and tens of megabytes for a large
+/// one. Fifty megabytes is the generous end of that.
+///
+/// It is a number worth disagreeing with, which is why it is one line with a reason
+/// attached rather than an assumption inside a sentence about seconds. If a typical
+/// configuration is ever found to be far larger than this, the assertion below fails
+/// and the promise gets revisited — which is the whole job of writing it down.
+const A_TYPICAL_CONFIGURATION: u64 = 50 * 1024 * 1024;
+
+/// The promise is reasoned from a floor, so a typical configuration has to sit inside
+/// the budget that floor allows — with a great deal of room, or the promise is being
+/// kept by luck.
+#[test]
+fn a_typical_configuration_is_well_inside_what_a_minute_allows() {
+    let pace = backup::Pace::of(A_TYPICAL_CONFIGURATION);
+    assert!(
+        pace.brisk,
+        "a typical configuration moves {} against a budget of {}",
+        pace.moved, pace.budget
+    );
+    assert!(
+        A_TYPICAL_CONFIGURATION * 4 <= pace.budget,
+        "the margin is thin enough to be worth rechecking: {} against {}",
+        A_TYPICAL_CONFIGURATION,
+        pace.budget
+    );
+}
+
+/// What the capture says it moved is what is actually on the disk, not an estimate
+/// that drifts from it.
+///
+/// The whole promise rests on this number, so it is worth one test of its own: the
+/// room check walks the trees before writing, and a reading taken from anywhere else
+/// would be a second answer to the same question.
+#[tokio::test]
+async fn the_room_check_counts_the_bytes_that_are_really_there() {
+    let root = scratch("weighed");
+    let paths = install(&root);
+    let plan = backup::plan(&paths, &Scope::WholeStack);
+
+    let measured = Tar.space(&paths.backups(), &plan.items).await;
+    let on_disk: u64 = ["DATA_ROOT=/srv/media\n", "<Config/>", "services: {}"]
+        .iter()
+        .map(|written| written.len() as u64)
+        .sum();
+
+    assert_eq!(
+        measured.ok().map(|space| space.needed),
+        Some(on_disk),
+        "the bytes reported are the bytes written"
+    );
+    let _ = fs::remove_dir_all(&root);
 }
