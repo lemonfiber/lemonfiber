@@ -57,6 +57,7 @@ pub mod bazarr;
 pub mod bindery;
 pub mod bundle;
 pub mod bytes;
+pub mod changelog;
 pub mod clients;
 pub mod condition;
 pub mod config;

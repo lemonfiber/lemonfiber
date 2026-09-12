@@ -598,6 +598,7 @@ mod tests {
             supported_schema: vec![1],
             stack: "1.2.3".to_owned(),
             compose: None,
+            changelog: lemonfiber_core::changelog::Notes::unread(),
         }
     }
 

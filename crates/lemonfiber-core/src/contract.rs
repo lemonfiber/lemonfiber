@@ -270,6 +270,7 @@ mod tests {
                 supported_schema: vec![1],
                 stack: "0.1.0".to_owned(),
                 compose: None,
+                changelog: crate::changelog::Notes::unread(),
             }),
             Outcome::Forms(FormsReport { forms: Vec::new() }),
             Outcome::Preview(plan()),

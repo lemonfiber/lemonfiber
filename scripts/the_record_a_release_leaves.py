@@ -442,6 +442,45 @@ def history(record: dict, identifier: str) -> str:
     return "\n".join(written).rstrip() + "\n"
 
 
+def standing(stored: dict, fresh: dict) -> tuple[str, list[str]]:
+    """Where a kept record stands against the tags, and what led to the verdict.
+
+    Three states, and only one of them is a fault. A tag the record has not been
+    regenerated for is `pending` — a release exists whose notes are not written
+    yet, which is the ordinary state of the trunk between a tag and the refresh
+    that follows it. A record naming a release the repository has no tag for, or
+    saying something different about a tag it does have, is `stale`: those are the
+    two ways a kept file can contradict what shipped, and neither may be presented
+    as current.
+
+    What is compared is what the tags decide — which releases there are, and what
+    each of them changed. The feature a requirement belongs to and the page it is
+    defined on are the specification's to say and move on their own clock, so
+    comparing them would call the record stale every time a page was retitled.
+    """
+    said = {one["version"]: summaries(one) for one in stored["releases"]}
+    tagged = {one["version"]: summaries(one) for one in fresh["releases"]}
+    faults = [f"{version} is in the record and has no tag" for version in said if version not in tagged]
+    faults += [
+        f"{version} shipped something the record does not hold"
+        for version, entries in tagged.items()
+        if version in said and entries != said[version]
+    ]
+    if faults:
+        return ("stale", faults)
+    behind = [version for version in tagged if version not in said]
+    if behind:
+        return ("pending", [f"{version} has been tagged and its notes are not written" for version in behind])
+    return ("current", [])
+
+
+def summaries(release_record: dict) -> list[str]:
+    """What one release changed, as the lines a reader would count."""
+    return [
+        entry["summary"] for group in release_record["groups"] for entry in group["entries"]
+    ]
+
+
 def self_test() -> int:  # noqa: C901 - one claim per block, read as a list
     """Hold every claim this makes, against a history it builds for itself."""
     uninstall = Page("Clean uninstall", "features/a6-uninstall", "acceptance-criteria")
@@ -571,6 +610,20 @@ def self_test() -> int:  # noqa: C901 - one claim per block, read as a list
     if "Withdrawn since" not in gone or "a6-uninstall" in gone:
         failures.append(f"a withdrawn requirement's history invented a link: {gone}")
 
+    # A kept record is behind the tags, ahead of them, or in step with them, and
+    # only one of those three is a fault.
+    if standing(record, record)[0] != "current":
+        failures.append("a record in step with the tags was not called current")
+    behind = {"releases": record["releases"][1:], "requirements": record["requirements"]}
+    if standing(behind, record)[0] != "pending":
+        failures.append("a record one tag behind was not called pending")
+    if standing(record, behind)[0] != "stale":
+        failures.append("a record naming a release with no tag was not called stale")
+    altered = json.loads(json.dumps(record))
+    altered["releases"][1]["groups"][0]["entries"][0]["summary"] = "something else entirely"
+    if standing(altered, record)[0] != "stale":
+        failures.append("a record disagreeing with a tag it holds was not called stale")
+
     for line in failures:
         print(f"self-test: {line}", file=sys.stderr)
     print("self-test: every claim holds." if not failures else "self-test: FAILED")
@@ -582,6 +635,7 @@ def main() -> int:
     parser.add_argument("--spec", type=pathlib.Path, help="a checkout of the lemonfiber spec")
     parser.add_argument("--markdown", metavar="VERSION", help="render one release from a record")
     parser.add_argument("--requirement", metavar="ID", help="render one requirement's history")
+    parser.add_argument("--check", type=pathlib.Path, metavar="RECORD", help="a kept record, against the tags")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args()
     if arguments.self_test:
@@ -612,7 +666,14 @@ def main() -> int:
     if not record["releases"]:
         print("::error::the history holds no release tag, so there is no record to write", file=sys.stderr)
         return 1
-    print(json.dumps(record, indent=2, sort_keys=False))
+    if arguments.check:
+        kept = json.loads(arguments.check.read_text(encoding="utf-8"))
+        where, why = standing(kept, record)
+        for line in why:
+            print(f"::{'error' if where == 'stale' else 'notice'}::{line}")
+        print(f"the kept record is {where}.")
+        return 1 if where == "stale" else 0
+    print(json.dumps(record, indent=2, ensure_ascii=False))
     return 0
 
 

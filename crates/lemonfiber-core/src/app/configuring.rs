@@ -571,6 +571,7 @@ mod tests {
             supported_schema: Vec::new(),
             stack: String::new(),
             compose: None,
+            changelog: crate::changelog::Notes::unread(),
         });
         let said = consequence(&Ok(other));
         assert!(said.is_some_and(|said| said.contains("not a configuration answer")));

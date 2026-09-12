@@ -108,3 +108,56 @@ jobs:
         with:
           persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  # The record the binary carries is generated, and a generated file that is
+  # committed is a file somebody can edit. This is what makes that visible: the
+  # record is written again from the history and compared with the one in the tree.
+  #
+  # What is compared is what the tags decide — which releases there are, and what
+  # each of them changed. The feature a requirement belongs to and the page it is
+  # defined on move on the specification's own clock, so comparing those would call
+  # the record stale every time a page was retitled.
+  #
+  # Being behind is not a fault and does not fail. Between a tag and the refresh
+  # that follows it a release exists whose notes are not written yet, which is where
+  # every release leaves the trunk; that is reported as a notice. What fails is the
+  # record naming a release the repository has no tag for, or saying something
+  # different about one it does — the two ways a kept file can contradict what
+  # shipped.
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Every tag, because the record is every release rather than the last one.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the canonical spec
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lemonfiber/spec
+          ref: main
+          path: .spec-canonical
+          persist-credentials: false
+      - name: The record holds its own claims
+        run: python3 scripts/the_record_a_release_leaves.py --self-test
+      # Fetched and checked against a digest rather than taken on trust, the same
+      # way `release-changelog` takes it and for the same reason.
+      - name: Take git-cliff, and check it is the one asked for
+        env:
+          CLIFF: "2.14.1"
+          DIGEST: cba6ae86f0a4205784eed8ef049fe53c904138806e33a1bda2e25026b17198eb
+        run: |
+          set -euo pipefail
+          archive="git-cliff-${CLIFF}-x86_64-unknown-linux-musl.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$archive" \
+            "https://github.com/orhun/git-cliff/releases/download/v${CLIFF}/${archive}"
+          echo "${DIGEST}  ${archive}" | sha256sum --check --status
+          tar -xzf "$archive"
+          sudo install "git-cliff-${CLIFF}/git-cliff" /usr/local/bin/git-cliff
+      - name: The committed record still describes what the tags say shipped
+        run: |
+          set -euo pipefail
+          git-cliff --config cliff.toml --context > context.json
+          python3 scripts/the_record_a_release_leaves.py \
+            --spec .spec-canonical --check reference/changelog.json < context.json
