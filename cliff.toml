@@ -1,18 +1,18 @@
-# How a release's notes are written from the commits that made it.
+# How the history is read, and what a bare `git cliff` prints from it.
 #
-# The bullet carries the plain-language summary first and the identifiers after
-# it (E5-R9), and every commit reaches a group whether or not it cites anything
-# (E5-R5). The `Spec:` trailer every commit in this repository already carries is
-# what turns an entry into something traceable: the identifiers are deduplicated
-# and sorted here, and `scripts/the_requirements_an_entry_names.py` — run over
-# this output by `.github/workflows/release-changelog.yml` — groups them under the
-# feature each belongs to and links the page that defines them (E5-R3).
+# The release pipeline no longer renders from the template below. It asks for
+# `--context` — git-cliff's own parse of the history, tag by tag, with the
+# conventional type and the trailers already taken apart — and
+# `scripts/the_record_a_release_leaves.py` turns that into the record every
+# release page is then written from. Which is why the `[git]` half matters most
+# here: `filter_unconventional = false` and the `.*` parser are what guarantee
+# every commit reaches the reader, and the groups below are what the record maps
+# onto the four an operator is offered.
 #
-# The two halves are split that way because a URL cannot be built from an
-# identifier alone: which file defines `A6-R7` is a fact only the spec tree holds,
-# and this repository does not vendor it. Left un-rewritten the entry is still
-# correct and still readable, which is what makes `git cliff` on its own a useful
-# thing to run by hand.
+# The template stays because a bare `git cliff` is a useful thing to run by hand,
+# and what it prints should be recognisable. It cannot be what ships: an
+# identifier says nothing about which page defines it, and a bullet cannot name
+# the release it shipped in from inside a single tag's own section.
 [changelog]
 header = "# Changelog\n\n"
 body = """

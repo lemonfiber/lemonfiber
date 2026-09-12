@@ -96,6 +96,36 @@ reference:
 codes:
     cargo run --quiet --example codes -p lemonfiber > reference/error-codes.md
 
+# The record every release leaves, from the commits that made them.
+#
+# The same two readings the release pipeline makes, in the same order, so what is
+# printed here is what the release page gets: `git-cliff` parses the history, and
+# the record turns that into releases, entries and the requirements each served.
+#
+# The spec has to be a checkout beside this one, because an identifier says nothing
+# about which page defines it and this repository does not vendor the spec — the
+# same `--spec` convention the contract check uses.
+#
+#   just record 0.13.0          the notes for one release
+#   just record '' A5-R3        every release that shipped something for one requirement
+record VERSION='' REQUIREMENT='' SPEC='../spec':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v git-cliff > /dev/null; then
+        echo "git-cliff is not installed (cargo install git-cliff)" >&2
+        exit 1
+    fi
+    held=$(mktemp)
+    git-cliff --config cliff.toml --context \
+        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} > "$held"
+    if [ -n "{{VERSION}}" ]; then
+        python3 scripts/the_record_a_release_leaves.py --markdown {{VERSION}} < "$held"
+    elif [ -n "{{REQUIREMENT}}" ]; then
+        python3 scripts/the_record_a_release_leaves.py --requirement {{REQUIREMENT}} < "$held"
+    else
+        cat "$held"
+    fi
+
 fmt-check:
     cargo fmt --check
 
