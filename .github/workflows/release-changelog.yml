@@ -47,7 +47,6 @@ jobs:
       contents: read
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
-      version: ${{ steps.tag.outputs.version }}
     steps:
       - name: Settle the tag
         id: tag
@@ -87,36 +86,54 @@ jobs:
           path: .spec-canonical
           persist-credentials: false
 
-      - name: The entry renderer holds its own claims
+      - name: Both renderers hold their own claims
         if: steps.tag.outputs.tag != ''
-        run: python3 scripts/the_requirements_an_entry_names.py --self-test
+        run: |
+          set -euo pipefail
+          python3 scripts/the_requirements_an_entry_names.py --self-test
+          python3 scripts/the_record_a_release_leaves.py --self-test
 
-      - name: Generate the changelog (git-cliff)
-        if: steps.tag.outputs.tag != ''
-        id: cliff
-        uses: orhun/git-cliff-action@3d96a18cc4ec17e9dc69ddcc424ccafaf1f78ce2 # v4.9.0
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-
-      - name: Hand it on as data
+      # Fetched and checked against a digest rather than taken on trust, which is
+      # the stance `verify_dist_installer.py` already holds this project's own
+      # installers to.
+      #
+      # By hand rather than through the action that used to do it, and the reason
+      # is a size. That action reads whatever it generated back out through a step
+      # output, and what is wanted here is `--context` over the whole history —
+      # five megabytes of it. The action's own limit is forty, the runner's is
+      # nowhere near, and a release pipeline is the last place to find out which
+      # one applies.
+      - name: Take git-cliff, and check it is the one asked for
         if: steps.tag.outputs.tag != ''
         env:
-          CHANGELOG: ${{ steps.cliff.outputs.content }}
+          CLIFF: "2.14.1"
+          DIGEST: cba6ae86f0a4205784eed8ef049fe53c904138806e33a1bda2e25026b17198eb
+        run: |
+          set -euo pipefail
+          archive="git-cliff-${CLIFF}-x86_64-unknown-linux-musl.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$archive" \
+            "https://github.com/orhun/git-cliff/releases/download/v${CLIFF}/${archive}"
+          echo "${DIGEST}  ${archive}" | sha256sum --check --status
+          tar -xzf "$archive"
+          sudo install "git-cliff-${CLIFF}/git-cliff" /usr/local/bin/git-cliff
+          git-cliff --version
+
+      - name: Read the history, and write the record it leaves
+        if: steps.tag.outputs.tag != ''
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p notes
-          printf '%s\n' "$CHANGELOG" > notes/changelog.md
-          if ! grep -q '[^[:space:]]' notes/changelog.md; then
-            echo "::error::git-cliff found no commits for this tag."
-            exit 1
-          fi
-          # Identifiers become the feature they belong to and a link to the page
-          # defining them. It refuses an identifier the spec does not define, so
-          # a changelog that lost its links fails the run rather than shipping.
-          python3 scripts/the_requirements_an_entry_names.py \
-            --spec .spec-canonical < notes/changelog.md > notes/linked.md
-          mv notes/linked.md notes/changelog.md
+          git-cliff --config cliff.toml --context > notes/context.json
+          # The record refuses an identifier the spec never defined, so a
+          # changelog that lost its links fails the run rather than shipping.
+          python3 scripts/the_record_a_release_leaves.py \
+            --spec .spec-canonical < notes/context.json > notes/record.json
+          # And this refuses a version the record does not hold, which is what a
+          # tag with no commits behind it comes to.
+          python3 scripts/the_record_a_release_leaves.py \
+            --markdown "$VERSION" < notes/record.json > notes/changelog.md
           echo "generated $(wc -l < notes/changelog.md) lines."
 
       - name: Upload it
@@ -144,7 +161,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           TAG: ${{ needs.changelog.outputs.tag }}
-          VERSION: ${{ needs.changelog.outputs.version }}
         run: |
           set -euo pipefail
           # Found by id over the listing rather than by tag: a draft release is
@@ -170,8 +186,11 @@ jobs:
             mv kept.md installers.md
           fi
 
+          # The heading is the record's, not this workflow's. It names the version
+          # and links the release, which is what makes every entry underneath it
+          # traceable to the version that shipped it — and a heading written here
+          # would be a second opinion about which version that is.
           {
-            printf '## What changed in %s\n\n' "$VERSION"
             cat notes/changelog.md
             printf '\n%s\n\n' "$marker"
             cat installers.md
