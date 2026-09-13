@@ -551,8 +551,11 @@ mod tests {
         const WAITED: &str = include_str!("engine.rs");
         const STREAMED: &str = include_str!("engine/streaming.rs");
         for (path, source) in [("engine.rs", WAITED), ("engine/streaming.rs", STREAMED)] {
+            // Split at the test module rather than at the first `#[cfg(test)]`: one of
+            // these files carries a test-only re-export near its imports, and splitting
+            // there would read nine lines of `use` and call them the whole file.
             let production = source
-                .split_once("#[cfg(test)]")
+                .split_once("mod tests {")
                 .map_or(source, |(before, _)| before);
             assert!(
                 production.contains("autostart::noted(ctx, "),

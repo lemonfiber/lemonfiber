@@ -400,12 +400,12 @@ mod tests {
 
     /// A filesystem holding Docker Desktop's settings at exactly that candidate.
     fn holding(candidate: &str, text: &str) -> Arc<dyn FileSystem> {
-        Files::at(vec![(home().join(candidate), text)]) as Arc<dyn FileSystem>
+        Files::at(vec![(home().join(candidate), text)])
     }
 
     /// A filesystem with nothing in it at all.
     fn bare() -> Arc<dyn FileSystem> {
-        Files::empty() as Arc<dyn FileSystem>
+        Files::empty()
     }
 
     /// The one verdict a check produces.
