@@ -298,8 +298,14 @@ mod tests {
         );
         let said = prose(&line, &marks(salt()), &Terms::default());
 
-        assert!(said.contains("https://indexer.example.com/api?"), "{said}");
-        assert!(!said.contains(&key_shaped()), "{said}");
+        assert!(
+            said.contains("https://indexer.example.com/api?"),
+            "the address went with the key riding in its query"
+        );
+        assert!(
+            !said.contains(&key_shaped()),
+            "the key riding in the query survived into the line"
+        );
         assert!(
             said.contains("prowlarr | GET"),
             "the line still reads as a line"
@@ -315,7 +321,10 @@ mod tests {
             &marks(salt()),
             &Terms::default(),
         );
-        assert!(!said.contains(&key_shaped()), "{said}");
+        assert!(
+            !said.contains(&key_shaped()),
+            "a key with no name in front of it survived into the line"
+        );
     }
 
     /// The diagnostic the marks preserve: two mentions of one key read alike, so a reader

@@ -281,7 +281,7 @@ mod tests {
         // costs. A dependency bump that quietly lowered any of them is red here.
         assert!(
             written.contains("$argon2id$v=19$m=19456,t=2,p=1$"),
-            "{written}"
+            "the record does not name argon2id, the format version and all three costs"
         );
     }
 
@@ -289,8 +289,14 @@ mod tests {
     fn the_password_itself_is_nowhere_in_what_is_kept() {
         let held = a_record();
         let written = held.as_ref().map_or_else(chosen, Credential::to_json);
-        assert!(!written.contains(&chosen()));
-        assert!(written.starts_with("{\"verifier\":"), "{written}");
+        assert!(
+            !written.contains(&chosen()),
+            "the password itself is in what is kept"
+        );
+        assert!(
+            written.starts_with("{\"verifier\":"),
+            "what is kept does not open on the verifier"
+        );
         assert_eq!(
             held.map(|held| format!("{held:?}")).unwrap_or_default(),
             "Credential(withheld)"

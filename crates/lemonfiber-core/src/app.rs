@@ -2643,13 +2643,25 @@ mod tests {
         );
 
         let said = what_it_said(&ctx).await;
-        assert!(!said.contains(&secret), "{said}");
+        assert!(
+            !said.contains(&secret),
+            "the credential survived into the finding"
+        );
         // The sentence around it, still whole. A redactor that took the credential by
         // taking the line with it would leave a finding with no evidence under it, which
         // is the failure this path is here to prevent.
-        assert!(said.contains("startup:"), "{said}");
-        assert!(said.contains("was rejected"), "{said}");
-        assert!(said.contains("INDEXER_APIKEY"), "{said}");
+        assert!(
+            said.contains("startup:"),
+            "what the service was doing went with the credential"
+        );
+        assert!(
+            said.contains("was rejected"),
+            "what the service reported went with the credential"
+        );
+        assert!(
+            said.contains("INDEXER_APIKEY"),
+            "which setting the service named went with its value"
+        );
     }
 
     /// A container quoting an outbound URL back at itself, with the key not the first
@@ -2670,9 +2682,18 @@ mod tests {
         );
 
         let said = what_it_said(&ctx).await;
-        assert!(!said.contains(&secret), "{said}");
-        assert!(said.contains("https://indexer.example/api"), "{said}");
-        assert!(said.contains("returned 401"), "{said}");
+        assert!(
+            !said.contains(&secret),
+            "the key in the quoted address survived into the finding"
+        );
+        assert!(
+            said.contains("https://indexer.example/api"),
+            "the address went with the key riding in its query"
+        );
+        assert!(
+            said.contains("returned 401"),
+            "what the indexer answered went with the key"
+        );
     }
 
     /// A log line opening on one word, which is how most of them open.

@@ -195,18 +195,30 @@ mod tests {
         let sent = asked.body.unwrap_or_default();
 
         assert_eq!(asked.url, PUSHOVER);
-        assert!(sent.contains(r#""message":"no room this month""#), "{sent}");
-        assert!(sent.contains(&format!(r#""title":"{WHY}""#)), "{sent}");
-        assert!(sent.contains(r#""user":"the-user-key""#), "{sent}");
+        assert!(
+            sent.contains(r#""message":"no room this month""#),
+            "the reason did not travel"
+        );
+        assert!(
+            sent.contains(&format!(r#""title":"{WHY}""#)),
+            "the one word over the reason did not travel"
+        );
+        assert!(
+            sent.contains(r#""user":"the-user-key""#),
+            "the member's own key did not travel"
+        );
         assert!(
             sent.contains(r#""token":"the-application-token""#),
-            "{sent}"
+            "the application token did not travel"
         );
-        assert!(sent.contains(r#""sound":"bike""#), "{sent}");
+        assert!(
+            sent.contains(r#""sound":"bike""#),
+            "the sound the member chose did not travel"
+        );
         // The name of this program, an address to open, and the word the request
         // service has already sent them. None of the three has any business here.
         for absent in ["lemonfiber", "http://", "declined"] {
-            assert!(!sent.contains(absent), "{absent} travelled: {sent}");
+            assert!(!sent.contains(absent), "{absent} travelled");
         }
     }
 
@@ -217,7 +229,10 @@ mod tests {
             .body
             .unwrap_or_default();
 
-        assert!(!sent.contains("sound"), "{sent}");
+        assert!(
+            !sent.contains("sound"),
+            "a member who chose no sound was sent a blank one"
+        );
     }
 
     /// Pushbullet takes its token in a header and the reason in a note.
@@ -227,17 +242,25 @@ mod tests {
         let sent = asked.body.clone().unwrap_or_default();
 
         assert_eq!(asked.url, PUSHBULLET);
-        assert!(sent.contains(r#""type":"note""#), "{sent}");
-        assert!(sent.contains(r#""body":"we already have it""#), "{sent}");
+        assert!(
+            sent.contains(r#""type":"note""#),
+            "the note did not travel as one"
+        );
+        assert!(
+            sent.contains(r#""body":"we already have it""#),
+            "the reason did not travel"
+        );
         assert!(
             asked
                 .headers
                 .iter()
                 .any(|(name, value)| name == "Access-Token" && value == "the-access-token"),
-            "{:?}",
-            asked.headers
+            "the token did not travel in the header that carries it"
         );
-        assert!(!sent.contains("the-access-token"), "{sent}");
+        assert!(
+            !sent.contains("the-access-token"),
+            "the access token travelled in the body as well as the header"
+        );
     }
 
     /// Nowhere to send is told apart from everywhere refusing.

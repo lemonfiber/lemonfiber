@@ -16,6 +16,10 @@
 //! judgement, and the justfile records the reason for each beside the list. It
 //! can say the two lists are one list, and that the list still describes this
 //! workspace rather than an earlier one.
+//!
+//! The list is not the only thing written twice. What a *failing* gate is asked is
+//! written twice as well — as `just uncovered` and as the step `sonar.yml` runs on
+//! failure — and that pair had already drifted before anything here was watching it.
 
 mod source_tree;
 
@@ -46,11 +50,18 @@ fn quoted(text: &str) -> Option<&str> {
     Some(inside)
 }
 
+/// The justfile and the coverage workflow, as they are written.
+fn files() -> (String, String) {
+    let root = workspace_root();
+    (
+        fs::read_to_string(root.join("justfile")).unwrap_or_default(),
+        fs::read_to_string(root.join(".github/workflows/sonar.yml")).unwrap_or_default(),
+    )
+}
+
 /// Both lists, read from the files that carry them.
 fn both() -> (String, String) {
-    let root = workspace_root();
-    let recipe = fs::read_to_string(root.join("justfile")).unwrap_or_default();
-    let workflow = fs::read_to_string(root.join(".github/workflows/sonar.yml")).unwrap_or_default();
+    let (recipe, workflow) = files();
 
     let Some(one) = in_the_recipe(&recipe) else {
         unreachable!("the justfile declares no `skipped :=`, so the gate's own list is unreadable")
@@ -125,5 +136,55 @@ fn the_list_names_only_crates_this_workspace_has() {
         missing.is_empty(),
         "the coverage gate excludes paths in crates this workspace does not have, so those \
          exclusions describe an older tree: {missing:?}"
+    );
+}
+
+/// The two questions a failing gate is asked, each named by what asks it.
+///
+/// One reads the export's merged segments and one reads its regions. They are a pair
+/// rather than a first choice and a fallback: the segments are what a reader wants
+/// when they speak, and they are silent on exactly the miss that survives a merge.
+const ASKED: [&str; 2] = ["--show-missing-lines", "counted_but_not_named.py"];
+
+/// A failing gate is asked the same questions from a shell and from CI.
+///
+/// This pair had drifted, and in the direction that matters: the recipe asked both
+/// questions and the workflow asked one — the segments half, which comes back empty
+/// on exactly the failure the other half exists for. So a run from a shell named the
+/// line and CI did not, which is the wrong way round, because CI is where the gate
+/// fails and a shell is where somebody has to reproduce it.
+#[test]
+fn a_failing_gate_is_asked_the_same_questions_in_both_places() {
+    let (recipe, workflow) = files();
+
+    for asks in ASKED {
+        assert!(
+            recipe.contains(asks),
+            "`just uncovered` no longer asks {asks}, so a gate that fails from a shell \
+             answers with less than the one that fails in CI"
+        );
+        assert!(
+            workflow.contains(asks),
+            "the coverage workflow no longer asks {asks}, so a gate that fails in CI \
+             answers with less than the one that fails from a shell"
+        );
+    }
+}
+
+/// The reader both of them name is a file that is here.
+///
+/// Both reach it through a pipe, and a pipe whose right-hand side does not exist says
+/// so to a stream nobody is reading: the recipe swallows the failure with `-`, and
+/// the workflow step is already running because something else went red. A renamed
+/// script would leave both halves reporting nothing and neither saying why.
+#[test]
+fn the_reader_they_name_is_here() {
+    let reader = workspace_root().join("scripts/counted_but_not_named.py");
+
+    assert!(
+        reader.is_file(),
+        "the recipe and the workflow both pipe a report into {} and it is not there, so \
+         the half that can name a miss the segments merge away answers nothing",
+        reader.display()
     );
 }

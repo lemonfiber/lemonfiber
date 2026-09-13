@@ -300,8 +300,14 @@ mod tests {
             warning: SHOULDER.to_owned(),
         }));
 
-        assert!(text.contains("scrollback"), "{text}");
-        assert!(!text.contains(&secret), "{text}");
+        assert!(
+            text.contains("scrollback"),
+            "the warning was not printed over the reveal"
+        );
+        assert!(
+            !text.contains(&secret),
+            "a value was printed under a warning nobody confirmed"
+        );
     }
 
     #[test]
@@ -315,9 +321,12 @@ mod tests {
 
         assert!(
             text.contains(&format!("Indexer API key: {secret}")),
-            "{text}"
+            "the value a confirmed reveal was asked for was not printed"
         );
-        assert!(text.contains("Clear your scrollback"), "{text}");
+        assert!(
+            text.contains("Clear your scrollback"),
+            "the value was printed with no warning under it"
+        );
     }
 
     /// The property the whole shape exists for: listing what is held prints no value,
@@ -331,6 +340,9 @@ mod tests {
         let text = drawn(Inventory::of(vec![line]));
 
         assert!(!text.is_empty());
-        assert!(!text.contains(&secret), "{text}");
+        assert!(
+            !text.contains(&secret),
+            "a recorded value was printed in the listing"
+        );
     }
 }

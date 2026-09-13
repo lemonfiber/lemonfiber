@@ -305,7 +305,10 @@ mod tests {
         });
 
         let listed = serde_json::to_string(&inventory.held).unwrap_or_default();
-        assert!(!listed.contains(&secret), "{listed}");
+        assert!(
+            !listed.contains(&secret),
+            "the revealed value was listed inside the inventory"
+        );
         assert!(inventory.revealed.is_some_and(|one| one.value.is_some()));
     }
 
@@ -330,8 +333,16 @@ mod tests {
         let mark = fingerprint(&value);
 
         assert_ne!(mark, fingerprint("a-different-value"));
-        assert!(!mark.contains(&value), "{mark}");
-        assert!(!value.contains(mark.trim_start_matches('~')), "{mark}");
+        assert!(
+            !mark.contains(&value),
+            "the value survived into its own fingerprint"
+        );
+        // The mark is the safe half of this pair and the only one worth quoting: five
+        // characters chosen so the value cannot be read back out of them.
+        assert!(
+            !value.contains(mark.trim_start_matches('~')),
+            "the fingerprint was lifted straight out of the value: {mark}"
+        );
     }
 
     #[test]
