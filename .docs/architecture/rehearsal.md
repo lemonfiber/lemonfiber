@@ -83,6 +83,30 @@ that is not a weakening of the same claim: a real host adapter would install a l
 agent into the home directory of whoever ran the suite. The assertion is still that
 they were asked for nothing.
 
+## The seven that answer twice
+
+Several commands here already give two answers: unconfirmed they say what they would
+do, confirmed they do it. `reset`, `remove`, `quality upgrade`, `migrate`, `update`,
+`restore` and `doctor --fix` are all shaped that way, and the unconfirmed answer
+*is* the rehearsal — the same report, in the same words, filled in by the same code
+path.
+
+So a rehearsal takes the operator's go-ahead back on the way in
+(`rehearsal::carried` → `unconfirmed`) rather than seven handlers each learning a
+second way to say what they already say. A second way is a second thing to keep true,
+and the one nobody exercises is the one that stops being true.
+
+That function is deliberately *not* exhaustive: it is the mechanism, not the
+decision. What a rehearsal means is decided in `asked`, which the compiler does check,
+and a command that claims to report while its go-ahead is not taken back here fails
+the gate against a real disk.
+
+`doctor --fix` needed one thing beyond the withheld yes. It writes the fault store on every
+run, before it decides whether to act, because the offer is built from how often a
+fault has been seen and how often a fix left it standing. A rehearsal reads that store
+and no longer adds to it: recording a sighting would move the counts, so the next real
+run would decide differently because somebody had asked a question.
+
 ## What a rehearsal says
 
 The same words the real run uses. `LifecycleReport` carries `rehearsed: bool` and the
