@@ -139,6 +139,7 @@ const fn kept(what: Kept) -> Hostable {
     match what {
         Kept::Watch => Hostable::Watch,
         Kept::Expiring => Hostable::Expiring,
+        Kept::Boot => Hostable::Boot,
     }
 }
 

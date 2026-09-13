@@ -110,6 +110,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
         stack_edits,
         forwarding: None,
         switched: Some(switched),
+        held: None,
     };
 
     if ctx.dry_run {

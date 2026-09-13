@@ -16,7 +16,8 @@ use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
     indexer_from_env, ip_echo_from_env, port_forward_from_env, provider_host_from_env,
-    reads_as_off, service_user_from_env, store, Protocols, Reaching, Settings, EXPLANATIONS_KEY,
+    reads_as_off, reads_as_on, service_user_from_env, store, Protocols, Reaching, Settings,
+    AUTOSTART_ON_BATTERY_KEY, EXPLANATIONS_KEY,
 };
 use lemonfiber_core::platform::{Environment, HOST_OS};
 use lemonfiber_core::ports::hosting::Manager;
@@ -185,6 +186,12 @@ pub(crate) fn read_settings() -> Settings {
         // does not know there is a setting to look for, and somebody who wants the
         // explanations gone knows exactly what they want to stop.
         explanations: !recorded.get(EXPLANATIONS_KEY).is_some_and(reads_as_off),
+        // Off unless it is explicitly turned on, which is the other way round from the
+        // explanations above and deliberately so: a stack started on a battery costs an
+        // afternoon of it, and that is a thing to have asked for.
+        autostart_on_battery: recorded
+            .get(AUTOSTART_ON_BATTERY_KEY)
+            .is_some_and(reads_as_on),
         env_file,
         stack_dir: stack_directory(),
     }

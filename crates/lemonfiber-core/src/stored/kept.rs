@@ -160,6 +160,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::autostart,
     },
     Entry {
+        accessor: "boot",
+        what: "which restart of this machine was last acted on",
+        why: "So a run can tell a machine that has just restarted from one that has not, and \
+              report a boot that failed once rather than every time you type something. It is \
+              what this machine did, kept apart from what you asked for.",
+        secret: false,
+        at: Paths::boot,
+    },
+    Entry {
         accessor: "accepted",
         what: "the questions you have already settled",
         why: "The choices whose cost was stated to you once — running with no VPN, or with a \

@@ -27,6 +27,7 @@ mod autostart;
 pub mod backup;
 mod bandwidth;
 mod beside;
+mod boot;
 pub mod bundle;
 mod command;
 pub mod conditions;
@@ -258,6 +259,15 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
+    // What a failed restart left, said before the answer to whatever was actually
+    // asked for — and once, however many commands follow it. A boot that failed at
+    // four in the morning has nobody to tell, so the only moment it can reach the
+    // operator is the next one they are present at, and that is any command at all
+    // rather than a particular one. The run a login starts is excluded: it is the
+    // thing being reported on, not somebody arriving to be told.
+    if !matches!(command, Command::AtBoot) {
+        boot::reported(ctx).await;
+    }
     routed(rehearsal::carried(command, ctx), ctx).await
 }
 
@@ -272,6 +282,9 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
+        // The same start with four questions in front of it and two behind it, none
+        // of which a start somebody typed should ask.
+        Command::AtBoot => boot::at_boot(ctx).await,
         Command::Start { forms, services } => acting(ctx, &forms, Action::Start(services)).await,
         Command::Down { forms, wait } => engine::teardown(ctx, &forms, wait).await,
         Command::Halt { forms, services } => acting(ctx, &forms, Action::Stop(services)).await,
@@ -308,7 +321,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Expiring(arranged) => expiring::expiring(ctx, arranged, expiring::SWEEPING)
             .await
             .map(Outcome::Household),
-        // The short command that decides what becomes of the two long ones. It reads
+        // The short command that decides what becomes of the long ones. It reads
         // after it writes rather than reporting what a write claimed, because a written
         // definition is not a running command and this exists to tell the two apart.
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),

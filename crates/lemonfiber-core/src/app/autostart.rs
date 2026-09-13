@@ -149,6 +149,7 @@ mod tests {
             stack_edits: Vec::new(),
             forwarding: None,
             switched: None,
+            held: None,
         }
     }
 

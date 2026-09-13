@@ -146,6 +146,22 @@ impl Paths {
         self.config.join("autostart.json")
     }
 
+    /// Which restart of this machine lemonfiber last acted on.
+    ///
+    /// The observation half of autostart, kept apart from the answer beside it on
+    /// purpose: one records what the operator asked for and the other records what
+    /// this machine did, and a single file holding both is the `enabled-unverified`
+    /// trap committed to disk — a record that cannot tell wanting from working.
+    ///
+    /// Kept with configuration rather than beside the stack because losing it is not
+    /// free: a run that forgot which restart it had already acted on would verify the
+    /// same boot again, and report a failure the operator was told about a week ago as
+    /// though it had just happened.
+    #[must_use]
+    pub fn boot(&self) -> PathBuf {
+        self.config.join("boot.json")
+    }
+
     /// What the household declared about its line: the limits, the hours, the cap,
     /// and what the line has been seen to carry. Kept with configuration for the
     /// same reasons the quality choice is, and for one of its own — the measured
@@ -296,6 +312,7 @@ mod tests {
             paths.quality(),
             paths.notifications(),
             paths.autostart(),
+            paths.boot(),
             paths.bandwidth(),
             paths.accepted(),
             paths.refusals(),
@@ -421,6 +438,7 @@ mod tests {
             paths.materialised(),
             paths.quality(),
             paths.autostart(),
+            paths.boot(),
             paths.bandwidth(),
             paths.admission(),
             paths.updates(),

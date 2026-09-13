@@ -171,6 +171,13 @@ fn unfinished(report: &LifecycleReport) -> String {
 /// What a lifecycle command did, or would have done.
 pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     let mut lines = Lines::default();
+    // A start that declined to start anything has one thing to say, and the plan
+    // underneath it is the plan it did not run. Printing that first would read as an
+    // account of what happened, which is the opposite of what this report is.
+    if let Some(held) = &report.held {
+        lines.put(format!("{}: nothing was started — {held}", report.action));
+        return lines;
+    }
     if report.rehearsed {
         lines.put("would run:");
         // Both invocations, in the order they would run. A switch that stops

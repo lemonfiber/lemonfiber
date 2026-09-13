@@ -79,6 +79,7 @@ pub mod jellyfin;
 pub mod journal;
 pub mod lidarr;
 pub mod logs;
+pub mod machine;
 pub mod materialised;
 pub mod migration;
 pub mod model;

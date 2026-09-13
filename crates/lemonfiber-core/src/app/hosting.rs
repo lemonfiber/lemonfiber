@@ -1,9 +1,11 @@
 //! Handing a long-running command to this machine, and taking it back.
 //!
-//! Two of this product's guarantees are made by a command that has to keep
-//! running, and both of them end when the terminal that started them closes.
-//! This is what makes them survive it: the operating system's own service
-//! manager is asked to run the same command the operator would have typed.
+//! Three of this product's guarantees are made by a command the terminal that
+//! started it would otherwise take with it. Two of them keep running for weeks; the
+//! third is a start that has to happen again at every login, which is the same
+//! promise reached from the other direction. This is what makes all three survive:
+//! the operating system's own service manager is asked to run the very command the
+//! operator would have typed.
 //!
 //! Nothing here reports success from having written a file. What a reading says
 //! is what the manager answered, and where the manager would not answer, that is

@@ -230,6 +230,7 @@ async fn readied(
         stack_edits,
         forwarding: None,
         switched: None,
+        held: None,
     };
     Ok((manifest, command, report))
 }

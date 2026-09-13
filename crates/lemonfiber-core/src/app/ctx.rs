@@ -17,6 +17,7 @@ use crate::ports::docker::{Engine, Images};
 use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
+use crate::ports::machine::{Started, Supply};
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
 use crate::ports::nntp::Nntp;
@@ -87,6 +88,21 @@ pub struct Ctx {
     /// one particular machine, so a test written against the real ones would pass
     /// where it was written and nowhere else.
     pub site: Arc<dyn Site>,
+    /// How this machine is asked when it last started.
+    ///
+    /// A port beside [`Self::site`] and for the same reason: it is a fact about one
+    /// particular machine at one particular moment, so a test written against the
+    /// real one would pass where it was written and nowhere else. It is what lets a
+    /// run tell "this machine has restarted since I last looked" from "it has not",
+    /// which nothing in this workspace could say before.
+    pub started: Arc<dyn Started>,
+    /// How this machine is asked where its power is coming from.
+    ///
+    /// Beside the one above, built over the same runner, and read by exactly one
+    /// decision: whether a start nobody asked for should happen while a laptop is on
+    /// its battery. A media stack started on battery empties one in an afternoon,
+    /// which is a thing to have chosen rather than a thing to discover.
+    pub power: Arc<dyn Supply>,
     /// How a credential is proven against the service it authenticates to.
     ///
     /// A port because setup proves one the moment it is entered, on every surface:
@@ -194,6 +210,13 @@ impl Ctx {
         // rather than over the machine: asking this machine its name means running a
         // program, and which program runner that is, is this context's answer already.
         let site: Arc<dyn Site> = Arc::new(crate::network::Here::over(Arc::clone(&runner)));
+        // One object answering both questions about this machine's state, held as the
+        // two seams that ask them. Built here rather than handed over for the reason
+        // the site is: asking means running a program, and which program runner that
+        // is, is this context's answer already.
+        let asking = Arc::new(crate::machine::Asking::over(Arc::clone(&runner)));
+        let started: Arc<dyn Started> = Arc::clone(&asking) as Arc<dyn Started>;
+        let power: Arc<dyn Supply> = asking as Arc<dyn Supply>;
         Self {
             dry_run: false,
             force: false,
@@ -211,6 +234,8 @@ impl Ctx {
             http,
             random,
             site,
+            started,
+            power,
             // Nobody, until a surface says otherwise. A context is built before the
             // thing that would listen exists in both surfaces, and a default that
             // said something would have to guess where.
@@ -375,6 +400,27 @@ impl Ctx {
     #[must_use]
     pub fn with_volume(mut self, volume: Arc<dyn Volume>) -> Self {
         self.volume = volume;
+        self
+    }
+
+    /// The same context, asking the given seam when this machine last started.
+    ///
+    /// So a test can drive the one decision that turns on it — whether this run is
+    /// the first since a restart — without a machine that has actually restarted,
+    /// which no test can arrange.
+    #[must_use]
+    pub fn with_started(mut self, started: Arc<dyn Started>) -> Self {
+        self.started = started;
+        self
+    }
+
+    /// The same context, asking the given seam where the power comes from.
+    ///
+    /// For the reason above: the machine a test runs on is plugged into whatever it
+    /// is plugged into, and both answers have to be exercised from it.
+    #[must_use]
+    pub fn with_power(mut self, power: Arc<dyn Supply>) -> Self {
+        self.power = power;
         self
     }
 

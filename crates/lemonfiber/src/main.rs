@@ -267,9 +267,14 @@ async fn main() -> ExitCode {
         // not: it affects what is running rather than what a form holds — a restart of
         // one named service touches one service — so "starts eight services" before it
         // would be a sentence about the wrong set.
-        Request::Up { forms, services } => {
-            return starting(&ctx, &forms, &services, cli.json).await
-        }
+        // A start at a login has nobody watching it, so unlike the one below it has
+        // nothing to stream to and nothing to announce — and what it starts is not in
+        // the request at all. It goes through dispatch like every other value that
+        // arrives once.
+        Request::Up { at_boot: true, .. } => Command::AtBoot,
+        Request::Up {
+            forms, services, ..
+        } => return starting(&ctx, &forms, &services, cli.json).await,
         Request::Down {
             forms,
             services,
