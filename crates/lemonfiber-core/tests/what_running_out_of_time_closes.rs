@@ -157,13 +157,19 @@ async fn the_clock_closes_what_ran_out_and_leaves_it_all_on_the_record() {
         "nothing was closed at the request service"
     );
     let carried = sent(&transport, "pushover.net");
-    assert!(carried.contains("30 days"), "{carried}");
-    assert!(carried.contains(r#""title":"Why""#), "{carried}");
+    assert!(
+        carried.contains("30 days"),
+        "how long they have did not travel"
+    );
+    assert!(
+        carried.contains(r#""title":"Why""#),
+        "the one word over the reason did not travel"
+    );
     // The request service sends the decline itself, so what leaves here is why and
     // nothing else — a second message saying it was declined is the duplicate this
     // product refuses to send.
     for absent in ["declined", "lemonfiber", "http://", "Alex"] {
-        assert!(!carried.contains(absent), "{absent} travelled: {carried}");
+        assert!(!carried.contains(absent), "{absent} travelled");
     }
 
     let read = dispatch(Command::Household { member: None }, &ctx)

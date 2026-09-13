@@ -392,11 +392,20 @@ mod tests {
 
         let outcome = format!("{:?}", answering(&body).validate(&indexer()).await);
 
-        assert!(!outcome.contains(&key), "{outcome}");
+        assert!(
+            !outcome.contains(&key),
+            "the key the indexer quoted back survived into the outcome"
+        );
         // And the reason survives, which is the whole of what the operator is given:
         // a refusal with its refusal withheld says only that something went wrong.
-        assert!(outcome.contains("the indexer refused the key"), "{outcome}");
-        assert!(outcome.contains("has expired"), "{outcome}");
+        assert!(
+            outcome.contains("the indexer refused the key"),
+            "the reason the key was refused went with the key"
+        );
+        assert!(
+            outcome.contains("has expired"),
+            "what the indexer said about the key went with the key"
+        );
     }
 
     #[tokio::test]

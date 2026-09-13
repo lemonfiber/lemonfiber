@@ -242,10 +242,13 @@ mod tests {
             "OPENVPN_USER=somebody\n",
         );
 
-        assert!(!shown.contains(&account), "{shown}");
+        assert!(
+            !shown.contains(&account),
+            "the account number survived into the diff"
+        );
         assert!(
             shown.contains("OPENVPN_USER"),
-            "the operator learns which drifted: {shown}"
+            "the operator does not learn which setting drifted"
         );
         assert_eq!(shown.matches(REDACTED).count(), 2, "both sides withheld");
     }
@@ -261,8 +264,14 @@ mod tests {
             "INDEXER_URL=https://indexer.example/api\n",
         );
 
-        assert!(!shown.contains(&key), "{shown}");
-        assert!(shown.contains("https://indexer.example/api"), "{shown}");
+        assert!(
+            !shown.contains(&key),
+            "the key in the query survived into the diff"
+        );
+        assert!(
+            shown.contains("https://indexer.example/api"),
+            "the address went with the key riding in its query"
+        );
     }
 
     #[test]

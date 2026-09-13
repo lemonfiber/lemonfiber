@@ -287,17 +287,20 @@ async fn what_was_entered_never_comes_back() {
     let said = answer(&paths, &submitted).await.map(|(_, body)| body);
 
     let body = said.unwrap_or_default();
-    assert!(!body.contains(&key), "the key came back: {body}");
+    assert!(!body.contains(&key), "the key came back in the answer");
     assert!(
         body.contains("(set, not shown)"),
-        "and is marked present: {body}"
+        "the key that was entered is not marked present"
     );
     // Nor on a later read of where things stand.
     let later = standing(&paths)
         .await
         .map(|(_, body)| body)
         .unwrap_or_default();
-    assert!(!later.contains(&key), "{later}");
+    assert!(
+        !later.contains(&key),
+        "the key came back on a later read of where things stand"
+    );
     // A caller cannot assert a credential was proven by saying it was: what is
     // recorded is what the live test established, and nothing answered here.
     assert!(

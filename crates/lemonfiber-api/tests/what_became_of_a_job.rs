@@ -372,7 +372,10 @@ async fn a_name_that_was_handed_out_is_not_repeated_back_to_a_caller_that_guesse
     // What was asked for is not quoted into the refusal: a name is a secret this
     // run minted, and a message repeating one carries it wherever the message goes.
     let (_, body) = asked(Jobs::default(), "deadbeef").await;
-    assert!(!body.contains("deadbeef"), "{body}");
+    assert!(
+        !body.contains("deadbeef"),
+        "the name the caller guessed was repeated back to them"
+    );
 }
 
 // ── Ending work by the name it was answered with ─────────────────────────────

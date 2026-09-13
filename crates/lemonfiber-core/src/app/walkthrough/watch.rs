@@ -429,15 +429,21 @@ mod tests {
         let said = what_was_said(&ctx, &services(&ctx), "Sintel")
             .await
             .join("");
-        assert!(!said.contains(&secret), "{said}");
+        assert!(
+            !said.contains(&secret),
+            "the credential survived into what the service was quoted as saying"
+        );
         // What is left has to still be the diagnosis: the service that wrote it, the
         // item it is about, and the reason. A rule that ate the sentence would leave an
         // operator a stop with nothing under it.
         assert!(
             said.starts_with("sonarr: Sintel: import refused,"),
-            "{said}"
+            "the service, the item and the refusal went with the credential"
         );
-        assert!(said.ends_with("was rejected"), "{said}");
+        assert!(
+            said.ends_with("was rejected"),
+            "why the import was refused went with the credential"
+        );
     }
 
     #[tokio::test]
