@@ -431,54 +431,73 @@ mod tests {
     /// The sub-patterns are listed beside the variants they split, because the split is
     /// where the mistake lives: `Support { write: false }` and `Support { .. }` are one
     /// word to an operator and two arms here.
+    ///
+    /// One group below per verdict, and the verdict written once for the group rather
+    /// than once per row. A row under the wrong heading used to be a row that still
+    /// declared the right answer beside itself, and read correctly while sitting in the
+    /// wrong place; now the heading is the answer.
     fn every_verdict() -> Vec<(Command, Rehearsal)> {
+        fn under(commands: Vec<Command>, verdict: Rehearsal) -> Vec<(Command, Rehearsal)> {
+            commands
+                .into_iter()
+                .map(|command| (command, verdict))
+                .collect()
+        }
+
+        let mut every = under(reads(), Rehearsal::Reads);
+        every.extend(refused_for_good());
+        every.extend(under(reports(), Rehearsal::Reports));
+        every.extend(under(untaught(), Rehearsal::Untaught));
+        every
+    }
+
+    /// The commands a rehearsal runs exactly as it always does.
+    ///
+    /// Nothing here reaches for anything it could put back, so there is nothing to
+    /// hold off on and no report to give in place of the work.
+    fn reads() -> Vec<Command> {
         vec![
-            // Reads. Nothing here reaches for anything it could put back.
-            (Command::Version, Rehearsal::Reads),
-            (Command::Forms, Rehearsal::Reads),
-            (
-                Command::Preview {
-                    forms: vec!["library".to_owned()],
-                },
-                Rehearsal::Reads,
-            ),
-            (
-                Command::ConfigGet {
-                    key: "DATA_ROOT".to_owned(),
-                },
-                Rehearsal::Reads,
-            ),
-            (Command::ConfigShow, Rehearsal::Reads),
-            (Command::History, Rehearsal::Reads),
-            (Command::Ps { forms: Vec::new() }, Rehearsal::Reads),
-            (Command::Stuck, Rehearsal::Reads),
-            (Command::FrontDoor, Rehearsal::Reads),
-            (
-                Command::Explain {
-                    word: "seeding".to_owned(),
-                },
-                Rehearsal::Reads,
-            ),
-            (Command::Glossary, Rehearsal::Reads),
-            (Command::Clients, Rehearsal::Reads),
-            (Command::Outbound, Rehearsal::Reads),
-            (Command::Stored, Rehearsal::Reads),
-            (Command::Archives, Rehearsal::Reads),
-            (Command::Migrate(MigrateAction::Survey), Rehearsal::Reads),
-            (Command::Credentials(Asking::Read), Rehearsal::Reads),
-            (
-                Command::Credentials(Asking::Reveal {
-                    credential: "qbittorrent".to_owned(),
-                    confirmed: true,
-                }),
-                Rehearsal::Reads,
-            ),
-            (Command::Hosting(Keeping::Read), Rehearsal::Reads),
-            (Command::Setup(SetupAction::Where), Rehearsal::Reads),
-            (bundling(false), Rehearsal::Reads),
-            (tracing(false), Rehearsal::Reads),
-            (examining(false), Rehearsal::Reads),
-            // The three that refuse the flag for good, each with its own reason.
+            Command::Version,
+            Command::Forms,
+            Command::Preview {
+                forms: vec!["library".to_owned()],
+            },
+            Command::ConfigGet {
+                key: "DATA_ROOT".to_owned(),
+            },
+            Command::ConfigShow,
+            Command::History,
+            Command::Ps { forms: Vec::new() },
+            Command::Stuck,
+            Command::FrontDoor,
+            Command::Explain {
+                word: "seeding".to_owned(),
+            },
+            Command::Glossary,
+            Command::Clients,
+            Command::Outbound,
+            Command::Stored,
+            Command::Archives,
+            Command::Migrate(MigrateAction::Survey),
+            Command::Credentials(Asking::Read),
+            Command::Credentials(Asking::Reveal {
+                credential: "qbittorrent".to_owned(),
+                confirmed: true,
+            }),
+            Command::Hosting(Keeping::Read),
+            Command::Setup(SetupAction::Where),
+            bundling(false),
+            tracing(false),
+            examining(false),
+        ]
+    }
+
+    /// The three that refuse the flag for good, each with its own reason.
+    ///
+    /// Listed with their reasons rather than under one verdict, because here the
+    /// reason is the whole of the verdict: they differ in nothing else.
+    fn refused_for_good() -> Vec<(Command, Rehearsal)> {
+        vec![
             (tracing(true), Rehearsal::Cannot(A_SEARCH_IS_THE_ANSWER)),
             (
                 examining(true),
@@ -488,180 +507,125 @@ mod tests {
                 Command::Walkthrough { item: None },
                 Rehearsal::Cannot(THE_WALK_IS_THE_OBSERVATION),
             ),
-            // Reports. Each builds what it would have filled in and stops before the
-            // step it cannot take back.
-            (Command::Up { forms: Vec::new() }, Rehearsal::Reports),
-            (
-                Command::Start {
-                    forms: Vec::new(),
-                    services: Vec::new(),
-                },
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Down {
-                    forms: Vec::new(),
-                    wait: Waiting::Never,
-                },
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Halt {
-                    forms: Vec::new(),
-                    services: Vec::new(),
-                },
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Switch {
-                    forms: vec!["library".to_owned()],
-                },
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Restart {
-                    forms: Vec::new(),
-                    services: Vec::new(),
-                },
-                Rehearsal::Reports,
-            ),
-            (Command::Pull { forms: Vec::new() }, Rehearsal::Reports),
-            (
-                Command::ConfigSet(Setting::to("DATA_ROOT", "/srv/library").agreed(true)),
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Quality(QualityAction::Set {
-                    preset: crate::quality::Preset::Maximum,
-                    media_type: None,
-                    confirm: true,
-                }),
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Alerts(AlertAction::Set(crate::alert::Appetite::Everything)),
-                Rehearsal::Reports,
-            ),
-            (
-                Command::QualityMusic {
-                    format: crate::audio::Format::Lossless,
-                },
-                Rehearsal::Reports,
-            ),
-            (Command::Household { member: None }, Rehearsal::Reports),
-            (Command::Allowing(Chosen::default()), Rehearsal::Reports),
-            (
-                Command::Deciding(Decision {
-                    request: 1,
-                    answer: crate::app::Answer::LetThrough,
-                }),
-                Rehearsal::Reports,
-            ),
-            (Command::Expiring(Arranged::After(30)), Rehearsal::Reports),
-            (
-                Command::Hosting(Keeping::Install {
-                    what: crate::app::Hostable::Watch,
-                    forms: Vec::new(),
-                }),
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Invite {
-                    name: "ana".to_owned(),
-                    allowance: crate::app::Allowance::default(),
-                },
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Reissue {
-                    name: "ana".to_owned(),
-                },
-                Rehearsal::Reports,
-            ),
-            (Command::Forget { confirm: true }, Rehearsal::Reports),
-            (Command::Space { confirm: true }, Rehearsal::Reports),
-            (
-                Command::StopSeeding {
-                    download: "anything".to_owned(),
-                    agreement: None,
-                },
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Bandwidth(BandwidthAsked {
-                    down: Some("20".to_owned()),
-                    ..BandwidthAsked::default()
-                }),
-                Rehearsal::Reports,
-            ),
-            (
-                Command::Uninstall(Removing {
-                    tier: crate::uninstall::Tier::Configuration,
-                    confirm: true,
-                    agreement: None,
-                    waiting: Waiting::Never,
-                }),
-                Rehearsal::Reports,
-            ),
-            // Untaught. Each changes something and refuses the flag until it has been
-            // taught to say what it would change.
-            (examining_accepting(), Rehearsal::Untaught),
-            (Command::Watch { forms: Vec::new() }, Rehearsal::Untaught),
-            (
-                Command::Migrate(MigrateAction::Act {
-                    mode: crate::migration::mode::Mode::Adopt,
-                    confirmed: true,
-                }),
-                Rehearsal::Untaught,
-            ),
-            (
-                Command::Remove {
-                    name: "ana".to_owned(),
-                    confirm: true,
-                },
-                Rehearsal::Untaught,
-            ),
-            (
-                Command::QualityUpgrade { confirm: true },
-                Rehearsal::Untaught,
-            ),
-            (
-                Command::Repair {
-                    consent: crate::app::repair::Consent::Standing,
-                    disruptive: false,
-                },
-                Rehearsal::Untaught,
-            ),
-            (Command::Undo { run: None }, Rehearsal::Untaught),
-            (
-                Command::Credentials(Asking::Rotate {
-                    credential: "qbittorrent".to_owned(),
-                }),
-                Rehearsal::Untaught,
-            ),
-            (Command::SelfUpdate { to: None }, Rehearsal::Untaught),
-            (Command::Seed, Rehearsal::Untaught),
-            (Command::Adopt, Rehearsal::Untaught),
-            (Command::Reset { confirm: true }, Rehearsal::Untaught),
-            (Command::Setup(SetupAction::Apply), Rehearsal::Untaught),
-            (
-                Command::Update(crate::app::update::Asked {
-                    service: None,
-                    confirm: true,
-                    wait: Waiting::Never,
-                }),
-                Rehearsal::Untaught,
-            ),
-            (Command::Backup { service: None }, Rehearsal::Untaught),
-            (bundling(true), Rehearsal::Untaught),
-            (
-                Command::Restore {
-                    archive: crate::app::restore::Kept::Named("anything".to_owned()),
-                    repoint: false,
-                    consent: crate::app::restore::Consent::Standing,
-                },
-                Rehearsal::Untaught,
-            ),
+        ]
+    }
+
+    /// The commands that report instead of acting.
+    ///
+    /// Each builds what it would have filled in and stops before the step it cannot
+    /// take back.
+    fn reports() -> Vec<Command> {
+        vec![
+            Command::Up { forms: Vec::new() },
+            Command::Start {
+                forms: Vec::new(),
+                services: Vec::new(),
+            },
+            Command::Down {
+                forms: Vec::new(),
+                wait: Waiting::Never,
+            },
+            Command::Halt {
+                forms: Vec::new(),
+                services: Vec::new(),
+            },
+            Command::Switch {
+                forms: vec!["library".to_owned()],
+            },
+            Command::Restart {
+                forms: Vec::new(),
+                services: Vec::new(),
+            },
+            Command::Pull { forms: Vec::new() },
+            Command::ConfigSet(Setting::to("DATA_ROOT", "/srv/library").agreed(true)),
+            Command::Quality(QualityAction::Set {
+                preset: crate::quality::Preset::Maximum,
+                media_type: None,
+                confirm: true,
+            }),
+            Command::Alerts(AlertAction::Set(crate::alert::Appetite::Everything)),
+            Command::QualityMusic {
+                format: crate::audio::Format::Lossless,
+            },
+            Command::Household { member: None },
+            Command::Allowing(Chosen::default()),
+            Command::Deciding(Decision {
+                request: 1,
+                answer: crate::app::Answer::LetThrough,
+            }),
+            Command::Expiring(Arranged::After(30)),
+            Command::Hosting(Keeping::Install {
+                what: crate::app::Hostable::Watch,
+                forms: Vec::new(),
+            }),
+            Command::Invite {
+                name: "ana".to_owned(),
+                allowance: crate::app::Allowance::default(),
+            },
+            Command::Reissue {
+                name: "ana".to_owned(),
+            },
+            Command::Forget { confirm: true },
+            Command::Space { confirm: true },
+            Command::StopSeeding {
+                download: "anything".to_owned(),
+                agreement: None,
+            },
+            Command::Bandwidth(BandwidthAsked {
+                down: Some("20".to_owned()),
+                ..BandwidthAsked::default()
+            }),
+            Command::Uninstall(Removing {
+                tier: crate::uninstall::Tier::Configuration,
+                confirm: true,
+                agreement: None,
+                waiting: Waiting::Never,
+            }),
+        ]
+    }
+
+    /// The commands that change something and have not been taught to say what.
+    ///
+    /// The flag is refused rather than ignored, which is the whole of the difference
+    /// this module exists to make.
+    fn untaught() -> Vec<Command> {
+        vec![
+            examining_accepting(),
+            Command::Watch { forms: Vec::new() },
+            Command::Migrate(MigrateAction::Act {
+                mode: crate::migration::mode::Mode::Adopt,
+                confirmed: true,
+            }),
+            Command::Remove {
+                name: "ana".to_owned(),
+                confirm: true,
+            },
+            Command::QualityUpgrade { confirm: true },
+            Command::Repair {
+                consent: crate::app::repair::Consent::Standing,
+                disruptive: false,
+            },
+            Command::Undo { run: None },
+            Command::Credentials(Asking::Rotate {
+                credential: "qbittorrent".to_owned(),
+            }),
+            Command::SelfUpdate { to: None },
+            Command::Seed,
+            Command::Adopt,
+            Command::Reset { confirm: true },
+            Command::Setup(SetupAction::Apply),
+            Command::Update(crate::app::update::Asked {
+                service: None,
+                confirm: true,
+                wait: Waiting::Never,
+            }),
+            Command::Backup { service: None },
+            bundling(true),
+            Command::Restore {
+                archive: crate::app::restore::Kept::Named("anything".to_owned()),
+                repoint: false,
+                consent: crate::app::restore::Consent::Standing,
+            },
         ]
     }
 
