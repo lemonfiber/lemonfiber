@@ -487,7 +487,7 @@ mod tests {
         assert!(!said.is_empty(), "it refused, and said why");
         assert!(
             !said.contains(&live),
-            "and the refusal does not carry the value: {said}"
+            "the refusal carries the value the file now holds"
         );
         assert!(
             said.contains("INDEXER_APIKEY") && said.contains("something else"),

@@ -232,7 +232,7 @@ async fn the_credential_never_appears_in_a_finding() {
         let rendered = serde_json::to_string(&check.run().await).unwrap_or_default();
         assert!(
             !rendered.contains(THE_KEY),
-            "the credential leaked into a finding: {rendered}"
+            "the credential leaked into a finding"
         );
     }
 }

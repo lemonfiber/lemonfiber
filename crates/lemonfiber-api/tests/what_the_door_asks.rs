@@ -202,11 +202,13 @@ async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_t
         answer
             .body
             .starts_with(r#"{"api_version":1,"kind":"admission","data":{"token":"#),
-        "{}",
-        answer.body
+        "the right password was not exchanged for an admission carrying a session"
     );
     let opened = session(&answer.body);
-    assert!(!opened.is_empty(), "{}", answer.body);
+    assert!(
+        !opened.is_empty(),
+        "the admission carried no session for the rest of the surface to take"
+    );
     // And what it handed back is a secret the rest of the surface takes, which is the
     // whole of what being given one is worth.
     assert!(

@@ -408,11 +408,14 @@ async fn a_request_that_went_is_written_down_where_the_operator_can_read_it() {
     assert!(answered.is_ok(), "the request still happened");
     assert!(
         written.contains("indexer.example"),
-        "where it went is written down: {written:?}"
+        "where the request went was not written down"
     );
-    assert!(written.contains("204"), "and what came back: {written:?}");
+    assert!(
+        written.contains("204"),
+        "what came back was not written down"
+    );
     assert!(
         !written.contains("the-indexer-key"),
-        "and the credential is not, in the URL or the header: {written:?}"
+        "the indexer key was written down, in the URL or the header"
     );
 }

@@ -152,10 +152,13 @@ async fn a_bundle_holds_the_recent_logs_with_the_keys_in_them_replaced() {
         .find(|piece| piece.name == "logs.txt")
         .map(|piece| piece.body.clone())
         .unwrap_or_default();
-    assert!(logs.contains("https://indexer.example.com/api?"), "{logs}");
+    assert!(
+        logs.contains("https://indexer.example.com/api?"),
+        "the address went with the key riding in its query"
+    );
     assert!(
         !logs.contains(&key_shaped()),
-        "the key does not ride out: {logs}"
+        "the key rode out in the bundle"
     );
 
     // Stated, because an extract that does not say what it is an extract of reads as the

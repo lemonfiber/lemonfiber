@@ -706,7 +706,7 @@ mod tests {
         assert!(
             !rendered.contains(&withheld_value("indexer"))
                 && !rendered.contains(&withheld_value("provider")),
-            "neither reaches anything a caller could log: {rendered}"
+            "a credential reaches anything a caller could log"
         );
     }
 
@@ -739,15 +739,18 @@ mod tests {
 
         assert!(
             !rendered.contains(&withheld_value("indexer")),
-            "the key reaches a caller that may log it: {rendered}"
+            "the key reaches a caller that may log it"
         );
         // And what the operator is deciding on survives. A refusal whose reason has
         // been withheld says only that something went wrong.
         assert!(
             rendered.contains("the indexer refused the key"),
-            "and the reason it was refused does not: {rendered}"
+            "the reason the key was refused went with the key"
         );
-        assert!(rendered.contains("has expired"), "{rendered}");
+        assert!(
+            rendered.contains("has expired"),
+            "what the indexer said about the key went with the key"
+        );
     }
 
     #[tokio::test]

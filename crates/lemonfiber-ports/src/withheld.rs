@@ -358,6 +358,18 @@ mod tests {
         ["abcdef", "1234", "567890"].concat()
     }
 
+    /// The half of a fixture line it is safe to quote: the name in front of the value.
+    ///
+    /// Every line these cases are built from carries the credential itself, and a
+    /// failure message is copied into a CI log — read by more people and kept far
+    /// longer than the machine that wrote it. The name says which case broke, which
+    /// is what a reader of the failure needs; the value behind it says nothing they
+    /// do, and an assertion that a credential was withheld must not be the thing
+    /// that carries it onward.
+    fn named(line: &str) -> &str {
+        line.split(['=', ':']).next().unwrap_or(line).trim()
+    }
+
     #[test]
     fn a_login_in_front_of_a_host_is_withheld_even_where_the_address_carries_no_query() {
         // The gap this closes: the query rule reached the password only as a
@@ -430,8 +442,16 @@ mod tests {
             format!("homepage-var-jellyfin-key={secret}"),
         ] {
             let shown = withheld(&line);
-            assert!(shown.ends_with(REDACTED), "{line} -> {shown}");
-            assert!(!shown.contains(&secret), "{line} -> {shown}");
+            assert!(
+                shown.ends_with(REDACTED),
+                "{}: the value was not replaced by the marker",
+                named(&line)
+            );
+            assert!(
+                !shown.contains(&secret),
+                "{}: the credential survived being withheld",
+                named(&line)
+            );
         }
     }
 
@@ -466,9 +486,18 @@ mod tests {
             ),
         ] {
             let shown = withheld(&line);
-            assert!(!shown.contains(&secret), "{line} -> {shown}");
-            assert!(shown.contains(REDACTED), "{line} -> {shown}");
-            assert!(shown.contains(survives), "{line} -> {shown}");
+            assert!(
+                !shown.contains(&secret),
+                "{survives}: the credential survived being withheld"
+            );
+            assert!(
+                shown.contains(REDACTED),
+                "{survives}: nothing marked that a value had been taken"
+            );
+            assert!(
+                shown.contains(survives),
+                "{survives}: the sentence around the credential went with it"
+            );
         }
     }
 
@@ -516,8 +545,14 @@ mod tests {
         let secret = a_credential();
         let detail = format!("the indexer refused the key: it expired\nINDEXER_APIKEY={secret}");
         let shown = withheld_text(&detail);
-        assert!(shown.contains("it expired"), "{shown}");
-        assert!(!shown.contains(&secret), "{shown}");
+        assert!(
+            shown.contains("it expired"),
+            "the reason on the first line went with the credential on the second"
+        );
+        assert!(
+            !shown.contains(&secret),
+            "the credential on the second line survived being withheld"
+        );
     }
 
     #[test]
@@ -533,15 +568,24 @@ mod tests {
         );
         let shown = withheld(&line);
 
-        assert!(!shown.contains(&secret), "{line} -> {shown}");
+        assert!(
+            !shown.contains(&secret),
+            "the key behind the second parameter survived being withheld"
+        );
         // And what the sentence was for survives: which service, which address, and
         // that the request failed.
-        assert!(shown.contains("sonarr: GET"), "{line} -> {shown}");
+        assert!(
+            shown.contains("sonarr: GET"),
+            "which service made the request went with the key"
+        );
         assert!(
             shown.contains("https://indexer.example/api?"),
-            "{line} -> {shown}"
+            "the address the request went to went with the key"
         );
-        assert!(shown.ends_with("failed"), "{line} -> {shown}");
+        assert!(
+            shown.ends_with("failed"),
+            "that the request failed went with the key"
+        );
     }
 
     #[test]
@@ -578,8 +622,16 @@ mod tests {
             format!("token={secret}"),
         ] {
             let shown = withheld(&line);
-            assert!(!shown.contains(&secret), "{line} -> {shown}");
-            assert!(shown.contains(REDACTED), "{line} -> {shown}");
+            assert!(
+                !shown.contains(&secret),
+                "{}: the credential survived being withheld",
+                named(&line)
+            );
+            assert!(
+                shown.contains(REDACTED),
+                "{}: nothing marked that a value had been taken",
+                named(&line)
+            );
         }
     }
 
@@ -627,8 +679,14 @@ mod tests {
             "https://indexer.example/api"
         );
         let shown = without_query(&format!("https://indexer.example/api?apikey={key}"));
-        assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
-        assert!(!shown.contains(&key), "{shown}");
+        assert!(
+            shown.starts_with("https://indexer.example/api?"),
+            "the address went with the query it carried"
+        );
+        assert!(
+            !shown.contains(&key),
+            "the key in the query survived into the shown address"
+        );
     }
 
     #[test]
@@ -638,9 +696,18 @@ mod tests {
         // what somebody checks when a login is refused.
         let secret = a_credential();
         let shown = without_credentials(&format!("https://operator:{secret}@indexer.example/api"));
-        assert!(!shown.contains(&secret), "{shown}");
-        assert!(shown.starts_with("https://operator:"), "{shown}");
-        assert!(shown.ends_with("@indexer.example/api"), "{shown}");
+        assert!(
+            !shown.contains(&secret),
+            "the password in front of the host survived into the shown address"
+        );
+        assert!(
+            shown.starts_with("https://operator:"),
+            "the account went with the password beside it"
+        );
+        assert!(
+            shown.ends_with("@indexer.example/api"),
+            "the host and the path went with the password in front of them"
+        );
     }
 
     #[test]
@@ -651,12 +718,18 @@ mod tests {
         let shown = withheld(&format!(
             "prowlarr refused https://operator:{secret}@indexer.example/api?t=caps&apikey={secret}"
         ));
-        assert!(!shown.contains(&secret), "{shown}");
+        assert!(
+            !shown.contains(&secret),
+            "a credential carried in two places survived in one of them"
+        );
         assert!(
             shown.starts_with("prowlarr refused https://operator:"),
-            "{shown}"
+            "the sentence and the account went with the password"
         );
-        assert!(shown.contains("@indexer.example/api?"), "{shown}");
+        assert!(
+            shown.contains("@indexer.example/api?"),
+            "the host and the fact of a query went with what they carried"
+        );
     }
 
     #[test]

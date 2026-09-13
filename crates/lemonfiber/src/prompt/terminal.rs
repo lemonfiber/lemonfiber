@@ -494,24 +494,36 @@ mod tests {
 
         let review = reviewed(&plan).join("\n");
 
-        assert!(review.contains("INDEXER_APIKEY = ********"), "{review}");
-        assert!(review.contains("USENET_PASS = ********"), "{review}");
-        assert!(review.contains("USENET_USER = ********"), "{review}");
+        assert!(
+            review.contains("INDEXER_APIKEY = ********"),
+            "the indexer key was not marked present only"
+        );
+        assert!(
+            review.contains("USENET_PASS = ********"),
+            "the provider password was not marked present only"
+        );
+        assert!(
+            review.contains("USENET_USER = ********"),
+            "the provider account was not marked present only"
+        );
         assert!(
             !review.contains(THE_KEY),
-            "the key is in the clear: {review}"
+            "the indexer key stands in the clear on the review"
         );
         assert!(
             !review.contains(THE_LOGIN),
-            "the login is in the clear: {review}"
+            "the provider login stands in the clear on the review"
         );
         // And the settings somebody vouched for are shown as they will be written,
         // or a review that masked everything would say nothing at all.
         assert!(
             review.contains("INDEXER_URL = http://indexer.test"),
-            "{review}"
+            "the indexer address was masked along with the key beside it"
         );
-        assert!(review.contains("DATA_ROOT = /srv/media"), "{review}");
+        assert!(
+            review.contains("DATA_ROOT = /srv/media"),
+            "where the files go was masked along with the credentials"
+        );
         assert!(answered(&[""]).confirm(&plan));
     }
 
@@ -728,13 +740,16 @@ mod tests {
             };
             assert!(
                 review.contains(&format!("  {key} = {shown}")),
-                "{key} is shown the wrong way: {review:?}"
+                "{key} is shown the wrong way on the review"
             );
         }
         // And neither credential reaches the review by any other route.
         let said = review.join("\n");
         for credential in [THE_KEY, THE_LOGIN] {
-            assert!(!said.contains(credential), "{credential} is in {said}");
+            assert!(
+                !said.contains(credential),
+                "a credential reached the review by another route"
+            );
         }
 
         // Confirmed by default: a bare enter applies.

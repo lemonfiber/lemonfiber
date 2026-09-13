@@ -375,15 +375,15 @@ async fn what_a_reversal_reports_carries_no_credential_it_put_back() {
 
     assert!(
         !said.contains("s3cret"),
-        "the reversal reports the credential it restored: {said}"
+        "the reversal reports the credential it restored"
     );
     assert!(
         said.contains("INDEXER_APIKEY"),
-        "which setting went back is still said: {said}"
+        "the reversal does not say which setting went back"
     );
     assert!(
         said.contains(REDACTED),
-        "and it says a value was put back rather than dropping the fact: {said}"
+        "the reversal drops the fact that a value was put back"
     );
 }
 
@@ -406,11 +406,11 @@ async fn a_service_field_named_like_a_credential_is_withheld_in_the_account_too(
 
     assert!(
         !said.contains("s3cret"),
-        "the reversal reports the field it restored: {said}"
+        "the reversal reports the field it restored"
     );
     assert!(
         said.contains("apiKey") && said.contains(REDACTED),
-        "which field went back is said, and that a value went with it: {said}"
+        "the reversal does not say which field went back, or that a value went with it"
     );
 }
 

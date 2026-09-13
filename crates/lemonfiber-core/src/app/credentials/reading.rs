@@ -294,8 +294,14 @@ mod tests {
 
         assert_eq!(state, State::Stale);
         let said = advisory.unwrap_or_default();
-        assert!(said.contains("lemonfiber seed"), "{said}");
-        assert!(!said.contains(&one), "{said}");
+        assert!(
+            said.contains("lemonfiber seed"),
+            "the advisory does not point at the seeding"
+        );
+        assert!(
+            !said.contains(&one),
+            "the key nothing has copied out yet is in the advisory"
+        );
     }
 
     #[test]
@@ -329,8 +335,14 @@ mod tests {
         let said = advisory.unwrap_or_default();
 
         assert!(!said.is_empty());
-        assert!(!said.contains(&held), "{said}");
-        assert!(!said.contains(&published), "{said}");
+        assert!(
+            !said.contains(&held),
+            "the held copy is in what the mismatch says"
+        );
+        assert!(
+            !said.contains(&published),
+            "the published copy is in what the mismatch says"
+        );
     }
 
     #[test]

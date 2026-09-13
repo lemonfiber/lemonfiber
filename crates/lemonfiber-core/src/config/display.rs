@@ -368,14 +368,29 @@ mod tests {
         // secret scanner's finding for as long as the commit exists.
         let key = ["the", "indexer", "key"].join("-");
         let shown = without_credentials(&format!("https://indexer.example/api?apikey={key}"));
-        assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
-        assert!(!shown.contains(&key), "{shown}");
+        assert!(
+            shown.starts_with("https://indexer.example/api?"),
+            "the address went with the key riding in its query"
+        );
+        assert!(
+            !shown.contains(&key),
+            "the key in the query survived into the displayed address"
+        );
         // The other half a URL can carry a credential in, on the surface an operator
         // reads their own settings back from.
         let behind = without_credentials(&format!("https://operator:{key}@indexer.example/api"));
-        assert!(!behind.contains(&key), "{behind}");
-        assert!(behind.starts_with("https://operator:"), "{behind}");
-        assert!(behind.ends_with("@indexer.example/api"), "{behind}");
+        assert!(
+            !behind.contains(&key),
+            "the password in front of the host survived into the displayed address"
+        );
+        assert!(
+            behind.starts_with("https://operator:"),
+            "the account went with the password beside it"
+        );
+        assert!(
+            behind.ends_with("@indexer.example/api"),
+            "the host and the path went with the password in front of them"
+        );
     }
 
     #[test]

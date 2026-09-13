@@ -1141,14 +1141,17 @@ mod tests {
 
         let text = exported(&viewer);
 
-        assert!(!text.contains("letmein"), "the key survived: {text}");
+        assert!(
+            !text.contains("letmein"),
+            "the key in the query survived into the export"
+        );
         assert!(
             text.contains("/api/v3/series?"),
-            "the address it rode in on did not: {text}"
+            "the address the key rode in on went with it"
         );
         assert!(
             text.contains("done"),
-            "and the rest of the line stays: {text}"
+            "the rest of the line went with the key"
         );
     }
 

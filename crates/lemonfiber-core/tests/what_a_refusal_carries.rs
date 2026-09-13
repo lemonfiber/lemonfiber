@@ -48,12 +48,18 @@ async fn the_reason_reaches_the_person_who_asked_and_carries_nothing_else() {
         .unwrap_or_default();
     assert!(
         carried.contains(r#""message":"we already have it dubbed""#),
-        "{carried}"
+        "the reason did not travel"
     );
-    assert!(carried.contains(r#""title":"Why""#), "{carried}");
-    assert!(carried.contains(r#""user":"the-user-key""#), "{carried}");
+    assert!(
+        carried.contains(r#""title":"Why""#),
+        "the one word over the reason did not travel"
+    );
+    assert!(
+        carried.contains(r#""user":"the-user-key""#),
+        "the member's own key did not travel"
+    );
     for absent in ["lemonfiber", "declined", "http://", "Alex"] {
-        assert!(!carried.contains(absent), "{absent} travelled: {carried}");
+        assert!(!carried.contains(absent), "{absent} travelled");
     }
 }
 

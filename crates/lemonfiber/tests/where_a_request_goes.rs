@@ -216,15 +216,15 @@ async fn no_credential_a_request_carries_reaches_a_host_that_asked_for_it() {
 
     assert!(
         !heard.contains(&key),
-        "a host this product never named was handed the service's credential: {heard:?}"
+        "a host this product never named was handed the service's credential"
     );
     assert!(
         !heard.to_lowercase().contains("x-api-key"),
-        "and was sent the credential header at all: {heard:?}"
+        "a host this product never named was sent the credential header at all"
     );
     assert!(
         heard.is_empty(),
-        "nothing whatever should have reached it: {heard:?}"
+        "a host this product never named was reached at all"
     );
 }
 

@@ -281,19 +281,22 @@ async fn a_query_is_withheld_from_an_unreachable_whatever_its_parameters_are_cal
     // a run that reads as one in this source is a secret scanner's finding for as long
     // as the commit exists.
     let key = ["the", "indexer", "key"].join("-");
-    for query in [
-        format!("t=search&apikey={key}"),
-        format!("t=search&r={key}"),
-        format!("mode=queue&sid={key}"),
+    // Named beside each query, because the query itself carries the key: the name of
+    // the parameter is the half of the case a reader of a failure needs, and the half
+    // that is safe to copy into a CI log.
+    for (carried_in, query) in [
+        ("apikey", format!("t=search&apikey={key}")),
+        ("r", format!("t=search&r={key}")),
+        ("sid", format!("mode=queue&sid={key}")),
     ] {
         let rendered = shown_for(&query).await;
         assert!(
             !rendered.contains(&key),
-            "{query}: the key must appear nowhere the operator could see it: {rendered:?}"
+            "{carried_in}: the key appears where the operator could see it"
         );
         assert!(
             rendered.contains("/api?"),
-            "{query}: the address and the fact of a query survive: {rendered:?}"
+            "{carried_in}: the address and the fact of a query went with the key"
         );
     }
 }
@@ -347,11 +350,11 @@ async fn a_cookie_set_by_one_service_is_never_sent_to_another() {
     let asked = indexer.request();
     assert!(
         !asked.contains("a-session-token"),
-        "the other service was handed the session: {asked}"
+        "the other service was handed the session"
     );
     assert!(
         !asked.to_lowercase().contains("cookie:"),
-        "and was sent no cookie header at all: {asked}"
+        "the other service was sent a cookie header at all"
     );
 
     downloads.stop().await;
