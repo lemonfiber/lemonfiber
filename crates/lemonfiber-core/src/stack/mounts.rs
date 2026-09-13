@@ -28,8 +28,13 @@ use serde_yaml_ng::Value;
 const DATA_ROOT: &str = "DATA_ROOT";
 
 /// One service that would see more than one mount beneath the data root.
+///
+/// Public because what is done about it is not settled here. The stack lemonfiber
+/// ships is refused over one of these; a stack directory the operator pointed at is
+/// reported instead, by the storage check that states what it costs them. Both need
+/// to be able to hold one.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Crowded {
+pub struct Crowded {
     /// The service as the compose file names it.
     pub service: String,
     /// The mounts it would get, in the order they were declared.

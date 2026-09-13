@@ -21,6 +21,7 @@ pub mod environment;
 pub mod guides;
 pub mod headroom;
 pub mod indexer;
+pub mod mounts;
 pub mod narrowing;
 pub mod permissions;
 pub mod providers;

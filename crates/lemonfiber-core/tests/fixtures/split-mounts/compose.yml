@@ -1,0 +1,9 @@
+# The tidier-looking layout, and the one that turns every import into a copy: inside
+# the container these two paths are separate filesystems, so nothing can be linked
+# between them.
+services:
+  sonarr:
+    image: sonarr
+    volumes:
+      - ${DATA_ROOT}/downloads:/downloads
+      - ${DATA_ROOT}/media:/media
