@@ -63,7 +63,7 @@ const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observ
 const NOT_YET: Code = Code::new("REHEARSE-2");
 
 /// What a rehearsal means for one command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Rehearsal {
     /// Nothing to rehearse: the command changes nothing, so the rehearsal *is* the
     /// command and runs exactly as it always does.
@@ -77,6 +77,22 @@ pub enum Rehearsal {
     /// State-changing, and not taught to report yet. The flag is refused rather than
     /// ignored, which is the whole of the difference this module exists to make.
     Untaught,
+}
+
+impl Rehearsal {
+    /// Why this command cannot be rehearsed, where that is the answer it gives.
+    ///
+    /// For a surface that wants to explain a refusal in its own words rather than
+    /// render the one the core wrote — the reason is the part that is worth having,
+    /// and asking for it should not mean matching on a verdict to find out there is
+    /// nothing to ask about.
+    #[must_use]
+    pub const fn why(self) -> Option<&'static str> {
+        match self {
+            Self::Cannot(why) => Some(why),
+            Self::Reads | Self::Reports | Self::Untaught => None,
+        }
+    }
 }
 
 /// What was asked for, and what a rehearsal of it comes to.
@@ -323,16 +339,13 @@ mod tests {
     /// flag on a read.
     #[test]
     fn reading_a_credential_is_not_refused_the_way_rotating_one_is() {
-        assert_eq!(
-            asked(&Command::Credentials(Asking::Read)).rehearsal,
-            Rehearsal::Reads
-        );
-        assert_eq!(
+        assert!(asked(&Command::Credentials(Asking::Read)).rehearsal == Rehearsal::Reads);
+        assert!(
             asked(&Command::Credentials(Asking::Rotate {
                 credential: "qbittorrent".to_owned(),
             }))
-            .rehearsal,
-            Rehearsal::Untaught
+            .rehearsal
+                == Rehearsal::Untaught
         );
     }
 
@@ -363,8 +376,8 @@ mod tests {
         }
     }
 
-    /// The three that refuse the flag for good say so, and the read half of each
-    /// command that carries one of them under a shared name does not.
+    /// The three that refuse the flag for good say so, the read half of each command
+    /// that shares a name with one does not, and the reason reaches the operator.
     ///
     /// Driven rather than read, because the two halves of `trace` and of `doctor` are
     /// one word to an operator and two arms here, and an arm nothing reaches is an arm
@@ -380,28 +393,15 @@ mod tests {
             (bundling(false), false),
         ] {
             let asked = asked(&command);
-            assert_eq!(
-                matches!(asked.rehearsal, Rehearsal::Cannot(_)),
-                refuses,
+            assert!(
+                asked.rehearsal.why().is_some() == refuses,
                 "{command:?} was read as the wrong one of the two"
             );
-        }
-    }
-
-    /// And the reason a refusal carries reaches the operator rather than staying in
-    /// the source, which is the difference between refusing and refusing usefully.
-    #[test]
-    fn the_reason_a_refusal_gives_is_in_what_the_operator_is_told() {
-        for command in [
-            tracing(true),
-            examining(true),
-            Command::Walkthrough { item: None },
-        ] {
-            let asked = asked(&command);
-            let Rehearsal::Cannot(why) = asked.rehearsal else {
-                unreachable!("{command:?} is one of the three that refuse for good")
-            };
-            assert!(refused(&asked, why).meaning.contains(why), "{command:?}");
+            // The reason reaches the operator rather than staying in the source, which
+            // is the difference between refusing and refusing usefully.
+            if let Some(why) = asked.rehearsal.why() {
+                assert!(refused(&asked, why).meaning.contains(why), "{command:?}");
+            }
         }
     }
 
@@ -415,9 +415,8 @@ mod tests {
             (Command::Setup(SetupAction::Where), Rehearsal::Reads),
             (Command::Setup(SetupAction::Apply), Rehearsal::Untaught),
         ] {
-            assert_eq!(
-                asked(&command).rehearsal,
-                expected,
+            assert!(
+                asked(&command).rehearsal == expected,
                 "{command:?} was read as the wrong half of what it carries"
             );
         }
