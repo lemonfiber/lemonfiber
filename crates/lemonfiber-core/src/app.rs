@@ -88,7 +88,7 @@ pub use command::{
 mod outcome;
 pub use ctx::Ctx;
 pub use outcome::Outcome;
-pub use rehearsal::{asked, permitted, Asked, Rehearsal};
+pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};
 pub use setup::SetupAction;
 
 // The log-following reads a surface streams from live outside dispatch, so they are the
@@ -257,7 +257,7 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
-    routed(command, ctx).await
+    routed(rehearsal::carried(command, ctx), ctx).await
 }
 
 /// The table itself: every command, and where it goes.

@@ -34,7 +34,7 @@ use lemonfiber_ports::error::{Amiss, Code, Problem, Remedy, Severity, State};
 
 use super::command::{Asking, Keeping, MigrateAction};
 use super::setup::SetupAction;
-use super::{Command, Ctx};
+use super::{repair, restore, update, Command, Ctx};
 
 /// The flag cannot be honoured by this command, and never will be.
 const CANNOT: Code = Code::new("REHEARSE-1");
@@ -183,6 +183,17 @@ pub fn asked(command: &Command) -> Asked {
         Command::StopSeeding { .. } => ("stop-seeding", Rehearsal::Reports),
         Command::Bandwidth(_) => ("bandwidth", Rehearsal::Reports),
         Command::Uninstall(_) => ("uninstall", Rehearsal::Reports),
+        // The seven whose yes a rehearsal takes back. Each already answers twice —
+        // unconfirmed it says what it would do, confirmed it does it — so the report a
+        // rehearsal wants is the one it already gives, in the same words. See
+        // [`unconfirmed`].
+        Command::Migrate(_) => ("migrate", Rehearsal::Reports),
+        Command::Remove { .. } => ("remove", Rehearsal::Reports),
+        Command::QualityUpgrade { .. } => ("quality upgrade", Rehearsal::Reports),
+        Command::Repair { .. } => ("doctor --fix", Rehearsal::Reports),
+        Command::Reset { .. } => ("reset", Rehearsal::Reports),
+        Command::Update(_) => ("update", Rehearsal::Reports),
+        Command::Restore { .. } => ("restore", Rehearsal::Reports),
 
         // Untaught. Each changes something and reports it as though it had been asked
         // about, so each refuses the flag until it has been taught to report instead.
@@ -192,23 +203,77 @@ pub fn asked(command: &Command) -> Asked {
         // have yet. Until it does, a rehearsal refuses rather than holding a terminal
         // open for a week.
         Command::Watch { .. } => ("watch", Rehearsal::Untaught),
-        Command::Migrate(_) => ("migrate", Rehearsal::Untaught),
-        Command::Remove { .. } => ("remove", Rehearsal::Untaught),
-        Command::QualityUpgrade { .. } => ("quality upgrade", Rehearsal::Untaught),
-        Command::Repair { .. } => ("doctor --fix", Rehearsal::Untaught),
         Command::Undo { .. } => ("undo", Rehearsal::Untaught),
         Command::Credentials(_) => ("credentials --rotate", Rehearsal::Untaught),
         Command::SelfUpdate { .. } => ("update self", Rehearsal::Untaught),
         Command::Seed => ("seed", Rehearsal::Untaught),
         Command::Adopt => ("adopt", Rehearsal::Untaught),
-        Command::Reset { .. } => ("reset", Rehearsal::Untaught),
         Command::Setup(_) => ("setup", Rehearsal::Untaught),
-        Command::Update(_) => ("update", Rehearsal::Untaught),
         Command::Backup { .. } => ("backup", Rehearsal::Untaught),
         Command::Support { .. } => ("support --write", Rehearsal::Untaught),
-        Command::Restore { .. } => ("restore", Rehearsal::Untaught),
     };
     Asked { named, rehearsal }
+}
+
+/// The command as this run should carry it out.
+///
+/// A real run carries what was asked. A rehearsal carries the same thing with the
+/// operator's go-ahead taken back — see [`unconfirmed`] for why that is the whole of
+/// what a rehearsal of those commands needs to be.
+#[must_use]
+pub fn carried(command: Command, ctx: &Ctx) -> Command {
+    if ctx.dry_run {
+        unconfirmed(command)
+    } else {
+        command
+    }
+}
+
+/// The same command with the operator's go-ahead withheld.
+///
+/// Seven commands here already answer twice: unconfirmed they say what they would do,
+/// confirmed they do it. The unconfirmed answer *is* the rehearsal — the same report,
+/// in the same words, filled in by the same code path — so a rehearsal takes the yes
+/// back rather than seven handlers each learning a second way to say what they already
+/// say. A second way is a second thing to keep true, and the one nobody exercises is
+/// the one that stops being true.
+///
+/// Not exhaustive, and that is deliberate: this is the mechanism, not the decision.
+/// What a rehearsal of a command *means* is decided in [`asked`], which the compiler
+/// checks, and a command that claims to report while its go-ahead is not taken back
+/// here fails `a_rehearsal_changes_nothing` against a real disk.
+#[must_use]
+fn unconfirmed(command: Command) -> Command {
+    match command {
+        Command::Reset { .. } => Command::Reset { confirm: false },
+        Command::Remove { name, .. } => Command::Remove {
+            name,
+            confirm: false,
+        },
+        Command::QualityUpgrade { .. } => Command::QualityUpgrade { confirm: false },
+        Command::Migrate(MigrateAction::Act { mode, .. }) => Command::Migrate(MigrateAction::Act {
+            mode,
+            confirmed: false,
+        }),
+        Command::Update(asked) => Command::Update(update::Asked {
+            confirm: false,
+            ..asked
+        }),
+        Command::Restore {
+            archive, repoint, ..
+        } => Command::Restore {
+            archive,
+            repoint,
+            consent: restore::Consent::List,
+        },
+        Command::Repair { disruptive, .. } => Command::Repair {
+            consent: repair::Consent::Offer,
+            disruptive,
+        },
+        // Everything else either changes nothing, reports for itself, or refuses the
+        // flag outright — none of which a withheld confirmation would change.
+        other => other,
+    }
 }
 
 /// Whether this run may go ahead, or the refusal to give instead of running it.
@@ -286,8 +351,8 @@ fn not_taught_yet(asked: &Asked) -> Problem {
 #[cfg(test)]
 mod tests {
     use super::{
-        asked, not_taught_yet, refused, Rehearsal, A_SEARCH_IS_THE_ANSWER,
-        THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
+        asked, carried, not_taught_yet, refused, repair, restore, update, Rehearsal,
+        A_SEARCH_IS_THE_ANSWER, THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
     };
     use crate::app::command::{
         AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Keeping, MigrateAction,
@@ -581,17 +646,9 @@ mod tests {
                 agreement: None,
                 waiting: Waiting::Never,
             }),
-        ]
-    }
-
-    /// The commands that change something and have not been taught to say what.
-    ///
-    /// The flag is refused rather than ignored, which is the whole of the difference
-    /// this module exists to make.
-    fn untaught() -> Vec<Command> {
-        vec![
-            examining_accepting(),
-            Command::Watch { forms: Vec::new() },
+            // The seven that answer twice. Each is here rather than under Untaught
+            // because the answer it gives unconfirmed is the report a rehearsal wants,
+            // and `carried` is what takes the yes back on the way in.
             Command::Migrate(MigrateAction::Act {
                 mode: crate::migration::mode::Mode::Adopt,
                 confirmed: true,
@@ -605,6 +662,28 @@ mod tests {
                 consent: crate::app::repair::Consent::Standing,
                 disruptive: false,
             },
+            Command::Reset { confirm: true },
+            Command::Update(crate::app::update::Asked {
+                service: None,
+                confirm: true,
+                wait: Waiting::Never,
+            }),
+            Command::Restore {
+                archive: crate::app::restore::Kept::Named("anything".to_owned()),
+                repoint: false,
+                consent: crate::app::restore::Consent::Standing,
+            },
+        ]
+    }
+
+    /// The commands that change something and have not been taught to say what.
+    ///
+    /// The flag is refused rather than ignored, which is the whole of the difference
+    /// this module exists to make.
+    fn untaught() -> Vec<Command> {
+        vec![
+            examining_accepting(),
+            Command::Watch { forms: Vec::new() },
             Command::Undo { run: None },
             Command::Credentials(Asking::Rotate {
                 credential: "qbittorrent".to_owned(),
@@ -612,20 +691,9 @@ mod tests {
             Command::SelfUpdate { to: None },
             Command::Seed,
             Command::Adopt,
-            Command::Reset { confirm: true },
             Command::Setup(SetupAction::Apply),
-            Command::Update(crate::app::update::Asked {
-                service: None,
-                confirm: true,
-                wait: Waiting::Never,
-            }),
             Command::Backup { service: None },
             bundling(true),
-            Command::Restore {
-                archive: crate::app::restore::Kept::Named("anything".to_owned()),
-                repoint: false,
-                consent: crate::app::restore::Consent::Standing,
-            },
         ]
     }
 
@@ -659,6 +727,51 @@ mod tests {
             wrong.is_empty(),
             "these were read as a verdict other than the one declared for them: {wrong:?}"
         );
+    }
+
+    /// A rehearsal of the seven that answer twice is the answer they already give
+    /// unconfirmed, so the go-ahead is taken back on the way in.
+    #[test]
+    fn a_rehearsal_carries_the_seven_confirmable_commands_without_their_yes() {
+        let rehearsing = crate::test_support::a_context().build().rehearsing();
+        for asked in [
+            Command::Reset { confirm: true },
+            Command::Remove {
+                name: "ana".to_owned(),
+                confirm: true,
+            },
+            Command::QualityUpgrade { confirm: true },
+            Command::Migrate(MigrateAction::Act {
+                mode: crate::migration::mode::Mode::Adopt,
+                confirmed: true,
+            }),
+            Command::Update(update::Asked {
+                service: None,
+                confirm: true,
+                wait: Waiting::Never,
+            }),
+            Command::Restore {
+                archive: restore::Kept::Named("anything".to_owned()),
+                repoint: false,
+                consent: restore::Consent::Standing,
+            },
+            Command::Repair {
+                consent: repair::Consent::Standing,
+                disruptive: false,
+            },
+        ] {
+            let carried = carried(asked.clone(), &rehearsing);
+            assert_ne!(carried, asked, "{asked:?} kept the yes it was given");
+        }
+    }
+
+    /// And a real run carries exactly what it was handed, because the withholding is
+    /// what a rehearsal is rather than something the dispatcher does to everybody.
+    #[test]
+    fn a_real_run_carries_the_command_it_was_given() {
+        let real = crate::test_support::a_context().build();
+        let asked = Command::Reset { confirm: true };
+        assert_eq!(carried(asked.clone(), &real), asked);
     }
 
     /// The same split, on the three other commands that carry a read and a write under
