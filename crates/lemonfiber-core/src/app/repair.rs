@@ -13,19 +13,21 @@
 //! surface with no terminal to hold a question open in has to send with the request.
 
 mod consent;
+mod proving;
+mod remembering;
 mod telling;
 
 pub use consent::{Consent, STALE};
+use proving::{carried, looked};
+use remembering::{beyond, declined, recorded, remembered};
 use telling::told;
 
-use crate::condition::Fault;
-use crate::config::paths::{Paths, JOURNAL};
-use crate::doctor::{Check, Finding, Mend, Verdict};
+use crate::config::paths::Paths;
+use crate::doctor::{Check, Finding};
 use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::Undo;
-use crate::repair::{self, Attempt, Outcome, Repair, Stance};
+use crate::repair::{self, Outcome, Repair, Stance};
 
-use super::repairs::Entry;
 use super::Ctx;
 
 /// Whoever decides, for this run, whether a repair goes ahead.
@@ -329,74 +331,6 @@ fn nowhere_to_look() -> Problem {
     .in_state(State::Guided)
 }
 
-/// Fold what this run found into the store, and answer with it.
-///
-/// The same folding the dashboard does for services, for the same reason: how long a fault
-/// has stood, whether it flaps, whether a fix was declined and how often one has failed are
-/// all comparisons against previous runs, and none of them can be made by a store that has
-/// never heard of the check.
-fn remembered(ctx: &Ctx, found: &[Finding]) -> crate::condition::Conditions {
-    let mut conditions = super::conditions::load(ctx);
-    let now = ctx.stamp();
-    for finding in found {
-        conditions.observe(&finding.check, wrong(finding).as_ref(), &now);
-    }
-    // Written down only by a run that is really happening. What this file holds is how
-    // often a fault has been seen and how often a fix for it was tried and left it
-    // standing, which is how the offer decides what is worth offering again — and a
-    // rehearsal that recorded a sighting would move that count without anybody having
-    // asked it to. The reading above still happens, because the report a rehearsal
-    // gives is built from it.
-    if !ctx.dry_run {
-        super::conditions::save(ctx, &conditions);
-    }
-    conditions
-}
-
-/// What a finding is remembered as, where it says something is wrong.
-///
-/// A pass says nothing is wrong and a skip says there was nothing to look at, so neither
-/// raises anything. Unverified is the careful one: it means the check could not be
-/// established, which is not the same as finding it broken — claiming a fault from it would
-/// have lemonfiber remember trouble it never actually saw.
-fn wrong(finding: &Finding) -> Option<Fault> {
-    let problem = match &finding.verdict {
-        Verdict::Warn(problem) | Verdict::Fail(problem) => problem,
-        Verdict::Pass { .. } | Verdict::Skipped { .. } | Verdict::Unverified { .. } => return None,
-    };
-    Some(Fault::new(
-        problem.code.as_str(),
-        problem.severity,
-        &problem.summary,
-        problem
-            .remedies
-            .first()
-            .map_or("", |remedy| remedy.action.as_str()),
-    ))
-}
-
-/// The faults a repair could answer and has stopped being offered for.
-///
-/// Only where something could still have been offered: a check nothing can mend was never
-/// going to be repaired, and telling its operator that repairs have been exhausted would
-/// be describing something that never happened.
-fn beyond(conditions: &[&crate::condition::Condition], proposals: &[Repair]) -> Vec<Beyond> {
-    conditions
-        .iter()
-        .filter(|condition| condition.is_raised())
-        .filter(|condition| repair::exhausted(condition))
-        .filter(|condition| {
-            proposals
-                .iter()
-                .any(|repair| repair.check == condition.check)
-        })
-        .map(|condition| Beyond {
-            check: condition.check.clone(),
-            remedy: repair::escalation(condition),
-        })
-        .collect()
-}
-
 /// Every repair the checks that can mend would offer for what was just found, each kept
 /// beside the check that offered it — because a repair names its finding and there is no
 /// way back from a finding to the thing that raised it.
@@ -414,139 +348,11 @@ fn proposed(checks: &[Box<dyn Check>], found: &[Finding]) -> Vec<(usize, Repair)
         .collect()
 }
 
-/// What the checks find, through the very path a diagnosis takes.
-///
-/// Shared rather than repeated: a check the operator has already answered must not read as
-/// freshly failing because a repair asked again, and a second copy of that rule is a
-/// second place for it to be forgotten.
-async fn looked(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    checks: &[Box<dyn Check>],
-) -> Vec<Finding> {
-    super::engine::examined(ctx, services, checks, &crate::doctor::Narrowing::Suite)
-        .await
-        .findings
-}
-
-/// Carry one out, then ask again whether the fault is gone.
-///
-/// The checks are **assembled afresh** for the proof. A check holds what it read when it was
-/// built — the download client's listening port among it — so asking the same instances
-/// again would compare the repair's work against the very reading it was meant to change,
-/// and report every success as a failure.
-///
-/// Assembled without the disruptive ones, too. Proving a repair worked is no reason to drop
-/// the default route or run a live indexer search again, once per repair.
-async fn carried(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    mender: &dyn Mend,
-    again: &[Box<dyn Check>],
-    repair: &Repair,
-) -> Outcome {
-    let attempt = mender.mend(repair).await;
-    // Recorded before the proof, and before anything else can go wrong. What a repair
-    // changed is the operator's way back, and a way back that depends on the rest of the
-    // run going well is one they find missing exactly when they need it.
-    if let Some(journal) = super::targets::beside_env(ctx, JOURNAL) {
-        super::recover::journalled(&journal, attempt.changes(), ctx.random.as_ref());
-    }
-    if matches!(attempt, Attempt::Stopped { .. }) {
-        // Nothing changed, or something changed half way. Either way the state it was left
-        // in is what the operator needs, and asking the checks again would only rename it.
-        return Outcome::of(attempt, false);
-    }
-    judged(attempt, prove(ctx, services, again, &repair.check).await)
-}
-
-/// Ask again whether the fault is gone.
-///
-/// Over checks assembled for the purpose rather than the ones that found it: a check holds
-/// what it read when it was built, so proving a repair against those very instances would
-/// compare its work with the reading it was meant to change — and report every success as
-/// a failure.
-async fn prove(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    again: &[Box<dyn Check>],
-    check: &str,
-) -> Option<bool> {
-    proved(&looked(ctx, services, again).await, check)
-}
-
-/// What an attempt and the proof of it amount to together.
-///
-/// Apart from [`carried`] so that all three answers can be asked of it directly: the one
-/// inside a function that assembles nine checks and runs them is an answer no test reaches,
-/// and the repo keeps applicable code coverable rather than arguing about it afterwards.
-fn judged(attempt: Attempt, proof: Option<bool>) -> Outcome {
-    match proof {
-        Some(settled) => Outcome::of(attempt, settled),
-        // "I could not tell" is not "it is still broken", and reporting it as such would
-        // spend one of the few attempts a repair is given on nothing at all.
-        None => Outcome::Stopped {
-            leaving: "the repair ran, and the check could not be established afterwards".to_owned(),
-        },
-    }
-}
-
-/// Whether the named check now passes, or nothing where it could not be established.
-///
-/// Absent from the second look counts as passing: a finding no longer raised is a fault no
-/// longer there, which is exactly what a repair is for.
-fn proved(found: &[Finding], check: &str) -> Option<bool> {
-    let Some(finding) = found.iter().find(|finding| finding.check == check) else {
-        return Some(true);
-    };
-    match finding.verdict {
-        Verdict::Pass { .. } | Verdict::Skipped { .. } => Some(true),
-        Verdict::Warn(_) | Verdict::Fail(_) => Some(false),
-        Verdict::Unverified { .. } => None,
-    }
-}
-
-/// Remember that the operator said no, so it stops being offered until the fault has been
-/// away and genuinely come back.
-fn declined(ctx: &Ctx, repair: &Repair) {
-    let mut conditions = super::conditions::load(ctx);
-    conditions.decline(&repair.check);
-    super::conditions::save(ctx, &conditions);
-}
-
-/// Record what was done and how it turned out.
-///
-/// Both halves, always. The count of attempts that left the fault standing, so a repair
-/// that is not working stops being offered — and the history, including the attempts that
-/// changed nothing, which are the entries somebody reads when the same repair keeps
-/// failing to hold a fault down.
-fn recorded(ctx: &Ctx, repair: &Repair, outcome: &Outcome) {
-    let mut conditions = super::conditions::load(ctx);
-    match outcome {
-        Outcome::Fixed => conditions.mended(&repair.check),
-        // Spent only where the repair ran and the fault is demonstrably still there. One
-        // that stopped, was declined, or could not be proved either way has told us nothing
-        // about whether lemonfiber is wrong about the cause, which is what the count means.
-        Outcome::FixFailed => conditions.attempted(&repair.check),
-        Outcome::Stopped { .. } | Outcome::Declined | Outcome::WouldOverwrite => {}
-    }
-    super::conditions::save(ctx, &conditions);
-
-    let mut history = super::repairs::load(ctx);
-    history.record(Entry {
-        at: ctx.stamp(),
-        check: repair.check.clone(),
-        did: repair.does.clone(),
-        outcome: outcome.clone(),
-    });
-    super::repairs::save(ctx, &history);
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        beyond, proved, putting_right, reversing, wrong, Beyond, Consent, NOWHERE_TO_LOOK,
-    };
+    use super::proving::{judged, proved};
+    use super::remembering::wrong;
+    use super::{beyond, putting_right, reversing, Beyond, Consent, NOWHERE_TO_LOOK};
     use crate::app::fixtures::ctx_at;
     use crate::condition::{Conditions, Fault};
     use crate::doctor::{Category, Finding, Verdict};
@@ -657,8 +463,6 @@ mod tests {
     /// All three answers the proof can give, and what each makes of an attempt that ran.
     #[test]
     fn an_attempt_and_its_proof_together_say_what_happened() {
-        use super::judged;
-
         assert_eq!(judged(Attempt::carried(), Some(true)), Outcome::Fixed);
         assert_eq!(judged(Attempt::carried(), Some(false)), Outcome::FixFailed);
         // Could not be established afterwards: neither fixed nor demonstrably still
