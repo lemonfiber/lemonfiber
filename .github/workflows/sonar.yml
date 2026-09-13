@@ -59,9 +59,19 @@ jobs:
         run: |
           echo "── lines the gate could not reach ──"
           cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --show-missing-lines || true
-          echo "── regions nothing entered, which is where a miss the lines above cannot name hides ──"
-          cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --json --output-path /dev/stdout 2>/dev/null \
-            | python3 scripts/counted_but_not_named.py
+          cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --json --output-path report.json
+          echo "── the lines behind the count, and which kind each is ──"
+          python3 scripts/counted_but_not_named.py < report.json
+      # The profile is gone with the runner, and rebuilding it to ask one more question
+      # costs the ten minutes above. The report is a few megabytes and answers every
+      # question the two steps did not think to ask.
+      - name: Keep the report the gate read
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: report.json
+          retention-days: 7
       # A Dependabot run reads secrets from the Dependabot store rather than the
       # Actions store, and `SONAR_TOKEN` is only in the second. The scanner was
       # handed an empty string, died with "Not authorized or project not found",
