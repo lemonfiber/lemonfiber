@@ -11,7 +11,7 @@
 #                     hygiene / {actionlint, invite, links, markdown, pins, typos},
 #                     security / {gitleaks, osv-scanner}
 #   build             check, deny
-#   codeql            analyze (rust), analyze (actions), alerts
+#   codeql            analyze (rust), analyze (actions), alerts / alerts
 #   sonar             sonar, gate / gate
 #   release-workflow  release-workflow
 #
