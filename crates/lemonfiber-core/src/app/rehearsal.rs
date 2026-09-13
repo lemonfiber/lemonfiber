@@ -641,13 +641,19 @@ mod tests {
     /// Every command gives the verdict this module says it gives.
     #[test]
     fn every_command_is_answered_the_way_the_table_says() {
-        let mut wrong = Vec::new();
-
-        for (command, expected) in every_verdict() {
-            if asked(&command).rehearsal != expected {
-                wrong.push(format!("{command:?}"));
-            }
-        }
+        // `then_some` rather than an `if` with a body, and the name built before
+        // the comparison rather than inside it. A block that runs only when a row
+        // disagrees is a block nothing enters while the table is right, and the
+        // coverage gate counts regions: this test passing is exactly the condition
+        // under which the old shape read as an unreached line. Naming all
+        // sixty-five commands to use none of them costs nothing here.
+        let wrong: Vec<String> = every_verdict()
+            .into_iter()
+            .filter_map(|(command, expected)| {
+                let named = format!("{command:?}");
+                (asked(&command).rehearsal != expected).then_some(named)
+            })
+            .collect();
 
         assert!(
             wrong.is_empty(),
