@@ -241,6 +241,28 @@ mod tests {
         }
     }
 
+    /// What comes back is private to the operator, because it says what they run.
+    ///
+    /// Not a credential, and still nobody else's business: the forms named here are a
+    /// list of what somebody watches, on a machine other accounts may have logins on.
+    /// The write goes through the same store the settings file does, which creates
+    /// every file it writes owner-only from the outset rather than tightening it
+    /// afterwards — this asserts the outcome rather than trusting the route, because
+    /// a record that moved to a different writer would go world-readable silently.
+    #[cfg(unix)]
+    #[test]
+    fn nothing_here_is_readable_by_another_account_on_this_machine() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let ctx = ctx_at("private");
+        asked(&ctx);
+        noted(&ctx, &Action::Up, &named(&["films"]), &ran(Some(0), false));
+
+        let mode = std::fs::metadata(scratch("private").join("autostart.json"))
+            .map(|kept| kept.permissions().mode() & 0o777);
+        assert_eq!(mode.ok(), Some(0o600), "readable only by its owner");
+    }
+
     #[test]
     fn a_machine_with_nothing_configured_has_nowhere_to_keep_one() {
         // Saving is a no-op rather than an error, and loading gives the default,
