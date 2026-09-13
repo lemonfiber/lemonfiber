@@ -93,6 +93,13 @@ pub const EXPLAIN: &str = "/api/explain";
 /// and the stack's, told apart.
 pub const OUTBOUND: &str = "/api/outbound";
 
+/// Where each service in this stack comes from, and under what licence.
+///
+/// The read that turns an assurance into something checkable: a page can say a stack
+/// is open source, and only this can hand somebody the identifier, the project and
+/// the exact image to go and see for themselves.
+pub const PROVENANCE: &str = "/api/provenance";
+
 /// Everything lemonfiber keeps on this machine, where each thing is and why.
 ///
 /// The read a browser is least able to answer for itself: a page has no filesystem
@@ -213,6 +220,7 @@ pub const OFFERED: &[&str] = &[
     EXPLAIN,
     BACKUPS,
     OUTBOUND,
+    PROVENANCE,
     STORED,
     UNINSTALL,
     SPACE,
@@ -344,6 +352,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         EXPLAIN => Ok(word.map_or(Command::Glossary, |word| Command::Explain { word })),
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
+        PROVENANCE => Ok(Command::Provenance),
         STORED => Ok(Command::Stored),
         // Which removal is the one thing this takes, and a name that is none of the
         // four is refused rather than read as the safest — somebody who typed a word

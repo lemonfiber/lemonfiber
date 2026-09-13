@@ -177,6 +177,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("stuck", Command::Stuck),
         ("front-door", Command::FrontDoor),
         ("outbound", Command::Outbound),
+        ("provenance", Command::Provenance),
         (
             "credentials",
             Command::Credentials(Asking::Rotate {

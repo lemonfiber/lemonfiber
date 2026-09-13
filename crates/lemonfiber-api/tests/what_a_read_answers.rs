@@ -692,6 +692,37 @@ async fn what_leaves_this_machine_carries_the_switch_beside_each_request() {
     );
 }
 
+#[tokio::test]
+async fn where_the_services_come_from_is_the_envelope_the_command_renders() {
+    // The read that makes the open-source claim checkable, and the one a page has no
+    // way of answering for itself: what is bundled is written in the stack this
+    // machine runs, and a browser can see neither.
+    let expected = as_the_command_renders_it(&world(running(), stack()), Command::Provenance).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), reads::PROVENANCE).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
+async fn where_the_services_come_from_carries_the_licence_the_project_and_the_pin() {
+    // Written out rather than derived, so a second serialisation could not pass this
+    // by agreeing with itself. All three fields, because each on its own is something
+    // somebody would have to take on trust: an identifier with no project to check it
+    // against, or a project with no version the check would be about.
+    let seen = asked(world(running(), stack()), reads::PROVENANCE).await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"provenance","data":{"services":[{"#)
+            && body.contains(r#""license":"GPL-3.0-only""#)
+            && body.contains(r#""upstream":"https://github.com/Prowlarr/Prowlarr""#)
+            && body.contains(r#""image":"lscr.io/linuxserver/prowlarr""#)),
+        "the listing a browser is served"
+    );
+}
+
 /// A machine whose data location is a real directory this test made, holding one
 /// file — so the walk has something to answer about.
 ///

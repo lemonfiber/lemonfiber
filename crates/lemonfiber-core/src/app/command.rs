@@ -339,6 +339,14 @@ pub enum Command {
     /// narrow it by — and an enumeration a surface could narrow would be one an
     /// operator could be shown half of.
     Outbound,
+    /// Say where every service in this stack comes from: its licence, the project
+    /// that publishes it, and the exact version this stack pins.
+    ///
+    /// A read with no arguments, over the manifest and nothing else. What it answers
+    /// is what the stack declares about itself, so there is nothing for a caller to
+    /// narrow it by — and an operator checking whether everything they run is open
+    /// source is asking about all of it rather than about one service.
+    Provenance,
     /// Say which credentials this stack holds, or act on one of them.
     ///
     /// One inventory over every secret in the stack, whoever produced it: what each is,

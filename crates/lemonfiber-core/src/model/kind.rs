@@ -98,6 +98,8 @@ pub const MUSIC: Kind = Kind("music");
 pub const OUTBOUND: Kind = Kind("outbound");
 /// What starting or stopping would do, before it is done.
 pub const PREVIEW: Kind = Kind("preview");
+/// Where each service in the stack comes from, and under what licence.
+pub const PROVENANCE: Kind = Kind("provenance");
 /// One line the container engine wrote while pulling images.
 pub const PULL: Kind = Kind("pull");
 /// The quality choice, what it means, and what a command did with it.
@@ -184,6 +186,7 @@ pub const ALL: &[Kind] = &[
     MUSIC,
     OUTBOUND,
     PREVIEW,
+    PROVENANCE,
     PULL,
     QUALITY,
     REPAIR,

@@ -36,6 +36,7 @@ Commands:
   stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door    Name the one address to send somebody who lives here
   outbound      List everything that leaves this machine, and what refusing each of it costs
+  provenance    Say where each service comes from: its licence, its project, and the exact version this stack pins it at
   credentials   Say which credentials this stack holds, or act on one of them
   stored        List what lemonfiber keeps on this machine, where it is, and why
   clients       Say which app to watch on, for each kind of device somebody in the house has
@@ -1522,6 +1523,34 @@ List everything that leaves this machine, and what refusing each of it costs.
 lemonfiber's own requests first — where each goes, why, exactly what travels, whether it is on, the setting that switches it off and what stops working when it is — then the requests the stack's own services make, which are theirs rather than lemonfiber's.
 
 Usage: lemonfiber outbound [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber provenance`
+
+```text
+Say where each service comes from: its licence, its project, and the exact version this stack pins it at.
+
+Everything bundled here is open source, and this is how you check that rather than take it on faith — the licence each service is published under, the project to go and read it at, and the image and tag actually being run.
+
+It reads the stack description and nothing else, so it answers with the machine off and the containers down.
+
+Usage: lemonfiber provenance [OPTIONS]
 
 Options:
       --json

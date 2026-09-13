@@ -322,6 +322,16 @@ pub enum Request {
     /// when it is — then the requests the stack's own services make, which are
     /// theirs rather than lemonfiber's.
     Outbound,
+    /// Say where each service comes from: its licence, its project, and the exact
+    /// version this stack pins it at.
+    ///
+    /// Everything bundled here is open source, and this is how you check that rather
+    /// than take it on faith — the licence each service is published under, the
+    /// project to go and read it at, and the image and tag actually being run.
+    ///
+    /// It reads the stack description and nothing else, so it answers with the
+    /// machine off and the containers down.
+    Provenance,
     /// Say which credentials this stack holds, or act on one of them.
     ///
     /// Every secret in the stack in one list, whoever produced it: what each is, what

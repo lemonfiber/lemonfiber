@@ -7,7 +7,8 @@ use super::{Ctx, Outcome};
 use crate::docker::{condition, survey};
 use crate::error::{Diagnose, Problem};
 use crate::model::{
-    FormReport, FormsReport, LifecycleReport, StackEdit, StatusReport, VersionReport,
+    FormReport, FormsReport, LifecycleReport, ProvenanceReport, StackEdit, StatusReport,
+    VersionReport,
 };
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
@@ -393,6 +394,28 @@ pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
             })
             .collect(),
     })
+}
+
+/// Where every service this stack declares comes from, in the stack's own words.
+///
+/// A read of the manifest and nothing else, the way the forms listing above is — and
+/// through the checked read rather than a bare one, which is the whole strength of the
+/// answer. The check holds every service's licence against the OSI identifier list, so
+/// a stack carrying one published under something else is refused here rather than
+/// listed with the rest, and an operator asking what they are running is answered by a
+/// report that stands on that check instead of repeating the claim it is about.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be read, or
+/// when what it declares does not hold together. Boxed as the listing beside it is.
+pub(super) fn provenance(ctx: &Ctx) -> Result<ProvenanceReport, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+
+    Ok(ProvenanceReport::of(&manifest))
 }
 
 /// The binary's version, and the engine's where it answers.
