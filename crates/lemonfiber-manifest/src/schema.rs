@@ -29,6 +29,13 @@ pub struct Manifest {
     /// Every declared service.
     #[serde(default, rename = "service")]
     pub services: Vec<Service>,
+    /// Every service this stack used to carry and no longer does.
+    ///
+    /// Optional, and deliberately: a stack that has never dropped anything has
+    /// nothing to record, and requiring an empty table of it would make the record
+    /// something to satisfy rather than something to read.
+    #[serde(default)]
+    pub removed: Vec<Removed>,
 }
 
 impl Manifest {
@@ -205,6 +212,38 @@ pub struct Service {
     pub host_managed: bool,
 }
 
+/// A service this stack used to carry, and what became of it.
+///
+/// Kept beside the services rather than in a changelog because of who asks and when:
+/// an operator who remembers a service and cannot find it is holding a gap, and a gap
+/// is closed by a record that travels with the stack they are running rather than by a
+/// file they would have to know exists. It versions with the stack for the same reason
+/// every other per-service fact here does — the stack decided the removal, so the stack
+/// is what carries the answer, and a lemonfiber release is not needed to say what
+/// became of a service lemonfiber never chose.
+///
+/// `replaced_by` is optional because the honest answer is sometimes that nothing
+/// replaced it. Recording a replacement that does not exist to avoid an empty field is
+/// worse than the gap it fills.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Removed {
+    /// The id it was declared under, which is the name an operator will look for.
+    pub id: String,
+    /// The `stack_version` whose catalogue no longer carries it.
+    ///
+    /// A stack version rather than a date, because the manifest already carries one
+    /// and an operator asking what became of a service is holding a stack rather than
+    /// a calendar: *which release of this stack stopped having it* is the question a
+    /// date could only be translated back into.
+    pub removed_in: String,
+    /// Why it went — a sentence, not a word.
+    pub reason: String,
+    /// The service that took its place, where one did.
+    #[serde(default)]
+    pub replaced_by: Option<String>,
+}
+
 /// Which interface a service's port is published on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -378,6 +417,16 @@ last_release = "2026-01-09"
 describes = "Downloads torrents"
 without_it = "No torrent downloads"
 depends_on = ["gluetun"]
+"#;
+
+    /// One removal, appended to a manifest that declares the service it names as a
+    /// replacement — so the record points at something an operator can actually run.
+    const DROPPED: &str = r#"
+[[removed]]
+id = "readarr"
+removed_in = "1.0.0"
+reason = "Discontinued upstream in 2025; the project is archived and releases nothing."
+replaced_by = "qbittorrent"
 "#;
 
     /// Parsed, or absent.
@@ -567,6 +616,81 @@ depends_on = ["gluetun"]
             .unwrap_or_default();
         assert!(refusal.contains("plex"), "names the first: {refusal}");
         assert!(refusal.contains("vital"), "names the second too: {refusal}");
+    }
+
+    /// A stack that has dropped something says what it was and what became of it.
+    ///
+    /// Read back whole rather than counted, because the count is the half that would
+    /// still pass if every field arrived empty.
+    #[test]
+    fn reads_what_a_stack_has_dropped_and_what_took_its_place() {
+        let text = format!("{MINIMAL}{DROPPED}");
+        let recorded = parse(&text)
+            .and_then(|manifest| manifest.removed.into_iter().next())
+            .map(|removed| {
+                (
+                    removed.id,
+                    removed.removed_in,
+                    removed.reason.contains("Discontinued"),
+                    removed.replaced_by,
+                )
+            });
+        assert_eq!(
+            recorded,
+            Some((
+                "readarr".to_owned(),
+                "1.0.0".to_owned(),
+                true,
+                Some("qbittorrent".to_owned())
+            ))
+        );
+    }
+
+    /// Nothing replaced it is an answer, and the one a record has to be able to give
+    /// — a stack forced to name a successor would name the nearest thing to hand.
+    #[test]
+    fn a_removal_with_nothing_in_its_place_records_that_rather_than_inventing_one() {
+        let text = format!(
+            "{MINIMAL}{}",
+            DROPPED.replace("replaced_by = \"qbittorrent\"\n", "")
+        );
+        let replaced = parse(&text)
+            .and_then(|manifest| manifest.removed.into_iter().next())
+            .map(|removed| removed.replaced_by);
+        assert_eq!(replaced, Some(None));
+    }
+
+    /// The table is optional, which is what keeps the two repositories from having to
+    /// land together: a stack that has dropped nothing declares nothing and reads as
+    /// having dropped nothing, rather than as a manifest missing a table.
+    ///
+    /// The generation does not move for it, and this is the assertion that pins that
+    /// decision to something executable — a stack recording a removal reads under the
+    /// generation every stack already declares, so neither repository is waiting on the
+    /// other to renumber before it can land.
+    #[test]
+    fn a_stack_that_has_dropped_nothing_reads_as_having_dropped_nothing() {
+        let recorded = parse(&format!("{MINIMAL}{DROPPED}")).map(|manifest| manifest.removed.len());
+        let silent = parse(MINIMAL).map(|manifest| manifest.removed.len());
+
+        assert_eq!(silent, Some(0));
+        assert_eq!(
+            recorded,
+            Some(1),
+            "and the same generation reads one that did"
+        );
+    }
+
+    /// A field nobody declared on a removal is refused, the way it is everywhere else
+    /// here: a misspelled `replaced_by` that is quietly dropped records a removal with
+    /// no replacement, which is a different fact from the one somebody wrote.
+    #[test]
+    fn a_removal_declaring_a_field_this_build_does_not_know_is_refused() {
+        let text = format!(
+            "{MINIMAL}{}",
+            DROPPED.replace("replaced_by = ", "replaced_with = ")
+        );
+        assert!(Manifest::from_toml(&text).is_err());
     }
 
     #[test]
