@@ -28,12 +28,15 @@ use super::{Category, Check, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
+use crate::stack::mounts::Crowded;
 use crate::storage::{self, Linked};
 
 mod findings;
+mod mounts;
 mod space;
 
 pub use findings::{COPY_ONLY, DEGRADED, ROOT_ABSENT, ROOT_UNWRITABLE, SERVICE_DENIED};
+pub use mounts::SPLIT_MOUNTS;
 pub use space::{LOW_SPACE_FLOOR, SPACE_LOW};
 
 use findings::{
@@ -57,6 +60,7 @@ pub struct StorageCheck {
     environment: Environment,
     service_user: Option<(u32, u32)>,
     committed: Option<u64>,
+    crowded: Vec<Crowded>,
 }
 
 impl StorageCheck {
@@ -77,6 +81,13 @@ impl StorageCheck {
     /// a figure, zero where the clients are quiet or unreachable; `None` is the
     /// "no projection at all" case a caller with no clients to read passes, and
     /// guards the raw free space exactly as a zero would.
+    ///
+    /// `crowded` is what reading the stack's own compose files found: the services
+    /// that would see more than one mount beneath the data location. It arrives read
+    /// rather than read here, because the files are the stack's business and this
+    /// check's seam is the filesystem — but it is reported here, because it answers
+    /// the same question the probe does and a separate heading would let an operator
+    /// read one half without the other.
     #[must_use]
     pub fn new(
         filesystem: Arc<dyn FileSystem>,
@@ -85,6 +96,7 @@ impl StorageCheck {
         environment: Environment,
         service_user: Option<(u32, u32)>,
         committed: Option<u64>,
+        crowded: Vec<Crowded>,
     ) -> Self {
         Self {
             filesystem,
@@ -93,6 +105,7 @@ impl StorageCheck {
             environment,
             service_user,
             committed,
+            crowded,
         }
     }
 
@@ -206,19 +219,26 @@ impl Check for StorageCheck {
 
 /// Whether the data location is there, writable, and on one filesystem.
 async fn ran(check: &StorageCheck) -> Vec<Finding> {
-    let Some(root) = &check.root else {
-        return vec![skipped(
+    let mut found = match &check.root {
+        None => vec![skipped(
             "no data location is configured yet — run setup to choose one",
-        )];
+        )],
+        // Resolved first so the probe runs against the filesystem the data
+        // actually lives on: a symlinked root would otherwise be tested on the
+        // filesystem holding the link, which is not the one that matters.
+        Some(root) => match check.filesystem.canonicalize(root).await {
+            Err(fault) => absent(root, &fault.message),
+            Ok(real) => check.probe(&real).await,
+        },
     };
-
-    // Resolved first so the probe runs against the filesystem the data
-    // actually lives on: a symlinked root would otherwise be tested on the
-    // filesystem holding the link, which is not the one that matters.
-    match check.filesystem.canonicalize(root).await {
-        Err(fault) => absent(root, &fault.message),
-        Ok(real) => check.probe(&real).await,
-    }
+    // The same question asked of the container's view, which the probe above cannot
+    // reach from here: on this machine the data location is one filesystem and links
+    // work perfectly, and a stack that mounts the downloads and the library separately
+    // has put a boundary between them that exists only inside the container. Reported
+    // whatever the probe found, since a location that could not be reached at all is
+    // still a stack whose layout an operator can be told about.
+    found.extend(mounts::findings(&check.crowded));
+    found
 }
 
 /// The findings when the data root could not be reached at all.
@@ -297,8 +317,8 @@ mod tests {
 
     use super::findings::writable;
     use super::{
-        Check, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
-        ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
+        Check, Crowded, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED,
+        ROOT_ABSENT, ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
     };
     use crate::ports::filesystem::{
         Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
@@ -407,6 +427,7 @@ mod tests {
             Environment::MacOs,
             None,
             None,
+            Vec::new(),
         )
         .run()
         .await
@@ -422,6 +443,7 @@ mod tests {
             Environment::MacOs,
             None,
             committed,
+            Vec::new(),
         )
         .run()
         .await
@@ -437,6 +459,7 @@ mod tests {
             Environment::MacOs,
             None,
             None,
+            Vec::new(),
         )
         .run()
         .await
@@ -452,6 +475,29 @@ mod tests {
             Environment::LinuxNative,
             Some(service_user),
             None,
+            Vec::new(),
+        )
+        .run()
+        .await
+    }
+
+    /// A run whose stack splits the data location between two mounts, so the half of
+    /// the answer the probe cannot see arrives beside the half it can.
+    async fn run_with_split_mounts(bench: Bench) -> Vec<Finding> {
+        StorageCheck::new(
+            Arc::new(bench),
+            Some(PathBuf::from("/data")),
+            None,
+            Environment::MacOs,
+            None,
+            None,
+            vec![Crowded {
+                service: "sonarr".to_owned(),
+                mounts: vec![
+                    "${DATA_ROOT}/downloads:/downloads".to_owned(),
+                    "${DATA_ROOT}/media:/media".to_owned(),
+                ],
+            }],
         )
         .run()
         .await
@@ -810,6 +856,7 @@ mod tests {
             Environment::LinuxNative,
             None,
             None,
+            Vec::new(),
         )
         .run()
         .await;
@@ -945,6 +992,7 @@ mod tests {
             Environment::MacOs,
             None,
             None,
+            Vec::new(),
         )
         .run()
         .await;
@@ -956,5 +1004,51 @@ mod tests {
         ));
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_location_that_links_still_says_the_containers_cannot() {
+        // The trap this exists for. On this machine the data location is one
+        // filesystem and the probe passes; inside the containers the downloads and the
+        // library are on opposite sides of a boundary, and every import copies. An
+        // operator shown only the first half has been told the wrong thing.
+        let findings = run_with_split_mounts(Bench::healthy()).await;
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Pass { .. })
+        ));
+        assert!(matches!(
+            verdict(&findings, "storage.single-mount"),
+            Some(Verdict::Warn(problem)) if problem.summary.contains("sonarr")
+        ));
+    }
+
+    #[tokio::test]
+    async fn the_layout_is_reported_even_where_the_location_cannot_be_reached() {
+        // A drive that is not plugged in says nothing about how the stack is written,
+        // and the operator can act on the layout from anywhere. Withholding it until
+        // the disk comes back would hold one answer hostage to another.
+        let unreachable = Bench {
+            resolves: Err(Fault::new("no such file or directory")),
+            ..Bench::healthy()
+        };
+        let findings = run_with_split_mounts(unreachable).await;
+        assert!(matches!(
+            verdict(&findings, "storage.hardlinks"),
+            Some(Verdict::Fail(_))
+        ));
+        assert!(matches!(
+            verdict(&findings, "storage.single-mount"),
+            Some(Verdict::Warn(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_stack_that_mounts_the_location_once_says_so_beside_the_probe() {
+        let findings = run(Bench::healthy(), Some("/data")).await;
+        assert!(matches!(
+            verdict(&findings, "storage.single-mount"),
+            Some(Verdict::Pass { .. })
+        ));
     }
 }

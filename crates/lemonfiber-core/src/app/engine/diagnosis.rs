@@ -17,7 +17,6 @@ use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
-use crate::doctor::mounts::MountsCheck;
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::storage::StorageCheck;
@@ -235,6 +234,11 @@ pub(crate) async fn assembled(
     // are all quiet reads as zero committed and the finding guards the raw free
     // space.
     let committed = committed_bytes(ctx, &manifest.services, project.as_deref()).await;
+    // The mounts are read here rather than inside the check, for the reason every other
+    // reading is: a check holds the seam it looks through, and the stack's own files are
+    // not reached through one. What the storage check does with them is report the half
+    // of the hardlink question its probe cannot see — a fork that splits the data
+    // location between two mounts, where imports copy however well the host links.
     let storage = StorageCheck::new(
         ctx.filesystem.clone(),
         ctx.settings.data_root.clone(),
@@ -242,15 +246,8 @@ pub(crate) async fn assembled(
         ctx.environment,
         ctx.settings.service_user,
         Some(committed),
+        ctx.stack.crowded_mounts(),
     );
-    // What each service would see beneath the data location, read from the stack's own
-    // compose files rather than probed. The link test above runs on the host, where the
-    // data location is one volume and links work perfectly; a stack that mounts the
-    // downloads and the library separately has put them on opposite sides of a boundary
-    // that exists only inside the container, where no experiment on this machine can
-    // reach it. Reported rather than refused, because a stack directory the operator
-    // pointed lemonfiber at is theirs to lay out.
-    let mounts = MountsCheck::new(ctx.stack.crowded_mounts());
     let vpn = VpnCheck::new(
         ctx.engine.clone(),
         ctx.settings.project.clone(),
@@ -346,7 +343,6 @@ pub(crate) async fn assembled(
         Box::new(environment),
         Box::new(bindings),
         Box::new(storage),
-        Box::new(mounts),
         Box::new(vpn),
         Box::new(credentials),
         Box::new(indexer),
