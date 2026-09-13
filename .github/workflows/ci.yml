@@ -14,20 +14,20 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/spec-check.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/spec-check.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
   hygiene:
-    uses: lemonfiber/spec/.github/workflows/hygiene.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/hygiene.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
   security:
-    uses: lemonfiber/spec/.github/workflows/security.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/security.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
   dco:
-    uses: lemonfiber/spec/.github/workflows/dco.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/dco.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
   commitlint:
-    uses: lemonfiber/spec/.github/workflows/commitlint.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/commitlint.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
   labeler:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/labeler.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
   # OPS-R39, OPS-R40 and OPS-R42: label a PR that advances the staged version,
   # put it in that version's milestone, comment which goals it moves, and route
   # one that cites only out-of-scope requirements to the next version. The
@@ -42,4 +42,4 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@d972aee34a685b3d1fa763c9ea9753191ebe87d0 # main
+    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
