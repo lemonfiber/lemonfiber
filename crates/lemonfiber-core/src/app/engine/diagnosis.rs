@@ -234,6 +234,11 @@ pub(crate) async fn assembled(
     // are all quiet reads as zero committed and the finding guards the raw free
     // space.
     let committed = committed_bytes(ctx, &manifest.services, project.as_deref()).await;
+    // The mounts are read here rather than inside the check, for the reason every other
+    // reading is: a check holds the seam it looks through, and the stack's own files are
+    // not reached through one. What the storage check does with them is report the half
+    // of the hardlink question its probe cannot see — a fork that splits the data
+    // location between two mounts, where imports copy however well the host links.
     let storage = StorageCheck::new(
         ctx.filesystem.clone(),
         ctx.settings.data_root.clone(),
@@ -241,6 +246,7 @@ pub(crate) async fn assembled(
         ctx.environment,
         ctx.settings.service_user,
         Some(committed),
+        ctx.stack.crowded_mounts(),
     );
     let vpn = VpnCheck::new(
         ctx.engine.clone(),

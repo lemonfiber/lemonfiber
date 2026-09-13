@@ -163,6 +163,7 @@ what to do about it, is written for operators at
 - `STORAGE-4`
 - `STORAGE-5`
 - `STORAGE-6`
+- `STORAGE-7`
 - `TELLING-1`
 - `TUI-1`
 - `UNDO-1`

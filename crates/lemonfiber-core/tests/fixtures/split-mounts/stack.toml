@@ -1,0 +1,9 @@
+# A stack whose compose file splits the data root, used to prove the one thing the
+# same bytes are answered two ways about: read as the stack lemonfiber ships, it is
+# refused; read as a directory the operator pointed at, it is reported instead.
+#
+# Nothing is declared beyond the pairing, so the manifest itself contributes no
+# violations and the only thing either reading can complain about is the mounts.
+schema_version  = 1
+stack_version   = "1.0.0"
+min_cli_version = "0.1.0"

@@ -100,22 +100,61 @@ impl Source {
         // file is written in the volumes rather than in `stack.toml` — and it is
         // invisible to every probe, since from the host the data root is one
         // filesystem and links work perfectly.
-        violations.extend(
-            mounts::crowded(&self.compose_files())
-                .iter()
-                .map(ToString::to_string),
-        );
+        //
+        // For the stack lemonfiber ships and for that one only. A shipped stack
+        // that splits the data root is this binary being wrong about its own
+        // contents, which belongs with the manifest that will not parse: nobody
+        // chose it and nobody can fix it from here. A stack directory the operator
+        // pointed at is the opposite of that. The rule is ours and the stack is
+        // theirs, so it is guidance there rather than a contract — refusing to
+        // operate a fork over a choice that costs them disk and minutes and costs
+        // lemonfiber nothing would make this tool the thing standing between an
+        // operator and their own system, which is the one thing it may never be.
+        // Their fork is read exactly the same way; what changes is that the answer
+        // is reported as a cost they can weigh rather than raised as a refusal. See
+        // [`Self::crowded_mounts`] and the storage check that carries it.
+        if self.is_ours() {
+            violations.extend(self.crowded_mounts().iter().map(ToString::to_string));
+        }
         if violations.is_empty() {
             return Ok(manifest);
         }
         Err(Failure::Invalid { violations })
     }
 
+    /// Every service in this stack that would see more than one mount beneath the
+    /// data root, and which mounts those are.
+    ///
+    /// Read for both kinds of stack and refused for neither: what is done with the
+    /// answer belongs to the caller, and the two callers answer differently on
+    /// purpose. [`Self::checked_manifest`] turns it into a refusal for the stack
+    /// lemonfiber ships, because that one breaking the rule is a broken build; the
+    /// storage check turns it into a finding the operator can weigh and accept,
+    /// because a fork is theirs to lay out as they like.
+    ///
+    /// Read afresh each time rather than remembered. An operator edits the directory
+    /// they pointed lemonfiber at between one run and the next — that is what
+    /// pointing at one is for — so an answer kept from last time would be about a
+    /// stack that no longer exists.
+    #[must_use]
+    pub fn crowded_mounts(self) -> Vec<mounts::Crowded> {
+        mounts::crowded(&self.compose_files())
+    }
+
+    /// Whether this stack is lemonfiber's own rather than the operator's.
+    ///
+    /// The line a rule of lemonfiber's own is either enforced or offered across.
+    /// Nothing else in this module needs to tell the two apart — every other read
+    /// answers for both without caring which it has.
+    const fn is_ours(self) -> bool {
+        matches!(self, Self::Embedded(_))
+    }
+
     /// Every compose file in this stack, with its text.
     ///
     /// Read for both kinds of stack: an operator running their own fork is
-    /// exactly who this protects, since the shipped one is held to the rule by
-    /// its own tests.
+    /// exactly who this is read for, since the shipped one is held to the mount
+    /// rule by its own tests and theirs is held to it by nobody else.
     #[must_use]
     fn compose_files(self) -> Vec<(PathBuf, String)> {
         match self {
@@ -442,6 +481,12 @@ mod tests {
     /// the real thing rather than against a fixture that could drift from it.
     static EMBEDDED: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
 
+    /// A stack whose compose file splits the data root, read as the stack lemonfiber
+    /// ships. The same directory is read as an operator's own below, which is the
+    /// pairing the two tests about it exist for: one set of bytes, two answers, and
+    /// the difference is whose stack it is.
+    static SPLIT_MOUNTS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/split-mounts");
+
     /// A directory that is certainly not a stack.
     ///
     /// `adapters` because the crate cannot compile without it. The previous choice was a
@@ -766,45 +811,60 @@ api = { kind = \"plex\", key_source = \"config-xml\" }
         // one filesystem and links work perfectly — so the only thing that can
         // hold the shipped stack to it is this.
         assert_eq!(refusal(Source::Embedded(&EMBEDDED)), "");
+        assert!(
+            Source::Embedded(&EMBEDDED).crowded_mounts().is_empty(),
+            "and the reading the refusal is built from agrees"
+        );
+    }
+
+    /// The fixture above, read the way an operator's own stack directory is read.
+    fn forked() -> Source {
+        Source::External(Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/split-mounts"
+        )))
     }
 
     #[test]
-    fn a_stack_that_splits_the_data_root_is_refused() {
-        // The failure this exists for: two mounts beneath the data root put the
-        // download and the library on opposite sides of a filesystem boundary
-        // inside the container, and every import silently becomes a copy.
-        let dir = std::env::temp_dir().join(format!("lemonfiber-split-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        assert!(std::fs::create_dir_all(&dir).is_ok());
-        assert!(std::fs::copy(
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../assets/media-stack/stack.toml"
-            ),
-            dir.join("stack.toml")
-        )
-        .is_ok());
-        // A raw literal on its own lines: a continued string here is reflowed by
-        // the formatter into one indented line, which YAML then reads as a
-        // continuation of the previous entry rather than a second mount — a
-        // fixture that quietly stops describing the thing it is testing.
-        let split = r"services:
-  sonarr:
-    volumes:
-      - ${DATA_ROOT}/downloads:/downloads
-      - ${DATA_ROOT}/media:/media
-";
-        assert!(std::fs::write(dir.join("split.yml"), split).is_ok());
-
-        // Leaked deliberately: `Source::External` holds a `&'static Path`, and a
-        // stack directory outliving one test is a few kilobytes in a scratch dir.
-        let path: &'static Path = Box::leak(dir.clone().into_boxed_path());
-        // Asserted on what the operator is actually shown, rather than on the
-        // shape of the error behind it.
-        let said = refusal(Source::External(path));
+    fn a_shipped_stack_that_splits_the_data_root_is_refused() {
+        // Two mounts beneath the data root put the download and the library on
+        // opposite sides of a filesystem boundary inside the container, and every
+        // import silently becomes a copy. In the stack this binary carries, that is
+        // the binary being wrong about its own contents: nobody chose it, and nobody
+        // running it could put it right.
+        //
+        // Asserted on what the operator is actually shown, rather than on the shape
+        // of the error behind it.
+        let said = refusal(Source::Embedded(&SPLIT_MOUNTS));
         assert!(said.contains("sonarr"), "{said}");
         assert!(said.contains("copied rather than hardlinked"), "{said}");
-        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_same_stack_as_an_operator_s_own_is_reported_rather_than_refused() {
+        // The same bytes, read as a directory the operator pointed at. A rule of
+        // lemonfiber's is guidance over somebody else's stack: refusing to operate it
+        // would put this tool between an operator and their own system over a cost
+        // that is theirs to carry, so what it costs is reported and the stack runs.
+        // Read once rather than inside the message an assertion would only format on
+        // its way to failing: a call in there is a line no passing run enters.
+        let refused = refusal(forked());
+        assert!(
+            forked().checked_manifest(today()).is_ok(),
+            "a fork was refused over a rule of ours: {refused}"
+        );
+
+        let found = forked().crowded_mounts();
+        assert_eq!(
+            found
+                .iter()
+                .map(|one| one.service.as_str())
+                .collect::<Vec<_>>(),
+            vec!["sonarr"],
+            "the reading itself still happens, and still names the service"
+        );
+        let said = found.first().map(ToString::to_string).unwrap_or_default();
+        assert!(said.contains("copied rather than hardlinked"), "{said}");
     }
 
     #[test]
