@@ -186,9 +186,12 @@ jobs:
       # they were real; what was not real was the zero this file declared while they
       # stood.
       #
-      # One is left, and this branch takes it away, so the next fall is to nothing.
+      # None is left. The last one went, and this takes the ceiling down with it.
       # It is a ceiling and not an allowance: it may not rise past what actually
-      # stands against `main`, so it falls as they are fixed and cannot go back up.
-      allowed-open: 1
+      # stands against `main`, so it falls as they are fixed and cannot go back
+      # up. At zero the gate refuses the first issue rather than the first issue
+      # past a tolerance, which is what `Q-R64` asks for and what every other
+      # repository in the organisation already declares.
+      allowed-open: 0
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
