@@ -227,13 +227,18 @@ pub(crate) fn a_plan(name: &str, dropped: Vec<Dropped>) -> Plan {
 /// Shared across the renderer, the exit codes and the plan itself, because all
 /// three are written against the same shape and a fixture per module is a
 /// fixture that drifts per module.
+///
+/// The quiet status is a clean exit rather than no status at all. A report carrying
+/// no status was either a rehearsal or a process that was signalled, and both are
+/// things a test should have to ask for — a default that meant "signalled" would put
+/// a failure into every test written about something else.
 pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
     LifecycleReport {
         action: action.to_owned(),
         plan,
         command: Vec::new(),
         rehearsed: false,
-        status: None,
+        status: Some(0),
         services: Vec::new(),
         condition: None,
         stack_edits: Vec::new(),

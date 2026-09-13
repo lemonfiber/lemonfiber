@@ -152,6 +152,22 @@ fn moved(switched: &Switched) -> Lines {
     lines
 }
 
+/// What to say about a lifecycle run Compose did not carry out.
+///
+/// The code is named because it is the operator's way into Compose's own account of
+/// what went wrong, and because it is the number a script's caller will branch on. A
+/// run carrying no code at all was signalled rather than ended — a different thing to
+/// have happened, and a different thing to go looking into.
+fn unfinished(report: &LifecycleReport) -> String {
+    match report.status {
+        Some(code) => format!("{} did not finish — Compose exited {code}", report.action),
+        None => format!(
+            "{} did not finish — Compose was stopped before it ended",
+            report.action
+        ),
+    }
+}
+
 /// What a lifecycle command did, or would have done.
 pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     let mut lines = Lines::default();
@@ -171,6 +187,14 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     }
     let profiles: Vec<&str> = report.plan.profiles.iter().map(String::as_str).collect();
     lines.put(format!("{}: {}", report.action, profiles.join(", ")));
+
+    // A run Compose did not carry out says so here rather than leaving the operator to
+    // infer it from the settled services that are missing below. The exit status says
+    // the same thing to a script, and the two are decided from the same field, so a
+    // screen and a caller cannot come away with different accounts of one run.
+    if !report.rehearsed && report.status != Some(0) {
+        lines.put(unfinished(report));
+    }
 
     // What narrowing moved. The kept list is the point of the verb — it is the
     // promise that a download in flight was not interrupted — so it is said even
@@ -354,6 +378,44 @@ mod tests {
         };
         let text = lifecycle(&report).text();
         assert_eq!(text, "down: media");
+    }
+
+    /// The half of the failed-start defect a person sees. The other half is the exit
+    /// status, and both are read from the same field so a screen and a script cannot
+    /// come away with different accounts of one run.
+    #[test]
+    fn a_run_compose_did_not_carry_out_says_so_rather_than_reading_as_a_success() {
+        let failed = LifecycleReport {
+            status: Some(1),
+            ..a_lifecycle("up", a_plan("media", Vec::new()))
+        };
+        let said = lifecycle(&failed).text();
+        assert!(
+            said.contains("up did not finish — Compose exited 1"),
+            "{said}"
+        );
+
+        // No status at all, on a run that was not a rehearsal, is a process that was
+        // signalled rather than one that exited — there is no code to name, and saying
+        // one anyway would invent a number Compose never produced.
+        let signalled = LifecycleReport {
+            status: None,
+            ..a_lifecycle("up", a_plan("media", Vec::new()))
+        };
+        let stopped = lifecycle(&signalled).text();
+        assert!(
+            stopped.contains("Compose was stopped before it ended"),
+            "{stopped}"
+        );
+
+        // A rehearsal spawned nothing, so it failed at nothing — saying it did not
+        // finish would make `--dry-run` read as a broken command on every run.
+        let rehearsed = LifecycleReport {
+            status: None,
+            rehearsed: true,
+            ..a_lifecycle("up", a_plan("media", Vec::new()))
+        };
+        assert!(!lifecycle(&rehearsed).text().contains("did not finish"));
     }
 
     #[test]

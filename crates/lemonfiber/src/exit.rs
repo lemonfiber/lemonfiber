@@ -16,7 +16,10 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::Revoked;
-use lemonfiber_core::model::{AdoptReport, Disposition, ResetReport, Triggered, UpgradeReport};
+use lemonfiber_core::model::{
+    AdoptReport, Disposition, LifecycleReport, ResetReport, Triggered, UpgradeReport, WizardReport,
+};
+use lemonfiber_core::wizard::Phase;
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
@@ -133,6 +136,49 @@ fn adopting(report: &AdoptReport) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// What a run that started, stopped or restarted the stack exits on.
+///
+/// The exit status is the only thing a script reads, and for years this was the one
+/// command where it said nothing: every lifecycle outcome sat in the always-success
+/// arm below, on the reasoning that whether the stack settled is raised as a problem
+/// by the core. It is not. Waiting for services to become usable happens only where
+/// Compose exited zero, so a start whose Compose invocation failed raises nothing,
+/// returns a report, and used to exit zero — a `lemonfiber up` that started nothing
+/// telling its caller it had worked.
+///
+/// So the Compose status is the verdict. A rehearsal ran nothing and therefore failed
+/// at nothing. A status that is absent on a run that was not a rehearsal is a process
+/// that was signalled rather than one that exited, which is no more a success than a
+/// non-zero code is.
+///
+/// This is what `pull` has always done — it returns a failure code on a non-zero exit
+/// — and the two are the same command in every way that matters to a script.
+fn lifecycle(report: &LifecycleReport) -> ExitCode {
+    if report.rehearsed || report.status == Some(0) {
+        return ExitCode::SUCCESS;
+    }
+    ExitCode::from(FAILURE)
+}
+
+/// What a step of setup exits on.
+///
+/// Recording an answer, moving on and being told where setup stands are all the
+/// command doing what it was asked, and an apply that failed already comes back as a
+/// problem. One phase is neither: `Applying`, read back out of the progress file,
+/// can only mean a previous apply stopped part-way, because one that is still running
+/// is the run this answer is waiting on. What is written is written and what is not is
+/// not, and until the operator chooses a way out the machine is in neither state.
+///
+/// So it earns the code a held quality choice earns — something to act on rather than
+/// something that went wrong — and a script asking whether this machine is set up can
+/// tell "not yet" from "half-way, and somebody has to decide".
+fn setting_up(report: &WizardReport) -> ExitCode {
+    if report.phase == Phase::Applying {
+        return ExitCode::from(VALIDATION);
+    }
+    ExitCode::SUCCESS
+}
+
 /// Most answers are simply produced, so their success is that they arrived. A
 /// diagnosis is different: a script runs it precisely to learn whether the stack
 /// is healthy, so a broken or undetermined result must exit non-zero — reporting
@@ -228,6 +274,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
             }
         }
         Outcome::Update(report) => moving(report),
+        Outcome::Lifecycle(report) => lifecycle(report),
+        Outcome::Wizard(report) => setting_up(report),
         // Only a walk that stopped is a failure. One that finished worked; one still
         // downloading is working, and reporting that as a failure would contradict
         // the sentence that just told the operator nothing was cancelled; and one
@@ -250,7 +298,6 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Version(_)
         | Outcome::Forms(_)
         | Outcome::Preview(_)
-        | Outcome::Lifecycle(_)
         | Outcome::Config(_)
         // What the operator is told about was reported or changed; a write that could
         // not happen already comes back as a problem.
@@ -279,7 +326,6 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // problem, so there is nothing for a code to tell apart here.
         | Outcome::Invited(_)
         | Outcome::Outbound(_)
-        | Outcome::Wizard(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
         | Outcome::Undo(_)
@@ -482,7 +528,7 @@ mod tests {
     use lemonfiber_core::model::{
         Disposition, DoctorReport, LifecycleReport, MusicChoice, MusicReport, QualityReport,
         ResetReport, StackEdit, StatusReport, Triggered, UpgradeMedia, UpgradeReport,
-        VersionReport,
+        VersionReport, WizardReport,
     };
     use lemonfiber_core::reconfigure::Stance;
     use lemonfiber_core::seed::{
@@ -490,6 +536,7 @@ mod tests {
     };
     use lemonfiber_core::stored::{stored, Left, Removal};
     use lemonfiber_core::walkthrough::{Shape, State as WalkState};
+    use lemonfiber_core::wizard::{Phase, Step};
 
     use lemonfiber_core::config::paths::Paths;
     use std::path::Path;
@@ -527,6 +574,20 @@ mod tests {
         );
         problem.state = state;
         problem
+    }
+
+    fn a_wizard() -> WizardReport {
+        WizardReport {
+            offered: true,
+            phase: Phase::InProgress,
+            at: Step::DataLocation,
+            asks: true,
+            unanswered: Vec::new(),
+            ready_for_review: false,
+            plan: Vec::new(),
+            written: Vec::new(),
+            proof: None,
+        }
     }
 
     fn lifecycle(status: Option<i32>) -> LifecycleReport {
@@ -590,16 +651,57 @@ mod tests {
     }
 
     #[test]
-    fn a_lifecycle_reports_what_it_did_rather_than_a_verdict_on_it() {
-        // Whether the stack settled is a property of the run, raised as a problem by
-        // the core; the report of what was done is not itself a pass or a fail.
-        for status in [Some(0), Some(1), None] {
-            assert_eq!(
-                format!("{:?}", settled(&Outcome::Lifecycle(lifecycle(status)))),
+    fn a_start_that_compose_did_not_carry_out_is_not_a_success() {
+        // The hole this closes: waiting for services to become usable happens only
+        // where Compose exited zero, so a failed start raises no problem at all and
+        // used to leave through the always-success arm. A script could not tell a
+        // stack that came up from one that never started.
+        assert_eq!(
+            shown(settled(&Outcome::Lifecycle(lifecycle(Some(0))))),
+            success()
+        );
+        for status in [Some(1), Some(137), None] {
+            assert_ne!(
+                shown(settled(&Outcome::Lifecycle(lifecycle(status)))),
                 success(),
                 "{status:?}"
             );
         }
+    }
+
+    #[test]
+    fn an_apply_that_stopped_part_way_is_something_to_act_on_rather_than_a_success() {
+        // Read back out of the progress file, `Applying` can only mean a previous run
+        // died mid-write: what is written is written and what is not is not, and a
+        // script that read success would go on against a machine that is in neither
+        // state. Every other phase is the command doing what it was asked.
+        let mut half_written = a_wizard();
+        half_written.phase = Phase::Applying;
+        assert_eq!(
+            shown(settled(&Outcome::Wizard(half_written))),
+            shown(std::process::ExitCode::from(VALIDATION))
+        );
+
+        for phase in [Phase::InProgress, Phase::Reviewing, Phase::Applied] {
+            let mut standing = a_wizard();
+            standing.phase = phase;
+            assert_eq!(
+                shown(settled(&Outcome::Wizard(standing))),
+                success(),
+                "{phase:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_rehearsal_ran_nothing_and_so_failed_at_nothing() {
+        // A rehearsal carries no status because it spawned no process, which is the
+        // one case where an absent status is not a run that was signalled. Reading it
+        // as a failure would make `--dry-run` unusable from a script — the very thing
+        // the flag exists for.
+        let mut rehearsed = lifecycle(None);
+        rehearsed.rehearsed = true;
+        assert_eq!(shown(settled(&Outcome::Lifecycle(rehearsed))), success());
     }
 
     #[test]
