@@ -245,7 +245,11 @@ pub(super) async fn lifecycle(
     // Claimed around the whole operation, and given back whether it worked or not —
     // an early return between the two would leave the stack claimed by a run that has
     // already finished, which is the one way this can be worse than no lock at all.
-    let claim = lock::claimed(ctx).await?;
+    //
+    // The claim is recorded under the Compose verb rather than under the command the
+    // surface was given, because that is the word the next run to ask is shown and it
+    // has to mean something to somebody who did not type it.
+    let claim = lock::claimed(ctx, action.name()).await?;
     let outcome = worked(ctx, forms, action).await;
     lock::released(ctx, claim).await;
     outcome

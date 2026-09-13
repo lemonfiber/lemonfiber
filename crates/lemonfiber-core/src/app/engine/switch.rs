@@ -52,7 +52,11 @@ pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<P
     // starts others, and two of them against one stack interleave a teardown with a
     // start. Given back whether it worked or not — an early return between the two
     // would leave the stack claimed by a run that has already finished.
-    let claim = lock::claimed(ctx).await?;
+    //
+    // Recorded under its own name rather than under either of the two Compose
+    // invocations it runs, because a run waiting behind it is shown that word and
+    // "down" would be half of what is in the way.
+    let claim = lock::claimed(ctx, SWITCH).await?;
     let outcome = moving(ctx, forms).await;
     lock::released(ctx, claim).await;
     outcome
