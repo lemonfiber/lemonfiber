@@ -8211,6 +8211,89 @@
         }
       }
     },
+    "provenance": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/ProvenanceReport"
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "ProvenanceReport": {
+          "description": "Where every service in this stack comes from.",
+          "type": "object",
+          "properties": {
+            "services": {
+              "description": "The services, in the order the stack declares them.\n\nEvery service the manifest holds rather than the ones some form would start:\nwhat is *in* this stack is the question being asked, and an answer narrowed to\nwhat is running would leave the operator unable to ask about the service they\nare deciding whether to run.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ServiceProvenance"
+              }
+            }
+          },
+          "required": [
+            "services"
+          ]
+        },
+        "ServiceProvenance": {
+          "description": "Where one service comes from, as the stack declares it.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The service's id, which is also its Compose service name.",
+              "type": "string"
+            },
+            "image": {
+              "description": "The image it runs, without a tag.",
+              "type": "string"
+            },
+            "license": {
+              "description": "The SPDX identifier of the licence it is published under.\n\nStated rather than summarised as *open source*, because the identifier is what\nsomebody checks against the project — and because the four in this stack are\nnot interchangeable to anybody deciding what to do with what they run.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "pinned": {
+              "description": "The exact tag this stack pins it at.\n\nKept apart from the image rather than written as one reference, so that a\ncaller comparing what is pinned against what a project has released is\ncomparing versions rather than parsing them out of a string. The two are\nprinted together for a person, because a version without the image it belongs\nto names nothing that can be fetched.",
+              "type": "string"
+            },
+            "upstream": {
+              "description": "The project it is built from.\n\nThe whole point of the entry for anybody verifying: the licence is a string\nthis stack wrote down, and this is where somebody goes to find out whether the\nproject still agrees with it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "license",
+            "upstream",
+            "image",
+            "pinned"
+          ]
+        }
+      }
+    },
     "pull": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

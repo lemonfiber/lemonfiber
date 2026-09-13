@@ -169,6 +169,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/outbound",
     },
     Reach {
+        request: "provenance",
+        through: "/api/provenance",
+    },
+    Reach {
         request: "stored",
         through: "/api/stored",
     },

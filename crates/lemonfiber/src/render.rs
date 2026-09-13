@@ -28,6 +28,7 @@ mod hosting;
 mod invitation;
 mod migration;
 mod outbound;
+mod provenance;
 mod qr;
 mod quality;
 mod reconfigure;
@@ -244,6 +245,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Invited(report) => invitation::invitation(report),
         Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
+        Outcome::Provenance(report) => provenance::comes_from(report),
         Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::SelfUpdate(report) => self_update::standing(report),

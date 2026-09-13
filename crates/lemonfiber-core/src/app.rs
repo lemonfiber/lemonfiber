@@ -324,6 +324,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Outbound => outbound(ctx),
+        Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => {
             upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
         }
@@ -1895,6 +1896,36 @@ mod tests {
         assert!(json.contains("\"reach\":\"registry\""), "{json}");
     }
 
+    /// Where the services come from, asked for here as well as from the integration
+    /// test beside it, for the reason the enumeration above is: the arm is reached
+    /// from two compilations of this file and has to run in both.
+    #[tokio::test]
+    async fn a_dispatched_listing_of_where_the_services_come_from_serialises_under_its_own_kind() {
+        let json = dispatch(Command::Provenance, &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(json.contains("\"kind\":\"provenance\""), "{json}");
+        assert!(json.contains("\"license\":"), "{json}");
+        assert!(json.contains("\"upstream\":"), "{json}");
+    }
+
+    /// And the refusal, for the reason the enumeration's is: a stack that will not
+    /// read has nothing to say about what it bundles, and an empty listing would read
+    /// as a stack that bundles nothing.
+    #[tokio::test]
+    async fn a_listing_over_a_stack_that_will_not_read_is_refused() {
+        let nowhere = a_context()
+            .over(crate::test_support::nowhere())
+            .runner(Arc::new(Scripted(Ok(spoke("")))))
+            .engine(Arc::new(Reporting::default()))
+            .build();
+
+        assert!(dispatch(Command::Provenance, &nowhere).await.is_err());
+    }
+
     /// And the refusal, because half an enumeration reads as the whole of it: a stack
     /// that will not read cannot say what its services reach.
     #[tokio::test]
@@ -2410,6 +2441,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::SelfUpdate(_)
@@ -2468,6 +2500,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::SelfUpdate(_)
@@ -3327,6 +3360,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::SelfUpdate(_)
@@ -4321,6 +4355,7 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Outbound(_)
+                | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
                 | Outcome::SelfUpdate(_)

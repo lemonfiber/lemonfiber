@@ -326,6 +326,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // problem, so there is nothing for a code to tell apart here.
         | Outcome::Invited(_)
         | Outcome::Outbound(_)
+        | Outcome::Provenance(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
         | Outcome::Undo(_)

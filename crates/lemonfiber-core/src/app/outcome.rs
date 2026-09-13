@@ -76,6 +76,8 @@ pub enum Outcome {
     Removed(crate::model::HouseholdRemoval),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
+    /// Where every service in this stack comes from, and under what licence.
+    Provenance(crate::model::ProvenanceReport),
     /// Every credential this stack holds, and what became of acting on one.
     Credentials(crate::credential::Inventory),
     /// Everything this machine keeps of lemonfiber's, and what became of it.
@@ -151,6 +153,7 @@ impl Outcome {
             Self::Invited(_) => kind::INVITATION,
             Self::Removed(_) => kind::REMOVAL,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
+            Self::Provenance(_) => crate::model::kind::PROVENANCE,
             Self::Credentials(_) => crate::model::kind::CREDENTIALS,
             Self::Stored(_) => crate::model::kind::STORED,
             Self::SelfUpdate(_) => crate::model::kind::SELF_UPDATE,
@@ -206,6 +209,7 @@ impl serde::Serialize for Outcome {
             Self::Invited(report) => report.serialize(serializer),
             Self::Removed(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
+            Self::Provenance(report) => report.serialize(serializer),
             Self::Credentials(inventory) => inventory.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),
             Self::SelfUpdate(report) => report.serialize(serializer),

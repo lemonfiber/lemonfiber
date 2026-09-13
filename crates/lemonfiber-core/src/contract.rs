@@ -62,10 +62,10 @@ use crate::model::{
     kind::{self, Kind},
     Admitted, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
     FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdRemoval, HouseholdReport,
-    ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport, QualityReport,
-    ReplaceReport, ResetReport, SetupReport, Started, StatusReport, StuckReport, SupervisionReport,
-    TraceReport, UpdateReport, UpgradeReport, VersionReport, WalkthroughReport, WizardReport,
-    API_VERSION,
+    ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport,
+    QualityReport, ReplaceReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
+    SupervisionReport, TraceReport, UpdateReport, UpgradeReport, VersionReport, WalkthroughReport,
+    WizardReport, API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -120,6 +120,17 @@ impl Contract {
 /// against these keys, so a variant added here without one is named, and a sample for
 /// something no answer carries is named too.
 fn answered(kinds: &mut BTreeMap<String, Schema>) {
+    the_first_kinds(kinds);
+    the_rest_of_the_kinds(kinds);
+}
+
+/// The first of them, in the order the contract lists their kinds.
+///
+/// Split in two only because one call per kind outgrew what a function may be, which
+/// is the reason the sample set below is in three. The halves mean nothing apart: a
+/// kind falls in whichever of them its own name does, and [`answered`] is the only
+/// caller either has.
+fn the_first_kinds(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ADOPTION, schema_for!(Envelope<AdoptReport>));
     describing(kinds, kind::ALERTS, schema_for!(Envelope<AlertReport>));
     describing(kinds, kind::ARCHIVES, schema_for!(Envelope<Listing>));
@@ -164,6 +175,15 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
     describing(kinds, kind::OUTBOUND, schema_for!(Envelope<Leaving>));
     describing(kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
+}
+
+/// The rest of them, continuing that order.
+fn the_rest_of_the_kinds(kinds: &mut BTreeMap<String, Schema>) {
+    describing(
+        kinds,
+        kind::PROVENANCE,
+        schema_for!(Envelope<ProvenanceReport>),
+    );
     describing(kinds, kind::QUALITY, schema_for!(Envelope<QualityReport>));
     describing(
         kinds,
@@ -263,9 +283,10 @@ mod tests {
     use crate::model::{
         AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, FormsReport,
         FrontDoorReport, HistoryReport, HostingReport, HouseholdReport, ImportReport,
-        LifecycleReport, MigrationReport, MusicReport, QualityReport, ReplaceReport, ResetReport,
-        StatusReport, StuckReport, SupervisionReport, TraceReport, UpdateReport, UpgradeReport,
-        VersionReport, WalkthroughReport, WizardReport,
+        LifecycleReport, MigrationReport, MusicReport, ProvenanceReport, QualityReport,
+        ReplaceReport, ResetReport, ServiceProvenance, StatusReport, StuckReport,
+        SupervisionReport, TraceReport, UpdateReport, UpgradeReport, VersionReport,
+        WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
 
@@ -506,6 +527,19 @@ mod tests {
                 },
             ))),
             Outcome::Outbound(what_leaves()),
+            // One service rather than a whole stack: every field of the entry is on
+            // it, which is all the shape comparison reads, and a listing of nineteen
+            // would be nineteen copies of the same schema.
+            Outcome::Provenance(ProvenanceReport {
+                services: vec![ServiceProvenance {
+                    id: "sonarr".to_owned(),
+                    name: "Sonarr".to_owned(),
+                    license: "GPL-3.0-only".to_owned(),
+                    upstream: "https://github.com/Sonarr/Sonarr".to_owned(),
+                    image: "lscr.io/linuxserver/sonarr".to_owned(),
+                    pinned: "4.0.15".to_owned(),
+                }],
+            }),
             Outcome::Stored(crate::stored::stored(
                 &crate::config::paths::Paths::rooted(
                     std::path::Path::new("/home/op/.config"),
