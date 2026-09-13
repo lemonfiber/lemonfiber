@@ -232,17 +232,17 @@ coverage:
 
 # What the gate counted and could not name, from the profile already gathered.
 #
-# Two questions, because one of them answers and the other sometimes does not.
-# `--show-missing-lines` names line numbers and is what you want when it speaks. It has
-# been seen to come back empty against a gate that counted missed lines all the same —
-# so the second half asks the report for functions never entered, which is the shape
-# those misses take: a `map_or_else` default that never fired, an `else` on a parent
-# that is always `Some`, an arm reachable only from a caller that never passes it.
+# Two questions, because the first one sometimes has no answer to give.
+# `--show-missing-lines` names line numbers and is what you want when it speaks, but it
+# reads the export's merged segments, and `--fail-under-lines` reads a summary that
+# counts each instantiation — so a line one instantiation missed and another took is a
+# miss the gate fails on and this half cannot show. Seen here more than once, and the
+# reason the second half exists: it reads the regions, which do not merge.
 #
 # Neither builds or runs anything. Both re-read what the gate just wrote.
 uncovered:
     @echo "── lines the gate could not reach ──"
     -cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --show-missing-lines
-    @echo "── candidates: functions with no count, worth reading when the lines above name nothing ──"
+    @echo "── regions nothing entered, which is where a miss the lines above cannot name hides ──"
     @cargo llvm-cov report --ignore-filename-regex '{{ skipped }}' --json --output-path /dev/stdout 2>/dev/null \
-        | python3 scripts/never_entered.py
+        | python3 scripts/counted_but_not_named.py

@@ -44,9 +44,24 @@ jobs:
       # A gate that says only "below the threshold" sends whoever tripped it looking for a
       # line the run already knew. `report` re-reads the profile just gathered — no build,
       # no tests, seconds — and names them.
+      #
+      # Two questions, because the first one has been asked here and come back empty
+      # while the gate above counted twelve missed lines. `--show-missing-lines` reads
+      # the export's merged segments; `--fail-under-lines` reads a summary that counts
+      # each instantiation, so a line one instantiation missed and another took is a
+      # miss this half can never show. The second reads the regions, which do not
+      # merge. `just uncovered` asks both from a shell — change both or they drift.
+      - name: The reader names a miss the line list cannot
+        if: failure()
+        run: python3 scripts/counted_but_not_named.py --self-test
       - name: Which lines the gate missed
         if: failure()
-        run: cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --show-missing-lines
+        run: |
+          echo "── lines the gate could not reach ──"
+          cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --show-missing-lines || true
+          echo "── regions nothing entered, which is where a miss the lines above cannot name hides ──"
+          cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --json --output-path /dev/stdout 2>/dev/null \
+            | python3 scripts/counted_but_not_named.py
       # A Dependabot run reads secrets from the Dependabot store rather than the
       # Actions store, and `SONAR_TOKEN` is only in the second. The scanner was
       # handed an empty string, died with "Not authorized or project not found",
