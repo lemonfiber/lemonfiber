@@ -13,7 +13,17 @@ exclude_path = [".git"]
 # re-run it rather than to read it.
 max_retries = 2
 
-# 206 is a partial response and 429 is a host asking to be asked less often.
-# Neither says the link is wrong.
-accept = ["200", "206", "429"]
+# There is deliberately no `accept` list here.
+#
+# There was one — `["200", "206", "429"]` — and it never ran. The shared hygiene
+# workflow passes `--accept` on the command line, and a command-line argument
+# beats a config file, so this file's list was decoration. It happened to be
+# identical to the one that ran, which is why nobody noticed it was dead.
+#
+# That is the worse half of the duplication: not two values disagreeing, but two
+# values agreeing while only one is consulted. Somebody editing this one to fix a
+# failing link check would watch it keep failing and have no idea why.
+#
+# The list lives in `lemonfiber/spec`'s `hygiene.yml`, which is also where the
+# reasoning for each accepted code is written.
 exclude_loopback = true
