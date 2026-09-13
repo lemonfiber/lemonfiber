@@ -35,4 +35,4 @@ jobs:
       # Reading the workflow list is how it judges the pipeline itself.
       actions: read
     secrets: inherit
-    uses: lemonfiber/spec/.github/workflows/scorecard.yml@30ae524aea425cc66cdbfe2329e0914031b9d4e4 # main
+    uses: lemonfiber/spec/.github/workflows/scorecard.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
