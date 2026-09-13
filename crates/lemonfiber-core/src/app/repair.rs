@@ -20,7 +20,7 @@ mod telling;
 pub use consent::{Consent, STALE};
 use proving::{carried, looked};
 use remembering::{beyond, declined, recorded, remembered};
-use telling::told;
+pub(in crate::app) use telling::told;
 
 use crate::config::paths::Paths;
 use crate::doctor::{Check, Finding};
@@ -301,9 +301,7 @@ pub async fn reversing(ctx: &Ctx) -> Result<Reversal, Box<Problem>> {
 pub async fn retracting(ctx: &Ctx, paths: &Paths) -> Result<Reversal, Box<Problem>> {
     if ctx.dry_run {
         let undos = repair::undoing(super::recover::journal_at(&paths.journal()).changes());
-        return Ok(super::putting_back::would_reverse(
-            undos.into_iter().map(told).collect(),
-        ));
+        return Ok(super::putting_back::would_reverse(undos));
     }
     retract(ctx, paths).await.map(|reversed| Reversal {
         reversed,

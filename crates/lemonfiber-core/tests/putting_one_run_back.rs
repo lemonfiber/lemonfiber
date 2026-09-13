@@ -193,6 +193,82 @@ async fn one_run_goes_back_as_a_unit_and_the_others_stand() {
     );
 }
 
+/// A reversal reports what it put back and never the value it put back — on this road
+/// to `Outcome::Undo` as much as on the one `doctor --undo` takes.
+///
+/// The list is printed at a terminal and served at `/api/undo`, so a credential left in
+/// it is the record sealed and the door held open. The undo itself still carries the
+/// value, because that is what the reversal is carried out *with*.
+#[tokio::test]
+async fn a_reversal_reports_a_credential_without_reporting_its_value() {
+    let root = scratch("withheld");
+    env_holds(&root, "QBITTORRENT_PASSWORD=after\n");
+    journalled(
+        &root,
+        &[set(
+            "1000",
+            SEED,
+            "QBITTORRENT_PASSWORD",
+            Some("before"),
+            "after",
+        )],
+    );
+
+    let reversal = put_back(&root, "1000").await;
+    let said = format!("{reversal:?}");
+    let env = reading(&root);
+
+    assert!(
+        env.contains("QBITTORRENT_PASSWORD=before"),
+        "the value still went back: {env}"
+    );
+    assert!(
+        !said.contains("before") && !said.contains("after"),
+        "a value the reversal handled is on the report: {said}"
+    );
+}
+
+/// A rehearsal names the run it would put back, and the file it would have rewritten is
+/// the file it was.
+#[tokio::test]
+async fn a_rehearsed_reversal_names_what_would_go_back_and_touches_nothing() {
+    let root = scratch("rehearsed-run");
+    env_holds(&root, "ONE=new\n");
+    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    let recorded = std::fs::read_to_string(paths(&root).journal()).unwrap_or_default();
+
+    let reversal = dispatch(
+        Command::Undo {
+            run: Some("1000".to_owned()),
+        },
+        &ctx(&root).rehearsing(),
+    )
+    .await
+    .ok()
+    .and_then(|outcome| match outcome {
+        Outcome::Undo(reversal) => Some(reversal),
+        _ => None,
+    })
+    .unwrap_or_default();
+
+    assert!(reversal.rehearsed, "{reversal:?}");
+    assert_eq!(
+        reversal.reversed.len(),
+        1,
+        "a rehearsal that named nothing said nothing: {reversal:?}"
+    );
+    assert!(
+        reading(&root).contains("ONE=new"),
+        "a rehearsal put the value back: {}",
+        reading(&root)
+    );
+    assert_eq!(
+        std::fs::read_to_string(paths(&root).journal()).unwrap_or_default(),
+        recorded,
+        "a rehearsal recorded a reversal it did not make"
+    );
+}
+
 /// A stamp naming no run is refused, and says so rather than reporting nothing done.
 #[tokio::test]
 async fn a_stamp_naming_no_run_is_refused_explicitly() {

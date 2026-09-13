@@ -29,7 +29,11 @@ use crate::ports::withheld::REDACTED;
 ///
 /// Asked of the name in both, so a service field spelled like a credential is treated
 /// as one — `apiKey` is withheld and `tvCategory` is not.
-pub(super) fn told(undo: Undo) -> Undo {
+///
+/// Reachable from the reversal that puts back a named run as well as from the one that
+/// puts back the last repair. Both fill in the same `Outcome::Undo`, and a rule applied
+/// on one of the two roads to it is a rule that holds half the time.
+pub(in crate::app) fn told(undo: Undo) -> Undo {
     let action = match undo.action {
         Action::Restore { key, value, .. } if is_secret(&key) => Action::Restore {
             key,

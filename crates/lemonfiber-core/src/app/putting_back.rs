@@ -21,6 +21,7 @@ use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::{Change, Undo};
 use crate::rollback::{standing, together, Reversal as Judgement};
 
+use super::repair::told;
 use super::Ctx;
 
 /// What putting a run back came to.
@@ -176,8 +177,19 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
     let carried = super::recover::carrying_out(&reached.left, &paths.env_file(), Vec::new())?;
 
-    let mut reversed = reached.put_back;
-    reversed.extend(carried.done.iter().cloned());
+    // The account rather than the instruction, which is the division `told` exists to
+    // make: what a reversal is carried out *with* holds the values it puts back, and
+    // what it reports must not. Applied here as well as on the path that puts back the
+    // last repair — both fill in the same `Outcome::Undo`, a terminal prints it and
+    // `/api/undo` serves it, and a rule that holds on one of the two roads to it is a
+    // rule that holds half the time.
+    let reversed: Vec<Undo> = reached
+        .put_back
+        .iter()
+        .chain(carried.done.iter())
+        .cloned()
+        .map(told)
+        .collect();
 
     // Recorded before the report is built, so a reversal that is reported is a reversal
     // that is in the record. The changes it writes are the inverse of the ones it put
@@ -209,7 +221,11 @@ pub(super) fn would_reverse(undos: Vec<Undo>) -> Reversal {
         .into_iter()
         .partition(|undo| matches!(undo.action, crate::journal::Action::Reconfigure { .. }));
     Reversal {
-        reversed: here,
+        // Withheld the way a reversal that happened withholds. A rehearsal names the
+        // same changes and so would carry the same values out of the journal, and a
+        // credential is not less exposed for having been reported about a write nobody
+        // made.
+        reversed: here.into_iter().map(told).collect(),
         left: through_a_service
             .into_iter()
             .map(|undo| Left {
