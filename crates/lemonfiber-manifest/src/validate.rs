@@ -612,9 +612,14 @@ mod tests {
 
     /// One removal recorded against the shipped stack, which declares the service it
     /// names as a replacement.
+    ///
+    /// Named for nothing that ever existed, on purpose. The stack is a submodule that
+    /// moves, and it is about to start recording removals of its own — an id borrowed
+    /// from a real one would collide with the stack's own entry the day its pin moves,
+    /// and these tests would report a duplicate that is nobody's mistake.
     const DROPPED: &str = r#"
 [[removed]]
-id = "readarr"
+id = "an-old-thing"
 removed_in = "0.1.0"
 reason = "Discontinued upstream in 2025; the project is archived and releases nothing."
 replaced_by = "bindery"
@@ -634,7 +639,7 @@ replaced_by = "bindery"
 
     #[test]
     fn a_removal_that_is_still_a_declared_service_is_caught() {
-        let text = with_removal(&DROPPED.replace(r#"id = "readarr""#, r#"id = "bindery""#));
+        let text = with_removal(&DROPPED.replace(r#"id = "an-old-thing""#, r#"id = "bindery""#));
         assert!(
             messages(&text)
                 .iter()
@@ -672,10 +677,13 @@ replaced_by = "bindery"
     fn a_removal_replaced_by_another_removal_is_accepted() {
         let chained = format!(
             "{}{}",
-            DROPPED.replace(r#"replaced_by = "bindery""#, r#"replaced_by = "booksonic""#),
+            DROPPED.replace(
+                r#"replaced_by = "bindery""#,
+                r#"replaced_by = "an-older-thing""#
+            ),
             r#"
 [[removed]]
-id = "booksonic"
+id = "an-older-thing"
 removed_in = "0.1.0"
 reason = "Unmaintained upstream; Audiobookshelf covers what it did."
 replaced_by = "audiobookshelf"
@@ -686,9 +694,10 @@ replaced_by = "audiobookshelf"
 
     #[test]
     fn a_removal_recorded_as_replacing_itself_is_caught() {
-        let text = with_removal(
-            &DROPPED.replace(r#"replaced_by = "bindery""#, r#"replaced_by = "readarr""#),
-        );
+        let text = with_removal(&DROPPED.replace(
+            r#"replaced_by = "bindery""#,
+            r#"replaced_by = "an-old-thing""#,
+        ));
         assert!(messages(&text)
             .iter()
             .any(|m| m.contains("is recorded as having replaced itself")));
@@ -743,7 +752,7 @@ replaced_by = "audiobookshelf"
         let text = with_removal(&DROPPED.replacen("reason = ", "reason = \"\" # ", 1));
         assert!(check(&text)
             .iter()
-            .any(|violation| violation.location == "removed readarr"));
+            .any(|violation| violation.location == "removed an-old-thing"));
     }
 
     #[test]

@@ -353,6 +353,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Invite { name, allowance } => invited(ctx, name, allowance).await,
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
+        Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => {
@@ -1969,6 +1970,37 @@ mod tests {
         assert!(dispatch(Command::Outbound, &nowhere).await.is_err());
     }
 
+    /// What the services are for, asked for here as well as from the integration test
+    /// beside it, for the reason the enumeration above is: the arm is reached from two
+    /// compilations of this file and has to run in both.
+    #[tokio::test]
+    async fn a_dispatched_catalogue_serialises_under_its_own_kind() {
+        let json = dispatch(Command::Catalogue, &ctx(Ok(spoke(""))))
+            .await
+            .ok()
+            .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+            .unwrap_or_default();
+
+        assert!(json.contains("\"kind\":\"catalogue\""), "{json}");
+        assert!(json.contains("\"describes\":"), "{json}");
+        assert!(json.contains("\"without_it\":"), "{json}");
+        assert!(json.contains("\"removed\":"), "{json}");
+    }
+
+    /// And the refusal, for the reason the enumeration's is: a stack that will not
+    /// read has nothing to say about what it holds, and an empty listing would read as
+    /// a stack holding nothing.
+    #[tokio::test]
+    async fn a_catalogue_over_a_stack_that_will_not_read_is_refused() {
+        let nowhere = a_context()
+            .over(crate::test_support::nowhere())
+            .runner(Arc::new(Scripted(Ok(spoke("")))))
+            .engine(Arc::new(Reporting::default()))
+            .build();
+
+        assert!(dispatch(Command::Catalogue, &nowhere).await.is_err());
+    }
+
     /// The words need no stack and no engine, so this is the one command that runs
     /// through dispatch, envelope and serialise against a context that has nothing.
     #[tokio::test]
@@ -2494,6 +2526,7 @@ mod tests {
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
+                | Outcome::Catalogue(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -2553,6 +2586,7 @@ mod tests {
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
+                | Outcome::Catalogue(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -3413,6 +3447,7 @@ mod tests {
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
+                | Outcome::Catalogue(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -4408,6 +4443,7 @@ mod tests {
                 | Outcome::Clients(_)
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
+                | Outcome::Catalogue(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)

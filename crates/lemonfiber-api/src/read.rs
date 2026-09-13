@@ -26,6 +26,7 @@
 mod alerts;
 mod archives;
 mod bandwidth;
+mod catalogue;
 mod chosen;
 mod clients;
 mod credentials;
@@ -78,6 +79,7 @@ pub fn routes() -> Router<Serving> {
         .merge(clients::routes())
         .merge(outbound::routes())
         .merge(provenance::routes())
+        .merge(catalogue::routes())
         .merge(stored::routes())
         .merge(uninstall::routes())
         .merge(alerts::routes())
