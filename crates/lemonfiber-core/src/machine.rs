@@ -19,14 +19,24 @@ use async_trait::async_trait;
 use crate::ports::machine::{Power, Started, Supply};
 use crate::ports::Runner;
 
+/// The program the BSD way of asking runs.
+///
+/// Named apart from the argument vector it heads so a test can assert which program
+/// was asked without reaching into the vector by position, which this workspace
+/// denies everywhere rather than only where a panic would matter.
+const SYSCTL: &str = "sysctl";
+
 /// The BSD way of asking when a machine started, which macOS answers.
-const BOOT_SYSCTL: [&str; 3] = ["sysctl", "-n", "kern.boottime"];
+const BOOT_SYSCTL: [&str; 3] = [SYSCTL, "-n", "kern.boottime"];
 
 /// The Linux way: the kernel's own counters name the moment under `btime`.
 const BOOT_PROC: [&str; 2] = ["cat", "/proc/stat"];
 
+/// The program that reports where the power is coming from on macOS.
+const PMSET: &str = "pmset";
+
 /// The macOS way of asking where the power is coming from.
-const POWER_PMSET: [&str; 3] = ["pmset", "-g", "batt"];
+const POWER_PMSET: [&str; 3] = [PMSET, "-g", "batt"];
 
 /// The Linux way, under the two names a mains adapter is conventionally given.
 ///
@@ -149,7 +159,7 @@ fn online(said: &str) -> Option<Power> {
 mod tests {
     use std::sync::Arc;
 
-    use super::{drawing, online, proc_moment, sysctl_moment, Asking, BOOT_SYSCTL, POWER_PMSET};
+    use super::{drawing, online, proc_moment, sysctl_moment, Asking, PMSET, SYSCTL};
     use crate::ports::machine::{Power, Started, Supply};
     use crate::ports::process::{Failure, Output};
     use crate::ports::Runner;
@@ -215,7 +225,7 @@ mod tests {
             .at()
             .await;
         assert_eq!(at, Some(1_694_612_345));
-        assert!(asked.ran(BOOT_SYSCTL[0]));
+        assert!(asked.ran(SYSCTL));
     }
 
     #[tokio::test]
@@ -265,7 +275,7 @@ mod tests {
             .source()
             .await;
         assert_eq!(source, Some(Power::Mains));
-        assert!(asked.ran(POWER_PMSET[0]));
+        assert!(asked.ran(PMSET));
     }
 
     #[test]

@@ -149,6 +149,7 @@ async fn install(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Changed,
         .place(&wanted)
         .await
         .map_err(|failure| Box::new(failure.problem()))?;
+    answered(ctx, what, true);
     Ok(Changed {
         name: what.name().to_owned(),
         installed: true,
@@ -179,6 +180,7 @@ async fn remove(ctx: &Ctx, what: Hostable) -> Result<Changed, Box<Problem>> {
         .withdraw(what.name())
         .await
         .map_err(|failure| Box::new(failure.problem()))?;
+    answered(ctx, what, false);
     Ok(Changed {
         name: what.name().to_owned(),
         installed: false,
@@ -186,6 +188,29 @@ async fn remove(ctx: &Ctx, what: Hostable) -> Result<Changed, Box<Problem>> {
         started: false,
         rehearsed: false,
     })
+}
+
+/// Keep the autostart answer in step with what was just installed or withdrawn.
+///
+/// Only the boot start, and only because for that one the act *is* the answer: an
+/// operator who asks this machine to bring the stack back after a restart has said
+/// yes, and one who takes it back off has said no. Leaving the recorded answer at yes
+/// with nothing installed would be the `enabled-unverified` trap in its purest form —
+/// a record saying autostart is wanted, on a machine where nothing would do it.
+///
+/// The other two say nothing about it. A guard on the data location and a clock on
+/// requests are neither of them a statement about what should happen at a restart.
+///
+/// Best effort, like every other record written beside a command rather than by one:
+/// the thing the operator asked for has happened either way, and a record that could
+/// not be written costs the next run its knowledge of the answer rather than leaving
+/// a claim that is wrong.
+fn answered(ctx: &Ctx, what: Hostable, wanted: bool) {
+    if !matches!(what, Hostable::Boot) {
+        return;
+    }
+    let returning = super::autostart::load(ctx).answering(wanted);
+    super::autostart::save(ctx, &returning);
 }
 
 /// What is to be installed, or why it cannot be described.

@@ -162,9 +162,17 @@ const COMPOSE_REFUSED: &str = "the stack would not start";
 const ALREADY_DONE: &str = "this machine has not restarted since the stack was last brought back";
 
 /// What an operator on a battery is told, and what it takes to change it.
-const ON_BATTERY: &str =
-    "this machine is running on its battery, and a media stack started on one empties it in an \
-     afternoon — turn autostart on battery on if you would rather it started anyway";
+///
+/// The setting is interpolated rather than written out, the way every other sentence
+/// that names one does it: a name spelled in two places is a name that stops matching
+/// when one of them is renamed, and the operator is the one who finds out.
+fn on_battery_said() -> String {
+    format!(
+        "this machine is running on its battery, and a media stack started on one empties it \
+         in an afternoon — set {} to on if you would rather it started anyway",
+        crate::config::AUTOSTART_ON_BATTERY_KEY
+    )
+}
 
 /// Which forms should come back, or why none should.
 ///
@@ -181,7 +189,7 @@ async fn asked_for(ctx: &Ctx) -> Result<Vec<String>, String> {
         Err(held) => return Err(held.said().to_owned()),
     };
     if on_battery(ctx).await {
-        return Err(ON_BATTERY.to_owned());
+        return Err(on_battery_said());
     }
     Ok(forms)
 }
@@ -435,7 +443,7 @@ mod tests {
     use async_trait::async_trait;
     use tokio::sync::mpsc::Receiver;
 
-    use super::{reported, waited, ALREADY_DONE, CHECK, ON_BATTERY};
+    use super::{on_battery_said, reported, waited, ALREADY_DONE, CHECK};
     use crate::app::{Ctx, Outcome};
     use crate::autostart::Returning;
     use crate::condition::Fault;
@@ -685,7 +693,7 @@ mod tests {
         );
         asked(&ctx, &Returning::default().answering(true));
 
-        assert_eq!(held(&run(&ctx).await).as_deref(), Some(ON_BATTERY));
+        assert_eq!(held(&run(&ctx).await), Some(on_battery_said()));
     }
 
     #[tokio::test]
