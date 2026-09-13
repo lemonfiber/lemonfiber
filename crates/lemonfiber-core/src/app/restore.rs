@@ -18,50 +18,27 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::archive::{Fault, Reader};
+use crate::archive::Reader;
 use crate::backup::{self, Compatibility, Manifest, Relocation, Scope, SCHEMA};
 use crate::config::paths::Paths;
 use crate::config::{self, store};
-use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose as _, Problem};
 
 use super::{quiesced, Ctx};
 
 mod consent;
+mod refusals;
 
 pub use consent::{Consent, MOVED_ON};
+pub use refusals::{
+    CORRUPT, INCOMPATIBLE, NEEDS_REPOINT, NOT_KEPT_HERE, NOT_OURS, NOT_REPOINTED, NOT_RESTORED,
+    NOWHERE_KEPT, STILL_RUNNING, TOO_NEW, UNSAFE,
+};
 
-/// Raised when a backup archive cannot be read to decide a restore.
-pub const CORRUPT: Code = Code::new("RESTORE-1");
-
-/// Raised when an archive was written by a newer lemonfiber than this one.
-pub const TOO_NEW: Code = Code::new("RESTORE-2");
-
-/// Raised when an archive's format cannot be restored by this build.
-pub const INCOMPATIBLE: Code = Code::new("RESTORE-3");
-
-/// Raised when an archive holds a member that would be written outside its area.
-pub const UNSAFE: Code = Code::new("RESTORE-4");
-
-/// Raised when a restore onto a different data root awaits the operator's consent.
-pub const NEEDS_REPOINT: Code = Code::new("RESTORE-5");
-
-/// Raised when an archive could not be unpacked.
-pub const NOT_RESTORED: Code = Code::new("RESTORE-6");
-
-/// Raised when a restore could not be shown that nothing is writing to a database.
-pub const STILL_RUNNING: Code = Code::new("RESTORE-7");
-
-/// Raised when a name does not name one of the backups this machine kept.
-pub const NOT_KEPT_HERE: Code = Code::new("RESTORE-8");
-
-/// Raised when this run has nowhere it knows to look for an archive.
-pub const NOWHERE_KEPT: Code = Code::new("RESTORE-9");
-
-/// Raised when the restored settings could not be pointed at this machine's data root.
-pub const NOT_REPOINTED: Code = Code::new("RESTORE-10");
-
-/// Raised when the archive holds trees lemonfiber does not manage.
-pub const NOT_OURS: Code = Code::new("RESTORE-12");
+use refusals::{
+    corrupt, incompatible, needs_repoint, not_kept_here, not_ours, not_repointed, not_restored,
+    nowhere, too_new, unsafe_paths,
+};
 
 /// What a restore would do, shown before anything is overwritten.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -216,56 +193,6 @@ pub async fn run(
 /// never wrote.
 fn kept(dir: &Path, name: &str) -> Option<PathBuf> {
     Some(dir.join(crate::within::one_file(name)?))
-}
-
-/// The refusal for a run that cannot say where its own files go.
-fn nowhere() -> Problem {
-    Problem::new(
-        NOWHERE_KEPT,
-        Severity::Error,
-        "This run has nowhere it knows to look for a backup",
-        "Backups are kept in lemonfiber's own directory, and this machine would not say where \
-         that is. Nothing was touched.",
-        Remedy::new("Set a home directory for this user and run it again"),
-    )
-    .in_state(State::Guided)
-}
-
-/// The refusal for a name that is not one of the backups kept here.
-///
-/// The name is quoted back because the caller chose it and a caller that mistyped
-/// one needs to see which. What it is not is followed: a name carrying a path is a
-/// request to read somewhere lemonfiber does not keep archives, and the server runs
-/// as the operator.
-fn not_kept_here(name: &str) -> Problem {
-    Problem::new(
-        NOT_KEPT_HERE,
-        Severity::Error,
-        format!("`{name}` is not one of the backups kept here"),
-        "A restore asked for by name restores one of the archives this machine took, which are \
-         files in one directory. A name holding a path, or climbing out of that directory, is \
-         refused rather than followed. Nothing was touched.",
-        Remedy::new("Ask for one of the backups by the name it was written under"),
-    )
-    .in_state(State::Guided)
-}
-
-/// The refusal for settings that landed but could not be pointed at this machine.
-///
-/// Its own refusal rather than the store's, because what failed is the last step of
-/// a restore that has already replaced the files: the archive is in place and its
-/// recorded data root is the one it was taken against, which is not here.
-fn not_repointed(cause: &Problem) -> Problem {
-    Problem::new(
-        NOT_REPOINTED,
-        Severity::Error,
-        "The restored settings still name the backup's own data root",
-        "The archive was unpacked, and the data root it recorded could not be changed to this \
-         machine's — so the restored settings point at a library that is not here.",
-        Remedy::new("Set the data root by hand, then run a seed"),
-    )
-    .in_state(State::Guided)
-    .caused_by(cause.clone())
 }
 
 /// Read and verify an archive, returning what a restore from it would do — without
@@ -435,108 +362,6 @@ pub async fn restore(
         from_version: manifest.product_version,
         relocated: relocation,
     })
-}
-
-/// The problem for an archive that cannot be read at all.
-fn corrupt(fault: &Fault) -> Problem {
-    Problem::new(
-        CORRUPT,
-        Severity::Error,
-        "The backup could not be read",
-        "A restore verifies the archive before it changes anything, and this one could not be read — most often it is truncated or not a lemonfiber backup. Nothing was touched.",
-        Remedy::new("Check the archive, or restore from a different backup"),
-    )
-    .in_state(State::Guided)
-    .with_detail(fault.message.clone())
-}
-
-/// The problem for an archive from a newer lemonfiber.
-fn too_new(archive: &str, current: &str) -> Problem {
-    Problem::new(
-        TOO_NEW,
-        Severity::Error,
-        "This backup is from a newer lemonfiber",
-        "It may hold configuration this version would not restore correctly, so it is refused rather than half-applied. Nothing was touched.",
-        Remedy::new("Update lemonfiber to at least the version that made the backup, then restore"),
-    )
-    .in_state(State::Guided)
-    .with_detail(format!("the backup is {archive}, this is {current}"))
-}
-
-/// The problem for an archive in a format this build cannot restore.
-fn incompatible(detail: &str) -> Problem {
-    Problem::new(
-        INCOMPATIBLE,
-        Severity::Error,
-        "This backup is not in a format this lemonfiber can restore",
-        "Restoring it could leave the configuration in a state neither version expects, so it is refused. Nothing was touched.",
-        Remedy::new("Restore it with the lemonfiber version that made it"),
-    )
-    .in_state(State::Guided)
-    .with_detail(detail.to_owned())
-}
-
-/// The refusal for an archive of a setup lemonfiber does not manage.
-///
-/// Deliberately not a failure of the archive: it is a good capture of exactly what
-/// it says it holds, and the operator may well want it back. What lemonfiber will
-/// not do is write it back for them. Every other refusal here protects the archive
-/// from this machine; this one protects a tree on this machine that was never
-/// lemonfiber's to write to, so the remedy hands the work over rather than
-/// suggesting another way to ask.
-fn not_ours(project: &str, paths: &[String]) -> Problem {
-    Problem::new(
-        NOT_OURS,
-        Severity::Error,
-        "This backup holds a setup lemonfiber does not manage",
-        "It was captured before lemonfiber took over, so what is inside it belongs to the setup \
-         that was already here rather than to lemonfiber's own layout. Putting it back means \
-         writing into directories lemonfiber does not manage, which is not something it will do \
-         on your behalf. Nothing was touched.",
-        Remedy::new("Unpack it yourself with `tar -xzf`, into the paths it names"),
-    )
-    .in_state(State::Guided)
-    .with_detail(format!(
-        "taken from the project {project}, covering {}",
-        paths.join(", ")
-    ))
-}
-
-/// The problem for an archive whose members would escape their area.
-fn unsafe_paths(escaping: &[String]) -> Problem {
-    Problem::new(
-        UNSAFE,
-        Severity::Critical,
-        "This backup would write outside where it should",
-        "One or more of its entries name a path that leaves the directory they belong in, which a genuine lemonfiber backup never does. It is refused, and nothing was touched.",
-        Remedy::new("Do not restore this archive; it is corrupt or was tampered with"),
-    )
-    .with_detail(escaping.join(", "))
-}
-
-/// The problem for a restore that would land on a different data root.
-fn needs_repoint(relocation: &Relocation) -> Problem {
-    Problem::new(
-        NEEDS_REPOINT,
-        Severity::Warning,
-        "This backup was taken against a different data root",
-        "Restoring it unchanged would keep the data-root setting the backup was taken with, which names a location that is not on this machine. Accepting re-pointing continues the restore and records that it must use this machine's data root instead.",
-        Remedy::new("Re-run the restore accepting the re-point to continue"),
-    )
-    .in_state(State::Guided)
-    .with_detail(format!("was {}, now {}", relocation.was, relocation.now))
-}
-
-/// The problem for an archive that could not be unpacked.
-fn not_restored(fault: &Fault) -> Problem {
-    Problem::new(
-        NOT_RESTORED,
-        Severity::Error,
-        "The backup could not be unpacked",
-        "The restore was stopped part-way through writing the configuration back. Run it again once the cause is fixed; a seed afterwards will reconcile anything left half-written.",
-        Remedy::new("Check the configuration location is writable and restore again"),
-    )
-    .with_detail(fault.message.clone())
 }
 
 #[cfg(test)]

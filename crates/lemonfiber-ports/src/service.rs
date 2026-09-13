@@ -15,6 +15,7 @@ mod addressing;
 mod aggregators;
 mod applications;
 mod asking;
+mod carrying;
 mod catalogue;
 mod clients;
 mod failure;
@@ -24,6 +25,7 @@ mod metering;
 mod notices;
 mod providers;
 mod quality;
+mod requests;
 mod subtitles;
 mod throttling;
 mod trace;
@@ -32,6 +34,7 @@ pub use addressing::{Address, Addressing};
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
+pub use carrying::{Carried, Carrying, Record};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
     Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, FulfilmentTarget,
@@ -52,6 +55,7 @@ pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
+pub use requests::{HouseholdRequest, Requesting, Requests, Telling};
 pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
@@ -206,218 +210,6 @@ pub trait MediaServer: Send + Sync {
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
 }
 
-/// One thing a household member asked for, as the request service records it.
-///
-/// The two statuses are carried as the service's own numbers rather than folded here:
-/// what became of the request and what became of the media it asked for are separate
-/// facts, and turning the pair into one word a member reads is a decision for the household
-/// model above this, not for the code that reads them off the wire.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HouseholdRequest {
-    /// The number the request service files this request under, which is how one is
-    /// named to it again when somebody rules on it.
-    pub id: i64,
-    /// When it was asked for, as the service timestamps it — what a request waiting
-    /// on somebody is measured against, and what a counting period runs from.
-    pub made: Option<String>,
-    /// The member who asked, by the name the request service shows them under.
-    pub member: String,
-    /// Which service files the media — television or film — or `None` where the
-    /// request service names a media type this build does not know.
-    pub kind: Option<crate::media::Kind>,
-    /// The id the \*arr filing this media knows it by, where the request service has
-    /// handed it over yet. Nothing for a request still awaiting approval, which no
-    /// \*arr has been told about — so the item cannot be named from the library, and
-    /// is not claimed to be.
-    pub item: Option<i64>,
-    /// What became of the request, as the service numbers them.
-    pub request_status: u8,
-    /// What became of the media it asked for, as the service numbers them.
-    pub media_status: u8,
-}
-
-/// What one member may ask for on the request service.
-///
-/// Only the half that bears on what a household chose. Everything else about the
-/// account — what they are called, what they may watch — is the media server's to say,
-/// and a second copy here would be a copy able to disagree with it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Requesting {
-    /// The identifier this service tells them apart by.
-    pub id: String,
-    /// Whether what they ask for arrives without anybody approving it.
-    ///
-    /// True is the state a restriction has to undo: it is the whole of how a limit on
-    /// watching and a lack of limit on requesting come apart.
-    pub approves_own: bool,
-}
-
-/// A request manager's identity setup and the household's own requests — Seerr,
-/// configured to authenticate its household against the media server rather than
-/// against accounts of its own.
-#[async_trait]
-pub trait Requests: Send + Sync {
-    /// Whether it has already been initialised — the gate that never re-points a
-    /// running instance's identity source and so keeps its existing sign-ins.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn initialized(&self) -> Result<bool, Failure>;
-
-    /// Point authentication at the media server reached at `server_url`, signing
-    /// in as `username` with `password` — which on the first call also creates the
-    /// owner from that account.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn configure_identity(
-        &self,
-        username: &str,
-        password: &str,
-        server_url: &str,
-    ) -> Result<(), Failure>;
-
-    /// Sign in through the media server as `username` with `password`, leaving the
-    /// session the later reads are made under.
-    ///
-    /// Signing in is what [`Requests::configure_identity`] does first; this is that step
-    /// on its own, for a read that must not also finish somebody's setup.
-    ///
-    /// **Where the media server is, is not named here**, and that is the difference
-    /// between the two. A service that has been pointed at one already knows where it
-    /// is, and naming it again is an attempt to point it somewhere — which it refuses,
-    /// because moving a household's identity source out from under them is not a thing
-    /// a sign-in should be able to do. So this opens a session on a service that is
-    /// already set up, and [`Requests::configure_identity`] is the one that sets it up.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn sign_in(&self, username: &str, password: &str) -> Result<(), Failure>;
-
-    /// Every request the household has made, across its members.
-    ///
-    /// Read as the owner, whose session sees the whole household: the members
-    /// themselves have no way to run this, so the one account lemonfiber holds a
-    /// credential for asks on their behalf.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure>;
-
-    /// Give the request service an account for each of these media-server members.
-    ///
-    /// The link an invitation owes: the account exists on the media server from the
-    /// moment somebody is invited, and this is what makes the same person known to
-    /// the service they ask through.
-    ///
-    /// **Sending somebody it already knows is not an error and does nothing** — the
-    /// service skips a member it already holds. So this is safe to call with everybody
-    /// on every run, and a link that could not be made while the service was down is
-    /// completed by the next run rather than by anything remembered in between.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn link_members(&self, members: &[String]) -> Result<(), Failure>;
-
-    /// The account this service holds for a media-server member, where it holds one.
-    ///
-    /// `None` where it holds none — a member who has never signed in here is somebody
-    /// this service has never heard of, which is **nothing to revoke** rather than a
-    /// failure to revoke something.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn member_for(&self, media_server_id: &str) -> Result<Option<String>, Failure>;
-
-    /// What one member may ask for here, by the media server's own identifier.
-    ///
-    /// `None` where this service holds no account for them, which is a member who has
-    /// never signed in here rather than a read that failed.
-    ///
-    /// Wanted because a limit on what somebody may *watch* says nothing about what they
-    /// may *ask for*, and the two disagreeing is the gap parental controls exist to
-    /// close: a child who cannot watch something but can pull it into the library is a
-    /// child whose parents' setting did half a job.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn requesting(&self, media_server_id: &str) -> Result<Option<Requesting>, Failure>;
-
-    /// Make what this member asks for wait for somebody to approve it.
-    ///
-    /// **The narrowest thing this service can be told about a restricted member.** It
-    /// has no notion of a content rating, so there is no limit here to mirror the media
-    /// server's — what there is instead is the difference between a request that lands
-    /// in the library unseen and one that an adult sees first. Taking the approval off
-    /// leaves everything else about the account exactly as it was.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn approval_first(&self, id: &str) -> Result<(), Failure>;
-
-    /// Take that account away, and with it everything it asked for.
-    ///
-    /// **This destroys their requests**, which is the service's own behaviour and not a
-    /// choice made here: it removes them by hand so that a title still waiting goes back
-    /// to being unrequested rather than being left pointing at nobody. Anything shown to
-    /// an operator before this runs has to say so.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn remove_member(&self, id: &str) -> Result<(), Failure>;
-
-    /// What the request service will tell the household about, as it stands.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn telling(&self) -> Result<Telling, Failure>;
-
-    /// Set what it tells them about.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn tell(&self, telling: &Telling) -> Result<(), Failure>;
-
-    /// The \*arrs it already hands requests to, by the endpoint each reaches.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn fulfilment_targets(&self) -> Result<Vec<RegisteredTarget>, Failure>;
-
-    /// Hand it an \*arr to fulfil requests through.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure>;
-}
-
-/// Whether the request service reaches the household, and about what.
-///
-/// The occasions are a set, carried as the bit field the service keeps them in. It
-/// is a number here rather than a list of named events because that is the shape the
-/// service reads and writes, and translating it twice — once out, once back — would
-/// be two places for the set to lose a member.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Telling {
-    /// Whether it will send anything at all.
-    pub enabled: bool,
-    /// Which occasions it sends on.
-    pub occasions: u32,
-}
-
 /// Asking a Servarr-shape service to run one of its background commands — the
 /// operator-triggered maintenance a stack sometimes needs, such as re-searching
 /// existing content for a better release when the quality bar is raised.
@@ -431,89 +223,6 @@ pub trait Maintenance: Send + Sync {
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses the command.
     async fn run_command(&self, name: &str) -> Result<(), Failure>;
-}
-
-/// A kind of record a service holds, for carrying a setup across.
-///
-/// Four, because four are what an operator would miss: where things are found, and the
-/// three libraries the *arrs keep. Each is a path under the same API and behaves the
-/// same way, which is why one port serves all of them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Record {
-    /// Where releases are searched for.
-    Indexer,
-    /// Television the service is following.
-    Series,
-    /// Films the service is following.
-    Film,
-    /// Music the service is following.
-    Artist,
-}
-
-impl Record {
-    /// The path this kind lives at, under the service's versioned API.
-    #[must_use]
-    pub const fn path(self) -> &'static str {
-        match self {
-            Self::Indexer => "/indexer",
-            Self::Series => "/series",
-            Self::Film => "/movie",
-            Self::Artist => "/artist",
-        }
-    }
-
-    /// What a person calls this kind, for a line about what was carried.
-    #[must_use]
-    pub const fn plural(self) -> &'static str {
-        match self {
-            Self::Indexer => "indexers",
-            Self::Series => "series",
-            Self::Film => "films",
-            Self::Artist => "artists",
-        }
-    }
-}
-
-/// One record a service holds, as it holds it.
-///
-/// The profile and the folder are carried **by name and by path**, never by the ids the
-/// service gave them. Two stacks number their own profiles and folders independently, so
-/// a record copied with its ids intact would point at whatever happened to be third on
-/// the other machine — which is the quiet way an import ruins a library rather than
-/// failing to copy it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Carried {
-    /// What it is called, which is how a copy already here is recognised.
-    pub name: String,
-    /// The quality profile it follows, by name.
-    pub profile: Option<String>,
-    /// The root folder it sits under, by path.
-    pub folder: Option<String>,
-    /// Everything else the service said about it, kept as it was said.
-    pub rest: String,
-}
-
-/// Reading what a service holds and re-creating it on another.
-///
-/// Its own port because it is neither provisioning nor a read of state: it is the one
-/// thing that copies an operator's own records from a stack lemonfiber did not build
-/// into one it did.
-#[async_trait]
-pub trait Carrying: Send + Sync {
-    /// Every record of a kind this service holds.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the service is unreachable or answers unusably.
-    async fn records(&self, kind: Record) -> Result<Vec<Carried>, Failure>;
-
-    /// Re-create a record here, pointing it at this service's own profile and folder.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the service refuses it, or names a profile or folder
-    /// this service does not have.
-    async fn carry(&self, kind: Record, item: &Carried) -> Result<(), Failure>;
 }
 
 /// Telling a service how to move files from the download directory into the
@@ -547,23 +256,6 @@ mod tests {
         Failure, Identity, RegisteredApplication, RootFolder,
     };
     use crate::error::{Severity, State};
-
-    /// Four kinds, four paths. The three libraries are three different words for the
-    /// same idea across the three services, and getting one wrong would carry television
-    /// into the films.
-    #[test]
-    fn each_kind_of_record_names_its_own_path_and_its_own_word() {
-        use super::Record;
-        assert_eq!(Record::Indexer.path(), "/indexer");
-        assert_eq!(Record::Series.path(), "/series");
-        assert_eq!(Record::Film.path(), "/movie");
-        assert_eq!(Record::Artist.path(), "/artist");
-
-        assert_eq!(Record::Indexer.plural(), "indexers");
-        assert_eq!(Record::Series.plural(), "series");
-        assert_eq!(Record::Film.plural(), "films");
-        assert_eq!(Record::Artist.plural(), "artists");
-    }
 
     #[test]
     fn an_absent_service_is_skipped_rather_than_failed() {
