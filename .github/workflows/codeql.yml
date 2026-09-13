@@ -61,8 +61,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RESULT_REF: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+
+          # The commit the alerts are about: the merge commit on a pull request,
+          # the pushed commit otherwise. Asked of the API rather than taken from
+          # the event, because `github.event.pull_request.merge_commit_sha` is
+          # the value at the time the event fired and the merge commit is rebuilt
+          # whenever the base moves.
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            sha=$(gh api "repos/${REPO}/pulls/${PR}" --jq '.merge_commit_sha')
+          else
+            sha=${GITHUB_SHA}
+          fi
+
+          # Both lists, for the same ref. An empty alert list means either "this
+          # commit was analysed and is clean" or "this commit was never
+          # analysed", and the gate refuses to guess which — so it is handed the
+          # analyses and the commit rather than inferring either.
+          # `analyze` succeeding means the upload was accepted, not that the
+          # analysis is queryable — those are minutes apart. So this waits for
+          # every language's analysis of this commit rather than racing it, and
+          # the same function that decides the wait decides the gate, so there is
+          # no second opinion to drift.
+          gate() {
+            python3 scripts/no_open_codeql_alert.py \
+              --analyses analyses.json \
+              --sha "${sha}" \
+              --workflow .github/workflows/codeql.yml "$@"
+          }
+
+          for attempt in $(seq 1 30); do
+            gh api --paginate --slurp \
+              "repos/${REPO}/code-scanning/analyses?ref=${RESULT_REF}" > analyses.json
+            if gate --complete-only; then break; fi
+            echo "  (${attempt}/30)"
+            sleep 10
+          done
+
           gh api --paginate --slurp \
             "repos/${REPO}/code-scanning/alerts?state=open&tool_name=CodeQL&ref=${RESULT_REF}" \
-            | python3 scripts/no_open_codeql_alert.py
+            | gate
