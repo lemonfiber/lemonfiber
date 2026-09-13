@@ -358,18 +358,6 @@ mod tests {
         ["abcdef", "1234", "567890"].concat()
     }
 
-    /// The half of a fixture line it is safe to quote: the name in front of the value.
-    ///
-    /// Every line these cases are built from carries the credential itself, and a
-    /// failure message is copied into a CI log — read by more people and kept far
-    /// longer than the machine that wrote it. The name says which case broke, which
-    /// is what a reader of the failure needs; the value behind it says nothing they
-    /// do, and an assertion that a credential was withheld must not be the thing
-    /// that carries it onward.
-    fn named(line: &str) -> &str {
-        line.split(['=', ':']).next().unwrap_or(line).trim()
-    }
-
     #[test]
     fn a_login_in_front_of_a_host_is_withheld_even_where_the_address_carries_no_query() {
         // The gap this closes: the query rule reached the password only as a
@@ -432,25 +420,39 @@ mod tests {
     #[test]
     fn a_setting_line_still_loses_its_value_however_it_is_written() {
         let secret = a_credential();
-        for line in [
-            format!("INDEXER_APIKEY={secret}"),
-            format!("  USENET_PASS: {secret}"),
-            format!("      SONARR_API_KEY: {secret}:more"),
-            format!("WIREGUARD_PRIVATE_KEY={secret}=more"),
-            format!("PROVIDER_CREDENTIAL={secret}"),
+        // Each case carries its name beside it rather than having one taken off the
+        // line, because the line holds the credential and the name does not — and a
+        // message argument is worked out only when the assertion fails, so anything
+        // computed for one is a line no passing run ever reaches.
+        for (name, line) in [
+            ("INDEXER_APIKEY", format!("INDEXER_APIKEY={secret}")),
+            ("USENET_PASS", format!("  USENET_PASS: {secret}")),
+            (
+                "SONARR_API_KEY",
+                format!("      SONARR_API_KEY: {secret}:more"),
+            ),
+            (
+                "WIREGUARD_PRIVATE_KEY",
+                format!("WIREGUARD_PRIVATE_KEY={secret}=more"),
+            ),
+            (
+                "PROVIDER_CREDENTIAL",
+                format!("PROVIDER_CREDENTIAL={secret}"),
+            ),
             // A name is a name whatever it is spelled with, so long as it is one word.
-            format!("homepage-var-jellyfin-key={secret}"),
+            (
+                "homepage-var-jellyfin-key",
+                format!("homepage-var-jellyfin-key={secret}"),
+            ),
         ] {
             let shown = withheld(&line);
             assert!(
                 shown.ends_with(REDACTED),
-                "{}: the value was not replaced by the marker",
-                named(&line)
+                "{name}: the value was not replaced by the marker"
             );
             assert!(
                 !shown.contains(&secret),
-                "{}: the credential survived being withheld",
-                named(&line)
+                "{name}: the credential survived being withheld"
             );
         }
     }
@@ -616,21 +618,19 @@ mod tests {
         // The other side of the same rule, and why the sentence is judged on what
         // follows the name rather than on the name alone: a value is one word.
         let secret = a_credential();
-        for line in [
-            format!("password: {secret}"),
-            format!("api_key: {secret}"),
-            format!("token={secret}"),
+        for (name, line) in [
+            ("password", format!("password: {secret}")),
+            ("api_key", format!("api_key: {secret}")),
+            ("token", format!("token={secret}")),
         ] {
             let shown = withheld(&line);
             assert!(
                 !shown.contains(&secret),
-                "{}: the credential survived being withheld",
-                named(&line)
+                "{name}: the credential survived being withheld"
             );
             assert!(
                 shown.contains(REDACTED),
-                "{}: nothing marked that a value had been taken",
-                named(&line)
+                "{name}: nothing marked that a value had been taken"
             );
         }
     }
