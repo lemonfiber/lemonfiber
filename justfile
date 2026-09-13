@@ -167,11 +167,18 @@ stack-moved:
 # `--self-test` that nothing runs before a release, unless it declares why it
 # cannot. One does, and the reason is real — `dist` generates the installer at
 # release time, so there is nothing to mutate until then.
+#
+# The alert gate's proof is here because the job that used to run it is no longer
+# this repository's to read. `codeql.yml` calls the organisation's shared alert
+# workflow, which runs the self-test as its own first step — true, and invisible
+# to a checker that reads this tree. Proving it here is the better half anyway:
+# it fails on the machine that broke it rather than after a push.
 scripts:
     uvx ruff@0.16.4 check scripts/
     python3 scripts/every_proof_runs.py
     python3 scripts/every_proof_runs.py --self-test
     python3 scripts/the_requirements_an_entry_names.py --self-test
+    python3 scripts/no_open_codeql_alert.py --self-test
 
 deny:
     cargo deny check

@@ -41,93 +41,38 @@ jobs:
   # check GitHub raises beside it compares the configurations a pull request
   # produced against every one seen on main, and the supply-chain scan uploads
   # three that only ever run on main — so it is neutral on every pull request,
-  # whatever the analysis found, and gates nothing. This asks the question that
-  # was meant instead: is there an open alert against what this branch proposes.
+  # whatever the analysis found, and gates nothing. The workflow called here asks
+  # the question that was meant instead: is there an open alert against what this
+  # branch proposes.
+  #
+  # Called rather than written out, because it is one judgement for the whole
+  # organisation (GOV-R12), and because the sixty lines of shell around the gate
+  # were the part with no guard on them — the gate script itself is already held
+  # to the canonical copy, byte for byte, by `check_shared_files.py`. What stays
+  # here is what is about this repository: the matrix the gate reads the expected
+  # languages off, and the triggers a reusable workflow cannot declare.
+  #
+  # `!cancelled()` rather than `always()`, and rather than `needs:` alone: a
+  # `needs:` dependency that fails makes this job vanish, and a skipped required
+  # check satisfies branch protection — so the one gate that refuses a branch an
+  # alert stands against would be absent in exactly the case where the analysis
+  # went wrong. GitHub's code-scanning upload failed for hours on 2026-09-13 and
+  # every one of those runs took this job with it. The gate refuses a commit it
+  # has no analysis of, by language and by name, so running it after a failed
+  # analysis is a red check naming what is missing rather than a skipped one that
+  # says nothing. A cancelled run is somebody pressing stop, and finishing the
+  # job they stopped serves nobody.
   alerts:
     needs: analyze
-    # Runs whatever the analysis did, which it could not safely do until the gate
-    # below learned to tell an unanalysed commit from a clean one.
-    #
-    # `needs` alone made this job vanish when any language failed, and a skipped
-    # required check satisfies branch protection — so the one gate that refuses a
-    # branch an alert stands against was, in exactly the case where the analysis
-    # went wrong, not a gate at all. It was the safer of two bad options then:
-    # running it would have read an empty alert list and passed on nothing.
-    #
-    # It is no longer either. `no_open_codeql_alert.py` now refuses a commit it
-    # has no analysis of, by language and by name, so running it after a failed
-    # analysis produces a red check that says what is missing rather than a
-    # skipped one that says nothing. GitHub's code-scanning upload failed for
-    # hours on 2026-09-13 and every one of those runs took this job with it.
-    #
-    # `!cancelled()` rather than `always()`: a cancelled run is somebody pressing
-    # stop, and finishing the job they stopped serves nobody.
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # A gate nobody has watched fail is a gate nobody knows works, so it is put
-      # in front of an alert before it is trusted about their absence.
-      - name: The gate refuses a branch an alert stands against
-        run: python3 scripts/no_open_codeql_alert.py --self-test
-      - name: No open CodeQL alert reaches main
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RESULT_REF: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
-          PR: ${{ github.event.pull_request.number }}
-          ANALYSIS: ${{ needs.analyze.result }}
-        run: |
-          set -euo pipefail
-
-          # The commit the alerts are about: the merge commit on a pull request,
-          # the pushed commit otherwise. Asked of the API rather than taken from
-          # the event, because `github.event.pull_request.merge_commit_sha` is
-          # the value at the time the event fired and the merge commit is rebuilt
-          # whenever the base moves.
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            sha=$(gh api "repos/${REPO}/pulls/${PR}" --jq '.merge_commit_sha')
-          else
-            sha=${GITHUB_SHA}
-          fi
-
-          # Both lists, for the same ref. An empty alert list means either "this
-          # commit was analysed and is clean" or "this commit was never
-          # analysed", and the gate refuses to guess which — so it is handed the
-          # analyses and the commit rather than inferring either.
-          # `analyze` succeeding means the upload was accepted, not that the
-          # analysis is queryable — those are minutes apart. So this waits for
-          # every language's analysis of this commit rather than racing it, and
-          # the same function that decides the wait decides the gate, so there is
-          # no second opinion to drift.
-          gate() {
-            python3 scripts/no_open_codeql_alert.py \
-              --analyses analyses.json \
-              --sha "${sha}" \
-              --workflow .github/workflows/codeql.yml "$@"
-          }
-
-          # Five minutes is worth waiting for an analysis that is on its way and
-          # nothing at all for one that is not. An analysis job that already
-          # failed is not indexing; ask once, say so, and be red in seconds.
-          tries=30
-          if [ "${ANALYSIS}" != "success" ]; then
-            echo "::warning::The analysis did not succeed (${ANALYSIS}), so this asks once rather than waiting for an upload that is not coming."
-            tries=1
-          fi
-
-          for attempt in $(seq 1 "${tries}"); do
-            gh api --paginate --slurp \
-              "repos/${REPO}/code-scanning/analyses?ref=${RESULT_REF}" > analyses.json
-            if gate --complete-only; then break; fi
-            echo "  (${attempt}/${tries})"
-            sleep 10
-          done
-
-          gh api --paginate --slurp \
-            "repos/${REPO}/code-scanning/alerts?state=open&tool_name=CodeQL&ref=${RESULT_REF}" \
-            | gate
+    uses: lemonfiber/spec/.github/workflows/codeql-alerts.yml@86d2957e27595294d91a7ba71eae2c745eb93a48 # main
+    with:
+      # A matrix's aggregate: not `success` if either language's analysis failed,
+      # which is the right reading — an alert list missing one language's findings
+      # answers for neither. It only decides whether the gate waits five minutes
+      # for an upload or asks once; which language is absent it works out itself,
+      # off the matrix above.
+      analysis: ${{ needs.analyze.result }}
