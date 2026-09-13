@@ -75,6 +75,22 @@ jobs:
       - name: Every claim refuses the tree that has lost it
         run: python3 scripts/the_toolchain_a_job_gets.py --self-test
 
+      # That sentence is written beside most of the scripts in this directory,
+      # and until now nothing checked it was acted on. Eight carry a
+      # `--self-test`; this job ran one of them, and four of the rest were proven
+      # only by a workflow that fires on a release — so a gate that had stopped
+      # working would have been found during a release.
+      #
+      # `the_requirements_an_entry_names.py` was exactly that, and it needs no
+      # network and a tenth of a second. It runs here now, and the gate below
+      # refuses the next one to drift into that state.
+      - name: Every proof runs before a release, or says why it cannot
+        run: python3 scripts/every_proof_runs.py
+      - name: And this one is held to the same rule
+        run: python3 scripts/every_proof_runs.py --self-test
+      - name: What a changelog entry must name
+        run: python3 scripts/the_requirements_an_entry_names.py --self-test
+
   msrv:
     runs-on: ubuntu-latest
     steps:

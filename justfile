@@ -156,8 +156,22 @@ stack-moved:
 # the harder half.
 #
 # Read the release gates themselves, for a name that does not exist.
+#
+# And run the proofs. Each script here answers "how do you know this gate works"
+# with a `--self-test` that breaks its own claims in turn, and until now `just
+# ci` reached exactly one of the seven — the rest were proven by workflows, four
+# of them only by one that fires on a release. A gate found broken during a
+# release is found at the worst moment available.
+#
+# `every_proof_runs.py` is what keeps that true: it refuses a script carrying a
+# `--self-test` that nothing runs before a release, unless it declares why it
+# cannot. One does, and the reason is real — `dist` generates the installer at
+# release time, so there is nothing to mutate until then.
 scripts:
     uvx ruff@0.16.4 check scripts/
+    python3 scripts/every_proof_runs.py
+    python3 scripts/every_proof_runs.py --self-test
+    python3 scripts/the_requirements_an_entry_names.py --self-test
 
 deny:
     cargo deny check
