@@ -50,16 +50,41 @@ def flatten(read) -> list:
 
 
 def expected(workflow: str) -> list[str]:
-    """The categories this repository's own CodeQL matrix says it produces.
+    """The categories this repository's own CodeQL job says it produces.
 
-    Read from the workflow rather than passed in beside it. The matrix is the one
-    place the language list belongs, and a second copy of it in the step below
-    would be a list nothing compares — free to fall behind the day a language is
-    added, and to fall behind silently, which is how this gate would come to
-    check two of three and report a pass.
+    Read from the workflow rather than passed in beside it. The workflow is the
+    one place the language list belongs, and a second copy of it in the step
+    below would be a list nothing compares — free to fall behind the day a
+    language is added, and to fall behind silently, which is how this gate would
+    come to check two of three and report a pass.
+
+    Two shapes, because the organisation writes both: a `strategy.matrix` where
+    there are several languages, and `init`'s own `languages:` where there is
+    one. `brand` and `lemonfiber-media-stack` are the second, and reading only
+    the first would meet them with a bare `KeyError` — a red check with a
+    traceback in it, which tells a maintainer nothing about their pull request.
     """
-    matrix = yaml.safe_load(workflow)["jobs"]["analyze"]["strategy"]["matrix"]
-    return [f"/language:{language}" for language in matrix["language"]]
+    job = (yaml.safe_load(workflow) or {}).get("jobs", {}).get("analyze") or {}
+    languages = (
+        ((job.get("strategy") or {}).get("matrix") or {}).get("language")
+        or _init_languages(job)
+    )
+    if isinstance(languages, str):
+        languages = [part.strip() for part in languages.split(",") if part.strip()]
+    if not languages:
+        raise ValueError(
+            "no CodeQL languages found in the workflow: expected "
+            "jobs.analyze.strategy.matrix.language or a languages: on the init step"
+        )
+    return [f"/language:{language}" for language in languages]
+
+
+def _init_languages(job: dict):
+    """`languages:` from the `codeql-action/init` step, where there is no matrix."""
+    for step in job.get("steps") or []:
+        if "codeql-action/init" in str(step.get("uses", "")):
+            return (step.get("with") or {}).get("languages")
+    return None
 
 
 def missing(analysed: list[str], wanted: list[str]) -> list[str]:
@@ -178,6 +203,30 @@ jobs:
 """
     if expected(matrix) != ["/language:rust", "/language:actions"]:
         failures.append("the matrix's languages were not read off the workflow")
+
+    # The shape `brand` and `lemonfiber-media-stack` are written in. Reading only
+    # the matrix met it with a bare KeyError.
+    single = """
+jobs:
+  analyze:
+    steps:
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: actions
+"""
+    if expected(single) != ["/language:actions"]:
+        failures.append("a job with one language and no matrix was not read")
+    if expected(single.replace("languages: actions", "languages: actions, python")) != [
+        "/language:actions",
+        "/language:python",
+    ]:
+        failures.append("a comma-separated languages: was not read as a list")
+    for empty in ("jobs: {}\n", "jobs:\n  analyze:\n    steps: []\n"):
+        try:
+            expected(empty)
+            failures.append("a workflow naming no language was accepted")
+        except ValueError:
+            pass
     if missing(["/language:rust", "/language:actions"], expected(matrix)):
         failures.append("a complete set of analyses was called incomplete")
     if missing(["/language:actions"], expected(matrix)) != ["/language:rust"]:
