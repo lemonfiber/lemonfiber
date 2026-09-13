@@ -15,6 +15,7 @@ use crate::stack::compose::{build, Action};
 
 mod diagnosis;
 mod fetching;
+mod grounded;
 mod inflight;
 mod lock;
 mod settling;
@@ -266,6 +267,12 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
     if ctx.dry_run {
         return Ok(Outcome::Lifecycle(report));
     }
+
+    // Nothing is spawned over a data location that is not there. Compose would make
+    // the directory rather than refuse, on whatever sits under the mount point, and
+    // the stack would then look entirely healthy while filing a second library onto
+    // the system disk. The streamed start asks the same thing at the same point.
+    grounded::grounded(ctx, action).await?;
 
     // One credential has to exist before the service that uses it has ever run: the
     // book *arr takes a key from its environment on its first start and generates its
@@ -528,19 +535,19 @@ mod tests {
         }
     }
 
-    /// Both ways of starting write down what was asked for, because there are two.
+    /// Both ways of starting ask the same two things first, because there are two.
     ///
-    /// The same hazard the minting above is pinned against, on a record that is read
-    /// at a moment nobody is watching: a start recorded on only the waited-on path
-    /// leaves the next boot bringing back whatever form the *other* path last named,
-    /// and the operator finds out days later that the wrong half of their stack has
-    /// been running.
+    /// The same hazard the minting above is pinned against, on two questions asked at
+    /// moments nobody is watching. A start recorded on only the waited-on path leaves
+    /// the next boot bringing back whatever form the *other* path last named; a data
+    /// location proven present on only that path leaves the one an operator actually
+    /// types building a second library on the system disk.
     ///
     /// Pinned by the call rather than by behaviour, since neither path can be run here
     /// without a container to start. The production half of each file is what is read,
     /// so the name appearing in this very test does not satisfy it.
     #[test]
-    fn both_ways_of_starting_write_down_what_was_asked_for() {
+    fn both_ways_of_starting_ask_the_same_things_before_they_spawn() {
         const WAITED: &str = include_str!("engine.rs");
         const STREAMED: &str = include_str!("engine/streaming.rs");
         for (path, source) in [("engine.rs", WAITED), ("engine/streaming.rs", STREAMED)] {
@@ -550,6 +557,10 @@ mod tests {
             assert!(
                 production.contains("autostart::noted(ctx, "),
                 "{path} starts services without recording what was asked for"
+            );
+            assert!(
+                production.contains("grounded::grounded(ctx, "),
+                "{path} starts services without proving the data location is there"
             );
         }
     }
