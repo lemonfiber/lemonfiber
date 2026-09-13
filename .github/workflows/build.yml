@@ -56,6 +56,15 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      # The scripts before what they decide. Several of them prove their own
+      # claims against a tree that has lost one, which is the harder half of the
+      # problem — but nothing read them for a name that does not exist, an
+      # import a rewrite left behind, or two strings a missing comma has
+      # silently joined into one. A mistake here reads as a broken workflow
+      # rather than as a broken checker.
+      - name: The gate scripts themselves
+        run: pipx run ruff==0.16.4 check scripts/
+
       - name: Install the yaml reader
         run: |
           python3 -m pip install --quiet --disable-pip-version-check \

@@ -226,7 +226,7 @@ def restrict(server, limit, hold_unrated_back):
 
 def set_limit(server, who, limit, hold_unrated_back):
     """The same read-modify-write again, for a limit changed on an account that has one."""
-    status, account = server.call("GET", f"/Users/{who}")
+    _, account = server.call("GET", f"/Users/{who}")
     policy = account["Policy"]
     policy["MaxParentalRating"] = limit
     policy["BlockUnratedItems"] = UNRATED_KINDS if hold_unrated_back else []
@@ -250,7 +250,7 @@ def catalogued(server, who, token=False):
 def settled(server, who, expected, seconds=120):
     """Wait for the scan to have found everything, rather than racing it."""
     for _ in range(seconds):
-        total, held = catalogued(server, who)
+        _, held = catalogued(server, who)
         if len(held) >= expected:
             return held
         time.sleep(2)
@@ -273,19 +273,19 @@ def what_is_offered(server, admin, member, token):
         "/Items/Latest": f"/Items/Latest?userId={member}&IncludeItemTypes=Movie",
     }
     for name, path in reads.items():
-        status, page = server.call("GET", path, as_token=token)
+        _, page = server.call("GET", path, as_token=token)
         items = page["Items"] if isinstance(page, dict) else page
         print(f"  {name:<20} {len(items)} titles")
-    status, counts = server.call("GET", f"/Items/Counts?userId={member}", as_token=token)
+    _, counts = server.call("GET", f"/Items/Counts?userId={member}", as_token=token)
     print(f"  {'/Items/Counts':<20} MovieCount={counts['MovieCount']}")
 
     # Searching for a withheld title by its own name, which is the read that would give
     # one away without ever listing it.
-    for title, (certificate, _) in sorted(catalogue.items()):
+    for title, _ in sorted(catalogue.items()):
         if title in held:
             continue
         term = urllib.parse.quote(title.split(" (")[0])
-        status, hints = server.call(
+        _, hints = server.call(
             "GET", f"/Search/Hints?userId={member}&searchTerm={term}", as_token=token
         )
         found = [hint["Name"] for hint in hints["SearchHints"]]
@@ -312,7 +312,7 @@ def hidden_or_flagged(server, catalogue, held, member, token):
 def re_evaluated(server, admin, member, token, media):
     """An upstream certificate changes; what the member may open changes with it."""
     print("\n== a certificate revised upstream ==")
-    everything, catalogue = catalogued(server, admin)
+    _, catalogue = catalogued(server, admin)
     raised = "Younger Film (2002)"
     lowered = "Grown Film (2004)"
 
@@ -379,7 +379,6 @@ def say_pair(server, admin, member, token, catalogue, raised, lowered):
 def every_step(server, admin, who, token):
     """Each limit lemonfiber offers, against a catalogue from more than one country."""
     print("\n== every step, against certificates from more than one table ==")
-    _, catalogue = catalogued(server, admin)
     print(f"  {'limit':>5} | offered")
     for age in (0, 7, 12, 15, 18):
         set_limit(server, who, age, True)
@@ -437,7 +436,7 @@ def main():
         admin = stand_up(server, media)
         settled(server, admin, len(CATALOGUE))
 
-        status, ratings = server.call("GET", "/Localization/ParentalRatings")
+        _, ratings = server.call("GET", "/Localization/ParentalRatings")
         named = [(row["Name"], row.get("Value")) for row in ratings]
         print(f"\nthe server's own table names {len(named)} certificates, opening with")
         print(f"  {named[:6]}")

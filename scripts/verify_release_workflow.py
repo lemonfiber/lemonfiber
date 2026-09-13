@@ -36,11 +36,10 @@ import re
 import sys
 import tomllib
 
-import yaml
-
 import pin_release_actions
 import scope_release_permissions as permissions
 import verify_dist_installer as installers
+import yaml
 
 WORKFLOW = pathlib.Path(".github/workflows/release.yml")
 CARGO = pathlib.Path("Cargo.toml")
@@ -97,8 +96,12 @@ def claim_one_download(job: str, step: dict) -> list[str]:
     run = step.get("run") or ""
     spot = where(job, step)
     if PIPED_INTO_A_SHELL.search(run):
-        return [f"{spot} pipes a download into a shell, so what runs is whatever "
-                "the URL serves at the moment the tag is pushed"]
+        return [
+            (
+                f"{spot} pipes a download into a shell, so what runs is whatever "
+                "the URL serves at the moment the tag is pushed"
+            )
+        ]
     url, digest, name = pinned_pair(step)
     if url is None or digest is None:
         return [f"{spot} downloads and runs a script with no URL and digest in its env"]
@@ -201,8 +204,10 @@ def claim_allow_dirty(_workflow: dict, cargo: dict) -> list[str]:
     if "ci" in (dist.get("allow-dirty") or []):
         return []
     return [
-        'Cargo.toml no longer carries allow-dirty = ["ci"], so cargo-dist\'s '
-        "up-to-date check fails CI on the patched workflow"
+        (
+            'Cargo.toml no longer carries allow-dirty = ["ci"], so cargo-dist\'s '
+            "up-to-date check fails CI on the patched workflow"
+        )
     ]
 
 
