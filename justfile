@@ -140,6 +140,16 @@ fmt-check:
 lint:
     cargo clippy --all-targets --workspace -- -D warnings
 
+# Whether the vendored stack has moved on a file this repository compiles in.
+#
+# Networked, and not in `ci`: a pin is meant to lag, and bumping one changes what
+# ships. `stack-moved.yml` asks this weekly and reports.
+#
+# Ask it now, before deciding whether a pin should move.
+stack-moved:
+    python3 scripts/what_the_stack_moved_on.py --self-test
+    python3 scripts/what_the_stack_moved_on.py
+
 # `scripts/` decides whether a tagged build can be trusted, whether the installer
 # places the binary it verified, and whether each job runs the compiler the manifest
 # promises. Several prove their own claims against a tree that has lost one, which is

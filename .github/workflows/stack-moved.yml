@@ -1,0 +1,57 @@
+# Whether the vendored stack has moved on something this repository reads.
+#
+# `assets/media-stack` is a submodule pinned by revision, and three files inside
+# it are compiled in: `stack.toml`, `scripts/spdx_osi.txt` and `.env.example`.
+# The binary carries whatever those said at the pinned revision, and every test
+# that validates against them validates against that same copy — so this
+# repository and the stack can disagree while both are green.
+#
+# A pin is meant to lag. Bumping one changes what ships, which is a release
+# decision rather than something that drifts under a build, so this runs on a
+# schedule and reports rather than on pull requests and gating. Failing every
+# open pull request because the stack merged a CI change is the check people
+# route around.
+#
+# What it asks is narrower than "is the pin behind": eight commits behind and
+# none of them touching a file read here is a healthy pin, and one commit behind
+# on `spdx_osi.txt` is a manifest validator refusing a licence the stack now
+# permits. `website-docs` draws the same line for the trees it renders, and the
+# shared `pins` job in `spec` for the workflows it calls (Q-R68).
+name: stack-moved
+
+on:
+  schedule:
+    # Sunday morning, before a week's work rather than after it.
+    - cron: "17 6 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The pin, not the contents: `submodule status --cached` reads what the
+          # tree records, and checking the submodule out would cost a clone to
+          # learn nothing this needs.
+          submodules: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # The judgement before the forge is asked, and with no network of its own.
+      # A check nobody has watched decide is a check nobody knows decides
+      # anything, and this one's ordinary answer is "nothing moved" — which is
+      # also what it would say if the reading found no paths at all.
+      - name: The reading is proved before the forge is asked
+        run: python3 scripts/what_the_stack_moved_on.py --self-test
+
+      - name: What the stack has moved on since this pin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/what_the_stack_moved_on.py
