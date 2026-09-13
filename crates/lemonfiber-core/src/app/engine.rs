@@ -93,7 +93,18 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     } else {
         None
     };
-    let (stack, edits) = super::materialise::materialise(
+    // The one write on this path, and the one a rehearsal used to make anyway. Every
+    // lifecycle command materialises the stack before it can build an invocation over
+    // it, and the gate against running Compose sits below this — so a rehearsal that
+    // ran nothing had already written the whole stack out and rewritten the record of
+    // what it wrote. The walk is the same walk either way; a rehearsal takes it
+    // without the writing, which is where the edits it reports come from.
+    let written = if ctx.dry_run {
+        super::materialise::would_materialise
+    } else {
+        super::materialise::materialise
+    };
+    let (stack, edits) = written(
         ctx.stack,
         ctx.settings.stack_dir.as_deref(),
         record.as_deref(),

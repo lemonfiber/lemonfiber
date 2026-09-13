@@ -75,6 +75,27 @@ pub(super) fn reset_stack(
     write_stack(source, into, record_path, selection, Pass::Reset)
 }
 
+/// Where the stack would live and which files the operator has edited, without
+/// writing a byte of it — the materialise a rehearsal does.
+///
+/// The same walk over the same files, with the writing left out. That is the whole of
+/// the difference, and it is why this is a `Pass` rather than a second function: the
+/// edits a rehearsal reports are found by the comparison an ordinary run makes on its
+/// way to writing, so a preview computed some other way would be a second account of
+/// what is on disk and the two would drift.
+///
+/// # Errors
+///
+/// Returns [`Failure`] where there is nowhere the stack could live to read from.
+pub(super) fn would_materialise(
+    source: Source,
+    into: Option<&Path>,
+    record_path: Option<&Path>,
+    selection: Option<&Selection>,
+) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
+    write_stack(source, into, record_path, selection, Pass::Preview)
+}
+
 /// The edits a reset would revert, without touching a thing — the operator's hand-edited
 /// stack files, each with the diff of what would be lost. The preview a reset shows before
 /// it is confirmed.
