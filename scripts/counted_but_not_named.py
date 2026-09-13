@@ -17,36 +17,30 @@ report shows every line with a count on it. Add a function nothing calls and the
 `--show-missing-lines` names its lines immediately — so the flag works, and this shape
 is what it cannot see.
 
-What does survive the merge is the export's per-function regions, and this reads those.
-Two things have to be got right or the answer is unusable.
+The regions survive the merge. This reads them: every region the run never entered, as
+a file and the line it opens on. A function nothing entered is named the same way, once
+per region inside it.
 
-The same function is counted once per binary that links it. A workspace of a hundred
-test binaries has a hundred records for a function one of them calls, and ninety-nine
-say nothing ran. Read naively that is twenty-two thousand missed lines here, nearly all
-of them in files the same report calls fully covered. So records are merged by name
-first: one function, one set of counts, however many binaries carried it.
+Where to read rather than what to fix. The gate counts instantiations and this counts
+regions, so a file whose miss is one line can be named on two — the two arms of one
+`if`, each taken by a different instantiation of the same function. Both are lines a
+test never ran through; which of them the gate's number came from is a question the
+export cannot answer, and is not the question worth asking.
 
-Then the miss is a *disagreement*. A line no record entered is an ordinary miss and
-`--show-missing-lines` already names it. The one it cannot name is the line one
-instantiation ran and another did not — which after the merge above is exactly a line
-whose counts are both zero and not-zero. On the reproduction that is lines 3 and 5, and
-nothing else.
-
-Only the files the report's own summary is failing on are read, which is the list the
-gate itself acted on and is one or two files long.
+Only what the gate measures. The report carries every target that ran, including test
+files and the `examples/` wrappers the gate excludes by path — naming those would send
+a reader to a file the gate is not asking about.
 
 Reads the JSON report on standard input and builds nothing:
 
   cargo llvm-cov report --json --output-path /dev/stdout | counted_but_not_named.py
 
-`--self-test` runs it against a report carrying a miss of that shape, beside the
-per-binary noise that hid it and a fully covered file that has uncounted regions all
-the same, and fails unless it names the first and stays quiet about the rest.
+`--self-test` runs it against a report carrying a miss of exactly that shape, and
+against one carrying none, and fails unless it tells them apart.
 """
 
 import json
 import sys
-from collections import defaultdict
 
 # The kinds a region carries in the export. Only code is a miss: a skipped region is
 # one `#[cfg]` took out of this build, and an expansion region repeats a macro's own
@@ -54,113 +48,50 @@ from collections import defaultdict
 CODE = 0
 
 # Where a region's numbers sit in the array the export writes it as.
-OPENS, COUNT, FILE, KIND, CLOSES = 0, 4, 5, 7, 2
+LINE, COUNT, FILE, KIND = 0, 4, 5, 7
 
 
-def failing(report: dict) -> dict[str, int]:
-    """Every file the report's own summary says has a missed line, and how many.
-
-    The summary is what `--fail-under-lines` read, so this is the gate's own list of
-    where to look — and the reason the regions below can be read at all.
-    """
-    short = {}
-    for run in report.get("data", []):
-        for entry in run.get("files", []):
-            lines = entry.get("summary", {}).get("lines", {})
-            missed = lines.get("count", 0) - lines.get("covered", 0)
-            if missed > 0:
-                short[entry["filename"]] = missed
-    return short
-
-
-def counted(report: dict, inside: dict[str, int]) -> dict[str, dict[str, dict[int, int]]]:
-    """What each function ran, by file and by name, merged across binaries.
-
-    Keyed by name so that the same function linked into forty test binaries is one
-    answer rather than forty, thirty-nine of which never called it.
-    """
-    held: dict[str, dict[str, dict[int, int]]] = {where: defaultdict(dict) for where in inside}
+def unentered(report: dict) -> list[tuple[str, int]]:
+    """Every code region with no count, as the file and the line it opens on."""
+    found = []
     for run in report.get("data", []):
         for function in run.get("functions", []):
             files = function.get("filenames") or []
             for region in function.get("regions") or []:
-                if len(region) <= KIND or region[KIND] != CODE:
+                if len(region) <= KIND or region[KIND] != CODE or region[COUNT] != 0:
                     continue
                 where = files[region[FILE]] if region[FILE] < len(files) else ""
-                if where not in held:
+                if "/src/" not in where or "/examples/" in where:
                     continue
-                lines = held[where][function.get("name", "")]
-                for line in range(region[OPENS], region[CLOSES] + 1):
-                    lines[line] = max(lines.get(line, 0), region[COUNT])
-    return held
+                found.append((where, region[LINE]))
+    return sorted(set(found))
 
 
-def disagreed(ran: dict[str, dict[int, int]]) -> tuple[list[int], list[int]]:
-    """The lines one instantiation ran and another did not, and those none ran."""
-    seen: dict[int, list[int]] = defaultdict(list)
-    for lines in ran.values():
-        for line, count in lines.items():
-            seen[line].append(count)
-    split = sorted(line for line, counts in seen.items() if min(counts) == 0 < max(counts))
-    nowhere = sorted(line for line, counts in seen.items() if max(counts) == 0)
-    return split, nowhere
-
-
-def shortened(where: str) -> str:
-    """A path a reader can paste, where it is one this workspace carries."""
-    cut = where.split("/crates/", 1)
-    return f"crates/{cut[1]}" if len(cut) == 2 else where
-
-
-def say(missed: dict[str, int], held: dict[str, dict[str, dict[int, int]]]) -> None:
-    """What was found, file by file, or the sentence for nothing."""
-    if not missed:
-        print("  none — the report's own summary counts no missed line")
+def say(found: list[tuple[str, int]]) -> None:
+    """What was found, as paths a reader can paste, or the sentence for nothing."""
+    if not found:
+        print("  none — every region the gate measures was entered")
         return
-    for where, count in sorted(missed.items()):
-        split, nowhere = disagreed(held.get(where, {}))
-        print(f"  {shortened(where)} — {count} line(s) the summary counts as missed")
-        for line in nowhere:
-            print(f"    {shortened(where)}:{line} — no instantiation ran it")
-        for line in split:
-            print(f"    {shortened(where)}:{line} — one instantiation ran it and another did not")
-        if not split and not nowhere:
-            print("    every region in it was entered, so the miss is in how they are summed")
+    for where, line in found:
+        cut = where.split("/crates/", 1)
+        print(f"  crates/{cut[1]}:{line}" if len(cut) == 2 else f"  {where}:{line}")
 
 
-def record(name: str, where: str, lines: dict[int, int]) -> dict:
-    """One function in a report, as the export writes it."""
-    return {
-        "name": name,
-        "filenames": [where],
-        "regions": [[line, 9, line, 13, count, 0, 0, CODE] for line, count in lines.items()],
-    }
-
-
-def split_report() -> dict:
-    """The shape the segments merge away, beside everything that hid it.
-
-    `pick` is the real miss: two instantiations that disagree on one line each.
-    `helper` is the same function linked into two binaries, one of which never called
-    it — the shape that made the raw region list twenty-two thousand lines long.
-    `whole.rs` is every other file in a real run: fully covered, and carrying uncounted
-    regions all the same.
-    """
-    pick = "/w/crates/x/src/pick.rs"
-    whole = "/w/crates/x/src/whole.rs"
+def split(count: int, kind: int = CODE) -> dict:
+    """A report of the shape the segments merge away: one line, two instantiations."""
     return {
         "data": [
             {
-                "files": [
-                    {"filename": pick, "summary": {"lines": {"count": 12, "covered": 11}}},
-                    {"filename": whole, "summary": {"lines": {"count": 40, "covered": 40}}},
-                ],
+                "files": [{"filename": "/w/crates/x/src/pick.rs"}],
                 "functions": [
-                    record("pick::<u8>", pick, {1: 1, 2: 1, 3: 0, 5: 1, 7: 1}),
-                    record("pick::<u16>", pick, {1: 1, 2: 1, 3: 1, 5: 0, 7: 1}),
-                    record("helper", pick, {9: 0, 10: 0}),
-                    record("helper", pick, {9: 4, 10: 4}),
-                    record("whole", whole, {3: 0}),
+                    {
+                        "filenames": ["/w/crates/x/src/pick.rs"],
+                        "regions": [[3, 9, 3, 13, count, 0, 0, kind]],
+                    },
+                    {
+                        "filenames": ["/w/crates/x/src/pick.rs"],
+                        "regions": [[5, 9, 5, 19, 1, 0, 0, CODE]],
+                    },
                 ],
             }
         ]
@@ -169,34 +100,27 @@ def split_report() -> dict:
 
 def self_test() -> int:
     problems = []
-    report = split_report()
-    missed = failing(report)
-    pick = "/w/crates/x/src/pick.rs"
-
-    if sorted(missed) != [pick]:
-        problems.append(f"the files the summary is failing on were read as {sorted(missed)}")
-
-    split, nowhere = disagreed(counted(report, missed).get(pick, {}))
-    if split != [3, 5]:
-        problems.append(f"the lines the instantiations disagree on were read as {split}")
-    if nowhere:
-        problems.append(f"a function linked into a binary that never called it was named: {nowhere}")
+    missed = unentered(split(0))
+    if missed != [("/w/crates/x/src/pick.rs", 3)]:
+        problems.append(f"a region with no count was not named: {missed}")
+    if unentered(split(1)):
+        problems.append("a report with nothing missed was reported as missing a line")
+    if unentered(split(0, kind=2)):
+        problems.append("a region this build cut out was reported as a miss")
 
     for problem in problems:
         print(f"::error::{problem}")
     if problems:
         print("\nA reader that cannot tell a miss from a line is not a reader.")
         return 1
-    print("the miss the segments merge away is named, and the noise that hid it is not")
+    print("the miss the segments merge away is named, and nothing else is")
     return 0
 
 
 def main() -> int:
     if "--self-test" in sys.argv[1:]:
         return self_test()
-    report = json.load(sys.stdin)
-    missed = failing(report)
-    say(missed, counted(report, missed))
+    say(unentered(json.load(sys.stdin)))
     return 0
 
 
