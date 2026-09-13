@@ -130,6 +130,17 @@ async fn send<H: Http + Send + Sync>(
     answer
 }
 
+/// The record is asserted about without being quoted.
+///
+/// Most of what is checked here is that a credential did **not** survive into a
+/// line, and a failure message is copied into a CI log — read by more people and
+/// kept far longer than the machine that wrote it. An assertion that a key is
+/// absent must not be the thing that carries it onward when it is wrong, which is
+/// the one moment the line actually holds one.
+///
+/// So no assertion below interpolates the line it is unhappy with. Each names the
+/// half of the claim that broke instead, which is what a reader of the failure
+/// needs and is the half `{said}` never told them.
 #[cfg(test)]
 mod tests {
     use super::{kept, line, Recording, KEPT};
@@ -173,14 +184,26 @@ mod tests {
     fn what_is_written_down_is_where_it_went_and_not_what_it_carried() {
         let said = line(1_700_000_000, &asking(), Some(200));
 
-        assert!(said.contains("indexer.example"), "{said}");
-        assert!(said.contains("200"), "{said}");
-        assert!(!said.contains("the-indexer-key"), "no credential: {said}");
-        assert!(!said.contains("hunter2"), "no body: {said}");
-        assert!(!said.contains("X-Api-Key"), "no header: {said}");
+        assert!(
+            said.contains("indexer.example"),
+            "where the request went did not survive"
+        );
+        assert!(said.contains("200"), "what answered did not survive");
+        assert!(
+            !said.contains("the-indexer-key"),
+            "the indexer key survived into the record"
+        );
+        assert!(
+            !said.contains("hunter2"),
+            "what the request carried survived into the record"
+        );
+        assert!(
+            !said.contains("X-Api-Key"),
+            "the header the credential travels in was named in the record"
+        );
         assert!(
             !said.contains("q=something"),
-            "and nothing asked for: {said}"
+            "what was asked for survived into the record"
         );
     }
 
@@ -213,11 +236,6 @@ mod tests {
             };
             let said = line(1_700_000_000, &asked, Some(200));
 
-            // None of these quote the line. A failure message is copied into a CI log,
-            // which is read by more people and kept longer than the machine that wrote
-            // it — so an assertion about a credential not surviving must not be the
-            // thing that carries it onward. Each says which half of the claim broke,
-            // which is what a reader of the failure needs.
             assert!(
                 !said.contains(&password),
                 "the operator's login survived into the record"
@@ -238,7 +256,10 @@ mod tests {
     #[test]
     fn a_request_nothing_answered_is_written_down_as_that() {
         let said = line(1, &asking(), None);
-        assert!(said.contains("nothing answered"), "{said}");
+        assert!(
+            said.contains("nothing answered"),
+            "a request nothing answered was not written down as one"
+        );
     }
 
     /// A query is withheld whether or not it holds a credential, and an address
@@ -320,15 +341,15 @@ mod tests {
         let written = std::fs::read_to_string(&at).unwrap_or_default();
         assert!(
             written.starts_with("1 Get "),
-            "the stamp and the verb: {written}"
+            "the stamp and the verb did not open the line"
         );
         assert!(
             written.trim_end().ends_with(" 200"),
-            "what came back: {written}"
+            "what came back was not written at the end of the line"
         );
         assert!(
             !written.contains("the-indexer-key"),
-            "the credential reached the record: {written}"
+            "the indexer key reached the file on disk"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
