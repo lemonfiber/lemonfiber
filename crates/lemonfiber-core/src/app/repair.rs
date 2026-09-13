@@ -277,9 +277,38 @@ pub async fn putting_right(
 /// files are, and every reason [`retract`] gives.
 pub async fn reversing(ctx: &Ctx) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
-    retract(ctx, &paths).await.map(|reversed| Reversal {
+    retracting(ctx, &paths).await
+}
+
+/// The same, for a surface that already holds the layout — and the one place the
+/// rehearsal of it is decided.
+///
+/// Here rather than in the caller for the reason every other verdict is taken away from
+/// the caller: a surface asked to decide can be written without deciding, and what that
+/// looks like from outside is the reversal happening and the report calling it a
+/// rehearsal. The terminal's `doctor --undo` comes in here rather than through the
+/// dispatcher, so without this the one gate the flag has would sit beside the one path
+/// that skips it.
+///
+/// The undos are read out of the journal either way; what a rehearsal leaves out is the
+/// two steps that act on them, and what it answers with is the split the named run's
+/// rehearsal answers with — through the same function, so the two cannot come to differ.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] where the stack cannot be read, where a setting or directory
+/// could not be put back, or where a change needed a service that would not answer.
+pub async fn retracting(ctx: &Ctx, paths: &Paths) -> Result<Reversal, Box<Problem>> {
+    if ctx.dry_run {
+        let undos = repair::undoing(super::recover::journal_at(&paths.journal()).changes());
+        return Ok(super::putting_back::would_reverse(
+            undos.into_iter().map(told).collect(),
+        ));
+    }
+    retract(ctx, paths).await.map(|reversed| Reversal {
         reversed,
         left: Vec::new(),
+        rehearsed: false,
     })
 }
 

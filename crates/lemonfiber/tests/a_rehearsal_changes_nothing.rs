@@ -26,7 +26,10 @@
 //! whoever ran this, and a real eraser would be handed the paths a `forget` names.
 //! Those are recorders: the assertion is that they were asked for nothing, which is
 //! the same assertion, made where letting the real thing answer would be damage
-//! rather than evidence.
+//! rather than evidence. The archive vault is a recorder for a second reason as well
+//! as that one: two commands need somewhere to keep an archive before they reach
+//! anything worth watching, and without one they are refused at the door — which is a
+//! pass that says nothing about what they would have done.
 //!
 //! **Completeness.** The list below is held against clap's own subcommands, so a new
 //! command that nobody decided a rehearsal for fails here as well as failing to
@@ -37,8 +40,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use clap::CommandFactory as _;
 
 use lemonfiber::cli::{Cli, STACK};
@@ -47,6 +51,9 @@ use lemonfiber_core::app::{
     dispatch, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Ctx, Decision,
     Keeping, MigrateAction, QualityAction, Removing, Setting, SetupAction, Waiting,
 };
+use lemonfiber_core::archive::{Archive, Archiving, Fault, Reader, Space, Vault};
+use lemonfiber_core::backup::{Existing, Item, Manifest};
+use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::platform::Environment;
@@ -334,6 +341,34 @@ fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
                 disruptive: false,
             },
         ),
+        // The other half of `undo`. Naming a run reaches a different function from
+        // naming none — one reads the journal for the last repair, the other for the
+        // run a stamp names — and only the second judges the whole run before acting.
+        (
+            "undo-a-named-run",
+            Command::Undo {
+                run: Some("2026-07-30T00:00:00Z".to_owned()),
+            },
+        ),
+        // The read half of a support bundle, which is what a rehearsal of the writing
+        // half becomes. Driven under its own name so a failure says which of the two
+        // wrote something.
+        (
+            "support-described",
+            Command::Support {
+                write: false,
+                wanted: lemonfiber_core::app::bundle::Wanted::default(),
+                dest: lemonfiber_core::app::support::Destination::Kept,
+            },
+        ),
+        // Answering a setup question, which writes the resumable progress file — the
+        // one write in the configuration home that no other sample here reaches.
+        (
+            "setup-answer",
+            Command::Setup(SetupAction::Answer(
+                lemonfiber_core::wizard::Answer::Protocols(Protocols::both()),
+            )),
+        ),
     ]
 }
 
@@ -375,21 +410,131 @@ fn tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 ///
 /// Its own directory per command so a failure names the command that caused it, and
 /// so one command's writes cannot be another's starting point.
-fn scratch(named: &str) -> PathBuf {
+///
+/// `configured` is what most commands need and one refuses: setup will not run on a
+/// machine that already holds configuration, so against a scratch with settings in it
+/// every setup sample is turned back before it reaches the writes this file exists to
+/// catch — the resumable progress file among them. Given the choice rather than
+/// special-cased inside, so the two shapes of machine are named where a sample is
+/// driven rather than inferred somewhere further down.
+fn scratch(named: &str, configured: bool) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "lemonfiber-rehearsal-{}-{named}",
         std::process::id()
     ));
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("data"));
-    let _ = std::fs::write(
-        dir.join(".env"),
-        format!(
-            "DATA_ROOT={}\nLF_PROJECT=lemonfiber\n",
-            dir.join("data").display()
-        ),
-    );
+    if configured {
+        let _ = std::fs::write(
+            dir.join(".env"),
+            format!(
+                "DATA_ROOT={}\nLF_PROJECT=lemonfiber\n",
+                dir.join("data").display()
+            ),
+        );
+    }
     dir
+}
+
+/// Whether this command needs a machine nothing has configured yet.
+///
+/// Only setup, and only because it refuses one that is. Everything else reads a data
+/// root out of the settings and would have nothing to work from without them.
+fn before_configuration(command: &Command) -> bool {
+    matches!(command, Command::Setup(_))
+}
+
+/// An archive that answers every read and records every write without making one.
+///
+/// A recorder rather than the real packer, for the reason the host adapter is one: a
+/// real vault handed a capture would write a tar into the scratch home, which is a
+/// thing the tree comparison would catch — but it would also be the one seam here
+/// allowed to be slow, and what is being asserted is that it was asked for nothing.
+/// Without it the two commands that need somewhere to keep an archive are refused
+/// before they reach anything worth watching, which is a pass that says nothing.
+#[derive(Default)]
+struct Vaulting {
+    /// Every destination it was asked to write, which must be none.
+    wrote: Mutex<Vec<PathBuf>>,
+    /// Every archive it was asked to prune, which must be none.
+    removed: Mutex<Vec<String>>,
+}
+
+impl Vaulting {
+    /// What it was asked to write or take away, as one list of findings.
+    fn asked(&self) -> Vec<String> {
+        let wrote = self
+            .wrote
+            .lock()
+            .map(|held| held.clone())
+            .unwrap_or_default();
+        let removed = self
+            .removed
+            .lock()
+            .map(|held| held.clone())
+            .unwrap_or_default();
+        wrote
+            .into_iter()
+            .map(|dest| format!("wrote the archive {}", dest.display()))
+            .chain(
+                removed
+                    .into_iter()
+                    .map(|name| format!("pruned the archive {name}")),
+            )
+            .collect()
+    }
+
+    /// Note a destination it was asked to write, and refuse: a rehearsal that got as
+    /// far as asking has already failed, and answering yes would leave the report
+    /// claiming a file exists.
+    fn refuse(&self, dest: &Path) -> Result<(), Fault> {
+        if let Ok(mut wrote) = self.wrote.lock() {
+            wrote.push(dest.to_path_buf());
+        }
+        Err(Fault::new("a rehearsal asked for an archive to be written"))
+    }
+}
+
+#[async_trait]
+impl Archive for Vaulting {
+    async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, Fault> {
+        Ok(Space {
+            needed: 1_024,
+            available: u64::MAX,
+        })
+    }
+
+    async fn write(&self, dest: &Path, _manifest: &Manifest, _items: &[Item]) -> Result<(), Fault> {
+        self.refuse(dest)
+    }
+
+    async fn write_files(&self, dest: &Path, _files: &[(String, String)]) -> Result<(), Fault> {
+        self.refuse(dest)
+    }
+
+    async fn existing(&self, _dir: &Path) -> Result<Vec<Existing>, Fault> {
+        Ok(Vec::new())
+    }
+
+    async fn remove(&self, _dir: &Path, name: &str) -> Result<(), Fault> {
+        if let Ok(mut removed) = self.removed.lock() {
+            removed.push(name.to_owned());
+        }
+        Err(Fault::new("a rehearsal asked for an archive to be pruned"))
+    }
+}
+
+#[async_trait]
+impl Reader for Vaulting {
+    async fn read_manifest(&self, _src: &Path) -> Result<Manifest, Fault> {
+        Err(Fault::new("no archive here holds a manifest"))
+    }
+
+    async fn extract(&self, _src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+        Err(Fault::new(
+            "a rehearsal asked for an archive to be unpacked",
+        ))
+    }
 }
 
 /// What a rehearsal was handed, and what it was asked of afterwards.
@@ -398,6 +543,7 @@ struct Watched {
     http: Arc<Fake>,
     eraser: Arc<Erasing>,
     hosting: Arc<Hosting>,
+    archives: Arc<Vaulting>,
 }
 
 /// A context that rehearses, over a real disk and recording seams.
@@ -406,6 +552,7 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
     let http = Fake::always(Answer::reply(200, "{}"));
     let eraser = Erasing::willing();
     let hosting = Hosting::with(Manager::Launchd);
+    let archives = Arc::new(Vaulting::default());
 
     let ctx = Ctx::new(
         Arc::clone(&runner) as Arc<dyn lemonfiber_core::ports::Runner>,
@@ -430,6 +577,10 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
         },
         Environment::LinuxNative,
     )
+    .keeping(Archiving {
+        paths: Paths::at(dir, dir),
+        vault: Arc::clone(&archives) as Arc<dyn Vault>,
+    })
     .rehearsing();
 
     (
@@ -439,6 +590,7 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
             http,
             eraser,
             hosting,
+            archives,
         },
     )
 }
@@ -454,7 +606,7 @@ const CHANGES: [&str; 9] = [
 
 /// Drive one command as a rehearsal and say nothing changed, or why that is wrong.
 async fn unchanged(named: &str, command: Command) -> Result<(), String> {
-    let dir = scratch(named);
+    let dir = scratch(named, !before_configuration(&command));
     let before = tree(&dir);
     let (ctx, watched) = rehearsing(&dir);
 
@@ -497,6 +649,7 @@ async fn unchanged(named: &str, command: Command) -> Result<(), String> {
     for name in watched.hosting.withdrawn() {
         wrong.push(format!("removed the service `{name}`"));
     }
+    wrong.extend(watched.archives.asked());
 
     let _ = std::fs::remove_dir_all(&dir);
     if wrong.is_empty() {

@@ -193,13 +193,19 @@ fn confirm_setup(surface: &dyn Surface) -> bool {
 
 /// What setup says when it is asked to rehearse.
 ///
-/// Setup is the one conversation that *is* the change: every answer is applied, and
-/// what it would apply is what the operator has not typed yet. The dispatcher refuses
-/// the flag on `Command::Setup` for the same reason; this is the same refusal said on
-/// the path the terminal takes, which does not go through the dispatcher because a
-/// conversation is not a value that arrives once.
+/// Setup is the one conversation that *is* the change: what it would apply is what
+/// the operator has not typed yet, so a rehearsal of it would be a report of nothing
+/// followed by the same questions again. That is the shape a walkthrough refuses the
+/// flag under, and it belongs to the conversation rather than to setup: the steps a
+/// surface drives one at a time — where it stands, an answer recorded, the apply — are
+/// values that arrive once, and every one of those says what it would write and writes
+/// none of it. This path does not go through the dispatcher, so the refusal is said
+/// here, and it points at the two commands that do answer.
 pub(crate) fn nothing_to_rehearse() -> ExitCode {
-    complain!("Setup applies your answers, so it has nothing to rehearse.");
+    complain!("Setup asks its questions as it goes, so there is nothing yet to rehearse.");
+    complain!(
+        "Run `{PRODUCT} setup --status` to see where it stands and what applying would write."
+    );
     complain!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
     ExitCode::from(USAGE)
 }

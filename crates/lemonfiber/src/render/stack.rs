@@ -5,7 +5,7 @@
 
 use lemonfiber_core::docker::{Condition, Service, State, Undeclared};
 use lemonfiber_core::model::{
-    LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
+    LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched, Vigil,
 };
 use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Plan, Protocol};
@@ -369,8 +369,11 @@ fn what_for(service: &Service) -> String {
 /// carries, the way every other answer does, so there is no second rendering here
 /// that could describe the same ending differently.
 pub(super) fn watch(report: &SupervisionReport) -> Lines {
-    let mut lines = Lines::default();
+    if let Some(would) = &report.would {
+        return kept(would, &report.forms);
+    }
 
+    let mut lines = Lines::default();
     lines.put(format!("the watch ended: {}", report.reason));
     if report.stopped {
         lines.put(format!("stopped: {}", report.forms.join(", ")));
@@ -381,6 +384,35 @@ pub(super) fn watch(report: &SupervisionReport) -> Lines {
         ));
     }
     lines
+}
+
+/// The watch a rehearsal would keep, said the way a rehearsed lifecycle command says
+/// what it would run: the argv first, because that is the sentence an operator is
+/// checking, and the terms of the guard around it.
+fn kept(would: &Vigil, forms: &[String]) -> Lines {
+    let mut lines = Lines::default();
+    lines.put("would run, the moment the data location went:");
+    lines.put(format!("  {}", would.command.join(" ")));
+    lines.spaced(format!(
+        "watching {} every {}s, and stopping {}",
+        would.root,
+        would.every,
+        naming(forms)
+    ));
+    lines.spaced("Nothing is being watched. Run it without --dry-run to keep the guard.");
+    lines
+}
+
+/// The forms a watch would stop, or what naming none of them means.
+///
+/// Said rather than left as an empty list, because a line ending in nothing reads as a
+/// guard that would stop nothing at all — which is the opposite of what naming no form
+/// asks for.
+fn naming(forms: &[String]) -> String {
+    if forms.is_empty() {
+        return "the whole stack".to_owned();
+    }
+    forms.join(", ")
 }
 
 #[cfg(test)]
@@ -877,6 +909,31 @@ mod tests {
             ..a_watch()
         };
         assert!(watch(&stranded).text().contains("could not stop media"));
+    }
+
+    #[test]
+    fn a_rehearsed_watch_prints_the_invocation_it_would_run_and_the_guard_it_would_keep() {
+        let rehearsed = SupervisionReport {
+            forms: Vec::new(),
+            would: Some(Vigil {
+                root: "/srv/library".to_owned(),
+                every: 5,
+                command: vec!["docker".to_owned(), "compose".to_owned(), "stop".to_owned()],
+            }),
+            ..a_watch()
+        };
+        let text = watch(&rehearsed).text();
+        assert!(text.contains("docker compose stop"), "{text}");
+        assert!(text.contains("/srv/library"), "{text}");
+        assert!(text.contains("every 5s"), "{text}");
+        assert!(
+            text.contains("the whole stack"),
+            "naming no form is a guard over all of them: {text}"
+        );
+        assert!(
+            !text.contains("the watch ended"),
+            "nothing ended, and saying so would be the rehearsal claiming to be the thing: {text}"
+        );
     }
 
     #[test]

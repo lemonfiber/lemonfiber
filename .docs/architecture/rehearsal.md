@@ -49,6 +49,11 @@ a row on a board somebody is working through. Given one code between them the
 temporary becomes indistinguishable from the permanent, which is how a temporary
 state becomes a permanent one.
 
+Where the sixty-four arms stand: **thirty-seven report**, **twenty-two change
+nothing** (twenty-four command shapes — two arms carry a pair each), **three refuse
+for good**, and **two are untaught**. The untaught two are `seed` and `adopt`, and
+what they owe is below.
+
 ## Why forgetting is not possible
 
 Three things, each catching what the other two cannot.
@@ -83,18 +88,25 @@ that is not a weakening of the same claim: a real host adapter would install a l
 agent into the home directory of whoever ran the suite. The assertion is still that
 they were asked for nothing.
 
-## The seven that answer twice
+## The eight that answer twice
 
 Several commands here already give two answers: unconfirmed they say what they would
 do, confirmed they do it. `reset`, `remove`, `quality upgrade`, `migrate`, `update`,
-`restore` and `doctor --fix` are all shaped that way, and the unconfirmed answer
-*is* the rehearsal — the same report, in the same words, filled in by the same code
-path.
+`restore`, `doctor --fix` and `support --write` are all shaped that way, and the
+unconfirmed answer *is* the rehearsal — the same report, in the same words, filled in
+by the same code path.
 
 So a rehearsal takes the operator's go-ahead back on the way in
-(`rehearsal::carried` → `unconfirmed`) rather than seven handlers each learning a
+(`rehearsal::carried` → `unconfirmed`) rather than eight handlers each learning a
 second way to say what they already say. A second way is a second thing to keep true,
 and the one nobody exercises is the one that stops being true.
+
+`support --write` is the newest of them and needed one thing beyond the withheld yes.
+The run that writes nothing said what the bundle would hold and not where it would
+land, so a rehearsal answered half the question an operator asks at a shell. Both
+halves now resolve the destination through one function (`support::landing`), and the
+description carries it — which is the better command for it either way, since the
+moment the path can still change what somebody does is before the file exists.
 
 That function is deliberately *not* exhaustive: it is the mechanism, not the
 decision. What a rehearsal means is decided in `asked`, which the compiler does check,
@@ -107,6 +119,56 @@ fault has been seen and how often a fix left it standing. A rehearsal reads that
 and no longer adds to it: recording a sighting would move the counts, so the next real
 run would decide differently because somebody had asked a question.
 
+## The records a read keeps of having read
+
+Three commands change nothing an operator asked about and still write something: a
+note that they ran. `doctor --fix` keeps the fault store above; `update self` keeps
+`updates.json` beside the settings, which is how it knows not to ask the release list
+again today; and answering a setup question keeps the resumable progress file, which
+is the whole of setup's state. Each of those is suppressed under a rehearsal and read
+as normal, for one reason said three times: a question that moved when the next real
+run decides has been answered on the operator's behalf.
+
+`update self` was refusing the flag it did not need to refuse, which is its own small
+defect — a command that says no to `--dry-run` teaches an operator the flag is
+unreliable everywhere. It replaces nothing; what it answers with is the exact command
+for whichever tool owns the copy that is running, and that answer is the same either
+way.
+
+## The commands that wait, and the ones that cannot be asked twice
+
+A watch has no ending of its own — it holds until the data location is lost — so a
+rehearsal of it cannot be the command with its last step left out. It reports the
+watch instead: the location it would hold, how often it would look, and the exact
+invocation it would run the moment that location went. That argv comes from the same
+prelude a real stop is built from (`engine::invocation`), never from a sentence
+written beside it.
+
+The terminal's first-run conversation (`lemonfiber setup`, with no sub-action) still
+refuses the flag, and that refusal lives in the surface because the conversation does
+not go through the dispatcher. It is the walkthrough's reason: what a rehearsal would
+report is what the operator has not typed yet. The steps a surface drives one at a
+time — where setup stands, an answer recorded, the apply — are values that arrive
+once, and every one of those says what it would write and writes none of it.
+
+`doctor --undo` is the other path that does not go through the dispatcher, and the
+verdict for it is taken inside `repair::retracting` rather than above it. A surface
+asked to read the flag can be written without reading it, which is the whole failure
+this module exists to prevent.
+
+## What is left
+
+`seed` and `adopt` still refuse with `REHEARSE-2`. They are one pass over the same
+graph, and the report they owe is per connection: the field, what the service holds
+now, and what would be pushed. The survey that produces it is already written and
+already shared — the three-way reconcile in [`seed/drift.rs`](../../crates/lemonfiber-core/src/seed/drift.rs)
+that every driver reads a connection through — but the writes sit inside those same
+drivers, immediately below the observation, with no gate between the two. Teaching
+them means putting one there, in `crate::seed`, so that the pass a rehearsal takes is
+the pass a real run takes with the registering left out. Reporting from a second
+survey beside it would be a second opinion about what lemonfiber intends, and the one
+nobody runs is the one that goes wrong.
+
 ## What a rehearsal says
 
 The same words the real run uses. `LifecycleReport` carries `rehearsed: bool` and the
@@ -115,6 +177,29 @@ same `command`, `plan` and `stack_edits` either way;
 and the exact argv above the report it would have printed anyway. A rehearsal that
 spoke a vocabulary of its own would be teaching the operator that the rehearsal is
 not the thing.
+
+`rehearsed: bool` is the shape the rest took as well, and always for the same reason:
+every field of the report means one thing in both tenses, so the flag moves the verb
+and nothing else. A capture is settled before it is written — the room measured, the
+manifest described, the destination derived, the surplus retention has no room for
+worked out — so `BackupReport` carries the real destination and the real prune list
+and says *would*. A reversal is judged whole before anything is touched, so
+`UndoReversal` carries the changes that would go back and, apart from them, the ones
+that only go back where the service that made them is answering.
+
+Where a report had no field that could carry the answer, one was added rather than a
+second report shape invented: a bundle now says where it would land, a watch carries
+the vigil it would keep, and a rotation carries what it would replace, where that
+value lives and what would still be owed afterwards — never a value, and never one
+generated in order to describe it.
+
+## What a rehearsal must not produce
+
+A rehearsal of `credentials --rotate` mints nothing. A replacement generated to
+describe a rotation is a secret that exists because somebody asked a question, and it
+would then have to be kept or thrown away — and one thrown away may be one the service
+has already taken. So the report names the credential, the place its current value is
+kept, and what each consumer would still need afterwards, and stops there.
 
 The same rule holds for the work a rehearsal has to do in order to have something to
 say. Materialising the stack is one walk over the same files with the writing left

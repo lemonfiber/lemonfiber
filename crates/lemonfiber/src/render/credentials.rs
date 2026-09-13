@@ -84,7 +84,16 @@ fn rotation(rotated: &Rotation) -> Lines {
             rotated.credential,
             known.join(", ")
         ),
+        Settled::Rehearsed {
+            detail, location, ..
+        } => format!(
+            "{} would be replaced where it is kept, in {location}. {detail}",
+            rotated.credential
+        ),
     });
+    if let Settled::Rehearsed { afterwards, .. } = &rotated.settled {
+        owed(&mut lines, afterwards);
+    }
     if rotated.consumers.is_empty() {
         return lines;
     }
@@ -100,6 +109,23 @@ fn rotation(rotated: &Rotation) -> Lines {
         ));
     }
     lines
+}
+
+/// What would still have to happen before every consumer held a replacement.
+///
+/// Its own heading rather than folded into the sentence above it, because it is the
+/// half an operator plans around: a rotation that lands and leaves three consumers on
+/// the old value is one they find out about when something stops working. Nothing at
+/// all where nothing is owed, since an empty heading reads as a list somebody forgot
+/// to fill in.
+fn owed(lines: &mut Lines, afterwards: &[String]) {
+    if afterwards.is_empty() {
+        return;
+    }
+    lines.spaced("Afterwards, before everything holds the replacement:");
+    for step in afterwards {
+        lines.put(format!("  {step}"));
+    }
 }
 
 /// How far the replacement reached one consumer, in one clause.
@@ -272,6 +298,24 @@ mod tests {
         assert!(
             text.contains("Usenet provider password: change it with your provider first"),
             "{text}"
+        );
+    }
+
+    #[test]
+    fn a_rehearsed_rotation_names_where_the_value_lives_and_what_is_owed_after() {
+        let text = drawn(Inventory::of(Vec::new()).after(Rotation::would(
+            "qBittorrent web UI password",
+            "a real run would generate a new web UI password",
+            "the environment file, as QBITTORRENT_PASSWORD",
+            vec!["the forwarded-port push — lemonfiber restart torrent".to_owned()],
+        )));
+
+        assert!(text.contains("would be replaced"), "{text}");
+        assert!(text.contains("QBITTORRENT_PASSWORD"), "{text}");
+        assert!(text.contains("lemonfiber restart torrent"), "{text}");
+        assert!(
+            !text.contains("was replaced"),
+            "a rehearsal must not read as a rotation that landed: {text}"
         );
     }
 

@@ -400,6 +400,7 @@ mod tests {
                     },
                 }],
                 left: Vec::new(),
+                rehearsed: false,
             }),
             Outcome::Seed(crate::seed::Report::default()),
             Outcome::Reset(ResetReport::default()),
@@ -410,12 +411,14 @@ mod tests {
                 sensitive: true,
                 pruned: Vec::new(),
                 pace: crate::backup::Pace::of(0),
+                rehearsed: false,
             }),
             Outcome::Update(an_update()),
             Outcome::Support(crate::app::support::Bundle {
                 contents: crate::bundle::Contents::default(),
                 bytes: 0,
                 path: None,
+                would_go: None,
             }),
             Outcome::Restore(crate::app::restore::Restoration {
                 would: crate::app::restore::Preview {
@@ -598,6 +601,7 @@ mod tests {
                 forms: vec!["media".to_owned()],
                 reason: "the data location went away".to_owned(),
                 stopped: true,
+                would: None,
             }),
             Outcome::Walkthrough(a_walk()),
             // Every optional half filled, so the shape is compared whole: a version to

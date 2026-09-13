@@ -229,6 +229,25 @@ pub fn resume(wizard: &mut Wizard, applying: &Applying<'_>) -> Result<(), Box<Pr
     Ok(())
 }
 
+/// What an apply would write, without writing any of it.
+///
+/// The same gate [`resume`] passes and the same refusal where it does not: review is
+/// reached only from a complete set of answers, so a rehearsal is turned back exactly
+/// where the run that writes is turned back rather than by a second judgement beside
+/// it. Below that gate an apply is nothing but writes — the progress file, the journal,
+/// the data directory, the stack, every setting, the appetite and the autostart answer
+/// — so this stops at it, and the plan the wizard now holds is the whole of the report.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a real apply gives for answers that have not reached review.
+pub(super) fn would_apply(wizard: &mut Wizard) -> Result<(), Box<Problem>> {
+    if wizard.transition(Phase::Reviewing) {
+        return Ok(());
+    }
+    Err(Box::new(apply::not_reviewed()))
+}
+
 /// Take an interrupted apply the way it was chosen out of, and leave nothing of it
 /// stranded.
 ///

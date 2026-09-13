@@ -31,7 +31,8 @@ use super::Ctx;
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, schemars::JsonSchema)]
 #[schemars(rename = "UndoReversal")]
 pub struct Reversal {
-    /// What was put back, in the order it was.
+    /// What was put back, in the order it was — or, on a run that only said what it
+    /// would do, what would go back.
     pub reversed: Vec<Undo>,
     /// What was not put back, each with the reason it was not.
     ///
@@ -39,7 +40,17 @@ pub struct Reversal {
     /// changes asked back and three carried out is a machine in a state nobody has been
     /// told about, and "some of it worked" is the sentence that makes somebody go
     /// looking by hand. Empty where everything went back, which is the common case.
+    ///
+    /// On a run that only said what it would do, this is what it cannot promise: a
+    /// change that goes back through the service that made it goes back only where that
+    /// service is answering, and a rehearsal has not asked one.
     pub left: Vec<Left>,
+    /// Whether this run only said what it would put back.
+    ///
+    /// A flag rather than a second shape, because the two lists mean the same thing
+    /// either way and a caller reading them should read one document. What changes is
+    /// the tense a surface says them in.
+    pub rehearsed: bool,
 }
 
 /// One change a reversal did not put back, and why it did not.
@@ -66,6 +77,10 @@ pub const NOWHERE_TO_LOOK: Code = Code::new("UNDO-4");
 
 /// The operation a reversal records its own work under, so it can be put back in turn.
 pub const OPERATION: &str = "undo";
+
+/// Why a rehearsal will not promise a change that lives inside a service.
+const NEEDS_THE_SERVICE: &str = "it goes back through the service that made it, so it \
+     goes back only where that service is answering when this is run for real";
 
 /// Put back the last repair, or the run a stamp names.
 ///
@@ -142,6 +157,16 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     }
 
     let undos: Vec<Undo> = run.iter().map(|change| change.undo()).collect();
+
+    // A rehearsal stops here, and here is where a real run stops being reversible: the
+    // judgement above is the whole of what can be known without touching anything, and
+    // everything below it reaches a service, rewrites the environment file or records
+    // what it did. What it reports is that judgement — every change of the run, split by
+    // whether putting it back needs something to be answering.
+    if ctx.dry_run {
+        return Ok(would_reverse(undos));
+    }
+
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -166,7 +191,34 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     Ok(Reversal {
         reversed,
         left: standing_after(&reached.unreached, &carried),
+        rehearsed: false,
     })
+}
+
+/// What a run of changes would come to, with none of it coming to that.
+///
+/// The split is read off each change rather than found out by trying it: a change that
+/// lives inside a service goes back through that service and everything else goes back
+/// on this machine, which is the division `recover::reconfigured` makes when it carries
+/// them out. Finding out the other way would mean a rehearsal opening a client
+/// and setting a field in order to discover that it could — which is the write, done to
+/// describe itself.
+#[must_use]
+pub(super) fn would_reverse(undos: Vec<Undo>) -> Reversal {
+    let (through_a_service, here): (Vec<Undo>, Vec<Undo>) = undos
+        .into_iter()
+        .partition(|undo| matches!(undo.action, crate::journal::Action::Reconfigure { .. }));
+    Reversal {
+        reversed: here,
+        left: through_a_service
+            .into_iter()
+            .map(|undo| Left {
+                target: undo.target,
+                because: NEEDS_THE_SERVICE.to_owned(),
+            })
+            .collect(),
+        rehearsed: true,
+    }
 }
 
 /// The one operation a stamp names, refusing where it names none or several.

@@ -127,6 +127,13 @@ pub fn asked(command: &Command) -> Asked {
         Command::Hosting(Keeping::Read) => ("hosting", Rehearsal::Reads),
         Command::Setup(SetupAction::Where) => ("setup --status", Rehearsal::Reads),
         Command::Support { write: false, .. } => ("support", Rehearsal::Reads),
+        // Its own doc comment is the verdict: it replaces nothing, and what it answers
+        // with is the command for whichever tool owns the copy that is running. It was
+        // refusing the flag it did not need to refuse, which costs an operator a run
+        // and teaches them the flag is unreliable. The one thing a rehearsal holds
+        // back is the note it keeps of having asked, so that a question does not move
+        // the day the next real run is due to ask on.
+        Command::SelfUpdate { .. } => ("update self", Rehearsal::Reads),
 
         // A search asks an indexer, and the answer exists only once it has been
         // asked. Refused rather than reported because the asking is the part with a
@@ -149,7 +156,7 @@ pub fn asked(command: &Command) -> Asked {
             Rehearsal::Cannot(THE_CHECK_IS_THE_DISRUPTION),
         ),
         Command::Doctor { accept: None, .. } => ("doctor", Rehearsal::Reads),
-        Command::Doctor { .. } => ("doctor --accept", Rehearsal::Untaught),
+        Command::Doctor { .. } => ("doctor --accept", Rehearsal::Reports),
 
         // Same shape, for the same reason: a walk adds an item, waits for the stack to
         // do something with it, and reports what actually happened at each stage. What
@@ -186,7 +193,29 @@ pub fn asked(command: &Command) -> Asked {
         Command::StopSeeding { .. } => ("stop-seeding", Rehearsal::Reports),
         Command::Bandwidth(_) => ("bandwidth", Rehearsal::Reports),
         Command::Uninstall(_) => ("uninstall", Rehearsal::Reports),
-        // The seven whose yes a rehearsal takes back. Each already answers twice —
+        // A guard is the one command with no ending of its own, so a rehearsal of it
+        // cannot be the command run with the last step left out — it would hold the
+        // terminal until the drive was pulled. What it reports instead is the watch it
+        // would keep: the location, how often it would look, and the invocation it
+        // would run the moment that location went. The invocation is the lifecycle
+        // stop's own, built by the same path a real watch builds it with.
+        Command::Watch { .. } => ("watch", Rehearsal::Reports),
+        // Which changes would go back, and which of them need a service that is
+        // answering. The judgement is already made before anything is touched, because
+        // a run goes back whole or not at all — so the report a rehearsal wants is the
+        // one this command has already formed by the time it would act.
+        Command::Undo { .. } => ("undo", Rehearsal::Reports),
+        // Which credential would be replaced, where its value lives, and what would
+        // still need doing before every consumer held the new one. No replacement is
+        // generated: a value minted to describe a rotation is a secret that exists
+        // because somebody asked a question, and it would have to go somewhere.
+        Command::Credentials(_) => ("credentials --rotate", Rehearsal::Reports),
+        // What a capture would hold, how large it would be, and the exact path it
+        // would be written to — read off the same room check a real capture makes
+        // before it writes anything.
+        Command::Backup { .. } => ("backup", Rehearsal::Reports),
+
+        // The eight whose yes a rehearsal takes back. Each already answers twice —
         // unconfirmed it says what it would do, confirmed it does it — so the report a
         // rehearsal wants is the one it already gives, in the same words. See
         // [`unconfirmed`].
@@ -197,23 +226,31 @@ pub fn asked(command: &Command) -> Asked {
         Command::Reset { .. } => ("reset", Rehearsal::Reports),
         Command::Update(_) => ("update", Rehearsal::Reports),
         Command::Restore { .. } => ("restore", Rehearsal::Reports),
+        Command::Support { .. } => ("support --write", Rehearsal::Reports),
+
+        // Setup is split where the split is real, the way `credentials` and `doctor`
+        // are. Reading where the walk stands changes nothing; every other step records
+        // something — an answer into the resumable progress file, or the whole of the
+        // configuration — and each reports what it would record instead of recording
+        // it. The answers gathered so far are the report either way, so a rehearsal is
+        // the same walk with the file left alone.
+        Command::Setup(_) => ("setup", Rehearsal::Reports),
 
         // Untaught. Each changes something and reports it as though it had been asked
         // about, so each refuses the flag until it has been taught to report instead.
-        // A guard is held open until the data location is lost, and a rehearsal of it
-        // cannot wait for that — so what it would have to report is the watch it would
-        // keep and what it would do when the moment came, which is a report it does not
-        // have yet. Until it does, a rehearsal refuses rather than holding a terminal
-        // open for a week.
-        Command::Watch { .. } => ("watch", Rehearsal::Untaught),
-        Command::Undo { .. } => ("undo", Rehearsal::Untaught),
-        Command::Credentials(_) => ("credentials --rotate", Rehearsal::Untaught),
-        Command::SelfUpdate { .. } => ("update self", Rehearsal::Untaught),
+        //
+        // Both of these are one pass over the same graph, and the report they owe is
+        // per connection: the field, what the service holds, and what would be pushed.
+        // The survey that produces it is already written and already shared — the
+        // three-way reconcile every driver reads a connection through — but the writes
+        // sit inside those same drivers, below the observation, and there is no gate
+        // between the two. Teaching them is putting one there, in `crate::seed`, so
+        // that the pass a rehearsal takes is the pass a real run takes with the
+        // registering left out. Reporting from a second survey beside it would be a
+        // second opinion about what lemonfiber intends, and the one nobody runs is the
+        // one that goes wrong.
         Command::Seed => ("seed", Rehearsal::Untaught),
         Command::Adopt => ("adopt", Rehearsal::Untaught),
-        Command::Setup(_) => ("setup", Rehearsal::Untaught),
-        Command::Backup { .. } => ("backup", Rehearsal::Untaught),
-        Command::Support { .. } => ("support --write", Rehearsal::Untaught),
     };
     Asked { named, rehearsal }
 }
@@ -234,10 +271,10 @@ pub fn carried(command: Command, ctx: &Ctx) -> Command {
 
 /// The same command with the operator's go-ahead withheld.
 ///
-/// Seven commands here already answer twice: unconfirmed they say what they would do,
+/// Eight commands here already answer twice: unconfirmed they say what they would do,
 /// confirmed they do it. The unconfirmed answer *is* the rehearsal — the same report,
 /// in the same words, filled in by the same code path — so a rehearsal takes the yes
-/// back rather than seven handlers each learning a second way to say what they already
+/// back rather than eight handlers each learning a second way to say what they already
 /// say. A second way is a second thing to keep true, and the one nobody exercises is
 /// the one that stops being true.
 ///
@@ -272,6 +309,16 @@ fn unconfirmed(command: Command) -> Command {
         Command::Repair { disruptive, .. } => Command::Repair {
             consent: repair::Consent::Offer,
             disruptive,
+        },
+        // A support bundle is asked for twice by the same word: without `--write` it
+        // says what one would hold and where it would land, with it there is a file.
+        // The description is the rehearsal, and it is the better command to be asked
+        // for it — an operator deciding whether to produce the archive wants the size
+        // and the path at the one moment the answer can still change what they do.
+        Command::Support { wanted, dest, .. } => Command::Support {
+            write: false,
+            wanted,
+            dest,
         },
         // Everything else either changes nothing, reports for itself, or refuses the
         // flag outright — none of which a withheld confirmation would change.
@@ -397,17 +444,17 @@ mod tests {
     }
 
     /// Reading a credential and rotating one arrive as the same command, and only one
-    /// of them changes anything. A verdict taken at the outer variant would refuse the
-    /// flag on a read.
+    /// of them changes anything. A verdict taken at the outer variant would hold the
+    /// read to a rule written for the write.
     #[test]
-    fn reading_a_credential_is_not_refused_the_way_rotating_one_is() {
+    fn reading_a_credential_is_not_read_the_way_rotating_one_is() {
         assert!(asked(&Command::Credentials(Asking::Read)).rehearsal == Rehearsal::Reads);
         assert!(
             asked(&Command::Credentials(Asking::Rotate {
                 credential: "qbittorrent".to_owned(),
             }))
             .rehearsal
-                == Rehearsal::Untaught
+                == Rehearsal::Reports
         );
     }
 
@@ -556,6 +603,7 @@ mod tests {
             }),
             Command::Hosting(Keeping::Read),
             Command::Setup(SetupAction::Where),
+            Command::SelfUpdate { to: None },
             bundling(false),
             tracing(false),
             examining(false),
@@ -651,7 +699,17 @@ mod tests {
                 agreement: None,
                 waiting: Waiting::Never,
             }),
-            // The seven that answer twice. Each is here rather than under Untaught
+            // Taught to report rather than to act: each stops short of the write and
+            // says what the write would have been.
+            examining_accepting(),
+            Command::Watch { forms: Vec::new() },
+            Command::Undo { run: None },
+            Command::Credentials(Asking::Rotate {
+                credential: "qbittorrent".to_owned(),
+            }),
+            Command::Setup(SetupAction::Apply),
+            Command::Backup { service: None },
+            // The eight that answer twice. Each is here rather than under Untaught
             // because the answer it gives unconfirmed is the report a rehearsal wants,
             // and `carried` is what takes the yes back on the way in.
             Command::Migrate(MigrateAction::Act {
@@ -678,6 +736,7 @@ mod tests {
                 repoint: false,
                 consent: crate::app::restore::Consent::Standing,
             },
+            bundling(true),
         ]
     }
 
@@ -686,20 +745,7 @@ mod tests {
     /// The flag is refused rather than ignored, which is the whole of the difference
     /// this module exists to make.
     fn untaught() -> Vec<Command> {
-        vec![
-            examining_accepting(),
-            Command::Watch { forms: Vec::new() },
-            Command::Undo { run: None },
-            Command::Credentials(Asking::Rotate {
-                credential: "qbittorrent".to_owned(),
-            }),
-            Command::SelfUpdate { to: None },
-            Command::Seed,
-            Command::Adopt,
-            Command::Setup(SetupAction::Apply),
-            Command::Backup { service: None },
-            bundling(true),
-        ]
+        vec![Command::Seed, Command::Adopt]
     }
 
     /// A doctor run acknowledging a finding, which is the third of its three arms.
@@ -734,10 +780,10 @@ mod tests {
         );
     }
 
-    /// A rehearsal of the seven that answer twice is the answer they already give
+    /// A rehearsal of the eight that answer twice is the answer they already give
     /// unconfirmed, so the go-ahead is taken back on the way in.
     #[test]
-    fn a_rehearsal_carries_the_seven_confirmable_commands_without_their_yes() {
+    fn a_rehearsal_carries_the_confirmable_commands_without_their_yes() {
         let rehearsing = crate::test_support::a_context().build().rehearsing();
         for asked in [
             Command::Reset { confirm: true },
@@ -764,10 +810,23 @@ mod tests {
                 consent: repair::Consent::Standing,
                 disruptive: false,
             },
+            bundling(true),
         ] {
             let carried = carried(asked.clone(), &rehearsing);
             assert_ne!(carried, asked, "{asked:?} kept the yes it was given");
         }
+    }
+
+    /// And what a rehearsal of a support bundle carries is the read beside it, rather
+    /// than merely something other than what was asked.
+    ///
+    /// Its own case because `assert_ne!` above is satisfied by any difference, and the
+    /// difference that matters here is which of the command's two halves runs: the
+    /// describing one, which is already classified as changing nothing.
+    #[test]
+    fn a_rehearsed_support_bundle_is_the_run_that_describes_one() {
+        let rehearsing = crate::test_support::a_context().build().rehearsing();
+        assert_eq!(carried(bundling(true), &rehearsing), bundling(false));
     }
 
     /// And a real run carries exactly what it was handed, because the withholding is
@@ -787,7 +846,7 @@ mod tests {
             (Command::Migrate(MigrateAction::Survey), Rehearsal::Reads),
             (Command::Hosting(Keeping::Read), Rehearsal::Reads),
             (Command::Setup(SetupAction::Where), Rehearsal::Reads),
-            (Command::Setup(SetupAction::Apply), Rehearsal::Untaught),
+            (Command::Setup(SetupAction::Apply), Rehearsal::Reports),
         ] {
             assert!(
                 asked(&command).rehearsal == expected,

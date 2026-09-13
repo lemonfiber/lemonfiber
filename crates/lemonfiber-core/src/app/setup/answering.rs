@@ -94,19 +94,23 @@ pub async fn setting_up(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, 
                 .answer(answer)
                 .map_err(|rejected| Box::new(super::does_not_apply(rejected)))?;
             wizard.advance();
-            super::save(&wizard, &paths);
+            kept(ctx, &wizard, &paths);
         }
         SetupAction::Next => {
             wizard.advance();
-            super::save(&wizard, &paths);
+            kept(ctx, &wizard, &paths);
         }
         SetupAction::Back => {
             wizard.back();
-            super::save(&wizard, &paths);
+            kept(ctx, &wizard, &paths);
         }
         // The same apply a terminal run reaches, at the same gate: review is
         // entered only from a complete set of answers, and applying anything else
-        // is refused there rather than judged again here.
+        // is refused there rather than judged again here. A rehearsal meets that gate
+        // and stops at it, so what it answers with is the reviewed plan — every
+        // setting apply would write, with the credentials among them withheld — and
+        // not one file of it is on disk.
+        SetupAction::Apply if ctx.dry_run => super::would_apply(&mut wizard)?,
         SetupAction::Apply => {
             let stamp = ctx.stamp();
             super::resume(&mut wizard, &applying(ctx, &paths, &stamp))?;
@@ -114,22 +118,43 @@ pub async fn setting_up(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, 
         // Refused where nothing is part-way through: the three ways out are about a
         // half-written apply, and offering them for a run that has not begun one
         // would reverse changes nothing made and discard answers nobody replaced.
+        //
+        // That refusal is the half a rehearsal keeps, because it is a fact about the
+        // machine rather than a consequence of acting. What it leaves out is the
+        // reversal and the apply behind it, and what it answers with is the list the
+        // choice is being made about: an interrupted apply's own record of what it
+        // wrote, which is on the report either way.
         SetupAction::Recover(choice) => {
             if wizard.phase() != Phase::Applying {
                 return Err(Box::new(nothing_to_recover()));
             }
-            let stamp = ctx.stamp();
-            super::recovered(&mut wizard, &applying(ctx, &paths, &stamp), choice)?;
-            // Starting over forgot the answers, so the walk is back at its
-            // beginning — and a report still reading them off the wizard in hand
-            // would describe a run that no longer exists anywhere.
-            if choice == Choice::StartOver {
-                wizard = Wizard::new(ctx.environment);
+            if !ctx.dry_run {
+                let stamp = ctx.stamp();
+                super::recovered(&mut wizard, &applying(ctx, &paths, &stamp), choice)?;
+                // Starting over forgot the answers, so the walk is back at its
+                // beginning — and a report still reading them off the wizard in hand
+                // would describe a run that no longer exists anywhere.
+                if choice == Choice::StartOver {
+                    wizard = Wizard::new(ctx.environment);
+                }
             }
         }
     }
 
     Ok(reported(&wizard, &paths, proof))
+}
+
+/// Keep what has been answered so far, unless this run is only saying what it would do.
+///
+/// The progress file is the state and nothing else is, so writing it is what makes an
+/// answer an answer. A rehearsal walks the wizard the same step and leaves the file
+/// where it was, so the report says where that answer would put the walk while the next
+/// run still finds the question unanswered — which is what somebody asking what an
+/// answer *would* do has asked for.
+fn kept(ctx: &Ctx, wizard: &Wizard, paths: &Paths) {
+    if !ctx.dry_run {
+        super::save(wizard, paths);
+    }
 }
 
 /// What an apply reached from a request writes with.
@@ -976,6 +1001,84 @@ mod tests {
         assert!(
             over_requests.contains(&("DATA_ROOT".to_owned(), root.display().to_string())),
             "and it is not an empty agreement: {over_requests:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_answer_moves_the_walk_on_and_records_nothing() {
+        // The progress file is the state and nothing else is, so a rehearsal that
+        // wrote it would have answered the question on the operator's behalf.
+        let paths = scratch("rehearsed-answer");
+        let rehearsing = ctx(&paths).rehearsing();
+
+        let before = walked(&rehearsing, SetupAction::Where)
+            .await
+            .map(|report| report.at);
+        let after = walked(
+            &rehearsing,
+            SetupAction::Answer(Answer::Protocols(Protocols::both())),
+        )
+        .await
+        .map(|report| report.at);
+
+        assert!(after.is_some(), "the answer was refused rather than read");
+        assert_ne!(before, after, "a rehearsal left the walk where it was");
+        assert!(
+            !paths.setup_progress().exists(),
+            "the answer was written down anyway"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_apply_reports_the_plan_and_writes_none_of_it() {
+        // The report is the review: every setting an apply would write, in the words
+        // it would write them in, and no file of it on disk.
+        let paths = scratch("rehearsed-apply");
+        let context = ctx(&paths);
+        let root = paths.data_dir().join("media");
+        answer_everything(&context, &root).await;
+
+        let report = walked(&ctx(&paths).rehearsing(), SetupAction::Apply).await;
+
+        assert_eq!(
+            report.as_ref().map(|report| report.phase),
+            Some(Phase::Reviewing),
+            "a rehearsal reaches review and stops at it"
+        );
+        assert_eq!(
+            planned(report.as_ref(), "DATA_ROOT"),
+            Some(root.display().to_string()),
+            "a rehearsal naming nothing it would write has printed no invocation"
+        );
+        assert!(
+            !paths.env_file().exists(),
+            "the settings an apply writes were written"
+        );
+        assert!(
+            !paths.autostart().exists() && !paths.notifications().exists(),
+            "the answers an apply keeps beside the settings were kept"
+        );
+        assert!(
+            paths.setup_progress().exists(),
+            "a finished apply clears the progress, and this one had not applied"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_apply_is_refused_before_review_the_way_a_real_one_is() {
+        let paths = scratch("rehearsed-early");
+        let rehearsing = ctx(&paths).rehearsing();
+        assert!(setting_up(
+            &rehearsing,
+            SetupAction::Answer(Answer::Protocols(Protocols::both()))
+        )
+        .await
+        .is_ok());
+
+        assert_eq!(
+            refused(&rehearsing, SetupAction::Apply).await,
+            Some(NOT_REVIEWED),
+            "a rehearsal judging this for itself would be a second judgement to keep true"
         );
     }
 }

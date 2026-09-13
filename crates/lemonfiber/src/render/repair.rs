@@ -3,7 +3,7 @@
 //! The outcome leads every line, because that is the question being answered: not whether
 //! lemonfiber ran something, but whether the fault is gone.
 
-use lemonfiber_core::app::repair::{Left, Report};
+use lemonfiber_core::app::repair::{Left, Report, Reversal};
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::repair::{Outcome, ASK_FOR_REPAIRS};
 
@@ -47,14 +47,24 @@ pub(crate) fn mended(report: &Report) -> Lines {
 }
 
 /// What was put back, or that there was nothing to put back.
-pub(crate) fn reversed(undos: &[Undo], left: &[Left]) -> Lines {
+///
+/// One rendering for both tenses rather than two, because the two lists mean the same
+/// thing either way: what goes back here, and what does not go back here without
+/// something else being true. Only the heading moves, and a second renderer for a
+/// rehearsal would be a second account of one report.
+pub(crate) fn reversed(report: &Reversal) -> Lines {
+    let (undos, left) = (&report.reversed, &report.left);
     let mut lines = Lines::default();
     if undos.is_empty() && left.is_empty() {
         lines.put("There is no repair to put back.");
         return lines;
     }
     if !undos.is_empty() {
-        lines.put("Put back:");
+        lines.put(if report.rehearsed {
+            "Would put back:"
+        } else {
+            "Put back:"
+        });
         for undo in undos {
             lines.put(format!("  {} — {}", undo.target, restoring(&undo.action)));
         }
@@ -63,10 +73,17 @@ pub(crate) fn reversed(undos: &[Undo], left: &[Left]) -> Lines {
     // the whole point of the report. An operator who asked for five things and got three
     // finds out here rather than by going and looking.
     if !left.is_empty() {
-        lines.put("Still as it was:");
+        lines.put(if report.rehearsed {
+            "Would depend on something else:"
+        } else {
+            "Still as it was:"
+        });
         for standing in left {
             lines.put(format!("  {} — {}", standing.target, standing.because));
         }
+    }
+    if report.rehearsed {
+        lines.spaced("Nothing has been put back. Run it without --dry-run to do it.");
     }
     lines
 }
@@ -295,7 +312,7 @@ mod tests {
             },
         ];
 
-        let said = reversed(&undos, &[]).text();
+        let said = reversed(&putting_back(undos, Vec::new())).text();
 
         assert!(said.contains("PORT back to 8080"), "{said}");
         assert!(said.contains("PROXY removed, as it was"), "{said}");
@@ -312,11 +329,22 @@ mod tests {
         );
     }
 
+    /// A reversal that was carried out, over these two lists.
+    fn putting_back(reversed: Vec<Undo>, left: Vec<Left>) -> Reversal {
+        Reversal {
+            reversed,
+            left,
+            rehearsed: false,
+        }
+    }
+
     /// A run with nothing to put back says so, rather than showing an empty list that
     /// reads as a command that did not work.
     #[test]
     fn nothing_to_put_back_is_said_plainly() {
-        assert!(reversed(&[], &[]).text().contains("no repair"));
+        assert!(reversed(&putting_back(Vec::new(), Vec::new()))
+            .text()
+            .contains("no repair"));
     }
 
     /// What did not go back is said beside what did, and named one at a time.
@@ -339,7 +367,7 @@ mod tests {
             because: "the service that made it did not answer".to_owned(),
         }];
 
-        let said = reversed(&undos, &left).text();
+        let said = reversed(&putting_back(undos, left)).text();
 
         assert!(said.contains("PORT back to 8080"), "{said}");
         assert!(said.contains("Still as it was:"), "{said}");
@@ -356,9 +384,40 @@ mod tests {
             because: "it holds something chosen since".to_owned(),
         }];
 
-        let said = reversed(&[], &left).text();
+        let said = reversed(&putting_back(Vec::new(), left)).text();
 
         assert!(!said.contains("no repair"), "{said}");
         assert!(said.contains("chosen since"), "{said}");
+    }
+
+    /// A rehearsal says the same two lists in the tense that is true of them, and says
+    /// plainly that nothing happened — the line that stops a report being read as a run.
+    #[test]
+    fn a_rehearsed_reversal_says_what_would_go_back_rather_than_what_did() {
+        let said = reversed(&Reversal {
+            reversed: vec![Undo {
+                target: ".env".to_owned(),
+                action: Action::Restore {
+                    key: "PORT".to_owned(),
+                    value: Some("8080".to_owned()),
+                    wrote: "6881".to_owned(),
+                },
+            }],
+            left: vec![Left {
+                target: "downloadclient in sonarr".to_owned(),
+                because: "it goes back through the service that made it".to_owned(),
+            }],
+            rehearsed: true,
+        })
+        .text();
+
+        assert!(said.contains("Would put back:"), "{said}");
+        assert!(said.contains("PORT back to 8080"), "{said}");
+        assert!(said.contains("Would depend on something else:"), "{said}");
+        assert!(said.contains("Nothing has been put back."), "{said}");
+        assert!(
+            !said.contains("Still as it was:"),
+            "a rehearsal has nothing that stayed as it was: {said}"
+        );
     }
 }

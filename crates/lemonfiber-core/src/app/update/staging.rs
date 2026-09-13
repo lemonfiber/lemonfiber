@@ -171,7 +171,7 @@ fn steps(ctx: &Ctx, taking: Vec<Change>) -> Result<Vec<Step>, Box<Problem>> {
         .into_iter()
         .map(|change| {
             let started = Action::Start(vec![change.service.clone()]);
-            let (argv, _) = engine::invocation(ctx, &started)?;
+            let (argv, _) = engine::invocation(ctx, &[], &started)?;
             Ok(Step { change, argv })
         })
         .collect()
@@ -232,7 +232,7 @@ async fn moved(
 /// was established service by service for everything this run moved, and the rest is
 /// on the versions it was already running.
 async fn whole(ctx: &Ctx, action: &Action) -> Result<Vec<crate::model::StackEdit>, Box<Problem>> {
-    let (argv, edits) = engine::invocation(ctx, action)?;
+    let (argv, edits) = engine::invocation(ctx, &[], action)?;
     ctx.runner
         .run(&argv)
         .await

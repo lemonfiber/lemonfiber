@@ -71,7 +71,14 @@ pub(super) async fn read(ctx: &Ctx) -> Read {
         return Read::of(&noticed, Silence::NotYet);
     }
     asked(ctx, &mut noticed, now).await;
-    keep(ctx, record.as_deref(), &noticed).await;
+    // The one write on this path, and a rehearsal does not make it. What it records is
+    // that this machine has asked today, which moves the day the next real check is
+    // due — so a run that was only asked what it *would* say would change what a later
+    // one does. Reading the record is still right: the answer a rehearsal gives has to
+    // be the answer the command gives.
+    if !ctx.dry_run {
+        keep(ctx, record.as_deref(), &noticed).await;
+    }
     Read::of(&noticed, Silence::Unanswered)
 }
 

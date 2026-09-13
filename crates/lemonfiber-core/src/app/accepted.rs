@@ -61,6 +61,14 @@ fn path(ctx: &Ctx) -> Option<PathBuf> {
 /// saying the thing they thought they had answered, and they would stop trusting
 /// either half of it. A failure cannot be answered at all: it is not a choice.
 ///
+/// A rehearsal is this run with the recording left out, and the report it gives is
+/// the one a real answer produces: the check it names stops leading, in the same
+/// findings, through the same suppression. That is the whole of what an operator is
+/// deciding about — which warning would go quiet and what it was saying — and it is
+/// reached without writing an answer down, so the question they asked does not settle
+/// anything on their behalf. The refusal above still applies, because a name nothing
+/// warns about is a mistake whether or not this run means it.
+///
 /// # Errors
 ///
 /// Where the named check is not warning in this report, or the answer cannot be
@@ -78,7 +86,9 @@ pub(crate) fn acknowledge(
     }
     let mut answered = load(ctx);
     answered.accept(check);
-    save(ctx, &answered)?;
+    if !ctx.dry_run {
+        save(ctx, &answered)?;
+    }
     Ok(DoctorReport {
         findings: suppressing(report.findings, &answered),
         ..report
@@ -319,6 +329,39 @@ mod tests {
         );
         assert!(super::acknowledge(&ctx, Some("vpn.egress-match"), reporting(failing)).is_err());
         assert!(!load(&ctx).has("vpn.egress-match"));
+    }
+
+    #[test]
+    fn a_rehearsed_answer_settles_the_warning_in_the_report_and_nowhere_else() {
+        // The two halves together: the operator sees exactly the report a real answer
+        // would give them, and the next run still puts the question.
+        let ctx = ctx_at("rehearsed").rehearsing();
+        let answered = super::acknowledge(
+            &ctx,
+            Some("vpn.unprotected"),
+            reporting(warning("vpn.unprotected")),
+        );
+        let states: Vec<crate::error::State> = answered
+            .as_ref()
+            .map(|report| {
+                report
+                    .findings
+                    .iter()
+                    .filter_map(|finding| match &finding.verdict {
+                        crate::doctor::Verdict::Warn(problem)
+                        | crate::doctor::Verdict::Fail(problem) => Some(problem.state),
+                        crate::doctor::Verdict::Pass { .. }
+                        | crate::doctor::Verdict::Unverified { .. }
+                        | crate::doctor::Verdict::Skipped { .. } => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert_eq!(states, vec![crate::error::State::Suppressed]);
+        assert!(
+            !load(&ctx).has("vpn.unprotected"),
+            "a rehearsal that wrote the answer down would have answered for them"
+        );
     }
 
     #[test]

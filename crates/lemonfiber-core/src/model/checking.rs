@@ -21,10 +21,34 @@ pub struct SupervisionReport {
     /// The forms that were being watched, and are now stopped.
     pub forms: Vec<String>,
     /// Why the watch ended: the data root vanished, or a different volume took
-    /// its place.
+    /// its place — or, on a run that only said what a watch would do, that nothing
+    /// was watched at all.
     pub reason: String,
     /// Whether stopping the services succeeded.
     pub stopped: bool,
+    /// The watch this run would have kept, where it only said what it would do.
+    ///
+    /// A guard is the one command with no ending of its own, so a rehearsal of it
+    /// cannot be the command with its last step left out — it would hold until the
+    /// drive was pulled. What it answers with is this instead, and the fields above
+    /// then describe a watch that never began: nothing ended, and nothing was
+    /// stopped. Absent on every watch that actually ran.
+    pub would: Option<Vigil>,
+}
+
+/// The watch a run would keep, and what it would do at the end of it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Vigil {
+    /// The data location it would hold.
+    pub root: String,
+    /// How often it would look, in seconds.
+    pub every: u64,
+    /// The invocation it would run the moment that location went, word for word.
+    ///
+    /// Built by the same path a real watch stops the services through, rather than
+    /// described beside it: an argv reported from a second reckoning is one nobody
+    /// runs, and the one nobody runs is the one that stops being right.
+    pub command: Vec<String>,
 }
 
 /// What each service is doing, and what that adds up to.

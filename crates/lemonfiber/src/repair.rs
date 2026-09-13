@@ -10,7 +10,7 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::repair::{mend, putting_right, retract, Confirm, Consent, Reversal};
+use lemonfiber_core::app::repair::{mend, putting_right, retracting, Confirm, Consent};
 use lemonfiber_core::app::{Ctx, Outcome};
 use lemonfiber_core::repair::{Repair, Stance};
 
@@ -83,19 +83,16 @@ fn answered(outcome: &Outcome, json: bool) -> ExitCode {
     code
 }
 
-/// Put back what the last repair changed.
+/// Put back what the last repair changed, or say what putting it back would do.
 ///
 /// The deciding and the doing are the core's — which repair was last, what reversing it
-/// takes, and which of those need a service to reach. What is here is the saying.
+/// takes, which of those need a service to reach, and whether this run may act at all.
+/// What is here is the saying. This path does not go through the dispatcher, so the
+/// rehearsal verdict is taken inside the call rather than above it; reading the flag
+/// here would be a second reading to keep in step with the one that already exists.
 async fn undone(ctx: &Ctx, paths: &Paths, json: bool) -> ExitCode {
-    match retract(ctx, paths).await {
-        Ok(reversed) => answered(
-            &Outcome::Undo(Reversal {
-                reversed,
-                left: Vec::new(),
-            }),
-            json,
-        ),
+    match retracting(ctx, paths).await {
+        Ok(reversal) => answered(&Outcome::Undo(reversal), json),
         Err(problem) => crate::complain(&problem),
     }
 }

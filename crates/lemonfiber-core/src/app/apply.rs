@@ -331,7 +331,11 @@ pub const NOT_REVIEWED: Code = Code::new("SETUP-1");
 pub const DIR_NOT_MADE: Code = Code::new("SETUP-2");
 
 /// The problem of applying before review — nothing is settled to write.
-fn not_reviewed() -> Problem {
+///
+/// Visible to setup because a rehearsal of an apply has to be refused in the same
+/// words at the same point. A refusal written twice is two sentences that start the
+/// same and stop matching.
+pub(super) fn not_reviewed() -> Problem {
     Problem::new(
         NOT_REVIEWED,
         Severity::Error,
