@@ -30,6 +30,7 @@ nobody has watched fail is a gate nobody knows works.
 """
 
 import argparse
+import io
 import json
 import pathlib
 import sys
@@ -192,23 +193,36 @@ def _analysis(sha: str, category: str, tool: str = "CodeQL") -> dict:
 
 
 def _reading_alerts() -> list[str]:
-    """Whether an alert list is read, and whether an empty one is believed."""
+    """Whether an alert list is read, and whether an empty one is believed.
+
+    The judgements below are written into a buffer nobody reads rather than to
+    `stderr`, and that is not tidiness. GitHub lifts `::error::` off **both**
+    streams and turns each into an annotation on the run, so a self-test that
+    exercised its own refusal path put four red annotations on every green job
+    in every repository that calls this gate — including one naming a Rust file
+    that does not exist, in repositories with no Rust in them. A passing step
+    that decorates a run with fabricated findings is a step people learn to read
+    past, which is the opposite of what a gate is for.
+
+    What is asserted here is the verdict, and the verdict is the return value.
+    """
     one = [
         {
             "rule": {"id": "rust/path-injection", "security_severity_level": "high"},
             "most_recent_instance": {"location": {"path": "a.rs", "start_line": 7}},
         }
     ]
+    said = io.StringIO()
     wrong = []
     if flatten([one, []]) != one:
         wrong.append("pages of alerts were not read as one list")
     if flatten(one) != one:
         wrong.append("a single page of alerts was not read as it came")
-    if judge(one, sys.stderr) != 1:
+    if judge(one, said) != 1:
         wrong.append("an open alert did not refuse the branch")
-    if judge([], sys.stderr) != 0:
+    if judge([], said) != 0:
         wrong.append("no open alert did not allow the branch")
-    if judge([], sys.stderr, seen=False) != 1:
+    if judge([], said, seen=False) != 1:
         wrong.append("a commit with no analysis was allowed on an empty alert list")
     return wrong
 
