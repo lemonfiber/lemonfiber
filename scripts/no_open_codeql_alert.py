@@ -87,6 +87,26 @@ def _init_languages(job: dict):
     return None
 
 
+def named(category: str) -> str:
+    """The `language:x` a CodeQL category ends in, whatever precedes it.
+
+    A workflow that sets `category:` gets exactly what it wrote — this repository
+    writes `/language:rust`. A workflow that sets none gets one GitHub builds from
+    the workflow path and the matrix, which reads
+    `.github/workflows/codeql.yml:analyze/language:python`.
+
+    Both name the same language, and only one of them is a string this file could
+    have guessed. Four of the six repositories in this organisation are the second
+    kind, so comparing the whole category would have failed every one of them on
+    the first run — which is the sort of thing a gate does once, loudly, to five
+    repositories at the same time.
+
+    The last `/`-separated segment, so `language:rust` cannot be satisfied by a
+    category ending `language:rustacean`.
+    """
+    return category.rsplit("/", 1)[-1]
+
+
 def missing(analysed: list[str], wanted: list[str]) -> list[str]:
     """The categories that were meant to be analysed here and were not.
 
@@ -96,7 +116,8 @@ def missing(analysed: list[str], wanted: list[str]) -> list[str]:
     nothing. That happened on 2026-09-13 and this is the sentence that would have
     said so.
     """
-    return [want for want in wanted if want not in analysed]
+    seen = {named(one) for one in analysed}
+    return [want for want in wanted if named(want) not in seen]
 
 
 def at(analyses, sha: str) -> list[str]:
@@ -155,45 +176,96 @@ def judge(alerts: list, out, seen: bool = True) -> int:
     return 1
 
 
-def self_test() -> int:
-    """Each claim this gate makes, put in front of the case that would break it.
+# The two languages this repository analyses, named once. The self-test below
+# built them by hand seven and three times over, which is a literal nobody can
+# grep for and a rename that has to be got right in ten places.
+RUST = "/language:rust"
+ACTIONS = "/language:actions"
+# Not analysed here. Named because the self-test uses it to stand for "a language
+# this repository does not run", and because a third repeated literal is how the
+# other two came to be constants.
+PYTHON = "/language:python"
 
-    An open alert is refused, an empty list on an analysed ref is allowed, and an
-    empty list on a ref with no analysis is refused — that last one because the
-    first two are indistinguishable without it.
-    """
+# One CodeQL analysis, as the API describes it, for the fixtures to vary.
+def _analysis(sha: str, category: str, tool: str = "CodeQL") -> dict:
+    return {"tool": {"name": tool}, "commit_sha": sha, "category": category}
+
+
+def _reading_alerts() -> list[str]:
+    """Whether an alert list is read, and whether an empty one is believed."""
     one = [
         {
             "rule": {"id": "rust/path-injection", "security_severity_level": "high"},
             "most_recent_instance": {"location": {"path": "a.rs", "start_line": 7}},
         }
     ]
-    failures = []
+    wrong = []
     if flatten([one, []]) != one:
-        failures.append("pages of alerts were not read as one list")
+        wrong.append("pages of alerts were not read as one list")
     if flatten(one) != one:
-        failures.append("a single page of alerts was not read as it came")
+        wrong.append("a single page of alerts was not read as it came")
     if judge(one, sys.stderr) != 1:
-        failures.append("an open alert did not refuse the branch")
+        wrong.append("an open alert did not refuse the branch")
     if judge([], sys.stderr) != 0:
-        failures.append("no open alert did not allow the branch")
+        wrong.append("no open alert did not allow the branch")
     if judge([], sys.stderr, seen=False) != 1:
-        failures.append("a commit with no analysis was allowed on an empty alert list")
+        wrong.append("a commit with no analysis was allowed on an empty alert list")
+    return wrong
 
-    codeql = {"tool": {"name": "CodeQL"}}
-    here = {**codeql, "commit_sha": "aaa", "category": "/language:rust"}
-    stale = {**codeql, "commit_sha": "bbb", "category": "/language:rust"}
+
+def _reading_analyses() -> list[str]:
+    """Whether an analysis is matched to this commit, and to CodeQL."""
+    here = _analysis("aaa", RUST)
+    stale = _analysis("bbb", RUST)
+    wrong = []
     if at([], "aaa") or at([[]], "aaa"):
-        failures.append("no analysis was read as an analysis")
+        wrong.append("no analysis was read as an analysis")
     if at([stale], "aaa"):
-        failures.append("an analysis of another commit was read as this one's")
-    if at([{**here, "tool": {"name": "Other"}}], "aaa"):
-        failures.append("another tool's analysis was read as CodeQL's")
-    if at([here], "aaa") != ["/language:rust"]:
-        failures.append("an analysis of this commit was not seen")
-    if at([[here], [stale]], "aaa") != ["/language:rust"]:
-        failures.append("paged analyses were not read as one list")
+        wrong.append("an analysis of another commit was read as this one's")
+    if at([_analysis("aaa", RUST, tool="Other")], "aaa"):
+        wrong.append("another tool's analysis was read as CodeQL's")
+    if at([here], "aaa") != [RUST]:
+        wrong.append("an analysis of this commit was not seen")
+    if at([[here], [stale]], "aaa") != [RUST]:
+        wrong.append("paged analyses were not read as one list")
+    return wrong
 
+
+def _reading_a_path() -> list[str]:
+    """Whether a path that leaves the working directory is refused."""
+    wrong = []
+    try:
+        inside("scripts/no_open_codeql_alert.py")
+    except ValueError:
+        wrong.append("a path inside the working directory was refused")
+    for outside in ("../../etc/passwd", "/etc/passwd", "a/../../../etc/passwd"):
+        try:
+            inside(outside)
+            wrong.append(f"{outside} was read rather than refused")
+        except ValueError:
+            pass
+    return wrong
+
+
+def _reading_a_category() -> list[str]:
+    """Whether a category GitHub wrote itself names the same language as ours."""
+    auto = f".github/workflows/codeql.yml:analyze{PYTHON}"
+    wrong = []
+    if named(auto) != "language:python":
+        wrong.append("a category GitHub generated was not read down to its language")
+    if named(RUST) != "language:rust":
+        wrong.append("a category this repository writes was not read")
+    if missing([auto], [PYTHON]):
+        wrong.append("a generated category did not satisfy the language it names")
+    if not missing(["/language:rustacean"], [RUST]):
+        wrong.append("language:rust was satisfied by language:rustacean")
+    if missing([auto, RUST], [PYTHON, RUST]):
+        wrong.append("a mix of both category styles was not read")
+    return wrong
+
+
+def _reading_the_workflow() -> list[str]:
+    """Whether the languages are read off both shapes the org writes."""
     matrix = """
 jobs:
   analyze:
@@ -201,11 +273,6 @@ jobs:
       matrix:
         language: [rust, actions]
 """
-    if expected(matrix) != ["/language:rust", "/language:actions"]:
-        failures.append("the matrix's languages were not read off the workflow")
-
-    # The shape `brand` and `lemonfiber-media-stack` are written in. Reading only
-    # the matrix met it with a bare KeyError.
     single = """
 jobs:
   analyze:
@@ -214,27 +281,68 @@ jobs:
         with:
           languages: actions
 """
-    if expected(single) != ["/language:actions"]:
-        failures.append("a job with one language and no matrix was not read")
-    if expected(single.replace("languages: actions", "languages: actions, python")) != [
-        "/language:actions",
-        "/language:python",
-    ]:
-        failures.append("a comma-separated languages: was not read as a list")
+    wrong = []
+    if expected(matrix) != [RUST, ACTIONS]:
+        wrong.append("the matrix's languages were not read off the workflow")
+    if missing([RUST, ACTIONS], expected(matrix)):
+        wrong.append("a complete set of analyses was called incomplete")
+    if missing([ACTIONS], expected(matrix)) != [RUST]:
+        wrong.append("a language whose analysis never landed was not named")
+    if expected(single) != [ACTIONS]:
+        wrong.append("a job with one language and no matrix was not read")
+    if expected(
+        single.replace("languages: actions", "languages: actions, python")
+    ) != [ACTIONS, PYTHON]:
+        wrong.append("a comma-separated languages: was not read as a list")
     for empty in ("jobs: {}\n", "jobs:\n  analyze:\n    steps: []\n"):
         try:
             expected(empty)
-            failures.append("a workflow naming no language was accepted")
+            wrong.append("a workflow naming no language was accepted")
         except ValueError:
             pass
-    if missing(["/language:rust", "/language:actions"], expected(matrix)):
-        failures.append("a complete set of analyses was called incomplete")
-    if missing(["/language:actions"], expected(matrix)) != ["/language:rust"]:
-        failures.append("a language whose analysis never landed was not named")
-    for line in failures:
+    return wrong
+
+
+def inside(named: str) -> pathlib.Path:
+    """`named`, resolved, or a refusal if it leaves the working directory.
+
+    Both files this reads are named on the command line by the workflow that
+    invokes it, and both are interpolated straight into a read. That is enough
+    for SonarCloud to raise `S8707`, and it is right to: "the caller is our own
+    workflow" is not a property of this function, and a gate is exactly the
+    thing not to leave resting on the caller being careful.
+
+    Resolved before the comparison, because `a/../../etc/passwd` is only outside
+    once the `..` has been applied. Refused rather than clamped: a path that
+    walks out is a mistake in the caller, and quietly reading something else
+    would be worse than stopping.
+    """
+    here = pathlib.Path.cwd().resolve()
+    path = (here / named).resolve()
+    if path != here and here not in path.parents:
+        raise ValueError(f"refusing to read {named!r}: it leaves {here}")
+    return path
+
+
+def self_test() -> int:
+    """Each claim this gate makes, put in front of the case that would break it.
+
+    Five readings, because they fail separately: whether an alert list is read
+    and an empty one believed, whether an analysis belongs to *this* commit,
+    whether the languages come off the workflow in either shape the organisation
+    writes them, and whether a path that leaves the working directory is refused.
+    """
+    wrong = (
+        _reading_alerts()
+        + _reading_analyses()
+        + _reading_the_workflow()
+        + _reading_a_category()
+        + _reading_a_path()
+    )
+    for line in wrong:
         print(f"self-test: {line}", file=sys.stderr)
-    print("self-test: every claim holds." if not failures else "self-test: FAILED")
-    return 1 if failures else 0
+    print("self-test: every claim holds." if not wrong else "self-test: FAILED")
+    return 1 if wrong else 0
 
 
 def main() -> int:
@@ -273,9 +381,16 @@ def main() -> int:
         )
         return 1
 
-    wanted = expected(pathlib.Path(args.workflow).read_text(encoding="utf-8"))
-    with open(args.analyses, encoding="utf-8") as handle:
-        here = at(json.load(handle), args.sha)
+    # `inside` and `expected` both refuse rather than guess, and a gate that
+    # reports a refusal as a traceback tells a maintainer nothing about their
+    # pull request. Said as an error with the reason in it instead.
+    try:
+        wanted = expected(inside(args.workflow).read_text(encoding="utf-8"))
+        with inside(args.analyses).open(encoding="utf-8") as handle:
+            here = at(json.load(handle), args.sha)
+    except (ValueError, OSError) as refused:
+        print(f"::error::{refused}", file=sys.stdout)
+        return 1
     absent = missing(here, wanted)
 
     # Asked on its own, so the step can wait for an answer rather than race one.
