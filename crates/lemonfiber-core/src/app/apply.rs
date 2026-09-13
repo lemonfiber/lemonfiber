@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 
 use crate::alert::{Appetite, Wants};
 use crate::app::reconfiguring::SETTINGS;
+use crate::autostart::Wanted;
 use crate::baseline::Baseline;
 use crate::config::paths::Paths;
 use crate::config::store::{self, is_secret};
@@ -209,6 +210,19 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
     )
     .map_err(Fault::Store)?;
 
+    // The autostart answer, for the reason the appetite is written: setup asks the
+    // question and stated what declining costs, and an answer gathered under that
+    // sentence and then dropped leaves the operator believing they decided
+    // something. Its own record rather than an environment setting because Compose
+    // has no use for it, and unanswered reads as declined — the direction that
+    // starts nothing on a machine nobody asked to have started.
+    let wanted = Wanted::answered(wizard.answers().autostart.unwrap_or(false));
+    store::write(
+        &paths.autostart(),
+        &serde_json::to_string(&wanted).unwrap_or_default(),
+    )
+    .map_err(Fault::Store)?;
+
     // The applied marker lands only after every setting is on disk, so a stop
     // before it leaves `applying` over a complete file rather than `applied` over
     // an incomplete one — the next run treats that as a failed apply and offers to
@@ -329,7 +343,7 @@ mod tests {
 
     use lemonfiber_fixtures::ports::Chance;
 
-    use super::{apply, Applying, Baseline, SETTINGS};
+    use super::{apply, Applying, Baseline, Wanted, SETTINGS};
     use crate::alert::{Appetite, Wants};
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
@@ -398,7 +412,19 @@ mod tests {
     /// A wizard on native Linux with every applicable question answered, moved to
     /// review — the state apply expects. The data location is given so the test
     /// controls whether it already exists.
+    ///
+    /// Autostart is declined, which is the terminal's own default. A test about
+    /// *that* answer takes [`answering_autostart`] instead, so the two cannot
+    /// agree by accident.
     fn reviewed(data_root: &Path) -> Wizard {
+        answering_autostart(data_root, false)
+    }
+
+    /// The same wizard, answering the autostart question either way.
+    ///
+    /// Split out rather than parameterising every call site: what apply does with
+    /// the answer is one test's subject and every other test's background noise.
+    fn answering_autostart(data_root: &Path, on_boot: bool) -> Wizard {
         let mut wizard = Wizard::new(Environment::LinuxNative);
         wizard
             .answer(Answer::Protocols(Protocols::both()))
@@ -419,7 +445,7 @@ mod tests {
         wizard
             .answer(Answer::Notifications(Appetite::default_appetite()))
             .unwrap_or(());
-        wizard.answer(Answer::Autostart(false)).unwrap_or(());
+        wizard.answer(Answer::Autostart(on_boot)).unwrap_or(());
         assert!(wizard.transition(Phase::Reviewing), "answers are complete");
         wizard
     }
@@ -771,6 +797,50 @@ mod tests {
             Some(Wants::preset(Appetite::default_appetite())),
             "{written}"
         );
+    }
+
+    /// The autostart answer as a later run reads it back off disk.
+    fn kept_autostart(paths: &Paths) -> Option<Wanted> {
+        let written = std::fs::read_to_string(paths.autostart()).unwrap_or_default();
+        serde_json::from_str(&written).ok()
+    }
+
+    #[test]
+    fn the_autostart_answer_is_written_where_a_later_run_reads_it() {
+        // Asked with its cost attached and then thrown away is the worst of both:
+        // the operator has weighed a consequence and been told nothing came of it.
+        // Both answers are checked, because a record that always says the same
+        // thing would pass a test of one of them.
+        for asked in [true, false] {
+            let dir = scratch(if asked { "boot-yes" } else { "boot-no" });
+            let paths = layout(&dir);
+            let mut wizard = answering_autostart(&dir.join("data-root"), asked);
+
+            assert!(apply(&mut wizard, &applying(&paths, external(), "1000")).is_ok());
+
+            assert_eq!(kept_autostart(&paths), Some(Wanted::answered(asked)));
+        }
+    }
+
+    #[test]
+    fn an_autostart_answer_that_cannot_be_written_stops_the_apply() {
+        // The last thing written before the applied marker, so failing here must
+        // leave `applying` rather than a stack recorded as fully set up carrying an
+        // answer nobody kept. The same standard the appetite is held to, and for a
+        // stronger reason: this one is about whether the stack exists after a
+        // reboot.
+        let dir = scratch("no-autostart");
+        let paths = layout(&dir);
+        assert!(
+            std::fs::create_dir_all(paths.autostart()).is_ok(),
+            "a directory sits where the answer's file must go"
+        );
+        let mut wizard = reviewed(&dir.join("data-root"));
+
+        let stopped = apply(&mut wizard, &applying(&paths, external(), "t"));
+
+        assert!(stopped.is_err());
+        assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);
     }
 
     #[test]

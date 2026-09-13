@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
+use lemonfiber_core::autostart::DECLINE_CONSEQUENCE;
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
@@ -366,7 +367,18 @@ impl Prompt for Terminal {
     }
 
     fn autostart(&self) -> bool {
-        self.yes_no("\nStart the stack when this machine boots?", false)
+        // The consequence goes before the question, not after it, because after it
+        // there is nothing left to decide. "Start on boot" sounds like a
+        // convenience, and an operator who reads it that way says no to keep their
+        // machine quiet — and then loses the stack to the next operating-system
+        // update with nothing anywhere to tell them. Said in the same words a later
+        // report would use, from the one place they are written.
+        say!("\n{DECLINE_CONSEQUENCE}");
+        // Defaulted to no all the same. The sentence above is what makes a no an
+        // informed answer rather than the absence of one, and it is a reasonable
+        // answer — a laptop that is not always on has no business starting a media
+        // stack at login. Nothing here decides for them.
+        self.yes_no("Start the stack when this machine boots?", false)
     }
 
     fn confirm(&self, plan: &Plan) -> bool {
@@ -702,6 +714,10 @@ mod tests {
         // Household defaults to no, autostart to no; a bare enter takes each.
         assert!(!answered(&[""]).household());
         assert!(answered(&["yes"]).household());
+        // Autostart keeps its no even though what precedes it now says what a no
+        // costs. The sentence is there to make the answer informed, not to push it:
+        // a laptop that is not always on has no business starting a media stack at
+        // login, and that operator presses enter.
         assert!(!answered(&[""]).autostart());
         assert!(answered(&["y"]).autostart());
         // An answer that is neither takes the default.

@@ -296,8 +296,13 @@ impl Wizard {
     /// operator confirms exactly what lands. Built from whatever has been
     /// answered, so it is empty at the start and complete at review; an
     /// unanswered question contributes no setting rather than a guessed default.
-    /// The household and autostart choices have no configuration home here — they
-    /// are applied by their own features — so they are collected but not written.
+    /// The household and autostart choices are not settings and so are not here:
+    /// neither is a value Compose is handed, and the environment file is handed to
+    /// Compose as it stands. The autostart answer is nonetheless kept — apply writes
+    /// it to [`crate::config::paths::Paths::autostart`] beside the settings, where a
+    /// backup carries it — because an answer gathered under a stated consequence and
+    /// then discarded leaves the operator believing they decided something. The
+    /// household choice is applied by its own feature.
     #[must_use]
     pub fn plan(&self) -> Plan {
         let mut settings = Vec::new();
