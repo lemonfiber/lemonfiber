@@ -16,6 +16,7 @@ use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
 use lemonfiber_core::ports::process::Progress as PullEvent;
 use lemonfiber_core::ports::Narrator;
+use lemonfiber_core::stack::compose::Action;
 
 use crate::exit::{complain, settled, FAILURE};
 use crate::keyboard::{Console, Keyboard};
@@ -79,7 +80,11 @@ pub(crate) async fn pull(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
     // request through the dispatcher already claims. Setup's pull is left alone —
     // it is followed immediately by a start that claims, and a first run has nothing
     // to race. Given back on both paths out.
-    let claim = match claimed(ctx).await {
+    //
+    // Recorded under the action's own word rather than one written here, so a run
+    // waiting behind a streamed pull is told the same thing as one waiting behind the
+    // pull the dispatcher runs. They are the same operation to whoever is waiting.
+    let claim = match claimed(ctx, Action::Pull.name()).await {
         Ok(claim) => claim,
         Err(problem) => return complain(&problem),
     };
@@ -231,7 +236,11 @@ pub(crate) async fn start(
     // A streamed start does not go through the dispatcher, so it claims the stack
     // here rather than inheriting the claim `lifecycle` takes. Given back below on
     // both paths out, for the same reason it is given back there.
-    let claim = match claimed(ctx).await {
+    //
+    // Recorded under the action's own word for the reason a streamed pull is: a
+    // stack held by a start is held by a start, and which of the two code paths is
+    // running it is not a fact the operator waiting on it has any use for.
+    let claim = match claimed(ctx, Action::Up.name()).await {
         Ok(claim) => claim,
         Err(problem) => return complain(&problem),
     };
@@ -302,7 +311,7 @@ mod tests {
     use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
     use lemonfiber_core::stack::Source;
 
-    use super::{claimed, emit_line, kind, pull, pull_showing, released, stream, Ctx};
+    use super::{claimed, emit_line, kind, pull, pull_showing, released, stream, Action, Ctx};
 
     /// A runner that answers every command the same way.
     struct Answering {
@@ -415,14 +424,19 @@ mod tests {
     }
 
     /// A clean exit, as it reads.
-    #[tokio::test]
-    async fn a_pull_is_refused_while_another_run_holds_the_stack() {
+    ///
+    /// On a paused clock, because a pull that cannot have the stack now waits for it
+    /// rather than being turned away, and the wait it eventually gives up on is five
+    /// minutes long. The runtime advances its own timers the moment nothing is ready,
+    /// so what is asserted is the end of the wait rather than the sitting through it.
+    #[tokio::test(start_paused = true)]
+    async fn a_pull_waits_for_the_stack_and_is_refused_when_the_wait_runs_out() {
         let mut ctx = ctx(0, "pulled");
         let dir = std::env::temp_dir().join(format!("lemonfiber-pull-lock-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         ctx.settings.env_file = Some(dir.join(".env"));
 
-        let held = claimed(&ctx).await;
+        let held = claimed(&ctx, Action::Up.name()).await;
         assert!(held.is_ok(), "nothing held it, so the first run took it");
 
         let code = pull(&ctx, &["tv".to_owned()], false).await;
@@ -431,7 +445,7 @@ mod tests {
             format!("{code:?}"),
             success(),
             "a pull asked for on its own is a lifecycle operation, so a stack \
-             somebody else is working on is one it is told about"
+             somebody else is working on is one it waits for and then reports"
         );
 
         if let Ok(claim) = held {
