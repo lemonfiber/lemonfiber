@@ -79,22 +79,6 @@ pub enum Rehearsal {
     Untaught,
 }
 
-impl Rehearsal {
-    /// Why this command cannot be rehearsed, where that is the answer it gives.
-    ///
-    /// For a surface that wants to explain a refusal in its own words rather than
-    /// render the one the core wrote — the reason is the part that is worth having,
-    /// and asking for it should not mean matching on a verdict to find out there is
-    /// nothing to ask about.
-    #[must_use]
-    pub const fn why(self) -> Option<&'static str> {
-        match self {
-            Self::Cannot(why) => Some(why),
-            Self::Reads | Self::Reports | Self::Untaught => None,
-        }
-    }
-}
-
 /// What was asked for, and what a rehearsal of it comes to.
 ///
 /// One value rather than two lookups because they are one decision: the name is what
@@ -301,8 +285,15 @@ fn not_taught_yet(asked: &Asked) -> Problem {
 
 #[cfg(test)]
 mod tests {
-    use super::{asked, not_taught_yet, refused, Rehearsal};
-    use crate::app::command::{Asking, Keeping, MigrateAction};
+    use super::{
+        asked, not_taught_yet, refused, Rehearsal, A_SEARCH_IS_THE_ANSWER,
+        THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
+    };
+    use crate::app::command::{
+        AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Keeping, MigrateAction,
+        QualityAction, Removing, Setting,
+    };
+    use crate::app::engine::Waiting;
     use crate::app::setup::SetupAction;
     use crate::app::Command;
 
@@ -312,11 +303,11 @@ mod tests {
     fn the_two_refusals_carry_codes_of_their_own() {
         let untaught = asked(&Command::Seed);
         let never = asked(&Command::Walkthrough { item: None });
-        // Asked through `why` rather than through `matches!`, which expands to a match
+        // Read with `reasoning` rather than with `matches!`, which expands to a match
         // whose second arm is only taken when the assertion is about to fail — a region
         // no passing run enters and one the coverage gate counts.
         assert!(
-            never.rehearsal.why().is_some(),
+            reasoning(never.rehearsal).is_some(),
             "a walkthrough should refuse the flag outright"
         );
         assert_ne!(
@@ -350,6 +341,20 @@ mod tests {
             .rehearsal
                 == Rehearsal::Untaught
         );
+    }
+
+    /// The reason a verdict gives, where it gives one.
+    ///
+    /// Here rather than on `Rehearsal` because here is the only place that asks. A
+    /// verdict carries its reason and `permitted` reads it out of the pattern, so an
+    /// accessor beside it was a second way to ask one question — and the shipped
+    /// build never called it, which is a whole function's worth of lines nothing
+    /// enters and the coverage gate counts.
+    fn reasoning(rehearsal: Rehearsal) -> Option<&'static str> {
+        match rehearsal {
+            Rehearsal::Cannot(why) => Some(why),
+            Rehearsal::Reads | Rehearsal::Reports | Rehearsal::Untaught => None,
+        }
     }
 
     /// A trace, asked with and without a live search.
@@ -397,15 +402,293 @@ mod tests {
         ] {
             let asked = asked(&command);
             assert!(
-                asked.rehearsal.why().is_some() == refuses,
+                reasoning(asked.rehearsal).is_some() == refuses,
                 "{command:?} was read as the wrong one of the two"
             );
             // The reason reaches the operator rather than staying in the source, which
             // is the difference between refusing and refusing usefully.
-            if let Some(why) = asked.rehearsal.why() {
+            if let Some(why) = reasoning(asked.rehearsal) {
                 assert!(refused(&asked, why).meaning.contains(why), "{command:?}");
             }
         }
+    }
+
+    /// Every command, against the answer a rehearsal of it gives.
+    ///
+    /// The match is exhaustive, so the compiler already refuses a new command with no
+    /// verdict. What it cannot refuse is a *wrong* verdict, or a pattern catching more
+    /// than it means — and an arm nothing drives is an arm whose pattern could be wrong
+    /// in either direction with nothing to say so. Forty-five of these had never been
+    /// read by anything.
+    ///
+    /// Here rather than beside the integration test that dispatches them, and the
+    /// reason is not tidiness. This file is compiled twice — once into the binary and
+    /// once for its own tests — and a table living in another crate leaves this copy's
+    /// arms unentered however thoroughly the other copy is driven. The coverage gate
+    /// counts both, which is how a module every line of which is reached came to read
+    /// as ninety-four per cent.
+    ///
+    /// The sub-patterns are listed beside the variants they split, because the split is
+    /// where the mistake lives: `Support { write: false }` and `Support { .. }` are one
+    /// word to an operator and two arms here.
+    fn every_verdict() -> Vec<(Command, Rehearsal)> {
+        vec![
+            // Reads. Nothing here reaches for anything it could put back.
+            (Command::Version, Rehearsal::Reads),
+            (Command::Forms, Rehearsal::Reads),
+            (
+                Command::Preview {
+                    forms: vec!["library".to_owned()],
+                },
+                Rehearsal::Reads,
+            ),
+            (
+                Command::ConfigGet {
+                    key: "DATA_ROOT".to_owned(),
+                },
+                Rehearsal::Reads,
+            ),
+            (Command::ConfigShow, Rehearsal::Reads),
+            (Command::History, Rehearsal::Reads),
+            (Command::Ps { forms: Vec::new() }, Rehearsal::Reads),
+            (Command::Stuck, Rehearsal::Reads),
+            (Command::FrontDoor, Rehearsal::Reads),
+            (
+                Command::Explain {
+                    word: "seeding".to_owned(),
+                },
+                Rehearsal::Reads,
+            ),
+            (Command::Glossary, Rehearsal::Reads),
+            (Command::Clients, Rehearsal::Reads),
+            (Command::Outbound, Rehearsal::Reads),
+            (Command::Stored, Rehearsal::Reads),
+            (Command::Archives, Rehearsal::Reads),
+            (Command::Migrate(MigrateAction::Survey), Rehearsal::Reads),
+            (Command::Credentials(Asking::Read), Rehearsal::Reads),
+            (
+                Command::Credentials(Asking::Reveal {
+                    credential: "qbittorrent".to_owned(),
+                    confirmed: true,
+                }),
+                Rehearsal::Reads,
+            ),
+            (Command::Hosting(Keeping::Read), Rehearsal::Reads),
+            (Command::Setup(SetupAction::Where), Rehearsal::Reads),
+            (bundling(false), Rehearsal::Reads),
+            (tracing(false), Rehearsal::Reads),
+            (examining(false), Rehearsal::Reads),
+            // The three that refuse the flag for good, each with its own reason.
+            (tracing(true), Rehearsal::Cannot(A_SEARCH_IS_THE_ANSWER)),
+            (
+                examining(true),
+                Rehearsal::Cannot(THE_CHECK_IS_THE_DISRUPTION),
+            ),
+            (
+                Command::Walkthrough { item: None },
+                Rehearsal::Cannot(THE_WALK_IS_THE_OBSERVATION),
+            ),
+            // Reports. Each builds what it would have filled in and stops before the
+            // step it cannot take back.
+            (Command::Up { forms: Vec::new() }, Rehearsal::Reports),
+            (
+                Command::Start {
+                    forms: Vec::new(),
+                    services: Vec::new(),
+                },
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Down {
+                    forms: Vec::new(),
+                    wait: Waiting::Never,
+                },
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Halt {
+                    forms: Vec::new(),
+                    services: Vec::new(),
+                },
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Switch {
+                    forms: vec!["library".to_owned()],
+                },
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Restart {
+                    forms: Vec::new(),
+                    services: Vec::new(),
+                },
+                Rehearsal::Reports,
+            ),
+            (Command::Pull { forms: Vec::new() }, Rehearsal::Reports),
+            (
+                Command::ConfigSet(Setting::to("DATA_ROOT", "/srv/library").agreed(true)),
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Quality(QualityAction::Set {
+                    preset: crate::quality::Preset::Maximum,
+                    media_type: None,
+                    confirm: true,
+                }),
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Alerts(AlertAction::Set(crate::alert::Appetite::Everything)),
+                Rehearsal::Reports,
+            ),
+            (
+                Command::QualityMusic {
+                    format: crate::audio::Format::Lossless,
+                },
+                Rehearsal::Reports,
+            ),
+            (Command::Household { member: None }, Rehearsal::Reports),
+            (Command::Allowing(Chosen::default()), Rehearsal::Reports),
+            (
+                Command::Deciding(Decision {
+                    request: 1,
+                    answer: crate::app::Answer::LetThrough,
+                }),
+                Rehearsal::Reports,
+            ),
+            (Command::Expiring(Arranged::After(30)), Rehearsal::Reports),
+            (
+                Command::Hosting(Keeping::Install {
+                    what: crate::app::Hostable::Watch,
+                    forms: Vec::new(),
+                }),
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Invite {
+                    name: "ana".to_owned(),
+                    allowance: crate::app::Allowance::default(),
+                },
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Reissue {
+                    name: "ana".to_owned(),
+                },
+                Rehearsal::Reports,
+            ),
+            (Command::Forget { confirm: true }, Rehearsal::Reports),
+            (Command::Space { confirm: true }, Rehearsal::Reports),
+            (
+                Command::StopSeeding {
+                    download: "anything".to_owned(),
+                    agreement: None,
+                },
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Bandwidth(BandwidthAsked {
+                    down: Some("20".to_owned()),
+                    ..BandwidthAsked::default()
+                }),
+                Rehearsal::Reports,
+            ),
+            (
+                Command::Uninstall(Removing {
+                    tier: crate::uninstall::Tier::Configuration,
+                    confirm: true,
+                    agreement: None,
+                    waiting: Waiting::Never,
+                }),
+                Rehearsal::Reports,
+            ),
+            // Untaught. Each changes something and refuses the flag until it has been
+            // taught to say what it would change.
+            (examining_accepting(), Rehearsal::Untaught),
+            (Command::Watch { forms: Vec::new() }, Rehearsal::Untaught),
+            (
+                Command::Migrate(MigrateAction::Act {
+                    mode: crate::migration::mode::Mode::Adopt,
+                    confirmed: true,
+                }),
+                Rehearsal::Untaught,
+            ),
+            (
+                Command::Remove {
+                    name: "ana".to_owned(),
+                    confirm: true,
+                },
+                Rehearsal::Untaught,
+            ),
+            (
+                Command::QualityUpgrade { confirm: true },
+                Rehearsal::Untaught,
+            ),
+            (
+                Command::Repair {
+                    consent: crate::app::repair::Consent::Standing,
+                    disruptive: false,
+                },
+                Rehearsal::Untaught,
+            ),
+            (Command::Undo { run: None }, Rehearsal::Untaught),
+            (
+                Command::Credentials(Asking::Rotate {
+                    credential: "qbittorrent".to_owned(),
+                }),
+                Rehearsal::Untaught,
+            ),
+            (Command::SelfUpdate { to: None }, Rehearsal::Untaught),
+            (Command::Seed, Rehearsal::Untaught),
+            (Command::Adopt, Rehearsal::Untaught),
+            (Command::Reset { confirm: true }, Rehearsal::Untaught),
+            (Command::Setup(SetupAction::Apply), Rehearsal::Untaught),
+            (
+                Command::Update(crate::app::update::Asked {
+                    service: None,
+                    confirm: true,
+                    wait: Waiting::Never,
+                }),
+                Rehearsal::Untaught,
+            ),
+            (Command::Backup { service: None }, Rehearsal::Untaught),
+            (bundling(true), Rehearsal::Untaught),
+            (
+                Command::Restore {
+                    archive: crate::app::restore::Kept::Named("anything".to_owned()),
+                    repoint: false,
+                    consent: crate::app::restore::Consent::Standing,
+                },
+                Rehearsal::Untaught,
+            ),
+        ]
+    }
+
+    /// A doctor run acknowledging a finding, which is the third of its three arms.
+    fn examining_accepting() -> Command {
+        Command::Doctor {
+            narrowing: crate::doctor::Narrowing::Suite,
+            disruptive: false,
+            accept: Some("storage.one-filesystem".to_owned()),
+        }
+    }
+
+    /// Every command gives the verdict this module says it gives.
+    #[test]
+    fn every_command_is_answered_the_way_the_table_says() {
+        let mut wrong = Vec::new();
+
+        for (command, expected) in every_verdict() {
+            if asked(&command).rehearsal != expected {
+                wrong.push(format!("{command:?}"));
+            }
+        }
+
+        assert!(
+            wrong.is_empty(),
+            "these were read as a verdict other than the one declared for them: {wrong:?}"
+        );
     }
 
     /// The same split, on the three other commands that carry a read and a write under
