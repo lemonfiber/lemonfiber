@@ -98,6 +98,8 @@ what to do about it, is written for operators at
 - `RATE-4`
 - `READ-1`
 - `READ-2`
+- `REHEARSE-1`
+- `REHEARSE-2`
 - `REISSUE-1`
 - `REISSUE-2`
 - `REISSUE-3`

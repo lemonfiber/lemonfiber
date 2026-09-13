@@ -58,6 +58,7 @@ mod reconfiguring;
 mod record;
 pub mod recover;
 mod refusals;
+pub mod rehearsal;
 mod remove;
 pub mod repair;
 mod repairs;
@@ -87,6 +88,7 @@ pub use command::{
 mod outcome;
 pub use ctx::Ctx;
 pub use outcome::Outcome;
+pub use rehearsal::{asked, permitted, Asked, Rehearsal};
 pub use setup::SetupAction;
 
 // The log-following reads a surface streams from live outside dispatch, so they are the
@@ -251,8 +253,19 @@ async fn mended(
 /// # Errors
 ///
 /// Returns the [`Problem`] a surface should render when the command could not
-/// be carried out.
+/// be carried out, and the [`Problem`] that says so where a rehearsal was asked
+/// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
+    rehearsal::permitted(&command, ctx)?;
+    routed(command, ctx).await
+}
+
+/// The table itself: every command, and where it goes.
+///
+/// Split from [`dispatch`] so that what a rehearsal means is asked once, above the
+/// table, rather than in an arm somebody can add without adding. Private, so this is
+/// reachable only through the question.
+async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),

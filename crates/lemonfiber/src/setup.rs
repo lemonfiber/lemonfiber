@@ -139,6 +139,13 @@ pub(crate) const fn bare_run(interactive: bool) -> Bare {
 /// The greeting itself, once there is somewhere to keep files and something to
 /// hold the conversation across.
 pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> ExitCode {
+    // Before anything is read, because every branch below this one leads somewhere
+    // that applies answers — including the unfinished-setup branch, which used to be
+    // taken first and walked a rehearsal straight into writing settings.
+    if ctx.dry_run {
+        return nothing_to_rehearse();
+    }
+
     // A stopped apply or a quit mid-question is unfinished setup, not a fresh or a
     // finished machine, and must be caught before the configured-yet check below —
     // an interrupted apply leaves half-written settings that check would read as
@@ -157,15 +164,6 @@ pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> 
     }
 
     say!("No configuration found.");
-
-    // Setup applies answers, so there is nothing for --dry-run to rehearse. Said
-    // here, before the offer, rather than asking a question whose yes could not be
-    // honoured — the same refusal `setup` gives, and at the same point in the walk.
-    if ctx.dry_run {
-        complain!("Setup applies your answers, so it has nothing to rehearse.");
-        complain!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
-        return ExitCode::from(USAGE);
-    }
 
     if !surface.interactive() {
         // No one is here to take the offer, so it is stated rather than asked —
@@ -193,6 +191,19 @@ fn confirm_setup(surface: &dyn Surface) -> bool {
     )
 }
 
+/// What setup says when it is asked to rehearse.
+///
+/// Setup is the one conversation that *is* the change: every answer is applied, and
+/// what it would apply is what the operator has not typed yet. The dispatcher refuses
+/// the flag on `Command::Setup` for the same reason; this is the same refusal said on
+/// the path the terminal takes, which does not go through the dispatcher because a
+/// conversation is not a value that arrives once.
+pub(crate) fn nothing_to_rehearse() -> ExitCode {
+    complain!("Setup applies your answers, so it has nothing to rehearse.");
+    complain!("Run `{PRODUCT} setup` without --dry-run when you are ready.");
+    ExitCode::from(USAGE)
+}
+
 /// What a previous run left decides what this one does — the whole of setup's
 /// routing, once there is somewhere to keep files and something to ask across.
 pub(crate) async fn setting_up(
@@ -201,6 +212,12 @@ pub(crate) async fn setting_up(
     surface: &dyn Surface,
     flags: SetupFlags,
 ) -> ExitCode {
+    // The funnel both entry points reach, so the refusal is here as well as at the
+    // greeting: a run given flags on the command line never passes the greeting at
+    // all, and would otherwise apply them.
+    if ctx.dry_run {
+        return nothing_to_rehearse();
+    }
     // What a previous run left decides what this one does. An apply that stopped
     // part-way is offered back before anything else — otherwise the configured-yet
     // check below would see its half-written settings and call the machine done.
@@ -746,6 +763,32 @@ pub(crate) mod tests {
         rehearsing.dry_run = true;
         let code = greeting(rehearsing, &paths, &Scripted::saying(true, &[])).await;
         assert_ne!(shown(code), success());
+    }
+
+    /// A run given flags never passes the greeting, so the refusal that lived there
+    /// was no refusal at all for `lemonfiber setup --data-root … --dry-run`, nor for
+    /// a rehearsal picking up a setup somebody had stopped part-way.
+    #[tokio::test]
+    async fn a_rehearsed_setup_given_flags_applies_none_of_them() {
+        let paths = scratch("rehearsed-flags");
+        let mut rehearsing = ctx();
+        rehearsing.dry_run = true;
+        let code = setting_up(
+            rehearsing,
+            &paths,
+            &Scripted::saying(false, &[]),
+            SetupFlags::none(),
+        )
+        .await;
+        assert_ne!(shown(code), success());
+
+        // The path is read into the message before the assertion rather than as an
+        // argument to it. An argument is only evaluated when the assertion fails, which
+        // is a region no passing run enters and one the coverage gate counts.
+        let env = paths.env_file();
+        let wrote = format!("a rehearsed setup wrote {}", env.display());
+
+        assert!(!env.exists(), "{wrote}");
     }
 
     #[tokio::test]
