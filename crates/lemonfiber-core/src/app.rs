@@ -120,6 +120,9 @@ pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
 /// Fetching images is switched off, so there was nothing to fetch with.
 pub const REGISTRY_REFUSED: Code = Code::new("LIFE-4");
 
+/// Raised when the stack's own location is not on the machine being operated.
+pub const ABSENT_THERE: Code = Code::new("LIFE-5");
+
 /// Ask the engine to act on a set of services, which three commands do identically.
 ///
 /// Named apart because they differ only in the action, and three arms that said the same

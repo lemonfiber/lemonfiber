@@ -18,6 +18,7 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::ports::docker::Target;
 use crate::ports::process::Failure;
 use crate::ports::Runner;
 
@@ -29,6 +30,9 @@ pub const DAEMON_DOWN: Code = Code::new("ENV-2");
 
 /// Raised when the Compose plugin is missing or too old to drive.
 pub const COMPOSE_UNUSABLE: Code = Code::new("ENV-3");
+
+/// Raised when this machine and the daemon speak different Docker API generations.
+pub const API_MISMATCH: Code = Code::new("ENV-4");
 
 /// The oldest Compose the driver is willing to build against.
 ///
@@ -42,12 +46,29 @@ const MINIMUM_COMPOSE: (u32, u32, u32) = (2, 0, 0);
 /// to drive it.
 pub struct EnvironmentCheck {
     runner: Arc<dyn Runner>,
+    target: Target,
+}
+
+/// What the client said when it answered.
+///
+/// Three numbers from one call rather than one from each of three, because the
+/// client connects to answer any of them and a second connection is a second
+/// moment — which is how two versions come to be reported from different daemons
+/// and compared as though they were not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Answered {
+    /// What the daemon calls its own release.
+    server: String,
+    /// The API generation this machine's client speaks.
+    ours: String,
+    /// The API generation the daemon speaks.
+    theirs: String,
 }
 
 /// What running the Docker client revealed about the engine.
 enum Engine {
     /// The client answered and named its daemon's version.
-    Up(String),
+    Up(Answered),
     /// The client is not installed.
     Absent,
     /// The client is present but its daemon did not answer.
@@ -57,22 +78,35 @@ enum Engine {
 }
 
 impl EnvironmentCheck {
-    /// A check over the given way of running programs.
+    /// A check over the given way of running programs, against this machine's engine.
     #[must_use]
     pub fn new(runner: Arc<dyn Runner>) -> Self {
-        Self { runner }
+        Self::reaching(runner, Target::local())
+    }
+
+    /// A check over the given way of running programs, against the engine this run
+    /// operates.
+    ///
+    /// The endpoint is named on the invocation rather than left to the environment,
+    /// for the reason the Compose invocation names it: a report about the API
+    /// generations in play has to be about the daemon the stack is actually run
+    /// against, and a client left to work that out for itself is a second opinion
+    /// about which machine this is.
+    #[must_use]
+    pub fn reaching(runner: Arc<dyn Runner>, target: Target) -> Self {
+        Self { runner, target }
     }
 
     /// Ask the Docker client for its daemon's version, and read the answer for
     /// which of the four things it means.
     async fn engine(&self) -> Engine {
-        match self.runner.run(&docker_version()).await {
+        match self.runner.run(&docker_version(&self.target)).await {
             Err(Failure::NotFound { .. }) => Engine::Absent,
             Err(Failure::Unusable { reason, .. }) => Engine::Unusable(reason),
             Ok(output) => {
-                let version = output.stdout.trim();
-                if output.succeeded() && !version.is_empty() {
-                    Engine::Up(version.to_owned())
+                let said = answered(&output.stdout);
+                if output.succeeded() && !said.server.is_empty() {
+                    Engine::Up(said)
                 } else {
                     // A client that ran and yet named no server is a client whose
                     // daemon did not answer; its own words on stderr are the
@@ -129,24 +163,102 @@ async fn ran(check: &EnvironmentCheck) -> Vec<Finding> {
         Engine::Up(_) | Engine::DaemonDown(_) => check.compose().await,
     };
 
+    // Read before the engine finding takes the answer, because both are about the
+    // same one call: asking the client twice would be asking two daemons on the day
+    // it matters.
+    let api = api_verdict(&engine);
+
     vec![
         finding(
             "environment.engine",
             "Docker engine",
             engine_verdict(engine),
         ),
+        finding("environment.api", "Docker API version", api),
         finding("environment.compose", "Docker Compose", compose),
     ]
 }
 
-/// The command that asks the client for the version of the daemon it fronts.
+/// What the client said, split into the three numbers it was asked for.
+///
+/// A client that answered with fewer fields than it was asked for — an older one
+/// that does not know a template key — leaves the rest empty, which reads as not
+/// stated rather than as zero.
+fn answered(stdout: &str) -> Answered {
+    let mut fields = stdout.trim().split(SEPARATOR);
+    let mut next = || fields.next().unwrap_or_default().trim().to_owned();
+    Answered {
+        server: next(),
+        ours: next(),
+        theirs: next(),
+    }
+}
+
+/// Whether the two ends speak the same generation of the engine's API.
+///
+/// Reported rather than refused. The client and this build both negotiate down to
+/// whatever the daemon offers, so a mismatch is a difference in what is available
+/// rather than a thing that is broken — and the operator hunting a feature that is
+/// not there needs the two numbers in front of them, which is the whole of what
+/// this finding is for.
+fn api_verdict(engine: &Engine) -> Verdict {
+    let Engine::Up(said) = engine else {
+        return Verdict::Skipped {
+            reason: "the daemon did not answer, so neither version could be read".to_owned(),
+        };
+    };
+    if said.ours.is_empty() || said.theirs.is_empty() {
+        return unverified("the Docker client did not report both API versions");
+    }
+    if said.ours == said.theirs {
+        return Verdict::Pass {
+            note: Some(said.theirs.clone()),
+        };
+    }
+    Verdict::Warn(mismatch(&said.ours, &said.theirs))
+}
+
+/// The problem for two ends that agreed on a generation neither of them prefers.
+///
+/// Both numbers, always. One of them is useless: an operator told the daemon speaks
+/// something older has no idea whether that is one release behind or six, and the
+/// pair is the only form of this that can be acted on.
+fn mismatch(ours: &str, theirs: &str) -> Problem {
+    Problem::new(
+        API_MISMATCH,
+        Severity::Warning,
+        format!("this machine speaks Docker API {ours} and the daemon speaks {theirs}"),
+        "Both ends settle on the older of the two, so everything works and anything newer than that generation is simply not available. It is worth knowing about when a feature that should be there is not, and it is ordinary where the two machines were updated at different times.",
+        Remedy::new("Bring both to the same Docker release, or carry on with the older set"),
+    )
+    .in_state(State::Guided)
+}
+
+/// What separates the three fields the client is asked for.
+///
+/// A character no version string carries, so splitting cannot take a version apart.
+const SEPARATOR: char = '|';
+
+/// What the client is asked to print: the daemon's release, then the API generation
+/// at each end.
+const FORMAT: &str = "{{.Server.Version}}|{{.Client.APIVersion}}|{{.Server.APIVersion}}";
+
+/// The command that asks the client about the daemon it fronts.
 ///
 /// The server field is the point: the client prints its own version without a
-/// daemon, and only names the server once one has answered.
-fn docker_version() -> Vec<String> {
-    ["docker", "version", "--format", "{{.Server.Version}}"]
-        .map(str::to_owned)
-        .to_vec()
+/// daemon, and only names the server once one has answered. The two API fields ride
+/// along because they are the same connection — and the daemon they describe has to
+/// be the one the stack is run against, which is why the endpoint is named here.
+fn docker_version(target: &Target) -> Vec<String> {
+    let mut argv = vec!["docker".to_owned()];
+    if let Some(endpoint) = target.endpoint() {
+        argv.push("--host".to_owned());
+        argv.push(endpoint.to_owned());
+    }
+    argv.push("version".to_owned());
+    argv.push("--format".to_owned());
+    argv.push(FORMAT.to_owned());
+    argv
 }
 
 /// The command that asks the Compose plugin for its bare version number.
@@ -159,8 +271,8 @@ fn compose_version() -> Vec<String> {
 /// The engine finding, from what running the client revealed.
 fn engine_verdict(engine: Engine) -> Verdict {
     match engine {
-        Engine::Up(version) => Verdict::Pass {
-            note: Some(version),
+        Engine::Up(said) => Verdict::Pass {
+            note: Some(said.server),
         },
         Engine::Absent => Verdict::Fail(
             Problem::new(
@@ -276,8 +388,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        parse_version, Category, Check, EnvironmentCheck, Verdict, COMPOSE_UNUSABLE, DAEMON_DOWN,
-        DOCKER_ABSENT,
+        parse_version, Category, Check, EnvironmentCheck, Verdict, API_MISMATCH, COMPOSE_UNUSABLE,
+        DAEMON_DOWN, DOCKER_ABSENT,
     };
     use crate::ports::process::{Failure, Output, Runner};
 
@@ -448,6 +560,85 @@ mod tests {
         assert!(matches!(
             verdict(&findings, "environment.compose"),
             Some(Verdict::Skipped { reason }) if reason.contains("would not start")
+        ));
+    }
+
+    /// Both numbers, from the one call, whether they agree or not.
+    ///
+    /// The pair is the point. An operator told the daemon speaks something older has
+    /// no idea whether that is one release behind or six, and cannot act on it.
+    #[tokio::test]
+    async fn the_two_ends_api_versions_are_both_reported() {
+        let agreed = Bench::default()
+            .docker(Ok(spoke("27.1.1|1.47|1.47\n")))
+            .compose(Ok(spoke("v2.32.1")));
+        let findings = run(agreed).await;
+        assert!(
+            matches!(
+                verdict(&findings, "environment.api"),
+                Some(Verdict::Pass { note: Some(note) }) if note == "1.47"
+            ),
+            "{:?}",
+            verdict(&findings, "environment.api")
+        );
+        // The engine finding still shows the daemon's own release, unchanged by the
+        // two fields that now ride along with it.
+        assert!(matches!(
+            verdict(&findings, "environment.engine"),
+            Some(Verdict::Pass { note: Some(note) }) if note == "27.1.1"
+        ));
+
+        let apart = Bench::default()
+            .docker(Ok(spoke("24.0.7|1.51|1.43")))
+            .compose(Ok(spoke("v2.32.1")));
+        let findings = run(apart).await;
+        let said = verdict(&findings, "environment.api");
+        assert!(
+            matches!(
+                said,
+                Some(Verdict::Warn(problem))
+                    if problem.code == API_MISMATCH
+                        && problem.summary.contains("1.51")
+                        && problem.summary.contains("1.43")
+            ),
+            "both versions are named: {said:?}"
+        );
+    }
+
+    /// A mismatch is a difference in what is available rather than a fault, so the
+    /// run is not failed by it.
+    #[tokio::test]
+    async fn a_mismatch_is_reported_without_failing_the_run() {
+        let findings = run(Bench::default()
+            .docker(Ok(spoke("24.0.7|1.51|1.43")))
+            .compose(Ok(spoke("v2.32.1"))))
+        .await;
+        assert!(!matches!(
+            verdict(&findings, "environment.api"),
+            Some(Verdict::Fail(_))
+        ));
+    }
+
+    /// A client that names no API version at all leaves the question open rather
+    /// than answering it with an empty string.
+    #[tokio::test]
+    async fn a_client_that_states_no_api_version_settles_nothing() {
+        let findings = run(Bench::default()
+            .docker(Ok(spoke("27.1.1")))
+            .compose(Ok(spoke("v2.32.1"))))
+        .await;
+        assert!(matches!(
+            verdict(&findings, "environment.api"),
+            Some(Verdict::Unverified { .. })
+        ));
+
+        let down = run(Bench::default()
+            .docker(Ok(refused("Cannot connect to the Docker daemon")))
+            .compose(Ok(spoke("v2.32.1"))))
+        .await;
+        assert!(matches!(
+            verdict(&down, "environment.api"),
+            Some(Verdict::Skipped { .. })
         ));
     }
 

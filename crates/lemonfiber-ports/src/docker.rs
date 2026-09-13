@@ -15,6 +15,10 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
+mod target;
+
+pub use target::{chosen, Choice, Origin, Reach, Target, DEFAULT_CONTEXT};
+
 /// What a container is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Lifecycle {
@@ -192,6 +196,54 @@ pub enum Failure {
         /// The container that was looked for.
         name: String,
     },
+    /// The host the endpoint names could not be turned into an address.
+    #[error("`{host}` could not be found on the network: {reason}")]
+    Unresolved {
+        /// The host as it may be shown.
+        host: String,
+        /// The resolver's own words.
+        reason: String,
+    },
+    /// The host was found and would not accept a connection.
+    #[error("`{host}` refused the connection: {reason}")]
+    Refused {
+        /// The host as it may be shown.
+        host: String,
+        /// The transport's own words.
+        reason: String,
+    },
+    /// The host was reached and would not accept the login.
+    #[error("`{host}` did not accept the SSH login: {reason}")]
+    Rejected {
+        /// The host as it may be shown.
+        host: String,
+        /// The client's own words.
+        reason: String,
+    },
+    /// The endpoint names a transport this build cannot drive.
+    #[error("`{endpoint}` is not an endpoint lemonfiber can reach")]
+    Unsupported {
+        /// The endpoint as it may be shown.
+        endpoint: String,
+    },
+    /// A Docker context was named and this machine records no such context.
+    #[error("no Docker context named `{name}` is recorded on this machine")]
+    NoSuchContext {
+        /// The context that was asked for.
+        name: String,
+    },
+    /// The remote host did not answer, in a way none of the three above describes.
+    ///
+    /// Its own variant rather than the local engine's, because the local one's
+    /// remedy is to start Docker on this machine — which, for an operator whose
+    /// laptop is talking to a server, is running perfectly.
+    #[error("`{host}` did not answer: {reason}")]
+    Unanswered {
+        /// The host as it may be shown.
+        host: String,
+        /// The transport's own words.
+        reason: String,
+    },
 }
 
 /// Raised when the container engine cannot be reached.
@@ -200,25 +252,160 @@ pub const ENGINE_UNREACHABLE: Code = Code::new("DOCKER-1");
 /// Raised when a container that should exist does not.
 pub const NO_SUCH_CONTAINER: Code = Code::new("DOCKER-2");
 
+/// Raised when the host an endpoint names cannot be found on the network.
+pub const HOST_UNRESOLVED: Code = Code::new("DOCKER-3");
+
+/// Raised when the host is found and refuses the connection.
+pub const HOST_REFUSED: Code = Code::new("DOCKER-4");
+
+/// Raised when the host is reached and will not accept the SSH login.
+pub const LOGIN_REJECTED: Code = Code::new("DOCKER-5");
+
+/// Raised when an endpoint names a transport this build cannot drive.
+pub const ENDPOINT_UNSUPPORTED: Code = Code::new("DOCKER-6");
+
+/// Raised when a named Docker context is not one this machine records.
+pub const UNKNOWN_CONTEXT: Code = Code::new("DOCKER-7");
+
+/// Raised when a remote host does not answer for a reason nothing here recognises.
+pub const HOST_SILENT: Code = Code::new("DOCKER-8");
+
+/// What to tell an operator whose engine is not answering at all.
+///
+/// Its own function because the arm that dispatches has to stay a dispatch: six
+/// problems written inline is a function longer than one may be here, and the
+/// distinctions between them are the whole point of there being six.
+fn down(reason: &str) -> Problem {
+    Problem::new(
+        ENGINE_UNREACHABLE,
+        Severity::Error,
+        "The container engine is not running",
+        "Nothing about your stack can be read or changed while the engine is down, so this is the first thing to fix.",
+        Remedy::new("Start Docker Desktop, or the docker service on Linux"),
+    )
+    .in_state(State::Guided)
+    .with_detail(reason.to_owned())
+}
+
+/// What to tell an operator who asked about a container that is not there.
+fn absent(name: &str) -> Problem {
+    Problem::new(
+        NO_SUCH_CONTAINER,
+        Severity::Warning,
+        format!("{name} is not running"),
+        "The service was expected to be up. It may have stopped on its own, or never been started.",
+        Remedy::new("Start the form that includes it").with_detail("lemonfiber ps"),
+    )
+}
+
+/// What to tell an operator whose host name went nowhere.
+///
+/// Kept apart from the refusal beside it because the two are different problems
+/// with different remedies, and folding them together is how both come to be
+/// reported as the local Docker Desktop being stopped — which is wrong for each of
+/// them and unactionable for both.
+fn unresolved(host: &str, reason: &str) -> Problem {
+    Problem::new(
+        HOST_UNRESOLVED,
+        Severity::Error,
+        format!("{host} could not be found on the network"),
+        "The name was looked up and nothing answered to it, so no connection was attempted. This is a name problem rather than a Docker one: the daemon may be running perfectly on a machine this one cannot name.",
+        Remedy::new("Check the host name, and that this machine can resolve it")
+            .with_detail("Try the host's address in place of its name"),
+    )
+    .in_state(State::Guided)
+    .with_detail(reason.to_owned())
+}
+
+/// What to tell an operator whose host answered by declining.
+fn declined(host: &str, reason: &str) -> Problem {
+    Problem::new(
+        HOST_REFUSED,
+        Severity::Error,
+        format!("{host} refused the connection"),
+        "The machine was found and answered by declining, so the name is right and something about the endpoint is not. Either Docker is not running over there, or it is not listening where this endpoint says it is.",
+        Remedy::new("Check Docker is running on that machine, and on the port the endpoint names"),
+    )
+    .in_state(State::Guided)
+    .with_detail(reason.to_owned())
+}
+
+/// What to tell an operator whose key the other machine would not take.
+fn rejected(host: &str, reason: &str) -> Problem {
+    Problem::new(
+        LOGIN_REJECTED,
+        Severity::Error,
+        format!("{host} did not accept the SSH login"),
+        "The machine was reached and the login was refused, so this is about keys and accounts rather than about Docker. lemonfiber uses the SSH configuration you already have and makes no keys of its own.",
+        Remedy::new("Check the login works on its own, then try again")
+            .with_detail("Connect to the host with ssh and read what it says"),
+    )
+    .in_state(State::Guided)
+    .with_detail(reason.to_owned())
+}
+
+/// What to tell an operator whose endpoint names a transport this cannot drive.
+///
+/// Refused rather than attempted, and the reason is the whole point of this type:
+/// an endpoint the reads cannot use is one the writes must not use either, or the
+/// operator is shown one machine and changes another.
+fn unsupported(endpoint: &str) -> Problem {
+    Problem::new(
+        ENDPOINT_UNSUPPORTED,
+        Severity::Error,
+        format!("{endpoint} is not an endpoint lemonfiber can reach"),
+        "lemonfiber drives the engine over a local socket, over plain TCP, or over SSH. Nothing was read and nothing was changed, because reading one machine while writing to another is worse than not reaching either.",
+        Remedy::new("Point DOCKER_HOST at an ssh:// or tcp:// endpoint, or at a local socket"),
+    )
+    .in_state(State::Guided)
+}
+
+/// What to tell an operator whose context this machine has never heard of.
+///
+/// Refused rather than quietly answered with the local daemon. A context name is
+/// usually a typo when it is wrong, and the fall back Docker's own tooling does not
+/// make would hand an operator who meant the server a report about their laptop.
+fn unknown(name: &str) -> Problem {
+    Problem::new(
+        UNKNOWN_CONTEXT,
+        Severity::Error,
+        format!("there is no Docker context named {name} on this machine"),
+        "A context was named and this machine records no endpoint under that name. Nothing was read and nothing was changed, because falling back to the local daemon would answer about this machine while you were asking about another one.",
+        Remedy::new("List the contexts this machine has, and name one of those")
+            .with_detail("docker context ls"),
+    )
+    .in_state(State::Guided)
+}
+
+/// What to tell an operator whose remote host said nothing this can read.
+///
+/// The honest end of the list. It names the host and quotes the transport, which
+/// is everything that is actually known, and it does not send somebody to start a
+/// Docker that is already running on the wrong machine.
+fn silent(host: &str, reason: &str) -> Problem {
+    Problem::new(
+        HOST_SILENT,
+        Severity::Error,
+        format!("{host} did not answer"),
+        "The endpoint was reached for and nothing usable came back. What the transport said is below; it is the most specific thing known about this, and it names the machine rather than this one.",
+        Remedy::new("Check the other machine is up and its Docker is running")
+            .with_detail("docker --host <endpoint> version"),
+    )
+    .in_state(State::Guided)
+    .with_detail(reason.to_owned())
+}
+
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {
         match self {
-            Self::Unreachable { reason } => Problem::new(
-                ENGINE_UNREACHABLE,
-                Severity::Error,
-                "The container engine is not running",
-                "Nothing about your stack can be read or changed while the engine is down, so this is the first thing to fix.",
-                Remedy::new("Start Docker Desktop, or the docker service on Linux"),
-            )
-            .in_state(State::Guided)
-            .with_detail(reason.clone()),
-            Self::NoSuchContainer { name } => Problem::new(
-                NO_SUCH_CONTAINER,
-                Severity::Warning,
-                format!("{name} is not running"),
-                "The service was expected to be up. It may have stopped on its own, or never been started.",
-                Remedy::new("Start the form that includes it").with_detail("lemonfiber ps"),
-            ),
+            Self::Unreachable { reason } => down(reason),
+            Self::NoSuchContainer { name } => absent(name),
+            Self::Unresolved { host, reason } => unresolved(host, reason),
+            Self::Refused { host, reason } => declined(host, reason),
+            Self::Rejected { host, reason } => rejected(host, reason),
+            Self::Unsupported { endpoint } => unsupported(endpoint),
+            Self::NoSuchContext { name } => unknown(name),
+            Self::Unanswered { host, reason } => silent(host, reason),
         }
     }
 }
@@ -349,6 +536,74 @@ mod tests {
         .problem();
         assert_eq!(problem.detail.as_deref(), Some("connection refused"));
         assert!(!problem.remedies.is_empty());
+    }
+
+    /// The three ways a remote engine refuses stay three answers.
+    ///
+    /// Folded together they all read as the local Docker Desktop being stopped,
+    /// which is wrong for a name that does not resolve, wrong for a port nothing is
+    /// listening on, and wrong for a key the other machine will not take. Each is
+    /// checked for its own code, its own remedy, and for naming the host — the one
+    /// thing all three have in common and the one the operator most needs.
+    #[test]
+    fn each_way_of_failing_to_reach_a_remote_engine_keeps_its_own_answer() {
+        let failures = [
+            Failure::Unresolved {
+                host: "ssh://nas.local".to_owned(),
+                reason: "nodename nor servname provided".to_owned(),
+            },
+            Failure::Refused {
+                host: "tcp://nas.local:2375".to_owned(),
+                reason: "connection refused".to_owned(),
+            },
+            Failure::Rejected {
+                host: "ssh://media@nas.local".to_owned(),
+                reason: "Permission denied (publickey)".to_owned(),
+            },
+        ];
+
+        let mut codes = Vec::new();
+        for failure in &failures {
+            let problem = failure.problem();
+            assert!(
+                problem.summary.contains("nas.local"),
+                "the host is named: {}",
+                problem.summary
+            );
+            assert!(!problem.remedies.is_empty(), "{:?}", problem.code);
+            assert!(
+                !problem
+                    .remedies
+                    .iter()
+                    .any(|remedy| remedy.action.contains("Docker Desktop")),
+                "a remote failure is not a local Docker Desktop: {:?}",
+                problem.code
+            );
+            assert!(failure.to_string().contains("nas.local"));
+            codes.push(problem.code);
+        }
+        codes.dedup();
+        assert_eq!(codes.len(), 3, "three conditions, three codes: {codes:?}");
+        assert_ne!(codes.first(), Some(&super::ENGINE_UNREACHABLE));
+    }
+
+    /// An endpoint nothing here can drive is refused rather than half-driven.
+    ///
+    /// Reading one machine and writing to another is the failure this whole seam
+    /// exists to prevent, so an endpoint the reads cannot use must not quietly
+    /// become one the writes do.
+    #[test]
+    fn an_endpoint_that_cannot_be_driven_is_refused_by_name() {
+        let problem = Failure::Unsupported {
+            endpoint: "https://nas.local:2376".to_owned(),
+        }
+        .problem();
+        assert!(problem.summary.contains("https://nas.local:2376"));
+        assert!(problem
+            .remedies
+            .iter()
+            .any(|remedy| remedy.action.contains("DOCKER_HOST")));
+        assert!(problem.meaning.contains("Nothing was read"));
     }
 
     #[test]

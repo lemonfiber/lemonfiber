@@ -64,6 +64,11 @@ pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<P
 
 /// The switch itself, with the stack already claimed for it.
 async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
+    // A switch is two lifecycle commands in a coat, so it owes the same pre-flight
+    // they do. It does not go through the one they share, which is exactly how a
+    // guard comes to hold everywhere but the path nobody remembered.
+    super::remote::verified(ctx).await?;
+
     let Composed {
         manifest,
         plan,

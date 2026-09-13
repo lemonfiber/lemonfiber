@@ -31,11 +31,13 @@ use tokio::sync::OnceCell;
 use tokio_stream::StreamExt as _;
 
 use lemonfiber_ports::docker::{
-    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, LogLine, LogQuery, Stats,
-    Stream,
+    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, LogLine, LogQuery, Reach,
+    Stats, Stream, Target,
 };
 
+pub mod context;
 mod images;
+mod refusal;
 mod translate;
 
 use translate::{describe, sampled, split_timestamp};
@@ -53,19 +55,17 @@ const PROJECT_LABEL: &str = "com.docker.compose.project";
 /// The label naming the service a container implements.
 const SERVICE_LABEL: &str = "com.docker.compose.service";
 
-/// Where the engine is listening.
-#[derive(Debug)]
-enum Address {
-    /// Wherever this machine's conventions say, honouring `DOCKER_HOST`.
-    Local,
-    /// A named socket, which is how a test points this at something it controls.
-    Socket(String),
-}
-
-/// The container engine on this machine, reached over its own API.
+/// The container engine this run operates, reached over its own API.
+///
+/// Built from the target rather than from the environment, and that is the whole
+/// point of it: the same value builds the Compose invocation, so the reads and the
+/// writes cannot be aimed at different machines. An adapter that read `DOCKER_HOST`
+/// for itself would be a second opinion about which machine this is, and the two
+/// only disagree where it matters most — a remote context, where the reads came
+/// from the laptop and the writes went to the server.
 #[derive(Debug)]
 pub struct Daemon {
-    address: Address,
+    target: Target,
     client: OnceCell<Docker>,
 }
 
@@ -73,22 +73,37 @@ impl Daemon {
     /// The engine this machine is configured to talk to.
     #[must_use]
     pub fn local() -> Self {
+        Self::reaching(Target::local())
+    }
+
+    /// The engine this run is pointed at.
+    ///
+    /// The seam a remote context arrives through. Taking the resolved target rather
+    /// than resolving one here is what keeps a single answer for the whole run.
+    #[must_use]
+    pub fn reaching(target: Target) -> Self {
         Self {
-            address: Address::Local,
+            target,
             client: OnceCell::new(),
         }
     }
 
     /// The engine listening on a particular socket.
     ///
-    /// This is the seam a remote context will arrive through, and the one tests
-    /// use to point the adapter at an engine they wrote themselves.
+    /// How a test points the adapter at an engine it wrote itself.
     #[must_use]
     pub fn at(socket: &Path) -> Self {
-        Self {
-            address: Address::Socket(socket.display().to_string()),
-            client: OnceCell::new(),
-        }
+        Self::reaching(Target::socket(&socket.display().to_string()))
+    }
+
+    /// What a refusal from this engine means, given which engine it is.
+    ///
+    /// A local daemon has one way of being unavailable and a remote one has four,
+    /// so where the engine is decides what its silence means. Asked of the daemon
+    /// rather than of a free function because the target is the half of the question
+    /// the error does not carry.
+    fn refused(&self, error: &bollard::errors::Error) -> Failure {
+        refusal::classify(&self.target, &wording(error))
     }
 
     /// The connected client, built and version-matched on first use.
@@ -97,15 +112,10 @@ impl Daemon {
     /// ends, and an adapter that cached the first refusal would keep reporting
     /// it long after Docker Desktop finished starting.
     async fn client(&self) -> Result<&Docker, Failure> {
+        let target = &self.target;
         self.client
             .get_or_try_init(|| async {
-                let connected = match &self.address {
-                    Address::Local => Docker::connect_with_local_defaults(),
-                    Address::Socket(path) => {
-                        Docker::connect_with_unix(path, TIMEOUT, bollard::API_DEFAULT_VERSION)
-                    }
-                };
-                let docker = connected.map_err(unreachable)?;
+                let docker = connect(target)?;
 
                 // Asking the daemon its version settles two things for one
                 // request: which API generation is in play, and whether there
@@ -114,7 +124,10 @@ impl Daemon {
                 // decode. See the client library's note in
                 // `.docs/architecture/engine-api.md` on what it does with the
                 // answer today.
-                docker.negotiate_version().await.map_err(unreachable)
+                docker
+                    .negotiate_version()
+                    .await
+                    .map_err(|error| refusal::classify(target, &wording(&error)))
             })
             .await
     }
@@ -140,7 +153,7 @@ impl Daemon {
             .await?
             .list_containers(Some(options))
             .await
-            .map_err(unreachable)
+            .map_err(|error| self.refused(&error))
     }
 
     /// Every container on this machine, whatever project it belongs to and whether
@@ -157,7 +170,7 @@ impl Daemon {
             .await?
             .list_containers(Some(options))
             .await
-            .map_err(unreachable)
+            .map_err(|error| self.refused(&error))
     }
 }
 
@@ -169,7 +182,7 @@ impl Images for Daemon {
             .await?
             .list_images(None::<ListImagesOptions>)
             .await
-            .map_err(unreachable)?;
+            .map_err(|error| self.refused(&error))?;
 
         Ok(images::correlate(listed, &self.every_container().await?))
     }
@@ -178,21 +191,76 @@ impl Images for Daemon {
 /// How long a request may take before the engine counts as unreachable.
 const TIMEOUT: u64 = 30;
 
-/// Any refusal from the engine, in the engine's own words.
+/// Build a client for wherever this run's engine is.
 ///
-/// Every way it can decline arrives here, because from the operator's side
-/// there is one question — can lemonfiber see Docker — and the detail belongs
-/// in the detail field rather than in a taxonomy nobody acts on differently.
+/// One arm per transport, and the endpoint handed over whole: the client library
+/// parses it, and a second parser here would be a second opinion about somebody
+/// else's address.
 ///
-/// A daemon that answered keeps its own message. Its wording is written for
-/// someone holding a terminal, and wrapping it in a transport description only
-/// buries the sentence worth reading.
-fn unreachable(error: bollard::errors::Error) -> Failure {
-    let reason = match error {
-        bollard::errors::Error::DockerResponseServerError { message, .. } => message,
-        answered_nothing => answered_nothing.to_string(),
+/// An endpoint nothing here can drive is refused before a connection is attempted,
+/// which is the property the whole target exists for. Reaching for it anyway and
+/// failing would leave the Compose half of the run still pointed at the same place
+/// and perfectly able to change it.
+fn connect(target: &Target) -> Result<Docker, Failure> {
+    if let Some(refusal) = target.refusal() {
+        return Err(refusal);
+    }
+    let built = match &target.reach {
+        Reach::Socket(endpoint) => {
+            Docker::connect_with_unix(endpoint, TIMEOUT, bollard::API_DEFAULT_VERSION)
+        }
+        Reach::Tcp(endpoint) => {
+            Docker::connect_with_http(endpoint, TIMEOUT, bollard::API_DEFAULT_VERSION)
+        }
+        Reach::Ssh(endpoint) => {
+            Docker::connect_with_ssh(endpoint, TIMEOUT, bollard::API_DEFAULT_VERSION, None)
+        }
+        // This machine's own conventions, which is what is left once the refusal
+        // above has taken the two endpoints that have no transport.
+        Reach::Local | Reach::Beyond(_) | Reach::Missing(_) => {
+            Docker::connect_with_local_defaults()
+        }
     };
-    Failure::Unreachable { reason }
+    built.map_err(|error| refusal::classify(target, &wording(&error)))
+}
+
+/// Everything the transport said about a failure, causes included.
+///
+/// A daemon that answered keeps its own message: its wording is written for
+/// somebody holding a terminal, and wrapping it in a transport description only
+/// buries the sentence worth reading.
+///
+/// Everything else is read through its whole chain of causes, because that is where
+/// the condition actually is. A connection failure arrives as one outer variant
+/// whatever went wrong, and only the sentence at the bottom says whether a name went
+/// nowhere, a port declined, or a key was refused.
+fn wording(error: &bollard::errors::Error) -> String {
+    if let bollard::errors::Error::DockerResponseServerError { message, .. } = error {
+        return message.clone();
+    }
+    let mut said = error.to_string();
+    let mut cause = std::error::Error::source(error);
+    while let Some(under) = cause {
+        let next = under.to_string();
+        if !said.contains(&next) {
+            said.push_str(": ");
+            said.push_str(&next);
+        }
+        cause = under.source();
+    }
+    said
+}
+
+/// Any refusal from a daemon that has already answered once.
+///
+/// The engine being there and declining is one question however far away it is, so
+/// this stays the one answer for it. Which machine it was is decided at connection,
+/// where the distinctions are, and a mid-stream chunk that stops arriving is not
+/// evidence about a host name.
+fn unreachable(error: &bollard::errors::Error) -> Failure {
+    Failure::Unreachable {
+        reason: wording(error),
+    }
 }
 
 #[async_trait]
@@ -247,14 +315,14 @@ async fn executed(
     let started = docker
         .start_exec(&created.id, None)
         .await
-        .map_err(unreachable)?;
+        .map_err(|error| daemon.refused(&error))?;
 
     let stdout = spoken(started).await?;
 
     let inspected = docker
         .inspect_exec(&created.id)
         .await
-        .map_err(unreachable)?;
+        .map_err(|error| daemon.refused(&error))?;
 
     Ok(ExecOutput {
         status: inspected
@@ -277,7 +345,7 @@ fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
         } => Failure::NoSuchContainer {
             name: container.to_owned(),
         },
-        other => unreachable(other),
+        other => unreachable(&other),
     }
 }
 
@@ -301,7 +369,7 @@ where
 {
     let mut said = String::new();
     while let Some(chunk) = output.next().await {
-        said.push_str(&chunk.map_err(unreachable)?.to_string());
+        said.push_str(&chunk.map_err(|error| unreachable(&error))?.to_string());
     }
     Ok(said)
 }

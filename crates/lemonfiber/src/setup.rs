@@ -588,8 +588,12 @@ pub(crate) mod tests {
     impl Runner for WorkingRunner {
         async fn run(&self, argv: &[String]) -> Result<Output, RunFailure> {
             let spoken = argv.join(" ");
+            // Three fields now, separated the way the check asks for them: the
+            // daemon's release, then the API generation at each end. A double
+            // answering with the release alone reads as a client that would not say
+            // which generations are in play, which is an unverified environment.
             let stdout = if spoken.contains("Server.Version") {
-                "27.0.0"
+                "27.0.0|1.45|1.45"
             } else if spoken.contains("compose version") {
                 "2.29.0"
             } else {

@@ -17,6 +17,7 @@ mod diagnosis;
 mod fetching;
 mod inflight;
 mod lock;
+mod remote;
 mod settling;
 mod stopping;
 pub(super) use settling::settled_into;
@@ -73,6 +74,10 @@ fn carries_quality(action: &Action) -> bool {
 /// unreadable manifest, a form that resolves to nothing, a stack that cannot be
 /// written — read the same wherever they surface.
 fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
+    // First, because it is the one refusal that has to reach every path that builds
+    // an invocation. An engine the reads cannot use must not become one the writes
+    // do, and an invocation is exactly what a write is made of.
+    remote::usable(ctx)?;
     if fetching::refused(ctx, action) {
         return Err(Box::new(fetching::refusal()));
     }
@@ -203,6 +208,13 @@ async fn readied(
     forms: &[String],
     action: &Action,
 ) -> Result<(lemonfiber_manifest::Manifest, Vec<String>, LifecycleReport), Box<Problem>> {
+    // Asked first, and of every action rather than only of a teardown: a stack
+    // brought up against a machine that has not got its location comes up empty, and
+    // one stopped there stops something that was never started. Before the stack is
+    // materialised rather than after, so a run that is going to be refused does not
+    // rewrite anything on the way to saying so.
+    remote::verified(ctx).await?;
+
     let Composed {
         manifest,
         plan,

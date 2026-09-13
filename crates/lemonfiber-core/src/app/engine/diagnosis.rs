@@ -225,7 +225,7 @@ pub(crate) async fn assembled(
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let environment = EnvironmentCheck::new(ctx.runner.clone());
+    let environment = EnvironmentCheck::reaching(ctx.runner.clone(), ctx.settings.docker.clone());
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     // What the download clients still have to write, so the free-space finding
     // projects exhaustion from the queue rather than only warning on a floor.

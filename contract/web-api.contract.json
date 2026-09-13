@@ -17,6 +17,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Admitted"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -63,6 +70,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/AdoptReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -211,6 +225,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/AlertReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -294,6 +315,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Listing"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -338,6 +366,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/BackupReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -510,6 +545,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Sharing"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -1269,6 +1311,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/BesideReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -1386,6 +1435,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Bundle"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -1547,6 +1603,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Guidance"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -1750,6 +1813,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/ConfigReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -2209,6 +2279,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Inventory"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -2640,6 +2717,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Snapshot"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -4571,6 +4655,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/DoctorReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -5077,6 +5168,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Problem"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -5244,6 +5342,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/FormsReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -5316,6 +5421,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/FrontDoorReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -5584,6 +5696,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Vocabulary"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -5661,6 +5780,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/HistoryReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -5765,6 +5891,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/HostingReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -5987,6 +6120,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/HouseholdReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -6573,6 +6713,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/ImportReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -6718,6 +6865,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Invitation"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -6911,6 +7065,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Started"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -6957,6 +7118,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/LifecycleReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -7359,6 +7527,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/LogLine"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -7432,6 +7607,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/MigrationReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -7782,6 +7964,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/MusicReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -7962,6 +8151,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Leaving"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -8124,6 +8320,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Plan"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -8227,6 +8430,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/ProvenanceReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -8310,6 +8520,13 @@
           "description": "The payload.",
           "type": "string"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -8336,6 +8553,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/QualityReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -8519,6 +8743,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/HouseholdRemoval"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -8610,6 +8841,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/RepairReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -8844,6 +9082,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/ReplaceReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -8949,6 +9194,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/ResetReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -9024,6 +9276,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Restoration"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -9304,6 +9563,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/SeedReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -9596,6 +9862,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/UpdateReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -9798,6 +10071,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/SetupReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -9896,6 +10176,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Reckoning"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -10545,6 +10832,13 @@
           "description": "The payload.",
           "type": "string"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -10571,6 +10865,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/StatusReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -10784,6 +11085,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/Line"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -10875,6 +11183,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Letting"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -11046,6 +11361,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Stored"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -11255,6 +11577,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/StuckReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -11382,6 +11711,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/TraceReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -11733,6 +12069,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/UndoReversal"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -11955,6 +12298,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Uninstall"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -12399,6 +12749,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/StackUpdateReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -12953,6 +13310,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/UpgradeReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -13085,6 +13449,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/VersionReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -13413,6 +13784,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/WalkthroughReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -13797,6 +14175,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/SupervisionReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
@@ -13851,6 +14236,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/WizardReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
@@ -14148,6 +14540,13 @@
         "data": {
           "description": "The payload.",
           "$ref": "#/$defs/Term"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
