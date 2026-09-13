@@ -39,6 +39,26 @@ use super::{Command, Ctx};
 /// The flag cannot be honoured by this command, and never will be.
 const CANNOT: Code = Code::new("REHEARSE-1");
 
+/// Why a search cannot be rehearsed.
+///
+/// Beside the other two rather than inside the arm that gives it: three sentences of
+/// the same kind, said to an operator who has met one of them before, are worth
+/// reading together — and an arm that is a pattern and a name reads as a decision
+/// rather than as a paragraph.
+const A_SEARCH_IS_THE_ANSWER: &str = "a search is the indexer's answer, which does not \
+     exist until the indexer has been asked — and asking spends one of the queries the \
+     operator's subscription allows that day";
+
+/// Why the disruptive checks cannot be rehearsed.
+const THE_CHECK_IS_THE_DISRUPTION: &str = "the disruptive checks find out what happens \
+     by making it happen — a killswitch that has not been tested is a killswitch nobody \
+     knows about, and there is nothing to predict from";
+
+/// Why a walkthrough cannot be rehearsed.
+const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observation — \
+     what it reports is what this stack actually did with a real item, which cannot be \
+     known without asking it to";
+
 /// The flag is not honoured by this command yet.
 const NOT_YET: Code = Code::new("REHEARSE-2");
 
@@ -112,14 +132,7 @@ pub fn asked(command: &Command) -> Asked {
         // a rehearsal is one the operator no longer has.
         Command::Trace {
             searching: true, ..
-        } => (
-            "trace --search",
-            Rehearsal::Cannot(
-                "a search is the indexer's answer, which does not exist until the \
-                 indexer has been asked — and asking spends one of the queries the \
-                 operator's subscription allows that day",
-            ),
-        ),
+        } => ("trace --search", Rehearsal::Cannot(A_SEARCH_IS_THE_ANSWER)),
         Command::Trace { .. } => ("trace", Rehearsal::Reads),
 
         // The killswitch check *is* the disruption. It takes the tunnel's own route
@@ -131,11 +144,7 @@ pub fn asked(command: &Command) -> Asked {
             disruptive: true, ..
         } => (
             "doctor --disruptive",
-            Rehearsal::Cannot(
-                "the disruptive checks find out what happens by making it happen — a \
-                 killswitch that has not been tested is a killswitch nobody knows \
-                 about, and there is nothing to predict from",
-            ),
+            Rehearsal::Cannot(THE_CHECK_IS_THE_DISRUPTION),
         ),
         Command::Doctor { accept: None, .. } => ("doctor", Rehearsal::Reads),
         Command::Doctor { .. } => ("doctor --accept", Rehearsal::Untaught),
@@ -146,11 +155,7 @@ pub fn asked(command: &Command) -> Asked {
         // anything.
         Command::Walkthrough { .. } => (
             "walkthrough",
-            Rehearsal::Cannot(
-                "a walkthrough is an end-to-end observation — what it reports is what \
-                 this stack actually did with a real item, which cannot be known \
-                 without asking it to",
-            ),
+            Rehearsal::Cannot(THE_WALK_IS_THE_OBSERVATION),
         ),
 
         // Reports. Each of these builds the report it would have filled in and stops
@@ -331,6 +336,33 @@ mod tests {
         );
     }
 
+    /// A trace, asked with and without a live search.
+    fn tracing(searching: bool) -> Command {
+        Command::Trace {
+            term: "anything".to_owned(),
+            season: None,
+            searching,
+        }
+    }
+
+    /// A doctor run, disruptive or not, acknowledging nothing.
+    fn examining(disruptive: bool) -> Command {
+        Command::Doctor {
+            narrowing: crate::doctor::Narrowing::Suite,
+            disruptive,
+            accept: None,
+        }
+    }
+
+    /// A support bundle, written out or only described.
+    fn bundling(write: bool) -> Command {
+        Command::Support {
+            write,
+            wanted: crate::app::bundle::Wanted::default(),
+            dest: crate::app::support::Destination::Kept,
+        }
+    }
+
     /// The three that refuse the flag for good say so, and the read half of each
     /// command that carries one of them under a shared name does not.
     ///
@@ -339,27 +371,11 @@ mod tests {
     /// whose pattern could be wrong in either direction without anything saying so.
     #[test]
     fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
-        let tracing = |searching| Command::Trace {
-            term: "anything".to_owned(),
-            season: None,
-            searching,
-        };
-        let examining = |disruptive, accept: Option<&str>| Command::Doctor {
-            narrowing: crate::doctor::Narrowing::Suite,
-            disruptive,
-            accept: accept.map(ToOwned::to_owned),
-        };
-        let bundling = |write| Command::Support {
-            write,
-            wanted: crate::app::bundle::Wanted::default(),
-            dest: crate::app::support::Destination::Kept,
-        };
-
         for (command, refuses) in [
             (tracing(true), true),
             (tracing(false), false),
-            (examining(true, None), true),
-            (examining(false, None), false),
+            (examining(true), true),
+            (examining(false), false),
             (Command::Walkthrough { item: None }, true),
             (bundling(false), false),
         ] {
@@ -369,14 +385,23 @@ mod tests {
                 refuses,
                 "{command:?} was read as the wrong one of the two"
             );
-            // And the reason reaches the operator rather than staying in the source,
-            // which is the difference between refusing and refusing usefully.
-            if let Rehearsal::Cannot(why) = asked.rehearsal {
-                assert!(
-                    refused(&asked, why).meaning.contains(why),
-                    "the reason did not reach the refusal for {command:?}"
-                );
-            }
+        }
+    }
+
+    /// And the reason a refusal carries reaches the operator rather than staying in
+    /// the source, which is the difference between refusing and refusing usefully.
+    #[test]
+    fn the_reason_a_refusal_gives_is_in_what_the_operator_is_told() {
+        for command in [
+            tracing(true),
+            examining(true),
+            Command::Walkthrough { item: None },
+        ] {
+            let asked = asked(&command);
+            let Rehearsal::Cannot(why) = asked.rehearsal else {
+                unreachable!("{command:?} is one of the three that refuse for good")
+            };
+            assert!(refused(&asked, why).meaning.contains(why), "{command:?}");
         }
     }
 
