@@ -191,8 +191,6 @@ fn confirm_setup(surface: &dyn Surface) -> bool {
     )
 }
 
-/// What a previous run left decides what this one does — the whole of setup's
-/// routing, once there is somewhere to keep files and something to ask across.
 /// What setup says when it is asked to rehearse.
 ///
 /// Setup is the one conversation that *is* the change: every answer is applied, and
@@ -206,6 +204,8 @@ pub(crate) fn nothing_to_rehearse() -> ExitCode {
     ExitCode::from(USAGE)
 }
 
+/// What a previous run left decides what this one does — the whole of setup's
+/// routing, once there is somewhere to keep files and something to ask across.
 pub(crate) async fn setting_up(
     ctx: Ctx,
     paths: &Paths,
