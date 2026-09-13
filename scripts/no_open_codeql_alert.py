@@ -181,6 +181,10 @@ def judge(alerts: list, out, seen: bool = True) -> int:
 # grep for and a rename that has to be got right in ten places.
 RUST = "/language:rust"
 ACTIONS = "/language:actions"
+# Not analysed here. Named because the self-test uses it to stand for "a language
+# this repository does not run", and because a third repeated literal is how the
+# other two came to be constants.
+PYTHON = "/language:python"
 
 # One CodeQL analysis, as the API describes it, for the fixtures to vary.
 def _analysis(sha: str, category: str, tool: str = "CodeQL") -> dict:
@@ -245,17 +249,17 @@ def _reading_a_path() -> list[str]:
 
 def _reading_a_category() -> list[str]:
     """Whether a category GitHub wrote itself names the same language as ours."""
-    auto = ".github/workflows/codeql.yml:analyze/language:python"
+    auto = f".github/workflows/codeql.yml:analyze{PYTHON}"
     wrong = []
     if named(auto) != "language:python":
         wrong.append("a category GitHub generated was not read down to its language")
     if named(RUST) != "language:rust":
         wrong.append("a category this repository writes was not read")
-    if missing([auto], ["/language:python"]):
+    if missing([auto], [PYTHON]):
         wrong.append("a generated category did not satisfy the language it names")
     if not missing(["/language:rustacean"], [RUST]):
         wrong.append("language:rust was satisfied by language:rustacean")
-    if missing([auto, RUST], ["/language:python", RUST]):
+    if missing([auto, RUST], [PYTHON, RUST]):
         wrong.append("a mix of both category styles was not read")
     return wrong
 
@@ -286,10 +290,9 @@ jobs:
         wrong.append("a language whose analysis never landed was not named")
     if expected(single) != [ACTIONS]:
         wrong.append("a job with one language and no matrix was not read")
-    if expected(single.replace("languages: actions", "languages: actions, python")) != [
-        ACTIONS,
-        "/language:python",
-    ]:
+    if expected(
+        single.replace("languages: actions", "languages: actions, python")
+    ) != [ACTIONS, PYTHON]:
         wrong.append("a comma-separated languages: was not read as a list")
     for empty in ("jobs: {}\n", "jobs:\n  analyze:\n    steps: []\n"):
         try:
