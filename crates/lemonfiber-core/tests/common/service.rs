@@ -13,7 +13,7 @@ use lemonfiber_core::ports::service::{
     Category, Client, ClientProbe, DownloadClient, Failure, Identity, RegisteredClient,
     RegisteredFolder, RootFolder,
 };
-use lemonfiber_core::seed::{wire_root_folders, State};
+use lemonfiber_core::seed::{wire_root_folders, Placing, State};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -300,14 +300,39 @@ pub async fn seed_contested(
         &service,
         "sonarr",
         wanted,
-        contested,
-        "/data",
+        Placing {
+            contested,
+            root: "/data",
+        },
         &mut journal,
         "t",
+        false,
     )
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
+}
+
+/// Drive the folder wiring as a rehearsal: the same pass over the same service, with
+/// the registering left out.
+pub async fn would_wire(service: &FakeService, wanted: &[RootFolder]) -> Vec<State> {
+    let mut journal = Journal::new();
+    wire_root_folders(
+        service,
+        "sonarr",
+        wanted,
+        Placing {
+            contested: &BTreeMap::new(),
+            root: "/data",
+        },
+        &mut journal,
+        "t",
+        true,
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect()
 }
 
 /// Drive the folder wiring against a borrowed service, so one fake can be carried
@@ -320,10 +345,13 @@ pub async fn wire_on(service: &FakeService, wanted: &[RootFolder]) -> Vec<State>
         service,
         "sonarr",
         wanted,
-        &BTreeMap::new(),
-        "/data",
+        Placing {
+            contested: &BTreeMap::new(),
+            root: "/data",
+        },
         &mut journal,
         "t",
+        false,
     )
     .await
     .into_iter()

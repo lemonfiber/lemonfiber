@@ -49,10 +49,13 @@ a row on a board somebody is working through. Given one code between them the
 temporary becomes indistinguishable from the permanent, which is how a temporary
 state becomes a permanent one.
 
-Where the sixty-four arms stand: **thirty-seven report**, **twenty-two change
+Where the sixty-four arms stand: **thirty-nine report**, **twenty-two change
 nothing** (twenty-four command shapes — two arms carry a pair each), **three refuse
-for good**, and **two are untaught**. The untaught two are `seed` and `adopt`, and
-what they owe is below.
+for good**, and **none is untaught**. Nothing carries `Untaught` today. The verdict
+stays because it is the right answer for a command added tomorrow that changes
+something nobody has yet taught to report — the alternative is an author having to
+choose between teaching it in the same afternoon and quietly reading the flag and
+ignoring it, which is the failure this file exists to describe.
 
 ## Why forgetting is not possible
 
@@ -157,18 +160,75 @@ verdict for it is taken inside `repair::retracting` rather than above it. A surf
 asked to read the flag can be written without reading it, which is the whole failure
 this module exists to prevent.
 
-## What is left
+## Seeding, and the rule it keeps
 
-`seed` and `adopt` still refuse with `REHEARSE-2`. They are one pass over the same
-graph, and the report they owe is per connection: the field, what the service holds
-now, and what would be pushed. The survey that produces it is already written and
-already shared — the three-way reconcile in [`seed/drift.rs`](../../crates/lemonfiber-core/src/seed/drift.rs)
-that every driver reads a connection through — but the writes sit inside those same
-drivers, immediately below the observation, with no gate between the two. Teaching
-them means putting one there, in `crate::seed`, so that the pass a rehearsal takes is
-the pass a real run takes with the registering left out. Reporting from a second
-survey beside it would be a second opinion about what lemonfiber intends, and the one
-nobody runs is the one that goes wrong.
+`seed` and `adopt` are one pass over one graph, and the report they owe is per
+connection: the field, what the service holds now, and what would be pushed. The
+survey that produces it was already written and already shared — the three-way
+reconcile in [`seed/drift.rs`](../../crates/lemonfiber-core/src/seed/drift.rs) that
+every driver reads a connection through — but the writes sat inside those same
+drivers, immediately below the observation, with no gate between the two.
+
+The gate is now there, at each write rather than above the pass, because the pass is
+where the report comes from: a rehearsal stopped at the door would have nothing to
+say, and one that surveyed separately would be a second opinion about what lemonfiber
+intends — the one nobody runs is the one that goes wrong. Four of the connections
+share one body (`wire_one`, behind root folders, download clients, applications and
+request targets), and that is where one gate covers four: `wire_one` takes the state
+to answer with rather than a flag saying to answer with one, because it holds two
+futures and three labels and has never seen a value — only the caller knows what the
+connection would be made *to*. A future is inert until it is polled, so returning
+before polling the register future is the write not happening rather than the write
+being skipped.
+
+Two states exist only here. `WouldWire { yours, ours }` carries what the service holds
+beside what a real run would leave it holding, the same pair `Conflicted` shows and
+for the same reason — a report saying a connection would be made without saying what
+it would be made *to* is a count, and a count is what an operator asking already has.
+`WouldAdopt` carries nothing, because an adoption writes to no service at all: what
+moves is lemonfiber's record of what it expects, and the value is not shown for the
+reason `Unmanaged` does not show one.
+
+**A rehearsed seed issues nothing but reads.** That rule is stricter than "registers
+no connection" and it is stricter on purpose: a sign-in is a `POST` that opens a
+session on somebody else's service, and a torrent client answers a password test the
+same way. Both are state left behind by a run that promised to leave none, and
+`a_rehearsal_changes_nothing.rs` holds exactly that line — any request that is not a
+`GET` fails it.
+
+Four things the rule costs, each reported as something this pass could not tell rather
+than told wrong:
+
+- whether the torrent password lemonfiber recorded is still the one in force, which is
+  answered by signing in;
+- what the household is told, and which \*arrs the request service hands a request to
+  — both read as the owner, and the owner's session is a sign-in;
+- whether a drifted download client still reaches anything, which the \*arr answers
+  only by being asked to test it, and the test is a `POST`. The drift is still
+  reported; what is left out is the claim that it broke something.
+
+And the keys the stack's own services read out of the environment are *named* rather
+than gathered. Two of them are read by being made — the media server mints its key
+when it is asked for one, and the listening server has no account at all until this
+pass makes one, with a password minted and recorded to go with it — so a question that
+gathered them would have created the very things it promised only to describe. The
+names come from the services present, which is knowable without asking anything, and
+the names are the whole of what the operator is deciding about: the values are the one
+thing a question must never make a second copy of.
+
+## One deliberate exception, written down
+
+`setup --answer --dry-run` still proves a credential against the live indexer or
+provider. That is a request to somebody else's service made by a run that changes
+nothing here, and it leaves an authentication attempt in their log.
+
+It stays, and the reasoning is the trade it is: the proof *is* the answer being
+reported — `WizardReport.proof` carries what the service said, and `validated` records
+what a test established rather than what a caller asserted — so a rehearsal that
+skipped it would report something the real run does not, and a rehearsal whose report
+differs from the real one is the worse defect of the two. Recorded here rather than
+left to be rediscovered, because a deliberate exception that is written down is a
+decision and one that is not is a bug waiting for somebody else to find.
 
 ## What a rehearsal says
 
@@ -192,7 +252,9 @@ Where a report had no field that could carry the answer, one was added rather th
 second report shape invented: a bundle now says where it would land, a watch carries
 the vigil it would keep, and a rotation carries what it would replace, where that
 value lives and what would still be owed afterwards — never a value, and never one
-generated in order to describe it.
+generated in order to describe it. `SeedReport` took the same flag, and it changes one
+sentence: a pass that wired things is run again once the rest is ready, and a pass
+that said what it would do is run for real.
 
 ## What a rehearsal must not produce
 
@@ -206,3 +268,12 @@ The same rule holds for the work a rehearsal has to do in order to have somethin
 say. Materialising the stack is one walk over the same files with the writing left
 out (`materialise::would_materialise`), not a second reckoning of what is on disk —
 two reckonings would drift, and the one nobody runs would be the one that is wrong.
+
+Seeding mints nothing for the same reason the rotation does not: the torrent client's
+web UI password and the media server's admin account are the two values this product
+generates rather than reads, and both report as `WouldWire` with no `ours` at all —
+absent exactly where a real run would make the value up rather than read it. The keys
+published into the environment are named and never shown, the way an adopted value is
+never shown, and a rehearsed seed writes no baseline record: the baseline is the only
+memory of what lemonfiber wrote, and one saved by a question would have the next real
+run compare against a record of connections nobody made.

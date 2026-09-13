@@ -99,7 +99,7 @@ fn app(base_url: &str) -> Application {
 /// and the number of changes journalled.
 async fn seed_applications(prowlarr: FakeProwlarr, wanted: &[Application]) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_applications(&prowlarr, "prowlarr", wanted, &mut journal, "t").await;
+    let wirings = wire_applications(&prowlarr, "prowlarr", wanted, &mut journal, "t", false).await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }

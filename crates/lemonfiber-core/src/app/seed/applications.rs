@@ -79,6 +79,7 @@ pub(super) async fn seed_applications(
         &wanted,
         &mut journal,
         &ctx.stamp(),
+        ctx.dry_run,
     )
     .await;
     wirings.extend(skipped);

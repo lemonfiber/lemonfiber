@@ -6,8 +6,8 @@
 
 use super::drift::{reconcile, Observed};
 use super::{
-    observe_or_skip, same_base_url, unreached, wire_one, AppSync, Application, Journal,
-    MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
+    observe_or_skip, observe_or_untold, same_base_url, unreached, unread, wire_one, AppSync,
+    Application, Journal, MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
 use crate::baseline::Record;
 use crate::ports::service::{FulfilmentTarget, RegisteredTarget, Telling};
@@ -53,8 +53,9 @@ pub(crate) fn said(telling: Telling) -> String {
 pub async fn wire_household_telling(
     seerr: &dyn Requests,
     recorded: Option<&Record>,
+    rehearsing: bool,
 ) -> (Wiring, Telling) {
-    let (state, held) = tell_the_household(seerr, recorded).await;
+    let (state, held) = tell_the_household(seerr, recorded, rehearsing).await;
     (
         Wiring::settled("What the household is told".to_owned(), state),
         held,
@@ -87,10 +88,11 @@ pub(crate) fn observed_telling(recorded: Option<&Record>, held: Telling) -> Obse
 pub(crate) async fn tell_the_household(
     seerr: &dyn Requests,
     recorded: Option<&Record>,
+    rehearsing: bool,
 ) -> (State, Telling) {
     let held = match seerr.telling().await {
         Ok(held) => held,
-        Err(failure) => return (unreached(&failure), Telling::default()),
+        Err(failure) => return (unread(&failure, rehearsing), Telling::default()),
     };
     let want = wanted_telling();
     let holding = said(held);
@@ -101,6 +103,10 @@ pub(crate) async fn tell_the_household(
         // that would not answer, and one that would not answer returned above with
         // its own words. Grouped the way the wiring check groups it, rather than
         // given an arm that nothing can reach.
+        Observed::Absent | Observed::Unavailable if rehearsing => State::WouldWire {
+            yours: Some(holding.clone()),
+            ours: Some(said(want)),
+        },
         Observed::Absent | Observed::Unavailable => match seerr.tell(&want).await {
             Ok(()) => State::Wired,
             Err(failure) => unreached(&failure),
@@ -136,9 +142,17 @@ pub async fn wire_fulfilment_targets(
     wanted: &[FulfilmentTarget],
     journal: &mut Journal,
     at: &str,
+    rehearsing: bool,
 ) -> Vec<Wiring> {
-    let existing = match observe_or_skip(seerr.fulfilment_targets().await, wanted, describe_target)
-    {
+    // Read as the owner, which a rehearsal is not: it opens no session, so the answer
+    // comes back unauthorised and each wanted target says it could not be told rather
+    // than naming a credential fault nobody has.
+    let existing = match observe_or_untold(
+        seerr.fulfilment_targets().await,
+        wanted,
+        describe_target,
+        rehearsing,
+    ) {
         Ok(existing) => existing,
         Err(skipped) => return skipped,
     };
@@ -159,6 +173,10 @@ pub async fn wire_fulfilment_targets(
                 },
                 journal,
                 at,
+                rehearsing.then(|| State::WouldWire {
+                    yours: None,
+                    ours: Some(format!("{}:{}", target.host, target.port)),
+                }),
             )
             .await
         };
@@ -204,6 +222,7 @@ pub async fn wire_applications(
     wanted: &[Application],
     journal: &mut Journal,
     at: &str,
+    rehearsing: bool,
 ) -> Vec<Wiring> {
     let existing = match observe_or_skip(prowlarr.applications().await, wanted, |application| {
         describe_application(service, application)
@@ -235,6 +254,10 @@ pub async fn wire_applications(
                 },
                 journal,
                 at,
+                rehearsing.then(|| State::WouldWire {
+                    yours: None,
+                    ours: Some(application.base_url.clone()),
+                }),
             )
             .await
         };
@@ -266,8 +289,25 @@ pub async fn wire_qbittorrent_password(
     client: &Qbittorrent,
     random: &dyn Random,
     temporary: &str,
+    rehearsing: bool,
 ) -> (Wiring, Option<String>) {
     let connection = "qBittorrent web UI password".to_owned();
+    // Above the generating, not below it. A password minted to describe a rehearsal is
+    // a secret that exists because somebody asked a question, and it would then have to
+    // be kept — putting it where the real one goes — or thrown away, which is worse,
+    // because a thrown-away one may be the one the client has already taken.
+    if rehearsing {
+        return (
+            Wiring::settled(
+                connection,
+                State::WouldWire {
+                    yours: None,
+                    ours: None,
+                },
+            ),
+            None,
+        );
+    }
     let Some(password) = secret::generate(random) else {
         return (
             Wiring::settled(
@@ -304,13 +344,15 @@ pub async fn wire_jellyfin_identity(
     random: &dyn Random,
     recorded_password: Option<&str>,
     server_url: &str,
+    rehearsing: bool,
 ) -> (Wiring, Option<String>) {
     let connection = "Jellyfin as Seerr's identity".to_owned();
-    let (password, minted) = match jellyfin_admin(jellyfin, random, recorded_password).await {
-        Ok(pair) => pair,
-        Err(state) => return (Wiring::settled(connection, state), None),
-    };
-    let state = configure_seerr(seerr, &password, server_url).await;
+    let (password, minted) =
+        match jellyfin_admin(jellyfin, random, recorded_password, rehearsing).await {
+            Ok(pair) => pair,
+            Err(state) => return (Wiring::settled(connection, state), None),
+        };
+    let state = configure_seerr(seerr, &password, server_url, rehearsing).await;
     (Wiring::settled(connection, state), minted)
 }
 
@@ -322,6 +364,7 @@ async fn jellyfin_admin(
     jellyfin: &dyn MediaServer,
     random: &dyn Random,
     recorded: Option<&str>,
+    rehearsing: bool,
 ) -> Result<(String, Option<String>), State> {
     let completed = match jellyfin.startup_completed().await {
         Ok(done) => done,
@@ -334,6 +377,15 @@ async fn jellyfin_admin(
                 reason: "Jellyfin was set up outside lemonfiber, so its admin password is unknown; a later run cannot complete this until it is set up through lemonfiber".to_owned(),
             }),
         };
+    }
+    // A wizard that has not run is an account a real pass would create, with a password
+    // it would mint. Reported without minting one, for the reason the torrent client's
+    // is: a value made up to describe a rehearsal has to go somewhere afterwards.
+    if rehearsing {
+        return Err(State::WouldWire {
+            yours: None,
+            ours: None,
+        });
     }
     let Some(password) = secret::generate(random) else {
         return Err(State::Failed {
@@ -350,13 +402,27 @@ async fn jellyfin_admin(
 /// left untouched, whether lemonfiber initialised it on an earlier run or the
 /// household set it up with accounts of its own. A fresh Seerr is signed in and
 /// then read back: it must report itself initialised, or the write did not land.
-async fn configure_seerr(seerr: &dyn Requests, password: &str, server_url: &str) -> State {
+async fn configure_seerr(
+    seerr: &dyn Requests,
+    password: &str,
+    server_url: &str,
+    rehearsing: bool,
+) -> State {
     let initialized = match seerr.initialized().await {
         Ok(done) => done,
         Err(failure) => return unreached(&failure),
     };
     if initialized {
         return State::AlreadyWired;
+    }
+    // Below the read, because a service already initialised is left untouched on a real
+    // run too — so a rehearsal of that is the run, and only the fresh one has anything
+    // to report.
+    if rehearsing {
+        return State::WouldWire {
+            yours: None,
+            ours: Some(server_url.to_owned()),
+        };
     }
     if let Err(failure) = seerr.configure_identity(ADMIN, password, server_url).await {
         return unreached(&failure);
@@ -402,7 +468,7 @@ mod tests {
     }
 
     async fn against(seerr: &Seerr, baseline: &Baseline) -> State {
-        tell_the_household(seerr, baseline.entry("seerr", TELLING))
+        tell_the_household(seerr, baseline.entry("seerr", TELLING), false)
             .await
             .0
     }

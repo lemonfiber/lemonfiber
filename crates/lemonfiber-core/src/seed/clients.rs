@@ -45,7 +45,15 @@ pub async fn wire_download_clients(
         wirings.push(wiring);
         drifted_ids.push(drifted_id);
     }
-    escalate_unreachable(client, &mut wirings, &drifted_ids).await;
+    // And not on a pass that only says what it would do. The service is asked to test
+    // its clients with a `POST` — a write by the rule a rehearsed seed keeps, even
+    // though it changes nothing the operator owns — so a rehearsal leaves each drift at
+    // the information it already is rather than raising it to a warning it did not
+    // prove. The drift is still reported; what is left out is the claim that it broke
+    // something, which is not this pass's to make without asking.
+    if !baselines.rehearsing {
+        escalate_unreachable(client, &mut wirings, &drifted_ids).await;
+    }
     wirings
 }
 
@@ -91,10 +99,24 @@ async fn wire_one_client(
     } else {
         None
     };
-    let state = if let Some(id) = reverting_id {
+    // What this pass answers instead of writing, where it is only saying what it would
+    // do — and `None` where it would not have written, since every other verdict is a
+    // fact about the service that a write would not have changed and reads the same in
+    // both tenses. Read before the three branches below rather than beside them,
+    // because a rehearsal is not a fourth kind of pass: it is this pass with the two
+    // writes left out.
+    let rehearsed = if baselines.rehearsing {
+        would_instead(want, observed, found.as_ref(), adopting)
+    } else {
+        None
+    };
+    let state = if let Some(would) = rehearsed {
+        would
+    } else if let Some(id) = reverting_id {
         // Write lemonfiber's category back over the operator's, in place. A revert that
         // lands records lemonfiber's value below; one the service refuses leaves the
-        // value as it was, reported as the failure it is.
+        // value as it was, reported as the failure it is. A reset is never a rehearsal:
+        // an unconfirmed one previews through `preview_reverts` and never reaches here.
         match client.update_download_client(&id, want).await {
             Ok(()) => State::Wired,
             Err(failure) => unreached(&failure),
@@ -132,6 +154,35 @@ async fn wire_one_client(
     )
 }
 
+/// What a rehearsal answers for one download client, or `None` where it would not
+/// have written and [`wire_by_intent`] already gives the same answer in both tenses.
+///
+/// Only two of the outcomes differ between a run and a rehearsal, and they are exactly
+/// the two that write: a value taken on as lemonfiber's own record, and a connection
+/// registered into the service. A preserved edit, a conflict presented, a value already
+/// where lemonfiber wants it — each is a fact about the service that writing would not
+/// have changed, so each is reported by the same table a real run reports it from
+/// rather than restated here. That is why this reads `intent` rather than repeating it:
+/// a second opinion about what lemonfiber intends is the one thing a rehearsal must
+/// never be.
+fn would_instead(
+    want: &DownloadClient,
+    observed: Observed,
+    found: Option<&String>,
+    adopting: bool,
+) -> Option<State> {
+    if adopting {
+        // Nothing would go to the service at all; what would move is lemonfiber's
+        // record of what it expects, and this run is not moving it. The value is not
+        // shown, the way an unmanaged value is not.
+        return Some(State::WouldAdopt);
+    }
+    matches!(intent(observed), Intent::Wire).then(|| State::WouldWire {
+        yours: found.cloned(),
+        ours: Some(want.category.value.clone()),
+    })
+}
+
 /// The seed policy's verdict for a client that is neither being reverted nor adopted:
 /// an absent one is written, one already at lemonfiber's value is left, an operator's
 /// edit is preserved, lemonfiber's own value behind its intent is reported stale, a
@@ -164,6 +215,10 @@ async fn wire_by_intent(
                 },
                 journal,
                 at,
+                // Never reached on a rehearsal: `would_instead` answers for the one
+                // intent that writes before this function is called at all, so the
+                // register below is only ever built by a pass that means it.
+                None,
             )
             .await
         }
@@ -240,11 +295,12 @@ pub fn client_field(client: &DownloadClient) -> String {
     format!("{CLIENT}:{}:{}", client.host, client.port)
 }
 
-/// The baseline a drift-aware wiring reads against and records into, and whether
-/// this is an adopt pass. Grouped so the wiring call carries one baseline argument
-/// rather than three: what lemonfiber last recorded, where this run records what it
-/// leaves, and whether an operator's edit is promoted to adopted rather than merely
-/// preserved.
+/// The baseline a drift-aware wiring reads against and records into, and what kind of
+/// pass this is. Grouped so the wiring call carries one baseline argument rather than
+/// four: what lemonfiber last recorded, where this run records what it leaves, whether
+/// an operator's edit is promoted to adopted rather than merely preserved, whether
+/// lemonfiber's own value is written back over it, and whether any of it is written
+/// down at all.
 pub struct Baselines<'a> {
     /// What lemonfiber last recorded — the expected leg of the comparison.
     pub expected: &'a Baseline,
@@ -257,4 +313,11 @@ pub struct Baselines<'a> {
     /// adopt: it writes lemonfiber's category over the operator's edit rather than keeping
     /// it, the connection side of a full reset. Never set with `adopt`.
     pub reset: bool,
+    /// Whether this pass only says what it would do, writing nothing.
+    ///
+    /// Beside the other two because it is the third thing a pass can be, and because it
+    /// is read at the same moment they are: what to do about a value once it has been
+    /// observed. A pass handed a baseline to record into and no answer to this is a
+    /// pass that can record during a rehearsal, so the question travels with them.
+    pub rehearsing: bool,
 }

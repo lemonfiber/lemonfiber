@@ -208,7 +208,7 @@ async fn a_generated_password_is_set_confirmed_and_handed_back() {
     let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword").await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", false).await;
 
     assert!(matches!(wiring.state, State::Wired));
     // The value handed back for recording is the one that was set: it appears in
@@ -228,6 +228,34 @@ async fn a_generated_password_is_set_confirmed_and_handed_back() {
 }
 
 #[tokio::test]
+async fn a_rehearsed_pass_generates_no_password_and_asks_the_client_nothing() {
+    // The whole of what must not happen: no value is minted, so there is none to keep
+    // or throw away, and the client is never signed in to — a login is a write on
+    // somebody else's service, and a run that promised to leave nothing behind leaves
+    // no session either.
+    let fake = Fake::in_turn(Vec::new());
+    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
+
+    let (wiring, recorded) =
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", true).await;
+
+    assert_eq!(
+        wiring.state,
+        State::WouldWire {
+            yours: None,
+            ours: None,
+        },
+        "a value on the report is a value that was minted"
+    );
+    assert_eq!(recorded, None, "and none was handed back to record");
+    assert!(
+        fake.requests().is_empty(),
+        "the client was asked something: {:?}",
+        fake.requests()
+    );
+}
+
+#[tokio::test]
 async fn without_randomness_the_password_is_not_set() {
     // Nothing to set, so the client is never even called — and nothing is handed
     // back to record.
@@ -235,7 +263,7 @@ async fn without_randomness_the_password_is_not_set() {
     let random = lemonfiber_fixtures::ports::Chance::exactly(None);
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword").await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", false).await;
 
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);
@@ -251,7 +279,7 @@ async fn a_rejected_current_password_fails_and_records_nothing() {
     let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "wrongword").await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, "wrongword", false).await;
 
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);

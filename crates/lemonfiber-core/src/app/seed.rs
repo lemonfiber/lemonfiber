@@ -39,7 +39,39 @@ use identity::seed_jellyfin_identity;
 pub(super) use reset::reset_connections;
 
 /// Wire the stack's services to each other, idempotently, and report what was
-/// wired and what a re-run still owes.
+/// wired and what a re-run still owes — or, on a run that only says what it would do,
+/// report the same pass with every write left out.
+///
+/// **A rehearsal issues nothing but reads, and that is the rule rather than a summary
+/// of one.** It is stricter than "registers no connection", because several of the
+/// things this pass would call reading are `POST`s: a sign-in opens a session on
+/// somebody else's service, a torrent client answers a password test the same way, and
+/// two of the keys published at the end are read by being minted. Each is state left
+/// behind by a run that promised to leave none, so none of them is made.
+///
+/// Four things the rule costs, each reported as something this pass could not tell
+/// rather than told wrong:
+///
+/// - whether the torrent password lemonfiber recorded is still the one in force, which
+///   is answered by signing in;
+/// - what the household is told, and which \*arrs the request service hands a request
+///   to — both read as the owner, and the owner's session is a sign-in;
+/// - whether a drifted download client still reaches anything, which the \*arr answers
+///   only by being asked to test it. The drift is reported; what is left out is the
+///   claim that it broke something.
+///
+/// And the keys the stack's own services read are named rather than gathered: the media
+/// server mints its key when it is asked for one, and the listening server has no
+/// account at all until this pass makes one. A question that gathered them would have
+/// created the very things it promised only to describe.
+///
+/// Everything else is the same walk — the same reads, the same three-way comparison,
+/// the same words — with the registering and the minting not done.
+///
+/// The gate is held at each write rather than above the pass, because the pass is where
+/// the report comes from: a rehearsal that stopped at the door would have nothing to
+/// say, and one that surveyed separately would be a second opinion about what
+/// lemonfiber intends — and the one nobody runs is the one that goes wrong.
 ///
 /// One connection is unlike the rest: qBittorrent's web UI password, the
 /// credential lemonfiber mints rather than reads — its temporary password is
@@ -190,7 +222,15 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // unless the record was lost and this is not an adopt pass, in which case the
     // lost record is left as it is rather than silently replaced, and re-baselining is
     // left to the deliberate `adopt`.
-    if !lost || adopt {
+    //
+    // And unless this run only said what it would do. The baseline is the only memory
+    // of what lemonfiber wrote, so a rehearsal that saved one would have the next real
+    // run compare against a record of connections nobody made — which is the drift
+    // question answered wrong in the one direction that silently overwrites an
+    // operator's own value. The whole pass records into `baseline` in memory either
+    // way, because that is what the comparison is made from; this is the line that
+    // makes the difference between a question and an answer.
+    if (!lost || adopt) && !ctx.dry_run {
         save_baseline(ctx, &baseline);
     }
 
@@ -202,6 +242,7 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     Ok(crate::seed::Report {
         wirings,
         assessment,
+        rehearsed: ctx.dry_run,
     })
 }
 
@@ -557,6 +598,11 @@ mod tests {
         matches!(wiring.state, crate::seed::State::Failed { .. })
     }
 
+    /// Whether a wiring is one a real pass would make, on one line for the same reason.
+    fn is_would_wire(wiring: &crate::seed::Wiring) -> bool {
+        matches!(wiring.state, crate::seed::State::WouldWire { .. })
+    }
+
     /// A context whose engine says the given qBittorrent log line, answering
     /// seeding's HTTP from `replies` and its randomness from `bytes`.
     fn seed_ctx(
@@ -647,6 +693,56 @@ mod tests {
 
         let written = std::fs::read_to_string(&env).unwrap_or_default();
         assert!(written.contains("QBITTORRENT_PASSWORD="));
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// The whole claim, over a whole pass: the same walk against the same log and the
+    /// same services, with nothing set, nothing recorded and nothing kept for the next
+    /// run to compare against.
+    ///
+    /// The counterpart above is the same context without `rehearsing`, and it asserts
+    /// the password *is* recorded — so these two together say the difference is the
+    /// flag rather than a fixture that could not have written anyway.
+    #[tokio::test]
+    async fn a_rehearsed_seed_names_what_it_would_do_and_records_none_of_it() {
+        let env = config_scratch("seed-rehearsed");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+        let ctx = seed_ctx(
+            Some(TEMP_LOG),
+            true,
+            exchange(),
+            Some(vec![0x11; 24]),
+            Some(env.clone()),
+        )
+        .rehearsing();
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+
+        assert!(report.rehearsed, "{report:?}");
+        assert!(
+            report.wirings.iter().any(is_would_wire),
+            "a rehearsal that named nothing it would do said nothing: {report:?}"
+        );
+        assert!(
+            !report
+                .wirings
+                .iter()
+                .any(|wiring| wiring.state == crate::seed::State::Wired),
+            "something was wired: {report:?}"
+        );
+
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            !written.contains("QBITTORRENT_PASSWORD="),
+            "a password was recorded: {written}"
+        );
+        assert!(
+            !env.with_file_name("baseline.json").exists(),
+            "the record a later run compares against was written by a question"
+        );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 

@@ -41,6 +41,13 @@ pub(super) fn seeding(report: &SeedReport) -> Lines {
                     )),
                 }
             }
+            SeedState::WouldWire { yours, ours } => lines.put(format!(
+                "  → {connection}   {}",
+                would(yours.as_deref(), ours.as_deref())
+            )),
+            SeedState::WouldAdopt => lines.put(format!(
+                "  → {connection}   found already set — yours, would be adopted"
+            )),
             SeedState::Skipped { reason } => {
                 lines.put(format!("  ? {connection}   skipped"));
                 lines.put(format!("      {reason}"));
@@ -73,13 +80,22 @@ pub(super) fn seeding(report: &SeedReport) -> Lines {
     }
     let outstanding = report.outstanding();
     let blocked = report.blocked();
+    // What the operator is told to do next, which is the one sentence that differs
+    // between the two tenses: a pass that wired things is run again once the rest is
+    // ready, and a pass that said what it would do is run for real.
+    let again = if report.rehearsed {
+        "run it again without --dry-run"
+    } else {
+        "run seed again once ready"
+    };
     if outstanding.is_empty() {
-        lines.spaced("Everything is wired.");
+        lines.spaced(if report.rehearsed {
+            "Everything is already wired — a real run would change nothing."
+        } else {
+            "Everything is wired."
+        });
     } else if blocked.is_empty() {
-        lines.spaced(format!(
-            "{} left to wire — run seed again once ready.",
-            outstanding.len()
-        ));
+        lines.spaced(format!("{} left to wire — {again}.", outstanding.len()));
     } else if blocked.len() == outstanding.len() {
         lines.spaced(format!(
             "{} to resolve — settle the conflict, then seed again.",
@@ -100,7 +116,30 @@ pub(super) fn seeding(report: &SeedReport) -> Lines {
              from the current state.",
         );
     }
+    // Last, and said whatever the lines above came to. A report an operator reads as a
+    // run is the failure this whole flag exists to prevent, and the one place they are
+    // certain to have reached is the bottom.
+    if report.rehearsed {
+        lines.spaced(
+            "Nothing was written. No service was asked to change anything, and the record \
+             of what lemonfiber last wrote is as it was.",
+        );
+    }
     lines
+}
+
+/// What a rehearsal says about one connection, in the tense it is true in.
+///
+/// Three readings of one pair, because what the operator is looking at differs: a
+/// connection that is not there would be made, one holding something else would be
+/// moved off it, and one whose value a real run would generate can be described but
+/// never shown — there is no value to show, on purpose.
+fn would(yours: Option<&str>, ours: Option<&str>) -> String {
+    match (yours, ours) {
+        (_, None) => "would be set to a newly generated value".to_owned(),
+        (None, Some(ours)) => format!("would be set to “{ours}”"),
+        (Some(yours), Some(ours)) => format!("would be changed from “{yours}” to “{ours}”"),
+    }
 }
 
 #[cfg(test)]
@@ -153,6 +192,28 @@ mod tests {
                     reason: "two arrs".to_owned(),
                 },
             ),
+            wiring(
+                "l",
+                SeedState::WouldWire {
+                    yours: None,
+                    ours: Some("/data/media/tv".to_owned()),
+                },
+            ),
+            wiring(
+                "m",
+                SeedState::WouldWire {
+                    yours: Some("tv-sonarr".to_owned()),
+                    ours: Some("lemonfiber".to_owned()),
+                },
+            ),
+            wiring(
+                "n",
+                SeedState::WouldWire {
+                    yours: None,
+                    ours: None,
+                },
+            ),
+            wiring("o", SeedState::WouldAdopt),
         ]);
         let text = seeding(&report).text();
         for phrase in [
@@ -167,9 +228,46 @@ mod tests {
             "you cleared it",
             "skipped",
             "refused",
+            "would be set to “/data/media/tv”",
+            "would be changed from “tv-sonarr” to “lemonfiber”",
+            "would be set to a newly generated value",
+            "would be adopted",
         ] {
             assert!(text.contains(phrase), "missing {phrase}");
         }
+    }
+
+    /// A rehearsal's last lines are the two an operator has to read: what a real run
+    /// would still have to do, and that this one did none of it.
+    #[test]
+    fn a_rehearsed_pass_says_it_wrote_nothing_and_what_running_it_for_real_would_take() {
+        let waiting = SeedReport {
+            wirings: vec![wiring(
+                "a",
+                SeedState::WouldWire {
+                    yours: None,
+                    ours: Some("http://sonarr:8989".to_owned()),
+                },
+            )],
+            assessment: SeedAssessment::Assessed,
+            rehearsed: true,
+        };
+        let text = seeding(&waiting).text();
+        assert!(text.contains("1 left to wire — run it again without --dry-run."));
+        assert!(text.contains("Nothing was written."));
+        assert!(
+            !text.contains("run seed again once ready"),
+            "a rehearsal that tells them to run it again has told them it ran: {text}"
+        );
+
+        let settled = SeedReport {
+            wirings: vec![wiring("a", SeedState::AlreadyWired)],
+            assessment: SeedAssessment::Assessed,
+            rehearsed: true,
+        };
+        let done = seeding(&settled).text();
+        assert!(done.contains("a real run would change nothing"), "{done}");
+        assert!(done.contains("Nothing was written."), "{done}");
     }
 
     #[test]
@@ -235,6 +333,7 @@ mod tests {
         let report = SeedReport {
             wirings: vec![wiring("a", SeedState::Wired)],
             assessment: SeedAssessment::Unassessable,
+            rehearsed: false,
         };
         assert!(seeding(&report).text().contains("could not be read"));
     }

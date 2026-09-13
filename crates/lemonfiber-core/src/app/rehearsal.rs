@@ -236,21 +236,18 @@ pub fn asked(command: &Command) -> Asked {
         // the same walk with the file left alone.
         Command::Setup(_) => ("setup", Rehearsal::Reports),
 
-        // Untaught. Each changes something and reports it as though it had been asked
-        // about, so each refuses the flag until it has been taught to report instead.
+        // One pass over one graph, reported per connection: the field, what the service
+        // holds now, and what would be pushed. The three-way reconcile every driver
+        // already reads a connection through is what produces that, so the gate sits at
+        // each write inside those same drivers rather than above the pass — a rehearsal
+        // stopped at the door would have nothing to say, and one that surveyed
+        // separately would be a second opinion about what lemonfiber intends.
         //
-        // Both of these are one pass over the same graph, and the report they owe is
-        // per connection: the field, what the service holds, and what would be pushed.
-        // The survey that produces it is already written and already shared — the
-        // three-way reconcile every driver reads a connection through — but the writes
-        // sit inside those same drivers, below the observation, and there is no gate
-        // between the two. Teaching them is putting one there, in `crate::seed`, so
-        // that the pass a rehearsal takes is the pass a real run takes with the
-        // registering left out. Reporting from a second survey beside it would be a
-        // second opinion about what lemonfiber intends, and the one nobody runs is the
-        // one that goes wrong.
-        Command::Seed => ("seed", Rehearsal::Untaught),
-        Command::Adopt => ("adopt", Rehearsal::Untaught),
+        // Adopting is the same survey in the other direction: nothing is written to any
+        // service, and what a real run would move is lemonfiber's record of what it
+        // expects, so a rehearsal of it names the values that would be taken on.
+        Command::Seed => ("seed", Rehearsal::Reports),
+        Command::Adopt => ("adopt", Rehearsal::Reports),
     };
     Asked { named, rehearsal }
 }
@@ -416,6 +413,10 @@ mod tests {
     /// searches for and what a surface keys off.
     #[test]
     fn the_two_refusals_carry_codes_of_their_own() {
+        // `not_taught_yet` builds its refusal from the command's name rather than from
+        // its verdict, so any command names one — which matters, because nothing
+        // carries `Untaught` today. What is asked here is about the two sentences, not
+        // about which command happens to be on the board when somebody reads them.
         let untaught = asked(&Command::Seed);
         let never = asked(&Command::Walkthrough { item: None });
         // Read with `reasoning` rather than with `matches!`, which expands to a match
@@ -737,15 +738,20 @@ mod tests {
                 consent: crate::app::restore::Consent::Standing,
             },
             bundling(true),
+            Command::Seed,
+            Command::Adopt,
         ]
     }
 
     /// The commands that change something and have not been taught to say what.
     ///
-    /// The flag is refused rather than ignored, which is the whole of the difference
-    /// this module exists to make.
+    /// Empty, and kept rather than deleted: the verdict it stands for is still one of
+    /// the four, a command added tomorrow can still be given it, and a reader comparing
+    /// this table with the match wants to see that nothing carries it rather than to
+    /// find the row missing. `every_command_is_answered_the_way_the_table_says` reads
+    /// it whatever it holds.
     fn untaught() -> Vec<Command> {
-        vec![Command::Seed, Command::Adopt]
+        Vec::new()
     }
 
     /// A doctor run acknowledging a finding, which is the third of its three arms.

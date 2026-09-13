@@ -156,10 +156,13 @@ pub(super) async fn seed_arr(
         &client,
         &arr.target.name,
         &wanted,
-        seeding.contested,
-        DATA_ROOT,
+        crate::seed::Placing {
+            contested: seeding.contested,
+            root: DATA_ROOT,
+        },
         &mut journal,
         &at,
+        ctx.dry_run,
     )
     .await;
     // Before the download clients are appended, `wirings` holds exactly one entry per
@@ -185,6 +188,7 @@ pub(super) async fn seed_arr(
                     records: &mut records,
                     adopt: seeding.adopt || re_baseline,
                     reset: false,
+                    rehearsing: ctx.dry_run,
                 },
                 &at,
             )

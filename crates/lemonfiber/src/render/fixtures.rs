@@ -31,6 +31,7 @@ pub(super) fn seed_report(wirings: Vec<Wiring>) -> SeedReport {
     SeedReport {
         wirings,
         assessment: SeedAssessment::Assessed,
+        rehearsed: false,
     }
 }
 

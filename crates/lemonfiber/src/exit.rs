@@ -461,6 +461,14 @@ pub(crate) fn repairing(report: &RepairReport) -> ExitCode {
 /// or failed may complete on a re-run, so it stays FAILURE. A script can then tell "fix
 /// your config" from "wait and retry".
 pub(crate) fn seed_exit(report: &lemonfiber_core::seed::Report) -> ExitCode {
+    // A pass that only said what it would do answered the question it was asked, and
+    // every connection it names as outstanding is one nobody has agreed to make yet.
+    // Read before completeness, because a rehearsal against a stack with anything left
+    // to wire is incomplete by construction — that is the report rather than a fault in
+    // it, and a script told otherwise would stop on the answer it asked for.
+    if report.rehearsed {
+        return ExitCode::SUCCESS;
+    }
     if report.is_complete() {
         ExitCode::SUCCESS
     } else if report.blocked().is_empty() {
@@ -1034,6 +1042,7 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            rehearsed: false,
         };
         assert_eq!(
             format!("{:?}", settled(&Outcome::Seed(settled_seed))),
@@ -1050,6 +1059,7 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            rehearsed: false,
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Seed(blocked))), success());
     }
@@ -1089,8 +1099,31 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            rehearsed: false,
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Seed(waiting))), success());
+    }
+
+    #[test]
+    fn a_seed_that_only_said_what_it_would_do_answered_the_question_it_was_asked() {
+        // The same report that earns a non-zero code from a run that wired things, on a
+        // run that wired nothing because it was not asked to.
+        let rehearsed = SeedReport {
+            wirings: vec![Wiring {
+                connection: "a".to_owned(),
+                state: SeedState::WouldWire {
+                    yours: None,
+                    ours: Some("http://sonarr:8989".to_owned()),
+                },
+                severity: SeedSeverity::Informational,
+            }],
+            assessment: Assessment::Assessed,
+            rehearsed: true,
+        };
+        assert_eq!(
+            format!("{:?}", settled(&Outcome::Seed(rehearsed))),
+            success()
+        );
     }
 
     #[test]

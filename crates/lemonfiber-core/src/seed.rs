@@ -49,9 +49,9 @@ pub use clients::{client_field, wire_download_clients, Baselines, CLIENT};
 pub(crate) use drift::observe_client;
 use drift::{canonical_root, same_base_url, same_path};
 pub use drift::{intent, reconcile, same_endpoint, wholesale_drift, Intent, Observed};
-use report::{observe_or_skip, record_outcome, unreached};
+use report::{observe_or_skip, observe_or_untold, record_outcome, unreached, unread};
 pub use report::{Assessment, Report, Severity, State, Wiring};
-pub use roots::{contested_roots, wire_root_folders};
+pub use roots::{contested_roots, wire_root_folders, Placing};
 pub(crate) use services::{observed_telling, said, wanted_telling, TELLING};
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_jellyfin_identity,
@@ -86,6 +86,18 @@ const ADMIN: &str = crate::config::JELLYFIN_ADMIN_USER;
 /// are made by the caller and awaited here — register first, the read-back only if
 /// it succeeded — which is free, because a future is inert until it is polled and
 /// this keeps the ordering, and the two `unreached` gates, in one place.
+///
+/// `would` is the whole of what a rehearsal is here, and it is the state to answer
+/// with rather than a flag saying to answer with one. Two reasons. This function has
+/// never seen a value — it holds two futures and three labels — so only the caller can
+/// say what the connection would be made *to*, and a report that could not say that
+/// would be a count. And the register future is inert until it is polled, so returning
+/// before polling it is the write not happening rather than the write being skipped:
+/// there is no branch anywhere below that a later reader could reorder past.
+///
+/// One gate here covers four connections — root folders, download clients,
+/// applications and request targets — because they already share this body. That is
+/// the reason the shape was worth sharing in the first place.
 async fn wire_one<T>(
     register: impl Future<Output = Result<(), Failure>>,
     read_back: impl Future<Output = Result<Vec<T>, Failure>>,
@@ -93,7 +105,11 @@ async fn wire_one<T>(
     naming: Naming<'_>,
     journal: &mut Journal,
     at: &str,
+    would: Option<State>,
 ) -> State {
+    if let Some(would) = would {
+        return would;
+    }
     if let Err(failure) = register.await {
         return unreached(&failure);
     }

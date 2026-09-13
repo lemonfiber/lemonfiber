@@ -63,7 +63,7 @@ fn registered() -> String {
 
 async fn wire(seerr: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
     let mut journal = Journal::new();
-    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z")
+    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z", false)
         .await
         .into_iter()
         .map(|wiring| wiring.state)
