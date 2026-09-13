@@ -96,10 +96,44 @@ jobs:
       # of main is what every pull request is measured against, and a comparison
       # that quietly went the other way would turn it off with nothing to notice.
       - name: SonarQube Cloud scan
+        id: scan
         if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # Runs when the scan failed, and asks the one question its output does not
+      # answer: was that this repository or the host?
+      #
+      # A scanner that cannot reach SonarCloud fails with a Spring
+      # bean-creation trace forty lines deep and `Error 503` somewhere in the
+      # middle, and the required check beside it goes red exactly as it does for
+      # a real finding. On 2026-09-13 SonarCloud answered 503 for over an hour
+      # and fourteen pull requests across the organisation sat blocked behind a
+      # stack trace nobody had read to the middle of.
+      #
+      # It reports and changes nothing: the scan still failed, the check is
+      # still red, and `Q-R64` was still not enforced on this run. What it adds
+      # is the sentence that says which of those two things happened.
+      - name: Whether SonarCloud was answering
+        if: always() && steps.scan.outcome == 'failure'
+        run: |
+          set -uo pipefail
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
+            https://sonarcloud.io/api/system/status 2>/dev/null || echo "000")
+
+          # 000 is curl reaching nothing at all, which is the same news as a 5xx
+          # for the purpose of this sentence.
+          case "$code" in
+          5?? | 000)
+            said="The scan failed and SonarCloud answered ${code} to a plain status request, so the host was unavailable rather than this pull request being at fault. Coverage ran above and had to reach 100% either way (Q-R61). Re-run this job once sonarcloud.io is answering — nothing on this run enforced Q-R64."
+            ;;
+          *)
+            said="The scan failed and SonarCloud answered ${code} to a plain status request, so the host was reachable and the failure is in this run rather than an outage. Read the scanner output above. Nothing on this run enforced Q-R64."
+            ;;
+          esac
+
+          echo "::notice::${said}"
+          printf '### Why the SonarCloud scan failed\n\n%s\n' "$said" >> "$GITHUB_STEP_SUMMARY"
       # Runs in exactly the case the scan does not. A step missing from a log
       # reads the same as a step that ran and found nothing, and this repository
       # has been caught by that reading more than once, so the skip appears under
@@ -123,6 +157,23 @@ jobs:
   # request hostage.
   gate:
     needs: sonar
+    # `needs` alone makes this job disappear when the scan fails, and a required
+    # check that does not report is not a check that says nothing — it is a pull
+    # request blocked with no line anywhere saying by what. That is the outcome
+    # the gate itself is written to avoid: it warns and passes on a summary that
+    # never arrived, precisely so a SonarCloud outage cannot hold somebody's work
+    # hostage. `needs` was quietly overruling that, and on 2026-09-13 it did:
+    # every pull request in this organisation sat on `MISSING: gate / gate` while
+    # the job that would have explained why was never scheduled.
+    #
+    # So it runs whatever the scan did. Nothing is loosened by that — a failed
+    # scan leaves `sonar` red, and `sonar` is a required check in its own right,
+    # so the pull request stays blocked for the reason it should be. What changes
+    # is that the reason is now written down.
+    #
+    # `!cancelled()` rather than `always()`: a cancelled run is somebody pressing
+    # stop, and finishing the job they stopped is not a service to anyone.
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
       pull-requests: write
