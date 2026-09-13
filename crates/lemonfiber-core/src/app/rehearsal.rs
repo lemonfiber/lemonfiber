@@ -331,6 +331,55 @@ mod tests {
         );
     }
 
+    /// The three that refuse the flag for good say so, and the read half of each
+    /// command that carries one of them under a shared name does not.
+    ///
+    /// Driven rather than read, because the two halves of `trace` and of `doctor` are
+    /// one word to an operator and two arms here, and an arm nothing reaches is an arm
+    /// whose pattern could be wrong in either direction without anything saying so.
+    #[test]
+    fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
+        let tracing = |searching| Command::Trace {
+            term: "anything".to_owned(),
+            season: None,
+            searching,
+        };
+        let examining = |disruptive, accept: Option<&str>| Command::Doctor {
+            narrowing: crate::doctor::Narrowing::Suite,
+            disruptive,
+            accept: accept.map(ToOwned::to_owned),
+        };
+        let bundling = |write| Command::Support {
+            write,
+            wanted: crate::app::bundle::Wanted::default(),
+            dest: crate::app::support::Destination::Kept,
+        };
+
+        for (command, refuses) in [
+            (tracing(true), true),
+            (tracing(false), false),
+            (examining(true, None), true),
+            (examining(false, None), false),
+            (Command::Walkthrough { item: None }, true),
+            (bundling(false), false),
+        ] {
+            let asked = asked(&command);
+            assert_eq!(
+                matches!(asked.rehearsal, Rehearsal::Cannot(_)),
+                refuses,
+                "{command:?} was read as the wrong one of the two"
+            );
+            // And the reason reaches the operator rather than staying in the source,
+            // which is the difference between refusing and refusing usefully.
+            if let Rehearsal::Cannot(why) = asked.rehearsal {
+                assert!(
+                    refused(&asked, why).meaning.contains(why),
+                    "the reason did not reach the refusal for {command:?}"
+                );
+            }
+        }
+    }
+
     /// The same split, on the three other commands that carry a read and a write under
     /// one name.
     #[test]
