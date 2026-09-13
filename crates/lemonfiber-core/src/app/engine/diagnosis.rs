@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
@@ -339,8 +340,21 @@ pub(crate) async fn assembled(
             .unwrap_or_default(),
     );
     let telling = household_telling(ctx, &manifest.services);
+    // Whether the stack would actually come back after a restart, which is a different
+    // question from whether the operator asked for it to. The answer they gave is read
+    // here rather than inside the check, for the reason every other reading is: a check
+    // holds the seam it looks through, and lemonfiber's own records are not reached
+    // through one.
+    let autostart = AutostartCheck::new(
+        ctx.filesystem.clone(),
+        ctx.runner.clone(),
+        ctx.environment,
+        crate::app::autostart::load(ctx).wanted().on_boot(),
+        ctx.settings.home.clone(),
+    );
     let checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
+        Box::new(autostart),
         Box::new(bindings),
         Box::new(storage),
         Box::new(vpn),
