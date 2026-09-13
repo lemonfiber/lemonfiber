@@ -45,6 +45,29 @@ pub(crate) fn save(ctx: &Ctx, returning: &Returning) {
     super::record::keep_beside(ctx, RECORD, returning);
 }
 
+/// What one lifecycle action says about what this machine is for.
+///
+/// Two of the seven say anything at all. The rest change what is running without
+/// saying anything about what should be: stopping one container to look at it, or
+/// fetching an image, is not the operator putting their stack down for the night.
+enum Said {
+    /// These forms are what the operator wants running.
+    Running,
+    /// The stack is to stay down until they say otherwise.
+    Stopped,
+}
+
+/// What this action amounts to, or nothing where it amounts to nothing.
+const fn said(action: &Action) -> Option<Said> {
+    match action {
+        Action::Up => Some(Said::Running),
+        Action::Down => Some(Said::Stopped),
+        Action::Start(_) | Action::Stop(_) | Action::Restart(_) | Action::Pull | Action::Config => {
+            None
+        }
+    }
+}
+
 /// Write down what this lifecycle command was asked to do, where it did it.
 ///
 /// Called from both ways of running one. A start can be waited on or streamed, and
@@ -55,16 +78,13 @@ pub(super) fn noted(ctx: &Ctx, action: &Action, forms: &[String], report: &Lifec
     if !carried(ctx, report) {
         return;
     }
+    let Some(said) = said(action) else {
+        return;
+    };
     let mut returning = load(ctx);
-    match action {
-        Action::Up => returning.started(forms),
-        Action::Down => returning.stopped(),
-        // Everything else leaves the record alone. Starting or stopping named
-        // services is a change to what is running rather than a statement about
-        // what this machine is for, and a restart or a fetch is neither.
-        Action::Start(_) | Action::Stop(_) | Action::Restart(_) | Action::Pull | Action::Config => {
-            return
-        }
+    match said {
+        Said::Running => returning.started(forms),
+        Said::Stopped => returning.stopped(),
     }
     save(ctx, &returning);
 }

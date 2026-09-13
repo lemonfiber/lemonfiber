@@ -110,10 +110,7 @@ async fn waited(
 /// Whether the location is there now, or at least readable enough not to be an
 /// absence.
 async fn present(ctx: &Ctx, root: &Path) -> bool {
-    match ctx.volume.presence(root).await {
-        Presence::On(_) | Presence::Unknown => true,
-        Presence::Gone => false,
-    }
+    !matches!(ctx.volume.presence(root).await, Presence::Gone)
 }
 
 /// What to tell an operator whose data location never turned up.

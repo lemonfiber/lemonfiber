@@ -346,11 +346,14 @@ const TURN_IT_ON: &str = "Open Docker Desktop, and under Settings → General tu
 /// Read the setting out of whichever settings file this machine has.
 async fn read_setting(check: &AutostartCheck, home: &Path) -> Option<bool> {
     for candidate in SETTINGS {
-        let Some(text) = check.filesystem.read(&home.join(candidate)).await else {
-            continue;
-        };
-        if let Some(answer) = at_login(&text) {
-            return Some(answer);
+        let answer = check
+            .filesystem
+            .read(&home.join(candidate))
+            .await
+            .as_deref()
+            .and_then(at_login);
+        if answer.is_some() {
+            return answer;
         }
     }
     None
@@ -387,6 +390,22 @@ mod tests {
     /// Where a test pretends this operator's home directory is.
     fn home() -> PathBuf {
         PathBuf::from("/home/op")
+    }
+
+    /// The location a test writes the setting to when it does not care which.
+    ///
+    /// Written out rather than taken off the list by position, so the list can be
+    /// reordered without quietly changing what these tests are about — and asserted
+    /// to be on it, so it cannot drift off the list either.
+    const SOMEWHERE: &str = "Library/Group Containers/group.com.docker/settings-store.json";
+
+    /// And the one Docker Desktop uses on Linux, for the test that is about platforms.
+    const ON_LINUX: &str = ".docker/desktop/settings-store.json";
+
+    #[test]
+    fn the_places_these_tests_write_to_are_places_the_check_looks() {
+        assert!(SETTINGS.contains(&SOMEWHERE));
+        assert!(SETTINGS.contains(&ON_LINUX));
     }
 
     /// A runner answering every program with the given output.
@@ -469,7 +488,7 @@ mod tests {
         // The key is `autoStart` in the old settings file and `AutoStart` in the
         // store that replaced it. A reader that knew one spelling would report a
         // machine set up correctly as unverified.
-        let check = desktop(holding(SETTINGS[0], r#"{"AutoStart": true, "Other": 1}"#));
+        let check = desktop(holding(SOMEWHERE, r#"{"AutoStart": true, "Other": 1}"#));
         assert!(matches!(verdict(check).await, Some(Verdict::Pass { .. })));
     }
 
@@ -477,7 +496,7 @@ mod tests {
     async fn docker_desktop_that_does_not_open_at_login_is_named_as_the_cause() {
         // The single most common reason a stack does not come back, and the one the
         // operator cannot see: nothing errors, nothing is logged, it is just gone.
-        let verdict = verdict(desktop(holding(SETTINGS[0], r#"{"autoStart": false}"#))).await;
+        let verdict = verdict(desktop(holding(SOMEWHERE, r#"{"autoStart": false}"#))).await;
         let problem = match verdict {
             Some(Verdict::Warn(problem)) => Some(problem),
             _ => None,
@@ -510,7 +529,7 @@ mod tests {
             "not json at all",
             r#"{"autoStart": "yes"}"#,
         ] {
-            let verdict = verdict(desktop(holding(SETTINGS[0], text))).await;
+            let verdict = verdict(desktop(holding(SOMEWHERE, text))).await;
             assert!(
                 matches!(verdict, Some(Verdict::Unverified { .. })),
                 "{text} was not treated as unreadable"
@@ -634,7 +653,7 @@ mod tests {
             Environment::MacOs,
         ] {
             let check = AutostartCheck::new(
-                holding(SETTINGS[2], r#"{"autoStart": false}"#),
+                holding(ON_LINUX, r#"{"autoStart": false}"#),
                 saying("enabled"),
                 environment,
                 true,
