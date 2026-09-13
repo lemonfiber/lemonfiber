@@ -283,6 +283,11 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
         .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
 
+    // What the operator has just asked for, written down before anything is waited
+    // on. A start whose services never settle has still started them, and a boot
+    // that forgot which form that was would bring back the wrong one.
+    super::autostart::noted(ctx, action, forms, &report);
+
     // Starting waits for the services to be usable, because "started" that
     // means "a process exists" is a claim the operator will disprove by opening
     // a browser. Nothing else waits: stopping is done when Compose says so.
@@ -519,6 +524,32 @@ mod tests {
             assert!(
                 before_spawn.is_some(),
                 "{path} starts services without minting the key one of them adopts"
+            );
+        }
+    }
+
+    /// Both ways of starting write down what was asked for, because there are two.
+    ///
+    /// The same hazard the minting above is pinned against, on a record that is read
+    /// at a moment nobody is watching: a start recorded on only the waited-on path
+    /// leaves the next boot bringing back whatever form the *other* path last named,
+    /// and the operator finds out days later that the wrong half of their stack has
+    /// been running.
+    ///
+    /// Pinned by the call rather than by behaviour, since neither path can be run here
+    /// without a container to start. The production half of each file is what is read,
+    /// so the name appearing in this very test does not satisfy it.
+    #[test]
+    fn both_ways_of_starting_write_down_what_was_asked_for() {
+        const WAITED: &str = include_str!("engine.rs");
+        const STREAMED: &str = include_str!("engine/streaming.rs");
+        for (path, source) in [("engine.rs", WAITED), ("engine/streaming.rs", STREAMED)] {
+            let production = source
+                .split_once("#[cfg(test)]")
+                .map_or(source, |(before, _)| before);
+            assert!(
+                production.contains("autostart::noted(ctx, "),
+                "{path} starts services without recording what was asked for"
             );
         }
     }

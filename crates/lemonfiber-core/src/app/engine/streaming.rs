@@ -181,8 +181,13 @@ pub async fn started(
     services: &[String],
     status: Option<i32>,
 ) -> Result<Outcome, Box<Problem>> {
-    let (manifest, _, mut report) = readied(ctx, forms, &aimed(services)).await?;
+    let aimed = aimed(services);
+    let (manifest, _, mut report) = readied(ctx, forms, &aimed).await?;
     report.status = status;
+    // The waited-on path writes the same record at the same point. A start that went
+    // one way and not the other would leave the next boot bringing back whatever the
+    // last start through the *other* path named, which is worse than nothing.
+    super::super::autostart::noted(ctx, &aimed, forms, &report);
     if status == Some(0) {
         settled_into(ctx, &manifest, &mut report).await?;
     }

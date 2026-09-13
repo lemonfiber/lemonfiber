@@ -152,8 +152,9 @@ pub const EVERY: &[Entry] = &[
     Entry {
         accessor: "autostart",
         what: "your answer about starting on boot",
-        why: "Whether you asked for the stack to come back after this machine restarts. It is \
-              the answer you gave and not a claim that it works — on a Mac or a Windows machine, \
+        why: "Whether you asked for the stack to come back after this machine restarts, which \
+              form that means, and whether the last thing you asked for was a stop. It is the \
+              answer you gave and not a claim that it works — on a Mac or a Windows machine, \
               half of what makes it work is a Docker Desktop setting lemonfiber cannot write.",
         secret: false,
         at: Paths::autostart,

@@ -23,6 +23,7 @@ pub mod apply;
 pub mod archives;
 mod arrangement;
 mod asking;
+mod autostart;
 pub mod backup;
 mod bandwidth;
 mod beside;
