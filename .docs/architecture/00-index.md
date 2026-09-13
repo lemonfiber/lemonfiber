@@ -9,6 +9,7 @@ are about Rust rather than about the product.
 |------|--------|
 | [module-layout.md](module-layout.md) | Where things live, and what the architecture test enforces |
 | [dispatch.md](dispatch.md) | The one entry point every surface goes through |
+| [rehearsal.md](rehearsal.md) | What `--dry-run` means per command, and the three things that stop a handler ignoring it |
 | [ports-and-adapters.md](ports-and-adapters.md) | The seam to the outside world, and how to fake it |
 | [engine-api.md](engine-api.md) | What the container engine is asked, and testing it without a daemon |
 | [error-model.md](error-model.md) | Typed errors, one operator-facing value, and how the coverage gate proves it |
