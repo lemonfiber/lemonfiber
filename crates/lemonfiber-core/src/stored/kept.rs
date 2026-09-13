@@ -150,6 +150,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::notifications,
     },
     Entry {
+        accessor: "autostart",
+        what: "your answer about starting on boot",
+        why: "Whether you asked for the stack to come back after this machine restarts. It is \
+              the answer you gave and not a claim that it works — on macOS and Windows, half of \
+              what makes it work is a Docker Desktop setting that is not lemonfiber's to write.",
+        secret: false,
+        at: Paths::autostart,
+    },
+    Entry {
         accessor: "accepted",
         what: "the questions you have already settled",
         why: "The choices whose cost was stated to you once — running with no VPN, or with a \

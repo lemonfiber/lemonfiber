@@ -135,6 +135,17 @@ impl Paths {
         self.config.join("notifications.json")
     }
 
+    /// The operator's autostart answer: whether they asked for the stack to come
+    /// back after this machine restarts. Kept with configuration rather than as a
+    /// setting in the environment file, because the environment file is handed to
+    /// Compose as it stands and this is not a thing Compose has any use for — and
+    /// kept at all because an answer gathered at setup and then discarded leaves
+    /// the operator believing they chose something they did not.
+    #[must_use]
+    pub fn autostart(&self) -> PathBuf {
+        self.config.join("autostart.json")
+    }
+
     /// What the household declared about its line: the limits, the hours, the cap,
     /// and what the line has been seen to carry. Kept with configuration for the
     /// same reasons the quality choice is, and for one of its own — the measured
@@ -284,6 +295,7 @@ mod tests {
             paths.materialised(),
             paths.quality(),
             paths.notifications(),
+            paths.autostart(),
             paths.bandwidth(),
             paths.accepted(),
             paths.refusals(),
@@ -408,6 +420,7 @@ mod tests {
             paths.baseline(),
             paths.materialised(),
             paths.quality(),
+            paths.autostart(),
             paths.bandwidth(),
             paths.admission(),
             paths.updates(),

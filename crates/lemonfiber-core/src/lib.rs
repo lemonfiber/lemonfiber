@@ -50,6 +50,7 @@ pub mod archive;
 pub mod asking;
 pub mod audio;
 pub mod audiobookshelf;
+pub mod autostart;
 pub mod backup;
 pub mod bandwidth;
 pub mod baseline;
