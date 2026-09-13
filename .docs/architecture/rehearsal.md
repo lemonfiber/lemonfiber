@@ -101,17 +101,17 @@ So a rehearsal takes the operator's go-ahead back on the way in
 second way to say what they already say. A second way is a second thing to keep true,
 and the one nobody exercises is the one that stops being true.
 
+That function is deliberately *not* exhaustive: it is the mechanism, not the
+decision. What a rehearsal means is decided in `asked`, which the compiler does check,
+and a command that claims to report while its go-ahead is not taken back here fails
+the gate against a real disk.
+
 `support --write` is the newest of them and needed one thing beyond the withheld yes.
 The run that writes nothing said what the bundle would hold and not where it would
 land, so a rehearsal answered half the question an operator asks at a shell. Both
 halves now resolve the destination through one function (`support::landing`), and the
 description carries it — which is the better command for it either way, since the
 moment the path can still change what somebody does is before the file exists.
-
-That function is deliberately *not* exhaustive: it is the mechanism, not the
-decision. What a rehearsal means is decided in `asked`, which the compiler does check,
-and a command that claims to report while its go-ahead is not taken back here fails
-the gate against a real disk.
 
 `doctor --fix` needed one thing beyond the withheld yes. It writes the fault store on every
 run, before it decides whether to act, because the offer is built from how often a
@@ -125,9 +125,10 @@ Three commands change nothing an operator asked about and still write something:
 note that they ran. `doctor --fix` keeps the fault store above; `update self` keeps
 `updates.json` beside the settings, which is how it knows not to ask the release list
 again today; and answering a setup question keeps the resumable progress file, which
-is the whole of setup's state. Each of those is suppressed under a rehearsal and read
-as normal, for one reason said three times: a question that moved when the next real
-run decides has been answered on the operator's behalf.
+is the whole of setup's state. Each of those is read as normal under a rehearsal and
+written on no run that only says what it would do, for one reason said three times:
+recording that this run happened moves what a later one decides, and a question that
+changes the answer has been answered on the operator's behalf.
 
 `update self` was refusing the flag it did not need to refuse, which is its own small
 defect — a command that says no to `--dry-run` teaches an operator the flag is
