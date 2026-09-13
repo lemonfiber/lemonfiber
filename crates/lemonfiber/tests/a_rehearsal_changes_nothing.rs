@@ -42,6 +42,7 @@ use std::sync::Arc;
 use clap::CommandFactory as _;
 
 use lemonfiber::cli::{Cli, STACK};
+use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
 use lemonfiber_core::app::{
     dispatch, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Ctx, Decision,
     Keeping, MigrateAction, QualityAction, Removing, Setting, SetupAction, Waiting,
@@ -568,5 +569,66 @@ fn nothing_is_driven_here_that_the_command_line_does_not_accept() {
         stray.is_empty(),
         "these are driven as subcommands and are not ones: {}",
         stray.join(", ")
+    );
+}
+
+/// Whether the command line accepts this, read the way a refusal writes it.
+///
+/// A word is a subcommand and a `--word` is a flag on whatever subcommand came before
+/// it, which is the grammar the names in `app::rehearsal` are written in.
+fn typed(named: &str) -> bool {
+    let mut here = Cli::command();
+    here.build();
+    for word in named.split_whitespace() {
+        if let Some(flag) = word.strip_prefix("--") {
+            if !here.get_arguments().any(|arg| arg.get_long() == Some(flag)) {
+                return false;
+            }
+            continue;
+        }
+        let Some(next) = here.find_subcommand(word).cloned() else {
+            return false;
+        };
+        here = next;
+    }
+    true
+}
+
+/// Every name a refusal publishes is a command line that can actually be typed.
+///
+/// A refusal ends with ``Run `lemonfiber <named>` without `--dry-run` when you mean
+/// it``, and `<named>` comes from `app::rehearsal`, which is in another crate and had
+/// never been read against clap. Three of them named nothing: `household remove` for a
+/// subcommand that is top-level, `self-update` for what is spelled `update self`, and
+/// `repair` for a thing the command line does not offer at all — it arrives from the
+/// terminal and the web interface, where the command line's word for it is `doctor
+/// --fix`. Each sent an operator who had just been told no to a second error.
+///
+/// Only the names that can reach a refusal. The verdicts that permit a rehearsal never
+/// publish theirs, and several of those are how an operator *says* a command rather
+/// than how they type it — `allow` for `household allow`, `archives` for a `restore`
+/// with nothing named. Widening this to those would be asking prose to be a command
+/// line. If something starts printing them, this is where to widen it.
+#[test]
+fn every_name_a_refusal_publishes_can_be_typed() {
+    let refusing: BTreeSet<String> = samples()
+        .into_iter()
+        .chain(beyond_the_command_line())
+        .map(|(_, command)| asked(&command))
+        .filter(|asked| !matches!(asked.rehearsal, Rehearsal::Reads | Rehearsal::Reports))
+        .map(|asked| asked.named.to_owned())
+        .collect();
+
+    assert!(
+        !refusing.is_empty(),
+        "no command here refuses the flag, so this test is reading nothing"
+    );
+
+    let wrong: Vec<&String> = refusing.iter().filter(|named| !typed(named)).collect();
+
+    assert!(
+        wrong.is_empty(),
+        "a refusal tells the operator to run these, and the command line has no such \
+         thing: {wrong:?}"
     );
 }
