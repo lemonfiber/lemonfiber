@@ -157,6 +157,23 @@ jobs:
   # request hostage.
   gate:
     needs: sonar
+    # `needs` alone makes this job disappear when the scan fails, and a required
+    # check that does not report is not a check that says nothing — it is a pull
+    # request blocked with no line anywhere saying by what. That is the outcome
+    # the gate itself is written to avoid: it warns and passes on a summary that
+    # never arrived, precisely so a SonarCloud outage cannot hold somebody's work
+    # hostage. `needs` was quietly overruling that, and on 2026-09-13 it did:
+    # every pull request in this organisation sat on `MISSING: gate / gate` while
+    # the job that would have explained why was never scheduled.
+    #
+    # So it runs whatever the scan did. Nothing is loosened by that — a failed
+    # scan leaves `sonar` red, and `sonar` is a required check in its own right,
+    # so the pull request stays blocked for the reason it should be. What changes
+    # is that the reason is now written down.
+    #
+    # `!cancelled()` rather than `always()`: a cancelled run is somebody pressing
+    # stop, and finishing the job they stopped is not a service to anyone.
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
       pull-requests: write
