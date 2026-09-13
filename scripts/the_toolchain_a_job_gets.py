@@ -111,15 +111,19 @@ def claim_promise(workflows: dict[str, dict]) -> list[str]:
         ]
         if not reads:
             return [
-                f"{file} job {MSRV} has no step reading {PROMISED} from {PROMISE}, "
-                "so the version it tests is a second copy of the promise"
+                (
+                    f"{file} job {MSRV} has no step reading {PROMISED} from {PROMISE}, "
+                    "so the version it tests is a second copy of the promise"
+                )
             ]
         asked = named(job) or ""
         if not any(f"steps.{step}." in asked for step in reads):
             return [
-                f"{file} job {MSRV} asks for {asked!r}, which is not what it read "
-                f"from {PROMISE} — a version spelled here can disagree with the one "
-                "promised, and a job testing the wrong compiler still goes green"
+                (
+                    f"{file} job {MSRV} asks for {asked!r}, which is not what it read "
+                    f"from {PROMISE} — a version spelled here can disagree with the one "
+                    "promised, and a job testing the wrong compiler still goes green"
+                )
             ]
         return []
     return [f"no workflow declares an {MSRV} job, so nothing collects on the promise"]

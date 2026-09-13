@@ -77,8 +77,8 @@ def refuses(text):
     )
     if not mismatch:
         return False, "a checksum mismatch does not reach err"
-    leaving = re.search(r"^err\(\) \{(.*?)^\}", text, re.S | re.M)
-    if not leaving or not re.search(r"^\s*exit [1-9]", leaving.group(1), re.M):
+    leaving = re.search(r"^err\(\) \{(.*?)^\}", text, re.DOTALL | re.MULTILINE)
+    if not leaving or not re.search(r"^\s*exit [1-9]", leaving.group(1), re.MULTILINE):
         return False, "err does not leave with a non-zero status"
     return True, "a mismatch stops the run before anything is placed"
 
@@ -117,7 +117,7 @@ BREAKAGES = {
         re.search(r'_checksum_value="([^"]+)"', text).group(0), '_checksum_value=""', 1
     ),
     "verified": lambda text: text.replace("verify_checksum \"$_file\"", "true \"$_file\"", 1),
-    "refuses": lambda text: re.sub(r"^(err\(\) \{.*?)^\s*exit [1-9]", r"\1    return 0", text, count=1, flags=re.S | re.M),
+    "refuses": lambda text: re.sub(r"^(err\(\) \{.*?)^\s*exit [1-9]", r"\1    return 0", text, count=1, flags=re.DOTALL | re.MULTILINE),
     "atomic": lambda text: text.replace(
         f'ensure mv "${STAGING}/$_bin_name" "${LANDING}"',
         f'ensure cp "${STAGING}/$_bin_name" "${LANDING}"',

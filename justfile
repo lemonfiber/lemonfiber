@@ -56,7 +56,7 @@ release-tag VERSION:
 #
 # The loop to run before a push is `just rebased`, then clippy and the tests for what
 # you touched.
-ci: hooks fmt-check lint test typos deny toolchain
+ci: hooks fmt-check lint scripts test typos deny toolchain
 
 build:
     cargo build --workspace
@@ -139,6 +139,15 @@ fmt-check:
 
 lint:
     cargo clippy --all-targets --workspace -- -D warnings
+
+# `scripts/` decides whether a tagged build can be trusted, whether the installer
+# places the binary it verified, and whether each job runs the compiler the manifest
+# promises. Several prove their own claims against a tree that has lost one, which is
+# the harder half.
+#
+# Read the release gates themselves, for a name that does not exist.
+scripts:
+    uvx ruff@0.16.4 check scripts/
 
 deny:
     cargo deny check

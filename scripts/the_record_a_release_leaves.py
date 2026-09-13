@@ -481,7 +481,7 @@ def summaries(release_record: dict) -> list[str]:
     ]
 
 
-def self_test() -> int:  # noqa: C901 - one claim per block, read as a list
+def self_test() -> int:
     """Hold every claim this makes, against a history it builds for itself."""
     uninstall = Page("Clean uninstall", "features/a6-uninstall", "acceptance-criteria")
     catalogue = Catalogue(
