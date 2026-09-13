@@ -17,20 +17,16 @@ target-version = "py312"
 line-length = 110
 
 [lint]
-# Correctness first — `F` is the half that finds undefined names and unreachable
-# code, `B` the half that finds the mistakes that still run. `ISC` is here for
-# one shape in particular: two adjacent strings inside a list are one string,
-# and the difference between that and a missing comma is invisible.
+# The floor, and the reasoning for each rule, live in
+# `lemonfiber/spec`'s `shared/ruff.toml`, which `check_shared_files.py` holds
+# this copy to: every rule below has to stay selected, and nothing may be
+# added to `ignore` that the shared file does not already ignore.
 select = ["E", "W", "F", "B", "I", "SIM", "UP", "RUF", "EXE", "FURB", "ISC"]
 
 ignore = [
-    # These scripts quote the repository's prose and the CLI's own output back
-    # in their messages, and both use typographic dashes and quotes.
     "RUF001",
     "RUF002",
     "RUF003",
-    # Width is not what these get wrong. They carry long workflow paths, long
-    # digests and long report lines.
     "E501",
 ]
 
