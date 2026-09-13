@@ -341,7 +341,15 @@ fn remembered(ctx: &Ctx, found: &[Finding]) -> crate::condition::Conditions {
     for finding in found {
         conditions.observe(&finding.check, wrong(finding).as_ref(), &now);
     }
-    super::conditions::save(ctx, &conditions);
+    // Written down only by a run that is really happening. What this file holds is how
+    // often a fault has been seen and how often a fix for it was tried and left it
+    // standing, which is how the offer decides what is worth offering again — and a
+    // rehearsal that recorded a sighting would move that count without anybody having
+    // asked it to. The reading above still happens, because the report a rehearsal
+    // gives is built from it.
+    if !ctx.dry_run {
+        super::conditions::save(ctx, &conditions);
+    }
     conditions
 }
 
@@ -594,6 +602,31 @@ mod tests {
         assert!(super::super::conditions::load(&ctx)
             .get("vpn.port-forward-client")
             .is_some());
+    }
+
+    /// A rehearsal reads the store and does not add to it.
+    ///
+    /// What this file holds is how often a fault has been seen and how often a fix left
+    /// it standing, and the offer decides what is worth offering again from those
+    /// counts. A rehearsal that recorded a sighting would move them, so the next real
+    /// run would decide differently because somebody had asked a question.
+    #[test]
+    fn a_rehearsed_repair_reads_the_store_and_writes_nothing_to_it() {
+        let ctx = ctx_at("repair-rehearsed").rehearsing();
+        let found = vec![finding("vpn.port-forward-client", Verdict::Warn(problem()))];
+
+        let conditions = super::remembered(&ctx, &found);
+
+        // The report a rehearsal gives is built from the reading, so the reading happens.
+        assert!(conditions
+            .get("vpn.port-forward-client")
+            .is_some_and(crate::condition::Condition::is_raised));
+        // Against the real file, not against what the function said it did.
+        let kept = crate::app::fixtures::scratch("repair-rehearsed").join("conditions.json");
+        assert!(!kept.exists(), "a rehearsal wrote {}", kept.display());
+        assert!(super::super::conditions::load(&ctx)
+            .get("vpn.port-forward-client")
+            .is_none());
     }
 
     /// A pass says nothing is wrong and a skip says there was nothing to look at. An
