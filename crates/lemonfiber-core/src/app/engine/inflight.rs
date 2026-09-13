@@ -166,7 +166,12 @@ pub(in crate::app) async fn teardown(
     forms: &[String],
     wait: Waiting,
 ) -> Result<Outcome, Box<Problem>> {
-    if wait == Waiting::ForTheDownloads {
+    // A rehearsal does not sit through the wait. What it is being asked is what
+    // stopping would come to, and the answer is the same whether it is given now or
+    // in an hour — so waiting for downloads that are not going to be interrupted
+    // would hold a terminal open for an hour to say something it already knows, while
+    // signing in to every download client each ten seconds to find it out.
+    if wait == Waiting::ForTheDownloads && !ctx.dry_run {
         drained(ctx, forms).await;
     }
     super::lifecycle(ctx, forms, &Action::Down).await
