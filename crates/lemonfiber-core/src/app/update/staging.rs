@@ -68,7 +68,10 @@ pub(super) async fn apply(
     // part-way reads as the update being broken rather than as the disk being full.
     space::admits(ctx).await?;
 
-    let claim = engine::claimed(ctx).await?;
+    // Recorded under the same word the history records it under, because a run that
+    // has to wait behind this one is told that word and an update is not any of the
+    // Compose verbs it issues along the way.
+    let claim = engine::claimed(ctx, OPERATION).await?;
     let run = moved(ctx, manifest, &taking).await;
     engine::released(ctx, claim).await;
     let (backup, edits, applied, halted) = run?;
