@@ -781,11 +781,14 @@ pub(crate) mod tests {
         )
         .await;
         assert_ne!(shown(code), success());
-        assert!(
-            !paths.env_file().exists(),
-            "a rehearsed setup wrote {}",
-            paths.env_file().display()
-        );
+
+        // The path is read into the message before the assertion rather than as an
+        // argument to it. An argument is only evaluated when the assertion fails, which
+        // is a region no passing run enters and one the coverage gate counts.
+        let env = paths.env_file();
+        let wrote = format!("a rehearsed setup wrote {}", env.display());
+
+        assert!(!env.exists(), "{wrote}");
     }
 
     #[tokio::test]

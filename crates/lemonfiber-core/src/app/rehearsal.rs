@@ -312,8 +312,11 @@ mod tests {
     fn the_two_refusals_carry_codes_of_their_own() {
         let untaught = asked(&Command::Seed);
         let never = asked(&Command::Walkthrough { item: None });
+        // Asked through `why` rather than through `matches!`, which expands to a match
+        // whose second arm is only taken when the assertion is about to fail — a region
+        // no passing run enters and one the coverage gate counts.
         assert!(
-            matches!(never.rehearsal, Rehearsal::Cannot(_)),
+            never.rehearsal.why().is_some(),
             "a walkthrough should refuse the flag outright"
         );
         assert_ne!(
