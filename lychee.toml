@@ -13,7 +13,14 @@ exclude_path = [".git"]
 # re-run it rather than to read it.
 max_retries = 2
 
-# 206 is a partial response and 429 is a host asking to be asked less often.
-# Neither says the link is wrong.
-accept = ["200", "206", "429"]
+# 206 is a partial response, 429 is a host asking to be asked less often, and
+# 503 is a host having a bad minute. None of the three says the link is wrong.
+#
+# 503 is here because it has been red on a pull request that touched no link:
+# this README carries two SonarCloud badge images, SonarCloud answered 503 for
+# half an hour, and the hygiene gate failed every run in that window. `502` and
+# `504` are the same sentence from a proxy rather than from the host. A link
+# that is actually wrong answers 404 — the server is there, and it is telling
+# you there is nothing at that address — and that still fails.
+accept = ["200", "206", "429", "502", "503", "504"]
 exclude_loopback = true
