@@ -351,7 +351,17 @@ pub fn permitted(command: &Command, ctx: &Ctx) -> Result<(), Box<Problem>> {
 /// which leaves the arm shipped and unreachable through `permitted` — and a rule
 /// nothing can enter is a rule nobody has checked. Taking the answer rather than the
 /// command is what lets it be handed one.
-fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
+///
+/// Public for that reason and only that reason. The arm is reachable nowhere
+/// inside this crate, and a test in a `#[cfg(test)]` module would enter the copy
+/// built for tests while the copy that ships stayed unentered — which is a rule
+/// checked in a build nobody runs.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] that refuses `--dry-run` where what was asked cannot be
+/// rehearsed, or has not been taught to report what it would do.
+pub fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
     match asked.rehearsal {
         Rehearsal::Reads | Rehearsal::Reports => Ok(()),
         Rehearsal::Cannot(why) => Err(Box::new(refused(asked, why))),
@@ -476,6 +486,13 @@ mod tests {
         assert!(
             reasoning(never.rehearsal).is_some(),
             "a walkthrough should refuse the flag outright"
+        );
+        // Put through the decision as well as read off the verdict. This crate is
+        // compiled twice and each copy is counted on its own, so an arm entered only
+        // by the other copy is an arm this one is charged for.
+        assert!(
+            verdict(&never).is_err(),
+            "the decision refuses what cannot be rehearsed"
         );
         assert_ne!(
             not_taught_yet(untaught.named).code,
