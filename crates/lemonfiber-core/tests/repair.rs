@@ -522,6 +522,60 @@ async fn a_repair_writing_outside_every_declared_area_is_carried_out() {
     );
 }
 
+/// A name beneath a declared one is covered by it, the way every other write point
+/// reads a declaration.
+#[tokio::test]
+async fn a_repair_writing_beneath_a_declared_area_is_refused_too() {
+    let (report, wrote) = declared(
+        &["config"],
+        "mending-beneath",
+        &["config/recyclarr/recyclarr.yml"],
+    )
+    .await;
+
+    assert_eq!(
+        report.mended.first().map(|mended| &mended.outcome),
+        Some(&Outcome::Unmanaged),
+        "{report:?}"
+    );
+    assert!(!wrote.load(Ordering::Relaxed), "{report:?}");
+}
+
+/// A mender that writes nothing an operator could have declared theirs is never held
+/// by a declaration, whatever they wrote down.
+#[tokio::test]
+async fn a_repair_that_declares_no_write_is_not_held_by_anything() {
+    let (report, wrote) = declared(&["sonarr"], "mending-declares-nothing", &[]).await;
+
+    assert!(
+        wrote.load(Ordering::Relaxed),
+        "the mender was never asked to write: {report:?}"
+    );
+    assert_ne!(
+        report.mended.first().map(|mended| &mended.outcome),
+        Some(&Outcome::Unmanaged),
+        "{report:?}"
+    );
+}
+
+/// A consent that read no offer says the offer in front of it still stands.
+///
+/// The answer [`Confirm`] gives where nobody overrides it, which is the whole reason it
+/// has one: a terminal asks about each repair in the same run that looked, so there is
+/// no earlier offer for this one to have moved on from. Only consent that crossed a
+/// request boundary read an offer this run has since looked again for, and only that
+/// has anything to say no about. Asserted rather than left to the default's
+/// obviousness, because the day somebody gives the trait an implementor that forgets to
+/// override it is the day a stale answer is carried out against an offer nobody is
+/// making any more.
+#[test]
+fn a_consent_that_read_no_offer_says_the_offer_in_front_of_it_still_stands() {
+    assert!(
+        Always(true).stands(&[]),
+        "a run that looked and asked in one go has no older offer to have moved on from"
+    );
+}
+
 /// The whole sequence over one check whose mender says what it writes, against a
 /// context holding the areas the operator declared theirs.
 ///

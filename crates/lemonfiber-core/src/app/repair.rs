@@ -408,10 +408,10 @@ fn proposed(checks: &[Box<dyn Check>], found: &[Finding]) -> Vec<(usize, Repair)
 mod tests {
     use super::proving::{judged, proved};
     use super::remembering::wrong;
-    use super::{beyond, putting_right, reversing, Beyond, Confirm, Consent, NOWHERE_TO_LOOK};
+    use super::{beyond, putting_right, reversing, Beyond, Consent, NOWHERE_TO_LOOK};
     use crate::app::fixtures::ctx_at;
     use crate::condition::{Conditions, Fault};
-    use crate::doctor::{Category, Finding, Mend, Verdict};
+    use crate::doctor::{Category, Finding, Verdict};
     use crate::error::{Code, Problem, Remedy, Severity};
     use crate::repair::{Attempt, Outcome, Repair, ATTEMPTS};
 
@@ -436,148 +436,6 @@ mod tests {
             effects: Vec::new(),
             reversible: false,
         }
-    }
-
-    /// A mender that says what it would write.
-    ///
-    /// Which is what the gate below reads, and the whole of what these cases are about.
-    /// Whether the runner then acts on the answer is asserted from the integration test
-    /// beside this crate, because that half runs the shipped copy of the sequence.
-    struct Writes {
-        /// What a repair here would write to, by the names a declaration uses.
-        areas: Vec<String>,
-    }
-
-    impl Writes {
-        /// A mender declaring these areas.
-        fn to(areas: &[&str]) -> Self {
-            Self {
-                areas: areas.iter().map(|area| (*area).to_owned()).collect(),
-            }
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Mend for Writes {
-        fn repairs(&self, found: &[Finding]) -> Vec<Repair> {
-            found
-                .iter()
-                .filter(|finding| matches!(finding.verdict, Verdict::Warn(_) | Verdict::Fail(_)))
-                .map(|finding| repair(&finding.check))
-                .collect()
-        }
-
-        async fn mend(&self, _repair: &Repair) -> Attempt {
-            Attempt::carried()
-        }
-
-        fn writes_to(&self, _repair: &Repair) -> Vec<String> {
-            self.areas.clone()
-        }
-    }
-
-    /// Agrees to whatever it is asked about, and leaves the question of whether the
-    /// offer still stands to the answer the trait gives when nobody overrides it.
-    ///
-    /// Which is the answer a surface that never read an offer has to give. A terminal
-    /// asks about each repair in the same run that looked, so there is no earlier
-    /// offer for this one to have moved on from — only consent that crossed a request
-    /// boundary has one, and only that has a reason to say no here.
-    struct Agreeing;
-
-    impl Confirm for Agreeing {
-        fn agreed(&self, _repair: &Repair) -> bool {
-            true
-        }
-    }
-
-    /// A consent that read no offer says the offer in front of it still stands.
-    ///
-    /// The answer the trait gives where nobody overrides it, which is the whole reason
-    /// it has one: a terminal asks about each repair in the same run that looked, so
-    /// there is no earlier offer for this one to have moved on from. Only consent that
-    /// crossed a request boundary read an offer this run has since looked again for,
-    /// and only that has anything to say no about. Asserted rather than left to the
-    /// default's obviousness, because the day somebody gives the trait a second
-    /// implementor that forgets to override it is the day a stale answer is carried
-    /// out against an offer nobody is making any more.
-    #[test]
-    fn a_consent_that_read_no_offer_says_the_offer_in_front_of_it_still_stands() {
-        assert!(
-            Agreeing.stands(&[]),
-            "a run that looked and asked in one go has no older offer to have moved on \
-             from"
-        );
-    }
-
-    /// A context with these areas declared unmanaged.
-    fn declaring(name: &str, areas: &[(&str, &str)]) -> crate::app::Ctx {
-        let mut ctx = ctx_at(name);
-        ctx.settings.unmanaged = areas
-            .iter()
-            .map(|(area, why)| ((*area).to_owned(), (*why).to_owned()))
-            .collect();
-        ctx
-    }
-
-    /// The fifth write point. A repair is the one write an operator asks for by name,
-    /// and it is still not a way past a declaration they made.
-    #[tokio::test]
-    async fn a_repair_that_would_write_a_declared_area_is_refused_by_the_declaration() {
-        let ctx = declaring(
-            "repair-unmanaged",
-            &[("sonarr", "I tune this one by hand every season")],
-        );
-        let mender = Writes::to(&["sonarr"]);
-
-        let standing = super::permitted(&ctx, &mender, &repair("wiring.sonarr")).await;
-
-        assert_eq!(standing, crate::repair::Writing::Unmanaged);
-        assert!(!standing.allowed());
-        // And the sentence it carries is about the instruction they gave rather than
-        // about a change they made, which is the whole reason it is its own answer.
-        let said = standing.refused().map(|remedy| remedy.action.clone());
-        assert!(
-            said.is_some_and(|said| said.contains("declared this unmanaged")),
-            "{standing:?}"
-        );
-    }
-
-    /// A name beneath a declared one is covered by it, the way every other write point
-    /// reads a declaration.
-    #[tokio::test]
-    async fn a_repair_writing_beneath_a_declared_area_is_refused_too() {
-        let ctx = declaring("repair-unmanaged-beneath", &[("config", "all mine")]);
-        let mender = Writes::to(&["config/recyclarr/recyclarr.yml"]);
-
-        let standing = super::permitted(&ctx, &mender, &repair("quality.preset")).await;
-
-        assert_eq!(standing, crate::repair::Writing::Unmanaged);
-    }
-
-    /// And where nothing is declared, the mender is asked exactly as before — the
-    /// default answer being that a repair touching nothing declarable may proceed.
-    #[tokio::test]
-    async fn a_repair_touching_nothing_declared_is_left_to_the_mender() {
-        let ctx = declaring("repair-unmanaged-elsewhere", &[("radarr", "mine as well")]);
-        let mender = Writes::to(&["sonarr"]);
-
-        let standing = super::permitted(&ctx, &mender, &repair("wiring.sonarr")).await;
-
-        assert_eq!(standing, crate::repair::Writing::Ours);
-        assert!(standing.allowed());
-    }
-
-    /// A mender that writes nothing an operator could have declared theirs is never
-    /// held by a declaration, whatever they wrote down.
-    #[tokio::test]
-    async fn a_repair_that_declares_no_write_is_not_held_by_anything() {
-        let ctx = declaring("repair-unmanaged-nothing", &[("sonarr", "mine")]);
-        let mender = Writes::to(&[]);
-
-        let standing = super::permitted(&ctx, &mender, &repair("engine.restart")).await;
-
-        assert_eq!(standing, crate::repair::Writing::Ours);
     }
 
     /// What a run found has to reach the store before anything is offered, or every
