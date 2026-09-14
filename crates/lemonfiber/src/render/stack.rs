@@ -936,6 +936,35 @@ mod tests {
         );
     }
 
+    /// A rehearsed watch over named forms says which ones it would stop.
+    ///
+    /// The counterpart above names none and gets the sentence for all of them, and both
+    /// halves are worth pinning because an operator setting a guard is deciding exactly
+    /// this: whether the thing that goes down when the drive does is the part they meant
+    /// or the whole stack. A line that ended in nothing would read as a guard that stops
+    /// nothing, and one that said "the whole stack" over two named forms would read as a
+    /// far bigger promise than the guard makes.
+    #[test]
+    fn a_rehearsed_watch_over_named_forms_says_which_ones_it_would_stop() {
+        let rehearsed = SupervisionReport {
+            forms: vec!["library".to_owned(), "search".to_owned()],
+            would: Some(Vigil {
+                root: "/srv/library".to_owned(),
+                every: 5,
+                command: vec!["docker".to_owned(), "compose".to_owned(), "stop".to_owned()],
+            }),
+            ..a_watch()
+        };
+
+        let text = watch(&rehearsed).text();
+
+        assert!(text.contains("stopping library, search"), "{text}");
+        assert!(
+            !text.contains("the whole stack"),
+            "a guard over two named forms was described as one over all of them: {text}"
+        );
+    }
+
     #[test]
     fn a_watch_read_by_a_script_is_the_envelope_every_other_answer_arrives_in() {
         // Through the outcome rather than through a rendering of its own, so a

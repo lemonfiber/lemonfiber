@@ -663,3 +663,76 @@ async fn a_stack_that_cannot_be_read_refuses_rather_than_reporting_none() {
     assert!(said.is_some(), "a stack that cannot be read is a refusal");
     assert!(asked(&nowhere, Asking::Read).await.held.is_empty());
 }
+
+/// A rehearsed rotation of the credential lemonfiber mints generates nothing and asks
+/// the client for nothing, and still names where the value lives.
+///
+/// It stops one line above the generating, and that line is the point. A password
+/// minted to describe a rotation is a secret that exists because somebody asked a
+/// question, and it would then have to be kept — put where the real one goes, which is
+/// the write — or thrown away, which is worse, because a thrown-away one may be the one
+/// the client has already taken. The client is scripted to accept a sign-in on purpose,
+/// so a run that reached it would land a replacement and this would catch it.
+#[tokio::test]
+async fn a_rehearsed_rotation_mints_nothing_and_asks_the_client_for_nothing() {
+    let password = the_torrent_password();
+    let env = env_at("rehearsed-mint", &[(QBITTORRENT_PASSWORD_KEY, &password)]);
+    let http = Fake::by_path(vec![("/auth/login", Answer::reply(200, "Ok."))]);
+    let ctx = ctx(env.clone(), Files::empty(), http.clone()).rehearsing();
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "qBittorrent web UI password".to_owned(),
+        },
+    )
+    .await;
+
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.starts_with("Some(Rehearsed"), "{said}");
+    assert!(said.contains("Nothing was generated"), "{said}");
+    // The file, not the report: a report claiming the recorded password survived proves
+    // nothing about whether it did.
+    assert_eq!(recorded(&env, QBITTORRENT_PASSWORD_KEY), Some(password));
+    let reached = http.requests();
+    assert!(
+        reached.is_empty(),
+        "a rehearsal signed in to the client: {reached:?}"
+    );
+}
+
+/// A rehearsed republish reads no key out of the service's own file and asks the
+/// service nothing.
+///
+/// Both halves are above the line this stops at, and each costs something on its own.
+/// Reading the key would put a credential into this run's memory to describe a rotation
+/// nobody asked it to make, and asking the service to identify itself with it is an
+/// authentication attempt in somebody's log that nobody asked for either. So the answer
+/// names the place and the steps, and the key that was already recorded is still the
+/// one recorded.
+#[tokio::test]
+async fn a_rehearsed_republish_reads_no_key_and_asks_the_service_nothing() {
+    let stale = format!("{}{}", "0000stale", "keykeykeykey");
+    let env = env_at("rehearsed-republish", &[("SONARR_API_KEY", &stale)]);
+    let http = Fake::by_path(vec![("/system/status", Answer::reply(200, SONARR_STATUS))]);
+    let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http.clone()).rehearsing();
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "Sonarr API key".to_owned(),
+        },
+    )
+    .await;
+
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.starts_with("Some(Rehearsed"), "{said}");
+    assert!(said.contains("Nothing was read out"), "{said}");
+    assert!(!said.contains(&the_service_key()), "{said}");
+    assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(stale));
+    let reached = http.requests();
+    assert!(
+        reached.is_empty(),
+        "a rehearsal asked the service to identify itself: {reached:?}"
+    );
+}

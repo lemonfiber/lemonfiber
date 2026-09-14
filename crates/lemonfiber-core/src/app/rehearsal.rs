@@ -338,11 +338,24 @@ pub fn permitted(command: &Command, ctx: &Ctx) -> Result<(), Box<Problem>> {
     if !ctx.dry_run {
         return Ok(());
     }
-    let asked = asked(command);
+    verdict(&asked(command))
+}
+
+/// What one of the four answers comes to, given what was asked.
+///
+/// Apart from the run that reaches it, because one of the four is an answer no
+/// command carries today. `Untaught` is the escape hatch a command added tomorrow
+/// gets: the match over every command is exhaustive, so whoever adds one has to
+/// choose a verdict, and this is the one that says "not yet" out loud rather than
+/// quietly rehearsing something that would act. Every command has since been taught,
+/// which leaves the arm shipped and unreachable through `permitted` — and a rule
+/// nothing can enter is a rule nobody has checked. Taking the answer rather than the
+/// command is what lets it be handed one.
+fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
     match asked.rehearsal {
         Rehearsal::Reads | Rehearsal::Reports => Ok(()),
-        Rehearsal::Cannot(why) => Err(Box::new(refused(&asked, why))),
-        Rehearsal::Untaught => Err(Box::new(not_taught_yet(&asked))),
+        Rehearsal::Cannot(why) => Err(Box::new(refused(asked, why))),
+        Rehearsal::Untaught => Err(Box::new(not_taught_yet(asked))),
     }
 }
 
@@ -398,8 +411,9 @@ fn not_taught_yet(asked: &Asked) -> Problem {
 #[cfg(test)]
 mod tests {
     use super::{
-        asked, carried, not_taught_yet, refused, repair, restore, update, Rehearsal,
-        A_SEARCH_IS_THE_ANSWER, THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
+        asked, carried, not_taught_yet, refused, repair, restore, update, verdict, Asked,
+        Rehearsal, A_SEARCH_IS_THE_ANSWER, THE_CHECK_IS_THE_DISRUPTION,
+        THE_WALK_IS_THE_OBSERVATION,
     };
     use crate::app::command::{
         AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Keeping, MigrateAction,
@@ -408,6 +422,35 @@ mod tests {
     use crate::app::engine::Waiting;
     use crate::app::setup::SetupAction;
     use crate::app::Command;
+
+    /// A command that has not been taught to rehearse is refused rather than run.
+    ///
+    /// Nothing carries this verdict today — every command that changes something has
+    /// since been taught to say what it would change — so the answer is handed over
+    /// directly rather than asked of a command. That is the point of it: this is the
+    /// escape hatch whoever adds the next command gets, and an escape hatch nothing
+    /// has ever been through is one nobody knows the shape of. What it must do is
+    /// refuse, and refuse under its own code: an operator who typed `--dry-run` and
+    /// was quietly run for real is the failure the whole flag exists to prevent, and
+    /// "this one has not been taught yet" is a different thing to be told from "this
+    /// one cannot be rehearsed at all".
+    #[test]
+    fn a_command_nobody_has_taught_to_rehearse_is_refused_under_its_own_code() {
+        let untaught = Asked {
+            named: "invent",
+            rehearsal: Rehearsal::Untaught,
+        };
+
+        let Err(refusal) = verdict(&untaught) else {
+            unreachable!("a command that cannot say what it would do must not be run");
+        };
+        assert_eq!(refusal.code, not_taught_yet(&untaught).code);
+        assert_ne!(
+            refusal.code,
+            refused(&untaught, THE_WALK_IS_THE_OBSERVATION).code,
+            "not taught yet and cannot be rehearsed are different things to be told"
+        );
+    }
 
     /// The two refusals are told apart by their code, which is what an operator
     /// searches for and what a surface keys off.

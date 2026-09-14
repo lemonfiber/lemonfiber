@@ -319,6 +319,30 @@ mod tests {
         );
     }
 
+    /// A rehearsal with nothing owed afterwards prints no heading for it.
+    ///
+    /// A service's own key is handed out by the rotation itself and by nothing else, so
+    /// there is genuinely no step left over — and an empty heading reads as a list
+    /// somebody forgot to fill in, which sends the operator looking for instructions
+    /// that were never there. The one above prints the heading because it has steps to
+    /// put under it; the difference between the two is the whole of what the heading is
+    /// for.
+    #[test]
+    fn a_rehearsed_rotation_owing_nothing_afterwards_prints_no_heading_for_it() {
+        let text = drawn(Inventory::of(Vec::new()).after(Rotation::would(
+            "Sonarr API key",
+            "a real run would read the key the service wrote for itself",
+            "the environment file, as SONARR_API_KEY",
+            Vec::new(),
+        )));
+
+        assert!(text.contains("would be replaced"), "{text}");
+        assert!(
+            !text.contains("Afterwards"),
+            "a heading was printed over a list with nothing in it: {text}"
+        );
+    }
+
     #[test]
     fn a_name_nothing_answers_to_says_what_would_have() {
         let text = drawn(Inventory::of(Vec::new()).after(Rotation::stopped(

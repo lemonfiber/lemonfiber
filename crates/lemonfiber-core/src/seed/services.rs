@@ -473,6 +473,14 @@ mod tests {
             .0
     }
 
+    /// The same comparison over the same service, asked what the pass would do rather
+    /// than asked to do it.
+    async fn would(seerr: &Seerr, baseline: &Baseline) -> State {
+        tell_the_household(seerr, baseline.entry("seerr", TELLING), true)
+            .await
+            .0
+    }
+
     /// Whether the service was asked to change anything.
     fn written_to(http: &Fake) -> bool {
         http.requests()
@@ -571,6 +579,38 @@ mod tests {
         assert!(
             matches!(state, State::Failed { .. } | State::Skipped { .. }),
             "a refused write was not reported: {state:?}"
+        );
+    }
+
+    /// A rehearsal says what the household hears now and what it would be signed up
+    /// for, and signs them up for nothing.
+    ///
+    /// Both halves are the answer to the question that was asked. A report naming only
+    /// the connection would leave the operator deciding about a phrase; what they are
+    /// actually deciding about is that nobody in the house hears anything today and
+    /// that a real run would have the service write to them on every occasion
+    /// lemonfiber sends on. And the write is the one thing a question must not make: a
+    /// household that started being told because somebody asked what would happen was
+    /// told by the asking, and there is no undoing a notification that has gone out.
+    #[tokio::test]
+    async fn a_rehearsed_telling_says_what_is_set_now_and_sets_nothing() {
+        // A service nobody has configured, with nothing recorded against it — the one
+        // case that is a connection to make rather than somebody's own choice to leave
+        // alone, and so the only one with anything to report in the other tense.
+        let (seerr, http) = service(vec![Answer::reply(200, r#"{"enabled":false,"types":0}"#)]);
+
+        let state = would(&seerr, &Baseline::new()).await;
+
+        assert_eq!(
+            state,
+            State::WouldWire {
+                yours: Some("off:0".to_owned()),
+                ours: Some(said(wanted_telling())),
+            }
+        );
+        assert!(
+            !written_to(&http),
+            "a question about the household told the household"
         );
     }
 

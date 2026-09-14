@@ -311,7 +311,25 @@ fn reached(setting: &str) -> Vec<Propagation> {
 mod tests {
     use super::{elsewhere, reached};
     use crate::config;
-    use crate::credential::{Reach, CATALOGUE};
+    use crate::credential::{Reach, Rotation, Settled, CATALOGUE};
+
+    /// Where a rehearsed rotation says the value lives and what would still be owed
+    /// after it — or nothing where the rotation was not a rehearsal at all.
+    ///
+    /// Read into a pair rather than matched with a diverging arm: this crate denies
+    /// `panic!` everywhere, tests included, and a `let … else` needs one. One reader
+    /// rather than one per test, so the arm that answers for every other outcome is
+    /// written once and is driven by the test below that asks it about one.
+    fn rehearsed(rotation: &Rotation) -> Option<(String, Vec<String>)> {
+        match &rotation.settled {
+            Settled::Rehearsed {
+                location,
+                afterwards,
+                ..
+            } => Some((location.clone(), afterwards.clone())),
+            _ => None,
+        }
+    }
 
     #[test]
     fn the_torrent_password_reaches_its_own_service_and_leaves_the_rest_pending() {
@@ -385,16 +403,7 @@ mod tests {
             said.consumers.is_empty(),
             "nothing was reached, so no consumer moved"
         );
-        // Read into a pair rather than matched with a diverging arm: this crate denies
-        // `panic!` everywhere, tests included, and a `let … else` needs one.
-        let settled = match &said.settled {
-            crate::credential::Settled::Rehearsed {
-                location,
-                afterwards,
-                ..
-            } => Some((location.clone(), afterwards.clone())),
-            _ => None,
-        };
+        let settled = rehearsed(&said);
         assert_eq!(
             settled.as_ref().map(|(location, _)| location.as_str()),
             Some("the environment file")
@@ -414,6 +423,30 @@ mod tests {
         assert!(
             said.contains("wherever this credential was issued"),
             "{said}"
+        );
+    }
+
+    /// A rotation that was not a rehearsal is not read as one.
+    ///
+    /// The distinction is the whole of what a surface prints from: a rehearsal says
+    /// where the value lives and what would be owed afterwards, and a rotation that was
+    /// stopped says what stopped it. Reading a stopped one as a rehearsal would print a
+    /// place and a list of steps for a replacement that was refused — which is the
+    /// sentence an operator acts on, telling them to go and finish something nothing
+    /// started.
+    #[test]
+    fn a_rotation_that_was_stopped_is_not_read_as_one_that_was_rehearsed() {
+        let stopped = Rotation::stopped(
+            "qBittorrent web UI password",
+            Settled::Refused {
+                detail: "the client refused the password lemonfiber holds".to_owned(),
+            },
+        );
+
+        assert_eq!(rehearsed(&stopped), None);
+        assert!(
+            !stopped.rehearsed(),
+            "a refusal answered to the question a rehearsal answers"
         );
     }
 }

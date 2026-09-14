@@ -336,11 +336,18 @@ mod tests {
         // The two halves together: the operator sees exactly the report a real answer
         // would give them, and the next run still puts the question.
         let ctx = ctx_at("rehearsed").rehearsing();
-        let answered = super::acknowledge(
-            &ctx,
-            Some("vpn.unprotected"),
-            reporting(warning("vpn.unprotected")),
-        );
+        let mut report = reporting(warning("vpn.unprotected"));
+        // A passing check alongside it, for the reason the answered case carries one:
+        // an answer to one finding must not reach into the rest of the run, and a
+        // rehearsal that quietened a check nobody asked about would be describing a
+        // report the real answer does not produce.
+        report.findings.push(crate::doctor::Finding::in_category(
+            crate::doctor::Category::Vpn,
+            "vpn.egress-match",
+            "The tunnel",
+            crate::doctor::Verdict::Pass { note: None },
+        ));
+        let answered = super::acknowledge(&ctx, Some("vpn.unprotected"), report);
         let states: Vec<crate::error::State> = answered
             .as_ref()
             .map(|report| {

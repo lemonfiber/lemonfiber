@@ -942,6 +942,50 @@ mod tests {
         assert!(paths.env_file().exists());
     }
 
+    /// A rehearsed way out of a half-written apply leaves it half-written, and still
+    /// names what the choice is being made about.
+    ///
+    /// The refusal above it is the half a rehearsal keeps, because whether an apply
+    /// stopped part-way is a fact about the machine rather than a consequence of
+    /// acting. What it leaves out is the reversal and the apply behind it — so the
+    /// setting the interrupted run wrote is still on the file, the record of it is
+    /// still in the journal, and the answers are still where they were. An operator who
+    /// asked what starting over would do has not started over, and the list they were
+    /// shown is the same list the real choice will be made from.
+    #[tokio::test]
+    async fn a_rehearsed_way_out_of_a_half_written_apply_leaves_it_half_written() {
+        let paths = scratch("rehearsed-recover");
+        interrupted(&paths);
+
+        let report = walked(
+            &ctx(&paths).rehearsing(),
+            SetupAction::Recover(Choice::StartOver),
+        )
+        .await;
+
+        assert_eq!(
+            report.as_ref().map(|report| report.phase),
+            Some(Phase::Applying),
+            "a rehearsal carried the recovery out"
+        );
+        assert_eq!(
+            report.map(|report| report.written),
+            Some(vec!["the setting DATA_ROOT".to_owned()]),
+            "and it no longer says what the choice is being made about"
+        );
+        assert!(
+            paths.journal().exists(),
+            "the record of the half-written apply was discarded by a question"
+        );
+        assert_eq!(
+            store::read(&paths.env_file())
+                .ok()
+                .and_then(|settings| settings.get("DATA_ROOT").map(ToOwned::to_owned)),
+            Some("/srv".to_owned()),
+            "the setting the interrupted apply had written was taken off the file"
+        );
+    }
+
     #[tokio::test]
     async fn a_way_out_of_an_apply_that_never_stopped_is_refused() {
         let paths = scratch("nothing-to-recover");
