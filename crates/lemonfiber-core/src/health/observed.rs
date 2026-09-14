@@ -358,6 +358,33 @@ mod tests {
     }
 
     #[test]
+    fn what_a_failure_costs_is_said_differently_at_every_criticality() {
+        // A sentence shared between two rungs would make the distinction
+        // decorative, and an operator learns quickly which distinctions are.
+        let said: Vec<String> = [
+            Criticality::Critical,
+            Criticality::Core,
+            Criticality::Important,
+            Criticality::Enhancing,
+            Criticality::Optional,
+        ]
+        .into_iter()
+        .filter_map(|criticality| {
+            let services = [service("x", State::Failed, criticality)];
+            observed(&services, Egress::NotApplicable)
+                .into_iter()
+                .find_map(|(_, fault)| fault.map(|fault| fault.meaning))
+        })
+        .collect();
+
+        let mut distinct = said.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(distinct.len(), 5, "{said:?}");
+        assert!(said.iter().all(|meaning| meaning.contains('x')), "{said:?}");
+    }
+
+    #[test]
     fn only_the_states_that_want_attention_are_faults() {
         let services = [
             service("a", State::Healthy, Criticality::Core),
