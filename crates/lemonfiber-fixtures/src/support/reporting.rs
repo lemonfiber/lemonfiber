@@ -33,6 +33,19 @@ pub struct Reporting {
     /// that always did would make the waiting itself untestable.
     settles_after: Option<usize>,
     asked: std::sync::atomic::AtomicUsize,
+    /// How many listings to refuse before this engine is there at all.
+    ///
+    /// Neither of the two states the rest of this fake describes. On two of the four
+    /// platforms the engine is a desktop application that has only just been asked to
+    /// start itself: it answers nothing for the better part of a minute and then
+    /// answers everything, which is the case the wait at a login exists for and the
+    /// one an engine that never changes its mind cannot produce.
+    refusals: usize,
+    /// How many listings it has refused so far, counted apart from the tally above
+    /// because they are different questions — whether the engine is there at all, and
+    /// whether what it holds has settled — and a test about one must not spend the
+    /// other's budget.
+    refused: std::sync::atomic::AtomicUsize,
     /// What `exec` answers a VPN probe with, where the test scripts one. Absent
     /// means `exec` has nothing to say and fails, as an engine asked for a
     /// container it does not know would.
@@ -82,6 +95,8 @@ impl Reporting {
             reachable: true,
             settles_after: None,
             asked: std::sync::atomic::AtomicUsize::new(0),
+            refusals: 0,
+            refused: std::sync::atomic::AtomicUsize::new(0),
             tunnel: None,
         }
     }
@@ -150,6 +165,18 @@ impl Reporting {
         self
     }
 
+    /// The same engine, not there at all for its first `refusals` listings.
+    ///
+    /// What a login meets, and a different thing from both of the states beside it: a
+    /// desktop engine is neither reachable nor permanently absent while it is starting
+    /// itself, and a run that gave up on the first refusal would report every Mac in
+    /// the world as having failed to come back.
+    #[must_use]
+    pub fn waking_after(mut self, refusals: usize) -> Self {
+        self.refusals = refusals;
+        self
+    }
+
     /// The same engine, with something to say about a service.
     #[must_use]
     pub fn saying(mut self, service: &str, line: &str) -> Self {
@@ -195,6 +222,8 @@ impl Reporting {
             reachable: false,
             settles_after: None,
             asked: std::sync::atomic::AtomicUsize::new(0),
+            refusals: 0,
+            refused: std::sync::atomic::AtomicUsize::new(0),
             tunnel: None,
         }
     }
@@ -254,6 +283,19 @@ fn listed(reporting: &Reporting, project: &str) -> Result<Vec<Container>, Engine
     if !reporting.reachable {
         return Err(EngineFailure::Unreachable {
             reason: "no daemon here".to_owned(),
+        });
+    }
+
+    // Refused before anything is counted against the settling budget, so an engine
+    // that was still starting arrives with the same patience for its containers as
+    // one that was there from the outset.
+    if reporting
+        .refused
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        < reporting.refusals
+    {
+        return Err(EngineFailure::Unreachable {
+            reason: "the daemon is still starting".to_owned(),
         });
     }
 

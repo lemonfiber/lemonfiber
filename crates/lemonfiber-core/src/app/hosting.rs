@@ -307,6 +307,31 @@ mod tests {
         machine(knowing(), manager)
     }
 
+    /// The same machine, keeping its records in an emptied scratch directory.
+    ///
+    /// Apart from [`a_machine`] because almost nothing here needs it: what a reading
+    /// says is the manager's business and the records are not in it. The two tests
+    /// below are the exception — the answer to the autostart question is written
+    /// beside an install rather than reported by one, and a machine with nowhere to
+    /// keep it would read back the default whatever had been asked for.
+    fn recording(name: &str, manager: Arc<Fake>) -> Ctx {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-hosting-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        machine(
+            Settings {
+                env_file: Some(dir.join(".env")),
+                ..knowing()
+            },
+            manager,
+        )
+    }
+
+    /// What this machine has recorded about bringing the stack back after a restart.
+    fn wants_the_stack_back(ctx: &Ctx) -> bool {
+        crate::app::autostart::load(ctx).wanted().on_boot()
+    }
+
     /// The report, or the empty one — which no assertion below is satisfied by, so
     /// a run that failed where it should not fails the test rather than skipping it.
     async fn read(ctx: &Ctx, asked: Keeping) -> HostingReport {
@@ -334,11 +359,14 @@ mod tests {
         let report = read(&a_machine(Fake::with(Manager::Launchd)), Keeping::Read).await;
         assert_eq!(report.commands.len(), HOSTABLE.len());
         for what in HOSTABLE {
+            // Bound rather than called inside the message. An argument to an assertion
+            // that never fails is a line nothing ever enters, which the coverage gate
+            // reads as dead code — and the reading is the same value either way.
+            let named = what.name();
             assert_eq!(
-                standing(&report, what.name()),
+                standing(&report, named),
                 Some(Hosting::NotHosted),
-                "{}",
-                what.name()
+                "{named}"
             );
         }
         assert_eq!(report.manager, Manager::Launchd);
@@ -685,6 +713,86 @@ mod tests {
         assert!(!keeping(&a_machine(holding(Standing::Stopped)), Hostable::Expiring).await);
         assert!(!keeping(&a_machine(holding(Standing::Unsaid)), Hostable::Expiring).await);
         assert!(!keeping(&a_machine(Fake::unsupported()), Hostable::Expiring).await);
+    }
+
+    /// Asking this machine for the boot start *is* the operator answering the
+    /// autostart question, and taking it back off is them answering it the other way.
+    ///
+    /// For that one command the act is the answer: somebody who installs the thing
+    /// that brings their stack back after a restart has said yes, and somebody who
+    /// removes it has said no. A recorded answer left at yes on a machine with nothing
+    /// installed to carry it out is `enabled-unverified` in its purest form — and the
+    /// cost of that state is not the wrong word on a report, it is an operator who
+    /// believes their stack comes back and finds out weeks later, from a household
+    /// asking why nothing has downloaded since Tuesday.
+    #[tokio::test]
+    async fn asking_for_the_boot_start_is_asking_for_autostart_and_so_is_taking_it_back() {
+        let ctx = recording("boot", Fake::with(Manager::Launchd));
+
+        assert!(hosting(
+            &ctx,
+            Keeping::Install {
+                what: Hostable::Boot,
+                forms: Vec::new()
+            }
+        )
+        .await
+        .is_ok());
+        assert!(
+            wants_the_stack_back(&ctx),
+            "installing the thing that does it is saying yes to it"
+        );
+
+        assert!(hosting(
+            &ctx,
+            Keeping::Remove {
+                what: Hostable::Boot
+            }
+        )
+        .await
+        .is_ok());
+        assert!(
+            !wants_the_stack_back(&ctx),
+            "and taking it back off is saying no, rather than leaving a claim behind"
+        );
+    }
+
+    /// The guard and the clock say nothing at all about what happens at a restart.
+    ///
+    /// A guard on the data location stops the stack precisely because nobody chose to,
+    /// and a clock on requests is not a statement about starting anything. Reading
+    /// either as an answer to the autostart question would leave an operator who
+    /// installed a guard this afternoon recorded as having asked for their stack back
+    /// at every reboot — or, worse the other way round, would take that answer away
+    /// from somebody who removed a guard and never touched the question.
+    #[tokio::test]
+    async fn the_other_two_say_nothing_about_what_happens_at_a_restart() {
+        let ctx = recording("others", Fake::with(Manager::Launchd));
+        let already = crate::autostart::Returning::default().answering(true);
+        crate::app::autostart::save(&ctx, &already);
+
+        assert!(hosting(
+            &ctx,
+            Keeping::Install {
+                what: Hostable::Expiring,
+                forms: Vec::new()
+            }
+        )
+        .await
+        .is_ok());
+        assert!(hosting(
+            &ctx,
+            Keeping::Remove {
+                what: Hostable::Watch
+            }
+        )
+        .await
+        .is_ok());
+
+        assert!(
+            wants_the_stack_back(&ctx),
+            "neither of them is a decision about starting on boot, so neither moved it"
+        );
     }
 
     #[test]

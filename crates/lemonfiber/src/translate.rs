@@ -1043,6 +1043,35 @@ mod tests {
         );
     }
 
+    /// The start a login makes is asked for by the same word as the other two, and
+    /// takes no forms.
+    ///
+    /// It is the third thing this machine can be asked to keep, and the one where the
+    /// asking *is* the answer to the autostart question — so an operator who types it
+    /// and gets a guard, or gets nothing, has had a decision about every login taken
+    /// for them by a translation. Which forms come back is the boot record's business
+    /// and never the command line's: a start pinned here would be pinned at install
+    /// time and stale by the next form the operator ran.
+    #[test]
+    fn the_start_that_runs_at_a_login_is_asked_for_by_name_and_takes_no_forms() {
+        assert_eq!(
+            hosting(Some(HostingCommand::Install {
+                what: Kept::Boot,
+                forms: Vec::new(),
+            })),
+            Command::Hosting(Keeping::Install {
+                what: Hostable::Boot,
+                forms: Vec::new(),
+            })
+        );
+        assert_eq!(
+            hosting(Some(HostingCommand::Remove { what: Kept::Boot })),
+            Command::Hosting(Keeping::Remove {
+                what: Hostable::Boot
+            })
+        );
+    }
+
     /// Naming no category at all asks for the whole suite rather than for nothing.
     #[test]
     fn naming_no_category_asks_for_the_whole_suite() {

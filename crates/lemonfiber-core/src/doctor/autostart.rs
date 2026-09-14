@@ -391,6 +391,7 @@ mod tests {
 
     use super::{at_login, AutostartCheck, Standing, ENGINE_NOT_AT_BOOT, SETTINGS};
     use crate::doctor::{Category, Check, Verdict};
+    use crate::error::Problem;
     use crate::platform::Environment;
     use crate::ports::process::{Failure, Output};
     use crate::ports::{FileSystem, Runner};
@@ -457,12 +458,34 @@ mod tests {
     }
 
     /// The words a verdict says, whichever kind it is.
+    ///
+    /// Total over the five kinds and over the absence of one, because eight
+    /// assertions below read the answer through it: a reader that fell through on a
+    /// kind it did not recognise would hand every one of them an empty string, and
+    /// `assert!(said(..).contains(..))` on an empty string fails in a way that reads
+    /// as the check having said the wrong thing rather than as the reader having a
+    /// hole in it.
     fn said(verdict: Option<Verdict>) -> String {
         match verdict {
             Some(Verdict::Pass { note }) => note.unwrap_or_default(),
             Some(Verdict::Skipped { reason } | Verdict::Unverified { reason, .. }) => reason,
             Some(Verdict::Warn(problem) | Verdict::Fail(problem)) => problem.summary,
             None => String::new(),
+        }
+    }
+
+    /// The fault a verdict carries, where it is a warning about one.
+    ///
+    /// Beside [`said`] rather than inside the one test that reads a fault out, so the
+    /// other arm is exercised by the tests about the readings that are *not* faults.
+    /// That is the distinction this whole check exists for: a setting nobody could
+    /// read is `enabled-unverified` and carries no fault, and a reader that folded it
+    /// into one would report a machine nothing is known about as a machine that is
+    /// wrong — the same falsehood as a pass, in the other direction.
+    fn warned(verdict: Option<Verdict>) -> Option<Problem> {
+        match verdict {
+            Some(Verdict::Warn(problem)) => Some(problem),
+            _ => None,
         }
     }
 
@@ -504,11 +527,7 @@ mod tests {
     async fn docker_desktop_that_does_not_open_at_login_is_named_as_the_cause() {
         // The single most common reason a stack does not come back, and the one the
         // operator cannot see: nothing errors, nothing is logged, it is just gone.
-        let verdict = verdict(desktop(holding(SOMEWHERE, r#"{"autoStart": false}"#))).await;
-        let problem = match verdict {
-            Some(Verdict::Warn(problem)) => Some(problem),
-            _ => None,
-        };
+        let problem = warned(verdict(desktop(holding(SOMEWHERE, r#"{"autoStart": false}"#))).await);
         assert_eq!(
             problem.as_ref().map(|problem| problem.code),
             Some(ENGINE_NOT_AT_BOOT)
@@ -672,6 +691,44 @@ mod tests {
                 "{environment:?} asked the wrong thing"
             );
         }
+    }
+
+    /// A reading short of a warning names no fault to go and act on.
+    ///
+    /// `enabled-unverified` is the state this whole check exists to give, and it is
+    /// worth something only while it stays apart from the other two. A reader that
+    /// found a fault in a pass would be the comfortable falsehood; one that found a
+    /// fault in a reading nobody could confirm is the same falsehood pointed the
+    /// other way, and it is the one an operator would act on — going to change a
+    /// setting that may already be right, on the strength of a machine that never
+    /// said so.
+    #[tokio::test]
+    async fn a_reading_short_of_a_warning_names_no_fault_to_act_on() {
+        assert!(
+            warned(verdict(native("disabled")).await).is_some(),
+            "a daemon that is not enabled at boot is a fault, and carries the one it is"
+        );
+        assert!(
+            warned(verdict(native("enabled\n")).await).is_none(),
+            "a daemon the distribution already enabled is not"
+        );
+        assert!(
+            warned(verdict(native("static\n")).await).is_none(),
+            "and an answer nobody here recognises has established nothing either way"
+        );
+    }
+
+    /// A check that reported nothing at all has nothing to say.
+    ///
+    /// Every check in this file reports exactly one finding, so this is the answer to
+    /// a question that does not arise — and it is answered rather than left to fall
+    /// through, because the reader it belongs to is what every assertion about the
+    /// words of a verdict goes through. A hole in it would turn a check that said
+    /// nothing into a check that said the wrong thing, and the failure would name the
+    /// check rather than the reader that lost its words.
+    #[test]
+    fn a_check_that_reported_nothing_at_all_has_nothing_to_say() {
+        assert!(said(None).is_empty());
     }
 
     #[test]

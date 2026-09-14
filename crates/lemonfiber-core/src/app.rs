@@ -2424,6 +2424,30 @@ mod tests {
         );
     }
 
+    /// The start a login makes reaches the run that decides whether to make it, and a
+    /// rehearsal of it is permitted rather than refused.
+    ///
+    /// Dispatched here as well as from `tests/`, and for the reason the two above are:
+    /// this file is compiled twice, and the arm joining a command to its handler is a
+    /// line of each copy — so the copy that never dispatched it counts the arm as never
+    /// run. Both ways round, because the table saying what a rehearsal of a command
+    /// means is read only on a rehearsal, and it lives in a second file compiled twice
+    /// over as well.
+    ///
+    /// A machine nobody has answered the autostart question on declines, which is the
+    /// cheapest of the four answers in front of the start and the only one reachable
+    /// without an engine, a stack of containers, or a machine that has actually
+    /// restarted. What the other three come to is settled beside the run itself; this
+    /// is about arriving there.
+    #[tokio::test]
+    async fn the_start_a_login_makes_reaches_the_run_that_decides_whether_to_make_it() {
+        for ctx in [a_context().build(), a_context().build().rehearsing()] {
+            let read = dispatch(Command::AtBoot, &ctx).await;
+            let declined = matches!(&read, Ok(Outcome::Lifecycle(report)) if report.held.is_some());
+            assert!(declined, "{read:?}");
+        }
+    }
+
     /// A context that runs against the checked-out stack, in rehearsal.
     fn rehearsing(protocols: crate::config::Protocols) -> Ctx {
         let settings = Settings {

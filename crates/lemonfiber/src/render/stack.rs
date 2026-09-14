@@ -425,6 +425,29 @@ mod tests {
         assert!(!lifecycle(&rehearsed).text().contains("did not finish"));
     }
 
+    /// A start that declined to start anything says why, and says nothing else.
+    ///
+    /// The start a login makes declines for three reasons an operator would act on
+    /// differently — the stack was stopped on purpose, autostart was never asked for,
+    /// the machine is on its battery — and the plan carried underneath is the plan it
+    /// did not run. Rendering the profiles, the services and the condition alongside
+    /// would read as an account of what happened, and an operator skimming it would
+    /// come away believing their stack came back. So the whole rendering is the one
+    /// sentence, which is why this asserts the whole of the text rather than a
+    /// fragment of it.
+    #[test]
+    fn a_start_that_declined_says_why_and_nothing_of_the_plan_it_did_not_run() {
+        let declined = LifecycleReport {
+            held: Some("the stack was stopped on purpose".to_owned()),
+            ..a_lifecycle("boot", a_plan("media", Vec::new()))
+        };
+
+        assert_eq!(
+            lifecycle(&declined).text(),
+            "boot: nothing was started — the stack was stopped on purpose"
+        );
+    }
+
     #[test]
     fn a_switch_says_what_moved_in_each_direction() {
         let report = LifecycleReport {
