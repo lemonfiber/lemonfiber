@@ -40,6 +40,12 @@ what to do about it, is written for operators at
 - `DIAG-1`
 - `DOCKER-1`
 - `DOCKER-2`
+- `DOCKER-3`
+- `DOCKER-4`
+- `DOCKER-5`
+- `DOCKER-6`
+- `DOCKER-7`
+- `DOCKER-8`
 - `ENV-1`
 - `ENV-2`
 - `ENV-3`

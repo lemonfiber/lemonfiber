@@ -201,10 +201,16 @@ fn no_other_services_word_is_written_as_if_it_were_ours() {
 /// no zone keep these hours by it, and quiet hours would begin at the wrong time of
 /// night. `TZ` is the operating system's own name for the setting, shown where it is
 /// typed rather than described. `HH` is a format beside the `MM` already here.
+///
+/// The two a remote daemon brought are both the first kind, and both sit beside names
+/// already here. `TCP` and `SSH` are how an endpoint is written — `tcp://` and `ssh://`
+/// are typed by whoever set `DOCKER_HOST`, so they are met as spelling before they are
+/// met as prose — and the sentences they stand in say what each costs: one is not
+/// encrypted, and the other is refused by keys and accounts rather than by Docker.
 const ORDINARY: &[&str] = &[
     "API", "URL", "TLS", "JSON", "DNS", "IP", "UI", "HTTP", "OSI", "FAT", "SMB", "CIFS", "NFS",
     "WSL2", "UID", "GID", "NAT", "PMP", "P2P", "GB", "MB", "CD", "TV", "MP3", "AAC", "FLAC",
-    "ALAC", "YYYY", "MM", "DD", "NOT", "CPU", "UTC", "TZ", "HH",
+    "ALAC", "YYYY", "MM", "DD", "NOT", "CPU", "UTC", "TZ", "HH", "TCP", "SSH",
 ];
 
 /// Every acronym an operator is shown is explained, or declared ordinary.

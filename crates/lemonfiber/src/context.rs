@@ -45,6 +45,10 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     crate::render::glossary::settle_known(here().map_or_else(Acknowledged::default, |paths| {
         acknowledged::at(&paths.acknowledged())
     }));
+    // And which machine this run is about, before it does anything. Settled here
+    // because this is where the one answer for the run already lives: everything
+    // below reads it off the settings rather than asking the environment again.
+    crate::render::host::settle(&settings.docker);
 
     // Docker Engine and Docker Desktop are told apart by asking the daemon,
     // which needs the engine adapter. Until then this is what can be seen from
@@ -54,11 +58,15 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     let runner: Arc<dyn Runner> = Arc::new(Local);
     let ctx = Ctx::new(
         Arc::clone(&runner),
-        Arc::new(Daemon::local()),
+        // Both engine seams are built from the one resolved target the settings
+        // carry, which is the same field the Compose invocation is built from. That
+        // is the whole of what stops the reads and the writes reaching different
+        // machines: there is no second place to resolve one.
+        Arc::new(Daemon::reaching(settings.docker.clone())),
         Arc::new(System),
         lemonfiber_core::ports::seams::Seams {
             filesystem: Arc::new(Disk),
-            ..lemonfiber_adapters::live()
+            ..lemonfiber_adapters::live_reaching(&settings.docker)
         },
         stack,
         settings,
@@ -182,6 +190,11 @@ pub(crate) fn read_settings() -> Settings {
         // Where the tools that install programs leave a record of having done so,
         // which is the only thing this is read for.
         home: home_directory(),
+        // Which engine this run operates, resolved once from the environment and
+        // from Docker's own records. Read here rather than by whoever needs it, so
+        // the Engine API client, the image listing, the Compose invocation and the
+        // diagnosis all obey one answer.
+        docker: lemonfiber_adapters::docker_target(),
         // On unless it is explicitly turned off: somebody meeting this vocabulary
         // does not know there is a setting to look for, and somebody who wants the
         // explanations gone knows exactly what they want to stop.

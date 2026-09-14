@@ -32,6 +32,8 @@ use std::path::PathBuf;
 use lemonfiber_manifest::Protocol;
 use serde::{Deserialize, Serialize};
 
+use crate::ports::docker::Target;
+
 pub use reaching::{
     offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
     REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY, SWITCHES,
@@ -502,6 +504,18 @@ pub struct Settings {
     /// of them put it there. Absent where the platform would not say, which reads as
     /// a machine with no such record rather than as a failure.
     pub home: Option<PathBuf>,
+    /// Which container engine this run operates, and how it came to be that one.
+    ///
+    /// Resolved once at the edge from the environment and Docker's own records, and
+    /// held here because this is what both halves of a run read. The Engine API
+    /// client is built from it and the Compose invocation is given it as `--host`,
+    /// so there is no arrangement of settings under which the reads and the writes
+    /// reach different machines — which is what they did while the client resolved
+    /// its own endpoint and Compose inherited the environment.
+    ///
+    /// This machine's own daemon unless something said otherwise, which is the
+    /// ordinary case and the one that must stay silent.
+    pub docker: Target,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -539,6 +553,7 @@ impl Default for Settings {
             program: None,
             hosted: None,
             home: None,
+            docker: Target::local(),
         }
     }
 }
