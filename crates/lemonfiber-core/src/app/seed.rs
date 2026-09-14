@@ -1602,14 +1602,18 @@ mod tests {
         )
         .await;
 
-        assert!(is_skipped(&wiring), "{wiring:?}");
-        let said = format!("{wiring:?}");
+        // Nothing this call answered with is put in an assertion message. The pair
+        // carries a minted password in its second half, and a failing assertion
+        // prints its message into the run's log — so each check below says what went
+        // wrong rather than showing what came back.
         assert!(
-            said.contains("signing in"),
-            "the operator was not told why this run could not tell: {said}"
+            is_skipped(&wiring),
+            "a rehearsal answered the question only a sign-in can answer"
         );
-        // The value is deliberately not in the message: it is a credential, and a
-        // failing assertion prints its message into the run's log.
+        assert!(
+            format!("{wiring:?}").contains("signing in"),
+            "the operator was not told why this run could not tell"
+        );
         assert!(recorded.is_none(), "a rehearsal minted a password");
         let asked = http.requests();
         assert!(

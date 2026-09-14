@@ -441,13 +441,16 @@ mod tests {
             rehearsal: Rehearsal::Untaught,
         };
 
-        let Err(refusal) = verdict(&untaught) else {
-            unreachable!("a command that cannot say what it would do must not be run");
-        };
-        assert_eq!(refusal.code, not_taught_yet(&untaught).code);
+        // Carried as a `Result` rather than opened with a `let ... else`. The else
+        // arm is a region no passing run enters, and the coverage gate counts it
+        // against this file — the same reason the test below reaches for
+        // `reasoning` instead of `matches!`.
+        let answer = verdict(&untaught).map_err(|refusal| refusal.code);
+
+        assert_eq!(answer, Err(not_taught_yet(&untaught).code));
         assert_ne!(
-            refusal.code,
-            refused(&untaught, THE_WALK_IS_THE_OBSERVATION).code,
+            answer,
+            Err(refused(&untaught, THE_WALK_IS_THE_OBSERVATION).code),
             "not taught yet and cannot be rehearsed are different things to be told"
         );
     }
