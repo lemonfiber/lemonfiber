@@ -76,7 +76,7 @@ impl Situation {
     /// second time. Kept honest by [`Situation::called`], whose match has no
     /// wildcard: a new situation fails to compile there, and the test that reads
     /// both then refuses any payload that has not grown a field for it.
-    pub const EVERY: &'static [Self] = &[
+    pub const EVERY: &[Self] = &[
         Self::Starting,
         Self::Stopping,
         Self::StoppingAfterDownloads,
