@@ -36,7 +36,7 @@ use crate::ports::docker::{Failure, Presence};
 /// to the same daemon as the real one. Fixed rather than invented: if a machine
 /// somehow has this, the check reports itself broken and the run goes on unverified,
 /// which is the harmless direction to be wrong in.
-const NOT_THERE: &str = ".lemonfiber-is-this-check-working";
+const CANNOT_BE_THERE: &str = ".lemonfiber-is-this-check-working";
 
 /// Whether this run may act on the engine it is pointed at at all.
 ///
@@ -136,7 +136,7 @@ async fn asked(ctx: &Ctx, root: &Path) -> Result<Verdict, Failure> {
 
 /// Somewhere the answer must be no, if the asking works at all.
 fn control(root: &Path) -> PathBuf {
-    root.join(NOT_THERE)
+    root.join(CANNOT_BE_THERE)
 }
 
 /// What to tell an operator whose stack has nowhere to live on the other machine.
@@ -198,7 +198,7 @@ fn unmeasured(host: &str, path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{control, refusal, unmeasured, unreadable, NOT_THERE};
+    use super::{control, refusal, unmeasured, unreadable, CANNOT_BE_THERE};
     use std::path::Path;
 
     /// The refusal is the useful part, and it is useful only if it names both.
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(asked.parent(), Some(Path::new("/srv/media")));
         assert_eq!(
             asked.file_name().and_then(|name| name.to_str()),
-            Some(NOT_THERE)
+            Some(CANNOT_BE_THERE)
         );
     }
 

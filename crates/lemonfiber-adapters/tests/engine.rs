@@ -1010,6 +1010,38 @@ async fn a_daemon_that_somehow_made_the_container_has_told_us_nothing() {
     engine.stop().await;
 }
 
+/// A daemon that answered with something the client cannot read is a transport
+/// failure, not a verdict on the path.
+///
+/// Apart from the three readable answers because it arrives as a different kind of
+/// error entirely — nothing came back that could be classified — and apart from the
+/// machine that never answered because that one fails before the question is even
+/// sent. This is the gap between them: connected, asked, and then nothing usable.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_daemon_whose_answer_cannot_be_read_is_reported_as_the_transport_failing() {
+    use lemonfiber_ports::docker::Locations as _;
+    use std::path::Path;
+
+    let engine = fake::engine(
+        "unreadable",
+        vec![(
+            "containers/create",
+            fake::Reply::Body(200, "this is not the document it promised".to_owned()),
+        )],
+    );
+
+    let answer = Daemon::at(&engine.socket)
+        .located(Path::new("/srv/media"))
+        .await;
+
+    assert!(
+        matches!(answer, Err(Failure::Unreachable { .. })),
+        "an answer nobody can read is not evidence about a path: {answer:?}"
+    );
+    engine.stop().await;
+}
+
 /// A machine that never answered said nothing about the path.
 ///
 /// Kept apart from the three answers above because it is a different kind of fact:
