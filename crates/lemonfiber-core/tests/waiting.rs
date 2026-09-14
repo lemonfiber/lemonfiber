@@ -191,10 +191,16 @@ async fn a_start_that_settles_at_once_says_nothing() {
     assert_eq!(said, Vec::<String>::new());
 }
 
-/// A rehearsal waits for nothing, so it has nothing to say. It stops before the
-/// single irreversible step, and the wait is on the far side of it.
+/// A rehearsal waits for nothing, so it has nothing to say about waiting. It stops
+/// before the single irreversible step, and the wait is on the far side of it.
+///
+/// It is not silent, and that is deliberate elsewhere: a rehearsal states what the
+/// real run would take away, because what it would cost is the one question the flag
+/// exists to answer. So the claim here is about the wait rather than about the
+/// narrator being empty — asserting emptiness would make this test fail the day any
+/// other sentence is added, whatever it said.
 #[tokio::test(start_paused = true)]
-async fn a_rehearsal_waits_for_nothing_and_says_nothing() {
+async fn a_rehearsal_waits_for_nothing_and_says_nothing_about_waiting() {
     let heard = Arc::new(Heard::default());
     let ctx = ctx(Health::Starting)
         .narrating(Arc::clone(&heard) as Arc<dyn Narrator>)
@@ -209,7 +215,12 @@ async fn a_rehearsal_waits_for_nothing_and_says_nothing() {
     .await;
 
     assert!(rehearsed.is_ok(), "a rehearsal reports what would run");
-    assert_eq!(heard.said().await, Vec::<String>::new());
+    let said = heard.said().await;
+    assert!(
+        said.iter()
+            .all(|line| line.starts_with("this takes services")),
+        "a rehearsal narrated a wait it never did: {said:?}"
+    );
 }
 
 /// A run nobody is listening to waits and refuses exactly as one being listened to

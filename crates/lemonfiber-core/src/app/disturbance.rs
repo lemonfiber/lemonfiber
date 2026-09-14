@@ -416,15 +416,21 @@ mod tests {
             );
         }
 
+        // Both sides are named before the assertion rather than inside its message.
+        // A message is rendered only where the assertion fails, so a run that passes
+        // never enters it — and the coverage gate counts a rendering no run reaches
+        // against every covered line beside it.
+        let published: Vec<&String> = fields.keys().collect();
+        let known: Vec<&str> = Situation::EVERY
+            .iter()
+            .copied()
+            .map(Situation::called)
+            .collect();
         assert_eq!(
-            fields.len(),
-            Situation::EVERY.len(),
-            "the payload publishes a length nothing is ever held to: {:?} against {:?}",
-            fields.keys().collect::<Vec<_>>(),
-            Situation::EVERY
-                .iter()
-                .map(|s| s.called())
-                .collect::<Vec<_>>()
+            published.len(),
+            known.len(),
+            "the payload publishes a length nothing is ever held to: {published:?} \
+             against {known:?}"
         );
     }
 
