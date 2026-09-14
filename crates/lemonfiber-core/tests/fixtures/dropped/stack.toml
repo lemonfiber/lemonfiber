@@ -1,0 +1,46 @@
+# A stack that has dropped services and says so, which the one this repository
+# carries has not yet — so the shape of the record could otherwise only be
+# exercised against a string built in a unit test.
+#
+# Generation 1, unchanged: a table an older reader has never heard of does not make
+# any field it already understands mean something else, which is what the generation
+# is for. See `SUPPORTED_SCHEMA_VERSIONS`.
+
+schema_version  = 1
+stack_version   = "1.0.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id = "books"
+name = "Books"
+description = "Reading and listening"
+
+[[form]]
+id = "library"
+name = "Library"
+description = "Keep a library of books."
+profiles = ["books"]
+
+[[service]]
+id = "bindery"
+name = "Bindery"
+profile = "books"
+image = "lscr.io/linuxserver/bindery"
+tag = "0.4.1"
+criticality = "enhancing"
+license = "MIT"
+upstream = "https://github.com/bindery/bindery"
+last_release = "2026-02-14"
+describes = "Watches for the books and audiobooks you want and fetches them"
+without_it = "Find and download books yourself"
+
+[[removed]]
+id = "readarr"
+removed_in = "0.1.0"
+reason = "Discontinued upstream in 2025; the project is archived and releases nothing."
+replaced_by = "bindery"
+
+[[removed]]
+id = "booksonic"
+removed_in = "0.2.0"
+reason = "Unmaintained upstream, and nothing in this stack took over what it did."

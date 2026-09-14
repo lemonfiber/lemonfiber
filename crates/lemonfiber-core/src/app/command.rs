@@ -341,6 +341,14 @@ pub enum Command {
         /// Go ahead and remove them, having seen what goes.
         confirm: bool,
     },
+    /// Say what each service in this stack is for, what going without it costs, how
+    /// much that matters, and what became of anything the stack has dropped.
+    ///
+    /// A read with no arguments, over the manifest and nothing else. What a service is
+    /// for is a property of the stack rather than of the caller, so there is nothing to
+    /// narrow it by — and an operator who cannot tell which of nineteen names matters
+    /// is asking about all of them rather than about the one they can already name.
+    Catalogue,
     /// List everything that leaves this machine: what lemonfiber asks of the world
     /// on its own account, and what the stack's own services ask of it.
     ///

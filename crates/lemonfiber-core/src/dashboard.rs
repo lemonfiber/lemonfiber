@@ -422,6 +422,7 @@ mod tests {
         Service {
             id: id.to_owned(),
             name: id.to_owned(),
+            describes: format!("what {id} is for"),
             profile: "media".to_owned(),
             state,
             criticality: Criticality::Core,

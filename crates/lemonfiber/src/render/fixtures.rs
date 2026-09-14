@@ -50,6 +50,7 @@ pub(super) fn service(id: &str, state: State, exit: Option<i32>) -> Service {
     Service {
         id: id.to_owned(),
         name: format!("{id} service"),
+        describes: format!("what {id} is for"),
         profile: "media".to_owned(),
         state,
         criticality: Criticality::Core,

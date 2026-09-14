@@ -74,6 +74,8 @@ pub enum Outcome {
     Invited(crate::model::Invitation),
     /// Somebody taken out of the household, or what taking them would cost.
     Removed(crate::model::HouseholdRemoval),
+    /// What each service in this stack is for, and what became of the ones that went.
+    Catalogue(crate::model::CatalogueReport),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
     /// Where every service in this stack comes from, and under what licence.
@@ -152,6 +154,7 @@ impl Outcome {
             Self::Clients(_) => kind::CLIENTS,
             Self::Invited(_) => kind::INVITATION,
             Self::Removed(_) => kind::REMOVAL,
+            Self::Catalogue(_) => crate::model::kind::CATALOGUE,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Provenance(_) => crate::model::kind::PROVENANCE,
             Self::Credentials(_) => crate::model::kind::CREDENTIALS,
@@ -208,6 +211,7 @@ impl serde::Serialize for Outcome {
             Self::Clients(report) => report.serialize(serializer),
             Self::Invited(report) => report.serialize(serializer),
             Self::Removed(report) => report.serialize(serializer),
+            Self::Catalogue(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Provenance(report) => report.serialize(serializer),
             Self::Credentials(inventory) => inventory.serialize(serializer),

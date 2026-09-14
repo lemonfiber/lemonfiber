@@ -327,6 +327,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Invited(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
+        | Outcome::Catalogue(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
         | Outcome::Undo(_)
@@ -1141,6 +1142,7 @@ mod tests {
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
                 condition: lemonfiber_core::docker::Condition::Inactive,
+                undeclared: Vec::new(),
                 services: Vec::new(),
             }),
         ] {

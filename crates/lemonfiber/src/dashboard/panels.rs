@@ -1039,6 +1039,7 @@ mod tests {
         let running = lemonfiber_core::docker::Service {
             id: "sonarr".to_owned(),
             name: "Sonarr".to_owned(),
+            describes: "Watches for new episodes and fetches them".to_owned(),
             profile: "tv".to_owned(),
             state: lemonfiber_core::docker::State::Running,
             criticality: lemonfiber_core::docker::Criticality::Core,

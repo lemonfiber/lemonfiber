@@ -337,6 +337,7 @@ pub fn empty() -> Manifest {
         profiles: Vec::new(),
         forms: Vec::new(),
         services: Vec::new(),
+        removed: Vec::new(),
     }
 }
 

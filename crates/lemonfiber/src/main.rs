@@ -330,6 +330,7 @@ async fn main() -> ExitCode {
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
+        Request::Catalogue => Command::Catalogue,
         Request::Outbound => Command::Outbound,
         Request::Provenance => Command::Provenance,
         Request::Credentials(asked) => translate::credentials(asked),

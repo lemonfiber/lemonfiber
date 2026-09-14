@@ -36,4 +36,13 @@ pub struct StatusReport {
     pub condition: crate::docker::Condition,
     /// Each service, worst first.
     pub services: Vec<crate::docker::Service>,
+    /// The containers running under this project that the stack never declared.
+    ///
+    /// Kept apart from the services rather than mixed in with them, because what is
+    /// known about each is different: a service has a profile, a criticality and a
+    /// description, and one of these has a name and a state and nothing else. Shown
+    /// all the same — something running under this project's name that lemonfiber did
+    /// not put there is the operator's business whether or not lemonfiber understands
+    /// it.
+    pub undeclared: Vec<crate::docker::Undeclared>,
 }
