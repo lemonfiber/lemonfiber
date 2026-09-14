@@ -244,5 +244,6 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         stack_edits: Vec::new(),
         forwarding: None,
         switched: None,
+        held: None,
     }
 }

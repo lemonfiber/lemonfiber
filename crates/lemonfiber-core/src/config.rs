@@ -32,6 +32,8 @@ use std::path::PathBuf;
 use lemonfiber_manifest::Protocol;
 use serde::{Deserialize, Serialize};
 
+use crate::ports::docker::Target;
+
 pub use reaching::{
     offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
     REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY, SWITCHES,
@@ -90,6 +92,17 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// look for, and somebody who finds the explanations patronising knows exactly what
 /// they want to stop.
 pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
+
+/// The setting that lets a start at a login happen while this machine is on its
+/// battery.
+///
+/// Off unless it is explicitly turned on, which is the opposite way round from the
+/// explanations and for the opposite reason: a media stack started on a battery
+/// empties one in an afternoon, and an operator who wants that has a reason for it
+/// while an operator who gets it by default has an afternoon ruined. A desktop with
+/// no battery to read is unaffected either way — nothing here holds back a machine
+/// that could not say where its power comes from.
+pub const AUTOSTART_ON_BATTERY_KEY: &str = "LEMONFIBER_AUTOSTART_ON_BATTERY";
 
 /// The hours the operator does not want waking for, as `HH:MM-HH:MM`.
 ///
@@ -306,6 +319,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_HOUSEHOLD_KEY,
     REACH_UPDATES_KEY,
     EXPLANATIONS_KEY,
+    AUTOSTART_ON_BATTERY_KEY,
     PROJECT_KEY,
     OVERLAY_KEY,
     QUIET_HOURS_KEY,
@@ -456,6 +470,11 @@ pub struct Settings {
     /// On unless switched off. The words are a wall to somebody meeting them, and
     /// the operator who wants them gone is the one who knows to go and look.
     pub explanations: bool,
+    /// Whether a start at a login may happen while this machine is on its battery.
+    ///
+    /// Off unless switched on. Read only by the run that a login starts; typing
+    /// `lemonfiber up` yourself is you deciding, and nothing here second-guesses it.
+    pub autostart_on_battery: bool,
     /// Which requests lemonfiber may make on its own account.
     ///
     /// Every one allowed unless the operator said otherwise, and what each of them
@@ -485,6 +504,18 @@ pub struct Settings {
     /// of them put it there. Absent where the platform would not say, which reads as
     /// a machine with no such record rather than as a failure.
     pub home: Option<PathBuf>,
+    /// Which container engine this run operates, and how it came to be that one.
+    ///
+    /// Resolved once at the edge from the environment and Docker's own records, and
+    /// held here because this is what both halves of a run read. The Engine API
+    /// client is built from it and the Compose invocation is given it as `--host`,
+    /// so there is no arrangement of settings under which the reads and the writes
+    /// reach different machines — which is what they did while the client resolved
+    /// its own endpoint and Compose inherited the environment.
+    ///
+    /// This machine's own daemon unless something said otherwise, which is the
+    /// ordinary case and the one that must stay silent.
+    pub docker: Target,
 }
 
 /// An indexer credential as configuration holds it: where it is, and the key.
@@ -516,11 +547,13 @@ impl Default for Settings {
             exposed: Vec::new(),
             front_door: None,
             explanations: true,
+            autostart_on_battery: false,
             reaching: Reaching::default(),
             provider_host: None,
             program: None,
             hosted: None,
             home: None,
+            docker: Target::local(),
         }
     }
 }

@@ -97,6 +97,35 @@ mod tests {
         );
     }
 
+    /// A run against this machine names no host, and one against another names it.
+    ///
+    /// Asserted on the wrapper directly rather than through what the run settled,
+    /// because that is a value latched for the whole process: a test that set it
+    /// would be deciding for every test beside it, and the wrapper is the thing
+    /// under test either way.
+    #[test]
+    fn a_payload_about_another_machine_says_which_one() {
+        assert_eq!(
+            Envelope::new(kind::VERSION, 7_u32).host,
+            None,
+            "a run against this machine carries no host to mistake"
+        );
+        assert_eq!(
+            super::settle_host(None),
+            None,
+            "and settling nothing leaves it that way"
+        );
+
+        let named = Envelope {
+            host: Some("ssh://media@nas.local".to_owned()),
+            ..Envelope::new(kind::VERSION, 7_u32)
+        };
+        assert_eq!(
+            json(&named),
+            r#"{"api_version":1,"kind":"version","data":7,"host":"ssh://media@nas.local"}"#
+        );
+    }
+
     #[test]
     fn an_unreachable_engine_is_absent_rather_than_guessed_at() {
         let report = VersionReport {

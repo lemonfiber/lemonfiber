@@ -57,6 +57,11 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the address the leak check asks each container for its public address",
     ),
     (
+        super::AUTOSTART_ON_BATTERY_KEY,
+        "whether a start at a login is allowed while this machine is on its battery, which \
+         is off unless you turned it on",
+    ),
+    (
         super::QUIET_HOURS_KEY,
         "the hours you would rather not be woken for, which hold everything but the \
          alerts that cannot wait",

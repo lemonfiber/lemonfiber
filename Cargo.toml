@@ -26,7 +26,14 @@ argon2 = { version = "0.6", default-features = false, features = ["alloc", "pass
 # websockets, none of which this API has; what is left is routing, HTTP/1 and JSON,
 # which is the whole of what the contract describes.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
-bollard = "0.21"
+# The Engine API client. `ssh` is on because a remote Docker context is nearly always an
+# ssh:// one, and without it the client cannot connect at all while `docker compose` — a
+# subprocess with an inherited environment — happily can: reads on one machine, writes on
+# another. The feature was measured against the reason the `reqwest` line below picks
+# rustls, and it is clean: it pulls `openssh`, which drives the operator's own `ssh`
+# binary, and three small crates with it. No OpenSSL, so the static musl release target
+# still builds without a system TLS library.
+bollard = { version = "0.21", features = ["ssh"] }
 # Wall-clock arithmetic in a named zone, for the one window this product holds against a
 # time of day: the hours an operator does not want waking for. Everything else here is
 # instants and calendar days on purpose. Its own tzdb is left to the platform's, so the

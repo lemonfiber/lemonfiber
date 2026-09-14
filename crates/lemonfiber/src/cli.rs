@@ -114,6 +114,19 @@ pub enum Request {
         /// Start only these services, leaving the rest of the form alone.
         #[arg(long = "service", value_name = "NAME")]
         services: Vec<String>,
+        /// Start what a restart of this machine should start, and nothing otherwise.
+        ///
+        /// What a login runs. It brings back whichever form was last running unless
+        /// you pinned one, and it declines — saying why — where you stopped the stack
+        /// on purpose, where you never asked for it to start on its own, or where this
+        /// machine is on its battery and you have not said to start anyway. It waits
+        /// for the container engine to finish starting and tries again while the
+        /// network is still arriving, and if the stack still does not come back it
+        /// records that, so the next thing you type tells you once rather than not at
+        /// all. Naming a form or a service alongside it is refused: which forms come
+        /// back is the record's answer, not this command line's.
+        #[arg(long, conflicts_with_all = ["forms", "services"])]
+        at_boot: bool,
     },
     /// Stop and remove what a form started.
     Down {

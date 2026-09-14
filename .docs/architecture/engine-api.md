@@ -78,19 +78,26 @@ Its whole job is to speak a wire protocol, so a fake implementing `Engine` would
 prove only that the fake works — the trait boundary sits *below* the code under
 test.
 
-So the **daemon** is what gets replaced. `crates/lemonfiber-core/tests/engine.rs`
+So the **daemon** is what gets replaced. `crates/lemonfiber-adapters/tests/fake/`
 carries a socket that answers the Engine API with whatever a test wants to say,
 which drives the connection, the request, the decoding and the mapping in one
 pass. It needs no Docker installed, which matters: a test that required a real
 daemon would make the coverage gate depend on what happens to be running.
 
-It answers three shapes:
+It is a module of its own rather than one inside the file that first needed it,
+because two binaries drive the adapter — `tests/engine.rs` for listings and
+streams, `tests/exec.rs` for running a command inside a container — and two
+engines that were meant to answer the same way are two engines that will
+eventually not.
+
+It answers four shapes:
 
 | Shape | Used by |
 |-------|---------|
 | A JSON body under a status code | `list`, `stats`, exec creation and inspection |
 | Docker's multiplexed framing — eight-byte header, then payload | `logs` |
 | The same framing behind a `101` protocol upgrade | `exec` output |
+| The same upgrade, with one frame promising more than it delivers | a stream cut mid-chunk |
 
 It lives in `tests/` rather than `src/` because it is scaffolding rather than
 product, and because scaffolding held to full line coverage grows tests about
@@ -104,6 +111,40 @@ Two things it taught, both cheaper to read than to rediscover:
 - Tests stop the engine and wait for it, rather than walking away. A socket
   still being served while the next test binds its own is a flake that will not
   reproduce.
+
+## Which daemon, and why it is decided once
+
+The adapter does not read the environment. It is handed a `ports::docker::Target`
+— a resolved endpoint, how it came to be chosen, and what may be shown of it —
+and builds its client from that and nothing else.
+
+That is a correction rather than a preference. Compose is a subprocess with an
+inherited environment, so it obeyed `DOCKER_HOST` and a named context. This
+adapter called `connect_with_local_defaults()`, which honours `DOCKER_HOST` only
+when it names a unix socket and silently falls back to the local daemon
+otherwise, and read `~/.docker/contexts` nowhere. On a laptop with a remote
+context set, the reads described one machine and the writes changed another —
+and on every machine where nobody had set one, the two agreed perfectly.
+
+So there is one resolution, in `adapters::docker::context`, whose answer lands on
+`Settings::docker`. The engine client is built from that field; the Compose
+invocation names the same field as `docker --host … compose …`, which beats
+anything the shell exported. Neither half can be aimed anywhere by itself.
+
+`ports::docker::Target::refusal()` is the other half of the same idea. An
+endpoint this build cannot drive — a scheme it does not speak, a TCP endpoint the
+operator asked to have verified with TLS, a context this machine has no record of
+— is refused by *both* halves before anything is attempted, because an endpoint
+the reads cannot use must never become one the writes do.
+
+### Telling refusals apart
+
+For a socket on this filesystem there is one question: is Docker running. For a
+daemon somewhere else there are several, and they have nothing in common. The
+transport's whole chain of causes is read in `adapters::docker::refusal`, because
+the condition is never in the outer error variant, and the distinctions are drawn
+**only** for a remote target: `permission denied` from a local socket is a group
+membership, and from an SSH endpoint it is a key.
 
 ## Related
 

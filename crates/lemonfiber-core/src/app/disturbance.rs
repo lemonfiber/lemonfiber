@@ -156,7 +156,13 @@ const fn situation(command: &Command) -> Option<Situation> {
         // Apart from one another because they are apart in [`Command`], and a
         // day where a service start is held to a different clock from a form
         // start is a day this reads as two lines rather than being rewritten.
-        Command::Up { .. } | Command::Start { .. } => Some(Situation::Starting),
+        // A boot joins the two because it runs the same start in the middle by
+        // calling it, and is held to the same clock. Nobody is watching one —
+        // that is the whole of why it reports to a store rather than to a person
+        // — but the length it was prepared to wait is exactly what somebody reads
+        // back afterwards to understand why a four-in-the-morning start gave up
+        // when it did.
+        Command::Up { .. } | Command::Start { .. } | Command::AtBoot => Some(Situation::Starting),
         Command::Restart { .. } => Some(Situation::Restarting),
         Command::Switch { .. } => Some(Situation::Switching),
         Command::Down {

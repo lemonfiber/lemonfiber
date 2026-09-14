@@ -24,6 +24,7 @@ pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
 mod history;
+pub(crate) mod host;
 mod hosting;
 mod invitation;
 mod migration;

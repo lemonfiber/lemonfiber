@@ -321,6 +321,10 @@ fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
             }),
         ),
         ("expiring", Command::Expiring(Arranged::After(30))),
+        // `up --at-boot` is a flag rather than a subcommand, so the sample above
+        // cannot reach it — and it is the one command here that writes three records
+        // of its own, which is exactly the shape a rehearsal gets wrong.
+        ("at-boot", Command::AtBoot),
         ("self-update", Command::SelfUpdate { to: None }),
         (
             "repair",

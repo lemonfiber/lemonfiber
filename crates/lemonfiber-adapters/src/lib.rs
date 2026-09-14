@@ -30,6 +30,7 @@ pub mod random;
 pub mod retrying;
 pub mod time;
 
+pub use docker::context::from_environment as docker_target;
 pub use docker::Daemon;
 pub use filesystem::Disk;
 pub use hosting::launchd::Launchd;
@@ -46,25 +47,38 @@ use std::sync::Arc;
 
 use lemonfiber_ports::seams::Seams;
 
-/// Every seam, wired to the real machine.
+/// Every seam, wired to the real machine and to this machine's own engine.
 ///
 /// The one place the real implementations are chosen, so a surface does not name ten of
 /// them and a core cannot name any. What a caller varies afterwards it varies by name,
 /// on the context, which is what keeps a fake visible at the call that installs it.
 ///
-/// Takes nothing. Everything here reaches the machine on its own account; a seam built
-/// over another seam — asking this machine its name by running a program — is written
-/// over the port rather than over the machine, and stayed in the core with the rest of
-/// the composition.
+/// Everything here reaches the machine on its own account; a seam built over another
+/// seam — asking this machine its name by running a program — is written over the port
+/// rather than over the machine, and stayed in the core with the rest of the composition.
 #[must_use]
 pub fn live() -> Seams {
+    live_reaching(&lemonfiber_ports::docker::Target::local())
+}
+
+/// Every seam, with the engine ones pointed at the engine this run operates.
+///
+/// The image listing is an engine read like any other, and it went through a client of
+/// its own built from this machine's defaults. On a remote context that put one more
+/// reader on the laptop while everything else was on the server — the same split this
+/// version exists to close, in the one seam nobody thinks of as an engine.
+///
+/// Takes the target rather than resolving one, so there is one answer for the run and
+/// no seam can be built against a second.
+#[must_use]
+pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
     Seams {
         filesystem: Arc::new(Disk),
         // Wrapped so a service that is merely still starting is tried again rather than
         // reported. Applied here rather than at each caller: a retry policy written into
         // fifteen call sites is fifteen policies.
         http: Arc::new(Retrying::around(Web::new())),
-        images: Arc::new(Daemon::local()),
+        images: Arc::new(Daemon::reaching(target.clone())),
         volume: Arc::new(Disk),
         eraser: Arc::new(Disk),
         occupancy: Arc::new(Disk),

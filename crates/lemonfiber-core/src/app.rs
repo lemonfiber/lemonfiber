@@ -23,9 +23,11 @@ pub mod apply;
 pub mod archives;
 mod arrangement;
 mod asking;
+mod autostart;
 pub mod backup;
 mod bandwidth;
 mod beside;
+mod boot;
 pub mod bundle;
 mod command;
 pub mod conditions;
@@ -120,6 +122,9 @@ pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
 
 /// Fetching images is switched off, so there was nothing to fetch with.
 pub const REGISTRY_REFUSED: Code = Code::new("LIFE-4");
+
+/// Raised when the stack's own location is not on the machine being operated.
+pub const ABSENT_THERE: Code = Code::new("LIFE-5");
 
 /// Ask the engine to act on a set of services, which three commands do identically.
 ///
@@ -263,22 +268,53 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
+    // What a failed restart left, said before the answer to whatever was actually
+    // asked for — and once, however many commands follow it. A boot that failed at
+    // four in the morning has nobody to tell, so the only moment it can reach the
+    // operator is the next one they are present at, and that is any command at all
+    // rather than a particular one. The run a login starts is excluded: it is the
+    // thing being reported on, not somebody arriving to be told.
+    if !matches!(command, Command::AtBoot) {
+        boot::reported(ctx).await;
+    }
+    // Last, so that the sentence nearest the acting is the one about what acting
+    // costs. The line above is news from a run nobody saw; this one is about the
+    // run the operator is in the middle of asking for.
     disturbance::said(&command, ctx).await;
     routed(rehearsal::carried(command, ctx), ctx).await
 }
 
+/// What this product's own vocabulary answers: one word, or all of them.
+///
+/// Two arms of the table folded into one call, the way asking for one setting and
+/// asking for every setting already are. They are one question read two ways — a
+/// reader who does not know a word and a reader who does not know which words there
+/// are — and the answer to both comes out of the same table.
+fn worded(word: Option<&str>) -> Result<Outcome, Box<Problem>> {
+    let Some(word) = word else {
+        return Ok(Outcome::Glossary(crate::glossary::vocabulary()));
+    };
+    crate::glossary::explain(word)
+        .map(|term| Outcome::Word(*term))
+        .ok_or_else(|| Box::new(crate::glossary::unrecognised(word)))
+}
+
 /// The table itself: every command, and where it goes.
 ///
-/// Split from [`dispatch`] so that the two things asked of every command are asked
+/// Split from [`dispatch`] so that the three things asked of every command are asked
 /// once, above the table, rather than in an arm somebody can add without adding:
-/// whether a rehearsal means anything here, and what this is about to take away.
-/// Private, so this is reachable only through both.
+/// whether a rehearsal means anything here, whether news is waiting from a run
+/// nobody saw, and what this is about to take away. Private, so this is reachable
+/// only through all three.
 async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
+        // The same start with four questions in front of it and two behind it, none
+        // of which a start somebody typed should ask.
+        Command::AtBoot => boot::at_boot(ctx).await,
         Command::Start { forms, services } => acting(ctx, &forms, Action::Start(services)).await,
         Command::Down { forms, wait } => engine::teardown(ctx, &forms, wait).await,
         Command::Halt { forms, services } => acting(ctx, &forms, Action::Stop(services)).await,
@@ -315,16 +351,14 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Expiring(arranged) => expiring::expiring(ctx, arranged, expiring::SWEEPING)
             .await
             .map(Outcome::Household),
-        // The short command that decides what becomes of the two long ones. It reads
+        // The short command that decides what becomes of the long ones. It reads
         // after it writes rather than reporting what a write claimed, because a written
         // definition is not a running command and this exists to tell the two apart.
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
-        Command::Explain { word } => crate::glossary::explain(&word)
-            .map(|term| Outcome::Word(*term))
-            .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
-        Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
+        Command::Explain { word } => worded(Some(&word)),
+        Command::Glossary => worded(None),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance(
             quality::straining(ctx),
         ))),
@@ -2403,6 +2437,30 @@ mod tests {
             wrote_nothing,
             "a run that asked for nothing wrote nothing: {read:?}"
         );
+    }
+
+    /// The start a login makes reaches the run that decides whether to make it, and a
+    /// rehearsal of it is permitted rather than refused.
+    ///
+    /// Dispatched here as well as from `tests/`, and for the reason the two above are:
+    /// this file is compiled twice, and the arm joining a command to its handler is a
+    /// line of each copy — so the copy that never dispatched it counts the arm as never
+    /// run. Both ways round, because the table saying what a rehearsal of a command
+    /// means is read only on a rehearsal, and it lives in a second file compiled twice
+    /// over as well.
+    ///
+    /// A machine nobody has answered the autostart question on declines, which is the
+    /// cheapest of the four answers in front of the start and the only one reachable
+    /// without an engine, a stack of containers, or a machine that has actually
+    /// restarted. What the other three come to is settled beside the run itself; this
+    /// is about arriving there.
+    #[tokio::test]
+    async fn the_start_a_login_makes_reaches_the_run_that_decides_whether_to_make_it() {
+        for ctx in [a_context().build(), a_context().build().rehearsing()] {
+            let read = dispatch(Command::AtBoot, &ctx).await;
+            let declined = matches!(&read, Ok(Outcome::Lifecycle(report)) if report.held.is_some());
+            assert!(declined, "{read:?}");
+        }
     }
 
     /// A context that runs against the checked-out stack, in rehearsal.

@@ -118,7 +118,22 @@ pub fn build(
 ) -> Vec<String> {
     let _ = environment;
 
-    let mut argv = vec!["docker".to_owned(), "compose".to_owned()];
+    let mut argv = vec!["docker".to_owned()];
+
+    // The endpoint is named on the invocation rather than left to whatever the shell
+    // exported. Compose is a subprocess and would inherit the environment, which is
+    // how it came to obey a remote context that the Engine API client silently
+    // ignored — the writes went to the server and the reads came from the laptop.
+    // Naming it here means both halves read the same field of the same settings, so
+    // there is no arrangement of environment and configuration that can separate
+    // them. Nothing is added where nothing was chosen, because a guessed endpoint
+    // would override the machine's own conventions with this build's idea of them.
+    if let Some(endpoint) = settings.docker.endpoint() {
+        argv.push("--host".to_owned());
+        argv.push(endpoint.to_owned());
+    }
+
+    argv.push("compose".to_owned());
 
     argv.push("--project-name".to_owned());
     argv.push(settings.project.clone());
@@ -178,6 +193,35 @@ mod tests {
     fn line(forms: &[&str], action: &Action, settings: &Settings) -> Option<String> {
         plan(forms)
             .map(|plan| build(&plan, settings, stack_dir(), action, Environment::MacOs).join(" "))
+    }
+
+    /// A run aimed at another machine names it on the invocation, ahead of the
+    /// subcommand, where it is a global flag.
+    ///
+    /// The endpoint beats whatever the shell exported, which is the whole reason it
+    /// is named here rather than left to the environment: Compose is a subprocess and
+    /// would inherit one, and an inherited endpoint is a second opinion about which
+    /// machine this run is about. Everything else is the invocation a local run
+    /// builds, unchanged.
+    #[test]
+    fn a_run_aimed_elsewhere_names_the_machine_ahead_of_the_subcommand() {
+        let settings = Settings {
+            docker: crate::ports::docker::Target::at(
+                "ssh://media@nas.local",
+                crate::ports::docker::Origin::Variable,
+            ),
+            ..Settings::default()
+        };
+        assert_eq!(
+            line(&["library"], &Action::Up, &settings).as_deref(),
+            Some(concat!(
+                "docker --host ssh://media@nas.local compose ",
+                "--project-name lemonfiber ",
+                "--project-directory /opt/lemonfiber/stack ",
+                "--file /opt/lemonfiber/stack/compose.yml ",
+                "--profile media up --detach"
+            ))
+        );
     }
 
     #[test]

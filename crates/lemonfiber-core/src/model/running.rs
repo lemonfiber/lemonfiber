@@ -48,6 +48,18 @@ pub struct LifecycleReport {
     /// on purpose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub switched: Option<Switched>,
+    /// Why nothing was run, where a start declined to run anything.
+    ///
+    /// Absent for every ordinary command, which is what makes it readable: a
+    /// lifecycle report with an empty plan and a status of nothing is a report of
+    /// something that did not happen, and without this there is nowhere to say
+    /// whether that was a fault or the correct answer. A start at a login declines
+    /// for three reasons the operator would each act on differently — the stack was
+    /// stopped on purpose, autostart was never asked for, or this machine is on its
+    /// battery and nobody said to start anyway — and a run nobody is watching has to
+    /// leave the reason somewhere a reader finds later.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held: Option<String>,
 }
 
 /// What narrowing the active set moved.
