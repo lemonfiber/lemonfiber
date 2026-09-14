@@ -1192,6 +1192,7 @@ mod tests {
                 condition: lemonfiber_core::docker::Condition::Inactive,
                 undeclared: Vec::new(),
                 services: Vec::new(),
+                disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             }),
         ] {
             assert_eq!(format!("{:?}", settled(&outcome)), success());

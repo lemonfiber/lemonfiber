@@ -35,6 +35,7 @@ mod configuring;
 mod credentials;
 mod ctx;
 pub mod dashboard;
+pub mod disturbance;
 mod door;
 mod engine;
 mod expiring;
@@ -88,7 +89,7 @@ pub use command::{
     Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
 };
 mod outcome;
-pub use ctx::Ctx;
+pub use ctx::{Ctx, PATIENCE};
 pub use outcome::Outcome;
 pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};
 pub use setup::SetupAction;
@@ -255,6 +256,11 @@ async fn mended(
 
 /// Carry out a command.
 ///
+/// What it takes away is said before anything is taken, and here rather than in
+/// the arm that does it: an operation stating its own cost is an operation that
+/// can be added without one, and the length is only any use to somebody who has
+/// not yet decided.
+///
 /// # Errors
 ///
 /// Returns the [`Problem`] a surface should render when the command could not
@@ -271,11 +277,13 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     if !matches!(command, Command::AtBoot) {
         boot::reported(ctx).await;
     }
+    // Last, so that the sentence nearest the acting is the one about what acting
+    // costs. The line above is news from a run nobody saw; this one is about the
+    // run the operator is in the middle of asking for.
+    disturbance::said(&command, ctx).await;
     routed(rehearsal::carried(command, ctx), ctx).await
 }
 
-/// The table itself: every command, and where it goes.
-///
 /// What this product's own vocabulary answers: one word, or all of them.
 ///
 /// Two arms of the table folded into one call, the way asking for one setting and
@@ -291,9 +299,13 @@ fn worded(word: Option<&str>) -> Result<Outcome, Box<Problem>> {
         .ok_or_else(|| Box::new(crate::glossary::unrecognised(word)))
 }
 
-/// Split from [`dispatch`] so that what a rehearsal means is asked once, above the
-/// table, rather than in an arm somebody can add without adding. Private, so this is
-/// reachable only through the question.
+/// The table itself: every command, and where it goes.
+///
+/// Split from [`dispatch`] so that the three things asked of every command are asked
+/// once, above the table, rather than in an arm somebody can add without adding:
+/// whether a rehearsal means anything here, whether news is waiting from a run
+/// nobody saw, and what this is about to take away. Private, so this is reachable
+/// only through all three.
 async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),

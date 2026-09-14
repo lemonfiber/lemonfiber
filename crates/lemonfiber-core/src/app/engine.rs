@@ -189,6 +189,7 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         condition: condition(&services),
         undeclared: undeclared(&manifest, &containers),
         services,
+        disturbs: crate::model::Disturbances::all(ctx.patience),
     })
 }
 

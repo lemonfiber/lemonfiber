@@ -773,6 +773,7 @@ mod tests {
             condition: Condition::Degraded,
             undeclared: Vec::new(),
             services: vec![service("sonarr", State::Unhealthy, None)],
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         };
         let text = status(&report).text();
         assert!(text.starts_with("running, and something needs attention"));
@@ -845,6 +846,7 @@ mod tests {
                 describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
             }],
             services: vec![service("sonarr", State::Absent, None)],
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         };
         let text = status(&report).text();
 
@@ -876,6 +878,7 @@ mod tests {
                 describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
             }],
             services: vec![service("sonarr", State::Absent, None)],
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         };
         let text = status(&report).text();
 
@@ -896,6 +899,7 @@ mod tests {
             condition: Condition::Inactive,
             undeclared: Vec::new(),
             services: vec![service("sonarr", State::Absent, None)],
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         };
 
         assert!(!status(&report).text().contains("does not declare"));

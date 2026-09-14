@@ -180,7 +180,12 @@ async fn a_teardown_that_was_not_asked_to_wait_asks_the_clients_nothing() {
         fake.requests().is_empty(),
         "and no download client was asked anything"
     );
-    assert!(heard.said().await.is_empty(), "and nothing was narrated");
+    let said = heard.said().await;
+    assert!(
+        said.iter()
+            .all(|line| line.starts_with("this takes services")),
+        "and nothing was narrated about a wait that never happened: {said:?}"
+    );
 }
 
 #[tokio::test]
