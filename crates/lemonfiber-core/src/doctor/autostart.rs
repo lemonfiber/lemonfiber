@@ -48,7 +48,15 @@ pub const ENGINE_NOT_AT_BOOT: Code = Code::new("ENV-4");
 
 /// The check this reports under, named once so a finding and an answer to it cannot
 /// drift apart on a rename.
-const CHECK: &str = "environment.autostart";
+///
+/// Public because one caller has to be able to *leave it out*. Setup's preflight asks
+/// this whole family and stops before a single question where the answer is broken or
+/// undetermined — which is right about an engine that cannot be reached and wrong
+/// about a Docker Desktop setting that could not be read, since the second says
+/// nothing about whether this machine can run the stack today. A name it can match on
+/// is the honest way to say that; the alternative is this check quietly never
+/// answering `enabled-unverified`, which is the one answer it exists to give.
+pub const CHECK: &str = "environment.autostart";
 
 /// What the operator reads on the line above the verdict.
 const TITLE: &str = "The stack comes back after a restart";
