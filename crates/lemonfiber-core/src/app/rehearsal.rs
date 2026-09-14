@@ -355,7 +355,7 @@ fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
     match asked.rehearsal {
         Rehearsal::Reads | Rehearsal::Reports => Ok(()),
         Rehearsal::Cannot(why) => Err(Box::new(refused(asked, why))),
-        Rehearsal::Untaught => Err(Box::new(not_taught_yet(asked))),
+        Rehearsal::Untaught => Err(Box::new(not_taught_yet(asked.named))),
     }
 }
 
@@ -389,19 +389,24 @@ fn refused(asked: &Asked, why: &'static str) -> Problem {
 /// Separate from [`refused`] because the two are separate facts about the world, and
 /// an operator can act on the difference: this one is a gap somebody is closing, and
 /// the message says so rather than implying a limitation that is not there.
+///
+/// Takes the name rather than the whole of what was asked, which is what lets a test
+/// in `tests/` reach it. It is unreachable through [`permitted`] — every command has
+/// been taught — so the copy in the shipped build is a function no run enters, and a
+/// function no run enters is counted against every covered line beside it. Reaching
+/// it from outside the crate is what exercises the copy that ships.
 #[must_use]
-fn not_taught_yet(asked: &Asked) -> Problem {
+pub fn not_taught_yet(named: &str) -> Problem {
     Problem::new(
         NOT_YET,
         Severity::Error,
-        format!("`{}` does not rehearse yet", asked.named),
+        format!("`{named}` does not rehearse yet"),
         "Nothing was done. This command changes things and has not yet been taught to \
          say what it would change, so it refuses the flag rather than accepting it and \
          going ahead — which is what it used to do."
             .to_owned(),
         Remedy::new(format!(
-            "Run `lemonfiber {}` without `--dry-run` when you mean it",
-            asked.named
+            "Run `lemonfiber {named}` without `--dry-run` when you mean it"
         )),
     )
     .lies_in(Amiss::Asking)
@@ -447,7 +452,7 @@ mod tests {
         // `reasoning` instead of `matches!`.
         let answer = verdict(&untaught).map_err(|refusal| refusal.code);
 
-        assert_eq!(answer, Err(not_taught_yet(&untaught).code));
+        assert_eq!(answer, Err(not_taught_yet(untaught.named).code));
         assert_ne!(
             answer,
             Err(refused(&untaught, THE_WALK_IS_THE_OBSERVATION).code),
@@ -473,7 +478,7 @@ mod tests {
             "a walkthrough should refuse the flag outright"
         );
         assert_ne!(
-            not_taught_yet(&untaught).code,
+            not_taught_yet(untaught.named).code,
             refused(&never, "the reason it gives").code,
             "a gap being closed and a limitation that will not change read alike"
         );
@@ -485,7 +490,7 @@ mod tests {
     fn a_refusal_names_the_command_it_refused() {
         let one = asked(&Command::Seed);
         assert!(
-            not_taught_yet(&one).summary.contains("seed"),
+            not_taught_yet(one.named).summary.contains("seed"),
             "a refusal that does not name the command leaves the operator guessing"
         );
     }
