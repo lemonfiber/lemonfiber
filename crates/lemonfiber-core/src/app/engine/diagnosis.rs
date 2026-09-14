@@ -207,6 +207,38 @@ fn household_telling(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Te
     TellingCheck::new(requests, recorded)
 }
 
+/// Whether what is meant to leave the house through the tunnel actually does.
+///
+/// Built apart from the assembly for the same reason the other three built apart from
+/// it are: asking this question takes more lines than any of the checks beside it, and
+/// an assembly longer than a reader holds in one go is one somebody adds a check to
+/// twice. What it needs that a check may not reach for itself — the port a client says
+/// it is listening on, and the client it would be corrected through — is read here,
+/// because this check speaks to containers and those are a service's own business.
+async fn tunnelled(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    project: Option<&std::path::Path>,
+    disruptive: bool,
+) -> VpnCheck {
+    VpnCheck::new(
+        ctx.engine.clone(),
+        ctx.settings.project.clone(),
+        manifest,
+        crate::doctor::vpn::Asked {
+            protocols: ctx.settings.protocols,
+            echo: ctx.settings.ip_echo.clone(),
+            listening: crate::app::forwarding::listening_port(ctx, manifest, project).await,
+            port_forward: ctx.settings.port_forward.clone(),
+            disruptive,
+            client: crate::app::targets::torrent_client(
+                ctx,
+                &crate::app::targets::download_targets(&manifest.services, project),
+            ),
+        },
+    )
+}
+
 /// The checks this stack is examined by, built and ready to run.
 ///
 /// Assembled apart from the running of them because a repair has to ask the very same
@@ -249,28 +281,7 @@ pub(crate) async fn assembled(
         Some(committed),
         ctx.stack.crowded_mounts(),
     );
-    let vpn = VpnCheck::new(
-        ctx.engine.clone(),
-        ctx.settings.project.clone(),
-        &manifest,
-        crate::doctor::vpn::Asked {
-            protocols: ctx.settings.protocols,
-            echo: ctx.settings.ip_echo.clone(),
-            // Asked here rather than inside the check: that one speaks to
-            // containers, and this is a service's own API.
-            listening: crate::app::forwarding::listening_port(ctx, &manifest, project.as_deref())
-                .await,
-            port_forward: ctx.settings.port_forward.clone(),
-            disruptive,
-            // Built here because a client's credentials are a service's own business,
-            // and the check speaks to containers. Absent where it could not be
-            // authenticated to, which is a client to leave alone.
-            client: crate::app::targets::torrent_client(
-                ctx,
-                &crate::app::targets::download_targets(&manifest.services, project.as_deref()),
-            ),
-        },
-    );
+    let vpn = tunnelled(ctx, &manifest, project.as_deref(), disruptive).await;
     let credentials = CredentialsCheck::new(
         ctx.http.clone(),
         ctx.filesystem.clone(),

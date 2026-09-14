@@ -273,6 +273,21 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
 
 /// The table itself: every command, and where it goes.
 ///
+/// What this product's own vocabulary answers: one word, or all of them.
+///
+/// Two arms of the table folded into one call, the way asking for one setting and
+/// asking for every setting already are. They are one question read two ways — a
+/// reader who does not know a word and a reader who does not know which words there
+/// are — and the answer to both comes out of the same table.
+fn worded(word: Option<&str>) -> Result<Outcome, Box<Problem>> {
+    let Some(word) = word else {
+        return Ok(Outcome::Glossary(crate::glossary::vocabulary()));
+    };
+    crate::glossary::explain(word)
+        .map(|term| Outcome::Word(*term))
+        .ok_or_else(|| Box::new(crate::glossary::unrecognised(word)))
+}
+
 /// Split from [`dispatch`] so that what a rehearsal means is asked once, above the
 /// table, rather than in an arm somebody can add without adding. Private, so this is
 /// reachable only through the question.
@@ -327,10 +342,8 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
-        Command::Explain { word } => crate::glossary::explain(&word)
-            .map(|term| Outcome::Word(*term))
-            .ok_or_else(|| Box::new(crate::glossary::unrecognised(&word))),
-        Command::Glossary => Ok(Outcome::Glossary(crate::glossary::vocabulary())),
+        Command::Explain { word } => worded(Some(&word)),
+        Command::Glossary => worded(None),
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance(
             quality::straining(ctx),
         ))),
