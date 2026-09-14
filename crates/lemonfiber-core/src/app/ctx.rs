@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::archive::Archiving;
 use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
-use crate::ports::docker::{Engine, Images};
+use crate::ports::docker::{Engine, Images, Locations};
 use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
@@ -47,6 +47,13 @@ pub struct Ctx {
     /// Apart from the engine because the question is apart: one command asks it, and
     /// every other reading of the engine asks the rest and never this.
     pub images: Arc<dyn Images>,
+    /// How the engine is asked whether a path is on the machine it runs on.
+    ///
+    /// Apart from the engine for the reason the image listing is, and asked of the
+    /// engine rather than of a shell for a reason of its own: the engine is what
+    /// resolves a bind mount, and a login on the same host can be looking at a
+    /// different filesystem than the daemon is.
+    pub locations: Arc<dyn Locations>,
     /// What time it is, for the one rule that depends on it.
     pub clock: Arc<dyn Clock>,
     /// How the filesystem is reached, for the checks that prove what it can do.
@@ -201,6 +208,7 @@ impl Ctx {
             filesystem,
             http,
             images,
+            locations,
             volume,
             eraser,
             occupancy,
@@ -225,6 +233,7 @@ impl Ctx {
             runner,
             engine,
             images,
+            locations,
             clock,
             filesystem,
             volume,
@@ -276,6 +285,17 @@ impl Ctx {
     #[must_use]
     pub fn with_images(mut self, images: Arc<dyn Images>) -> Self {
         self.images = images;
+        self
+    }
+
+    /// The same context, asking the given seam where a path is.
+    ///
+    /// Lets the pre-flight that refuses a machine without the stack's location be
+    /// driven against answers a test wrote down, including the one where the check
+    /// itself has stopped working — which no real daemon will produce on demand.
+    #[must_use]
+    pub fn locating_with(mut self, locations: Arc<dyn Locations>) -> Self {
+        self.locations = locations;
         self
     }
 

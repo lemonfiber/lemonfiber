@@ -45,6 +45,7 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
                 "lemonfiber-adapters/src/docker.rs",
                 "lemonfiber-adapters/src/docker/translate.rs",
                 "lemonfiber-adapters/src/docker/images.rs",
+                "lemonfiber-adapters/src/docker/presence.rs",
             ],
         ),
         ("reqwest", &["lemonfiber-adapters/src/http.rs"]),

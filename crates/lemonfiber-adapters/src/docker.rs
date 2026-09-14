@@ -31,12 +31,13 @@ use tokio::sync::OnceCell;
 use tokio_stream::StreamExt as _;
 
 use lemonfiber_ports::docker::{
-    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, LogLine, LogQuery, Reach,
-    Stats, Stream, Target,
+    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, Locations, LogLine, LogQuery,
+    Presence, Reach, Stats, Stream, Target,
 };
 
 pub mod context;
 mod images;
+mod presence;
 mod refusal;
 mod translate;
 
@@ -175,6 +176,46 @@ impl Daemon {
             .list_containers(Some(options))
             .await
             .map_err(|error| self.refused(&error))
+    }
+}
+
+#[async_trait]
+impl Locations for Daemon {
+    async fn located(&self, path: &Path) -> Result<Presence, Failure> {
+        looked(self, path).await
+    }
+}
+
+/// Put the question to the daemon, and read its refusal as the answer.
+///
+/// Outside the method for the reason every decision here is: `#[async_trait]`
+/// rewrites a body into a generated future the coverage report attributes nothing
+/// to, so a branch left in there could go untaken for ever without the gate saying
+/// a word.
+async fn looked(daemon: &Daemon, path: &Path) -> Result<Presence, Failure> {
+    let asked = daemon
+        .client()
+        .await?
+        .create_container(
+            None::<bollard::query_parameters::CreateContainerOptions>,
+            presence::asking(&path.display().to_string()),
+        )
+        .await;
+
+    match asked {
+        // The daemon answered about the request, which is where the answer is.
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code,
+            message,
+        }) => Ok(presence::read(status_code, &message)),
+        // Nothing answered. That is a fact about reaching the machine rather than
+        // about anything on it, and it keeps the distinctions the connection
+        // already draws between a name, a port and a key.
+        Err(error) => Err(daemon.refused(&error)),
+        // The request names an image that cannot exist, so this cannot happen — and
+        // a probe that somehow made a container is one that no longer knows what it
+        // is measuring, which is the single thing it must not report as a yes.
+        Ok(_) => Ok(Presence::Unknown),
     }
 }
 

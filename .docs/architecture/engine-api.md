@@ -16,6 +16,40 @@ page is about the adapter: `adapters::docker::Daemon`, on `bollard`.
 | `logs` | `GET /containers/{id}/logs` | Streams, and Compose cannot narrow to a service list |
 | `stats` | `GET /containers/{id}/stats` | Compose has no equivalent |
 | `exec` | `POST /containers/{id}/exec` | The leak test runs the same command in two namespaces |
+| `located` | `POST /containers/create` | See below — there is no route that stats a host path |
+
+### Asking a daemon about a path on its own machine
+
+The last row is not a read of anything, and it is worth spelling out. The
+pre-flight that refuses to start a stack on a machine without the location it
+mounts needs one fact — does this path exist *there* — and the Engine API has no
+route that answers it. Everything it touches on the host, it touches through a
+container.
+
+So the question is asked as a request to create one, against an image that
+cannot exist (`sha256:` and sixty-four zeroes), with the path as the source of a
+bind mount. A daemon validates the mounts before it looks for the image, which
+makes the refusal the answer:
+
+| Answer | Means |
+|--------|-------|
+| `400` … `bind source path does not exist` | The path is not on that machine |
+| `404 No such image` | It is — the request got past the mount to reach the image |
+| anything else | Neither; the asking did not work |
+
+Nothing is created on either path, nothing is pulled, no image need be present on
+the far machine, and there is nothing to remove afterwards: both outcomes are
+failures. That is the reason for this shape rather than one that makes a real
+container and removes it, and it is why the check costs the same over `tcp://` as
+over `ssh://`.
+
+**The ordering is the daemon's, not a promise.** If a release ever validated the
+image first, every path would answer `404` and read as present. The caller in
+`core::app::engine::remote` therefore refuses to believe a positive until a
+second question — about a name that cannot be there — comes back negative from
+the same daemon. The reading lives here, in `adapters::docker::presence`; the
+decision about whether to trust it lives in the core, where a test can drive an
+instrument that has stopped measuring.
 
 ## The client is built on first use
 

@@ -79,6 +79,11 @@ pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
         // fifteen call sites is fifteen policies.
         http: Arc::new(Retrying::around(Web::new())),
         images: Arc::new(Daemon::reaching(target.clone())),
+        // The third seam built from the one resolved target, and the reason it is
+        // built from it rather than from this machine's defaults is the whole of what
+        // it is for: a pre-flight that asked the laptop whether the server has a
+        // directory would answer yes and be wrong in exactly the case it exists for.
+        locations: Arc::new(Daemon::reaching(target.clone())),
         volume: Arc::new(Disk),
         eraser: Arc::new(Disk),
         occupancy: Arc::new(Disk),

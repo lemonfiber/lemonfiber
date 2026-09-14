@@ -5,7 +5,7 @@
 //! socket, and what keeps a container runtime and a TLS stack out of a crate that must
 //! not be able to reach the network at all.
 //!
-//! A bundle rather than a longer argument list. There are nine of them, they are always
+//! A bundle rather than a longer argument list. There are ten of them, they are always
 //! supplied together, and a surface that had to name each one at every call would be a
 //! surface where adding a tenth is a change in sixty places.
 //!
@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use crate::docker::Images;
+use crate::docker::{Images, Locations};
 use crate::filesystem::{Eraser, Volume};
 use crate::hosting::Host;
 use crate::http::Http;
@@ -32,6 +32,12 @@ pub struct Seams {
     pub http: Arc<dyn Http>,
     /// How the engine is asked what it has pulled.
     pub images: Arc<dyn Images>,
+    /// How the engine is asked whether a path is on the machine it runs on.
+    ///
+    /// Apart from the engine for the reason the image listing is: one guard asks it
+    /// and nothing else does, and it is the only reading of an engine that is about
+    /// the machine under it rather than about the containers on it.
+    pub locations: Arc<dyn Locations>,
     /// How a drive is asked what it holds.
     pub volume: Arc<dyn Volume>,
     /// How what this machine keeps is removed.

@@ -46,6 +46,14 @@ pub(super) async fn apply(
     changes: Vec<Change>,
     wait: Waiting,
 ) -> Result<Report, Box<Problem>> {
+    // First, and of the confirmed run alone: this is the one lifecycle path that does
+    // not go through the prelude every other one shares, and it moves services on the
+    // machine a remote context names like any other. A stack put back onto a host
+    // that has not got the location mounts an empty directory under services that had
+    // real ones a moment earlier, which is worse than the case this guard was written
+    // for rather than outside it.
+    engine::verified(ctx).await?;
+
     let taking = ordered(manifest, &changes);
     if taking.is_empty() {
         return Ok(Report::proposed(changes, Vec::new(), true));

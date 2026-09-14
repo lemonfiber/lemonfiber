@@ -927,3 +927,77 @@ async fn a_client_is_built_for_each_remote_transport_by_a_run_that_uses_one() {
         );
     }
 }
+
+/// The two answers the location pre-flight is built on, read off a real exchange.
+///
+/// There is no route that stats a path on the host, so the question goes as a
+/// request to create a container against an image that cannot exist: the daemon
+/// checks the mounts first, and which of the two refusals comes back is the answer.
+/// Driven against a socket rather than against the classifier alone because the
+/// shape being relied on is the daemon's, and a test that only called the reading
+/// function would prove the reading and not the asking.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_path_the_machine_has_not_got_is_told_from_one_it_has() {
+    use lemonfiber_ports::docker::{Locations as _, Presence};
+    use std::path::Path;
+
+    let cases = [
+        (
+            "absent",
+            400,
+            r#"{"message":"invalid mount config for type \"bind\": bind source path does not exist: /srv/media"}"#,
+            Presence::Absent,
+        ),
+        (
+            "past the mounts and looking for the image",
+            404,
+            r#"{"message":"No such image: sha256:0000"}"#,
+            Presence::There,
+        ),
+        (
+            "something else entirely",
+            500,
+            r#"{"message":"engine is having a day"}"#,
+            Presence::Unknown,
+        ),
+    ];
+
+    for (what, status, body, expected) in cases {
+        let engine = fake::engine(
+            "located",
+            vec![(
+                "containers/create",
+                fake::Reply::Body(status, body.to_owned()),
+            )],
+        );
+
+        let answer = Daemon::at(&engine.socket)
+            .located(Path::new("/srv/media"))
+            .await;
+
+        assert_eq!(answer.ok(), Some(expected), "{what}");
+        engine.stop().await;
+    }
+}
+
+/// A machine that never answered said nothing about the path.
+///
+/// Kept apart from the three answers above because it is a different kind of fact:
+/// the distinctions the connection draws are worth keeping, and folding an
+/// unreachable daemon into "cannot tell" would lose them at the one moment they are
+/// most useful.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_machine_that_never_answered_is_a_failure_rather_than_an_answer() {
+    use lemonfiber_ports::docker::Locations as _;
+    use std::path::Path;
+
+    let nowhere = std::path::PathBuf::from("/tmp/lf-no-such-engine.sock");
+    let refused = Daemon::at(&nowhere).located(Path::new("/srv/media")).await;
+
+    assert!(
+        matches!(refused, Err(Failure::Unreachable { .. })),
+        "{refused:?}"
+    );
+}

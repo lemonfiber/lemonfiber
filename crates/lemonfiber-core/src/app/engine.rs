@@ -19,6 +19,9 @@ mod grounded;
 mod inflight;
 mod lock;
 mod remote;
+// Reached from outside this module by the one lifecycle path that does not run the
+// prelude the rest share, which is the staged half of an update.
+pub(super) use remote::verified;
 mod settling;
 mod stopping;
 pub(super) use settling::settled_into;

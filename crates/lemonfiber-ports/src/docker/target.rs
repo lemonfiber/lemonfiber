@@ -191,21 +191,6 @@ impl Target {
         self.endpoint().map(named)
     }
 
-    /// Where the operator's own SSH client would connect, for the checks that need a
-    /// filesystem rather than an engine.
-    ///
-    /// `None` for everything else, including an authority this build will not hand to
-    /// a command line. What is refused is stated where the refusal is written.
-    #[must_use]
-    pub fn over_ssh(&self) -> Option<&str> {
-        let Reach::Ssh(url) = &self.reach else {
-            return None;
-        };
-        let authority = url.trim_start_matches("ssh://");
-        let authority = authority.split(['/', '?']).next().unwrap_or(authority);
-        addressable(authority).then_some(authority)
-    }
-
     /// The context whose name put this run where it is, where a context did.
     #[must_use]
     pub fn context(&self) -> Option<&str> {
@@ -245,25 +230,6 @@ fn qualified(path: &str) -> String {
 /// The endpoint as it may be shown, with anything a credential rides in taken out.
 fn named(endpoint: &str) -> String {
     without_credentials(endpoint)
-}
-
-/// Whether an authority may be handed to a command line as one argument.
-///
-/// An endpoint arrives from the environment, and the environment is the operator's
-/// shell on a good day and something else on a bad one. An authority beginning with
-/// a dash is read by every SSH client as an option rather than as a host — which is
-/// how a host name comes to name a program to run — and one carrying a space, a
-/// quote or a shell metacharacter has no business being an authority at all.
-///
-/// Refusing the unusual shapes costs an operator with an exotic host alias one
-/// check they were never promised; accepting them costs everyone the property that
-/// a variable cannot choose what this program runs.
-fn addressable(authority: &str) -> bool {
-    !authority.is_empty()
-        && !authority.starts_with('-')
-        && authority.chars().all(|character| {
-            character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_' | '@' | ':')
-        })
 }
 
 /// Which of the three ways of naming an engine won.
@@ -317,7 +283,7 @@ fn said(value: Option<&str>) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{addressable, chosen, Choice, Origin, Reach, Target};
+    use super::{chosen, Choice, Origin, Reach, Target};
 
     #[test]
     fn nothing_chosen_is_this_machines_own_daemon() {
@@ -325,7 +291,6 @@ mod tests {
         assert!(!target.is_remote());
         assert_eq!(target.endpoint(), None);
         assert_eq!(target.host(), None);
-        assert_eq!(target.over_ssh(), None);
         assert_eq!(target.context(), None);
         assert_eq!(Target::at("   ", Origin::Variable), target);
     }
@@ -402,34 +367,6 @@ mod tests {
             !shown.contains("abc123"),
             "a token in the query survived into what is shown"
         );
-    }
-
-    /// An authority is only handed to a command line where it cannot be read as one.
-    #[test]
-    fn an_authority_that_could_be_read_as_an_option_is_not_offered() {
-        assert_eq!(
-            Target::at("ssh://media@nas.local", Origin::Variable).over_ssh(),
-            Some("media@nas.local")
-        );
-        assert_eq!(
-            Target::at("ssh://nas.local:2222/var/run/docker.sock", Origin::Variable).over_ssh(),
-            Some("nas.local:2222"),
-            "the path after the authority is the daemon's, not the host's"
-        );
-        for hostile in [
-            "ssh://-oProxyCommand=touch /tmp/pwned",
-            "ssh://nas.local; touch /tmp/pwned",
-            "ssh://nas.local$(id)",
-            "ssh://",
-        ] {
-            assert_eq!(
-                Target::at(hostile, Origin::Variable).over_ssh(),
-                None,
-                "{hostile} was offered to a command line"
-            );
-        }
-        assert!(addressable("nas.local"));
-        assert!(!addressable(""));
     }
 
     /// An endpoint that can be driven refuses nothing; one that cannot refuses both

@@ -34,9 +34,10 @@ use lemonfiber_core::stack::compose::{build, Action};
 /// line that slips through. A port added to the context and not added here is not a
 /// hole — it is a port nothing has yet claimed reaches a machine, and whoever adds it
 /// decides which it is.
-const REACHES_A_MACHINE: [&str; 10] = [
+const REACHES_A_MACHINE: [&str; 11] = [
     "Engine",
     "Images",
+    "Locations",
     "Runner",
     "Host",
     "Http",

@@ -15,8 +15,10 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
+mod locations;
 mod target;
 
+pub use locations::{Locations, Presence};
 pub use target::{chosen, Choice, Origin, Reach, Target, DEFAULT_CONTEXT};
 
 /// What a container is doing.
