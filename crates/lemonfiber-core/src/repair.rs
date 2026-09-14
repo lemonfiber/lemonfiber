@@ -479,6 +479,7 @@ mod tests {
             "service.stopped",
             Severity::Error,
             "it is not running",
+            "nothing that needs it is working",
             "start it",
         );
         fault.caused_by = cause.map(str::to_owned);
@@ -698,6 +699,7 @@ mod tests {
             "service.stopped",
             Severity::Error,
             "it is not running",
+            "nothing that needs it is working",
             "start it",
         );
         condition.raise(&fault, "3000");

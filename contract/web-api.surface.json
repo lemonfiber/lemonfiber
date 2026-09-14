@@ -248,6 +248,12 @@
           ],
           "required": true
         },
+        "meaning": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
         "remedies": {
           "type": [
             "array[string]"
@@ -284,6 +290,12 @@
           "required": true
         },
         "kind": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "meaning": {
           "type": [
             "string"
           ],

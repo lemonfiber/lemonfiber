@@ -577,7 +577,13 @@ mod tests {
     #[test]
     fn only_a_standing_fault_with_a_repair_is_reported_as_beyond_one() {
         let mut conditions = Conditions::new();
-        let fault = Fault::new("vpn.port", Severity::Warning, "wrong port", "move it");
+        let fault = Fault::new(
+            "vpn.port",
+            Severity::Warning,
+            "wrong port",
+            "incoming connections are not reaching the client",
+            "move it",
+        );
         conditions.observe("vpn.port-forward-client", Some(&fault), "1000");
         for _ in 0..ATTEMPTS {
             conditions.attempted("vpn.port-forward-client");

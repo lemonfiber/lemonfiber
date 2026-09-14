@@ -91,6 +91,35 @@ impl Stall {
         }
     }
 
+    /// What it costs the operator, which is neither the event nor the fix.
+    ///
+    /// "Not moving" is what happened; whether that is spending an allowance, holding
+    /// a disk, or simply taking its time is what decides whether to act — and
+    /// working it out from the category name is the judgement this saves them.
+    #[must_use]
+    pub const fn means(self) -> &'static str {
+        match self {
+            Self::RedownloadLoop => {
+                "bandwidth and the Usenet allowance are being spent again and again on something \
+                 that never lands"
+            }
+            Self::RepeatedImportFailure => {
+                "it will not resolve itself, so this stays out of the library however long it is \
+                 left alone"
+            }
+            Self::CompletedNotImported => {
+                "the file is on the disk, counting against space, and will appear in the library \
+                 for nobody"
+            }
+            Self::Orphaned => "it is holding space that nothing is waiting for",
+            Self::StalledDownload => "nothing is arriving for it, and it will not restart itself",
+            Self::WaitingIndefinitely => {
+                "it will go on waiting for as long as nothing can satisfy it"
+            }
+            Self::Slow => "it is still arriving, only slowly — nothing is stuck",
+        }
+    }
+
     /// What to do about it, most likely first.
     ///
     /// Two of them, as a type rather than a promise: a caller cannot reach a
@@ -155,12 +184,13 @@ mod tests {
     use super::Stall;
 
     #[test]
-    fn every_category_says_what_it_is_what_causes_it_and_what_to_do() {
-        // A category that cannot answer all three is a status line wearing a name,
+    fn every_category_says_what_it_is_what_causes_it_what_it_costs_and_what_to_do() {
+        // A category that cannot answer all four is a status line wearing a name,
         // which is the thing this exists instead of.
         for stall in Stall::ALL {
             assert!(!stall.word().is_empty(), "{stall:?}");
             assert!(!stall.typically().is_empty(), "{stall:?}");
+            assert!(!stall.means().is_empty(), "{stall:?}");
             assert!(!stall.remedies().is_empty(), "{stall:?}");
         }
     }

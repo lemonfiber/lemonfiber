@@ -45,6 +45,15 @@ pub struct Condition {
     pub severity: Severity,
     /// What is wrong, in one line, as the finding said it.
     pub summary: String,
+    /// What it costs the operator, as the finding put it. Refreshed with the
+    /// fault, since a problem's consequence can change as it worsens.
+    ///
+    /// Empty only for a condition written down before this was carried, and only
+    /// until the check that raised it is next seen: raising refreshes it whether or
+    /// not the fault is already standing, so a store from an older build fills
+    /// itself in rather than needing a migration nobody would run.
+    #[serde(default)]
+    pub meaning: String,
     /// When it was first raised. Untouched while it stays raised: an operator
     /// asking how long something has been broken means since it broke, not since
     /// it was last looked at.
@@ -89,6 +98,7 @@ impl Condition {
             kind: fault.kind.clone(),
             severity: fault.severity,
             summary: fault.summary.clone(),
+            meaning: fault.meaning.clone(),
             since: now.to_owned(),
             cleared: None,
             recurrences: 0,
@@ -107,9 +117,9 @@ impl Condition {
 
     /// Raise it again, `now`.
     ///
-    /// Already raised: nothing moves. The severity and summary are refreshed —
-    /// a problem can worsen while it persists — but `since` is not, because how
-    /// long something has been broken is measured from when it broke.
+    /// Already raised: nothing moves. The severity, the summary and what it means
+    /// are refreshed — a problem can worsen while it persists — but `since` is not,
+    /// because how long something has been broken is measured from when it broke.
     ///
     /// Cleared and coming back: a recurrence. It starts again from now, the count
     /// goes up, and a previously declined fix is offered afresh.
@@ -121,6 +131,7 @@ impl Condition {
         self.kind.clone_from(&fault.kind);
         self.severity = fault.severity;
         self.summary.clone_from(&fault.summary);
+        self.meaning.clone_from(&fault.meaning);
         self.remedies.clone_from(&fault.remedies);
         self.caused_by.clone_from(&fault.caused_by);
         if self.is_raised() {
@@ -171,12 +182,13 @@ mod tests {
     use super::{Condition, Fault};
     use crate::error::Severity;
 
-    /// What the stall check reports, with what to do about it.
+    /// What the stall check reports, with what it costs and what to do about it.
     fn stalled(summary: &str) -> Fault {
         Fault::new(
             "queue.stalled",
             Severity::Warning,
             summary,
+            "nothing is arriving for them",
             "check the indexer is answering",
         )
     }
@@ -219,6 +231,7 @@ mod tests {
             "storage.full",
             Severity::Error,
             "the disk is full",
+            "nothing can be written until something goes",
             "delete something",
         );
         condition.raise(&worse, "2000");
@@ -287,7 +300,13 @@ mod tests {
 
         let advisory = Condition::raised(
             "x",
-            &Fault::new("note", Severity::Advisory, "a note", "read it"),
+            &Fault::new(
+                "note",
+                Severity::Advisory,
+                "a note",
+                "nothing is required",
+                "read it",
+            ),
             "1000",
         );
         assert!(!advisory.is_worth_saying(None), "not worth an interruption");
@@ -338,8 +357,31 @@ mod tests {
             "since":"1000","cleared":null,"recurrences":0,"declined":false}"#;
         let parsed = serde_json::from_str::<Condition>(older).ok();
         assert_eq!(
-            parsed.map(|condition| (condition.remedies, condition.caused_by, condition.attempts)),
-            Some((Vec::new(), None, 0))
+            parsed.map(|condition| (
+                condition.remedies,
+                condition.caused_by,
+                condition.attempts,
+                condition.meaning
+            )),
+            Some((Vec::new(), None, 0, String::new()))
+        );
+    }
+
+    #[test]
+    fn a_condition_from_an_older_store_is_told_what_it_means_the_next_time_it_is_seen() {
+        // Rather than a migration nobody would run: raising refreshes the wording
+        // whether or not the fault is already standing, so the first refresh after
+        // an upgrade fills in what the store was written without.
+        let older = r#"{"check":"queue.stalled","severity":"warning","summary":"stalled",
+            "since":"1000","cleared":null,"recurrences":0,"declined":false}"#;
+        let seen = serde_json::from_str::<Condition>(older).ok().map(|mut it| {
+            it.raise(&stalled("two downloads have not moved"), "2000");
+            (it.meaning, it.since)
+        });
+        assert_eq!(
+            seen,
+            Some(("nothing is arriving for them".to_owned(), "1000".to_owned())),
+            "the wording arrives; how long it has been wrong does not move"
         );
     }
 

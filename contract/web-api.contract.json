@@ -2967,6 +2967,10 @@
                 "type": "string"
               }
             },
+            "meaning": {
+              "description": "What it costs the operator. The line expands to items an operator can act\non, and an item that states only the event leaves the judgement it was\nsupposed to save them.",
+              "type": "string"
+            },
             "remedies": {
               "description": "What to do about it, most likely first.",
               "type": "array",
@@ -2987,6 +2991,7 @@
             "check",
             "severity",
             "summary",
+            "meaning",
             "remedies",
             "downstream"
           ]
@@ -3008,6 +3013,10 @@
             },
             "kind": {
               "description": "What kind of event it is, shared by every instance of it.",
+              "type": "string"
+            },
+            "meaning": {
+              "description": "What it costs the operator, which is the half between the event and the\nfix. \"The tunnel dropped\" and \"restart the gateway\" leave whoever reads\nthem to work out for themselves whether anything leaked.",
               "type": "string"
             },
             "moment": {
@@ -3036,6 +3045,7 @@
             "moment",
             "severity",
             "summary",
+            "meaning",
             "remedies",
             "affected"
           ]

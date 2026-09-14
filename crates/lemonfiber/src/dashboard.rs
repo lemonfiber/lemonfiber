@@ -508,6 +508,7 @@ pub(crate) mod tests {
             moment: lemonfiber_core::alert::Moment::Onset,
             severity: lemonfiber_core::error::Severity::Warning,
             summary: a_long(4),
+            meaning: a_long(4),
             remedies: vec!["start it".to_owned()],
             affected: vec!["service.sonarr".to_owned()],
         }];

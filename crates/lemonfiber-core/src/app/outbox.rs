@@ -69,6 +69,7 @@ mod tests {
             moment: Moment::Onset,
             severity: crate::error::Severity::Warning,
             summary: "something happened".to_owned(),
+            meaning: "something came of it".to_owned(),
             remedies: vec!["do this".to_owned()],
             affected: vec![check.to_owned()],
         }

@@ -177,6 +177,7 @@ fn group(alerts: Vec<Alert>) -> Vec<Alert> {
                 if alert.check < held.check {
                     held.check.clone_from(&alert.check);
                     held.summary.clone_from(&alert.summary);
+                    held.meaning.clone_from(&alert.meaning);
                     held.remedies.clone_from(&alert.remedies);
                 }
                 held.affected.extend(alert.affected);
@@ -206,6 +207,7 @@ fn alert_for(condition: &Condition, told: Option<u32>) -> Option<Alert> {
             "{} — and has come back {} times",
             condition.summary, condition.recurrences
         ),
+        meaning: condition.meaning.clone(),
         remedies: condition.remedies.clone(),
         affected: vec![condition.check.clone()],
     })
@@ -222,7 +224,13 @@ mod tests {
     fn flapped(check: &str, severity: Severity, times: u32) -> Condition {
         // Its own kind unless a test deliberately shares one, so a digest of
         // several checks is several alerts rather than one group.
-        let fault = Fault::new(check, severity, "it broke", "look at it");
+        let fault = Fault::new(
+            check,
+            severity,
+            "it broke",
+            "nothing that needs it is working",
+            "look at it",
+        );
         let mut condition = Condition::raised(check, &fault, "1000");
         for n in 0..times {
             condition.clear("1100");
@@ -340,10 +348,65 @@ mod tests {
                 "service.stopped",
                 severity,
                 &format!("{check} stopped on its own"),
+                "nothing that needs it is working",
                 "start it again",
             ),
             "1000",
         )
+    }
+
+    /// A service down, of a shared kind, saying in its own words what its absence
+    /// costs — so a group speaking for several can be caught speaking for the
+    /// wrong one.
+    fn stopped_costing(check: &str, means: &str) -> Condition {
+        Condition::raised(
+            check,
+            &Fault::new(
+                "service.stopped",
+                Severity::Error,
+                &format!("{check} stopped on its own"),
+                means,
+                "start it again",
+            ),
+            "1000",
+        )
+    }
+
+    #[test]
+    fn a_grouped_alert_says_what_it_means_in_the_words_of_the_one_that_speaks() {
+        // The summary and the meaning are one sentence in two halves. A group that
+        // took its event from one service and its consequence from another would
+        // describe a stack that does not exist.
+        let first = stopped_costing("service.radarr", "no film is being fetched");
+        let second = stopped_costing("service.sonarr", "no episode is being fetched");
+        let digest = Digest::of([&second, &first], &untold);
+        let said: Vec<(&str, &str)> = digest
+            .alerts
+            .iter()
+            .map(|alert| (alert.summary.as_str(), alert.meaning.as_str()))
+            .collect();
+        assert_eq!(
+            said,
+            vec![(
+                "service.radarr stopped on its own",
+                "no film is being fetched"
+            )],
+            "the earliest by check speaks, in both halves"
+        );
+    }
+
+    #[test]
+    fn a_flapping_alert_still_says_what_the_flapping_costs() {
+        // Past the threshold the alert is rewritten to report the pattern, and a
+        // rewrite is where the half nobody looks at gets dropped.
+        let bouncing = flapped("service.sonarr", Severity::Error, FLAPPING);
+        let digest = Digest::of([&bouncing], &untold);
+        let means: Vec<&str> = digest
+            .alerts
+            .iter()
+            .map(|alert| alert.meaning.as_str())
+            .collect();
+        assert_eq!(means, vec!["nothing that needs it is working"]);
     }
 
     #[test]
@@ -435,6 +498,7 @@ mod tests {
                 "request.available",
                 Severity::Warning,
                 "Dune is ready to watch",
+                "there is nothing left to wait for",
                 "open it",
             ),
             "1000",
@@ -474,6 +538,7 @@ mod tests {
                 "notify.channel.refused",
                 Severity::Warning,
                 "discord would not take it",
+                "alerts are not reaching it",
                 "check the channel's configuration",
             ),
             "1000",
@@ -491,6 +556,7 @@ mod tests {
                 "download.completed",
                 Severity::Advisory,
                 "Ubuntu.iso finished",
+                "it is on the disk now",
                 "nothing to do",
             ),
             "1000",
@@ -519,6 +585,7 @@ mod tests {
                 "update.available",
                 Severity::Advisory,
                 "a newer stack is available",
+                "this one goes on working meanwhile",
                 "upgrade when convenient",
             ),
             "1000",
@@ -551,6 +618,7 @@ mod tests {
                 "vpn.egress.leaking",
                 Severity::Critical,
                 "traffic is leaving the tunnel",
+                "this connection's address is visible to every peer",
                 "stop the download client",
             ),
             "1000",
