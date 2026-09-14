@@ -39,6 +39,13 @@
 //! dashboard answers are its panels rather than its lists. A panel is a rendering
 //! and not a named request, so there is no list of them to hold a row against;
 //! those are declared in the projection and remain a reader's job.
+//!
+//! What this does **not** read is whether two surfaces offering the same request
+//! answer it with the same figures. The name invites that reading and the
+//! mechanism has never supported it: for a while the event stream and the terminal
+//! dashboard each held their own copy of how often to gather, the second one
+//! documented as being the first one's, and everything here was green the whole
+//! time. `one_number_one_place.rs` holds that half.
 
 use std::collections::BTreeSet;
 use std::fs;
