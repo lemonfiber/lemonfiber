@@ -179,7 +179,12 @@ mod tests {
     ///
     /// `api` is the whole of what varies, written out by the caller: the cases here
     /// are all about which part of a declaration is missing.
-    fn service(id: &str, port: Option<u16>, api: &str) -> lemonfiber_manifest::Service {
+    /// A list of one rather than the service itself, and the assertion below is why:
+    /// a parse that failed would otherwise need a way out of its own, and a block no
+    /// run enters is a line the coverage gate counts against every honest one beside
+    /// it. Said here rather than left to the cases, because most of them assert that
+    /// nothing is reported — which an empty list satisfies while proving nothing.
+    fn service(id: &str, port: Option<u16>, api: &str) -> Vec<lemonfiber_manifest::Service> {
         let published = port.map_or_else(String::new, |port| format!("port = {port}\n"));
         let written = format!(
             "schema_version = 1\nstack_version = \"0.1.0\"\nmin_cli_version = \"0.1.0\"\n\n\
@@ -190,13 +195,16 @@ mod tests {
              upstream = \"https://example.invalid/{id}\"\nlast_release = \"2026-01-01\"\n\
              describes = \"Does a thing\"\nwithout_it = \"Do the thing yourself\"\n{api}"
         );
-        let read = lemonfiber_manifest::Manifest::from_toml(&written)
+        let read: Vec<_> = lemonfiber_manifest::Manifest::from_toml(&written)
             .ok()
-            .and_then(|manifest| manifest.services.into_iter().next());
-        let Some(service) = read else {
-            unreachable!("a manifest this test wrote is one the parser reads: {written}")
-        };
-        service
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        assert_eq!(
+            read.len(),
+            1,
+            "a manifest this test wrote is one the parser reads: {written}"
+        );
+        read
     }
 
     /// A complete Servarr declaration.
@@ -210,8 +218,8 @@ mod tests {
     }
 
     /// Why one service is unreachable, or nothing where it is not named at all.
-    fn because(service: &lemonfiber_manifest::Service) -> Option<String> {
-        unreachable_targets(std::slice::from_ref(service), Some(project()))
+    fn because(services: &[lemonfiber_manifest::Service]) -> Option<String> {
+        unreachable_targets(services, Some(project()))
             .into_iter()
             .next()
             .map(|report| report.because)
@@ -220,10 +228,7 @@ mod tests {
     #[test]
     fn a_complete_declaration_is_a_target_and_is_not_reported_as_anything_else() {
         let whole = service("theirs", Some(8989), WHOLE);
-        assert_eq!(
-            servarr_targets(std::slice::from_ref(&whole), Some(project())).len(),
-            1
-        );
+        assert_eq!(servarr_targets(&whole, Some(project())).len(), 1);
         assert_eq!(because(&whole), None);
     }
 
@@ -267,7 +272,7 @@ mod tests {
     /// The service is named, so an operator can go and find the declaration.
     #[test]
     fn what_is_unsupported_is_named_by_the_id_the_stack_declares_it_under() {
-        let reports = unreachable_targets(&[service("theirs", None, WHOLE)], Some(project()));
+        let reports = unreachable_targets(&service("theirs", None, WHOLE), Some(project()));
         assert_eq!(
             reports.first().map(|report| report.what.clone()),
             Some("theirs".to_owned())
@@ -279,6 +284,6 @@ mod tests {
     /// rather than about any declaration.
     #[test]
     fn a_stack_that_has_not_been_written_yet_reports_nothing_unsupported() {
-        assert!(unreachable_targets(&[service("theirs", None, WHOLE)], None).is_empty());
+        assert!(unreachable_targets(&service("theirs", None, WHOLE), None).is_empty());
     }
 }

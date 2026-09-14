@@ -3596,11 +3596,14 @@ mod tests {
     /// because it never reaches the list those things are built from.
     #[test]
     fn a_service_declared_unmanaged_is_taken_out_of_the_pass_and_reported() {
-        let Ok(manifest) = crate::test_support::stack().manifest() else {
-            unreachable!("the embedded stack parses")
-        };
-        let mut services = manifest.services;
+        let mut services = crate::test_support::stack()
+            .manifest()
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
         let counted = services.len();
+        // Said rather than left to the assertions below, which an empty list satisfies
+        // while proving nothing: no service was taken out of a pass that held none.
+        assert!(counted > 0, "the embedded stack declares services");
         let declared = vec![(
             "sonarr".to_owned(),
             "I tune this one by hand every season".to_owned(),
@@ -3639,11 +3642,14 @@ mod tests {
     /// where nobody has written anything down.
     #[test]
     fn nothing_declared_leaves_every_service_in_the_pass() {
-        let Ok(manifest) = crate::test_support::stack().manifest() else {
-            unreachable!("the embedded stack parses")
-        };
-        let mut services = manifest.services;
+        let mut services = crate::test_support::stack()
+            .manifest()
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
         let counted = services.len();
+        // Said rather than left to the assertions below, which an empty list satisfies
+        // while proving nothing: no service was taken out of a pass that held none.
+        assert!(counted > 0, "the embedded stack declares services");
 
         assert!(withheld(&mut services, &[]).is_empty());
         assert_eq!(services.len(), counted);

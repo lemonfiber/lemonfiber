@@ -287,14 +287,18 @@ mod tests {
     /// Compose project cost nothing here.
     #[test]
     fn a_service_that_describes_itself_is_taken_at_its_word() {
-        let Some(mut service) = declared().into_iter().next() else {
-            unreachable!("the stack declares services")
-        };
-        service.id = "somebodys-own-service".to_owned();
-        service.reaches = Some("a place of their own".to_owned());
-        service.asks_for = Some("Whatever they built it to ask for.".to_owned());
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .take(1)
+            .map(|mut service| {
+                service.id = "somebodys-own-service".to_owned();
+                service.reaches = Some("a place of their own".to_owned());
+                service.asks_for = Some("Whatever they built it to ask for.".to_owned());
+                service
+            })
+            .collect();
 
-        let found = elsewhere(&[service]);
+        let found = elsewhere(&theirs);
         let entry = found.first();
         assert!(
             entry.is_some_and(|one| one.destination == "a place of their own"),
@@ -309,14 +313,18 @@ mod tests {
     /// must not come back indistinguishable from a stack that said nothing at all.
     #[test]
     fn a_stack_saying_a_service_reaches_nothing_is_recorded_as_having_said_so() {
-        let Some(mut service) = declared().into_iter().next() else {
-            unreachable!("the stack declares services")
-        };
-        service.id = "somebodys-own-service".to_owned();
-        service.reaches = Some(String::new());
-        service.asks_for = Some("Nothing leaves this machine.".to_owned());
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .take(1)
+            .map(|mut service| {
+                service.id = "somebodys-own-service".to_owned();
+                service.reaches = Some(String::new());
+                service.asks_for = Some("Nothing leaves this machine.".to_owned());
+                service
+            })
+            .collect();
 
-        let found = elsewhere(&[service]);
+        let found = elsewhere(&theirs);
         let entry = found.first();
         assert!(
             entry.is_some_and(|one| one.destination.is_empty()),
@@ -339,14 +347,18 @@ mod tests {
     /// mean *nothing leaves this machine*.
     #[test]
     fn half_an_answer_from_the_stack_is_no_answer_and_falls_back_to_the_table() {
-        let found = declared().into_iter().find(|one| one.id == "prowlarr");
-        let Some(mut prowlarr) = found else {
-            unreachable!("the stack declares an indexer manager")
-        };
-        prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
-        prowlarr.asks_for = None;
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .filter(|one| one.id == "prowlarr")
+            .take(1)
+            .map(|mut prowlarr| {
+                prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
+                prowlarr.asks_for = None;
+                prowlarr
+            })
+            .collect();
 
-        let carried = elsewhere(&[prowlarr]);
+        let carried = elsewhere(&theirs);
         let entry = carried.first();
         assert!(
             entry.is_some_and(|one| one.destination.contains("indexers")),
@@ -359,16 +371,18 @@ mod tests {
     /// the field is that a fork can correct what this binary believes.
     #[test]
     fn the_stacks_own_word_is_preferred_to_what_is_written_down_here() {
-        let Some(mut prowlarr) = declared()
+        let theirs: Vec<_> = declared()
             .into_iter()
-            .find(|service| service.id == "prowlarr")
-        else {
-            unreachable!("the stack declares an indexer manager")
-        };
-        prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
-        prowlarr.asks_for = Some("Something this binary never heard of either.".to_owned());
+            .filter(|service| service.id == "prowlarr")
+            .take(1)
+            .map(|mut prowlarr| {
+                prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
+                prowlarr.asks_for = Some("Something this binary never heard of either.".to_owned());
+                prowlarr
+            })
+            .collect();
 
-        let found = elsewhere(&[prowlarr]);
+        let found = elsewhere(&theirs);
         assert!(
             found
                 .first()
@@ -483,12 +497,24 @@ mod tests {
     #[test]
     fn a_service_added_to_the_stack_needs_no_entry_here_to_be_reported() {
         let mut services = declared();
-        let Some(template) = services.first().cloned() else {
-            unreachable!("the stack declares services to copy")
-        };
-        let mut theirs = template;
-        theirs.id = "somebodys-own-service".to_owned();
-        services.push(theirs);
+        let copied: Vec<_> = services
+            .first()
+            .cloned()
+            .into_iter()
+            .map(|mut service| {
+                service.id = "somebodys-own-service".to_owned();
+                service
+            })
+            .collect();
+        let counted = services.len();
+        services.extend(copied);
+        // Said rather than left to the count below, which an empty stack satisfies
+        // twice over: nothing declared and nothing reported are equal.
+        assert_eq!(
+            services.len(),
+            counted + 1,
+            "the stack declares a service to copy"
+        );
 
         let found = elsewhere(&services);
         assert_eq!(

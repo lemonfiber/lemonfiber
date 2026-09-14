@@ -59,7 +59,13 @@ mod tests {
     /// One service declaring the given API shape, read back through the manifest
     /// parser rather than built as a struct, so what this calls a declaration is what
     /// the stack's own file means by one.
-    fn service(id: &str, api: &str) -> lemonfiber_manifest::Service {
+    ///
+    /// A list of one rather than the service itself, and the assertion below is why:
+    /// a parse that failed would otherwise need a way out of its own, and a block no
+    /// run enters is a line the coverage gate counts against every honest one beside
+    /// it. Said here rather than left to the cases, because three of them assert that
+    /// nothing is reported — which an empty list satisfies while proving nothing.
+    fn service(id: &str, api: &str) -> Vec<lemonfiber_manifest::Service> {
         let written = format!(
             "schema_version = 1\nstack_version = \"0.1.0\"\nmin_cli_version = \"0.1.0\"\n\n\
              [[profile]]\nid = \"tv\"\nname = \"Television\"\ndescription = \"Television\"\n\n\
@@ -69,13 +75,16 @@ mod tests {
              upstream = \"https://example.invalid/{id}\"\nlast_release = \"2026-01-01\"\n\
              describes = \"Does a thing\"\nwithout_it = \"Do the thing yourself\"\n{api}"
         );
-        let read = lemonfiber_manifest::Manifest::from_toml(&written)
+        let read: Vec<_> = lemonfiber_manifest::Manifest::from_toml(&written)
             .ok()
-            .and_then(|manifest| manifest.services.into_iter().next());
-        let Some(service) = read else {
-            unreachable!("a manifest this test wrote is one the parser reads: {written}")
-        };
-        service
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        assert_eq!(
+            read.len(),
+            1,
+            "a manifest this test wrote is one the parser reads: {written}"
+        );
+        read
     }
 
     #[test]
@@ -85,7 +94,7 @@ mod tests {
             "\n[service.api]\nkind = \"bindery\"\nkey_source = \"generated\"\n",
         );
 
-        let found = deferred(std::slice::from_ref(&theirs));
+        let found = deferred(&theirs);
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(
             found.first().is_some_and(|one| one.what == "bookish"),
@@ -101,7 +110,7 @@ mod tests {
     /// limit, so it is not reported back at the operator who wrote it.
     #[test]
     fn a_service_declaring_no_api_at_all_is_not_reported() {
-        assert!(deferred(&[service("caddy", "")]).is_empty());
+        assert!(deferred(&service("caddy", "")).is_empty());
     }
 
     #[test]
@@ -111,7 +120,7 @@ mod tests {
             "\n[service.api]\nkind = \"servarr\"\nkey_source = \"config-xml\"\n\
              path = \"/config/config.xml\"\nversion = 3\n",
         );
-        assert!(deferred(std::slice::from_ref(&ours)).is_empty());
+        assert!(deferred(&ours).is_empty());
     }
 
     /// Every entry says why, because the report carries the sentence rather than the
