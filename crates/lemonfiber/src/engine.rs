@@ -4,12 +4,18 @@
 //! value that comes back from dispatch — they stream, and something has to sit
 //! with them until they end. That is what is here, kept out of the dispatcher so
 //! it stays a dispatcher.
+//!
+//! Starting and stopping sit here too, with the announcement each of them makes
+//! first. They are the same kind of thing — Compose narrates for minutes and its
+//! report comes at the end — and they came across from `main` when the length rule
+//! sent that file looking for a module to put a concern in. This is the module that
+//! already held the half they call.
 
 use std::process::ExitCode;
 
 use lemonfiber_core::app::{
     claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started, Command,
-    Ctx,
+    Ctx, Outcome, Waiting,
 };
 use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
@@ -22,6 +28,7 @@ use crate::exit::{complain, settled, FAILURE};
 use crate::keyboard::{Console, Keyboard};
 use crate::prompt::Answers as _;
 use crate::render::downloads::interrupting;
+use crate::render::stack::Doing;
 use crate::render::{logged, render, UNRENDERABLE};
 use crate::say::{complain, emit, say};
 use crate::setup::Surface as _;
@@ -295,6 +302,77 @@ async fn narrated(
         }
     }
     Ok(status)
+}
+
+/// Announce what starting will affect, then start it, narrated as it goes.
+///
+/// Starting does not go through dispatch, for the same reason a pull and a watch do
+/// not: Compose narrates for minutes and the report comes at the end, which is not a
+/// value that arrives once.
+pub(crate) async fn starting(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    json: bool,
+) -> ExitCode {
+    // Not announced where services are named. The announcement is about what a form
+    // holds, and saying "starts eight services" before starting two of them would be
+    // a sentence about a set the operator did not ask for.
+    if services.is_empty() {
+        announce(ctx, forms, json, Doing::Starting).await;
+    }
+    start(ctx, forms, services, json).await
+}
+
+/// Announce what stopping would affect, put the question about anything still coming
+/// down, and hand the answer to the teardown.
+///
+/// Both happen before the teardown rather than during it: an operator who is going to
+/// be told a download is at ninety per cent wants to be told while stopping is still
+/// a question, not while it is already happening.
+pub(crate) async fn halting(
+    ctx: &Ctx,
+    forms: Vec<String>,
+    services: Vec<String>,
+    wait: bool,
+    yes: bool,
+    json: bool,
+) -> Command {
+    // Stopping named services and tearing a form down are different requests rather
+    // than one request with an argument, and Compose spells them differently too.
+    // The command line refuses the two flags together for the same reason.
+    if !services.is_empty() {
+        return Command::Halt { forms, services };
+    }
+    announce(ctx, &forms, json, Doing::Stopping).await;
+    // Asked only where there is somebody to ask. A machine-readable run is put no
+    // prompt — it has nobody to answer one, and a report not in the envelope is noise
+    // on a stream something is parsing — so what it typed is what the teardown gets.
+    let waiting = if json {
+        wait
+    } else {
+        settle(ctx, &forms, wait, yes).await == Choice::Wait
+    };
+    Command::Down {
+        forms,
+        wait: Waiting::from(waiting),
+    }
+}
+
+async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {
+    if json {
+        return;
+    }
+    if let Ok(Outcome::Preview(plan)) = dispatch(
+        Command::Preview {
+            forms: forms.to_vec(),
+        },
+        ctx,
+    )
+    .await
+    {
+        crate::render::stack::affects(&plan, doing).print();
+    }
 }
 
 #[cfg(test)]

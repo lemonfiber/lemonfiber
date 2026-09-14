@@ -78,6 +78,16 @@ pub enum Command {
         /// The forms to start, resolved to the union of their closures.
         forms: Vec<String>,
     },
+    /// Bring back what this machine was running, because it has just restarted.
+    ///
+    /// Apart from [`Command::Up`] because almost nothing about it is the same
+    /// request: which forms it starts is the record's answer rather than the
+    /// caller's, it declines where the operator stopped the stack on purpose or the
+    /// machine is on its battery, it waits for an engine that is still starting, and
+    /// it reports what it found to a condition store rather than to somebody
+    /// watching. What it shares with `Up` is the start in the middle, which it runs
+    /// by calling it.
+    AtBoot,
     /// Start named services, leaving the rest of the form where it is.
     ///
     /// Apart from [`Command::Up`] for the reason [`Command::Halt`] is apart from
@@ -442,7 +452,7 @@ pub enum Command {
     },
     /// Say what this machine keeps running for lemonfiber, or change it.
     ///
-    /// The short command that decides what happens to the two long ones. Asked
+    /// The short command that decides what happens to the long ones. Asked
     /// nothing it reports what stands between each of them and this machine —
     /// installed or not, running or not, and what to do where this is a platform
     /// lemonfiber configures nothing on. Asked to install one, it hands the

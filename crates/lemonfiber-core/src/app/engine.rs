@@ -15,6 +15,7 @@ use crate::stack::compose::{build, Action};
 
 mod diagnosis;
 mod fetching;
+mod grounded;
 mod inflight;
 mod lock;
 mod settling;
@@ -229,6 +230,7 @@ async fn readied(
         stack_edits,
         forwarding: None,
         switched: None,
+        held: None,
     };
     Ok((manifest, command, report))
 }
@@ -267,6 +269,12 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
         return Ok(Outcome::Lifecycle(report));
     }
 
+    // Nothing is spawned over a data location that is not there. Compose would make
+    // the directory rather than refuse, on whatever sits under the mount point, and
+    // the stack would then look entirely healthy while filing a second library onto
+    // the system disk. The streamed start asks the same thing at the same point.
+    grounded::grounded(ctx, action).await?;
+
     // One credential has to exist before the service that uses it has ever run: the
     // book *arr takes a key from its environment on its first start and generates its
     // own otherwise, and what it generates lives in a database nothing here can read.
@@ -282,6 +290,11 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
         .await
         .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
+
+    // What the operator has just asked for, written down before anything is waited
+    // on. A start whose services never settle has still started them, and a boot
+    // that forgot which form that was would bring back the wrong one.
+    super::autostart::noted(ctx, action, forms, &report);
 
     // Starting waits for the services to be usable, because "started" that
     // means "a process exists" is a claim the operator will disprove by opening
@@ -519,6 +532,39 @@ mod tests {
             assert!(
                 before_spawn.is_some(),
                 "{path} starts services without minting the key one of them adopts"
+            );
+        }
+    }
+
+    /// Both ways of starting ask the same two things first, because there are two.
+    ///
+    /// The same hazard the minting above is pinned against, on two questions asked at
+    /// moments nobody is watching. A start recorded on only the waited-on path leaves
+    /// the next boot bringing back whatever form the *other* path last named; a data
+    /// location proven present on only that path leaves the one an operator actually
+    /// types building a second library on the system disk.
+    ///
+    /// Pinned by the call rather than by behaviour, since neither path can be run here
+    /// without a container to start. The production half of each file is what is read,
+    /// so the name appearing in this very test does not satisfy it.
+    #[test]
+    fn both_ways_of_starting_ask_the_same_things_before_they_spawn() {
+        const WAITED: &str = include_str!("engine.rs");
+        const STREAMED: &str = include_str!("engine/streaming.rs");
+        for (path, source) in [("engine.rs", WAITED), ("engine/streaming.rs", STREAMED)] {
+            // Split at the test module rather than at the first `#[cfg(test)]`: one of
+            // these files carries a test-only re-export near its imports, and splitting
+            // there would read nine lines of `use` and call them the whole file.
+            let production = source
+                .split_once("mod tests {")
+                .map_or(source, |(before, _)| before);
+            assert!(
+                production.contains("autostart::noted(ctx, "),
+                "{path} starts services without recording what was asked for"
+            );
+            assert!(
+                production.contains("grounded::grounded(ctx, "),
+                "{path} starts services without proving the data location is there"
             );
         }
     }

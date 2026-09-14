@@ -17,6 +17,7 @@ use crate::ports::docker::{Engine, Images};
 use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
+use crate::ports::machine::{Started, Supply};
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
 use crate::ports::nntp::Nntp;
@@ -27,6 +28,8 @@ use crate::ports::{Clock, FileSystem, Narrator, Runner};
 use crate::stack::Source;
 use crate::validate::{Live, Validator};
 use crate::walkthrough::{Narrator as Stepwise, Unheard};
+
+mod moment;
 
 /// Everything a command needs that is not part of the command itself.
 pub struct Ctx {
@@ -87,6 +90,21 @@ pub struct Ctx {
     /// one particular machine, so a test written against the real ones would pass
     /// where it was written and nowhere else.
     pub site: Arc<dyn Site>,
+    /// How this machine is asked when it last started.
+    ///
+    /// A port beside [`Self::site`] and for the same reason: it is a fact about one
+    /// particular machine at one particular moment, so a test written against the
+    /// real one would pass where it was written and nowhere else. It is what lets a
+    /// run tell "this machine has restarted since I last looked" from "it has not",
+    /// which nothing in this workspace could say before.
+    pub started: Arc<dyn Started>,
+    /// How this machine is asked where its power is coming from.
+    ///
+    /// Beside the one above, built over the same runner, and read by exactly one
+    /// decision: whether a start nobody asked for should happen while a laptop is on
+    /// its battery. A media stack started on battery empties one in an afternoon,
+    /// which is a thing to have chosen rather than a thing to discover.
+    pub power: Arc<dyn Supply>,
     /// How a credential is proven against the service it authenticates to.
     ///
     /// A port because setup proves one the moment it is entered, on every surface:
@@ -194,6 +212,13 @@ impl Ctx {
         // rather than over the machine: asking this machine its name means running a
         // program, and which program runner that is, is this context's answer already.
         let site: Arc<dyn Site> = Arc::new(crate::network::Here::over(Arc::clone(&runner)));
+        // One object answering both questions about this machine's state, held as the
+        // two seams that ask them. Built here rather than handed over for the reason
+        // the site is: asking means running a program, and which program runner that
+        // is, is this context's answer already.
+        let asking = Arc::new(crate::machine::Asking::over(Arc::clone(&runner)));
+        let started: Arc<dyn Started> = Arc::clone(&asking) as Arc<dyn Started>;
+        let power: Arc<dyn Supply> = asking as Arc<dyn Supply>;
         Self {
             dry_run: false,
             force: false,
@@ -211,6 +236,8 @@ impl Ctx {
             http,
             random,
             site,
+            started,
+            power,
             // Nobody, until a surface says otherwise. A context is built before the
             // thing that would listen exists in both surfaces, and a default that
             // said something would have to guess where.
@@ -378,6 +405,27 @@ impl Ctx {
         self
     }
 
+    /// The same context, asking the given seam when this machine last started.
+    ///
+    /// So a test can drive the one decision that turns on it — whether this run is
+    /// the first since a restart — without a machine that has actually restarted,
+    /// which no test can arrange.
+    #[must_use]
+    pub fn with_started(mut self, started: Arc<dyn Started>) -> Self {
+        self.started = started;
+        self
+    }
+
+    /// The same context, asking the given seam where the power comes from.
+    ///
+    /// For the reason above: the machine a test runs on is plugged into whatever it
+    /// is plugged into, and both answers have to be exercised from it.
+    #[must_use]
+    pub fn with_power(mut self, power: Arc<dyn Supply>) -> Self {
+        self.power = power;
+        self
+    }
+
     /// The same context, handing long-running commands to the given manager.
     ///
     /// The default is the one that configures nothing, because which manager this
@@ -408,71 +456,6 @@ impl Ctx {
         self
     }
 
-    /// Today, as the manifest's date rules mean it.
-    ///
-    /// A clock before the epoch, or one far enough ahead to overflow a calendar,
-    /// falls back to the epoch: refusing to do anything because the machine's
-    /// clock is absurd would be a worse answer than checking dates against a
-    /// date that is merely wrong.
-    /// The moment now, as the opaque stamp durable records carry.
-    ///
-    /// Seconds since the epoch, read through the clock port rather than from the
-    /// system directly, so a test can say what time it is and a record written on
-    /// one run can be compared with one written on another.
-    pub(super) fn stamp(&self) -> String {
-        self.seconds().to_string()
-    }
-
-    /// The same moment as a number, for the records that compare two of them.
-    ///
-    /// Beside the stamp rather than parsed back out of one: what reads this asks
-    /// whether enough time has passed since the last run, and two strings cannot be
-    /// subtracted. A clock that will not answer reads as the epoch, which is a machine
-    /// that has waited long enough for anything.
-    pub(super) fn seconds(&self) -> u64 {
-        self.clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_secs())
-            .unwrap_or_default()
-    }
-
-    /// The moment a given number of hours ago, written as the media server writes
-    /// its own records: an ISO-8601 instant ending in `Z`.
-    ///
-    /// The calendar is left to [`Date::from_unix_seconds`], which already knows
-    /// about leap years; only the time of day is arithmetic on what is left over.
-    /// Written out rather than reached for from a date library, because this is the
-    /// one place in the product that needs an instant rather than a day.
-    pub(super) fn hours_ago(&self, hours: i64) -> String {
-        let now = self
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
-            .unwrap_or_default();
-        let then = now.saturating_sub(hours.saturating_mul(3600));
-        let day = lemonfiber_manifest::Date::from_unix_seconds(then).unwrap_or(EPOCH);
-        let past = then.rem_euclid(86_400);
-        let (hour, minute, second) = (past / 3600, (past % 3600) / 60, past % 60);
-        format!(
-            "{:04}-{:02}-{:02}T{hour:02}:{minute:02}:{second:02}Z",
-            day.year, day.month, day.day
-        )
-    }
-
-    pub(super) fn today(&self) -> lemonfiber_manifest::Date {
-        let seconds = self
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
-            .unwrap_or_default();
-        lemonfiber_manifest::Date::from_unix_seconds(seconds).unwrap_or(EPOCH)
-    }
-
     /// The same context, in rehearsal.
     #[must_use]
     pub fn rehearsing(mut self) -> Self {
@@ -492,14 +475,6 @@ impl Ctx {
         self
     }
 }
-
-/// The first day the calendar rules can name, used when the clock cannot be
-/// believed at all.
-const EPOCH: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
-    year: 1970,
-    month: 1,
-    day: 1,
-};
 
 /// How long starting waits for every service to settle.
 ///

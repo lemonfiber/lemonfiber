@@ -91,6 +91,17 @@ pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 /// they want to stop.
 pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
 
+/// The setting that lets a start at a login happen while this machine is on its
+/// battery.
+///
+/// Off unless it is explicitly turned on, which is the opposite way round from the
+/// explanations and for the opposite reason: a media stack started on a battery
+/// empties one in an afternoon, and an operator who wants that has a reason for it
+/// while an operator who gets it by default has an afternoon ruined. A desktop with
+/// no battery to read is unaffected either way — nothing here holds back a machine
+/// that could not say where its power comes from.
+pub const AUTOSTART_ON_BATTERY_KEY: &str = "LEMONFIBER_AUTOSTART_ON_BATTERY";
+
 /// The hours the operator does not want waking for, as `HH:MM-HH:MM`.
 ///
 /// Read in the zone `TZ` names, which is the same zone the stack hands every container,
@@ -306,6 +317,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_HOUSEHOLD_KEY,
     REACH_UPDATES_KEY,
     EXPLANATIONS_KEY,
+    AUTOSTART_ON_BATTERY_KEY,
     PROJECT_KEY,
     OVERLAY_KEY,
     QUIET_HOURS_KEY,
@@ -456,6 +468,11 @@ pub struct Settings {
     /// On unless switched off. The words are a wall to somebody meeting them, and
     /// the operator who wants them gone is the one who knows to go and look.
     pub explanations: bool,
+    /// Whether a start at a login may happen while this machine is on its battery.
+    ///
+    /// Off unless switched on. Read only by the run that a login starts; typing
+    /// `lemonfiber up` yourself is you deciding, and nothing here second-guesses it.
+    pub autostart_on_battery: bool,
     /// Which requests lemonfiber may make on its own account.
     ///
     /// Every one allowed unless the operator said otherwise, and what each of them
@@ -516,6 +533,7 @@ impl Default for Settings {
             exposed: Vec::new(),
             front_door: None,
             explanations: true,
+            autostart_on_battery: false,
             reaching: Reaching::default(),
             provider_host: None,
             program: None,

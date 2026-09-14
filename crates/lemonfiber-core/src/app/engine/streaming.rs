@@ -149,7 +149,13 @@ pub async fn start_progress(
     forms: &[String],
     services: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
-    let (manifest, command, _) = readied(ctx, forms, &aimed(services)).await?;
+    let action = aimed(services);
+    let (manifest, command, _) = readied(ctx, forms, &action).await?;
+    // Refused where the data location is not there, after waiting for it. The
+    // waited-on path asks the same thing at the same point, for the reason the
+    // minting below is done on both: a start that went one way and not the other
+    // would leave the one an operator actually types unguarded.
+    super::grounded::grounded(ctx, &action).await?;
     // Before the spawn, because one credential has to exist before the service that
     // uses it has ever run. The waited-on path does the same thing at the same point;
     // a start that went one way and not the other would leave that service holding a
@@ -181,8 +187,13 @@ pub async fn started(
     services: &[String],
     status: Option<i32>,
 ) -> Result<Outcome, Box<Problem>> {
-    let (manifest, _, mut report) = readied(ctx, forms, &aimed(services)).await?;
+    let action = aimed(services);
+    let (manifest, _, mut report) = readied(ctx, forms, &action).await?;
     report.status = status;
+    // The waited-on path writes the same record at the same point. A start that went
+    // one way and not the other would leave the next boot bringing back whatever the
+    // last start through the *other* path named, which is worse than nothing.
+    super::super::autostart::noted(ctx, &action, forms, &report);
     if status == Some(0) {
         settled_into(ctx, &manifest, &mut report).await?;
     }

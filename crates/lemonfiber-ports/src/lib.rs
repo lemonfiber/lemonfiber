@@ -27,6 +27,7 @@ pub mod error;
 pub mod filesystem;
 pub mod hosting;
 pub mod http;
+pub mod machine;
 pub mod media;
 pub mod narration;
 pub mod network;

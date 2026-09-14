@@ -1,9 +1,11 @@
 //! Handing a long-running command to this machine, and taking it back.
 //!
-//! Two of this product's guarantees are made by a command that has to keep
-//! running, and both of them end when the terminal that started them closes.
-//! This is what makes them survive it: the operating system's own service
-//! manager is asked to run the same command the operator would have typed.
+//! Three of this product's guarantees are made by a command the terminal that
+//! started it would otherwise take with it. Two of them keep running for weeks; the
+//! third is a start that has to happen again at every login, which is the same
+//! promise reached from the other direction. This is what makes all three survive:
+//! the operating system's own service manager is asked to run the very command the
+//! operator would have typed.
 //!
 //! Nothing here reports success from having written a file. What a reading says
 //! is what the manager answered, and where the manager would not answer, that is
@@ -11,7 +13,7 @@
 //! operator believing a guarantee is in force while nothing is keeping it.
 //!
 //! Installing is asked for and never arrived at. No other command reaches this,
-//! and running one of the two long commands does not offer it: an operator who
+//! and running one of the long commands does not offer it: an operator who
 //! asked to guard a volume this afternoon has not asked for something on their
 //! machine that starts at every login.
 
@@ -147,6 +149,7 @@ async fn install(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Changed,
         .place(&wanted)
         .await
         .map_err(|failure| Box::new(failure.problem()))?;
+    answered(ctx, what, true);
     Ok(Changed {
         name: what.name().to_owned(),
         installed: true,
@@ -177,6 +180,7 @@ async fn remove(ctx: &Ctx, what: Hostable) -> Result<Changed, Box<Problem>> {
         .withdraw(what.name())
         .await
         .map_err(|failure| Box::new(failure.problem()))?;
+    answered(ctx, what, false);
     Ok(Changed {
         name: what.name().to_owned(),
         installed: false,
@@ -184,6 +188,29 @@ async fn remove(ctx: &Ctx, what: Hostable) -> Result<Changed, Box<Problem>> {
         started: false,
         rehearsed: false,
     })
+}
+
+/// Keep the autostart answer in step with what was just installed or withdrawn.
+///
+/// Only the boot start, and only because for that one the act *is* the answer: an
+/// operator who asks this machine to bring the stack back after a restart has said
+/// yes, and one who takes it back off has said no. Leaving the recorded answer at yes
+/// with nothing installed would be the `enabled-unverified` trap in its purest form —
+/// a record saying autostart is wanted, on a machine where nothing would do it.
+///
+/// The other two say nothing about it. A guard on the data location and a clock on
+/// requests are neither of them a statement about what should happen at a restart.
+///
+/// Best effort, like every other record written beside a command rather than by one:
+/// the thing the operator asked for has happened either way, and a record that could
+/// not be written costs the next run its knowledge of the answer rather than leaving
+/// a claim that is wrong.
+fn answered(ctx: &Ctx, what: Hostable, wanted: bool) {
+    if !matches!(what, Hostable::Boot) {
+        return;
+    }
+    let returning = super::autostart::load(ctx).answering(wanted);
+    super::autostart::save(ctx, &returning);
 }
 
 /// What is to be installed, or why it cannot be described.
@@ -248,7 +275,7 @@ fn nowhere_to_write() -> Problem {
 #[cfg(test)]
 mod tests {
     use super::{
-        hosting, keeping, settled, typed, Ctx, Held, Hostable, Hosting, Keeping, Standing,
+        hosting, keeping, settled, typed, Ctx, Held, Hostable, Hosting, Keeping, Standing, HOSTABLE,
     };
     use crate::config::Settings;
     use crate::model::HostingReport;
@@ -280,6 +307,31 @@ mod tests {
         machine(knowing(), manager)
     }
 
+    /// The same machine, keeping its records in an emptied scratch directory.
+    ///
+    /// Apart from [`a_machine`] because almost nothing here needs it: what a reading
+    /// says is the manager's business and the records are not in it. The two tests
+    /// below are the exception — the answer to the autostart question is written
+    /// beside an install rather than reported by one, and a machine with nowhere to
+    /// keep it would read back the default whatever had been asked for.
+    fn recording(name: &str, manager: Arc<Fake>) -> Ctx {
+        let dir =
+            std::env::temp_dir().join(format!("lemonfiber-hosting-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        machine(
+            Settings {
+                env_file: Some(dir.join(".env")),
+                ..knowing()
+            },
+            manager,
+        )
+    }
+
+    /// What this machine has recorded about bringing the stack back after a restart.
+    fn wants_the_stack_back(ctx: &Ctx) -> bool {
+        crate::app::autostart::load(ctx).wanted().on_boot()
+    }
+
     /// The report, or the empty one — which no assertion below is satisfied by, so
     /// a run that failed where it should not fails the test rather than skipping it.
     async fn read(ctx: &Ctx, asked: Keeping) -> HostingReport {
@@ -295,12 +347,28 @@ mod tests {
             .map(|command| command.standing)
     }
 
+    /// Every one of them, counted off the declaration rather than off a number here.
+    ///
+    /// A count written down twice is a count that drifts: the reading grew a third
+    /// command and this went on asserting two, which is the shape of failure this
+    /// test exists to catch reported as this test being out of date. Read from
+    /// `HOSTABLE` it cannot disagree, and a command added to the reading and left off
+    /// this list fails here by name rather than by arithmetic.
     #[tokio::test]
     async fn every_long_running_command_is_on_the_reading_whether_hosted_or_not() {
         let report = read(&a_machine(Fake::with(Manager::Launchd)), Keeping::Read).await;
-        assert_eq!(report.commands.len(), 2);
-        assert_eq!(standing(&report, "watch"), Some(Hosting::NotHosted));
-        assert_eq!(standing(&report, "expiring"), Some(Hosting::NotHosted));
+        assert_eq!(report.commands.len(), HOSTABLE.len());
+        for what in HOSTABLE {
+            // Bound rather than called inside the message. An argument to an assertion
+            // that never fails is a line nothing ever enters, which the coverage gate
+            // reads as dead code — and the reading is the same value either way.
+            let named = what.name();
+            assert_eq!(
+                standing(&report, named),
+                Some(Hosting::NotHosted),
+                "{named}"
+            );
+        }
         assert_eq!(report.manager, Manager::Launchd);
         assert_eq!(report.instruction, None);
         assert_eq!(report.caveat, None);
@@ -623,7 +691,7 @@ mod tests {
         .await;
         assert!(matches!(
             asked,
-            Ok(crate::app::Outcome::Hosting(report)) if report.commands.len() == 2
+            Ok(crate::app::Outcome::Hosting(report)) if report.commands.len() == HOSTABLE.len()
         ));
     }
 
@@ -645,6 +713,86 @@ mod tests {
         assert!(!keeping(&a_machine(holding(Standing::Stopped)), Hostable::Expiring).await);
         assert!(!keeping(&a_machine(holding(Standing::Unsaid)), Hostable::Expiring).await);
         assert!(!keeping(&a_machine(Fake::unsupported()), Hostable::Expiring).await);
+    }
+
+    /// Asking this machine for the boot start *is* the operator answering the
+    /// autostart question, and taking it back off is them answering it the other way.
+    ///
+    /// For that one command the act is the answer: somebody who installs the thing
+    /// that brings their stack back after a restart has said yes, and somebody who
+    /// removes it has said no. A recorded answer left at yes on a machine with nothing
+    /// installed to carry it out is `enabled-unverified` in its purest form — and the
+    /// cost of that state is not the wrong word on a report, it is an operator who
+    /// believes their stack comes back and finds out weeks later, from a household
+    /// asking why nothing has downloaded since Tuesday.
+    #[tokio::test]
+    async fn asking_for_the_boot_start_is_asking_for_autostart_and_so_is_taking_it_back() {
+        let ctx = recording("boot", Fake::with(Manager::Launchd));
+
+        assert!(hosting(
+            &ctx,
+            Keeping::Install {
+                what: Hostable::Boot,
+                forms: Vec::new()
+            }
+        )
+        .await
+        .is_ok());
+        assert!(
+            wants_the_stack_back(&ctx),
+            "installing the thing that does it is saying yes to it"
+        );
+
+        assert!(hosting(
+            &ctx,
+            Keeping::Remove {
+                what: Hostable::Boot
+            }
+        )
+        .await
+        .is_ok());
+        assert!(
+            !wants_the_stack_back(&ctx),
+            "and taking it back off is saying no, rather than leaving a claim behind"
+        );
+    }
+
+    /// The guard and the clock say nothing at all about what happens at a restart.
+    ///
+    /// A guard on the data location stops the stack precisely because nobody chose to,
+    /// and a clock on requests is not a statement about starting anything. Reading
+    /// either as an answer to the autostart question would leave an operator who
+    /// installed a guard this afternoon recorded as having asked for their stack back
+    /// at every reboot — or, worse the other way round, would take that answer away
+    /// from somebody who removed a guard and never touched the question.
+    #[tokio::test]
+    async fn the_other_two_say_nothing_about_what_happens_at_a_restart() {
+        let ctx = recording("others", Fake::with(Manager::Launchd));
+        let already = crate::autostart::Returning::default().answering(true);
+        crate::app::autostart::save(&ctx, &already);
+
+        assert!(hosting(
+            &ctx,
+            Keeping::Install {
+                what: Hostable::Expiring,
+                forms: Vec::new()
+            }
+        )
+        .await
+        .is_ok());
+        assert!(hosting(
+            &ctx,
+            Keeping::Remove {
+                what: Hostable::Watch
+            }
+        )
+        .await
+        .is_ok());
+
+        assert!(
+            wants_the_stack_back(&ctx),
+            "neither of them is a decision about starting on boot, so neither moved it"
+        );
     }
 
     #[test]

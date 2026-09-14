@@ -202,7 +202,7 @@ pub enum ConfigAction {
     Show,
 }
 
-/// Which of the two commands that outlive the request that started them.
+/// Which of the commands that outlive the request that started them.
 ///
 /// A closed list rather than a name typed, because a word that names none of them
 /// is a mistake worth catching where it was typed rather than three layers in.
@@ -212,6 +212,8 @@ pub enum Kept {
     Watch,
     /// The clock that closes requests nobody has ruled on.
     Expiring,
+    /// The start that brings the stack back after this machine restarts.
+    Boot,
 }
 
 /// What can be done about what this machine keeps running.
@@ -228,7 +230,8 @@ pub enum HostingCommand {
     /// it, and says so, along with where a command with no terminal writes what it
     /// would have said in one.
     Install {
-        /// Which one: the guard on the data location, or the clock on requests.
+        /// Which one: the guard on the data location, the clock on requests, or the
+        /// start that brings the stack back after a restart.
         what: Kept,
         /// The forms the guard stops if the data location is lost. The guard alone
         /// takes them, and it will not be installed without them.

@@ -8,7 +8,8 @@ use std::process::ExitCode;
 
 use lemonfiber_core::app::{diagnose, dispatch, seeding, Command, Ctx, Outcome};
 use lemonfiber_core::docker::Condition;
-use lemonfiber_core::doctor::{Category, Narrowing, Overall};
+use lemonfiber_core::doctor::{autostart, overall, Category, Finding, Narrowing, Overall};
+use lemonfiber_core::model::DoctorReport;
 
 use crate::engine::pull_showing;
 use crate::exit::{complain, settled, PREFLIGHT};
@@ -40,12 +41,38 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
         .await
         .map_err(|problem| complain(&problem))?;
 
+    // Whether this machine would bring the stack back after a restart is in this
+    // family and is not this question. It answers `enabled-unverified` wherever a
+    // Docker Desktop setting cannot be read — which is a fact about a machine that is
+    // working perfectly well today — and an undetermined finding stops setup below.
+    // Left in, somebody who had answered yes to autostart could not run setup again.
+    // Re-summed rather than judged on the verdict that came back, because a word about
+    // findings that are no longer here is not a word about these.
+    let findings = gating(report.findings);
+    let report = DoctorReport {
+        overall: overall(&findings),
+        findings,
+    };
+
     if matches!(report.overall, Overall::Broken | Overall::Unknown) {
         render(&Outcome::Doctor(report), false);
         complain!("\nSetup needs these put right before it can go on.");
         return Err(ExitCode::from(PREFLIGHT));
     }
     Ok(())
+}
+
+/// The findings that decide whether setup can go on at all.
+///
+/// One is dropped, and it is the one whose honest answer would stop setup for a
+/// reason setup is not about. Named here rather than filtered inline so the rule can
+/// be read, and exercised, without standing up a machine whose Docker Desktop
+/// settings cannot be read.
+fn gating(findings: Vec<Finding>) -> Vec<Finding> {
+    findings
+        .into_iter()
+        .filter(|finding| finding.check != autostart::CHECK)
+        .collect()
 }
 
 /// Bring the stack up and report how it settled, the last step of a fresh setup.
@@ -105,10 +132,12 @@ fn condition(outcome: &Outcome) -> Option<Condition> {
 
 #[cfg(test)]
 mod tests {
-    use super::{afterwards, condition, preflight, start};
+    use super::{afterwards, condition, gating, overall, preflight, start};
     use crate::exit::{shown, success};
     use lemonfiber_core::app::Outcome;
     use lemonfiber_core::config::Protocols;
+    use lemonfiber_core::doctor::{autostart, Category, Finding, Overall, Verdict};
+    use lemonfiber_core::error::Remedy;
     use lemonfiber_core::stack::Source;
 
     use crate::setup::tests::{ctx, working_ctx, FakeEngine, Scripted};
@@ -132,6 +161,38 @@ mod tests {
     #[tokio::test]
     async fn an_environment_that_works_passes_without_a_word() {
         assert!(preflight(&working_ctx()).await.is_ok());
+    }
+
+    /// Autostart it could not confirm does not stop somebody setting up.
+    ///
+    /// The check that answers it is in this very family and answers
+    /// `enabled-unverified` wherever Docker Desktop's own setting cannot be read —
+    /// which is most machines, and says nothing about whether this one can run the
+    /// stack today. An undetermined finding stops setup, so left in this would have
+    /// meant that anybody who had answered yes to starting on boot could not run
+    /// setup a second time.
+    #[test]
+    fn a_prerequisite_nobody_could_confirm_does_not_stop_setup() {
+        let unverified = Finding::in_category(
+            Category::Environment,
+            autostart::CHECK,
+            "The stack comes back after a restart",
+            Verdict::Unverified {
+                reason: "enabled-unverified".to_owned(),
+                remedy: Remedy::new("Open Docker Desktop"),
+            },
+        );
+        let engine = Finding::in_category(
+            Category::Environment,
+            "environment.engine",
+            "Docker engine",
+            Verdict::Pass { note: None },
+        );
+
+        let kept = gating(vec![engine, unverified]);
+
+        assert_eq!(kept.len(), 1, "the autostart finding is the one dropped");
+        assert_eq!(overall(&kept), Overall::Healthy, "so setup goes on");
     }
 
     #[tokio::test]

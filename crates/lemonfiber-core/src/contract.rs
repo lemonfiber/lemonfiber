@@ -333,6 +333,7 @@ mod tests {
                 stack_edits: Vec::new(),
                 forwarding: None,
                 switched: None,
+                held: None,
             }),
             Outcome::Config(ConfigReport {
                 settings: Vec::new(),

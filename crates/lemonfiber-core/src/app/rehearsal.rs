@@ -162,6 +162,7 @@ pub fn asked(command: &Command) -> Asked {
         // Reports. Each of these builds the report it would have filled in and stops
         // before the step it cannot take back.
         Command::Up { .. } => ("up", Rehearsal::Reports),
+        Command::AtBoot => ("up --at-boot", Rehearsal::Reports),
         Command::Start { .. } => ("start", Rehearsal::Reports),
         Command::Down { .. } => ("down", Rehearsal::Reports),
         Command::Halt { .. } => ("stop", Rehearsal::Reports),

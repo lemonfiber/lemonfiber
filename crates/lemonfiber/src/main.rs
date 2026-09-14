@@ -11,7 +11,7 @@ use clap::Parser;
 use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request, UpdateCommand};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::update;
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction, Waiting};
+use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
 
 mod acting;
 mod archive;
@@ -34,15 +34,13 @@ mod ui;
 
 use crate::say::{complain, say};
 use context::{context, here};
-use engine::{pull, settle, start, stream};
+use engine::{halting, pull, starting, stream};
 use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
 use render::render;
-use render::stack::Doing;
 use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
-use stopping::Choice;
 use translate::{
     bundling, configuration, diagnosing, hosting, household, invitation, letting, quality,
     removing, restarting, traced,
@@ -267,9 +265,14 @@ async fn main() -> ExitCode {
         // not: it affects what is running rather than what a form holds — a restart of
         // one named service touches one service — so "starts eight services" before it
         // would be a sentence about the wrong set.
-        Request::Up { forms, services } => {
-            return starting(&ctx, &forms, &services, cli.json).await
-        }
+        // A start at a login has nobody watching it, so unlike the one below it has
+        // nothing to stream to and nothing to announce — and what it starts is not in
+        // the request at all. It goes through dispatch like every other value that
+        // arrives once.
+        Request::Up { at_boot: true, .. } => Command::AtBoot,
+        Request::Up {
+            forms, services, ..
+        } => return starting(&ctx, &forms, &services, cli.json).await,
         Request::Down {
             forms,
             services,
@@ -432,19 +435,6 @@ async fn explaining(ctx: &Ctx, word: &[String], json: bool, rehearsing: bool) ->
 
 /// Say what starting these forms will start, before it starts.
 ///
-/// The plan comes from the core, resolved exactly as the command about to run
-/// will resolve it, so this is the same answer arriving earlier rather than a
-/// second opinion. A failure to resolve is not reported here: the command
-/// itself is about to fail on it, and saying so twice would put the operator's
-/// own mistake in front of them as though it had happened twice.
-///
-/// Silent under `--json`, where the plan comes back inside the one document the
-/// command returns. A script reading a stream of objects is owed one per run.
-/// The command to run, once the operator has been told what it will affect.
-///
-/// The two directions share this because they share the sentence — only the verb
-/// differs — and a second copy of "say it, then do it" would be a second place for
-/// them to fall out of step about which half comes first.
 /// Carry the command out and say what came back.
 ///
 /// The exit code is the outcome's own, so what a run reports and what it exits with
@@ -459,77 +449,6 @@ async fn answered(command: Command, ctx: &Ctx, json: bool) -> ExitCode {
     }
 }
 
-/// Announce what starting will affect, then start it, narrated as it goes.
-///
-/// Starting does not go through dispatch, for the same reason a pull and a watch do
-/// not: Compose narrates for minutes and the report comes at the end, which is not a
-/// value that arrives once.
-async fn starting(ctx: &Ctx, forms: &[String], services: &[String], json: bool) -> ExitCode {
-    // Not announced where services are named. The announcement is about what a form
-    // holds, and saying "starts eight services" before starting two of them would be
-    // a sentence about a set the operator did not ask for.
-    if services.is_empty() {
-        announce(ctx, forms, json, Doing::Starting).await;
-    }
-    start(ctx, forms, services, json).await
-}
-
-/// Announce what stopping would affect, put the question about anything still coming
-/// down, and hand the answer to the teardown.
-///
-/// Both happen before the teardown rather than during it: an operator who is going to
-/// be told a download is at ninety per cent wants to be told while stopping is still
-/// a question, not while it is already happening.
-async fn halting(
-    ctx: &Ctx,
-    forms: Vec<String>,
-    services: Vec<String>,
-    wait: bool,
-    yes: bool,
-    json: bool,
-) -> Command {
-    // Stopping named services and tearing a form down are different requests rather
-    // than one request with an argument, and Compose spells them differently too.
-    // The command line refuses the two flags together for the same reason.
-    if !services.is_empty() {
-        return Command::Halt { forms, services };
-    }
-    announce(ctx, &forms, json, Doing::Stopping).await;
-    // Asked only where there is somebody to ask. A machine-readable run is put no
-    // prompt — it has nobody to answer one, and a report not in the envelope is noise
-    // on a stream something is parsing — so what it typed is what the teardown gets.
-    let waiting = if json {
-        wait
-    } else {
-        settle(ctx, &forms, wait, yes).await == Choice::Wait
-    };
-    Command::Down {
-        forms,
-        wait: Waiting::from(waiting),
-    }
-}
-
-async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {
-    if json {
-        return;
-    }
-    if let Ok(Outcome::Preview(plan)) = dispatch(
-        Command::Preview {
-            forms: forms.to_vec(),
-        },
-        ctx,
-    )
-    .await
-    {
-        render::stack::affects(&plan, doing).print();
-    }
-}
-
-/// A quality subcommand, or the exit code for input that cannot be understood.
-///
-/// The preset and the media type are named in plain words the operator types, so a
-/// name that is neither is a mistake to correct rather than a request to run — it
-/// is refused here, before the core is reached, with the valid names spelled out.
 /// Run setup from what the command line carried, or refuse it with a usage code.
 ///
 /// The flags are validated before anything is applied, so a contradictory pair is a

@@ -386,6 +386,11 @@ Options:
       --service <NAME>
           Start only these services, leaving the rest of the form alone
 
+      --at-boot
+          Start what a restart of this machine should start, and nothing otherwise.
+
+          What a login runs. It brings back whichever form was last running unless you pinned one, and it declines — saying why — where you stopped the stack on purpose, where you never asked for it to start on its own, or where this machine is on its battery and you have not said to start anyway. It waits for the container engine to finish starting and tries again while the network is still arriving, and if the stack still does not come back it records that, so the next thing you type tells you once rather than not at all. Naming a form or a service alongside it is refused: which forms come back is the record's answer, not this command line's.
+
       --dry-run
           Say what would happen, and change nothing
 
@@ -396,7 +401,7 @@ Options:
           Operate a stack directory of your own instead of the built-in one
 
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 ```
 
 ## `lemonfiber down`
@@ -1070,11 +1075,12 @@ Usage: lemonfiber hosting install [OPTIONS] <WHAT> [FORMS]...
 
 Arguments:
   <WHAT>
-          Which one: the guard on the data location, or the clock on requests
+          Which one: the guard on the data location, the clock on requests, or the start that brings the stack back after a restart
 
           Possible values:
           - watch:    The guard on the data location
           - expiring: The clock that closes requests nobody has ruled on
+          - boot:     The start that brings the stack back after this machine restarts
 
   [FORMS]...
           The forms the guard stops if the data location is lost. The guard alone takes them, and it will not be installed without them
@@ -1112,6 +1118,7 @@ Arguments:
           Possible values:
           - watch:    The guard on the data location
           - expiring: The clock that closes requests nobody has ruled on
+          - boot:     The start that brings the stack back after this machine restarts
 
 Options:
       --json

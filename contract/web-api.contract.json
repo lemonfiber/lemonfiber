@@ -7075,6 +7075,13 @@
                 "null"
               ]
             },
+            "held": {
+              "description": "Why nothing was run, where a start declined to run anything.\n\nAbsent for every ordinary command, which is what makes it readable: a\nlifecycle report with an empty plan and a status of nothing is a report of\nsomething that did not happen, and without this there is nowhere to say\nwhether that was a fault or the correct answer. A start at a login declines\nfor three reasons the operator would each act on differently — the stack was\nstopped on purpose, autostart was never asked for, or this machine is on its\nbattery and nobody said to start anyway — and a run nobody is watching has to\nleave the reason somewhere a reader finds later.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "plan": {
               "description": "What the named forms came to: the profiles, the services they hold, and\nwhat the configuration left out.\n\nThe resolved plan itself rather than a copy of its parts, because it is\nstated to the operator before the command runs and read out of the\nreport afterwards — two accounts of one run, and a second shape for it\nwould be a way for them to differ.",
               "$ref": "#/$defs/Plan"

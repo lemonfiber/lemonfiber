@@ -15,6 +15,7 @@
 //! See `.docs/architecture/module-layout.md`.
 
 pub mod acknowledged;
+pub mod autostart;
 pub mod bindings;
 pub mod credentials;
 pub mod environment;
@@ -449,12 +450,18 @@ fn timed_out(check: &dyn Check) -> Finding {
 
 /// Reduce findings to one word.
 ///
+/// Public as well as used here, because a caller that keeps only some of a run's
+/// findings has to be able to sum what it kept. Re-summing is the whole point: a
+/// verdict carried over from the run a finding was dropped from would be a word about
+/// findings that are no longer there.
+///
 /// Highest consequence wins, and it is never an average — one leaking VPN among
 /// eighteen passes is not eighteen-nineteenths healthy. An unverified finding
 /// keeps the answer out of `healthy`: a thing that could not be checked is not a
 /// thing that passed, and a run that established nothing is `unknown` rather than
 /// a comfortable green.
-fn overall(findings: &[Finding]) -> Overall {
+#[must_use]
+pub fn overall(findings: &[Finding]) -> Overall {
     let mut passed = false;
     let mut warned = false;
     let mut unverified = false;

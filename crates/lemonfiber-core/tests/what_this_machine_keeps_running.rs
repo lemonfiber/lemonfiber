@@ -63,17 +63,23 @@ fn standing(report: &HostingReport, name: &str) -> Option<Hosting> {
         .map(|command| command.standing)
 }
 
-/// Both of the long commands are on the reading, and neither is hosted until asked.
+/// Every command this machine can be asked to keep is on the reading, and none of
+/// them is hosted until asked.
 ///
 /// The count is asserted before the states, because `all` over an empty list is true
 /// and a reading that found nothing would otherwise pass every claim below it.
 #[tokio::test]
-async fn both_long_running_commands_are_on_the_reading_and_neither_starts_hosted() {
+async fn every_long_running_command_is_on_the_reading_and_none_starts_hosted() {
     let report = reading(&ctx(Fake::with(Manager::Launchd)), Keeping::Read).await;
 
-    assert_eq!(report.commands.len(), 2);
+    assert_eq!(report.commands.len(), 3);
     assert_eq!(standing(&report, "watch"), Some(Hosting::NotHosted));
     assert_eq!(standing(&report, "expiring"), Some(Hosting::NotHosted));
+    assert_eq!(
+        standing(&report, "boot"),
+        Some(Hosting::NotHosted),
+        "the start a restart of this machine should make is one of them"
+    );
     assert!(report
         .commands
         .iter()

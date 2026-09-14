@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 
 use crate::alert::{Appetite, Wants};
 use crate::app::reconfiguring::SETTINGS;
-use crate::autostart::Wanted;
+use crate::autostart::Returning;
 use crate::baseline::Baseline;
 use crate::config::paths::Paths;
 use crate::config::store::{self, is_secret};
@@ -216,10 +216,16 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
     // something. Its own record rather than an environment setting because Compose
     // has no use for it, and unanswered reads as declined — the direction that
     // starts nothing on a machine nobody asked to have started.
-    let wanted = Wanted::answered(wizard.answers().autostart.unwrap_or(false));
+    //
+    // Merged into whatever is already there rather than written over it, because the
+    // rest of that record is written by running the stack: which form was last up, and
+    // whether the last teardown was one the operator asked for. Setup run a second time
+    // over a machine that has been used must not take those with it.
+    let returning =
+        Returning::at(&paths.autostart()).answering(wizard.answers().autostart.unwrap_or(false));
     store::write(
         &paths.autostart(),
-        &serde_json::to_string(&wanted).unwrap_or_default(),
+        &serde_json::to_string(&returning).unwrap_or_default(),
     )
     .map_err(Fault::Store)?;
 
@@ -343,8 +349,9 @@ mod tests {
 
     use lemonfiber_fixtures::ports::Chance;
 
-    use super::{apply, Applying, Baseline, Wanted, SETTINGS};
+    use super::{apply, Applying, Baseline, SETTINGS};
     use crate::alert::{Appetite, Wants};
+    use crate::autostart::Wanted;
     use crate::config::paths::Paths;
     use crate::config::{store, Protocols};
     use crate::journal::{Change, Kind};
