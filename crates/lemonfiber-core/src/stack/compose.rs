@@ -195,6 +195,35 @@ mod tests {
             .map(|plan| build(&plan, settings, stack_dir(), action, Environment::MacOs).join(" "))
     }
 
+    /// A run aimed at another machine names it on the invocation, ahead of the
+    /// subcommand, where it is a global flag.
+    ///
+    /// The endpoint beats whatever the shell exported, which is the whole reason it
+    /// is named here rather than left to the environment: Compose is a subprocess and
+    /// would inherit one, and an inherited endpoint is a second opinion about which
+    /// machine this run is about. Everything else is the invocation a local run
+    /// builds, unchanged.
+    #[test]
+    fn a_run_aimed_elsewhere_names_the_machine_ahead_of_the_subcommand() {
+        let settings = Settings {
+            docker: crate::ports::docker::Target::at(
+                "ssh://media@nas.local",
+                crate::ports::docker::Origin::Variable,
+            ),
+            ..Settings::default()
+        };
+        assert_eq!(
+            line(&["library"], &Action::Up, &settings).as_deref(),
+            Some(concat!(
+                "docker --host ssh://media@nas.local compose ",
+                "--project-name lemonfiber ",
+                "--project-directory /opt/lemonfiber/stack ",
+                "--file /opt/lemonfiber/stack/compose.yml ",
+                "--profile media up --detach"
+            ))
+        );
+    }
+
     #[test]
     fn starts_a_form_detached_with_its_profiles() {
         assert_eq!(

@@ -163,11 +163,15 @@ impl Daemon {
     /// about the machine rather than about this stack: an image is shared exactly
     /// when something outside the project is built on it, and a list narrowed to the
     /// project could never report that.
-    async fn every_container(&self) -> Result<Vec<ContainerSummary>, Failure> {
+    ///
+    /// Handed the client rather than asking for one. Its only caller is already
+    /// holding it, and the connection is settled once and kept — so asking again
+    /// could only ever succeed, which would leave a refusal here that nothing can
+    /// reach and therefore nothing has ever checked.
+    async fn every_container(&self, docker: &Docker) -> Result<Vec<ContainerSummary>, Failure> {
         let options = ListContainersOptionsBuilder::default().all(true).build();
 
-        self.client()
-            .await?
+        docker
             .list_containers(Some(options))
             .await
             .map_err(|error| self.refused(&error))
@@ -177,14 +181,16 @@ impl Daemon {
 #[async_trait]
 impl Images for Daemon {
     async fn images(&self) -> Result<Vec<Image>, Failure> {
-        let listed = self
-            .client()
-            .await?
+        let docker = self.client().await?;
+        let listed = docker
             .list_images(None::<ListImagesOptions>)
             .await
             .map_err(|error| self.refused(&error))?;
 
-        Ok(images::correlate(listed, &self.every_container().await?))
+        Ok(images::correlate(
+            listed,
+            &self.every_container(docker).await?,
+        ))
     }
 }
 
@@ -371,9 +377,11 @@ async fn spoken(started: bollard::exec::StartExecResults) -> Result<String, Fail
 
 /// Everything a stream of exec output said, joined in the order it arrived.
 ///
-/// Takes the stream rather than the exec, because an attached exec needs a daemon and
-/// a stream does not — so what it does with a chunk, and with a chunk that will not
-/// arrive, is drivable here.
+/// Generic over the stream, which is worth knowing about when reading its tests: a
+/// generic is compiled once per type it is reached with, so a test handing it a
+/// stream of its own would exercise a copy of this loop that no run ever executes
+/// while the copy the product uses stayed unmeasured. The tests reach it through
+/// [`spoken`], the way an exec does, so there is one copy and it is the one measured.
 async fn gathered<S>(mut output: S) -> Result<String, Failure>
 where
     S: tokio_stream::Stream<Item = Result<bollard::container::LogOutput, bollard::errors::Error>>
@@ -388,8 +396,12 @@ where
 
 /// One sampling task per running container, feeding one channel.
 async fn sampling(daemon: &Daemon, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
-    let containers = daemon.containers(project).await?;
+    // The connection first, and what to ask it about second. The order is the whole
+    // of what makes both refusals reachable: the connection is settled once and kept,
+    // so reaching for it *after* a listing has already succeeded is a refusal nothing
+    // can produce — and one nothing can produce is one nothing has checked.
     let docker = daemon.client().await?.clone();
+    let containers = daemon.containers(project).await?;
     let (sender, receiver) = channel(BACKLOG);
 
     // A container that is not running is not using anything, and asking it
@@ -410,8 +422,10 @@ async fn read(
     services: &[String],
     query: LogQuery,
 ) -> Result<Receiver<LogLine>, Failure> {
-    let containers = daemon.containers(project).await?;
+    // The connection first, for the reason the sampling beside this one takes them in
+    // that order.
     let docker = daemon.client().await?.clone();
+    let containers = daemon.containers(project).await?;
     let (sender, receiver) = channel(BACKLOG);
 
     // Stopped services are included: their scrollback is usually the reason
@@ -481,7 +495,7 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
 
 #[cfg(test)]
 mod tests {
-    use super::{chained, connect, gathered, refused_exec, spoken, Failure};
+    use super::{chained, connect, refused_exec, spoken, Failure};
     use lemonfiber_ports::docker::{Origin, Target};
 
     /// An error with an optional cause, for driving a chain without a socket.
@@ -608,43 +622,45 @@ mod tests {
         assert_eq!(said.ok(), Some(String::new()));
     }
 
-    /// An attached exec is read through to the end, which is the arm that joins the two.
-    #[tokio::test]
-    async fn an_attached_exec_is_read_through_to_the_end() {
-        let output = Box::pin(tokio_stream::iter(vec![Ok(
-            bollard::container::LogOutput::StdOut {
-                message: "all of it\n".into(),
-            },
-        )]));
-        let said = spoken(bollard::exec::StartExecResults::Attached {
-            output,
+    /// What an exec attached to a stream of these chunks came to.
+    ///
+    /// Through the exec rather than through the loop underneath it, and that is the
+    /// point rather than a convenience: the loop is generic over the stream it reads,
+    /// so handing it a stream written here would compile a second copy of it and
+    /// measure that one instead of the one a run uses.
+    async fn attached(
+        chunks: Vec<Result<bollard::container::LogOutput, bollard::errors::Error>>,
+    ) -> Result<String, Failure> {
+        spoken(bollard::exec::StartExecResults::Attached {
+            output: Box::pin(tokio_stream::iter(chunks)),
             input: Box::pin(tokio::io::sink()),
         })
-        .await;
-        assert_eq!(said.ok(), Some("all of it\n".to_owned()));
+        .await
     }
 
-    /// What an attached exec said, and what a chunk that will not arrive costs.
-    ///
-    /// Driven through the stream rather than the exec, because an attached exec needs
-    /// a daemon and this needs only the chunks.
+    /// An attached exec is read through to the end, in the order it arrived.
     #[tokio::test]
     async fn every_chunk_an_exec_sent_is_gathered_in_order() {
-        let chunks = vec![
+        let said = attached(vec![
             Ok(bollard::container::LogOutput::StdOut {
                 message: "one\n".into(),
             }),
             Ok(bollard::container::LogOutput::StdErr {
                 message: "two\n".into(),
             }),
-        ];
-        let said = gathered(tokio_stream::iter(chunks)).await;
+        ])
+        .await;
         assert_eq!(said.ok(), Some("one\ntwo\n".to_owned()));
     }
 
+    /// And a chunk that will not arrive ends it, rather than being passed over.
+    ///
+    /// What was gathered up to that point is discarded with it. Half an exec's output
+    /// reported as the whole of it is the one answer worse than none: the leak check
+    /// compares two of these, and a truncated address compares unequal to itself.
     #[tokio::test]
     async fn a_chunk_that_will_not_arrive_ends_the_gathering() {
-        let chunks = vec![
+        let said = attached(vec![
             Ok(bollard::container::LogOutput::StdOut {
                 message: "some of it\n".into(),
             }),
@@ -652,7 +668,8 @@ mod tests {
                 status_code: 500,
                 message: "the stream stopped".to_owned(),
             }),
-        ];
-        assert!(gathered(tokio_stream::iter(chunks)).await.is_err());
+        ])
+        .await;
+        assert!(said.is_err());
     }
 }

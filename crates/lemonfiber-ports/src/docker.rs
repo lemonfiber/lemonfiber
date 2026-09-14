@@ -616,6 +616,39 @@ mod tests {
         );
     }
 
+    /// A context this machine has no record of is refused, not quietly answered.
+    ///
+    /// The fall back nothing here makes is the one the client library makes on its
+    /// own: a name it does not know becomes the local daemon. An operator who
+    /// mistyped the server would then be told about their laptop, in words that read
+    /// exactly like the answer they asked for.
+    #[test]
+    fn a_context_this_machine_has_no_record_of_is_refused_rather_than_answered() {
+        let refusal = Failure::NoSuchContext {
+            name: "nas".to_owned(),
+        };
+
+        assert!(
+            refusal.to_string().contains("nas"),
+            "the name that was asked for is the one thing worth saying back"
+        );
+
+        let problem = refusal.problem();
+        assert_eq!(problem.code, super::UNKNOWN_CONTEXT);
+        assert!(
+            problem.meaning.contains("Nothing was read"),
+            "the operator is told the machine is as they left it"
+        );
+        assert_eq!(
+            problem
+                .remedies
+                .first()
+                .and_then(|remedy| remedy.detail.clone()),
+            Some("docker context ls".to_owned()),
+            "and given the command that lists the names it does have"
+        );
+    }
+
     /// An endpoint nothing here can drive is refused rather than half-driven.
     ///
     /// Reading one machine and writing to another is the failure this whole seam

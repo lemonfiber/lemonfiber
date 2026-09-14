@@ -78,19 +78,26 @@ Its whole job is to speak a wire protocol, so a fake implementing `Engine` would
 prove only that the fake works — the trait boundary sits *below* the code under
 test.
 
-So the **daemon** is what gets replaced. `crates/lemonfiber-core/tests/engine.rs`
+So the **daemon** is what gets replaced. `crates/lemonfiber-adapters/tests/fake/`
 carries a socket that answers the Engine API with whatever a test wants to say,
 which drives the connection, the request, the decoding and the mapping in one
 pass. It needs no Docker installed, which matters: a test that required a real
 daemon would make the coverage gate depend on what happens to be running.
 
-It answers three shapes:
+It is a module of its own rather than one inside the file that first needed it,
+because two binaries drive the adapter — `tests/engine.rs` for listings and
+streams, `tests/exec.rs` for running a command inside a container — and two
+engines that were meant to answer the same way are two engines that will
+eventually not.
+
+It answers four shapes:
 
 | Shape | Used by |
 |-------|---------|
 | A JSON body under a status code | `list`, `stats`, exec creation and inspection |
 | Docker's multiplexed framing — eight-byte header, then payload | `logs` |
 | The same framing behind a `101` protocol upgrade | `exec` output |
+| The same upgrade, with one frame promising more than it delivers | a stream cut mid-chunk |
 
 It lives in `tests/` rather than `src/` because it is scaffolding rather than
 product, and because scaffolding held to full line coverage grows tests about

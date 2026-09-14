@@ -11,236 +11,11 @@
 //! rather than product, and because scaffolding that must itself reach full
 //! line coverage grows tests about the scaffolding.
 
+#[cfg(unix)]
+mod fake;
+
 use lemonfiber_adapters::Daemon;
 use lemonfiber_ports::docker::{Engine as _, Failure, Health, Images as _, Lifecycle, LogQuery};
-
-/// An engine of our own, answering only what the adapter asks.
-///
-/// Deliberately not a general Docker implementation: it serves the handful of
-/// routes this adapter uses and 404s the rest, because a fake that grew to
-/// cover the whole API would need tests of its own.
-#[cfg(unix)]
-mod fake {
-    use std::path::PathBuf;
-
-    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    use tokio::net::{UnixListener, UnixStream};
-    use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-    use tokio::sync::oneshot::{channel, Receiver, Sender};
-    use tokio::task::JoinHandle;
-
-    /// What the engine says when a route is asked for.
-    #[derive(Debug, Clone)]
-    pub enum Reply {
-        /// A complete body, under a status code.
-        Body(u16, String),
-        /// Docker's multiplexed stream framing, as logs arrive in.
-        Multiplexed(Vec<(u8, String)>),
-        /// The same framing, behind the protocol upgrade `exec` performs.
-        Upgraded(Vec<(u8, String)>),
-    }
-
-    /// The API version this engine claims, which is deliberately not the one
-    /// the adapter was compiled against — so a test can prove the two were
-    /// reconciled rather than assumed.
-    pub const CLAIMED_VERSION: &str = "1.44";
-
-    /// One multiplexed frame: stream number, length, payload.
-    fn frame(stream: u8, text: &str) -> Vec<u8> {
-        let length = u32::try_from(text.len()).unwrap_or_default();
-        let mut out = vec![stream, 0, 0, 0];
-        out.extend_from_slice(&length.to_be_bytes());
-        out.extend_from_slice(text.as_bytes());
-        out
-    }
-
-    /// Everything a reply puts on the wire, headers included.
-    fn rendered(reply: &Reply) -> Vec<u8> {
-        match reply {
-            Reply::Body(status, body) => {
-                let head = format!(
-                    "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\n\
-                     Content-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
-                );
-                let mut out = head.into_bytes();
-                out.extend_from_slice(body.as_bytes());
-                out
-            }
-            Reply::Multiplexed(frames) => {
-                let body: Vec<u8> = frames
-                    .iter()
-                    .flat_map(|(stream, text)| frame(*stream, text))
-                    .collect();
-                let head = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.docker.multiplexed-stream\r\n\
-                     Content-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
-                );
-                let mut out = head.into_bytes();
-                out.extend_from_slice(&body);
-                out
-            }
-            // An upgraded response has no length: the body is whatever arrives
-            // until the connection closes, which is the point of upgrading.
-            Reply::Upgraded(frames) => {
-                let head = "HTTP/1.1 101 UPGRADED\r\nContent-Type: \
-                            application/vnd.docker.multiplexed-stream\r\n\
-                            Connection: Upgrade\r\nUpgrade: tcp\r\n\r\n";
-                let mut out = head.as_bytes().to_vec();
-                for (stream, text) in frames {
-                    out.extend_from_slice(&frame(*stream, text));
-                }
-                out
-            }
-        }
-    }
-
-    /// Read one request, far enough to know what was asked for.
-    ///
-    /// Bodies are read and discarded rather than ignored: a server that answers
-    /// before the client has finished sending leaves the client writing into a
-    /// closed socket, which surfaces as a transport error in a test that was
-    /// about something else entirely.
-    async fn request(socket: &mut UnixStream) -> Option<String> {
-        let mut received = Vec::new();
-        let mut byte = [0_u8; 1];
-        while !received.ends_with(b"\r\n\r\n") && socket.read(&mut byte).await.ok()? != 0 {
-            received.push(byte[0]);
-        }
-
-        // Matched without regard to case, because header names are
-        // case-insensitive and the client that will actually call this sends
-        // them in lower case. Matching the spelling in the specification
-        // instead is a body silently never read.
-        let head = String::from_utf8_lossy(&received).into_owned();
-        let length: usize = head
-            .lines()
-            .filter_map(|line| line.split_once(':'))
-            .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
-            .and_then(|(_, value)| value.trim().parse().ok())
-            .unwrap_or_default();
-        if length > 0 {
-            let mut body = vec![0_u8; length];
-            socket.read_exact(&mut body).await.ok()?;
-        }
-
-        head.lines()
-            .next()
-            .and_then(|line| line.split_whitespace().nth(1))
-            .map(ToOwned::to_owned)
-    }
-
-    /// An engine listening on a socket of its own.
-    pub struct Engine {
-        /// Where it is listening.
-        pub socket: PathBuf,
-        asked: UnboundedReceiver<String>,
-        stopping: Option<Sender<()>>,
-        serving: Option<JoinHandle<()>>,
-    }
-
-    impl Engine {
-        /// Every route this engine was asked for, in order.
-        pub fn asked_for(&mut self) -> Vec<String> {
-            let mut seen = Vec::new();
-            while let Ok(path) = self.asked.try_recv() {
-                seen.push(path);
-            }
-            seen
-        }
-
-        /// Stop answering, and wait until it has actually stopped.
-        ///
-        /// Tests end by calling this rather than by walking away, so a socket
-        /// is never still being served while the next test binds its own.
-        pub async fn stop(mut self) {
-            if let Some(stopping) = self.stopping.take() {
-                let _ = stopping.send(());
-            }
-            if let Some(serving) = self.serving.take() {
-                let _ = serving.await;
-            }
-        }
-    }
-
-    impl Drop for Engine {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_file(&self.socket);
-        }
-    }
-
-    /// Start an engine answering `routes`, matched as substrings of the path.
-    ///
-    /// The version route is always present, because the adapter settles the API
-    /// version before it asks anything else and every test would otherwise have
-    /// to declare that route itself.
-    pub fn engine(name: &str, routes: Vec<(&'static str, Reply)>) -> Engine {
-        // Not the platform's temporary directory: a Unix socket path is capped
-        // near a hundred characters, and macOS puts per-user temporaries deep
-        // enough to exceed it.
-        let socket = PathBuf::from(format!("/tmp/lf-{}-{name}.sock", std::process::id()));
-        let _ = std::fs::remove_file(&socket);
-
-        let version = format!(r#"{{"ApiVersion":"{CLAIMED_VERSION}","Version":"29.4.0"}}"#);
-        let mut table: Vec<(String, Reply)> =
-            vec![("/version".to_owned(), Reply::Body(200, version))];
-        table.extend(
-            routes
-                .into_iter()
-                .map(|(path, reply)| (path.to_owned(), reply)),
-        );
-
-        let (asked, receiver) = unbounded_channel();
-        let (stopping, stopped) = channel();
-        let serving = UnixListener::bind(&socket)
-            .ok()
-            .map(|listener| tokio::spawn(answer(listener, table, asked, stopped)));
-
-        Engine {
-            socket,
-            asked: receiver,
-            stopping: Some(stopping),
-            serving,
-        }
-    }
-
-    /// Answer requests until asked to stop.
-    async fn answer(
-        listener: UnixListener,
-        table: Vec<(String, Reply)>,
-        asked: UnboundedSender<String>,
-        mut stopped: Receiver<()>,
-    ) {
-        loop {
-            tokio::select! {
-                Ok((mut socket, _)) = listener.accept() => {
-                    let table = table.clone();
-                    let asked = asked.clone();
-                    tokio::spawn(async move {
-                        if let Some(path) = request(&mut socket).await {
-                            let _ = asked.send(path.clone());
-
-                            let found = table
-                                .iter()
-                                .find(|(route, _)| path.contains(route.as_str()))
-                                .map(|(_, reply)| reply.clone());
-                            let reply = found.unwrap_or(Reply::Body(
-                                404,
-                                r#"{"message":"no such route in this engine"}"#.to_owned(),
-                            ));
-
-                            let _ = socket.write_all(&rendered(&reply)).await;
-                            let _ = socket.flush().await;
-                            let _ = socket.shutdown().await;
-                        }
-                    });
-                }
-                _ = &mut stopped => break,
-            }
-        }
-    }
-}
 
 /// Two containers as a listing, one running and one that fell over.
 #[cfg(unix)]
@@ -707,15 +482,35 @@ async fn a_sampler_nobody_is_reading_stops_as_well() {
 
 #[tokio::test]
 async fn resource_use_cannot_be_sampled_from_an_engine_that_is_not_there() {
-    // Sampling starts by finding the containers, so an absent engine refuses
-    // here as surely as it refuses a listing — a dashboard must be told the
-    // telemetry is gone rather than shown a panel that never fills in.
+    // Sampling reaches for the connection before it asks anything over it, so an
+    // absent engine refuses here as surely as it refuses a listing — a dashboard
+    // must be told the telemetry is gone rather than shown a panel that never
+    // fills in.
     let nowhere = std::path::PathBuf::from("/tmp/lemonfiber-no-such-engine.sock");
     let outcome = Daemon::at(&nowhere).stats("lemonfiber").await;
     assert!(
         matches!(outcome, Err(Failure::Unreachable { .. })),
         "{:?}",
         outcome.err()
+    );
+}
+
+/// A log viewer is told the engine is down rather than shown an empty scrollback.
+///
+/// The same reach as the sampling above it, and the same reason: an operator who
+/// opened the logs because something is wrong would read emptiness as the service
+/// having written nothing, which is the opposite of what happened.
+#[tokio::test]
+async fn output_cannot_be_followed_from_an_engine_that_is_not_there() {
+    let nowhere = std::path::PathBuf::from("/tmp/lemonfiber-no-such-engine.sock");
+
+    let outcome = Daemon::at(&nowhere)
+        .logs("lemonfiber", &[], LogQuery::recent(10))
+        .await;
+
+    assert!(
+        matches!(outcome, Err(Failure::Unreachable { .. })),
+        "an engine that is not there has no scrollback to be empty"
     );
 }
 
@@ -759,54 +554,84 @@ async fn naming_services_opens_no_stream_for_the_ones_nobody_asked_about() {
     engine.stop().await;
 }
 
+/// A socket path that is not a socket is reported, not dialled.
+///
+/// The client library checks only that the path exists, so a plain file there gets
+/// past it and fails on the first request — which is the connection failing, not a
+/// route. An operator who pointed `DOCKER_HOST` at the wrong thing gets a refusal
+/// rather than a decoding error about a reply that never came.
 #[cfg(unix)]
 #[tokio::test]
-async fn a_command_run_inside_a_container_reports_what_it_wrote() {
+async fn a_path_that_exists_and_is_not_a_socket_is_refused_at_the_connection() {
+    let path = std::path::PathBuf::from(format!("/tmp/lf-{}-not-a-socket", std::process::id()));
+    let _ = std::fs::write(&path, "this is a file");
+
+    let refused = Daemon::at(&path).list("lemonfiber").await;
+
+    let _ = std::fs::remove_file(&path);
+    assert!(
+        matches!(refused, Err(Failure::Unreachable { .. })),
+        "a path that is not a socket is the engine being unreachable"
+    );
+}
+
+/// An engine that lists its images and will not say what is running refuses.
+///
+/// The two answers are joined to decide whether removing an image takes something
+/// outside this project with it, so half of it is not a smaller answer — it is the
+/// wrong one. An operator shown images with nothing standing on them would remove
+/// the lot.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_engine_that_will_not_say_what_is_running_refuses_the_image_listing() {
     let engine = fake::engine(
-        "exec",
+        "images-half",
         vec![
+            ("images/json", fake::Reply::Body(200, IMAGES.to_owned())),
             (
-                "/exec/e1/start",
-                fake::Reply::Upgraded(vec![(1, "203.0.113.7\n".to_owned())]),
+                "containers/json",
+                fake::Reply::Body(500, r#"{"message":"database is locked"}"#.to_owned()),
             ),
-            (
-                "/exec/e1/json",
-                fake::Reply::Body(200, r#"{"ExitCode":0}"#.to_owned()),
-            ),
-            ("/exec", fake::Reply::Body(201, r#"{"Id":"e1"}"#.to_owned())),
         ],
     );
 
-    let argv = ["curl", "-s", "https://ifconfig.me"].map(str::to_owned);
-    let ran = Daemon::at(&engine.socket).exec("gluetun", &argv).await;
+    let refused = Daemon::at(&engine.socket).images().await;
 
-    assert_eq!(
-        ran.ok().map(|output| (output.status, output.stdout)),
-        Some((Some(0), "203.0.113.7\n".to_owned())),
-        "this is the shape the leak test compares two of"
+    assert!(
+        matches!(refused, Err(Failure::Unreachable { .. })),
+        "half the join is not a listing"
     );
     engine.stop().await;
 }
 
+/// An engine that will not say what is running opens no streams either.
+///
+/// Both stream readers start by asking which containers there are, and a dashboard
+/// told nothing is running would show nineteen empty panels rather than a fault.
+/// Driven through one daemon, because the connection is settled once and what fails
+/// here is the question asked over it.
 #[cfg(unix)]
 #[tokio::test]
-async fn a_command_aimed_at_a_container_that_is_not_there_says_which() {
+async fn an_engine_that_will_not_say_what_is_running_opens_no_streams() {
     let engine = fake::engine(
-        "no-container",
+        "streams-refused",
         vec![(
-            "/exec",
-            fake::Reply::Body(
-                404,
-                r#"{"message":"No such container: gluetun"}"#.to_owned(),
-            ),
+            "containers/json",
+            fake::Reply::Body(500, r#"{"message":"database is locked"}"#.to_owned()),
         )],
     );
+    let daemon = Daemon::at(&engine.socket);
 
-    let argv = ["true".to_owned()];
-    let outcome = Daemon::at(&engine.socket).exec("gluetun", &argv).await;
+    let sampled = daemon.stats("lemonfiber").await;
+    let followed = daemon.logs("lemonfiber", &[], LogQuery::recent(10)).await;
+
     assert!(
-        matches!(&outcome, Err(Failure::NoSuchContainer { name }) if name == "gluetun"),
-        "{outcome:?}"
+        matches!(sampled, Err(Failure::Unreachable { .. })),
+        "telemetry gone is a thing to say, not a panel that never fills in"
+    );
+    assert!(
+        matches!(followed, Err(Failure::Unreachable { .. })),
+        "and so is a log viewer with nothing in it"
     );
     engine.stop().await;
 }

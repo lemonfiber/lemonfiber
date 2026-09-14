@@ -42,42 +42,114 @@ pub(crate) fn settle(target: &Target) {
     if crate::say::for_a_parser() || ANNOUNCED.set(()).is_err() {
         return;
     }
-    say!("This run is aimed at {host}, not at this machine.");
-    match target.context() {
-        Some(name) => say!("A Docker context named {name} is in force."),
-        None => say!("DOCKER_HOST names it."),
+    for line in said(&host, target.context()) {
+        say!("{line}");
     }
-    say!();
+}
+
+/// What a run aimed at another machine says about it, before it does anything.
+///
+/// Built rather than printed, which is this module's whole convention: a renderer
+/// hands its lines back and one printer at the edge puts them on a terminal, so what
+/// an operator reads is a value a test can assert on rather than a side effect it
+/// can only watch happen.
+///
+/// Two sentences and a gap. The first is the one that matters and says the machine;
+/// the second says how the run came to be aimed there, because a variable is
+/// something an operator can see in their shell and a context recorded months ago is
+/// not, and the two are fixed in different places.
+fn said(host: &str, context: Option<&str>) -> Vec<String> {
+    let how = match context {
+        Some(name) => format!("A Docker context named {name} is in force."),
+        None => "DOCKER_HOST names it.".to_owned(),
+    };
+    vec![
+        format!("This run is aimed at {host}, not at this machine."),
+        how,
+        String::new(),
+    ]
 }
 
 #[cfg(test)]
 mod tests {
+    use super::said;
     use lemonfiber_core::ports::docker::{Origin, Target};
 
-    /// A local run says nothing and settles nothing, which is what lets every other
-    /// test in this binary run without one of them deciding for the rest.
+    /// A run against this machine has nothing to say, and nothing is what it says.
     ///
-    /// The value it settles is deliberately the default one. This is a latch for the
-    /// whole process, and a test that put a host in it would put that host on every
-    /// envelope every other test here renders.
+    /// Driven through the door rather than around it, because the claim is about the
+    /// door: a local run reaches it and leaves without printing. What it settles is
+    /// deliberately the ordinary value — this is a latch for the whole process, and
+    /// the tests run one to a process, but a test that put a host in it here would
+    /// still be the wrong test to write.
     #[test]
     fn a_run_against_this_machine_has_nothing_to_say() {
+        assert_eq!(Target::local().host(), None, "there is nothing to mistake");
         super::settle(&Target::local());
-        assert_eq!(lemonfiber_core::model::settle_host(None), None);
     }
 
-    /// What is shown is what may be shown: the endpoint with anything a credential
-    /// rides in taken out of it.
+    /// A run aimed elsewhere says so, once.
+    ///
+    /// Twice on purpose. The sentence belongs to the run rather than to whoever built
+    /// a context, so a second context in one process is the same run — and hearing it
+    /// again reads as two commands about two machines. Run rather than read back:
+    /// what a door puts where is the architecture test's to guard, and reading this
+    /// process's own stream would be a harness rather than a test.
     #[test]
-    fn what_would_be_said_carries_no_credential() {
+    fn a_run_aimed_elsewhere_says_so_once_and_not_twice() {
+        let there = Target::at("ssh://media@nas.local", Origin::Variable);
+
+        super::settle(&there);
+        super::settle(&there);
+    }
+
+    /// Both halves of what is said, and both ways a run came to be aimed.
+    ///
+    /// The host is the half that matters, and it is first for that reason. How it was
+    /// chosen is the half that tells an operator where to go and undo it, and the two
+    /// answers point at different places.
+    #[test]
+    fn what_is_said_names_the_machine_and_how_the_run_came_to_be_aimed_there() {
+        let by_variable = said("ssh://media@nas.local", None);
+        assert_eq!(
+            by_variable.first().map(String::as_str),
+            Some("This run is aimed at ssh://media@nas.local, not at this machine.")
+        );
+        assert_eq!(
+            by_variable.get(1).map(String::as_str),
+            Some("DOCKER_HOST names it.")
+        );
+        assert_eq!(
+            by_variable.last().map(String::as_str),
+            Some(""),
+            "a gap under it, so the command's own output is not run into"
+        );
+
+        let by_context = said("tcp://nas.local:2375", Some("nas"));
+        assert_eq!(
+            by_context.get(1).map(String::as_str),
+            Some("A Docker context named nas is in force.")
+        );
+    }
+
+    /// What is said is what may be said: the endpoint with anything a credential
+    /// rides in taken out of it.
+    ///
+    /// Asserted on the lines themselves rather than on the endpoint alone, because
+    /// the lines are what reaches a terminal — and a withholding that happened one
+    /// step earlier is only useful if nothing after it puts the value back.
+    #[test]
+    fn nothing_said_at_the_top_carries_a_credential() {
         let carried = Target::at("ssh://media:hunter2@nas.local", Origin::Variable);
         let shown = carried.host().unwrap_or_default();
+        let lines = said(&shown, carried.context());
+
         assert!(
-            !shown.contains("hunter2"),
-            "the password survived into what is said at the top"
+            !lines.iter().any(|line| line.contains("hunter2")),
+            "a password reached the line printed under every command"
         );
         assert!(
-            shown.contains("nas.local"),
+            lines.iter().any(|line| line.contains("nas.local")),
             "the host went with the password, leaving nothing to read"
         );
     }
