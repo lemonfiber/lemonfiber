@@ -123,7 +123,7 @@ pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
 pub const REGISTRY_REFUSED: Code = Code::new("LIFE-4");
 
 /// Raised when the stack's own location is not on the machine being operated.
-pub const ABSENT_THERE: Code = Code::new("LIFE-5");
+pub const ABSENT_THERE: Code = Code::new("LIFE-6");
 
 /// Ask the engine to act on a set of services, which three commands do identically.
 ///

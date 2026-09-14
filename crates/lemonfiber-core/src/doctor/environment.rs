@@ -32,7 +32,7 @@ pub const DAEMON_DOWN: Code = Code::new("ENV-2");
 pub const COMPOSE_UNUSABLE: Code = Code::new("ENV-3");
 
 /// Raised when this machine and the daemon speak different Docker API generations.
-pub const API_MISMATCH: Code = Code::new("ENV-4");
+pub const API_MISMATCH: Code = Code::new("ENV-5");
 
 /// The oldest Compose the driver is willing to build against.
 ///

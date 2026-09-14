@@ -50,6 +50,7 @@ what to do about it, is written for operators at
 - `ENV-2`
 - `ENV-3`
 - `ENV-4`
+- `ENV-5`
 - `FORM-1`
 - `FORM-2`
 - `FORM-3`
@@ -77,6 +78,7 @@ what to do about it, is written for operators at
 - `LIFE-3`
 - `LIFE-4`
 - `LIFE-5`
+- `LIFE-6`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`
