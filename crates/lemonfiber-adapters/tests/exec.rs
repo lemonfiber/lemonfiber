@@ -116,21 +116,42 @@ async fn an_exec_whose_outcome_cannot_be_read_is_refused() {
     engine.stop().await;
 }
 
-/// An exec whose stream is cut reports the break rather than half its output.
+/// An exec whose stream was cut is not reported as a clean answer.
 ///
-/// This is the one that matters most of the three. The leak check runs the same
-/// command in two namespaces and compares what each said, so a truncated address
-/// reported as a whole one compares unequal to itself — and the check would call a
-/// working tunnel a leak.
+/// This is the one that matters most of the three, and what it guards is narrower
+/// than "an error comes back". The client library hands up whatever arrived when a
+/// frame promised more than it delivered: it reads the length off the header, the
+/// connection ends before the payload does, and what reaches this adapter is the
+/// fragment with nothing marking it as one. That is worth knowing rather than
+/// wishing away — the framing is not what stands between a truncated address and
+/// the leak check believing it.
+///
+/// The exit status is. The leak check accepts an address only from a command that
+/// also exited zero, and a stream cut mid-frame cannot come with one: either the
+/// connection is gone, and the inspection that follows fails with it — that is the
+/// test above this one — or the container died mid-write, which is what this engine
+/// says. So the fragment arrives, and it arrives marked as the remains of a run that
+/// did not finish, which is what turns it into `Reach::Blocked` rather than into an
+/// address the operator is told their traffic is leaving by.
+///
+/// The inspection route is named before the creation route on purpose. The fake
+/// matches a path by substring in the order it was given, and `/exec` is a prefix of
+/// `/exec/e1/json` — so a test that leaves the inspection out does not get a 404 for
+/// it, it gets the creation reply and an exit status of nothing, which would pass
+/// this for a reason that has nothing to do with the cut.
 #[cfg(unix)]
 #[tokio::test]
-async fn an_exec_whose_stream_is_cut_reports_the_break_rather_than_half_its_output() {
+async fn an_exec_whose_stream_was_cut_is_not_reported_as_a_clean_answer() {
     let engine = fake::engine(
         "exec-cut",
         vec![
             (
                 "/exec/e1/start",
                 fake::Reply::Cut(1, "203.0.113.7\n".to_owned()),
+            ),
+            (
+                "/exec/e1/json",
+                fake::Reply::Body(200, r#"{"ExitCode":137}"#.to_owned()),
             ),
             ("/exec", fake::Reply::Body(201, r#"{"Id":"e1"}"#.to_owned())),
         ],
@@ -139,9 +160,11 @@ async fn an_exec_whose_stream_is_cut_reports_the_break_rather_than_half_its_outp
     let argv = ["true".to_owned()];
     let cut = Daemon::at(&engine.socket).exec("gluetun", &argv).await;
 
+    let clean = matches!(&cut, Ok(output) if output.status == Some(0));
     assert!(
-        cut.is_err(),
-        "half an address reported as a whole one is what makes the leak check lie"
+        !clean,
+        "half an address reported as a whole one is what would make the leak check \
+         lie, and the status is the only thing that says it is half: {cut:?}"
     );
     engine.stop().await;
 }
