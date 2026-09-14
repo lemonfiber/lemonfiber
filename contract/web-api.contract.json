@@ -1604,6 +1604,13 @@
           "description": "The payload.",
           "$ref": "#/$defs/CatalogueReport"
         },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "description": "Which payload this is, so a consumer can branch before parsing `data`.",
           "type": "string"
