@@ -138,7 +138,10 @@ fn declared(line: &str) -> Option<(&str, &str)> {
 /// paragraph and the number is one line.
 fn documentation_above(lines: &[&str], at: usize) -> String {
     let mut doc = Vec::new();
-    for above in lines[..at].iter().rev() {
+    // `get` rather than a range index: the workspace denies slicing, and a caller
+    // handing an index past the end would take the whole test binary down with it
+    // rather than reporting a claim it could not read.
+    for above in lines.get(..at).unwrap_or_default().iter().rev() {
         let trimmed = above.trim_start();
         if trimmed.starts_with("///") {
             doc.push(trimmed.trim_start_matches('/').trim().to_lowercase());
