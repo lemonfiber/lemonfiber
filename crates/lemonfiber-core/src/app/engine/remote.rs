@@ -100,7 +100,6 @@ pub(crate) async fn verified(ctx: &Ctx) -> Result<(), Box<Problem>> {
 }
 
 /// What asking the other machine about the location came to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Verdict {
     /// The machine has it, and the asking was shown to work.
     There,

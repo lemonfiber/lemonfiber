@@ -981,6 +981,35 @@ async fn a_path_the_machine_has_not_got_is_told_from_one_it_has() {
     }
 }
 
+/// A daemon that made the container is one that no longer knows what it measured.
+///
+/// It cannot happen: the request names an image identified by a digest of all
+/// zeroes, which is not the digest of anything. But "cannot happen" is a claim about
+/// today's daemon, and the answer if it ever did is the one thing this must never
+/// say — that the path is there. A creation that succeeded proves the mount was not
+/// what the refusal was about, and therefore proves nothing.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_daemon_that_somehow_made_the_container_has_told_us_nothing() {
+    use lemonfiber_ports::docker::{Locations as _, Presence};
+    use std::path::Path;
+
+    let engine = fake::engine(
+        "created",
+        vec![(
+            "containers/create",
+            fake::Reply::Body(201, r#"{"Id":"made-one","Warnings":[]}"#.to_owned()),
+        )],
+    );
+
+    let answer = Daemon::at(&engine.socket)
+        .located(Path::new("/srv/media"))
+        .await;
+
+    assert_eq!(answer.ok(), Some(Presence::Unknown));
+    engine.stop().await;
+}
+
 /// A machine that never answered said nothing about the path.
 ///
 /// Kept apart from the three answers above because it is a different kind of fact:
