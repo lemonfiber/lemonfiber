@@ -5,7 +5,8 @@
 
 use lemonfiber_core::docker::{Condition, Service, State, Undeclared};
 use lemonfiber_core::model::{
-    LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched, Vigil,
+    ConflictReport, LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
+    UnsupportedReport, Vigil,
 };
 use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Plan, Protocol};
@@ -230,6 +231,40 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
         ));
         lines.block(&edit.diff);
     }
+
+    lines.extend(clashes(&report.port_conflicts));
+    lines
+}
+
+/// Host ports something else on this machine already answers on.
+///
+/// Said whether the start went ahead or not, and said as a fact rather than as a
+/// refusal: sharing a port on purpose is the operator's business. What it buys is
+/// that an operator meeting a bind failure is told who is holding the port instead
+/// of going and finding out — and, on a rehearsal, is told before anything runs.
+///
+/// The holder is named rather than described in the opening line, because it can be
+/// another Compose project or it can be a program the operator started themselves,
+/// and an opening line that named one of those would be wrong about the other.
+fn clashes(conflicts: &[ConflictReport]) -> Lines {
+    let mut lines = Lines::default();
+    if conflicts.is_empty() {
+        return lines;
+    }
+    lines.spaced(
+        "Something on this machine already answers on these ports, so these services \
+         will not be able to bind:",
+    );
+    for clash in conflicts {
+        lines.put(format!(
+            "  {} wants {}, held by {}",
+            clash.wanted_by, clash.port, clash.held_by
+        ));
+    }
+    lines.spaced(
+        "Move them with `lemonfiber migrate beside`, which writes a Compose file of \
+         ports nothing else is using, or change the ports yourself.",
+    );
     lines
 }
 
@@ -239,6 +274,7 @@ pub(super) fn status(report: &StatusReport) -> Lines {
     lines.put(describe(report.condition));
     lines.extend(show(&report.services));
     lines.extend(strangers(&report.undeclared));
+    lines.extend(unsupported(&report.unsupported));
     lines
 }
 
@@ -275,6 +311,29 @@ fn strangers(undeclared: &[Undeclared]) -> Lines {
             worded(one.state),
             one.describes
         ));
+    }
+    lines
+}
+
+/// The services lemonfiber runs and cannot speak to, under the states of the ones it
+/// can.
+///
+/// Below rather than beside, and absent entirely on a stack where there are none —
+/// which is every stack this build ships. What it says is deliberately not a fault:
+/// these services are up, and every generic thing works on them. What is missing is
+/// the part that needs to know which service it is talking to, and the operator who
+/// wrote the declaration is the only person who can complete it.
+fn unsupported(reports: &[UnsupportedReport]) -> Lines {
+    let mut lines = Lines::default();
+    if reports.is_empty() {
+        return lines;
+    }
+    lines.spaced(
+        "These run and are yours to start, stop and watch like any other. What \
+         lemonfiber cannot do is anything that needs to know what they are:",
+    );
+    for report in reports {
+        lines.put(format!("  {} — {}", report.what, report.because));
     }
     lines
 }
@@ -486,6 +545,33 @@ mod tests {
         assert!(text.contains("sonarr"));
         assert!(text.contains("kept compose.yml as it is on disk"));
         assert!(text.contains("-a"));
+    }
+
+    /// Told before the bind fails, and told as a fact rather than a refusal.
+    #[test]
+    fn a_port_something_else_holds_is_named_on_both_sides_before_the_start() {
+        let report = LifecycleReport {
+            rehearsed: true,
+            port_conflicts: vec![ConflictReport {
+                port: 8989,
+                wanted_by: "sonarr".to_owned(),
+                held_by: "somebody-elses/sonarr".to_owned(),
+            }],
+            ..a_lifecycle("up", a_plan("media", Vec::new()))
+        };
+        let text = lifecycle(&report).text();
+        assert!(
+            text.contains("sonarr wants 8989, held by somebody-elses/sonarr"),
+            "{text}"
+        );
+        assert!(text.contains("migrate beside"), "{text}");
+    }
+
+    /// And a machine running one stack hears nothing about it.
+    #[test]
+    fn a_start_with_nothing_in_its_way_says_nothing_about_ports() {
+        let report = a_lifecycle("up", a_plan("media", Vec::new()));
+        assert!(!lifecycle(&report).text().contains("already answers on"));
     }
 
     #[test]
@@ -774,6 +860,7 @@ mod tests {
             undeclared: Vec::new(),
             services: vec![service("sonarr", State::Unhealthy, None)],
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            unsupported: Vec::new(),
         };
         let text = status(&report).text();
         assert!(text.starts_with("running, and something needs attention"));
@@ -847,6 +934,7 @@ mod tests {
             }],
             services: vec![service("sonarr", State::Absent, None)],
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            unsupported: Vec::new(),
         };
         let text = status(&report).text();
 
@@ -879,6 +967,7 @@ mod tests {
             }],
             services: vec![service("sonarr", State::Absent, None)],
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            unsupported: Vec::new(),
         };
         let text = status(&report).text();
 
@@ -900,9 +989,48 @@ mod tests {
             undeclared: Vec::new(),
             services: vec![service("sonarr", State::Absent, None)],
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            unsupported: Vec::new(),
         };
 
         assert!(!status(&report).text().contains("does not declare"));
+    }
+
+    /// A stack the operator maintains, carrying a declaration lemonfiber cannot reach.
+    #[test]
+    fn a_service_lemonfiber_cannot_speak_to_is_named_with_why_and_is_not_a_fault() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            condition: Condition::Active,
+            services: vec![service("theirs", State::Healthy, None)],
+            unsupported: vec![UnsupportedReport {
+                what: "theirs".to_owned(),
+                because: "it declares an API of the Servarr shape and no port to publish"
+                    .to_owned(),
+            }],
+            undeclared: Vec::new(),
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        };
+        let text = status(&report).text();
+        assert!(text.contains("needs to know what they are"), "{text}");
+        assert!(text.contains("theirs — it declares an API"), "{text}");
+        // Still up, and still reported as up: what is unsupported is a feature, not
+        // the service.
+        assert!(text.contains("everything is up"), "{text}");
+    }
+
+    /// And nothing is said at all where there is nothing to say, which is every stack
+    /// this build ships.
+    #[test]
+    fn a_stack_with_nothing_unsupported_says_nothing_about_it() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            condition: Condition::Active,
+            services: vec![service("sonarr", State::Healthy, None)],
+            unsupported: Vec::new(),
+            undeclared: Vec::new(),
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        };
+        assert!(!status(&report).text().contains("needs to know"));
     }
 
     #[test]

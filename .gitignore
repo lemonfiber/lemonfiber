@@ -17,3 +17,6 @@ __pycache__/
 
 # agent tooling scratch — session state and throwaway worktrees, never the repo's
 .claude/
+
+# the surface written through a temporary file by `just surface`
+contract/.surface.next

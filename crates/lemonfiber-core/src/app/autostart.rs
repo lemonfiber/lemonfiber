@@ -147,6 +147,7 @@ mod tests {
             services: Vec::new(),
             condition: None,
             stack_edits: Vec::new(),
+            port_conflicts: Vec::new(),
             forwarding: None,
             switched: None,
             held: None,

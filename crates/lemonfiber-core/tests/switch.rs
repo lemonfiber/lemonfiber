@@ -31,6 +31,10 @@ fn ctx(up: &[&str]) -> Ctx {
         lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_ports::seams::Seams {
             filesystem: lemonfiber_fixtures::files::Files::empty(),
+            // Faked so a start's port pre-flight never reaches a real daemon: what
+            // else is running on the machine a test happens to run on is not a fact
+            // the test is about.
+            images: lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()),
             ..lemonfiber_adapters::live()
         },
         Source::External(project()),
@@ -166,6 +170,10 @@ async fn a_real_switch_stops_then_starts_then_waits() {
         lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_ports::seams::Seams {
             filesystem: lemonfiber_fixtures::files::Files::empty(),
+            // Faked so a start's port pre-flight never reaches a real daemon: what
+            // else is running on the machine a test happens to run on is not a fact
+            // the test is about.
+            images: lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()),
             ..lemonfiber_adapters::live()
         },
         Source::External(project()),

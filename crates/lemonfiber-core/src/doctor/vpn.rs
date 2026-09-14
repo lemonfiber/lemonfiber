@@ -167,6 +167,7 @@ impl VpnCheck {
                 engine.clone(),
                 project.clone(),
                 pair.gateway.clone(),
+                pair.client.clone(),
                 client,
             )),
             _ => None,

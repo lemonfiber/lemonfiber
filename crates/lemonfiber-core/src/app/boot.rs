@@ -370,6 +370,10 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         services: Vec::new(),
         condition: None,
         stack_edits: Vec::new(),
+        // Nothing was about to bind, so nothing asked the machine who holds a port.
+        // Empty here means the question was never put, which is the same shape a
+        // teardown reports and reads the same way: no clash was found.
+        port_conflicts: Vec::new(),
         forwarding: None,
         switched: None,
         held: Some(reason.to_owned()),

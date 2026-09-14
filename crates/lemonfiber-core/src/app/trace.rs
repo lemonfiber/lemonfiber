@@ -141,7 +141,18 @@ pub(super) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
             Err(_) => incomplete = true,
         }
     }
-    Ok(StuckReport { items, incomplete })
+    // The queues that were never asked, as against the ones that were and would not
+    // answer. A service declaring an API this build cannot speak or reach holds a queue
+    // nothing here can read, and leaving it out makes this list exactly as short as an
+    // unreadable queue does — without the sentence that says so.
+    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let unsupported = super::targets::unsupported_here(&manifest.services, project.as_deref());
+
+    Ok(StuckReport {
+        items,
+        incomplete,
+        unsupported,
+    })
 }
 
 #[cfg(test)]

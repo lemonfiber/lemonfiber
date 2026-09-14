@@ -71,6 +71,29 @@ pub(super) fn quality(report: &QualityReport) -> Lines {
             }
         }
     }
+    // After the sentence, never instead of it, and for both reapplies: consent to an
+    // overwrite is consent to something the operator was shown, and a rehearsal is
+    // where they are shown it while it is still a question. Empty everywhere else,
+    // because nothing but a reapply carries an edit to report.
+    lines.extend(replaced(report));
+    lines
+}
+
+/// The lines a reapply replaced — or, rehearsed, would replace — under the sentence
+/// saying so.
+///
+/// Absent where the report carries none, which is a reapply over a config already in
+/// lemonfiber's own hand. The lines are the ones the core masked; nothing here
+/// unmasks them, and nothing here decides what a credential is.
+fn replaced(report: &QualityReport) -> Lines {
+    let mut lines = Lines::default();
+    let Some(edit) = &report.overwritten else {
+        return lines;
+    };
+    lines.spaced(format!("What went, in {}:", edit.path));
+    for line in edit.diff.lines() {
+        lines.put(format!("  {line}"));
+    }
     lines
 }
 
@@ -217,6 +240,7 @@ mod tests {
                 choices: vec![preset(false)],
                 music: Some(music_pick()),
                 customised,
+                overwritten: None,
                 disposition,
             };
             let text = quality(&report).text();
@@ -227,9 +251,45 @@ mod tests {
             choices: vec![preset(false)],
             music: None,
             customised: false,
+            overwritten: None,
             disposition: Disposition::Shown,
         };
         assert!(!quality(&plain).text().contains("authoritative"));
+    }
+
+    /// Consent to an overwrite is consent to something the operator was shown.
+    #[test]
+    fn a_reapply_that_replaced_an_edit_shows_which_lines_went() {
+        for disposition in [Disposition::Reapplied, Disposition::WouldReapply] {
+            let report = QualityReport {
+                choices: vec![preset(false)],
+                music: None,
+                customised: true,
+                overwritten: Some(lemonfiber_core::model::StackEdit {
+                    path: "config/recyclarr/recyclarr.yml".to_owned(),
+                    diff: "- # mine\n+ include:\n".to_owned(),
+                }),
+                disposition,
+            };
+            let text = quality(&report).text();
+            assert!(text.contains("What went, in config/recyclarr"), "{text}");
+            assert!(text.contains("- # mine"), "{text}");
+            assert!(text.contains("+ include:"), "{text}");
+        }
+    }
+
+    /// And nothing is offered where there is nothing to show, so the sentence and the
+    /// lines cannot disagree.
+    #[test]
+    fn a_reapply_with_nothing_to_replace_shows_no_lines() {
+        let report = QualityReport {
+            choices: vec![preset(false)],
+            music: None,
+            customised: false,
+            overwritten: None,
+            disposition: Disposition::Reapplied,
+        };
+        assert!(!quality(&report).text().contains("What went"));
     }
 
     #[test]

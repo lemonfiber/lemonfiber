@@ -104,6 +104,12 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
     }
     let stopping = switched.stop_command.clone();
 
+    // Only what is about to start. A service the switch keeps running already holds
+    // its port and cannot clash with itself, and one it is stopping is giving a port
+    // up rather than asking for it.
+    let port_conflicts =
+        crate::app::preflight::conflicting_ports(ctx, &manifest, &switched.started).await;
+
     let mut report = LifecycleReport {
         action: SWITCH.to_owned(),
         plan,
@@ -113,6 +119,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
         services: Vec::new(),
         condition: None,
         stack_edits,
+        port_conflicts,
         forwarding: None,
         switched: Some(switched),
         held: None,

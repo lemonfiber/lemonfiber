@@ -64,6 +64,17 @@ a second description of them. `cargo run --example reference`, `--example codes`
 `just reference`, `just codes` and `just contract` redirect them to the file the tests
 compare against.
 
+`--example surface` is the fourth and the one that is not merely a `print!`: it reads
+the artefact it is about to replace before it writes, and refuses where the new one
+drops a name or a type the committed one describes under an unchanged wire version.
+That is the difference between the two contract artefacts. `web-api.contract.json`
+says what the surfaces exchange now, so a comparison against it can only ever say
+"regenerate it" — a removal and an addition are equally stale to it.
+`web-api.surface.json` is names and types with every description stripped out, so it
+moves only when the interface moves, and it is what a removed or retyped field is
+caught against. `just surface` writes it through a temporary file, since a redirect
+would truncate the very thing the program compares against.
+
 `codes.rs` reads source text rather than values, because a code is a `const` beside
 what raises it and there is no registry to enumerate. It reads it with a lexer that
 tells code from a string from a comment, so the call it looks for is invisible where

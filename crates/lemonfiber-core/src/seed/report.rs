@@ -82,6 +82,19 @@ pub enum State {
     /// what it expects. Its value is not shown, exactly as [`Self::Unmanaged`] does not
     /// show one, so a secret among the adopted is never put on display by a question.
     WouldAdopt,
+    /// An area the operator declared unmanaged. Nothing was read from the service and
+    /// nothing was written to it, and the reason they gave is carried so a report says
+    /// whose decision it was.
+    ///
+    /// Apart from [`Self::Unmanaged`], which lemonfiber *infers* from a value it has
+    /// no record of having written, and which it adopts as the baseline so that later
+    /// runs recognise it. This one is a decision somebody wrote down, and it holds
+    /// whether or not lemonfiber would have had anything to say — nothing is adopted,
+    /// because adopting would be the first half of managing it again.
+    Observed {
+        /// Why the operator said to leave it alone, in their own words.
+        reason: String,
+    },
     /// Prerequisite unavailable; a later run will complete it.
     Skipped {
         /// Why it could not be attempted.
@@ -106,9 +119,9 @@ pub enum State {
 impl State {
     /// Whether this connection is settled: wired one way or another, or left in a
     /// working state — the operator's own edit, an adopted or pre-existing value that
-    /// is theirs to keep, or lemonfiber's own value that is merely behind its newer
-    /// intent. A skip, a failure, a refusal or a conflict is
-    /// not settled: a re-run or an operator's decision must return to it.
+    /// is theirs to keep, an area they declared unmanaged, or lemonfiber's own value
+    /// that is merely behind its newer intent. A skip, a failure, a refusal or a
+    /// conflict is not settled: a re-run or an operator's decision must return to it.
     ///
     /// Neither of the two a rehearsal reports is settled, and that is the whole of what
     /// a rehearsal's last line says: these are the connections a real run would still
@@ -124,6 +137,7 @@ impl State {
                 | Self::Stale
                 | Self::Adopted
                 | Self::Unmanaged
+                | Self::Observed { .. }
         )
     }
 }
@@ -226,6 +240,16 @@ pub struct Report {
     /// states are reachable only here, and that the last line of the report is an
     /// instruction to run it for real rather than to run it again.
     pub rehearsed: bool,
+    /// Services this pass could not wire because it cannot speak to them, each with
+    /// why.
+    ///
+    /// Not wirings, because nothing was attempted and a wiring says how an attempt
+    /// turned out. Not absences either, which is the point: a pass that skipped a
+    /// service declaring an API shape this build does not speak used to say nothing at
+    /// all, and an operator who wrote that declaration had no way to tell it from a
+    /// service lemonfiber had simply forgotten.
+    #[serde(default)]
+    pub unsupported: Vec<crate::model::UnsupportedReport>,
 }
 
 impl Report {

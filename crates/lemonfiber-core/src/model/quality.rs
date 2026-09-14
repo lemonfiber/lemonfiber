@@ -61,6 +61,16 @@ pub struct QualityReport {
     /// the `customised` state, in which the preset is no longer authoritative until
     /// it is deliberately re-asserted. For a reapply, whether an edit was overwritten.
     pub customised: bool,
+    /// The hand-edited config a reapply replaced — or, rehearsed, would replace — with
+    /// the diff of what goes against what lands in its place.
+    ///
+    /// Absent everywhere else, and absent for a reapply over a config already in
+    /// lemonfiber's own hand. Consent given against a yes-or-no is consent to
+    /// something the operator was never shown: they know a file they edited is about
+    /// to go, and not which of their lines is in it. The lines are masked the way
+    /// every stack-file diff is, so a key that drifted is named without its value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overwritten: Option<crate::model::StackEdit>,
     /// What became of the choice.
     pub disposition: Disposition,
 }

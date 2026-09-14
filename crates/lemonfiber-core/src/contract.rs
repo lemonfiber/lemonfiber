@@ -43,6 +43,8 @@
 //!
 //! [`Outcome`]: crate::app::Outcome
 
+pub mod stability;
+
 use std::collections::BTreeMap;
 
 use schemars::{schema_for, Schema};
@@ -76,6 +78,8 @@ use crate::walkthrough::Line;
 
 /// Where the generated artefact is kept, relative to the workspace root.
 pub const CONTRACT_PATH: &str = "contract/web-api.contract.json";
+
+pub use stability::{Surface, SURFACE_PATH};
 
 /// Every wire shape a surface may receive, keyed by its `kind`.
 ///
@@ -336,6 +340,11 @@ mod tests {
                 services: Vec::new(),
                 condition: Some(crate::docker::Condition::Active),
                 stack_edits: Vec::new(),
+                port_conflicts: vec![crate::model::ConflictReport {
+                    port: 8989,
+                    wanted_by: "sonarr".to_owned(),
+                    held_by: "somebody-elses/sonarr".to_owned(),
+                }],
                 forwarding: None,
                 switched: None,
                 held: None,
@@ -367,6 +376,11 @@ mod tests {
                 undeclared: Vec::new(),
                 services: Vec::new(),
                 disturbs: crate::model::Disturbances::all(crate::app::PATIENCE),
+                unsupported: vec![crate::model::UnsupportedReport {
+                    what: "somebodys-own-service".to_owned(),
+                    because: "it declares an API of the Servarr shape and no port to publish"
+                        .to_owned(),
+                }],
             }),
             Outcome::Doctor(DoctorReport {
                 overall: crate::doctor::Overall::Healthy,
@@ -674,6 +688,7 @@ mod tests {
                 service: "prowlarr".to_owned(),
                 destination: "the indexers you configured".to_owned(),
                 purpose: "runs the searches everything else asks for".to_owned(),
+                recorded: true,
             }],
         }
     }

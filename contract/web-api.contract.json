@@ -7032,15 +7032,15 @@
           ]
         },
         "UnsupportedReport": {
-          "description": "Something found that lemonfiber cannot take over, named rather than passed over.",
+          "description": "Something lemonfiber cannot act on, named rather than passed over.\n\nWritten for a migration survey and read by two reports now. The second is the\nstatus of a stack the operator maintains themselves, where a service declaring an\nAPI this build cannot reach is named the same way — what, and why — rather than\nbeing dropped from every feature that would have used it. One shape for both,\nbecause \"named rather than passed over\" is the whole of what either is saying and\ntwo shapes would be two ways of saying it.",
           "type": "object",
           "properties": {
             "because": {
-              "description": "Why it cannot be adopted, in the operator's terms.",
+              "description": "Why lemonfiber cannot act on it, in the operator's terms.",
               "type": "string"
             },
             "what": {
-              "description": "What was found, by the name the engine gives it.",
+              "description": "What was found, by the name the thing that found it gives it — a project and\nservice for a survey, a service id for a stack lemonfiber runs.",
               "type": "string"
             }
           },
@@ -7363,6 +7363,32 @@
             }
           ]
         },
+        "ConflictReport": {
+          "description": "A port lemonfiber wants for a service that something else already answers on.",
+          "type": "object",
+          "properties": {
+            "held_by": {
+              "description": "The project already holding it.",
+              "type": "string"
+            },
+            "port": {
+              "description": "The host port both want.",
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "wanted_by": {
+              "description": "The lemonfiber service that would publish it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "port",
+            "wanted_by",
+            "held_by"
+          ]
+        },
         "Criticality": {
           "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
           "oneOf": [
@@ -7454,6 +7480,14 @@
             "plan": {
               "description": "What the named forms came to: the profiles, the services they hold, and\nwhat the configuration left out.\n\nThe resolved plan itself rather than a copy of its parts, because it is\nstated to the operator before the command runs and read out of the\nreport afterwards — two accounts of one run, and a second shape for it\nwould be a way for them to differ.",
               "$ref": "#/$defs/Plan"
+            },
+            "port_conflicts": {
+              "description": "Host ports this start wants that another Compose project on this machine\nalready answers on, each named on both sides.\n\nEmpty for every action that starts nothing, and empty on a machine running one\nstack. Reported rather than refused: a port somebody deliberately shares is\ntheir business, and the start goes ahead — what this changes is whether an\noperator meeting a bind failure knows who is holding the port.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/ConflictReport"
+              }
             },
             "rehearsed": {
               "description": "Whether this was a rehearsal.",
@@ -8142,15 +8176,15 @@
           ]
         },
         "UnsupportedReport": {
-          "description": "Something found that lemonfiber cannot take over, named rather than passed over.",
+          "description": "Something lemonfiber cannot act on, named rather than passed over.\n\nWritten for a migration survey and read by two reports now. The second is the\nstatus of a stack the operator maintains themselves, where a service declaring an\nAPI this build cannot reach is named the same way — what, and why — rather than\nbeing dropped from every feature that would have used it. One shape for both,\nbecause \"named rather than passed over\" is the whole of what either is saying and\ntwo shapes would be two ways of saying it.",
           "type": "object",
           "properties": {
             "because": {
-              "description": "Why it cannot be adopted, in the operator's terms.",
+              "description": "Why lemonfiber cannot act on it, in the operator's terms.",
               "type": "string"
             },
             "what": {
-              "description": "What was found, by the name the engine gives it.",
+              "description": "What was found, by the name the thing that found it gives it — a project and\nservice for a survey, a service id for a stack lemonfiber runs.",
               "type": "string"
             }
           },
@@ -8387,12 +8421,16 @@
           "type": "object",
           "properties": {
             "destination": {
-              "description": "Where its requests go, in the terms an operator would recognise.",
+              "description": "Where its requests go, in the terms an operator would recognise.\n\nEmpty means it reaches nothing, which is an answer. It never means *and we\ndo not know*: that is [`Self::recorded`], and the two must not be read as one\n— an unknown service rendered as an empty destination would be this product\nclaiming nothing leaves the machine on the strength of having no idea.",
               "type": "string"
             },
             "purpose": {
               "description": "What it asks for.",
               "type": "string"
+            },
+            "recorded": {
+              "description": "Whether lemonfiber ships a record of what this service reaches.\n\nFalse for a service that arrived in the stack after this build was made, or\nfrom an operator's own fork. It is listed anyway, because the alternative —\nleaving it out — is a privacy inventory that is complete-looking and short,\nand a reader counting the services on their machine against the ones on this\nlist is the reader this surface exists for.",
+              "type": "boolean"
             },
             "service": {
               "description": "The service, by the id the stack declares it under.",
@@ -8402,7 +8440,8 @@
           "required": [
             "service",
             "destination",
-            "purpose"
+            "purpose",
+            "recorded"
           ]
         },
         "Leaving": {
@@ -8930,12 +8969,41 @@
                   "type": "null"
                 }
               ]
+            },
+            "overwritten": {
+              "description": "The hand-edited config a reapply replaced — or, rehearsed, would replace — with\nthe diff of what goes against what lands in its place.\n\nAbsent everywhere else, and absent for a reapply over a config already in\nlemonfiber's own hand. Consent given against a yes-or-no is consent to\nsomething the operator was never shown: they know a file they edited is about\nto go, and not which of their lines is in it. The lines are masked the way\nevery stack-file diff is, so a key that drifted is named without its value.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StackEdit"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
             "choices",
             "customised",
             "disposition"
+          ]
+        },
+        "StackEdit": {
+          "description": "A stack file the operator edited, preserved rather than overwritten, with the\nchange an upgrade would make shown against it.",
+          "type": "object",
+          "properties": {
+            "diff": {
+              "description": "The lines that differ between the operator's file and what lemonfiber would\nwrite — theirs marked `-`, lemonfiber's `+`, the matching head and tail left\nout. Empty where the two differ only in ways `lines` does not see.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file's path within the stack directory.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "diff"
           ]
         }
       }
@@ -9227,6 +9295,19 @@
                 "outcome": {
                   "type": "string",
                   "const": "would_overwrite"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "Not carried out, because the operator declared the area it would write\nunmanaged.\n\nApart from [`Self::WouldOverwrite`], which is lemonfiber declining to write over\na change it can see. This is lemonfiber obeying an instruction it was given, and\ntelling somebody the first when they wrote the second would send them looking\nfor a change they did not make.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "unmanaged"
                 }
               },
               "required": [
@@ -9822,6 +9903,14 @@
               "description": "Whether this pass only said what it would do.\n\nA flag rather than a second shape, because every connection above means the\nsame thing either way: what the service holds is what it holds, and what\nlemonfiber would write is what it would write. What changes is that two of the\nstates are reachable only here, and that the last line of the report is an\ninstruction to run it for real rather than to run it again.",
               "type": "boolean"
             },
+            "unsupported": {
+              "description": "Services this pass could not wire because it cannot speak to them, each with\nwhy.\n\nNot wirings, because nothing was attempted and a wiring says how an attempt\nturned out. Not absences either, which is the point: a pass that skipped a\nservice declaring an API shape this build does not speak used to say nothing at\nall, and an operator who wrote that declaration had no way to tell it from a\nservice lemonfiber had simply forgotten.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/UnsupportedReport"
+              }
+            },
             "wirings": {
               "description": "Every connection attempted, and how each turned out.",
               "type": "array",
@@ -10024,6 +10113,24 @@
               ]
             },
             {
+              "description": "An area the operator declared unmanaged. Nothing was read from the service and\nnothing was written to it, and the reason they gave is carried so a report says\nwhose decision it was.\n\nApart from [`Self::Unmanaged`], which lemonfiber *infers* from a value it has\nno record of having written, and which it adopts as the baseline so that later\nruns recognise it. This one is a decision somebody wrote down, and it holds\nwhether or not lemonfiber would have had anything to say — nothing is adopted,\nbecause adopting would be the first half of managing it again.",
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "description": "Why the operator said to leave it alone, in their own words.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "observed"
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            },
+            {
               "description": "Prerequisite unavailable; a later run will complete it.",
               "type": "object",
               "properties": {
@@ -10077,6 +10184,24 @@
                 "reason"
               ]
             }
+          ]
+        },
+        "UnsupportedReport": {
+          "description": "Something lemonfiber cannot act on, named rather than passed over.\n\nWritten for a migration survey and read by two reports now. The second is the\nstatus of a stack the operator maintains themselves, where a service declaring an\nAPI this build cannot reach is named the same way — what, and why — rather than\nbeing dropped from every feature that would have used it. One shape for both,\nbecause \"named rather than passed over\" is the whole of what either is saying and\ntwo shapes would be two ways of saying it.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why lemonfiber cannot act on it, in the operator's terms.",
+              "type": "string"
+            },
+            "what": {
+              "description": "What was found, by the name the thing that found it gives it — a project and\nservice for a survey, a service id for a stack lemonfiber runs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "because"
           ]
         },
         "Wiring": {
@@ -11376,6 +11501,14 @@
               "items": {
                 "$ref": "#/$defs/Undeclared"
               }
+            },
+            "unsupported": {
+              "description": "Services that are running and operable like any other, and that lemonfiber\ncannot offer the features needing to know what they are — each with why.\n\nEmpty for the stack this build ships. It fills in for a stack the operator\nmaintains, where a declaration can name an API and leave out the part that\nmakes it addressable: such a service starts, stops and reports its state\nexactly as the others do, and every feature that would have spoken to it used\nto do nothing and say nothing. Here rather than on the service's own row,\nbecause it is a statement about what this build can do rather than about how\nthe service is faring.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/UnsupportedReport"
+              }
             }
           },
           "required": [
@@ -11450,6 +11583,24 @@
             "id",
             "state",
             "describes"
+          ]
+        },
+        "UnsupportedReport": {
+          "description": "Something lemonfiber cannot act on, named rather than passed over.\n\nWritten for a migration survey and read by two reports now. The second is the\nstatus of a stack the operator maintains themselves, where a service declaring an\nAPI this build cannot reach is named the same way — what, and why — rather than\nbeing dropped from every feature that would have used it. One shape for both,\nbecause \"named rather than passed over\" is the whole of what either is saying and\ntwo shapes would be two ways of saying it.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why lemonfiber cannot act on it, in the operator's terms.",
+              "type": "string"
+            },
+            "what": {
+              "description": "What was found, by the name the thing that found it gives it — a project and\nservice for a survey, a service id for a stack lemonfiber runs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "because"
           ]
         }
       }
@@ -12072,11 +12223,37 @@
               "items": {
                 "$ref": "#/$defs/StuckEntry"
               }
+            },
+            "unsupported": {
+              "description": "Services whose queue lemonfiber cannot read at all, each with why.\n\nApart from [`Self::incomplete`], which is a queue that was asked and would not\nanswer. This is a queue that was never asked, because the service declares an\nAPI shape this build does not speak or a Servarr declaration it cannot reach\nthrough — and a reading that dropped those would be as short as an unreadable\nqueue makes it, without the sentence that says so.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/UnsupportedReport"
+              }
             }
           },
           "required": [
             "items",
             "incomplete"
+          ]
+        },
+        "UnsupportedReport": {
+          "description": "Something lemonfiber cannot act on, named rather than passed over.\n\nWritten for a migration survey and read by two reports now. The second is the\nstatus of a stack the operator maintains themselves, where a service declaring an\nAPI this build cannot reach is named the same way — what, and why — rather than\nbeing dropped from every feature that would have used it. One shape for both,\nbecause \"named rather than passed over\" is the whole of what either is saying and\ntwo shapes would be two ways of saying it.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why lemonfiber cannot act on it, in the operator's terms.",
+              "type": "string"
+            },
+            "what": {
+              "description": "What was found, by the name the thing that found it gives it — a project and\nservice for a survey, a service id for a stack lemonfiber runs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "what",
+            "because"
           ]
         }
       }

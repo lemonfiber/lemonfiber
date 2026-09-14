@@ -148,6 +148,7 @@ fn check_services(
             .chain(released(service, today))
             .chain(permitted(service))
             .chain(versioned(service))
+            .chain(outbound(service))
             .chain(depended(service, &of_service));
 
         let location = format!("service {}", service.id);
@@ -257,6 +258,23 @@ fn replaced(
     (!declared.contains(named) && !recorded.contains(named)).then(|| {
         format!("says {named} replaced it, and this stack neither declares nor records that")
     })
+}
+
+/// A service that says where it reaches says what it asks for there, and the
+/// other way round.
+///
+/// Half of that pair is not a smaller answer, it is a misleading one. An inventory
+/// of what leaves a machine reads an empty destination as "this service reaches
+/// nothing", so a stack that named a purpose and no destination would have that
+/// purpose attributed to a service the same report says goes nowhere. Refused by
+/// name here rather than papered over at the point of reading, so whoever wrote the
+/// manifest is the one who decides which half was meant.
+fn outbound(service: &Service) -> Option<String> {
+    match (&service.reaches, &service.asks_for) {
+        (Some(_), None) => Some("says where it reaches and not what it asks for".to_owned()),
+        (None, Some(_)) => Some("says what it asks for and not where it reaches".to_owned()),
+        (Some(_), Some(_)) | (None, None) => None,
+    }
 }
 
 /// A Servarr-shape service names the version of the API its client speaks.
@@ -556,6 +574,74 @@ mod tests {
         assert!(messages(&text)
             .iter()
             .any(|m| m.contains("kernel capability SYS_ADMIN, which is not allowed")));
+    }
+
+    /// The line every service in the shipped stack has, which these cases add to.
+    const AN_ID: &str = "id = \"prowlarr\"";
+
+    /// The first of the two outbound lines the shipped stack carries, and the second.
+    ///
+    /// Read out of the stack rather than written here, so a stack that rewords either
+    /// of them is a test that fails loudly instead of one quietly proving nothing.
+    const REACHES: &str = "reaches = ";
+    const ASKS_FOR: &str = "asks_for = ";
+
+    /// The stack with the first line starting `prefix` removed from it.
+    fn without(prefix: &str) -> String {
+        let at = STACK
+            .lines()
+            .position(|line| line.starts_with(prefix))
+            .unwrap_or_default();
+        assert!(at > 0, "the fixture must declare {prefix:?}");
+        STACK
+            .lines()
+            .enumerate()
+            .filter_map(|(number, line)| (number != at).then_some(line))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Half a declaration is a misleading answer rather than a smaller one, so it is
+    /// refused in either direction.
+    ///
+    /// Made by taking a half away rather than by adding one. Every service the stack
+    /// ships now declares both, so a case built by adding `reaches` to one of them
+    /// would be a second copy of a key the entry already has — which the parser
+    /// refuses before this rule is ever asked.
+    #[test]
+    fn declaring_where_a_service_reaches_without_what_it_asks_for_is_caught() {
+        let said = messages(&without(ASKS_FOR));
+        assert!(
+            said.iter().any(|fault| fault.contains("what it asks for")),
+            "{said:?}"
+        );
+    }
+
+    #[test]
+    fn declaring_what_a_service_asks_for_without_where_it_reaches_is_caught() {
+        let said = messages(&without(REACHES));
+        assert!(
+            said.iter().any(|fault| fault.contains("where it reaches")),
+            "{said:?}"
+        );
+    }
+
+    /// Both, or neither, and neither is what every stack written before this says.
+    #[test]
+    fn a_service_that_declares_both_or_neither_says_nothing_is_wrong() {
+        let both = messages(&edited(
+            AN_ID,
+            "id = \"prowlarr\"\nreaches = \"the indexers you configured\"\n\
+             asks_for = \"Runs the searches\"",
+        ));
+        assert!(both.is_empty(), "{both:?}");
+        // And an empty destination is an answer rather than an absence: a service
+        // that reaches nothing says so, with what it does instead.
+        let quiet = messages(&edited(
+            AN_ID,
+            "id = \"prowlarr\"\nreaches = \"\"\nasks_for = \"Nothing leaves this machine\"",
+        ));
+        assert!(quiet.is_empty(), "{quiet:?}");
     }
 
     #[test]

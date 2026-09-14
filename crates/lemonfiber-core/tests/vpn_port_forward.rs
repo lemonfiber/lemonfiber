@@ -604,3 +604,44 @@ fn left(attempt: Option<&Attempt>) -> Option<&str> {
         _ => None,
     }
 }
+
+/// What this repair would write to is the download client, named by the id the stack
+/// declares it under rather than by a word written into the mender.
+///
+/// The gate that reads this answer sits one function above every mender and has no
+/// way of knowing what any of them touches, so a mender that named nothing would pass
+/// straight through a declaration the operator made about the client — and a mender
+/// that named "qbittorrent" from memory would answer for a stack it is not running.
+/// The name comes off the pair the check resolved out of the manifest, which is the
+/// same reading that decided there was a client to move at all, so a fork whose
+/// torrent client is called something else is answered about that one.
+#[test]
+fn the_port_repair_declares_the_download_client_it_would_move() {
+    let subject = check_with(vec![gateway_with_port("51413")], forwarding("protonvpn"));
+    let Some(mender) = subject.mender() else {
+        unreachable!("a stack whose torrent client is contained has a repair to offer")
+    };
+
+    assert_eq!(mender.writes_to(&a_move()), vec!["qbittorrent".to_owned()]);
+
+    // The same question of a stack that calls its client something else. Read from a
+    // name written down here, both answers would be the first one.
+    let mut renamed = stack();
+    for service in &mut renamed.services {
+        if service.id == "qbittorrent" {
+            service.id = "their-torrent-client".to_owned();
+        }
+    }
+    let theirs = asking(Fake::new(vec![gateway_with_port("51413")]))
+        .against(renamed)
+        .forwarding(forwarding("protonvpn"))
+        .check();
+    let Some(mender) = theirs.mender() else {
+        unreachable!("renaming a service does not stop the tunnel containing it")
+    };
+
+    assert_eq!(
+        mender.writes_to(&a_move()),
+        vec!["their-torrent-client".to_owned()]
+    );
+}

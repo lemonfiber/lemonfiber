@@ -16,7 +16,7 @@ use super::Indexer;
 use super::{
     DATA_ROOT_KEY, DEFAULT_IP_ECHO, EXPOSED_KEY, FRONT_DOOR_KEY, HOUSEHOLD_HOST_KEY,
     INDEXER_APIKEY_KEY, INDEXER_URL_KEY, IP_ECHO_KEY, PGID_KEY, PROVIDER_HOST_KEY, PUID_KEY,
-    SECOND_IP_ECHO, VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
+    SECOND_IP_ECHO, UNMANAGED_KEY, VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
 };
 
 /// A recorded value with the whitespace and surrounding quotes a person might
@@ -276,9 +276,44 @@ pub fn exposed_from_env(file: &env::EnvFile) -> Vec<(String, String)> {
         .collect()
 }
 
+/// The areas the operator declared unmanaged, each with why.
+///
+/// The same shape as the register above and a lower bar for the reason, for the reason
+/// [`crate::unmanaged`] gives: these two fail in opposite directions, and a dropped
+/// entry here is somebody who believes a file is theirs and is about to find out it is
+/// not. Parsed where the rule about it lives rather than restated here, since a second
+/// copy of "what makes an entry a declaration" is a second place for it to drift.
+#[must_use]
+pub fn unmanaged_from_env(file: &env::EnvFile) -> Vec<(String, String)> {
+    crate::unmanaged::parse(file.get(UNMANAGED_KEY).unwrap_or_default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::env;
+
+    /// Read from the file rather than from a string, because the whole of what this
+    /// adds over the parser it calls is finding the line.
+    #[test]
+    fn the_declared_unmanaged_areas_are_read_off_the_file() {
+        let file = env::EnvFile::parse(
+            "LEMONFIBER_UNMANAGED=config/recyclarr=my own profiles live in here\n",
+        );
+        assert_eq!(
+            super::unmanaged_from_env(&file),
+            vec![(
+                "config/recyclarr".to_owned(),
+                "my own profiles live in here".to_owned()
+            )]
+        );
+    }
+
+    /// A file that says nothing declares nothing, which is every machine where nobody
+    /// has asked for any of this.
+    #[test]
+    fn a_file_with_no_declaration_declares_nothing() {
+        assert!(super::unmanaged_from_env(&env::EnvFile::parse("")).is_empty());
+    }
 
     /// Unset is lemonfiber's own project, which is what a machine with nothing adopted
     /// on it has.

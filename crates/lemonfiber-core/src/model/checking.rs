@@ -6,6 +6,8 @@
 
 use serde::Serialize;
 
+use super::UnsupportedReport;
+
 /// What a diagnostic run found, and what it amounts to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct DoctorReport {
@@ -162,4 +164,17 @@ pub struct StatusReport {
     /// Here so that a surface can say it before it asks the operator to confirm,
     /// which is the only moment saying it is any use.
     pub disturbs: Disturbances,
+
+    /// Services that are running and operable like any other, and that lemonfiber
+    /// cannot offer the features needing to know what they are — each with why.
+    ///
+    /// Empty for the stack this build ships. It fills in for a stack the operator
+    /// maintains, where a declaration can name an API and leave out the part that
+    /// makes it addressable: such a service starts, stops and reports its state
+    /// exactly as the others do, and every feature that would have spoken to it used
+    /// to do nothing and say nothing. Here rather than on the service's own row,
+    /// because it is a statement about what this build can do rather than about how
+    /// the service is faring.
+    #[serde(default)]
+    pub unsupported: Vec<UnsupportedReport>,
 }

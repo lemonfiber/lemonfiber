@@ -30,6 +30,7 @@ use crate::config::store::{self, is_secret};
 use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind, Seal};
 use crate::ports::random::Random;
+use crate::quality::{Preset, Selection};
 use crate::stack::{self, Source};
 use crate::wizard::{Phase, Plan, Wizard};
 
@@ -164,16 +165,38 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
         })?;
     }
 
-    // The stack is written where Compose reads it. An embedded stack is
-    // lemonfiber's own regenerable output — materialised the same way on every
-    // run, holding nothing an operator could lose — so it is not journalled: its
-    // undo is simply that the next apply rewrites it, and a directory left behind
-    // is a build artifact, not stranded work. An external stack is the operator's,
-    // already on disk, and materialising it writes nothing.
-    applying
-        .source
-        .materialise(Some(&paths.stack()))
-        .map_err(Fault::Stack)?;
+    // The stack is written where Compose reads it, through the same file-by-file
+    // comparison every later run makes rather than round it. This was a straight
+    // extraction over the top for a long time, on the stated grounds that an embedded
+    // stack holds nothing an operator could lose. That is true of a first install and
+    // of nothing else this function is reached by: a resumed apply, a recovered one,
+    // and setup run again on a machine that already has a stack all arrive here with
+    // files on disk that may be somebody's own, and an extraction cannot tell them
+    // from a version that has not been upgraded yet.
+    //
+    // It stays out of the journal for the half of that reasoning that does hold: what
+    // is written is regenerable, and its undo is that the next apply writes it again.
+    // An edit the comparison declines to overwrite comes back with its diff and is not
+    // carried further from here — nothing was overwritten, so nothing is owed a diff
+    // at this point, and the next lifecycle command reports exactly these files and
+    // exactly these diffs through the surface that already carries them.
+    //
+    // The default preset rather than no choice at all, because no choice means "leave
+    // the quality config exactly as it is on disk", and at setup there may be nothing
+    // there to leave. It rewrites the shipped config to itself, so an install that
+    // chose nothing gets the file the stack ships.
+    super::materialise::materialise(
+        applying.source,
+        Some(&paths.stack()),
+        Some(&paths.materialised()),
+        Some(&Selection::everywhere(Preset::default_preset())),
+        // Read from the file as it stands rather than assumed empty. A first install
+        // has declared nothing, and this function is reached by a resumed apply, a
+        // recovered one, and setup run again on a machine that has been set up for
+        // months — where a declaration may well be the reason a file is the way it is.
+        &crate::unmanaged::parse(before.get(crate::config::UNMANAGED_KEY).unwrap_or_default()),
+    )
+    .map_err(Fault::Stack)?;
 
     // `changes` is one entry per setting in the same order, so each pairs with the
     // key and value it was built from; they are two views of the same list, walked
@@ -720,6 +743,70 @@ mod tests {
         // The operator's own stack stays where it is; nothing is written to the
         // location an embedded stack would land in.
         assert!(!paths.stack().exists(), "no stack was written here");
+    }
+
+    /// The case that made routing this through the ordinary comparison worth doing.
+    ///
+    /// Setup is reached more than once on a machine that has been set up: a resumed
+    /// apply, a recovered one, and setup asked for again all land here, and the
+    /// extraction this replaced would have written over whatever was on disk.
+    #[test]
+    fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it() {
+        static EMBEDDED: include_dir::Dir<'_> =
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        let dir = scratch("stack-edited");
+        let paths = layout(&dir);
+        let mut first = reviewed(&dir.join("data-root"));
+        assert!(apply(
+            &mut first,
+            &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        )
+        .is_ok());
+
+        let compose = paths.stack().join("compose.yml");
+        let theirs = "services:\n  sonarr:\n    image: an-image-of-my-own\n";
+        assert!(
+            std::fs::write(&compose, theirs).is_ok(),
+            "the operator's edit"
+        );
+
+        let mut again = reviewed(&dir.join("data-root"));
+        assert!(apply(
+            &mut again,
+            &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        )
+        .is_ok());
+
+        assert_eq!(
+            std::fs::read_to_string(&compose).unwrap_or_default(),
+            theirs,
+            "a second apply wrote over a file the operator had changed by hand"
+        );
+        // And the rest of the stack is still lemonfiber's own: preserving one file is
+        // not declining to write the others.
+        assert!(paths.stack().join("stack.toml").is_file());
+    }
+
+    /// What makes the comparison above possible: a record of what was written, kept
+    /// where the next run reads it. Without it, the first change to any of these files
+    /// reads as an operator's edit — the safe direction, and a stack that never
+    /// upgrades.
+    #[test]
+    fn an_apply_records_the_checksums_of_what_it_wrote() {
+        static EMBEDDED: include_dir::Dir<'_> =
+            include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        let dir = scratch("stack-recorded");
+        let paths = layout(&dir);
+        let mut wizard = reviewed(&dir.join("data-root"));
+        assert!(apply(
+            &mut wizard,
+            &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        )
+        .is_ok());
+
+        let recorded = std::fs::read_to_string(paths.materialised()).unwrap_or_default();
+        assert!(recorded.contains("compose.yml"), "{recorded}");
+        assert!(recorded.contains("stack.toml"), "{recorded}");
     }
 
     #[test]

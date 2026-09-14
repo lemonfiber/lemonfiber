@@ -212,6 +212,16 @@ async fn weighed(ctx: &Ctx, held: &EnvFile, key: &str, value: &str, confirmed: b
     if !review.differs() {
         return review;
     }
+    // An area the operator declared unmanaged is not lemonfiber's to write, and the
+    // refusal carries the reason they gave rather than one of lemonfiber's own. Asked
+    // after the comparison above on purpose: a setting already holding what was asked
+    // for has nothing to refuse, and saying "you told me to leave this alone" about a
+    // change that would do nothing reads as an obstacle where there is none.
+    if let Some(because) = crate::unmanaged::covering(&ctx.settings.unmanaged, key) {
+        return review.blocked(format!(
+            "you declared this unmanaged, so lemonfiber does not write it: {because}"
+        ));
+    }
     // What the change comes to on this machine — where the library would land, what
     // is still coming down, what was edited underneath, what it opens and keeps —
     // worked out for a staged proposal as well as one about to land. A review that
@@ -391,6 +401,59 @@ mod tests {
         store::read(path)
             .ok()
             .and_then(|file| file.get(key).map(str::to_owned))
+    }
+
+    /// A setting the operator declared unmanaged is turned away, in their own words,
+    /// and the file is left exactly as it was.
+    #[tokio::test]
+    async fn a_setting_declared_unmanaged_is_refused_with_the_reason_they_gave() {
+        let path = env_at("unmanaged", "PUID=1000\n");
+        let context = a_context()
+            .settings(crate::config::Settings {
+                env_file: Some(path.clone()),
+                unmanaged: vec![(
+                    "PUID".to_owned(),
+                    "I set the ids here by hand to match my NAS".to_owned(),
+                )],
+                ..crate::config::Settings::default()
+            })
+            .build();
+
+        let outcome = configuration(&context, Setting::to("PUID", "1001")).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Blocked));
+        let why = reviewed(&outcome).and_then(|review| review.refusal);
+        assert!(
+            why.is_some_and(|why| why.contains("match my NAS")),
+            "the refusal does not carry the reason they gave"
+        );
+        assert_eq!(
+            on_disk(&path, "PUID"),
+            Some("1000".to_owned()),
+            "the file was written to anyway"
+        );
+    }
+
+    /// And a change that would do nothing is not turned away: saying "you told me to
+    /// leave this alone" about a value already where they want it reads as an obstacle
+    /// where there is none.
+    #[tokio::test]
+    async fn a_declared_setting_already_holding_what_was_asked_for_is_not_a_refusal() {
+        let path = env_at("unmanaged-same", "PUID=1000\n");
+        let context = a_context()
+            .settings(crate::config::Settings {
+                env_file: Some(path),
+                unmanaged: vec![(
+                    "PUID".to_owned(),
+                    "I set the ids here by hand to match my NAS".to_owned(),
+                )],
+                ..crate::config::Settings::default()
+            })
+            .build();
+
+        let outcome = configuration(&context, Setting::to("PUID", "1000")).await;
+
+        assert_eq!(stance(&outcome), Some(Stance::Unchanged));
     }
 
     #[tokio::test]

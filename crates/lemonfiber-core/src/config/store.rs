@@ -3,6 +3,29 @@
 //! One setting at a time, in place, leaving the file otherwise exactly as it
 //! was. The operator's own edits and comments are the reason this is not simply
 //! a serialised struct.
+//!
+//! # Why there is no checksum of this file
+//!
+//! The stack directory is protected by a record of what lemonfiber last wrote to
+//! each file, so an edit can be told from a version that has not been upgraded yet.
+//! This file is not, and the difference is deliberate rather than an omission.
+//!
+//! Nothing here ever writes the file whole. A change rewrites one line, and every
+//! other line — comment, blank, a setting this build has never heard of — survives
+//! byte for byte, which [`super::env`] guarantees and a test below holds it to. So
+//! there is no version of this file that lemonfiber replaces with its own, and
+//! therefore nothing for a whole-file comparison to protect.
+//!
+//! What *can* be lost is one setting's value, and that is guarded by content rather
+//! than by a remembered baseline: a change is read against what the file holds at
+//! the moment it is proposed, shown beside what would replace it with both sides
+//! withheld exactly as `config show` withholds them, and a consequential one is not
+//! written until the operator says so. See [`crate::reconfigure::Review`].
+//!
+//! A checksum here would be the wrong instrument twice over. It would report a
+//! difference for a comment somebody added, which is not a difference in any setting;
+//! and having reported one it could not say which setting, because a file of lines
+//! has no field for a checksum to name.
 
 use std::path::{Path, PathBuf};
 
@@ -391,6 +414,42 @@ mod tests {
             std::env::temp_dir().join(format!("lemonfiber-cfg-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir.join(".env")
+    }
+
+    /// What stands in for a checksum of this file: a write cannot lose anything,
+    /// because it replaces one line and appends at most one more.
+    ///
+    /// The module doc above argues that a whole-file comparison is the wrong
+    /// instrument here, and the argument rests entirely on this. A setting this build
+    /// has never heard of, a comment, and the blank lines between them all have to
+    /// come back exactly as they went in — otherwise something an operator wrote is
+    /// being overwritten with no diff and no consent, which is the thing the stack
+    /// directory keeps a record of what it wrote to avoid.
+    ///
+    /// Asserted as a prefix rather than line by line, which is the stronger claim:
+    /// what they wrote is still the opening of the file, in order, unshifted, with
+    /// the new setting after it.
+    #[test]
+    fn a_write_leaves_everything_it_does_not_name_byte_for_byte() {
+        let path = scratch("untouched");
+        let theirs = "# my own notes about this stack\n\n\
+                      SOMETHING_LEMONFIBER_HAS_NEVER_HEARD_OF=mine\n\nPUID=1000";
+        assert!(crate::config::store::write(&path, theirs).is_ok());
+
+        assert!(set(&path, "PGID", "1000").is_ok());
+
+        let after = std::fs::read_to_string(&path).unwrap_or_default();
+        assert!(
+            after.starts_with(theirs),
+            "a write disturbed what the operator had written: {after}"
+        );
+        // And the setting that was asked for is the one that arrived.
+        assert_eq!(
+            read(&path)
+                .ok()
+                .and_then(|file| file.get("PGID").map(str::to_owned)),
+            Some("1000".to_owned())
+        );
     }
 
     /// Only on unix: the guarantee is a file mode, which is the platform's own

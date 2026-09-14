@@ -196,6 +196,14 @@ pub enum Outcome {
     Declined,
     /// Refused, because it would have written over something changed by hand.
     WouldOverwrite,
+    /// Not carried out, because the operator declared the area it would write
+    /// unmanaged.
+    ///
+    /// Apart from [`Self::WouldOverwrite`], which is lemonfiber declining to write over
+    /// a change it can see. This is lemonfiber obeying an instruction it was given, and
+    /// telling somebody the first when they wrote the second would send them looking
+    /// for a change they did not make.
+    Unmanaged,
 }
 
 impl Outcome {
@@ -356,6 +364,15 @@ pub enum Writing {
     Adopted,
     /// Nothing was ever recorded here, so nothing lemonfiber knows about is being changed.
     TheirsAlone,
+    /// The operator declared this area unmanaged, so it is not lemonfiber's to write
+    /// whatever the baseline says about who wrote what.
+    ///
+    /// The one answer here that is not read off a record of what happened: the other
+    /// three are conclusions about a value, and this is an instruction about an area.
+    /// Kept apart from them because the sentence an operator is owed differs — being
+    /// told lemonfiber would have overwritten a change sends somebody looking for a
+    /// change they did not make.
+    Unmanaged,
 }
 
 impl Writing {
@@ -385,6 +402,19 @@ impl Writing {
             Self::TheirsAlone => Some(
                 Remedy::new("lemonfiber has never written this, so it will not start now")
                     .with_detail("lemonfiber seed writes what is missing"),
+            ),
+            // The setting is named through its own constant rather than spelled here,
+            // so a rename reaches this sentence and an operator is never told to read
+            // back something by a name nothing answers to.
+            Self::Unmanaged => Some(
+                Remedy::new(
+                    "You declared this unmanaged, so lemonfiber observes it and writes \
+                             nothing",
+                )
+                .with_detail(format!(
+                    "lemonfiber config show {} reads back what you declared",
+                    crate::config::UNMANAGED_KEY
+                )),
             ),
         }
     }
@@ -579,6 +609,18 @@ mod tests {
         assert_eq!(theirs, Writing::TheirsAlone);
         assert!(!theirs.allowed());
         assert!(theirs.refused().is_some());
+
+        // The one answer that is not a conclusion about a value: it is an instruction
+        // about an area, and the sentence it carries has to say so rather than talk
+        // about a change the operator may never have made.
+        let declared = Writing::Unmanaged;
+        assert!(!declared.allowed());
+        let said = declared.refused().map(|remedy| remedy.action.clone());
+        assert!(
+            said.as_ref()
+                .is_some_and(|said| said.contains("declared this unmanaged")),
+            "{said:?}"
+        );
     }
 
     /// Report-only unless this run said otherwise. A run that changed something because

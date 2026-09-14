@@ -64,15 +64,26 @@ fn theirs(services: &[Elsewhere]) -> Lines {
     }
     lines.spaced("What the services in this stack send, which is theirs and not lemonfiber's:");
     for service in services {
-        let goes = if service.destination.is_empty() {
-            "nothing leaves this machine".to_owned()
-        } else {
-            service.destination.clone()
-        };
-        lines.spaced(format!("  {} — {goes}", service.service));
+        lines.spaced(format!("  {} — {}", service.service, goes(service)));
         lines.put(format!("    {}", service.purpose));
     }
     lines
+}
+
+/// Where one service reaches, as the line above its explanation.
+///
+/// Three answers rather than two, and the third is the one worth having: a service
+/// lemonfiber ships no record for is marked as such, because the sentence for a
+/// service that reaches nothing is a promise and must never be given to a service
+/// nobody has looked at.
+fn goes(service: &Elsewhere) -> String {
+    if !service.recorded {
+        return format!("{} (not one lemonfiber knows)", service.destination);
+    }
+    if service.destination.is_empty() {
+        return "nothing leaves this machine".to_owned();
+    }
+    service.destination.clone()
 }
 
 #[cfg(test)]
@@ -149,6 +160,7 @@ mod tests {
                 service: "prowlarr".to_owned(),
                 destination: "the indexers you configured".to_owned(),
                 purpose: "Runs the searches everything else asks for.".to_owned(),
+                recorded: true,
             }],
         })
         .text();
@@ -167,6 +179,7 @@ mod tests {
                 service: "unpackerr".to_owned(),
                 destination: String::new(),
                 purpose: "Nothing. It extracts what it finds on this machine.".to_owned(),
+                recorded: true,
             }],
         })
         .text();
@@ -185,6 +198,28 @@ mod tests {
         let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Outbound(report)).text();
         assert!(drawn.contains("What lemonfiber sends"), "{drawn}");
         assert!(drawn.contains("registry"), "{drawn}");
+    }
+
+    /// The line an unknown service gets, which must not be the one that promises
+    /// nothing leaves the machine.
+    #[test]
+    fn a_service_lemonfiber_has_no_record_for_says_so_rather_than_promising_anything() {
+        let said = leaving(&Leaving {
+            ours: Vec::new(),
+            theirs: vec![Elsewhere {
+                service: "somebodys-own-service".to_owned(),
+                destination: "not known to lemonfiber".to_owned(),
+                purpose: "This service is not one lemonfiber knows.".to_owned(),
+                recorded: false,
+            }],
+        })
+        .text();
+        assert!(said.contains("somebodys-own-service"), "{said}");
+        assert!(said.contains("not one lemonfiber knows"), "{said}");
+        assert!(
+            !said.contains("nothing leaves this machine"),
+            "an unknown service was given the promise that belongs to a known one: {said}"
+        );
     }
 
     #[test]

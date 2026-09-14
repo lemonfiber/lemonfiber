@@ -33,7 +33,13 @@ fn ctx() -> Ctx {
         Arc::new(Idle),
         Arc::new(lemonfiber_adapters::Daemon::local()),
         Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
+        lemonfiber_core::ports::seams::Seams {
+            // Faked so a start's port pre-flight never reaches a real daemon: what
+            // else is running on the machine a test happens to run on is not a fact
+            // the test is about.
+            images: lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()),
+            ..lemonfiber_adapters::live()
+        },
         lemonfiber_core::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
         Settings::default(),
         Environment::MacOs,
@@ -86,7 +92,13 @@ fn guarding(volume: Arc<dyn Volume>) -> Ctx {
         Arc::new(Idle),
         Arc::new(lemonfiber_adapters::Daemon::local()),
         Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
+        lemonfiber_core::ports::seams::Seams {
+            // Faked so a start's port pre-flight never reaches a real daemon: what
+            // else is running on the machine a test happens to run on is not a fact
+            // the test is about.
+            images: lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()),
+            ..lemonfiber_adapters::live()
+        },
         lemonfiber_core::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
         Settings {
             data_root: Some(dir),

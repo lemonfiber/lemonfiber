@@ -1,0 +1,14 @@
+# Enough of a Compose project for the manifest beside it to describe. Nothing here
+# is run: the tests read the invocation lemonfiber would spawn rather than spawning
+# it, which is what lets a fork's service be proven operable with no daemon present.
+services:
+  sonarr:
+    image: linuxserver/sonarr:4.0.10
+    profiles: [tv]
+    ports:
+      - "127.0.0.1:8989:8989"
+  pantograph:
+    image: somebody/pantograph:2.1.0
+    profiles: [tv]
+    ports:
+      - "127.0.0.1:9411:9411"

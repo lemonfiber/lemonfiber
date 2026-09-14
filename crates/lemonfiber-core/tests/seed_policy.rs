@@ -137,6 +137,7 @@ fn a_pass_where_everything_settled_is_complete() {
             wiring("root folder in Radarr", State::AlreadyWired),
         ],
         rehearsed: false,
+        unsupported: Vec::new(),
     };
     assert!(report.is_complete());
     assert!(report.outstanding().is_empty());
@@ -162,6 +163,7 @@ fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
             ),
         ],
         rehearsed: false,
+        unsupported: Vec::new(),
     };
     assert!(!report.is_complete());
     let outstanding: Vec<&str> = report
@@ -206,6 +208,7 @@ fn a_blocked_connection_is_named_apart_from_the_merely_outstanding() {
             ),
         ],
         rehearsed: false,
+        unsupported: Vec::new(),
     };
     assert!(!report.is_complete());
     let blocked: Vec<&str> = report
@@ -252,6 +255,7 @@ fn the_report_names_each_state_on_the_wire() {
             wiring("i", State::Unmanaged),
         ],
         rehearsed: false,
+        unsupported: Vec::new(),
     };
     let json = serde_json::to_string(&report).unwrap_or_default();
     for state in [
@@ -287,6 +291,7 @@ fn the_report_draws_out_the_drifts_that_broke_the_stack() {
             wiring("fine", State::Wired),
         ],
         rehearsed: false,
+        unsupported: Vec::new(),
     };
     let warned: Vec<&str> = report
         .warnings()

@@ -160,8 +160,8 @@ pub fn begins_at(services: &[Service]) -> Option<(Facing, &Service)> {
 /// A manifest service built for a test, for the two modules that need one.
 ///
 /// Beside the rule rather than inside either test module: what a stack declares is
-/// this file's vocabulary, and a second copy of an eighteen-field literal is a
-/// second thing to keep agreeing with the schema.
+/// this file's vocabulary, and a second copy of a literal that names every field
+/// the schema declares is a second thing to keep agreeing with it.
 #[cfg(test)]
 pub(crate) mod fixtures {
     use lemonfiber_manifest::{Api, ApiKind, Bind, Criticality, KeySource, Service};

@@ -293,6 +293,11 @@ async fn permission(check: &WiringCheck, repair: &Repair) -> Option<Writing> {
     Some(check.mender()?.may_proceed(repair).await)
 }
 
+/// What carrying that repair out would write to, by the names a declaration uses.
+fn writes(check: &WiringCheck, repair: &Repair) -> Option<Vec<String>> {
+    Some(check.mender()?.writes_to(repair))
+}
+
 /// What carrying the repair out did.
 async fn carried(check: &WiringCheck, repair: &Repair) -> Option<Attempt> {
     Some(check.mender()?.mend(repair).await)
@@ -576,4 +581,56 @@ async fn a_service_that_refuses_the_write_keeps_the_category_it_had() {
         "{:?}",
         stopped(attempt.as_ref())
     );
+}
+
+/// A wiring that is still where lemonfiber put it is offered nothing to put right.
+///
+/// The mender is handed every finding the run produced, not only the ones that went
+/// wrong, so the filter that keeps a passing check out of the offer is the only thing
+/// between the operator and a list of repairs for things that are not broken. An
+/// offer with nothing wrong in it is an offer nobody reads carefully, which is how a
+/// repair that matters gets agreed to without being read.
+#[tokio::test]
+async fn a_wiring_still_where_lemonfiber_put_it_is_offered_nothing() {
+    let check = checking(Some(recorded(OURS, Origin::Written)), answering(Some(OURS)));
+
+    assert!(offer(&check).await.is_none());
+}
+
+/// What this repair would write to is the \*arr, by the id the stack declares it
+/// under — which is the name an operator writes down when they say a service is
+/// theirs to tune.
+///
+/// The thing being written is a download client's category *inside* Sonarr. It has no
+/// name of its own that anybody could have declared, so naming it would be offering
+/// the operator a word their declaration can never match; naming the service is what
+/// makes "sonarr is mine" reach this repair at all. Asked of the mender rather than
+/// decided beside it, because the gate that reads this answer is one function above
+/// every mender and cannot know what any of them touches.
+#[tokio::test]
+async fn a_wiring_repair_declares_the_arr_it_would_write_inside() {
+    let check = stale();
+    let repair = offer(&check).await;
+
+    let declared = match &repair {
+        Some(repair) => writes(&check, repair),
+        None => None,
+    };
+
+    assert_eq!(declared, Some(vec!["sonarr".to_owned()]));
+}
+
+/// And a repair naming a wiring this mender does not hold declares no write at all.
+///
+/// Offering a repair and carrying it out are two commands apart, and the manifest can
+/// change in between. A mender that answered with a service name it had not found
+/// would hand the gate above it a name drawn from nothing — and the gate would then
+/// either refuse a repair over a declaration about an unrelated service, or let one
+/// through because the name it invented matched nothing. Both are wrong for the same
+/// reason: it does not know what this repair would write, and says so.
+#[test]
+fn a_repair_naming_a_wiring_nobody_manages_declares_no_write() {
+    let check = stale();
+
+    assert_eq!(writes(&check, &for_something_else()), Some(Vec::new()));
 }

@@ -726,6 +726,7 @@ mod tests {
             choices: Vec::new(),
             music: None,
             customised: false,
+            overwritten: None,
             disposition: Disposition::Held,
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Quality(held))), success());
@@ -733,6 +734,7 @@ mod tests {
             choices: Vec::new(),
             music: None,
             customised: false,
+            overwritten: None,
             disposition: Disposition::Shown,
         };
         assert_eq!(
@@ -1043,6 +1045,7 @@ mod tests {
             }],
             assessment: Assessment::Assessed,
             rehearsed: false,
+            unsupported: Vec::new(),
         };
         assert_eq!(
             format!("{:?}", settled(&Outcome::Seed(settled_seed))),
@@ -1060,6 +1063,7 @@ mod tests {
             }],
             assessment: Assessment::Assessed,
             rehearsed: false,
+            unsupported: Vec::new(),
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Seed(blocked))), success());
     }
@@ -1100,6 +1104,7 @@ mod tests {
             }],
             assessment: Assessment::Assessed,
             rehearsed: false,
+            unsupported: Vec::new(),
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Seed(waiting))), success());
     }
@@ -1118,6 +1123,7 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            unsupported: Vec::new(),
             rehearsed: true,
         };
         assert_eq!(
@@ -1193,6 +1199,7 @@ mod tests {
                 undeclared: Vec::new(),
                 services: Vec::new(),
                 disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+                unsupported: Vec::new(),
             }),
         ] {
             assert_eq!(format!("{:?}", settled(&outcome)), success());
