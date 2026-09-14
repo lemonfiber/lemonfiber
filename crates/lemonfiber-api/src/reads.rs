@@ -99,6 +99,12 @@ pub const OUTBOUND: &str = "/api/outbound";
 /// is open source, and only this can hand somebody the identifier, the project and
 /// the exact image to go and see for themselves.
 pub const PROVENANCE: &str = "/api/provenance";
+/// What each service in this stack is for, and what became of the ones that went.
+///
+/// The read that answers the question a list of nineteen names raises and cannot
+/// settle: a page can print `bazarr` beside `prowlarr`, and only this can say which of
+/// them an operator would miss.
+pub const CATALOGUE: &str = "/api/catalogue";
 
 /// Everything lemonfiber keeps on this machine, where each thing is and why.
 ///
@@ -221,6 +227,7 @@ pub const OFFERED: &[&str] = &[
     BACKUPS,
     OUTBOUND,
     PROVENANCE,
+    CATALOGUE,
     STORED,
     UNINSTALL,
     SPACE,
@@ -353,6 +360,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         BACKUPS => Ok(Command::Archives),
         OUTBOUND => Ok(Command::Outbound),
         PROVENANCE => Ok(Command::Provenance),
+        CATALOGUE => Ok(Command::Catalogue),
         STORED => Ok(Command::Stored),
         // Which removal is the one thing this takes, and a name that is none of the
         // four is refused rather than read as the safest — somebody who typed a word

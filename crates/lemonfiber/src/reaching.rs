@@ -173,6 +173,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/provenance",
     },
     Reach {
+        request: "catalogue",
+        through: "/api/catalogue",
+    },
+    Reach {
         request: "stored",
         through: "/api/stored",
     },

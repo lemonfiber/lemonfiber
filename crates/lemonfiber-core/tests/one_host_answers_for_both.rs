@@ -23,7 +23,7 @@ use std::sync::Arc;
 use common::stack::project;
 
 use lemonfiber_adapters::Daemon;
-use lemonfiber_core::app::{dispatch, Command, Ctx};
+use lemonfiber_core::app::{dispatch, Command, Ctx, ABSENT_THERE};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::error::Diagnose as _;
 use lemonfiber_core::platform::Environment;
@@ -245,9 +245,12 @@ async fn a_location_that_is_not_on_the_other_machine_stops_the_command() {
 
     let refused = dispatch(Command::Up { forms: Vec::new() }, &ctx(settings, &runner)).await;
 
+    // Compared against the constant rather than against the number it currently
+    // carries: a code moves when two declarations collide, and a test spelling the
+    // number is a second place that has to be found when one does.
     assert_eq!(
-        refused.err().map(|problem| problem.code.to_string()),
-        Some("LIFE-5".to_owned())
+        refused.err().map(|problem| problem.code),
+        Some(ABSENT_THERE)
     );
     let asked = runner.seen();
     let over_ssh = asked.iter().any(|argv| {
