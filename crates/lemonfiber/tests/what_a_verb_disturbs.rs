@@ -1,12 +1,10 @@
 //! What an operation takes away, and whether anybody is told before it happens.
 //!
 //! A check that disturbs the stack has said how long for since the killswitch made
-//! the case, and `architecture.rs` holds that half. This is the other: the verbs
-//! that start and stop services, which said nothing for as long as they have
-//! existed. They are here rather than beside it because that file had reached the
-//! length past which a test file covers more than one seam, and because the two
-//! halves are read from different places — one from the shape of a check, one from
-//! the shape of the dispatcher.
+//! the case, and `what_a_check_can_see.rs` holds that half. This is the other: the
+//! verbs that start and stop services, which said nothing for as long as they have
+//! existed. They are apart because the two halves are read from different places —
+//! one from the shape of a check, one from the shape of the dispatcher.
 
 mod source_tree;
 

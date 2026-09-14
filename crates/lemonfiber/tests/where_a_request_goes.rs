@@ -17,9 +17,9 @@
 //! the client rather than of the text.
 //!
 //! **Why one transport is the whole claim.** This drives `Web`, which is the only
-//! `Http` the workspace ships; `architecture.rs` confines `reqwest` to the single
-//! adapter it lives in, so a second client built without this policy cannot exist
-//! without failing there first. The two together are the whole of it — this one
+//! `Http` the workspace ships; `where_the_outside_world_is_reached.rs` confines
+//! `reqwest` to the single adapter it lives in, so a second client built without
+//! this policy cannot exist without failing there first. The two together are the whole of it — this one
 //! alone would say nothing about a client somebody added elsewhere.
 //!
 //! **What is not covered.** A host reached because DNS answered with somebody

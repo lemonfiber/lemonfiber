@@ -95,23 +95,24 @@ question the type answers. Moved items widen to `pub(crate)` — a parent cannot
 see a child's private items, and `mod child; use child::*;` compiles happily
 while importing nothing at all.
 
-## What the architecture test checks
+## What the architecture tests check
 
-`crates/lemonfiber/tests/architecture.rs`, run by `cargo test`:
+One file per seam under `crates/lemonfiber/tests/`, all run by `cargo test`. The
+file name is the question; the tests inside it are the ways of asking:
 
-| Test | Enforces |
+| File | Enforces |
 |------|----------|
-| `the_core_has_no_user_interface_dependency` | The core cannot render — no `ratatui`, `clap`, `axum` or friends in its manifest |
-| `talking_to_the_outside_world_only_happens_in_adapters` | Each external crate appears in exactly one file |
-| `only_the_platform_module_asks_which_operating_system_this_is` | No `target_os` outside `platform.rs` |
-| `no_lint_is_suppressed_in_source` | No `#[allow(…)]` anywhere in `src/` |
-| `no_requirement_identifier_appears_in_a_comment` | Spec identifiers stay in commits |
-| `no_feature_requirement_identifier_appears_in_a_comment` | The same, for area identifiers with no fixed prefix |
-| `no_source_file_outgrows_reading_in_one_sitting` | No file holds more than 550 production lines |
-| `no_test_file_covers_more_than_one_seam` | One test file per seam, so a fake has one owner |
-| `each_requirement_is_claimed_by_one_row` | Every requirement appears exactly once in the status table |
-| `no_two_problems_answer_to_the_same_code` | An error code an operator searches for means one thing |
-| `a_failure_is_reported_on_stderr_and_never_on_stdout` | A failure never lands in a piped stdout |
+| `what_the_build_forbids.rs` | The core cannot render and cannot reach the network; the ports and fixtures crates depend on nothing of ours that would make them a cycle. Read from the manifests, where a dependency is actually enforced |
+| `where_the_outside_world_is_reached.rs` | Each external crate appears in exactly one file, and no `target_os` outside `platform.rs` |
+| `what_a_source_file_may_not_say.rs` | No `#[allow(…)]` anywhere in `src/`, and no spec or area identifier in a comment |
+| `how_long_a_file_may_be.rs` | 550 production lines a shipped file, 1,200 a test file, and the test module declared where the counter stops |
+| `the_one_way_out.rs` | Output leaves through `say.rs`, treated on the way; a failure lands on stderr; what a parser reads is never folded for a person |
+| `each_requirement_is_claimed_once.rs` | Every requirement appears exactly once in the status table |
+| `one_code_one_problem.rs` | An error code an operator searches for means one thing |
+| `what_a_check_can_see.rs` | Every diagnostic check is handed something to ask, and says how long it disturbs the stack for |
+| `a_latch_is_settled_once.rs` | Reading a value settled at startup never settles it |
+| `nothing_shapes_this_machines_traffic.rs` | Nothing shipped reaches for a traffic shaper |
+| `what_seeding_does_in_order.rs` | Every declared API kind is acted on, and the request service has an owner before anything is registered into it |
 
 They read source text rather than the compiled crate. That is coarse and it is
 enough — every rule above is about where a *name* is allowed to appear, and a
