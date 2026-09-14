@@ -341,6 +341,28 @@ pub trait Mend: Send + Sync {
     async fn may_proceed(&self, _repair: &Repair) -> Writing {
         Writing::Ours
     }
+
+    /// What carrying this out would write to, by the names a declaration uses — a
+    /// service id, a settings key, a path within the stack.
+    ///
+    /// Nothing for a repair that touches nothing anybody could have declared theirs:
+    /// restarting a container writes to no file and no setting, and a mender naming
+    /// something here would be claiming a write it does not make.
+    ///
+    /// **Asked by the caller that carries repairs out, never by the mender itself.**
+    /// That is the whole of the design rather than a detail of it: a mender says what
+    /// it would touch and the decision is taken once, above the handler, in a match
+    /// the compiler checks. A gate inside each mender is a gate somebody adds a third
+    /// mender beside, and the promise it keeps — that lemonfiber never writes to an
+    /// area the operator declared unmanaged — is one a third mender breaks in silence.
+    ///
+    /// Not `may_proceed`'s business either, for the reason that method's own doc gives
+    /// about deciding: this answer needs nothing of a service, is settled before a run
+    /// begins, and a mender that folded it in would be reaching a service the operator
+    /// asked it to leave alone in order to find out whether to leave it alone.
+    fn writes_to(&self, _repair: &Repair) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Run the checks that match, bound each by its own budget, and sum the result.

@@ -112,6 +112,20 @@ pub const PROJECT_KEY: &str = "LEMONFIBER_PROJECT";
 /// `sonarr=it is behind the reverse proxy I already run,radarr=the same`
 pub const EXPOSED_KEY: &str = "LEMONFIBER_EXPOSED";
 
+/// The areas the operator has told lemonfiber to leave alone.
+///
+/// Pairs of `area=reason`, comma-separated, the same shape the register of
+/// deliberately exposed services takes: it is a decision, and a decision recorded
+/// without why is a note that somebody once wanted something and nothing about what
+/// they knew. Both halves have to be there; how good the reason is is not judged,
+/// which is where the two registers part company and why.
+///
+/// What an area covers, and what a declaration does and does not stop, is written in
+/// [`crate::unmanaged`] — including the one write it deliberately does not reach.
+///
+/// `config/recyclarr=my own profiles live in here,sonarr=I tune this one by hand`
+pub const UNMANAGED_KEY: &str = "LEMONFIBER_UNMANAGED";
+
 /// The setting naming where downloads and the library are kept.
 ///
 /// The one location the storage contract rests on: the compose driver mounts it
@@ -285,6 +299,7 @@ pub const SETTINGS: &[&str] = &[
     OVERLAY_KEY,
     QUIET_HOURS_KEY,
     EXPOSED_KEY,
+    UNMANAGED_KEY,
     DATA_ROOT_KEY,
     PUID_KEY,
     PGID_KEY,

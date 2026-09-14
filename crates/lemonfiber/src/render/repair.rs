@@ -130,6 +130,10 @@ fn said(outcome: &Outcome) -> String {
         Outcome::Stopped { leaving } => format!("stopped partway — {leaving}"),
         Outcome::Declined => "left alone".to_owned(),
         Outcome::WouldOverwrite => "refused, it would overwrite your own change".to_owned(),
+        // A different sentence from the one above, and the difference is the point: that
+        // one is lemonfiber declining to write over a change it can see, and this is
+        // lemonfiber obeying an instruction it was given.
+        Outcome::Unmanaged => "left alone, you declared this unmanaged".to_owned(),
     }
 }
 
@@ -208,6 +212,7 @@ mod tests {
                 Outcome::FixFailed,
                 Outcome::Declined,
                 Outcome::WouldOverwrite,
+                Outcome::Unmanaged,
                 Outcome::Stopped {
                     leaving: "the client on its old port".to_owned(),
                 },
@@ -219,6 +224,9 @@ mod tests {
         assert!(text.contains("still wrong afterwards"), "{text}");
         assert!(text.contains("left alone"), "{text}");
         assert!(text.contains("would overwrite your own change"), "{text}");
+        // And the declaration's own sentence, which must not be the one above: that
+        // names a change the operator made, and this names an instruction they gave.
+        assert!(text.contains("you declared this unmanaged"), "{text}");
         // The state a stopped repair left behind travels with the verdict: it is the most
         // useful sentence in a failure, and flattening it loses what to do next.
         assert!(

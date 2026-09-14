@@ -53,8 +53,16 @@ pub(super) fn materialise(
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: Option<&Selection>,
+    unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
-    write_stack(source, into, record_path, selection, Pass::Materialise)
+    write_stack(
+        source,
+        into,
+        record_path,
+        selection,
+        unmanaged,
+        Pass::Materialise,
+    )
 }
 
 /// Overwrite the stack back to lemonfiber's own version, reverting every file the
@@ -71,8 +79,9 @@ pub(super) fn reset_stack(
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: Option<&Selection>,
+    unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
-    write_stack(source, into, record_path, selection, Pass::Reset)
+    write_stack(source, into, record_path, selection, unmanaged, Pass::Reset)
 }
 
 /// Where the stack would live and which files the operator has edited, without
@@ -92,8 +101,16 @@ pub(super) fn would_materialise(
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: Option<&Selection>,
+    unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
-    write_stack(source, into, record_path, selection, Pass::Preview)
+    write_stack(
+        source,
+        into,
+        record_path,
+        selection,
+        unmanaged,
+        Pass::Preview,
+    )
 }
 
 /// The edits a reset would revert, without touching a thing — the operator's hand-edited
@@ -108,8 +125,17 @@ pub(super) fn pending_reverts(
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: Option<&Selection>,
+    unmanaged: &[(String, String)],
 ) -> Result<Vec<StackEdit>, Failure> {
-    write_stack(source, into, record_path, selection, Pass::Preview).map(|(_, edits)| edits)
+    write_stack(
+        source,
+        into,
+        record_path,
+        selection,
+        unmanaged,
+        Pass::Preview,
+    )
+    .map(|(_, edits)| edits)
 }
 
 /// Which pass over the stack this is: an ordinary materialise (write lemonfiber's, keep
@@ -131,6 +157,7 @@ fn write_stack(
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: Option<&Selection>,
+    unmanaged: &[(String, String)],
     pass: Pass,
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     let files = source.files();
@@ -147,6 +174,19 @@ fn write_stack(
     let mut edits = Vec::new();
     for (relative, content) in files {
         let key = relative.to_string_lossy();
+        // An area the operator declared unmanaged, skipped on every pass — including a
+        // reset, which is otherwise the consent to let lemonfiber's state win. Two
+        // explicit decisions, and the one that says "never write here" is the one that
+        // has to hold, because the other failing quietly is how somebody comes to
+        // believe a file is theirs while a command they ran reverts it.
+        //
+        // Skipped before the comparison rather than after it, so the record of what
+        // lemonfiber wrote gains no entry for a file lemonfiber is not writing. An
+        // entry there would read, on the first run after a declaration is taken back,
+        // as lemonfiber's own file to overwrite.
+        if crate::unmanaged::covers(unmanaged, &key) {
+            continue;
+        }
         let content = match selection {
             Some(selection) => carrying_the_choice(&key, content, selection),
             // No choice to carry, and the Recyclarr config left as it is rather than
@@ -233,9 +273,16 @@ pub(super) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Pat
 /// to let the preset win. Records the new content so it is recognised as lemonfiber's
 /// own again.
 ///
-/// Returns whether it overwrote a customised config, as opposed to one already in
-/// lemonfiber's own hand. A rehearsal reports what it would do and writes nothing. An
-/// external stack, which lemonfiber does not materialise, is left untouched.
+/// Returns the edit it replaced, with the diff of what was lost against what was
+/// written, or nothing where the config was already in lemonfiber's own hand. A bare
+/// yes-or-no was what this answered for a long while, and consent given against a
+/// yes-or-no is consent to something the operator was never shown: they know a file
+/// they edited is about to go and not which of their lines is in it. The diff is
+/// masked the way every other diff of a stack file is, so a credential that drifted
+/// is named without either value being printed.
+///
+/// A rehearsal reports what it would replace and writes nothing. An external stack,
+/// which lemonfiber does not materialise, is left untouched.
 ///
 /// # Errors
 ///
@@ -245,29 +292,48 @@ pub(super) fn reapply_recyclarr(
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: &Selection,
+    unmanaged: &[(String, String)],
     rehearse: bool,
-) -> Result<bool, Failure> {
+) -> Result<Option<StackEdit>, Failure> {
+    // The one command whose whole purpose is to overwrite an operator's edit, held by
+    // the one declaration whose whole purpose is to stop that. Answered as "nothing was
+    // replaced", which is true: the config is theirs and stays exactly as it is.
+    if crate::unmanaged::covers(unmanaged, RECYCLARR_CONFIG) {
+        return Ok(None);
+    }
     let Some(shipped) = shipped_recyclarr(source) else {
         // External, or a stack with no Recyclarr config: nothing lemonfiber manages.
         // This is also the guard that keeps an external stack safe — `into` is the
         // built-in stack directory, not where an external stack lives, so writing
         // there would be wrong. An external source has no embedded files, so it
         // returns here before touching `into`; that invariant is load-bearing.
-        return Ok(false);
+        return Ok(None);
     };
     let Some(into) = into else {
         return Err(Failure::NowhereToWrite);
     };
-    let was_customised = recyclarr_customised(Some(into), record_path);
+    let target = into.join(RECYCLARR_CONFIG);
+    let desired = crate::recyclarr::rewrite(&String::from_utf8_lossy(shipped), selection);
+
+    // Read before the write, and read once. The same comparison `recyclarr_customised`
+    // makes — a record of what lemonfiber wrote, and a file on disk that no longer
+    // matches it — but holding the content rather than the verdict, because what is
+    // about to be overwritten cannot be read back afterwards.
+    let recorded = load(record_path).checksum(RECYCLARR_CONFIG);
+    let theirs = std::fs::read(&target)
+        .ok()
+        .filter(|bytes| recorded.is_some_and(|was| was != checksum(bytes)));
+
     if !rehearse {
-        let desired = crate::recyclarr::rewrite(&String::from_utf8_lossy(shipped), selection);
-        let target = into.join(RECYCLARR_CONFIG);
         write(&target, desired.as_bytes())?;
         let mut record = load(record_path);
         record.record(RECYCLARR_CONFIG, checksum(desired.as_bytes()));
         save(record_path, &record);
     }
-    Ok(was_customised)
+    Ok(theirs.map(|yours| StackEdit {
+        path: RECYCLARR_CONFIG.to_owned(),
+        diff: diff(&String::from_utf8_lossy(&yours), &desired),
+    }))
 }
 
 /// The Recyclarr config this stack ships, or `None` for a stack that has none — an
@@ -351,7 +417,7 @@ mod tests {
         let (into, record) = scratch("write-and-leave");
         let source = Source::Embedded(&STACKLET);
 
-        let first = materialise(source, Some(&into), Some(&record), Some(&balanced()));
+        let first = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
         let (path, edits) = first.unwrap_or((PathBuf::new(), Vec::new()));
         assert_eq!(path, into);
         assert!(edits.is_empty(), "a fresh materialise reports no edits");
@@ -365,7 +431,7 @@ mod tests {
         );
 
         // A second run finds every file exactly as it left it: nothing to report.
-        let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+        let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or((PathBuf::new(), Vec::new()));
         assert!(again.is_empty(), "an unchanged file is left, not reported");
     }
@@ -374,13 +440,13 @@ mod tests {
     fn an_edited_file_is_preserved_and_reported_with_a_diff() {
         let (into, record) = scratch("preserve-edit");
         let source = Source::Embedded(&STACKLET);
-        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()));
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
 
         // The operator edits a materialised file by hand.
         let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
         let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-        let (_, edits) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+        let (_, edits) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or((PathBuf::new(), Vec::new()));
         assert_eq!(edits.len(), 1, "only the edited file is reported");
         let edit = edits.first();
@@ -397,7 +463,7 @@ mod tests {
     fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
         let (into, record) = scratch("reset-revert");
         let source = Source::Embedded(&STACKLET);
-        let (_, _) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+        let (_, _) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or((PathBuf::new(), Vec::new()));
         let shipped = read(&into.join("compose.yaml"));
 
@@ -405,7 +471,7 @@ mod tests {
         let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
         let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-        let (_, reverted) = reset_stack(source, Some(&into), Some(&record), Some(&balanced()))
+        let (_, reverted) = reset_stack(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or((PathBuf::new(), Vec::new()));
         assert_eq!(reverted.len(), 1, "the reverted edit is named");
         assert!(reverted
@@ -414,7 +480,7 @@ mod tests {
         // The edit is gone: the file is lemonfiber's own again.
         assert_eq!(read(&into.join("compose.yaml")), shipped);
         // And a following materialise sees no drift — the reset re-recorded it.
-        let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()))
+        let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or((PathBuf::new(), Vec::new()));
         assert!(
             again.is_empty(),
@@ -426,12 +492,12 @@ mod tests {
     fn a_preview_names_the_reverts_but_writes_nothing() {
         let (into, record) = scratch("reset-preview");
         let source = Source::Embedded(&STACKLET);
-        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()));
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
 
         let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
         let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-        let pending = pending_reverts(source, Some(&into), Some(&record), Some(&balanced()))
+        let pending = pending_reverts(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or_default();
         assert_eq!(pending.len(), 1, "the edit that would be reverted is named");
         // The preview touched nothing: the operator's edit is still there.
@@ -447,6 +513,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&balanced()),
+            &[],
         )
         .unwrap_or((PathBuf::new(), vec![]));
         assert_eq!(path, external, "an external stack is used where it lives");
@@ -456,7 +523,13 @@ mod tests {
 
     #[test]
     fn an_embedded_stack_with_nowhere_to_write_is_refused() {
-        let refusal = materialise(Source::Embedded(&STACKLET), None, None, Some(&balanced()));
+        let refusal = materialise(
+            Source::Embedded(&STACKLET),
+            None,
+            None,
+            Some(&balanced()),
+            &[],
+        );
         assert!(matches!(refusal, Err(Failure::NowhereToWrite)));
     }
 
@@ -474,6 +547,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&balanced()),
+            &[],
         );
         assert!(matches!(failure, Err(Failure::NotWritten { .. })));
     }
@@ -486,6 +560,7 @@ mod tests {
             Some(&into),
             None,
             Some(&balanced()),
+            &[],
         )
         .unwrap_or((PathBuf::new(), vec![]));
         assert!(edits.is_empty());
@@ -502,6 +577,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&maximum),
+            &[],
         )
         .unwrap_or((PathBuf::new(), vec![]));
         // Written, not reported as an edit: this is lemonfiber's own choice landing.
@@ -522,6 +598,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&balanced()),
+            &[],
         )
         .unwrap_or((PathBuf::new(), vec![]));
         assert!(edits.is_empty());
@@ -542,6 +619,7 @@ mod tests {
             Some(&into),
             Some(&record),
             None,
+            &[],
         )
         .unwrap_or((PathBuf::new(), vec![]));
         assert!(edits.is_empty());
@@ -561,6 +639,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&Selection::everywhere(Preset::Maximum)),
+            &[],
         );
         let recyclarr = into.join("config/recyclarr/recyclarr.yml");
         assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
@@ -572,6 +651,7 @@ mod tests {
             Some(&into),
             Some(&record),
             None,
+            &[],
         );
         assert!(
             read(&recyclarr).contains("sonarr-web-2160p.yml"),
@@ -591,6 +671,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&balanced()),
+            &[],
         );
         assert!(!recyclarr_customised(Some(&into), Some(&record)));
 
@@ -614,6 +695,7 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&maximum),
+            &[],
         );
         let recyclarr = into.join("config/recyclarr/recyclarr.yml");
         // The operator hand-edits it.
@@ -621,18 +703,92 @@ mod tests {
         assert!(recyclarr_customised(Some(&into), Some(&record)));
 
         // Reapply re-asserts the recorded preset over the edit.
-        let overwrote = reapply_recyclarr(
+        let overwritten = reapply_recyclarr(
             Source::Embedded(&STACKLET),
             Some(&into),
             Some(&record),
             &maximum,
+            &[],
             false,
         )
-        .unwrap_or(false);
-        assert!(overwrote, "an edit was overwritten");
+        .unwrap_or_default();
+        let edit = overwritten.as_ref();
+        assert!(edit.is_some(), "an edit was overwritten");
+        assert!(edit.is_some_and(|edit| edit.path.ends_with("recyclarr.yml")));
+        // The operator is shown which of their lines went, not only that some did.
+        assert!(
+            edit.is_some_and(|edit| edit.diff.contains("- # mine")),
+            "{overwritten:?}"
+        );
+        assert!(
+            edit.is_some_and(|edit| edit.diff.contains('+')),
+            "{overwritten:?}"
+        );
         assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
         // Recorded as lemonfiber's own again: no longer customised.
         assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    }
+
+    /// The diff of a replaced config reaches a terminal, its scrollback and any bug
+    /// report pasted out of it, and a Recyclarr config carries a key per instance.
+    #[test]
+    fn a_credential_in_the_config_a_reapply_replaces_is_named_and_never_printed() {
+        let (into, record) = scratch("reapply-secret");
+        let maximum = Selection::everywhere(Preset::Maximum);
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&maximum),
+            &[],
+        );
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        let key = ["a", "recyclarr", "key"].join("-");
+        let _ = std::fs::write(&recyclarr, format!("    api_key: {key}\n"));
+
+        let overwritten = reapply_recyclarr(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            &maximum,
+            &[],
+            true,
+        )
+        .unwrap_or_default();
+        let shown = overwritten.map(|edit| edit.diff).unwrap_or_default();
+
+        assert!(shown.contains("api_key"), "{shown}");
+        assert!(
+            !shown.contains(&key),
+            "the key survived into the diff: {shown}"
+        );
+    }
+
+    #[test]
+    fn a_reapply_over_a_config_already_in_lemonfibers_own_hand_replaces_nothing() {
+        let (into, record) = scratch("reapply-clean");
+        let maximum = Selection::everywhere(Preset::Maximum);
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&maximum),
+            &[],
+        );
+
+        let overwritten = reapply_recyclarr(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            &maximum,
+            &[],
+            false,
+        )
+        .unwrap_or_default();
+        assert!(
+            overwritten.is_none(),
+            "nothing of the operator's was there to lose: {overwritten:?}"
+        );
     }
 
     #[test]
@@ -644,39 +800,147 @@ mod tests {
             Some(&into),
             Some(&record),
             Some(&maximum),
+            &[],
         );
         let recyclarr = into.join("config/recyclarr/recyclarr.yml");
         let _ = std::fs::write(&recyclarr, "# mine\n");
 
-        let overwrote = reapply_recyclarr(
+        let overwritten = reapply_recyclarr(
             Source::Embedded(&STACKLET),
             Some(&into),
             Some(&record),
             &maximum,
+            &[],
             true,
         )
-        .unwrap_or(false);
+        .unwrap_or_default();
         assert!(
-            overwrote,
+            overwritten.is_some(),
             "the rehearsal reports it would overwrite an edit"
+        );
+        assert!(
+            overwritten.is_some_and(|edit| edit.diff.contains("- # mine")),
+            "the rehearsal shows what it would replace"
         );
         // The edit is still on disk: a rehearsal changed nothing.
         assert_eq!(read(&recyclarr), "# mine\n");
     }
 
+    /// A declaration is a name and the reason somebody gave for writing it down.
+    fn declared(area: &str) -> Vec<(String, String)> {
+        vec![(
+            area.to_owned(),
+            "my own edits live in this one and I keep them".to_owned(),
+        )]
+    }
+
+    /// A file beneath a declared name is never written — not on a first materialise,
+    /// and not on the run that would have upgraded it.
+    #[test]
+    fn a_file_beneath_a_declared_area_is_never_written() {
+        let (into, record) = scratch("unmanaged-file");
+        let source = Source::Embedded(&STACKLET);
+        let theirs = declared("config/recyclarr");
+
+        let (_, edits) = materialise(
+            source,
+            Some(&into),
+            Some(&record),
+            Some(&balanced()),
+            &theirs,
+        )
+        .unwrap_or((PathBuf::new(), Vec::new()));
+
+        assert!(
+            !into.join("config/recyclarr/recyclarr.yml").exists(),
+            "a file the operator declared unmanaged was written"
+        );
+        // And the rest of the stack is written as usual: one declaration is not a
+        // refusal to maintain anything else.
+        assert!(read(&into.join("compose.yaml")).contains("image: sonarr"));
+        // Nor is it reported as an edit held back, which would be reporting drift
+        // about an area the operator said is not lemonfiber's to have an opinion on.
+        assert!(edits.is_empty(), "{edits:?}");
+        // And nothing is recorded for it: a checksum here would read, on the first run
+        // after the declaration is taken back, as lemonfiber's own file to overwrite.
+        assert!(
+            !read(&record).contains("recyclarr"),
+            "a file lemonfiber did not write was recorded as though it had"
+        );
+    }
+
+    /// Two explicit decisions meet here, and the one that says *never write* wins.
+    #[test]
+    fn a_reset_does_not_revert_a_file_the_operator_declared_unmanaged() {
+        let (into, record) = scratch("unmanaged-reset");
+        let source = Source::Embedded(&STACKLET);
+        let theirs = declared("compose.yaml");
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+
+        let mine = "services:\n  sonarr:\n    image: an-image-of-my-own\n";
+        let _ = std::fs::write(into.join("compose.yaml"), mine);
+
+        let (_, reverted) = reset_stack(
+            source,
+            Some(&into),
+            Some(&record),
+            Some(&balanced()),
+            &theirs,
+        )
+        .unwrap_or((PathBuf::new(), Vec::new()));
+
+        assert_eq!(
+            read(&into.join("compose.yaml")),
+            mine,
+            "a reset wrote over an area the operator had declared unmanaged"
+        );
+        assert!(reverted.is_empty(), "{reverted:?}");
+    }
+
+    /// The command whose whole purpose is to overwrite an edit, held by the
+    /// declaration whose whole purpose is to stop that.
+    #[test]
+    fn a_reapply_leaves_a_quality_config_declared_unmanaged_exactly_as_it_is() {
+        let (into, record) = scratch("unmanaged-reapply");
+        let maximum = Selection::everywhere(Preset::Maximum);
+        let _ = materialise(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            Some(&maximum),
+            &[],
+        );
+        let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+        let _ = std::fs::write(&recyclarr, "# mine\n");
+
+        let overwritten = reapply_recyclarr(
+            Source::Embedded(&STACKLET),
+            Some(&into),
+            Some(&record),
+            &maximum,
+            &declared("config/recyclarr/recyclarr.yml"),
+            false,
+        )
+        .unwrap_or_default();
+
+        assert!(overwritten.is_none(), "{overwritten:?}");
+        assert_eq!(read(&recyclarr), "# mine\n", "the config was overwritten");
+    }
+
     #[test]
     fn reapply_leaves_an_external_stack_alone() {
         let (into, record) = scratch("reapply-external");
-        let overwrote = reapply_recyclarr(
+        let overwritten = reapply_recyclarr(
             Source::External(Path::new("/some/operator/stack")),
             Some(&into),
             Some(&record),
             &balanced(),
+            &[],
             false,
         )
-        .unwrap_or(true);
+        .unwrap_or_default();
         assert!(
-            !overwrote,
+            overwritten.is_none(),
             "an external stack is the operator's, left untouched"
         );
         assert!(!into.exists(), "nothing was written for an external stack");

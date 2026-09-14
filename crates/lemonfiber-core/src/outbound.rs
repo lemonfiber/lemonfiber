@@ -110,9 +110,22 @@ pub struct Elsewhere {
     /// The service, by the id the stack declares it under.
     pub service: String,
     /// Where its requests go, in the terms an operator would recognise.
+    ///
+    /// Empty means it reaches nothing, which is an answer. It never means *and we
+    /// do not know*: that is [`Self::recorded`], and the two must not be read as one
+    /// — an unknown service rendered as an empty destination would be this product
+    /// claiming nothing leaves the machine on the strength of having no idea.
     pub destination: String,
     /// What it asks for.
     pub purpose: String,
+    /// Whether lemonfiber ships a record of what this service reaches.
+    ///
+    /// False for a service that arrived in the stack after this build was made, or
+    /// from an operator's own fork. It is listed anyway, because the alternative —
+    /// leaving it out — is a privacy inventory that is complete-looking and short,
+    /// and a reader counting the services on their machine against the ones on this
+    /// list is the reader this surface exists for.
+    pub recorded: bool,
 }
 
 /// Everything that leaves this machine: lemonfiber's own requests, and the stack's.

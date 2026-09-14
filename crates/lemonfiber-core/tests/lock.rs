@@ -137,6 +137,10 @@ fn ctx(files: &Arc<Remembering>) -> Ctx {
         lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_ports::seams::Seams {
             filesystem: Arc::clone(files) as Arc<dyn FileSystem>,
+            // Faked so a start's port pre-flight never reaches a real daemon: what
+            // else is running on the machine a test happens to run on is not a fact
+            // the test is about.
+            images: lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()),
             ..lemonfiber_adapters::live()
         },
         Source::External(project()),
@@ -161,6 +165,10 @@ fn ctx_without_settings(files: &Arc<Remembering>) -> Ctx {
         lemonfiber_fixtures::ports::Stopped::today(),
         lemonfiber_ports::seams::Seams {
             filesystem: Arc::clone(files) as Arc<dyn FileSystem>,
+            // Faked so a start's port pre-flight never reaches a real daemon: what
+            // else is running on the machine a test happens to run on is not a fact
+            // the test is about.
+            images: lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()),
             ..lemonfiber_adapters::live()
         },
         Source::External(project()),

@@ -1,0 +1,59 @@
+# A stack an operator maintains themselves, carrying a service this build has never
+# heard of.
+#
+# Two services and nothing else: one lemonfiber ships and knows how to speak to, and
+# one it does not — no API declaration, no entry in anything written down here, and a
+# name nothing in this workspace mentions. What the tests beside it hold is that the
+# second one is operated exactly like the first, and that the features which need to
+# know what a service *is* say so about it rather than passing over it in silence.
+
+schema_version  = 1
+stack_version   = "1.0.0"
+min_cli_version = "0.1.0"
+
+[[profile]]
+id          = "tv"
+name        = "Television"
+description = "Series, and what fetches them."
+
+[[form]]
+id          = "tv"
+name        = "Television"
+description = "Series."
+profiles    = ["tv"]
+
+[[service]]
+id           = "sonarr"
+name         = "Sonarr"
+profile      = "tv"
+image        = "linuxserver/sonarr"
+tag          = "4.0.10"
+port         = 8989
+bind         = "loopback"
+criticality  = "core"
+license      = "GPL-3.0-only"
+upstream     = "https://github.com/Sonarr/Sonarr"
+last_release = "2026-01-01"
+describes    = "Watches for series and files them into the library."
+without_it   = "Nothing files series; you move the downloads yourself."
+
+[service.api]
+kind       = "servarr"
+key_source = "config-xml"
+path       = "/config/config.xml"
+version    = 3
+
+[[service]]
+id           = "pantograph"
+name         = "Pantograph"
+profile      = "tv"
+image        = "somebody/pantograph"
+tag          = "2.1.0"
+port         = 9411
+bind         = "loopback"
+criticality  = "enhancing"
+license      = "MIT"
+upstream     = "https://example.invalid/pantograph"
+last_release = "2026-02-01"
+describes    = "Does something this operator wanted and lemonfiber does not ship."
+without_it   = "Whatever it does stops; lemonfiber cannot say what that is."

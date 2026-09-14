@@ -119,6 +119,12 @@ pub const SHOWN: &[(&str, &str)] = &[
          a record whose whole worth is that somebody can read it back",
     ),
     (
+        super::UNMANAGED_KEY,
+        "which parts of the stack the operator told lemonfiber to leave alone, and why — \
+         a record whose whole worth is that somebody can read it back, and the one setting \
+         whose effect is that lemonfiber stops doing something",
+    ),
+    (
         super::JELLYFIN_MODE_KEY,
         "whether the media server runs in a container or on the host machine",
     ),

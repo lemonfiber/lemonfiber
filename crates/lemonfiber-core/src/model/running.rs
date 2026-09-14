@@ -37,6 +37,15 @@ pub struct LifecycleReport {
     /// overwritten with lemonfiber's own. Empty in the ordinary case; a named entry
     /// warns that an upgrade would change a file they changed, and shows the diff.
     pub stack_edits: Vec<StackEdit>,
+    /// Host ports this start wants that another Compose project on this machine
+    /// already answers on, each named on both sides.
+    ///
+    /// Empty for every action that starts nothing, and empty on a machine running one
+    /// stack. Reported rather than refused: a port somebody deliberately shares is
+    /// their business, and the start goes ahead — what this changes is whether an
+    /// operator meeting a bind failure knows who is holding the port.
+    #[serde(default)]
+    pub port_conflicts: Vec<crate::model::ConflictReport>,
     /// What starting the stack did about the VPN's forwarded port, where it did
     /// anything. Absent in the ordinary case — the client was already on it, or
     /// there is no tunnel to forward through — and a sentence where the client was

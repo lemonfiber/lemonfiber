@@ -62,6 +62,14 @@ pub struct Cli {
     #[arg(long, global = true, value_name = "PATH")]
     pub stack_dir: Option<PathBuf>,
 
+    /// Keep lemonfiber's own configuration under a directory of your own.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub config_dir: Option<PathBuf>,
+
+    /// Keep lemonfiber's own data under a directory of your own.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub data_dir: Option<PathBuf>,
+
     /// What was asked for, or nothing at all — which is the terminal interface.
     #[command(subcommand)]
     pub command: Option<Request>,

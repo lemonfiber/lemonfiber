@@ -118,6 +118,8 @@ mod test_support;
 pub mod text;
 pub mod transcoding;
 pub mod uninstall;
+pub mod unmanaged;
+pub mod unsupported;
 pub mod update;
 pub mod validate;
 mod version;

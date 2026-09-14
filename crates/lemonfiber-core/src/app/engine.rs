@@ -116,6 +116,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         ctx.settings.stack_dir.as_deref(),
         record.as_deref(),
         quality.as_ref(),
+        &ctx.settings.unmanaged,
     )
     .map_err(|err| Box::new(err.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
@@ -184,12 +185,20 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .map_err(|err| Box::new(err.problem()))?;
     let services = survey(&manifest, &profiles, &containers);
 
+    // Read from the manifest rather than from what is running, because a declaration
+    // this build cannot reach is unreachable whether or not the container is up — and
+    // an operator who stopped the service would otherwise be told the declaration had
+    // healed.
+    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let unsupported = super::targets::unsupported_here(&manifest.services, project.as_deref());
+
     Ok(StatusReport {
         forms: forms.to_vec(),
         condition: condition(&services),
         undeclared: undeclared(&manifest, &containers),
         services,
         disturbs: crate::model::Disturbances::all(ctx.patience),
+        unsupported,
     })
 }
 
@@ -236,6 +245,16 @@ async fn readied(
         stopping::permitted(ctx, &manifest, forms).await?;
     }
 
+    // Asked only where something is about to bind. A teardown cannot want a port,
+    // and a pre-flight before one would be a question about a machine nobody is
+    // about to bind on. A rehearsal asks it too, and that is most of the point: what
+    // a start would run into is exactly what a rehearsal is for.
+    let port_conflicts = if starts(action) {
+        super::preflight::conflicting_ports(ctx, &manifest, &plan.services).await
+    } else {
+        Vec::new()
+    };
+
     let report = LifecycleReport {
         action: action.name().to_owned(),
         plan,
@@ -245,6 +264,7 @@ async fn readied(
         services: Vec::new(),
         condition: None,
         stack_edits,
+        port_conflicts,
         forwarding: None,
         switched: None,
         held: None,

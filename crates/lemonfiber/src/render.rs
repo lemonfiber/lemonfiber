@@ -961,6 +961,7 @@ mod tests {
                 choices: vec![preset(false)],
                 music: None,
                 customised: false,
+                overwritten: None,
                 disposition: Disposition::Shown,
             }),
             Outcome::Upgrade(UpgradeReport {
@@ -984,6 +985,7 @@ mod tests {
             Outcome::Stuck(StuckReport {
                 items: Vec::new(),
                 incomplete: false,
+                unsupported: Vec::new(),
             }),
             Outcome::FrontDoor(FrontDoorReport {
                 standing: Standing::Absent,
@@ -1008,6 +1010,7 @@ mod tests {
                 undeclared: Vec::new(),
                 services: Vec::new(),
                 disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+                unsupported: Vec::new(),
             }),
             Outcome::Doctor(DoctorReport {
                 overall: Overall::Healthy,

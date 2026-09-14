@@ -223,6 +223,10 @@ async fn main() -> ExitCode {
     // And who it is for, which decides the same for every failure without any of
     // the twenty-six places that report one having to be told.
     say::settle_audience(cli.json);
+    // And where this run keeps lemonfiber's own files, before anything has asked.
+    // Both paths below build a context, and a context reads the settings out of one
+    // of these directories, so this has to be settled in front of both of them.
+    context::settle_roots(cli.config_dir.take(), cli.data_dir.take());
 
     let Some(request) = cli.command else {
         return greeted(context(cli.stack_dir.take(), cli.dry_run, cli.force)).await;

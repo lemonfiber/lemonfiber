@@ -90,6 +90,16 @@ impl Mend for WiringMender {
             .collect()
     }
 
+    fn writes_to(&self, repair: &Repair) -> Vec<String> {
+        // The \*arr, by the id the stack declares it under. What is written is a
+        // download client's category *inside* that service, so the service is the thing
+        // an operator would have declared theirs — nothing here has a name of its own
+        // that a declaration could reach.
+        self.named(repair)
+            .map(|(managed, _)| vec![managed.target.id.clone()])
+            .unwrap_or_default()
+    }
+
     async fn may_proceed(&self, repair: &Repair) -> Writing {
         may_proceed(self, repair).await
     }

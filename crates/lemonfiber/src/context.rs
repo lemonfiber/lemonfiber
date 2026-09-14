@@ -4,6 +4,11 @@
 //! things every command needs before it can do anything, and both depend on the
 //! machine rather than on what was asked. Kept together, and away from the
 //! dispatcher, because that is the seam a test cannot cross.
+//!
+//! Both directories can be named instead of resolved, which is what `--config-dir`
+//! and `--data-dir` are for: a second instance on one machine, an install on a
+//! removable disk, or a machine whose home directory this program cannot work out at
+//! all. The platform is asked only for whichever half was not named.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -179,6 +184,7 @@ pub(crate) fn read_settings() -> Settings {
         admission: here().map(|paths| paths.admission()),
         household_host: household_host_from_env(&recorded),
         exposed: exposed_from_env(&recorded),
+        unmanaged: lemonfiber_core::config::unmanaged_from_env(&recorded),
         front_door: front_door_from_env(&recorded),
         reaching: Reaching::from_env(&recorded),
         provider_host: provider_host_from_env(&recorded),
@@ -249,11 +255,62 @@ pub(crate) fn remember(words: &[&str], rehearsing: bool) {
     }
 }
 
+/// The two base directories lemonfiber's own files sit beneath, where the operator
+/// named one instead of the platform's.
+///
+/// The pair rather than one directory, because the two mean different things to the
+/// operating system and to whoever backs this machine up: configuration is small and
+/// worth keeping, and the data directory holds what can be made again. An escape
+/// hatch that collapsed them would make the distinction unavailable to anybody who
+/// took it.
+#[derive(Debug)]
+struct Roots {
+    /// Where configuration goes, instead of the directory this platform names.
+    config: Option<PathBuf>,
+    /// Where regenerable data goes, instead of the directory this platform names.
+    data: Option<PathBuf>,
+}
+
+/// What this run was told about where its own files go.
+///
+/// Settled once and read by everything that asks, rather than handed to each reader:
+/// where lemonfiber keeps its files is a property of the run, the same way the
+/// explanations setting is, and there are six readers of it here. A reader told
+/// separately is a reader that can be told something different, and a run that
+/// answered two ways about where its own files are would write half of them
+/// somewhere nothing later looks.
+static ROOTS: std::sync::OnceLock<Roots> = std::sync::OnceLock::new();
+
+/// Take where the operator wants lemonfiber's own files kept, for the rest of the run.
+///
+/// A second call is ignored rather than obeyed, which is what the answer being a
+/// property of the run means: the flags are read once, before anything has asked
+/// where anything is.
+pub(crate) fn settle_roots(config: Option<PathBuf>, data: Option<PathBuf>) {
+    let _ = ROOTS.set(Roots { config, data });
+}
+
 pub(crate) fn here() -> Option<Paths> {
     use etcetera::BaseStrategy as _;
 
+    let given = ROOTS.get();
+    let config = given.and_then(|roots| roots.config.as_deref());
+    let data = given.and_then(|roots| roots.data.as_deref());
+    // Named both ways, and the platform is never asked. Worth the separate arm: a
+    // machine whose home directory cannot be resolved is exactly the machine
+    // somebody reaches for these flags on, and falling through here would answer it
+    // with the absence the flags were given to fill.
+    if let (Some(config), Some(data)) = (config, data) {
+        return Some(Paths::rooted(config, data));
+    }
+
     let strategy = etcetera::choose_base_strategy().ok()?;
-    Some(Paths::rooted(&strategy.config_dir(), &strategy.data_dir()))
+    let platform_config = strategy.config_dir();
+    let platform_data = strategy.data_dir();
+    Some(Paths::rooted(
+        config.unwrap_or(&platform_config),
+        data.unwrap_or(&platform_data),
+    ))
 }
 
 /// The operator's settings file, whether or not it exists yet.

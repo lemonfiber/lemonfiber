@@ -5,6 +5,7 @@
 
 use lemonfiber_core::model::{
     HouseholdMember, HouseholdReport, MemberRequest, Restriction, StuckReport, TraceReport,
+    UnsupportedReport,
 };
 use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
@@ -430,6 +431,28 @@ pub(super) fn stuck(report: &StuckReport) -> Lines {
     // from being read as "nothing else is stuck", the same honesty a trace keeps.
     if report.incomplete {
         lines.spaced("An *arr's queue could not be read, so this list may be incomplete.");
+    }
+    lines.extend(unreadable(&report.unsupported));
+    lines
+}
+
+/// The queues that were never asked, under the ones that were.
+///
+/// A different sentence from the unreadable-queue one above and deliberately so: that
+/// is a service that answered badly, and this is a service lemonfiber cannot speak to
+/// at all. An operator told only the first would go looking for a service that was
+/// down, and find it running.
+fn unreadable(unsupported: &[UnsupportedReport]) -> Lines {
+    let mut lines = Lines::default();
+    if unsupported.is_empty() {
+        return lines;
+    }
+    lines.spaced(
+        "These hold queues lemonfiber cannot read at all, so nothing of theirs is in the \
+         list above:",
+    );
+    for one in unsupported {
+        lines.put(format!("  {} — {}", one.what, one.because));
     }
     lines
 }
@@ -1169,16 +1192,37 @@ mod tests {
                 stage: Stage::Downloading,
             }],
             incomplete: true,
+            unsupported: Vec::new(),
         };
         let text = stuck(&report).text();
         assert!(text.contains("1 item(s) stuck"));
         assert!(text.contains("stuck at downloading"));
         assert!(text.contains("trace 'The Expanse'"));
         assert!(text.contains("may be incomplete"));
+
+        let unreadable = StuckReport {
+            items: Vec::new(),
+            incomplete: false,
+            unsupported: vec![UnsupportedReport {
+                what: "bookish".to_owned(),
+                because: "lemonfiber does not speak this service's API yet".to_owned(),
+            }],
+        };
+        let said = stuck(&unreadable).text();
+        assert!(said.contains("cannot read at all"), "{said}");
+        assert!(
+            said.contains("bookish — lemonfiber does not speak"),
+            "{said}"
+        );
+        // And it is not the sentence a queue that answered badly gets, which would send
+        // the operator looking for a service that is down and find it running.
+        assert!(!said.contains("may be incomplete"), "{said}");
+
         // Nothing stuck is said plainly.
         let clear = StuckReport {
             items: Vec::new(),
             incomplete: false,
+            unsupported: Vec::new(),
         };
         assert!(stuck(&clear).text().contains("Nothing is stuck"));
     }

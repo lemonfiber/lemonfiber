@@ -28,10 +28,22 @@ pub(super) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
     let into = ctx.settings.stack_dir.as_deref();
 
     let reverted = if confirm {
-        super::materialise::reset_stack(ctx.stack, into, record.as_deref(), Some(&selection))
-            .map(|(_, edits)| edits)
+        super::materialise::reset_stack(
+            ctx.stack,
+            into,
+            record.as_deref(),
+            Some(&selection),
+            &ctx.settings.unmanaged,
+        )
+        .map(|(_, edits)| edits)
     } else {
-        super::materialise::pending_reverts(ctx.stack, into, record.as_deref(), Some(&selection))
+        super::materialise::pending_reverts(
+            ctx.stack,
+            into,
+            record.as_deref(),
+            Some(&selection),
+            &ctx.settings.unmanaged,
+        )
     }
     .map_err(|failure| Box::new(failure.problem()))?;
 

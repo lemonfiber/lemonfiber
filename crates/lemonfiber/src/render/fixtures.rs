@@ -32,6 +32,7 @@ pub(super) fn seed_report(wirings: Vec<Wiring>) -> SeedReport {
         wirings,
         assessment: SeedAssessment::Assessed,
         rehearsed: false,
+        unsupported: Vec::new(),
     }
 }
 
@@ -245,6 +246,7 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         services: Vec::new(),
         condition: None,
         stack_edits: Vec::new(),
+        port_conflicts: Vec::new(),
         forwarding: None,
         switched: None,
         held: None,

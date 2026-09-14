@@ -6,10 +6,26 @@
 //! and leaving them out would understate what running the stack does, which is the
 //! thing an operator is actually deciding about.
 //!
-//! Every service the stack declares has an entry, including the ones that reach
-//! nothing. That is what makes the list hold: a service arriving in the stack is red
-//! until somebody writes down what it talks to, rather than quietly absent from a
-//! list of the ones that do.
+//! **The stack answers first, and this table answers for the ones that do not.** A
+//! service may say in its own manifest entry where it reaches and what it asks for,
+//! and where it does, that is what the inventory carries — so adding a service to a
+//! Compose project is a change to that project and to nothing here.
+//!
+//! It was not always so, and what it replaced is worth stating, because the thing it
+//! was defending is real. This table was held against the stack by a set-equality
+//! test in both directions, so a service arriving in the stack turned this crate red
+//! until somebody edited Rust — which is the one thing adding a service to a Compose
+//! project must never cost. But an inventory of what leaves a machine is only honest
+//! if a service cannot arrive in it unlisted, and that is what the test bought.
+//!
+//! Both, now, from two directions. A service the stack describes needs nothing here.
+//! A service neither source describes is carried into the inventory saying lemonfiber
+//! has no record of what it reaches, which is the truth and is neither a guess nor a
+//! silent omission. And what is still a build failure is the half that is about this
+//! file rather than about somebody's stack: an entry naming a service the stack does
+//! not declare is a stale decision or a mistyped id, and a mistyped id would now
+//! degrade quietly into "nothing is written down about this", which is exactly the
+//! failure the report cannot tell from the real thing.
 
 use super::Elsewhere;
 use lemonfiber_manifest::Service;
@@ -133,20 +149,69 @@ pub const ELSEWHERE: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// Where an unrecorded service is said to reach, which is the one thing that can
+/// honestly be said about it.
+///
+/// A sentence rather than an empty string, because empty already means *nothing
+/// leaves this machine* in this report and the two are opposite claims.
+const UNKNOWN: &str = "not known to lemonfiber";
+
+/// What is said about a service this build ships no record for.
+const NO_RECORD: &str = "This service is not one lemonfiber knows, so nothing here can say \
+                         where it reaches or what it asks for. It is listed because leaving \
+                         it out would make this inventory read as complete while it was \
+                         short. Its own documentation, and the Compose file that declares \
+                         it, are what answer this.";
+
 /// What the services in this stack reach, in the order the stack declares them.
+///
+/// Every service declared, whether or not anything describes it. One nothing
+/// describes says so; it is never dropped, and never rendered as reaching nothing.
 pub(super) fn elsewhere(services: &[Service]) -> Vec<Elsewhere> {
     services
         .iter()
-        .filter_map(|service| {
-            ELSEWHERE.iter().find(|(id, _, _)| *id == service.id).map(
-                |(_, destination, purpose)| Elsewhere {
-                    service: service.id.clone(),
-                    destination: (*destination).to_owned(),
-                    purpose: (*purpose).to_owned(),
-                },
-            )
-        })
+        .map(|service| from_the_stack(service).unwrap_or_else(|| written_down(service)))
         .collect()
+}
+
+/// What a service says about itself, where its own manifest entry says anything.
+///
+/// Both halves or neither, which the manifest's own validation holds it to: half an
+/// answer here would attribute a purpose to a service the same report says goes
+/// nowhere. Preferred over the table below because it travels with the stack — a fork
+/// describes its own services, and a service added to the stack needs no release of
+/// this binary to be described.
+fn from_the_stack(service: &Service) -> Option<Elsewhere> {
+    let destination = service.reaches.clone()?;
+    let purpose = service.asks_for.clone()?;
+    Some(Elsewhere {
+        service: service.id.clone(),
+        destination,
+        purpose,
+        recorded: true,
+    })
+}
+
+/// What this build knows about a service that says nothing about itself, or the
+/// admission that it knows nothing.
+fn written_down(service: &Service) -> Elsewhere {
+    ELSEWHERE
+        .iter()
+        .find(|(id, _, _)| *id == service.id)
+        .map_or_else(
+            || Elsewhere {
+                service: service.id.clone(),
+                destination: UNKNOWN.to_owned(),
+                purpose: NO_RECORD.to_owned(),
+                recorded: false,
+            },
+            |(_, destination, purpose)| Elsewhere {
+                service: service.id.clone(),
+                destination: (*destination).to_owned(),
+                purpose: (*purpose).to_owned(),
+                recorded: true,
+            },
+        )
 }
 
 #[cfg(test)]
@@ -161,25 +226,168 @@ mod tests {
             .unwrap_or_default()
     }
 
-    /// Both directions, because either alone passes about nothing. A service with
-    /// no entry is one nobody has said anything about; an entry with no service is
-    /// a decision about a stack that has moved on.
+    /// One direction, and it is the one about this file rather than about somebody's
+    /// stack: an entry here that names no declared service is a stale decision or a
+    /// mistyped id. The other direction is deliberately not a build failure any more
+    /// — a service arriving in the stack with no entry is reported as unknown by the
+    /// test below rather than turning this crate red, since adding a service to a
+    /// Compose project must not cost a Rust change.
+    ///
+    /// The mistyped id is why this half stays. Under the old pairing a typo showed up
+    /// as a service missing from the list; under the new one it shows up as a service
+    /// lemonfiber claims to know nothing about, which reads exactly like the real
+    /// thing and would be believed.
     #[test]
-    fn every_service_the_stack_declares_says_what_it_reaches() {
+    fn nothing_written_down_here_names_a_service_the_stack_does_not_declare() {
         let services: BTreeSet<String> = declared().into_iter().map(|service| service.id).collect();
         let counted = services.len();
         assert!(
             counted > 10,
             "the stack declares {counted} services, which means this is reading the wrong manifest"
         );
-        let listed: BTreeSet<String> = ELSEWHERE
+        let stale: Vec<&str> = ELSEWHERE
             .iter()
-            .map(|(id, _, _)| (*id).to_owned())
+            .map(|(id, _, _)| *id)
+            .filter(|id| !services.contains(*id))
             .collect();
-        assert_eq!(
-            services, listed,
-            "a service the stack runs is not written down here, or something written down \
-             here is not in the stack any more — say what it talks to, or take it out"
+        assert!(
+            stale.is_empty(),
+            "these are written down here and are not in the stack any more, or are spelt \
+             differently from the id the stack declares — either way what is written about \
+             them reaches nobody: {stale:?}"
+        );
+    }
+
+    /// Every service the shipped stack declares is answered, from one source or the
+    /// other.
+    ///
+    /// This is the half of the old set-equality worth keeping, and it no longer costs
+    /// what that one cost: a service added to the stack answers for itself in its own
+    /// manifest entry, which is a change to the stack and not to this binary. What it
+    /// refuses is a service that says nothing anywhere — because an inventory of what
+    /// leaves a machine is only honest if a service cannot arrive in it unlisted, and
+    /// the shipped stack is the one stack whose pairing with this binary is decided
+    /// here rather than by an operator.
+    #[test]
+    fn every_service_the_shipped_stack_declares_is_answered_from_one_source_or_the_other() {
+        let silent: Vec<String> = elsewhere(&declared())
+            .into_iter()
+            .filter(|entry| !entry.recorded)
+            .map(|entry| entry.service)
+            .collect();
+        assert!(
+            silent.is_empty(),
+            "these are in the stack this build ships and nothing says what they reach. \
+             Say it in the stack's own manifest entry — `reaches` and `asks_for`, which \
+             travel with the stack — or, failing that, write it down here: {silent:?}"
+        );
+    }
+
+    /// The manifest wins where it speaks, which is what makes adding a service to a
+    /// Compose project cost nothing here.
+    #[test]
+    fn a_service_that_describes_itself_is_taken_at_its_word() {
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .take(1)
+            .map(|mut service| {
+                service.id = "somebodys-own-service".to_owned();
+                service.reaches = Some("a place of their own".to_owned());
+                service.asks_for = Some("Whatever they built it to ask for.".to_owned());
+                service
+            })
+            .collect();
+
+        let found = elsewhere(&theirs);
+        let entry = found.first();
+        assert!(
+            entry.is_some_and(|one| one.destination == "a place of their own"),
+            "{found:?}"
+        );
+        assert!(entry.is_some_and(|one| one.recorded), "{found:?}");
+    }
+
+    /// An empty destination is an answer, and the whole of what this inventory is for
+    /// turns on it reading as one. "Nothing leaves this machine" is the strongest
+    /// thing a privacy inventory can say about a service, and a stack that says it
+    /// must not come back indistinguishable from a stack that said nothing at all.
+    #[test]
+    fn a_stack_saying_a_service_reaches_nothing_is_recorded_as_having_said_so() {
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .take(1)
+            .map(|mut service| {
+                service.id = "somebodys-own-service".to_owned();
+                service.reaches = Some(String::new());
+                service.asks_for = Some("Nothing leaves this machine.".to_owned());
+                service
+            })
+            .collect();
+
+        let found = elsewhere(&theirs);
+        let entry = found.first();
+        assert!(
+            entry.is_some_and(|one| one.destination.is_empty()),
+            "{found:?}"
+        );
+        assert!(entry.is_some_and(|one| one.recorded), "{found:?}");
+    }
+
+    /// Half an answer is no answer, and what it falls back to is the table rather
+    /// than a blank.
+    ///
+    /// A stack that says where a service reaches and not what it asks for there has
+    /// described a destination with no purpose attached — and a purpose is the half
+    /// an operator actually reads, because "it talks to a metadata provider" and
+    /// "it sends your library to a metadata provider" are the same destination and
+    /// different decisions. The manifest's own validation holds a stack to both
+    /// halves or neither, so this is the shape that arrives when something has gone
+    /// wrong upstream of it; taking the half offered would attribute a purpose this
+    /// service never claimed, or leave one blank in a report whose blanks already
+    /// mean *nothing leaves this machine*.
+    #[test]
+    fn half_an_answer_from_the_stack_is_no_answer_and_falls_back_to_the_table() {
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .filter(|one| one.id == "prowlarr")
+            .take(1)
+            .map(|mut prowlarr| {
+                prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
+                prowlarr.asks_for = None;
+                prowlarr
+            })
+            .collect();
+
+        let carried = elsewhere(&theirs);
+        let entry = carried.first();
+        assert!(
+            entry.is_some_and(|one| one.destination.contains("indexers")),
+            "{carried:?}"
+        );
+        assert!(entry.is_some_and(|one| one.recorded), "{carried:?}");
+    }
+
+    /// And where both speak, the stack's own word is the one carried: the point of
+    /// the field is that a fork can correct what this binary believes.
+    #[test]
+    fn the_stacks_own_word_is_preferred_to_what_is_written_down_here() {
+        let theirs: Vec<_> = declared()
+            .into_iter()
+            .filter(|service| service.id == "prowlarr")
+            .take(1)
+            .map(|mut prowlarr| {
+                prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
+                prowlarr.asks_for = Some("Something this binary never heard of either.".to_owned());
+                prowlarr
+            })
+            .collect();
+
+        let found = elsewhere(&theirs);
+        assert!(
+            found
+                .first()
+                .is_some_and(|one| one.destination == "somewhere this binary never heard of"),
+            "{found:?}"
         );
     }
 
@@ -219,17 +427,100 @@ mod tests {
         );
     }
 
+    /// The case the whole rearrangement is for: a service nobody has written anything
+    /// about is carried into the inventory saying so, rather than dropped from it.
     #[test]
-    fn a_service_nothing_is_written_down_about_is_left_out_rather_than_guessed_at() {
+    fn a_service_nothing_is_written_down_about_is_reported_rather_than_left_out() {
         let unknown: Vec<lemonfiber_manifest::Service> = declared()
             .into_iter()
             .take(1)
             .map(|mut service| {
                 service.id = "something-new".to_owned();
+                // And says nothing for itself. A stack may now declare where a
+                // service reaches, and a renamed entry keeping those two lines is a
+                // service this build has been told about rather than one it knows
+                // nothing of — which is the opposite of what these cases are.
+                service.reaches = None;
+                service.asks_for = None;
                 service
             })
             .collect();
         assert_eq!(unknown.len(), 1, "the stack declares services to rename");
-        assert!(elsewhere(&unknown).is_empty());
+
+        let found = elsewhere(&unknown);
+        let entry = found.first();
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            entry.is_some_and(|one| one.service == "something-new"),
+            "{found:?}"
+        );
+        assert!(entry.is_some_and(|one| !one.recorded), "{found:?}");
+    }
+
+    /// And it is not reported as reaching nothing, which is the one wrong answer here.
+    ///
+    /// An empty destination is what `unpackerr` and `caddy` say, and it means no
+    /// request leaves this machine. Saying that about a service nobody has looked at
+    /// would be this product making a privacy claim out of its own ignorance.
+    #[test]
+    fn an_unknown_service_is_never_reported_as_reaching_nothing() {
+        let unknown: Vec<lemonfiber_manifest::Service> = declared()
+            .into_iter()
+            .take(1)
+            .map(|mut service| {
+                service.id = "something-new".to_owned();
+                // And says nothing for itself. A stack may now declare where a
+                // service reaches, and a renamed entry keeping those two lines is a
+                // service this build has been told about rather than one it knows
+                // nothing of — which is the opposite of what these cases are.
+                service.reaches = None;
+                service.asks_for = None;
+                service
+            })
+            .collect();
+
+        let found = elsewhere(&unknown);
+        let entry = found.first();
+        assert!(
+            entry.is_some_and(|one| !one.destination.is_empty()),
+            "an empty destination reads as nothing leaving this machine: {found:?}"
+        );
+        assert!(
+            entry.is_some_and(|one| one.purpose.contains("not one lemonfiber knows")),
+            "{found:?}"
+        );
+    }
+
+    /// Adding a service to the stack is a Compose change and a manifest change and
+    /// nothing else. Asserted here because the rule it replaces was asserted here,
+    /// and a rule taken out without one to stand in its place comes back.
+    #[test]
+    fn a_service_added_to_the_stack_needs_no_entry_here_to_be_reported() {
+        let mut services = declared();
+        let copied: Vec<_> = services
+            .first()
+            .cloned()
+            .into_iter()
+            .map(|mut service| {
+                service.id = "somebodys-own-service".to_owned();
+                service
+            })
+            .collect();
+        let counted = services.len();
+        services.extend(copied);
+        // Said rather than left to the count below, which an empty stack satisfies
+        // twice over: nothing declared and nothing reported are equal.
+        assert_eq!(
+            services.len(),
+            counted + 1,
+            "the stack declares a service to copy"
+        );
+
+        let found = elsewhere(&services);
+        assert_eq!(
+            found.len(),
+            services.len(),
+            "every declared service reaches the inventory: {found:?}"
+        );
     }
 }

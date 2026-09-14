@@ -51,10 +51,11 @@ pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
     let record = materialised_record(ctx);
     let into = ctx.settings.stack_dir.as_deref();
 
-    let (disposition, customised) = match action {
+    let (disposition, customised, overwritten) = match action {
         QualityAction::Show => (
             Disposition::Shown,
             super::materialise::recyclarr_customised(into, record.as_deref()),
+            None,
         ),
         QualityAction::Set {
             preset,
@@ -80,14 +81,16 @@ pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             (
                 disposition,
                 super::materialise::recyclarr_customised(into, record.as_deref()),
+                None,
             )
         }
         QualityAction::Reapply => {
-            let overwrote = super::materialise::reapply_recyclarr(
+            let overwritten = super::materialise::reapply_recyclarr(
                 ctx.stack,
                 into,
                 record.as_deref(),
                 &selection,
+                &ctx.settings.unmanaged,
                 ctx.dry_run,
             )
             .map_err(|failure| Box::new(failure.problem()))?;
@@ -96,11 +99,19 @@ pub(super) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             } else {
                 Disposition::Reapplied
             };
-            (disposition, overwrote)
+            // One answer rather than two: a reapply overwrote an edit exactly when it
+            // has one to show, so the word and the diff cannot come apart.
+            (disposition, overwritten.is_some(), overwritten)
         }
     };
 
-    Ok(report(&selection, playback, customised, disposition))
+    Ok(report(
+        &selection,
+        playback,
+        customised,
+        disposition,
+        overwritten,
+    ))
 }
 
 /// Where the record of what lemonfiber last wrote to the stack is kept — beside the
@@ -211,6 +222,7 @@ fn report(
     playback: Playback,
     customised: bool,
     disposition: Disposition,
+    overwritten: Option<crate::model::StackEdit>,
 ) -> QualityReport {
     let mut choices = vec![choice(EVERYTHING, selection.global(), playback)];
     for (media_type, preset) in selection.overrides() {
@@ -223,6 +235,7 @@ fn report(
         choices,
         music,
         customised,
+        overwritten,
         disposition,
     }
 }
@@ -619,9 +632,32 @@ mod tests {
         let report = run(&context, QualityAction::Reapply);
         assert_eq!(report.disposition, Disposition::Reapplied);
         assert!(report.customised, "it reports that it overwrote an edit");
+        // And says which lines went, rather than only that some did.
+        let lost = report
+            .overwritten
+            .as_ref()
+            .map(|edit| edit.diff.clone())
+            .unwrap_or_default();
+        assert!(lost.contains("- # mine"), "{lost}");
         assert!(std::fs::read_to_string(&recyclarr)
             .unwrap_or_default()
             .contains("sonarr-web-2160p.yml"));
+    }
+
+    /// Nothing of the operator's to lose is nothing to show, which keeps the word and
+    /// the diff from coming apart.
+    #[test]
+    fn a_reapply_over_a_config_nobody_edited_shows_no_diff() {
+        let env = scratch("reapply-unedited");
+        let into = env.with_file_name("stack");
+        let context = embedded_ctx(Some(env), Some(into));
+
+        let _ = quality(&context, set(Preset::Maximum, None, true));
+        let _ = quality(&context, QualityAction::Reapply);
+
+        let report = run(&context, QualityAction::Reapply);
+        assert!(!report.customised);
+        assert!(report.overwritten.is_none(), "{:?}", report.overwritten);
     }
 
     #[test]

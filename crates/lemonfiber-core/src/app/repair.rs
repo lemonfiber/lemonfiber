@@ -26,7 +26,7 @@ use crate::config::paths::Paths;
 use crate::doctor::{Check, Finding};
 use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::Undo;
-use crate::repair::{self, Outcome, Repair, Stance};
+use crate::repair::{self, Outcome, Repair, Stance, Writing};
 
 use super::Ctx;
 
@@ -194,15 +194,44 @@ pub async fn mending(
         }
         // Asked before anything is carried out: a repair that must not go ahead is never
         // attempted, rather than attempted and reported as having changed nothing.
-        let outcome = if mender.may_proceed(&repair).await.allowed() {
-            carried(ctx, services, mender, again, &repair).await
-        } else {
-            Outcome::WouldOverwrite
+        //
+        // Matched rather than read through `allowed()`, because the three ways of not
+        // going ahead are not one answer: two of them are conclusions about a value and
+        // the third is an instruction about an area, and an operator told the wrong one
+        // goes looking for a change they did not make. A match the compiler checks is
+        // also what makes a fourth answer, if there ever is one, a decision somebody
+        // takes here rather than something that quietly joins the refusals.
+        let outcome = match permitted(ctx, mender, &repair).await {
+            Writing::Ours => carried(ctx, services, mender, again, &repair).await,
+            Writing::Unmanaged => Outcome::Unmanaged,
+            Writing::Changed | Writing::Adopted | Writing::TheirsAlone => Outcome::WouldOverwrite,
         };
         recorded(ctx, &repair, &outcome);
         report.mended.push(Mended { repair, outcome });
     }
     report
+}
+
+/// Whether this repair may go ahead: the declaration asked first, the mender second.
+///
+/// The declaration comes first because it is the stronger answer and the cheaper one.
+/// It is a decision already taken, it needs nothing of a service, and asking the mender
+/// first would mean reaching a service the operator told lemonfiber to leave alone in
+/// order to find out whether to leave it alone.
+///
+/// This is the fifth of the five points a declaration has to hold, and the one it could
+/// not reach while a repair was only a check name. What a mender would write is now the
+/// mender's to declare and nobody else's to guess.
+async fn permitted(ctx: &Ctx, mender: &dyn crate::doctor::Mend, repair: &Repair) -> Writing {
+    let declared = &ctx.settings.unmanaged;
+    if mender
+        .writes_to(repair)
+        .iter()
+        .any(|what| crate::unmanaged::covers(declared, what))
+    {
+        return Writing::Unmanaged;
+    }
+    mender.may_proceed(repair).await
 }
 
 /// Put back what the last repair changed, and say what went back.

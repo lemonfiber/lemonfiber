@@ -27,4 +27,13 @@ pub struct StuckReport {
     /// Whether an \*arr's queue could not be read, so the list may be short — reported
     /// rather than read as "nothing stuck", the same honesty a trace keeps.
     pub incomplete: bool,
+    /// Services whose queue lemonfiber cannot read at all, each with why.
+    ///
+    /// Apart from [`Self::incomplete`], which is a queue that was asked and would not
+    /// answer. This is a queue that was never asked, because the service declares an
+    /// API shape this build does not speak or a Servarr declaration it cannot reach
+    /// through — and a reading that dropped those would be as short as an unreadable
+    /// queue makes it, without the sentence that says so.
+    #[serde(default)]
+    pub unsupported: Vec<crate::model::UnsupportedReport>,
 }

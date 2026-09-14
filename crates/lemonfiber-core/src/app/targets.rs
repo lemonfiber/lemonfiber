@@ -7,12 +7,38 @@
 //! which download clients the stack has, what lemonfiber recorded for itself, and how to
 //! open a client for any of them. Re-exported as one, so callers see the module they
 //! always did.
+//!
+//! And one answer assembled from two of them: what in this stack a feature that has to
+//! know what a service *is* cannot cover. Three reports carry it — the status reading,
+//! a seed pass and a queue-health reading — and assembling it here is what keeps those
+//! three from each deciding it differently.
 
 mod downloads;
 mod layout;
 mod opening;
 mod secrets;
 mod servarr;
+
+/// Everything in this stack that a feature needing to know what a service is cannot
+/// cover, each with why, in one settled order.
+///
+/// Two sources and no third: a shape this build does not speak at all, and a Servarr
+/// declaration this build cannot reach through. A service declaring no API is in
+/// neither — the manifest saying nothing is the stack's own statement that there is
+/// nothing to integrate with, and repeating it back is not information.
+///
+/// Sorted by the service it names, so a report reads the same twice and two reports
+/// carrying it agree line for line. The two sources cannot name one service between
+/// them — a shape is either spoken or not — so nothing is reported twice.
+pub(super) fn unsupported_here(
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> Vec<crate::model::UnsupportedReport> {
+    let mut found = crate::unsupported::deferred(services);
+    found.extend(servarr::unreachable_targets(services, project));
+    found.sort_by(|one, two| one.what.cmp(&two.what));
+    found
+}
 
 pub(super) use downloads::*;
 pub(super) use layout::*;
@@ -49,9 +75,107 @@ mod tests {
         (services, project)
     }
 
-    /// The walk carries on past a service that files no media and is no target of its
-    /// own — the proxy solver in the middle of the list is exactly that, and stopping
-    /// at it would leave the aggregator unresolved on a stack that has one.
+    /// The shipped stack's only unsupported service is the one deferred on purpose.
+    ///
+    /// Not "none", which is what this claimed before somebody ran it: the stack ships
+    /// the book indexer, whose shape is the single entry in
+    /// [`crate::unsupported::DEFERRED`], so the honest assertion is that the list
+    /// holds exactly that and nothing beside it. Written against the declaration
+    /// rather than against a name spelled again here — a shape that stops being
+    /// deferred stops being expected by the same edit that makes it speakable, and a
+    /// second service arriving unsupported fails this whichever shape it declares.
+    #[test]
+    fn the_shipped_stack_defers_one_service_and_only_the_one() {
+        let (services, project) = resolving();
+        let found = super::unsupported_here(&services, project.as_deref());
+
+        let deferred: Vec<&str> = crate::unsupported::DEFERRED
+            .iter()
+            .map(|(_, because)| *because)
+            .collect();
+        let unexpected: Vec<&crate::model::UnsupportedReport> = found
+            .iter()
+            .filter(|report| !deferred.contains(&report.because.as_str()))
+            .collect();
+
+        assert!(
+            unexpected.is_empty(),
+            "a service this build ships declares an API it cannot speak or reach, and \
+             it is not one of the shapes deferred on purpose: {unexpected:?}"
+        );
+        assert_eq!(
+            found.len(),
+            1,
+            "the stack ships exactly one deferred service — the book indexer: {found:?}"
+        );
+    }
+
+    /// And a fork's incomplete declaration lands in the same list the deferred shapes
+    /// do, sorted together rather than appended in whichever order they were found.
+    #[test]
+    fn a_declaration_this_build_cannot_reach_is_named_in_the_same_list() {
+        let (services, project) = resolving();
+        let mut theirs: Vec<lemonfiber_manifest::Service> = services
+            .into_iter()
+            .filter(|service| service.id == "sonarr")
+            .collect();
+        for service in &mut theirs {
+            service.port = None;
+        }
+        assert_eq!(theirs.len(), 1, "the stack declares an episode filer");
+
+        let found = super::unsupported_here(&theirs, project.as_deref());
+        assert!(
+            found.first().is_some_and(|one| one.what == "sonarr"),
+            "{found:?}"
+        );
+    }
+
+    /// Everything this build cannot cover reads in one order, whichever of the two
+    /// sources named each of them.
+    ///
+    /// The list is assembled by appending one source to the other, so left alone it
+    /// would carry the seam it was built along: the shapes this build does not speak
+    /// first, then the declarations it cannot reach, each in manifest order. An
+    /// operator reading it has no idea there are two sources and no reason to learn —
+    /// what they have is a list of services with something wrong, and two of them next
+    /// to each other should be next to each other for a reason they can see.
+    ///
+    /// Driven with two unreachable declarations rather than one, because a single
+    /// entry proves nothing about an order and a pair already in order proves nothing
+    /// either: the two chosen here are declared the other way round.
+    #[test]
+    fn what_this_build_cannot_cover_reads_in_one_order_whichever_source_named_it() {
+        let (services, project) = resolving();
+        // Two Servarr declarations with the port taken away — unreachable, and so in
+        // the list beside the one shape this build defers on purpose.
+        let theirs: Vec<lemonfiber_manifest::Service> = services
+            .into_iter()
+            .map(|mut service| {
+                if service.id == "prowlarr" || service.id == "lidarr" {
+                    service.port = None;
+                }
+                service
+            })
+            .collect();
+        let declared: Vec<&str> = theirs
+            .iter()
+            .map(|service| service.id.as_str())
+            .filter(|id| *id == "prowlarr" || *id == "lidarr")
+            .collect();
+        assert_eq!(
+            declared,
+            vec!["prowlarr", "lidarr"],
+            "the stack declares these two in this order, which is what makes the sort \
+             below observable"
+        );
+
+        let found = super::unsupported_here(&theirs, project.as_deref());
+
+        let named: Vec<&str> = found.iter().map(|report| report.what.as_str()).collect();
+        assert_eq!(named, vec!["bindery", "lidarr", "prowlarr"], "{found:?}");
+    }
+
     #[test]
     fn a_service_that_files_no_media_and_is_no_target_does_not_end_the_walk() {
         let (services, project) = resolving();

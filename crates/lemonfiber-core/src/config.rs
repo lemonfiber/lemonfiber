@@ -31,7 +31,7 @@ pub use reading::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
     indexer_from_env, ip_echo_from_env, overlay_from_env, port_forward_from_env, project_from_env,
     provider_host_from_env, quiet_from_env, reads_as_off, reads_as_on, service_user_from_env,
-    PortForward,
+    unmanaged_from_env, PortForward,
 };
 
 use std::path::PathBuf;
@@ -173,6 +173,11 @@ pub struct Settings {
     /// The admin services the operator wrote down as deliberately exposed, each
     /// with the reason they gave.
     pub exposed: Vec<(String, String)>,
+    /// The areas the operator declared unmanaged, each with the reason they gave.
+    ///
+    /// Empty on every machine where nobody has said anything, which is most of them.
+    /// What a name covers and what a declaration stops is in [`crate::unmanaged`].
+    pub unmanaged: Vec<(String, String)>,
     /// The service the operator named as the front door, where they named one.
     ///
     /// Absent until they do, which is the state a fresh install is in and the one
@@ -260,6 +265,7 @@ impl Default for Settings {
             admission: None,
             household_host: None,
             exposed: Vec::new(),
+            unmanaged: Vec::new(),
             front_door: None,
             explanations: true,
             autostart_on_battery: false,

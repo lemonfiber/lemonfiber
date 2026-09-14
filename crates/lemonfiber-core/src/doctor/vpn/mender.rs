@@ -32,6 +32,10 @@ pub(crate) struct PortMender {
     engine: Arc<dyn Engine>,
     project: String,
     gateway: String,
+    /// The download client's service id, as the manifest declares it — carried so this
+    /// can say what a repair would write to without naming a service by sight. The
+    /// client below is an authenticated connection and has no id to give.
+    service: String,
     client: Option<Qbittorrent>,
 }
 
@@ -41,12 +45,14 @@ impl PortMender {
         engine: Arc<dyn Engine>,
         project: String,
         gateway: String,
+        service: String,
         client: Option<Qbittorrent>,
     ) -> Self {
         Self {
             engine,
             project,
             gateway,
+            service,
             client,
         }
     }
@@ -74,6 +80,13 @@ impl Mend for PortMender {
                 reversible: false,
             })
             .collect()
+    }
+
+    fn writes_to(&self, _repair: &Repair) -> Vec<String> {
+        // The download client, whose listening port this moves. Taken from the pair the
+        // check resolved out of the manifest rather than written down here, so a stack
+        // that contains a different torrent client is answered about that one.
+        vec![self.service.clone()]
     }
 
     async fn mend(&self, _repair: &Repair) -> Attempt {

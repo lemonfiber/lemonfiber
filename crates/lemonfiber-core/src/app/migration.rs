@@ -99,24 +99,12 @@ pub(super) async fn looked(ctx: &Ctx) -> Looked {
         return Looked::nothing();
     };
 
-    let mut projects: BTreeSet<&str> = BTreeSet::new();
-    for image in &images {
-        projects.extend(
-            image
-                .projects
-                .iter()
-                .map(String::as_str)
-                .filter(|project| !project.is_empty()),
-        );
-    }
-
-    let mut seen: Vec<Container> = Vec::new();
-    for project in projects {
-        let Ok(containers) = ctx.engine.list(project).await else {
-            return Looked::nothing();
-        };
-        seen.extend(containers);
-    }
+    // The same walk a start's port pre-flight makes, shared rather than written
+    // twice: two enumerations of the projects on one machine is two ways for the
+    // survey and the pre-flight to disagree about what is standing here.
+    let Some(seen) = super::preflight::every_container(ctx, &images).await else {
+        return Looked::nothing();
+    };
 
     let ours: Vec<Ours> = crate::migration::pins(&manifest);
 

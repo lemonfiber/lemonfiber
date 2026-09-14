@@ -651,6 +651,7 @@ mod tests {
         StuckReport {
             items: vec![a_stuck("The Expanse", "sonarr"), a_stuck("Dune", "radarr")],
             incomplete: false,
+            unsupported: Vec::new(),
         }
     }
 
@@ -1822,6 +1823,7 @@ mod tests {
         acting.came_to(Ok(Outcome::Stuck(StuckReport {
             items: vec![a_stuck("", "sonarr"), a_stuck("Dune", "radarr")],
             incomplete: false,
+            unsupported: Vec::new(),
         })));
 
         assert!(showing(&acting).contains("> Dune"));
@@ -1838,6 +1840,7 @@ mod tests {
         acting.came_to(Ok(Outcome::Stuck(StuckReport {
             items: vec![a_stuck("", "sonarr")],
             incomplete: false,
+            unsupported: Vec::new(),
         })));
         assert!(showing(&acting).contains("item(s) stuck"));
     }
@@ -2512,6 +2515,7 @@ mod tests {
             }],
             music: None,
             customised: false,
+            overwritten: None,
             disposition,
         }
     }

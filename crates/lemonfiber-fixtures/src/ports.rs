@@ -171,6 +171,55 @@ impl Site for Renamed {
         let last = self.answers.len().saturating_sub(1);
         self.answers.get(asked.min(last)).cloned().flatten()
     }
+
+    /// A machine scripted for its name is holding nothing, which is what every test
+    /// that reaches for one is saying about it.
+    async fn answering_on(&self, _ports: &[u16]) -> Vec<u16> {
+        Vec::new()
+    }
+}
+
+/// A machine with something already listening on these ports.
+///
+/// What is listening on a machine varies with the machine and with the minute, so a
+/// test written against the real one would pass where it was written and nowhere
+/// else — and would pass or fail differently depending on what the person running it
+/// happened to have open.
+///
+/// It has no name, because nothing that asks what is bound here also asks what this
+/// machine is called, and a fixture that answered both would be inviting a test to
+/// depend on an answer it never scripted.
+pub struct Bound {
+    /// The ports something is answering on.
+    held: Vec<u16>,
+}
+
+impl Bound {
+    /// A machine holding these ports and no others.
+    #[must_use]
+    pub fn holding(ports: &[u16]) -> Arc<Self> {
+        Arc::new(Self {
+            held: ports.to_vec(),
+        })
+    }
+}
+
+#[async_trait]
+impl Site for Bound {
+    async fn name(&self) -> Option<String> {
+        None
+    }
+
+    async fn answering_on(&self, ports: &[u16]) -> Vec<u16> {
+        let mut found: Vec<u16> = ports
+            .iter()
+            .copied()
+            .filter(|port| self.held.contains(port))
+            .collect();
+        found.sort_unstable();
+        found.dedup();
+        found
+    }
 }
 
 #[cfg(test)]

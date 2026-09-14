@@ -1,0 +1,7472 @@
+{
+  "api_version": 1,
+  "kinds": {
+    "admission": "ref:Admitted",
+    "adoption": "ref:AdoptReport",
+    "alerts": "ref:AlertReport",
+    "archives": "ref:Listing",
+    "backup": "ref:BackupReport",
+    "bandwidth": "ref:Sharing",
+    "beside": "ref:BesideReport",
+    "bundle": "ref:Bundle",
+    "catalogue": "ref:CatalogueReport",
+    "clients": "ref:Guidance",
+    "config": "ref:ConfigReport",
+    "credentials": "ref:Inventory",
+    "dashboard": "ref:Snapshot",
+    "doctor": "ref:DoctorReport",
+    "error": "ref:Problem",
+    "forms": "ref:FormsReport",
+    "front-door": "ref:FrontDoorReport",
+    "glossary": "ref:Vocabulary",
+    "history": "ref:HistoryReport",
+    "hosting": "ref:HostingReport",
+    "household": "ref:HouseholdReport",
+    "import": "ref:ImportReport",
+    "invitation": "ref:Invitation",
+    "job": "ref:Started",
+    "lifecycle": "ref:LifecycleReport",
+    "log": "ref:LogLine",
+    "migration": "ref:MigrationReport",
+    "music": "ref:MusicReport",
+    "outbound": "ref:Leaving",
+    "preview": "ref:Plan",
+    "provenance": "ref:ProvenanceReport",
+    "pull": "string",
+    "quality": "ref:QualityReport",
+    "removal": "ref:HouseholdRemoval",
+    "repair": "ref:RepairReport",
+    "replacement": "ref:ReplaceReport",
+    "reset": "ref:ResetReport",
+    "restore": "ref:Restoration",
+    "seed": "ref:SeedReport",
+    "self-update": "ref:UpdateReport",
+    "setup": "ref:SetupReport",
+    "space": "ref:Reckoning",
+    "start": "string",
+    "status": "ref:StatusReport",
+    "step": "ref:Line",
+    "stop-seeding": "ref:Letting",
+    "stored": "ref:Stored",
+    "stuck": "ref:StuckReport",
+    "trace": "ref:TraceReport",
+    "undo": "ref:UndoReversal",
+    "uninstall": "ref:Uninstall",
+    "update": "ref:StackUpdateReport",
+    "upgrade": "ref:UpgradeReport",
+    "version": "ref:VersionReport",
+    "walkthrough": "ref:WalkthroughReport",
+    "watch": "ref:SupervisionReport",
+    "wizard": "ref:WizardReport",
+    "word": "ref:Term"
+  },
+  "types": {
+    "Action": {
+      "fields": {
+        "current": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "does": {
+          "type": [
+            "const:\"delete\"",
+            "const:\"reconfigure\"",
+            "const:\"remove\"",
+            "const:\"repin\"",
+            "const:\"restore\""
+          ],
+          "required": true
+        },
+        "field": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "key": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "previous": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "resource": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "value": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "wrote": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"delete\"",
+        "\"reconfigure\"",
+        "\"remove\"",
+        "\"repin\"",
+        "\"restore\""
+      ]
+    },
+    "Active": {
+      "fields": {
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "progress": {
+          "type": [
+            "integer/uint8"
+          ],
+          "required": true
+        },
+        "protocol": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Address": {
+      "fields": {
+        "caution": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "url": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Admitted": {
+      "fields": {
+        "token": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "until": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "AdoptReport": {
+      "fields": {
+        "back_up": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "backed_up": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "project": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "refusal": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "stance": {
+          "type": [
+            "ref:Stance"
+          ],
+          "required": true
+        },
+        "upgrades": {
+          "type": [
+            "array[ref:CarryingReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Affected": {
+      "fields": {
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "downstream": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "remedies": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "severity": {
+          "type": [
+            "ref:ProblemSeverity"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Alert": {
+      "fields": {
+        "affected": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "kind": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "moment": {
+          "type": [
+            "ref:Moment"
+          ],
+          "required": true
+        },
+        "remedies": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "severity": {
+          "type": [
+            "ref:ProblemSeverity"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "AlertReport": {
+      "fields": {
+        "changed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "exceptions": {
+          "type": [
+            "array[ref:ExceptionReport]"
+          ],
+          "required": true
+        },
+        "means": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "preset": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Answer": {
+      "fields": {
+        "answered": {
+          "type": [
+            "const:\"held\"",
+            "const:\"silent\""
+          ],
+          "required": true
+        },
+        "down": {
+          "type": [
+            "ref:BandwidthHeld"
+          ],
+          "required": true
+        },
+        "period": {
+          "type": [
+            "anyOf(null,ref:Period)"
+          ],
+          "required": false
+        },
+        "said": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "up": {
+          "type": [
+            "ref:BandwidthHeld"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"held\"",
+        "\"silent\""
+      ]
+    },
+    "AskingStanding": {
+      "fields": {},
+      "variants": [
+        "\"near-quota\"",
+        "\"quota-exhausted\"",
+        "\"unlimited\"",
+        "\"within-quota\""
+      ]
+    },
+    "Assessment": {
+      "fields": {},
+      "variants": [
+        "\"assessed\"",
+        "\"unassessable\""
+      ]
+    },
+    "Awaiting": {
+      "fields": {},
+      "variants": [
+        "\"downloads\""
+      ]
+    },
+    "BackupManifest": {
+      "fields": {
+        "created_at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "data_root": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "members": {
+          "type": [
+            "array[ref:Member]"
+          ],
+          "required": true
+        },
+        "product_version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "schema": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "scope": {
+          "type": [
+            "ref:Scope"
+          ],
+          "required": true
+        },
+        "sensitive": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "BackupReport": {
+      "fields": {
+        "pace": {
+          "type": [
+            "ref:Pace"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "pruned": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "scope": {
+          "type": [
+            "ref:Scope"
+          ],
+          "required": true
+        },
+        "sensitive": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "BandwidthHeld": {
+      "fields": {
+        "accepted": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "asked": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "moving": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "verdict": {
+          "type": [
+            "ref:BandwidthVerdict"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "BandwidthReading": {
+      "fields": {
+        "limit": {
+          "type": [
+            "ref:Limit"
+          ],
+          "required": true
+        },
+        "resolved": {
+          "type": [
+            "ref:Resolved"
+          ],
+          "required": true
+        },
+        "says": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "BandwidthVerdict": {
+      "fields": {},
+      "variants": [
+        "\"holding\"",
+        "\"ignored\"",
+        "\"nothing-to-limit\"",
+        "\"overrunning\"",
+        "\"unasked\""
+      ]
+    },
+    "BesideReport": {
+      "fields": {
+        "ports": {
+          "type": [
+            "array[ref:MovedReport]"
+          ],
+          "required": true
+        },
+        "refusal": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "stance": {
+          "type": [
+            "ref:Stance"
+          ],
+          "required": true
+        },
+        "written": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Beyond": {
+      "fields": {
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "remedy": {
+          "type": [
+            "ref:Remedy"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Bundle": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "contents": {
+          "type": [
+            "ref:Contents"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "would_go": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Candidate": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "consequence": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "ref:SeedingStanding"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Cap": {
+      "fields": {
+        "exceeded": {
+          "type": [
+            "ref:WhenExceeded"
+          ],
+          "required": true
+        },
+        "monthly": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Capacity": {
+      "fields": {
+        "down": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "source": {
+          "type": [
+            "ref:Source"
+          ],
+          "required": true
+        },
+        "taken": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "through_tunnel": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "up": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CarryingReport": {
+      "fields": {
+        "backup_first": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "existing": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "ours": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "refused": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "verdict": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CatalogueReport": {
+      "fields": {
+        "removed": {
+          "type": [
+            "array[ref:RemovedService]"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[ref:CataloguedService]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CataloguedService": {
+      "fields": {
+        "criticality": {
+          "type": [
+            "ref:Criticality"
+          ],
+          "required": true
+        },
+        "describes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "without_it": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Cause": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "fix": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "tell": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ChangeReport": {
+      "fields": {
+        "alongside": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "because": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "did": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "instead": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "operation": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reversal": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "target": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Changed": {
+      "fields": {
+        "installed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "started": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "touched": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ChangelogState": {
+      "fields": {},
+      "variants": [
+        "\"current\"",
+        "\"pending\"",
+        "\"stale\""
+      ]
+    },
+    "Chosen": {
+      "fields": {
+        "chosen": {
+          "type": [
+            "const:\"derived\"",
+            "const:\"named\"",
+            "const:\"refused\""
+          ],
+          "required": true
+        },
+        "door": {
+          "type": [
+            "ref:Refusal",
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"derived\"",
+        "\"named\"",
+        "\"refused\""
+      ]
+    },
+    "Code": {
+      "fields": {},
+      "variants": []
+    },
+    "Coming": {
+      "fields": {
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "progress": {
+          "type": [
+            "integer/uint8"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Condition": {
+      "fields": {},
+      "variants": [
+        "\"active\"",
+        "\"degraded\"",
+        "\"inactive\"",
+        "\"partial\""
+      ]
+    },
+    "ConfigChange": {
+      "fields": {
+        "cost": {
+          "type": [
+            "ref:Cost"
+          ],
+          "required": true
+        },
+        "from": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "key": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ConfigReport": {
+      "fields": {
+        "changed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "consequence": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "review": {
+          "type": [
+            "anyOf(null,ref:Review)"
+          ],
+          "required": false
+        },
+        "settings": {
+          "type": [
+            "array[ref:SettingReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ConflictReport": {
+      "fields": {
+        "held_by": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "port": {
+          "type": [
+            "integer/uint16"
+          ],
+          "required": true
+        },
+        "wanted_by": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Consumption": {
+      "fields": {
+        "category": {
+          "type": [
+            "ref:SpaceCategory"
+          ],
+          "required": true
+        },
+        "reclaim": {
+          "type": [
+            "ref:Reclaim"
+          ],
+          "required": true
+        },
+        "tally": {
+          "type": [
+            "ref:Tally"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Contents": {
+      "fields": {
+        "missing": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "pieces": {
+          "type": [
+            "array[ref:Piece]"
+          ],
+          "required": true
+        },
+        "taken": {
+          "type": [
+            "ref:Taken"
+          ],
+          "required": true
+        },
+        "terms": {
+          "type": [
+            "ref:Terms"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Cost": {
+      "fields": {},
+      "variants": [
+        "\"cheap\"",
+        "\"consequential\""
+      ]
+    },
+    "Counted": {
+      "fields": {
+        "limit": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        },
+        "period": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "remaining": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        },
+        "used": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Coverage": {
+      "fields": {
+        "have": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "seasons": {
+          "type": [
+            "array[ref:SeasonCoverage]"
+          ],
+          "required": true
+        },
+        "unmonitored": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "wanted": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CredentialHeld": {
+      "fields": {
+        "advisory": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "consumers": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "fingerprint": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "location": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "origin": {
+          "type": [
+            "ref:Origin"
+          ],
+          "required": true
+        },
+        "setting": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:CredentialState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CredentialReach": {
+      "fields": {
+        "detail": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reach": {
+          "type": [
+            "const:\"failed\"",
+            "const:\"pending\"",
+            "const:\"updated\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"failed\"",
+        "\"pending\"",
+        "\"updated\""
+      ]
+    },
+    "CredentialState": {
+      "fields": {},
+      "variants": [
+        "\"absent\"",
+        "\"active\"",
+        "\"invalid\"",
+        "\"rotating\"",
+        "\"stale\"",
+        "\"superseded\""
+      ]
+    },
+    "Criticality": {
+      "fields": {},
+      "variants": [
+        "\"core\"",
+        "\"critical\"",
+        "\"enhancing\"",
+        "\"important\"",
+        "\"optional\""
+      ]
+    },
+    "DashboardProtocol": {
+      "fields": {},
+      "variants": [
+        "\"torrent\"",
+        "\"usenet\""
+      ]
+    },
+    "DashboardReading": {
+      "fields": {
+        "reading": {
+          "type": [
+            "const:\"known\"",
+            "const:\"stale\"",
+            "const:\"unknown\""
+          ],
+          "required": true
+        },
+        "value": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"known\"",
+        "\"stale\"",
+        "\"unknown\""
+      ]
+    },
+    "Device": {
+      "fields": {
+        "caution": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "client": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "device": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "instead": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "support": {
+          "type": [
+            "ref:Support"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Disposition": {
+      "fields": {},
+      "variants": [
+        "\"held\"",
+        "\"reapplied\"",
+        "\"recorded\"",
+        "\"rehearsed\"",
+        "\"shown\"",
+        "\"would-reapply\""
+      ]
+    },
+    "Disturbances": {
+      "fields": {
+        "restarting": {
+          "type": [
+            "ref:TakesAway"
+          ],
+          "required": true
+        },
+        "starting": {
+          "type": [
+            "ref:TakesAway"
+          ],
+          "required": true
+        },
+        "stopping": {
+          "type": [
+            "ref:TakesAway"
+          ],
+          "required": true
+        },
+        "stopping_after_downloads": {
+          "type": [
+            "ref:TakesAway"
+          ],
+          "required": true
+        },
+        "switching": {
+          "type": [
+            "ref:TakesAway"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "DoctorCategory": {
+      "fields": {},
+      "variants": [
+        "\"config\"",
+        "\"credentials\"",
+        "\"environment\"",
+        "\"network\"",
+        "\"providers\"",
+        "\"queue\"",
+        "\"services\"",
+        "\"storage\"",
+        "\"vpn\""
+      ]
+    },
+    "DoctorReport": {
+      "fields": {
+        "findings": {
+          "type": [
+            "array[ref:Finding]"
+          ],
+          "required": true
+        },
+        "overall": {
+          "type": [
+            "ref:Overall"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "DoctorVerdict": {
+      "fields": {
+        "cause": {
+          "type": [
+            "anyOf(null,ref:Problem)"
+          ],
+          "required": false
+        },
+        "code": {
+          "type": [
+            "ref:Code"
+          ],
+          "required": true
+        },
+        "detail": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "meaning": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "note": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "outcome": {
+          "type": [
+            "const:\"fail\"",
+            "const:\"pass\"",
+            "const:\"skipped\"",
+            "const:\"unverified\"",
+            "const:\"warn\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "remedies": {
+          "type": [
+            "array[ref:Remedy]"
+          ],
+          "required": true
+        },
+        "remedy": {
+          "type": [
+            "ref:Remedy"
+          ],
+          "required": true
+        },
+        "severity": {
+          "type": [
+            "ref:ProblemSeverity"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:ProblemState"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"fail\"",
+        "\"pass\"",
+        "\"skipped\"",
+        "\"unverified\"",
+        "\"warn\""
+      ]
+    },
+    "Dropped": {
+      "fields": {
+        "needs": {
+          "type": [
+            "ref:StackProtocol"
+          ],
+          "required": true
+        },
+        "profile": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Duration": {
+      "fields": {
+        "nanos": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "secs": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Edited": {
+      "fields": {
+        "found": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "secret": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "wrote": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Elsewhere": {
+      "fields": {
+        "destination": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "purpose": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "recorded": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Ending": {
+      "fields": {},
+      "variants": [
+        "\"not-fetched\"",
+        "\"not-reached\"",
+        "\"not-started\"",
+        "\"updated\""
+      ]
+    },
+    "Entry": {
+      "fields": {
+        "reference": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "requirements": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Estimate": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "measured": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ExceptionReport": {
+      "fields": {
+        "kind": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "wanted": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Facing": {
+      "fields": {},
+      "variants": [
+        "\"asking\"",
+        "\"carriage\"",
+        "\"operators\"",
+        "\"shelf\"",
+        "\"unstated\"",
+        "\"watching\""
+      ]
+    },
+    "Filenames": {
+      "fields": {},
+      "variants": []
+    },
+    "Finding": {
+      "fields": {
+        "category": {
+          "type": [
+            "ref:DoctorCategory"
+          ],
+          "required": true
+        },
+        "caused_by": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "said": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "service": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "verdict": {
+          "type": [
+            "ref:DoctorVerdict"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Findings": {
+      "fields": {
+        "active": {
+          "type": [
+            "array[ref:Active]"
+          ],
+          "required": true
+        },
+        "edited": {
+          "type": [
+            "anyOf(null,ref:Edited)"
+          ],
+          "required": false
+        },
+        "keeps": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "library": {
+          "type": [
+            "array[ref:LibraryPath]"
+          ],
+          "required": true
+        },
+        "opens": {
+          "type": [
+            "array[ref:Opening]"
+          ],
+          "required": true
+        },
+        "stops": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Foreign": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "files": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "FormReport": {
+      "fields": {
+        "composable": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "description": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "FormsReport": {
+      "fields": {
+        "forms": {
+          "type": [
+            "array[ref:FormReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Freshness": {
+      "fields": {
+        "as": {
+          "type": [
+            "const:\"as_of\"",
+            "const:\"live\""
+          ],
+          "required": true
+        },
+        "at": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"as_of\"",
+        "\"live\""
+      ]
+    },
+    "FrontDoorBeside": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "facing": {
+          "type": [
+            "ref:Facing"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "FrontDoorReport": {
+      "fields": {
+        "address": {
+          "type": [
+            "anyOf(null,ref:Address)"
+          ],
+          "required": false
+        },
+        "beside": {
+          "type": [
+            "array[ref:FrontDoorBeside]"
+          ],
+          "required": true
+        },
+        "chosen": {
+          "type": [
+            "ref:Chosen"
+          ],
+          "required": true
+        },
+        "facing": {
+          "type": [
+            "anyOf(null,ref:Facing)"
+          ],
+          "required": false
+        },
+        "meaning": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "standing": {
+          "type": [
+            "ref:FrontDoorStanding"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "FrontDoorStanding": {
+      "fields": {},
+      "variants": [
+        "\"established\"",
+        "\"library-only\"",
+        "\"none\"",
+        "\"stranded\"",
+        "\"unreachable\""
+      ]
+    },
+    "Gone": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Group": {
+      "fields": {
+        "entries": {
+          "type": [
+            "array[ref:Entry]"
+          ],
+          "required": true
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Guidance": {
+      "fields": {
+        "devices": {
+          "type": [
+            "array[ref:Device]"
+          ],
+          "required": true
+        },
+        "nothing_is_installed": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "only_at_home": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "straining": {
+          "type": [
+            "anyOf(null,ref:Straining)"
+          ],
+          "required": false
+        },
+        "trouble": {
+          "type": [
+            "array[ref:Trouble]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Handover": {
+      "fields": {
+        "next": {
+          "type": [
+            "array[ref:Next]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Hardlink": {
+      "fields": {},
+      "variants": [
+        "\"copying\"",
+        "\"linking\"",
+        "\"unknown\""
+      ]
+    },
+    "HealthStanding": {
+      "fields": {},
+      "variants": [
+        "\"advisory\"",
+        "\"broken\"",
+        "\"critical\"",
+        "\"degraded\"",
+        "\"healthy\"",
+        "\"stopped\"",
+        "\"unconfigured\"",
+        "\"unknown\""
+      ]
+    },
+    "HealthSummary": {
+      "fields": {
+        "affected": {
+          "type": [
+            "array[ref:Affected]"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "ref:HealthStanding"
+          ],
+          "required": true
+        },
+        "wanting_attention": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "worst": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "HistoryReport": {
+      "fields": {
+        "changes": {
+          "type": [
+            "array[ref:ChangeReport]"
+          ],
+          "required": true
+        },
+        "horizon": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Holding": {
+      "fields": {
+        "answer": {
+          "type": [
+            "ref:Answer"
+          ],
+          "required": true
+        },
+        "client": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "pulling": {
+          "type": [
+            "anyOf(null,ref:Pulling)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "HostedCommand": {
+      "fields": {
+        "command": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "definition": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "guarantees": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "missing": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "output": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "runs": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "standing": {
+          "type": [
+            "ref:Hosting"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Hosting": {
+      "fields": {},
+      "variants": [
+        "\"hosted\"",
+        "\"installed-unverified\"",
+        "\"not-hosted\"",
+        "\"orphaned\"",
+        "\"stopped\"",
+        "\"unsupported\""
+      ]
+    },
+    "HostingReport": {
+      "fields": {
+        "caveat": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "changed": {
+          "type": [
+            "anyOf(null,ref:Changed)"
+          ],
+          "required": false
+        },
+        "commands": {
+          "type": [
+            "array[ref:HostedCommand]"
+          ],
+          "required": true
+        },
+        "instruction": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "manager": {
+          "type": [
+            "ref:Manager"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "HouseholdMember": {
+      "fields": {
+        "access": {
+          "type": [
+            "ref:MemberAccess"
+          ],
+          "required": true
+        },
+        "asking": {
+          "type": [
+            "anyOf(null,ref:MemberAsking)"
+          ],
+          "required": false
+        },
+        "claimed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "last_seen": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "requests": {
+          "type": [
+            "array[ref:MemberRequest]"
+          ],
+          "required": true
+        },
+        "to_hand_over": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "HouseholdRemoval": {
+      "fields": {
+        "asks-through-the-request-service": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "confirmed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "findings": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "requests": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "revoked": {
+          "type": [
+            "ref:Revoked"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "HouseholdReport": {
+      "fields": {
+        "allows": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "available": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "filtering": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "findings": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "members": {
+          "type": [
+            "array[ref:HouseholdMember]"
+          ],
+          "required": true
+        },
+        "policy": {
+          "type": [
+            "anyOf(null,ref:Policy)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "ImportReport": {
+      "fields": {
+        "carried": {
+          "type": [
+            "array[ref:RecordReport]"
+          ],
+          "required": true
+        },
+        "not_carried": {
+          "type": [
+            "array[ref:UnsupportedReport]"
+          ],
+          "required": true
+        },
+        "project": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "refusal": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "stance": {
+          "type": [
+            "ref:Stance"
+          ],
+          "required": true
+        },
+        "would_carry": {
+          "type": [
+            "array[ref:RecordReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Installed": {
+      "fields": {},
+      "variants": [
+        "\"cargo\"",
+        "\"distribution\"",
+        "\"elsewhere\"",
+        "\"homebrew\"",
+        "\"installer\"",
+        "\"scoop\"",
+        "\"untellable\"",
+        "\"winget\""
+      ]
+    },
+    "Interrupted": {
+      "fields": {
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "partial": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "said": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Inventory": {
+      "fields": {
+        "held": {
+          "type": [
+            "array[ref:CredentialHeld]"
+          ],
+          "required": true
+        },
+        "protection": {
+          "type": [
+            "ref:Protection"
+          ],
+          "required": true
+        },
+        "revealed": {
+          "type": [
+            "anyOf(null,ref:Revealed)"
+          ],
+          "required": false
+        },
+        "rotated": {
+          "type": [
+            "anyOf(null,ref:Rotation)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Invitation": {
+      "fields": {
+        "address": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "applied": {
+          "type": [
+            "anyOf(null,ref:InvitationApplied)"
+          ],
+          "required": false
+        },
+        "caution": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "hours": {
+          "type": [
+            "integer/int64"
+          ],
+          "required": true
+        },
+        "linked": {
+          "type": [
+            "ref:Linked"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "ref:InvitationStanding"
+          ],
+          "required": true
+        },
+        "withdrawn": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "InvitationApplied": {
+      "fields": {
+        "filtering": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "libraries": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "limit": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "requesting": {
+          "type": [
+            "ref:Linked"
+          ],
+          "required": true
+        },
+        "unrated": {
+          "type": [
+            "ref:Unrated"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "InvitationStanding": {
+      "fields": {},
+      "variants": [
+        "\"joined\"",
+        "\"made\"",
+        "\"reset\"",
+        "\"waiting\""
+      ]
+    },
+    "Item": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "kept": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "secret": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "sort": {
+          "type": [
+            "ref:Sort"
+          ],
+          "required": true
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Jump": {
+      "fields": {},
+      "variants": [
+        "\"major\"",
+        "\"minor\"",
+        "\"patch\"",
+        "\"untellable\""
+      ]
+    },
+    "Kept": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "secret": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Leaving": {
+      "fields": {
+        "ours": {
+          "type": [
+            "array[ref:Outbound]"
+          ],
+          "required": true
+        },
+        "theirs": {
+          "type": [
+            "array[ref:Elsewhere]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Letting": {
+      "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "download": {
+          "type": [
+            "ref:Candidate"
+          ],
+          "required": true
+        },
+        "goes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "gone": {
+          "type": [
+            "anyOf(null,ref:Gone)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Level": {
+      "fields": {},
+      "variants": [
+        "\"advisory\"",
+        "\"ample\"",
+        "\"critical\"",
+        "\"exhausted\"",
+        "\"unknown\"",
+        "\"warning\""
+      ]
+    },
+    "LibraryPath": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "carried": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "host": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "LifecycleReport": {
+      "fields": {
+        "action": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "command": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "condition": {
+          "type": [
+            "anyOf(null,ref:Condition)"
+          ],
+          "required": false
+        },
+        "forwarding": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "held": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "plan": {
+          "type": [
+            "ref:Plan"
+          ],
+          "required": true
+        },
+        "port_conflicts": {
+          "type": [
+            "array[ref:ConflictReport]"
+          ],
+          "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[ref:Service]"
+          ],
+          "required": true
+        },
+        "stack_edits": {
+          "type": [
+            "array[ref:StackEdit]"
+          ],
+          "required": true
+        },
+        "status": {
+          "type": [
+            "integer|null/int32"
+          ],
+          "required": false
+        },
+        "switched": {
+          "type": [
+            "anyOf(null,ref:Switched)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Limit": {
+      "fields": {
+        "as": {
+          "type": [
+            "const:\"absolute\"",
+            "const:\"share\"",
+            "const:\"unlimited\""
+          ],
+          "required": true
+        },
+        "at": {
+          "type": [
+            "integer/uint64",
+            "integer/uint8"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"absolute\"",
+        "\"share\"",
+        "\"unlimited\""
+      ]
+    },
+    "Line": {
+      "fields": {
+        "detail": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "said": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "step": {
+          "type": [
+            "ref:WalkthroughStep"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Link": {
+      "fields": {},
+      "variants": [
+        "\"copied\"",
+        "\"hardlinked\""
+      ]
+    },
+    "Linked": {
+      "fields": {},
+      "variants": [
+        "\"made\"",
+        "\"not-tried\"",
+        "\"not-yet\""
+      ]
+    },
+    "LinkingReport": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "cost": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "filesystems": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "forced": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "links": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "remedy": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Listing": {
+      "fields": {
+        "archives": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "LogLine": {
+      "fields": {
+        "at": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "line": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stream": {
+          "type": [
+            "ref:Stream"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Manager": {
+      "fields": {},
+      "variants": [
+        "\"launchd\"",
+        "\"systemd\"",
+        "\"unsupported\""
+      ]
+    },
+    "Member": {
+      "fields": {
+        "archive_path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "label": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MemberAccess": {
+      "fields": {
+        "administrator": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "age_limit": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        },
+        "disabled": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "every_library": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "libraries": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "rated": {
+          "type": [
+            "anyOf(null,ref:Rated)"
+          ],
+          "required": false
+        },
+        "restriction": {
+          "type": [
+            "ref:Restriction"
+          ],
+          "required": true
+        },
+        "unrated": {
+          "type": [
+            "ref:Unrated"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MemberAsking": {
+      "fields": {
+        "films": {
+          "type": [
+            "ref:Counted"
+          ],
+          "required": true
+        },
+        "frees_up": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "policy": {
+          "type": [
+            "ref:Policy"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "ref:AskingStanding"
+          ],
+          "required": true
+        },
+        "television": {
+          "type": [
+            "ref:Counted"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MemberRequest": {
+      "fields": {
+        "estimate": {
+          "type": [
+            "anyOf(null,ref:Estimate)"
+          ],
+          "required": false
+        },
+        "id": {
+          "type": [
+            "integer/int64"
+          ],
+          "required": true
+        },
+        "media": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "refused": {
+          "type": [
+            "anyOf(null,ref:Refused)"
+          ],
+          "required": false
+        },
+        "state": {
+          "type": [
+            "anyOf(null,ref:RequestState)"
+          ],
+          "required": false
+        },
+        "title": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "waiting_days": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Mended": {
+      "fields": {
+        "outcome": {
+          "type": [
+            "ref:RepairOutcome"
+          ],
+          "required": true
+        },
+        "repair": {
+          "type": [
+            "ref:Repair"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Metered": {
+      "fields": {
+        "down": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "excludes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "incomplete": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "month": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "up": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MigrationReport": {
+      "fields": {
+        "beside": {
+          "type": [
+            "array[ref:MovedReport]"
+          ],
+          "required": true
+        },
+        "carrying": {
+          "type": [
+            "array[ref:CarryingReport]"
+          ],
+          "required": true
+        },
+        "conflicts": {
+          "type": [
+            "array[ref:ConflictReport]"
+          ],
+          "required": true
+        },
+        "linking": {
+          "type": [
+            "anyOf(null,ref:LinkingReport)"
+          ],
+          "required": false
+        },
+        "modes": {
+          "type": [
+            "array[ref:ModeReport]"
+          ],
+          "required": true
+        },
+        "not_carried": {
+          "type": [
+            "array[ref:UnsupportedReport]"
+          ],
+          "required": true
+        },
+        "read": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "array[ref:StandingReport]"
+          ],
+          "required": true
+        },
+        "unsupported": {
+          "type": [
+            "array[ref:UnsupportedReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ModeReport": {
+      "fields": {
+        "disturbs": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "mode": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "preselected": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Moment": {
+      "fields": {},
+      "variants": [
+        "\"onset\"",
+        "\"resolved\""
+      ]
+    },
+    "MovedReport": {
+      "fields": {
+        "from": {
+          "type": [
+            "integer/uint16"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "integer/uint16"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MusicChoice": {
+      "fields": {
+        "format": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "means": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "note": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "scope": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "size_per_hour": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "targets": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MusicReport": {
+      "fields": {
+        "choice": {
+          "type": [
+            "ref:MusicChoice"
+          ],
+          "required": true
+        },
+        "disposition": {
+          "type": [
+            "ref:Disposition"
+          ],
+          "required": true
+        },
+        "outcome": {
+          "type": [
+            "anyOf(null,ref:Triggered)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Next": {
+      "fields": {},
+      "variants": [
+        "\"client-apps\"",
+        "\"household\"",
+        "\"more-content\""
+      ]
+    },
+    "Notes": {
+      "fields": {
+        "releases": {
+          "type": [
+            "array[ref:ReleaseSummary]"
+          ],
+          "required": true
+        },
+        "requirements": {
+          "type": [
+            "object{ref:Requirement}"
+          ],
+          "required": true
+        },
+        "running": {
+          "type": [
+            "anyOf(null,ref:Release)"
+          ],
+          "required": false
+        },
+        "state": {
+          "type": [
+            "ref:ChangelogState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "OccupantReport": {
+      "fields": {
+        "adoptable": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "ports": {
+          "type": [
+            "array[integer/uint16]"
+          ],
+          "required": true
+        },
+        "running": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Opening": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "setting": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Origin": {
+      "fields": {},
+      "variants": [
+        "\"lemonfiber\"",
+        "\"operator\"",
+        "\"service\""
+      ]
+    },
+    "Outbound": {
+      "fields": {
+        "allowed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "cost": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "destination": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "purpose": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reach": {
+          "type": [
+            "ref:OutboundReach"
+          ],
+          "required": true
+        },
+        "sends": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "switch": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "OutboundReach": {
+      "fields": {},
+      "variants": [
+        "\"echo\"",
+        "\"guides\"",
+        "\"household\"",
+        "\"indexer\"",
+        "\"registry\"",
+        "\"updates\"",
+        "\"usenet\""
+      ]
+    },
+    "Outside": {
+      "fields": {
+        "by_hand": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "found": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Outsized": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "times_typical": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Overall": {
+      "fields": {},
+      "variants": [
+        "\"broken\"",
+        "\"degraded\"",
+        "\"healthy\"",
+        "\"unknown\""
+      ]
+    },
+    "Pace": {
+      "fields": {
+        "brisk": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "budget": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "moved": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PanelArray_of_Queue": {
+      "fields": {
+        "data": {
+          "type": [
+            "array[ref:Queue]",
+            "object"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "PanelArray_of_Service": {
+      "fields": {
+        "data": {
+          "type": [
+            "array[ref:Service]",
+            "object"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "PanelArray_of_Transfer": {
+      "fields": {
+        "data": {
+          "type": [
+            "array[ref:Transfer]",
+            "object"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "PanelFrontDoorReport": {
+      "fields": {
+        "data": {
+          "type": [
+            "object",
+            "ref:FrontDoorReport"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "PanelHouseholdReport": {
+      "fields": {
+        "data": {
+          "type": [
+            "object",
+            "ref:HouseholdReport"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "PanelStorage": {
+      "fields": {
+        "data": {
+          "type": [
+            "object",
+            "ref:Storage"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "PanelVpn": {
+      "fields": {
+        "data": {
+          "type": [
+            "object",
+            "ref:Vpn"
+          ],
+          "required": true
+        },
+        "panel": {
+          "type": [
+            "const:\"ready\"",
+            "const:\"unavailable\""
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"ready\"",
+        "\"unavailable\""
+      ]
+    },
+    "Part": {
+      "fields": {
+        "number": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "season": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "stage": {
+          "type": [
+            "ref:Stage"
+          ],
+          "required": true
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Passed": {
+      "fields": {
+        "at": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "to": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Period": {
+      "fields": {},
+      "variants": [
+        "\"active\"",
+        "\"quiet\""
+      ]
+    },
+    "Phase": {
+      "fields": {},
+      "variants": [
+        "\"applied\"",
+        "\"applying\"",
+        "\"in-progress\"",
+        "\"reviewing\""
+      ]
+    },
+    "Piece": {
+      "fields": {
+        "body": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Plan": {
+      "fields": {
+        "dropped": {
+          "type": [
+            "array[ref:Dropped]"
+          ],
+          "required": true
+        },
+        "forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "profiles": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Policy": {
+      "fields": {},
+      "variants": [
+        "\"everything-waits\"",
+        "\"trusted\"",
+        "\"within-a-limit\""
+      ]
+    },
+    "PresetChoice": {
+      "fields": {
+        "means": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "needs_transcoding_here": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "preset": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "resolution": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "scope": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "size_per_hour": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "transcoding": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Preview": {
+      "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "downgrade": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "manifest": {
+          "type": [
+            "ref:BackupManifest"
+          ],
+          "required": true
+        },
+        "relocation": {
+          "type": [
+            "anyOf(null,ref:Relocation)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Problem": {
+      "fields": {
+        "cause": {
+          "type": [
+            "anyOf(null,ref:Problem)"
+          ],
+          "required": false
+        },
+        "code": {
+          "type": [
+            "ref:Code"
+          ],
+          "required": true
+        },
+        "detail": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "meaning": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "remedies": {
+          "type": [
+            "array[ref:Remedy]"
+          ],
+          "required": true
+        },
+        "severity": {
+          "type": [
+            "ref:ProblemSeverity"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:ProblemState"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ProblemSeverity": {
+      "fields": {},
+      "variants": [
+        "\"advisory\"",
+        "\"critical\"",
+        "\"error\"",
+        "\"warning\""
+      ]
+    },
+    "ProblemState": {
+      "fields": {},
+      "variants": [
+        "\"actionable\"",
+        "\"guided\"",
+        "\"remediable\"",
+        "\"suppressed\"",
+        "\"unknown\""
+      ]
+    },
+    "Propagation": {
+      "fields": {
+        "consumer": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reach": {
+          "type": [
+            "ref:CredentialReach"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Protection": {
+      "fields": {
+        "against": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "not_against": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Protocols": {
+      "fields": {
+        "torrent": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "usenet": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ProvenanceReport": {
+      "fields": {
+        "services": {
+          "type": [
+            "array[ref:ServiceProvenance]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Pulling": {
+      "fields": {},
+      "variants": [
+        "\"fetching\"",
+        "\"stopped\""
+      ]
+    },
+    "QualityReport": {
+      "fields": {
+        "choices": {
+          "type": [
+            "array[ref:PresetChoice]"
+          ],
+          "required": true
+        },
+        "customised": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "disposition": {
+          "type": [
+            "ref:Disposition"
+          ],
+          "required": true
+        },
+        "music": {
+          "type": [
+            "anyOf(null,ref:MusicChoice)"
+          ],
+          "required": false
+        },
+        "overwritten": {
+          "type": [
+            "anyOf(null,ref:StackEdit)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Queue": {
+      "fields": {
+        "depth": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stuck": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Rated": {
+      "fields": {
+        "allows": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "fell_back": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "holds_back": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Reached": {
+      "fields": {},
+      "variants": [
+        "\"exceeded\"",
+        "\"warning\"",
+        "\"within\""
+      ]
+    },
+    "Reason": {
+      "fields": {},
+      "variants": [
+        "\"import-failed\"",
+        "\"indexers-failed\"",
+        "\"no-indexers\"",
+        "\"no-media-server\"",
+        "\"none-met-the-preset\"",
+        "\"not-grabbed\"",
+        "\"not-visible\"",
+        "\"nothing-matched\"",
+        "\"stalled\"",
+        "\"tunnel-down\""
+      ]
+    },
+    "Reckoning": {
+      "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "candidates": {
+          "type": [
+            "array[ref:Candidate]"
+          ],
+          "required": true
+        },
+        "consumption": {
+          "type": [
+            "array[ref:Consumption]"
+          ],
+          "required": true
+        },
+        "halted": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "interrupted": {
+          "type": [
+            "array[ref:Interrupted]"
+          ],
+          "required": true
+        },
+        "level": {
+          "type": [
+            "ref:Level"
+          ],
+          "required": true
+        },
+        "outsized": {
+          "type": [
+            "array[ref:Outsized]"
+          ],
+          "required": true
+        },
+        "reclaimable": {
+          "type": [
+            "array[ref:Consumption]"
+          ],
+          "required": true
+        },
+        "reclaimed": {
+          "type": [
+            "anyOf(null,ref:Reclaimed)"
+          ],
+          "required": false
+        },
+        "volumes": {
+          "type": [
+            "array[ref:Volume]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Reclaim": {
+      "fields": {},
+      "variants": [
+        "\"already_have_it\"",
+        "\"at_the_cost_of_ratio\"",
+        "\"by_losing_content\"",
+        "\"in_progress\"",
+        "\"marginally\"",
+        "\"the_easy_win\"",
+        "\"you_said_not\""
+      ]
+    },
+    "Reclaimed": {
+      "fields": {
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "gone": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "left": {
+          "type": [
+            "array[ref:SpaceLeft]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "RecordReport": {
+      "fields": {
+        "kind": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Refusal": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "named": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Refused": {
+      "fields": {
+        "at": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "expired": {
+          "type": [
+            "boolean"
+          ],
+          "required": false
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "told": {
+          "type": [
+            "anyOf(null,ref:Passed)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Release": {
+      "fields": {
+        "carried": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "delivers": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "groups": {
+          "type": [
+            "array[ref:Group]"
+          ],
+          "required": true
+        },
+        "patches": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "released_on": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "tag": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "user_facing": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "withdrawn": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "ReleaseSummary": {
+      "fields": {
+        "delivers": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "patches": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "released_on": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "user_facing": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "withdrawn": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Relocation": {
+      "fields": {
+        "now": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "was": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Remedy": {
+      "fields": {
+        "action": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "detail": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "RemovedService": {
+      "fields": {
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "removed_in": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "replaced_by": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Repair": {
+      "fields": {
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "does": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "effects": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "reversible": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "RepairOutcome": {
+      "fields": {
+        "leaving": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "outcome": {
+          "type": [
+            "const:\"declined\"",
+            "const:\"fix_failed\"",
+            "const:\"fixed\"",
+            "const:\"stopped\"",
+            "const:\"unmanaged\"",
+            "const:\"would_overwrite\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"declined\"",
+        "\"fix_failed\"",
+        "\"fixed\"",
+        "\"stopped\"",
+        "\"unmanaged\"",
+        "\"would_overwrite\""
+      ]
+    },
+    "RepairReport": {
+      "fields": {
+        "acted": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "beyond": {
+          "type": [
+            "array[ref:Beyond]"
+          ],
+          "required": true
+        },
+        "mended": {
+          "type": [
+            "array[ref:Mended]"
+          ],
+          "required": true
+        },
+        "offered": {
+          "type": [
+            "array[ref:Repair]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ReplaceReport": {
+      "fields": {
+        "project": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "refusal": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "stance": {
+          "type": [
+            "ref:Stance"
+          ],
+          "required": true
+        },
+        "still_running": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "stopped": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "would_stop": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "RequestState": {
+      "fields": {},
+      "variants": [
+        "\"declined\"",
+        "\"failed\"",
+        "\"getting\"",
+        "\"gone\"",
+        "\"here\"",
+        "\"partly-here\"",
+        "\"waiting-for-approval\""
+      ]
+    },
+    "Requirement": {
+      "fields": {
+        "feature": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "shipped_in": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "url": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "withdrawn": {
+          "type": [
+            "boolean"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "ResetReport": {
+      "fields": {
+        "confirmed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "reverted": {
+          "type": [
+            "array[ref:StackEdit]"
+          ],
+          "required": true
+        },
+        "reverted_connections": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Resolved": {
+      "fields": {
+        "bytes_per_second": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "is": {
+          "type": [
+            "const:\"at\"",
+            "const:\"unlimited\"",
+            "const:\"unmeasured\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"at\"",
+        "\"unlimited\"",
+        "\"unmeasured\""
+      ]
+    },
+    "RespiteStanding": {
+      "fields": {
+        "seconds": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "const:\"expired\"",
+            "const:\"in-force\"",
+            "const:\"none\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"expired\"",
+        "\"in-force\"",
+        "\"none\""
+      ]
+    },
+    "Restoration": {
+      "fields": {
+        "done": {
+          "type": [
+            "anyOf(null,ref:RestoreReport)"
+          ],
+          "required": false
+        },
+        "would": {
+          "type": [
+            "ref:Preview"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "RestoreReport": {
+      "fields": {
+        "from_version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "relocated": {
+          "type": [
+            "anyOf(null,ref:Relocation)"
+          ],
+          "required": false
+        },
+        "scope": {
+          "type": [
+            "ref:Scope"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Restraint": {
+      "fields": {},
+      "variants": [
+        "\"cap-exceeded\"",
+        "\"cap-warning\"",
+        "\"limited\"",
+        "\"overridden\"",
+        "\"scheduled-active\"",
+        "\"scheduled-quiet\"",
+        "\"unlimited\""
+      ]
+    },
+    "Restriction": {
+      "fields": {},
+      "variants": [
+        "\"both\"",
+        "\"inconsistent\"",
+        "\"library-limited\"",
+        "\"rating-limited\"",
+        "\"unrestricted\""
+      ]
+    },
+    "Revealed": {
+      "fields": {
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "value": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "warning": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Review": {
+      "fields": {
+        "change": {
+          "type": [
+            "ref:ConfigChange"
+          ],
+          "required": true
+        },
+        "findings": {
+          "type": [
+            "ref:Findings"
+          ],
+          "required": false
+        },
+        "proof": {
+          "type": [
+            "anyOf(null,ref:Validation)"
+          ],
+          "required": false
+        },
+        "refusal": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "stance": {
+          "type": [
+            "ref:Stance"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Revoked": {
+      "fields": {},
+      "variants": [
+        "\"everywhere\"",
+        "\"media-server-only\"",
+        "\"nothing\""
+      ]
+    },
+    "Rhythm": {
+      "fields": {
+        "from": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Role": {
+      "fields": {},
+      "variants": [
+        "\"data\"",
+        "\"services\""
+      ]
+    },
+    "Root": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Rotation": {
+      "fields": {
+        "consumers": {
+          "type": [
+            "array[ref:Propagation]"
+          ],
+          "required": true
+        },
+        "credential": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "settled": {
+          "type": [
+            "ref:Settled"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Scope": {
+      "fields": {
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "project": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "scope": {
+          "type": [
+            "const:\"existing\"",
+            "const:\"service\"",
+            "const:\"whole_stack\""
+          ],
+          "required": true
+        },
+        "trees": {
+          "type": [
+            "array[ref:Tree]"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"existing\"",
+        "\"service\"",
+        "\"whole_stack\""
+      ]
+    },
+    "SeasonCoverage": {
+      "fields": {
+        "have": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "outstanding": {
+          "type": [
+            "array[ref:Part]"
+          ],
+          "required": true
+        },
+        "season": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "unmonitored": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "wanted": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "SeedReport": {
+      "fields": {
+        "assessment": {
+          "type": [
+            "ref:Assessment"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "unsupported": {
+          "type": [
+            "array[ref:UnsupportedReport]"
+          ],
+          "required": false
+        },
+        "wirings": {
+          "type": [
+            "array[ref:Wiring]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "SeedSeverity": {
+      "fields": {
+        "breakage": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "remediation": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "severity": {
+          "type": [
+            "const:\"informational\"",
+            "const:\"warning\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"informational\"",
+        "\"warning\""
+      ]
+    },
+    "SeedState": {
+      "fields": {
+        "detail": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "ours": {
+          "type": [
+            "null|string",
+            "string"
+          ],
+          "required": false
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "const:\"adopted\"",
+            "const:\"already-wired\"",
+            "const:\"conflicted\"",
+            "const:\"drifted\"",
+            "const:\"failed\"",
+            "const:\"observed\"",
+            "const:\"refused\"",
+            "const:\"skipped\"",
+            "const:\"stale\"",
+            "const:\"unmanaged\"",
+            "const:\"wired\"",
+            "const:\"would-adopt\"",
+            "const:\"would-wire\""
+          ],
+          "required": true
+        },
+        "yours": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": [
+        "\"adopted\"",
+        "\"already-wired\"",
+        "\"conflicted\"",
+        "\"drifted\"",
+        "\"failed\"",
+        "\"observed\"",
+        "\"refused\"",
+        "\"skipped\"",
+        "\"stale\"",
+        "\"unmanaged\"",
+        "\"wired\"",
+        "\"would-adopt\"",
+        "\"would-wire\""
+      ]
+    },
+    "SeedingStanding": {
+      "fields": {
+        "ratio": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "const:\"left_alone\"",
+            "const:\"never_imported\"",
+            "const:\"seeding\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"left_alone\"",
+        "\"never_imported\"",
+        "\"seeding\""
+      ]
+    },
+    "SelfUpdateStanding": {
+      "fields": {},
+      "variants": [
+        "\"check-failed\"",
+        "\"current\"",
+        "\"managed-externally\"",
+        "\"update-available\""
+      ]
+    },
+    "Service": {
+      "fields": {
+        "criticality": {
+          "type": [
+            "ref:Criticality"
+          ],
+          "required": true
+        },
+        "depends_on": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "describes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "exit": {
+          "type": [
+            "integer|null/int32"
+          ],
+          "required": false
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "profile": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:ServiceState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ServiceProvenance": {
+      "fields": {
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "image": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "license": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "pinned": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "upstream": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "ServiceState": {
+      "fields": {},
+      "variants": [
+        "\"absent\"",
+        "\"crash-looping\"",
+        "\"failed\"",
+        "\"healthy\"",
+        "\"host-managed\"",
+        "\"running\"",
+        "\"starting\"",
+        "\"stopped\"",
+        "\"unhealthy\""
+      ]
+    },
+    "SettingReport": {
+      "fields": {
+        "key": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "secret": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "value": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Settled": {
+      "fields": {
+        "afterwards": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "detail": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "known": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "location": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "observed": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "settled": {
+          "type": [
+            "const:\"elsewhere\"",
+            "const:\"refused\"",
+            "const:\"rehearsed\"",
+            "const:\"replaced\"",
+            "const:\"unknown\"",
+            "const:\"unproven\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"elsewhere\"",
+        "\"refused\"",
+        "\"rehearsed\"",
+        "\"replaced\"",
+        "\"unknown\"",
+        "\"unproven\""
+      ]
+    },
+    "SetupOutcome": {
+      "fields": {},
+      "variants": [
+        "\"abandoned\"",
+        "\"already-set-up\"",
+        "\"applied\""
+      ]
+    },
+    "SetupReport": {
+      "fields": {
+        "data_root": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "outcome": {
+          "type": [
+            "ref:SetupOutcome"
+          ],
+          "required": true
+        },
+        "protocols": {
+          "type": [
+            "ref:Protocols"
+          ],
+          "required": true
+        },
+        "service_user": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Shape": {
+      "fields": {},
+      "variants": [
+        "\"library-only\"",
+        "\"pipeline\""
+      ]
+    },
+    "Sharing": {
+      "fields": {
+        "acting": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "applied": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "cap": {
+          "type": [
+            "anyOf(null,ref:Cap)"
+          ],
+          "required": false
+        },
+        "capacity": {
+          "type": [
+            "anyOf(null,ref:Capacity)"
+          ],
+          "required": false
+        },
+        "cautions": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "clients": {
+          "type": [
+            "array[ref:Holding]"
+          ],
+          "required": true
+        },
+        "down": {
+          "type": [
+            "ref:BandwidthReading"
+          ],
+          "required": true
+        },
+        "means": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "metered": {
+          "type": [
+            "anyOf(null,ref:Metered)"
+          ],
+          "required": false
+        },
+        "ratio": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "reached": {
+          "type": [
+            "anyOf(null,ref:Reached)"
+          ],
+          "required": false
+        },
+        "respite": {
+          "type": [
+            "ref:RespiteStanding"
+          ],
+          "required": true
+        },
+        "respite_says": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "restraint": {
+          "type": [
+            "ref:Restraint"
+          ],
+          "required": true
+        },
+        "rhythm": {
+          "type": [
+            "anyOf(null,ref:Rhythm)"
+          ],
+          "required": false
+        },
+        "untouched": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "up": {
+          "type": [
+            "ref:BandwidthReading"
+          ],
+          "required": true
+        },
+        "zone": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Snapshot": {
+      "fields": {
+        "alerts": {
+          "type": [
+            "array[ref:Alert]"
+          ],
+          "required": true
+        },
+        "door": {
+          "type": [
+            "ref:PanelFrontDoorReport"
+          ],
+          "required": true
+        },
+        "health": {
+          "type": [
+            "ref:HealthSummary"
+          ],
+          "required": true
+        },
+        "household": {
+          "type": [
+            "ref:PanelHouseholdReport"
+          ],
+          "required": true
+        },
+        "queue": {
+          "type": [
+            "ref:PanelArray_of_Queue"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "ref:PanelArray_of_Service"
+          ],
+          "required": true
+        },
+        "storage": {
+          "type": [
+            "ref:PanelStorage"
+          ],
+          "required": true
+        },
+        "stuck": {
+          "type": [
+            "array[ref:Stuck]"
+          ],
+          "required": true
+        },
+        "telemetry": {
+          "type": [
+            "ref:Telemetry"
+          ],
+          "required": true
+        },
+        "transfers": {
+          "type": [
+            "ref:PanelArray_of_Transfer"
+          ],
+          "required": true
+        },
+        "vpn": {
+          "type": [
+            "anyOf(null,ref:PanelVpn)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Sort": {
+      "fields": {},
+      "variants": [
+        "\"container\"",
+        "\"image\"",
+        "\"network\"",
+        "\"path\""
+      ]
+    },
+    "Source": {
+      "fields": {},
+      "variants": [
+        "\"declared\"",
+        "\"observed\""
+      ]
+    },
+    "SpaceCategory": {
+      "fields": {
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "of": {
+          "type": [
+            "const:\"extracted\"",
+            "const:\"landing\"",
+            "const:\"orphaned\"",
+            "const:\"seeding\"",
+            "const:\"services\"",
+            "const:\"tree\"",
+            "const:\"unmanaged\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"extracted\"",
+        "\"landing\"",
+        "\"orphaned\"",
+        "\"seeding\"",
+        "\"services\"",
+        "\"tree\"",
+        "\"unmanaged\""
+      ]
+    },
+    "SpaceLeft": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StackEdit": {
+      "fields": {
+        "diff": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StackProtocol": {
+      "fields": {},
+      "variants": [
+        "\"torrent\"",
+        "\"usenet\""
+      ]
+    },
+    "StackUpdateReport": {
+      "fields": {
+        "applied": {
+          "type": [
+            "array[ref:UpdateApplied]"
+          ],
+          "required": true
+        },
+        "backup": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "changelog": {
+          "type": [
+            "ref:Notes"
+          ],
+          "required": true
+        },
+        "changes": {
+          "type": [
+            "array[ref:UpdateChange]"
+          ],
+          "required": true
+        },
+        "confirmed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "halted": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "in_flight": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "stack_edits": {
+          "type": [
+            "array[ref:StackEdit]"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:UpdateState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Stage": {
+      "fields": {},
+      "variants": [
+        "\"available\"",
+        "\"downloaded\"",
+        "\"downloading\"",
+        "\"found\"",
+        "\"grabbed\"",
+        "\"imported\"",
+        "\"importing\"",
+        "\"monitored\"",
+        "\"not-monitored\"",
+        "\"searching\""
+      ]
+    },
+    "Stall": {
+      "fields": {},
+      "variants": [
+        "\"completed-not-imported\"",
+        "\"orphaned\"",
+        "\"redownload-loop\"",
+        "\"repeated-import-failure\"",
+        "\"slow\"",
+        "\"stalled-download\"",
+        "\"waiting-indefinitely\""
+      ]
+    },
+    "Stance": {
+      "fields": {},
+      "variants": [
+        "\"applied\"",
+        "\"blocked\"",
+        "\"pending\"",
+        "\"unchanged\""
+      ]
+    },
+    "StandingReport": {
+      "fields": {
+        "project": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[ref:OccupantReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Started": {
+      "fields": {
+        "action": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "job": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StatusReport": {
+      "fields": {
+        "condition": {
+          "type": [
+            "ref:Condition"
+          ],
+          "required": true
+        },
+        "disturbs": {
+          "type": [
+            "ref:Disturbances"
+          ],
+          "required": true
+        },
+        "forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[ref:Service]"
+          ],
+          "required": true
+        },
+        "undeclared": {
+          "type": [
+            "array[ref:Undeclared]"
+          ],
+          "required": true
+        },
+        "unsupported": {
+          "type": [
+            "array[ref:UnsupportedReport]"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Stopped": {
+      "fields": {
+        "logs": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "ref:Reason"
+          ],
+          "required": true
+        },
+        "remedy": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "step": {
+          "type": [
+            "ref:WalkthroughStep"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Storage": {
+      "fields": {
+        "exhaustion": {
+          "type": [
+            "anyOf(null,ref:Duration)"
+          ],
+          "required": false
+        },
+        "free": {
+          "type": [
+            "ref:DashboardReading"
+          ],
+          "required": true
+        },
+        "hardlink": {
+          "type": [
+            "ref:Hardlink"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Stored": {
+      "fields": {
+        "beside": {
+          "type": [
+            "array[ref:StoredBeside]"
+          ],
+          "required": true
+        },
+        "kept": {
+          "type": [
+            "array[ref:Kept]"
+          ],
+          "required": true
+        },
+        "removal": {
+          "type": [
+            "ref:StoredRemoval"
+          ],
+          "required": true
+        },
+        "roots": {
+          "type": [
+            "array[ref:Root]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StoredBeside": {
+      "fields": {
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StoredLeft": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StoredRemoval": {
+      "fields": {
+        "gone": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "left": {
+          "type": [
+            "array[ref:StoredLeft]"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "const:\"done\"",
+            "const:\"not-asked\"",
+            "const:\"unconfirmed\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"done\"",
+        "\"not-asked\"",
+        "\"unconfirmed\""
+      ]
+    },
+    "Straining": {
+      "fields": {
+        "caution": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "instead": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "preset": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Stream": {
+      "fields": {},
+      "variants": [
+        "\"stderr\"",
+        "\"stdout\""
+      ]
+    },
+    "Stuck": {
+      "fields": {
+        "blocking": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "held_for": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "items": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stall": {
+          "type": [
+            "ref:Stall"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StuckEntry": {
+      "fields": {
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stage": {
+          "type": [
+            "ref:Stage"
+          ],
+          "required": true
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "StuckReport": {
+      "fields": {
+        "incomplete": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "items": {
+          "type": [
+            "array[ref:StuckEntry]"
+          ],
+          "required": true
+        },
+        "unsupported": {
+          "type": [
+            "array[ref:UnsupportedReport]"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "SupervisionReport": {
+      "fields": {
+        "forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stopped": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "would": {
+          "type": [
+            "anyOf(null,ref:Vigil)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Support": {
+      "fields": {},
+      "variants": [
+        "\"fallback\"",
+        "\"good\"",
+        "\"poor\"",
+        "\"workable\""
+      ]
+    },
+    "Switched": {
+      "fields": {
+        "kept": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "started": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "stop_command": {
+          "type": [
+            "array|null[string]"
+          ],
+          "required": false
+        },
+        "stopped": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Taken": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "lemonfiber": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stack": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "TakesAway": {
+      "fields": {
+        "bound": {
+          "type": [
+            "const:\"bounded\"",
+            "const:\"open-ended\""
+          ],
+          "required": true
+        },
+        "seconds": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "until": {
+          "type": [
+            "ref:Awaiting"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"bounded\"",
+        "\"open-ended\""
+      ]
+    },
+    "Tally": {
+      "fields": {
+        "files": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        },
+        "logical": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "physical": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "shared": {
+          "type": [
+            "integer/uint"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Telemetry": {
+      "fields": {},
+      "variants": [
+        "\"degraded\"",
+        "\"disconnected\"",
+        "\"live\"",
+        "\"no-stack\"",
+        "\"unconfigured\""
+      ]
+    },
+    "Term": {
+      "fields": {
+        "also_called": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "deep": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "short": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "word": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Terms": {
+      "fields": {
+        "filenames": {
+          "type": [
+            "ref:Filenames"
+          ],
+          "required": true
+        },
+        "revealed": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "window": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Tier": {
+      "fields": {},
+      "variants": [
+        "\"configuration\"",
+        "\"media\"",
+        "\"services\"",
+        "\"stop\""
+      ]
+    },
+    "TraceConfidence": {
+      "fields": {},
+      "variants": [
+        "\"certain\"",
+        "\"uncertain\""
+      ]
+    },
+    "TraceMoment": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "outcome": {
+          "type": [
+            "ref:TraceOutcome"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "TraceOutcome": {
+      "fields": {},
+      "variants": [
+        "\"download-failed\"",
+        "\"grabbed\"",
+        "\"imported\"",
+        "\"removed\""
+      ]
+    },
+    "TraceReport": {
+      "fields": {
+        "confidence": {
+          "type": [
+            "ref:TraceConfidence"
+          ],
+          "required": true
+        },
+        "coverage": {
+          "type": [
+            "anyOf(null,ref:Coverage)"
+          ],
+          "required": false
+        },
+        "findings": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "furthest": {
+          "type": [
+            "ref:Stage"
+          ],
+          "required": true
+        },
+        "history": {
+          "type": [
+            "array[ref:TraceMoment]"
+          ],
+          "required": true
+        },
+        "item": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "matched": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "stages": {
+          "type": [
+            "array[ref:TraceStage]"
+          ],
+          "required": true
+        },
+        "stall": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "TraceStage": {
+      "fields": {
+        "at": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stage": {
+          "type": [
+            "ref:Stage"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Transfer": {
+      "fields": {
+        "eta": {
+          "type": [
+            "anyOf(null,ref:Duration)"
+          ],
+          "required": false
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "progress": {
+          "type": [
+            "integer/uint8"
+          ],
+          "required": true
+        },
+        "protocol": {
+          "type": [
+            "ref:DashboardProtocol"
+          ],
+          "required": true
+        },
+        "speed": {
+          "type": [
+            "ref:DashboardReading"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Tree": {
+      "fields": {
+        "archive_path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "host_path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Triggered": {
+      "fields": {
+        "detail": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "const:\"failed\"",
+            "const:\"not-started\"",
+            "const:\"started\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"failed\"",
+        "\"not-started\"",
+        "\"started\""
+      ]
+    },
+    "Trouble": {
+      "fields": {
+        "causes": {
+          "type": [
+            "array[ref:Cause]"
+          ],
+          "required": true
+        },
+        "symptom": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Undeclared": {
+      "fields": {
+        "describes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:ServiceState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Undo": {
+      "fields": {
+        "action": {
+          "type": [
+            "ref:Action"
+          ],
+          "required": true
+        },
+        "target": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UndoLeft": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "target": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UndoReversal": {
+      "fields": {
+        "left": {
+          "type": [
+            "array[ref:UndoLeft]"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "reversed": {
+          "type": [
+            "array[ref:Undo]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Uninstall": {
+      "fields": {
+        "manifest": {
+          "type": [
+            "ref:UninstallManifest"
+          ],
+          "required": true
+        },
+        "removal": {
+          "type": [
+            "ref:UninstallRemoval"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UninstallConfidence": {
+      "fields": {
+        "complete": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "unread": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UninstallLeft": {
+      "fields": {
+        "by_hand": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UninstallManifest": {
+      "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "backup": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "bytes": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "coming": {
+          "type": [
+            "array[ref:Coming]"
+          ],
+          "required": true
+        },
+        "confidence": {
+          "type": [
+            "ref:UninstallConfidence"
+          ],
+          "required": true
+        },
+        "foreign": {
+          "type": [
+            "array[ref:Foreign]"
+          ],
+          "required": true
+        },
+        "items": {
+          "type": [
+            "array[ref:Item]"
+          ],
+          "required": true
+        },
+        "keeps": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "outside": {
+          "type": [
+            "array[ref:Outside]"
+          ],
+          "required": true
+        },
+        "removes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "tier": {
+          "type": [
+            "ref:Tier"
+          ],
+          "required": true
+        },
+        "volume": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "UninstallRemoval": {
+      "fields": {
+        "credentials": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "gone": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "left": {
+          "type": [
+            "array[ref:UninstallLeft]"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "const:\"complete\"",
+            "const:\"confirmed\"",
+            "const:\"partial\"",
+            "const:\"surveyed\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"complete\"",
+        "\"confirmed\"",
+        "\"partial\"",
+        "\"surveyed\""
+      ]
+    },
+    "Unrated": {
+      "fields": {},
+      "variants": [
+        "\"held-back\"",
+        "\"let-through\""
+      ]
+    },
+    "UnsupportedReport": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "what": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UpdateApplied": {
+      "fields": {
+        "detail": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "ending": {
+          "type": [
+            "ref:Ending"
+          ],
+          "required": true
+        },
+        "from": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reversal": {
+          "type": [
+            "ref:UpdateReversal"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UpdateChange": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "current": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "irreversible": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "jump": {
+          "type": [
+            "ref:Jump"
+          ],
+          "required": true
+        },
+        "refused": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "target": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UpdateReport": {
+      "fields": {
+        "afterwards": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "asked": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "at": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "carries": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "changed": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "command": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "configuration": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "installed": {
+          "type": [
+            "ref:Installed"
+          ],
+          "required": true
+        },
+        "instead": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "offered": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "owner": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "replaceable": {
+          "type": [
+            "boolean|null"
+          ],
+          "required": false
+        },
+        "running": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "ref:SelfUpdateStanding"
+          ],
+          "required": true
+        },
+        "untold": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "UpdateReversal": {
+      "fields": {},
+      "variants": [
+        "\"restore\"",
+        "\"rollback\""
+      ]
+    },
+    "UpdateState": {
+      "fields": {},
+      "variants": [
+        "\"current\"",
+        "\"failed\"",
+        "\"partial\"",
+        "\"updated\"",
+        "\"updates-available\""
+      ]
+    },
+    "UpgradeMedia": {
+      "fields": {
+        "media_type": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "outcome": {
+          "type": [
+            "anyOf(null,ref:Triggered)"
+          ],
+          "required": false
+        },
+        "preset": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "size_per_hour": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "UpgradeReport": {
+      "fields": {
+        "confirmed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "media": {
+          "type": [
+            "array[ref:UpgradeMedia]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Validation": {
+      "fields": {
+        "detail": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "observed": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "outcome": {
+          "type": [
+            "const:\"degraded\"",
+            "const:\"rejected\"",
+            "const:\"unreachable\"",
+            "const:\"valid\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"degraded\"",
+        "\"rejected\"",
+        "\"unreachable\"",
+        "\"valid\""
+      ]
+    },
+    "VersionReport": {
+      "fields": {
+        "binary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "changelog": {
+          "type": [
+            "ref:Notes"
+          ],
+          "required": true
+        },
+        "compose": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "stack": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "supported_schema": {
+          "type": [
+            "array[integer/uint32]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Vigil": {
+      "fields": {
+        "command": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "every": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "root": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Vocabulary": {
+      "fields": {
+        "words": {
+          "type": [
+            "array[ref:Term]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Volume": {
+      "fields": {
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "committed": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "free": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "level": {
+          "type": [
+            "ref:Level"
+          ],
+          "required": true
+        },
+        "limit": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "point": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "projected": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "reading": {
+          "type": [
+            "ref:Freshness"
+          ],
+          "required": true
+        },
+        "role": {
+          "type": [
+            "ref:Role"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Vpn": {
+      "fields": {
+        "country": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "egress_matches": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "exit_ip": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "forwarded_port": {
+          "type": [
+            "integer|null/uint16"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "WalkthroughReport": {
+      "fields": {
+        "already_here": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "handover": {
+          "type": [
+            "anyOf(null,ref:Handover)"
+          ],
+          "required": false
+        },
+        "in_background": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "item": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "lines": {
+          "type": [
+            "array[ref:Line]"
+          ],
+          "required": true
+        },
+        "link": {
+          "type": [
+            "anyOf(null,ref:Link)"
+          ],
+          "required": false
+        },
+        "proves": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "shape": {
+          "type": [
+            "ref:Shape"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:WalkthroughState"
+          ],
+          "required": true
+        },
+        "stopped": {
+          "type": [
+            "anyOf(null,ref:Stopped)"
+          ],
+          "required": false
+        },
+        "suggestions": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "WalkthroughState": {
+      "fields": {},
+      "variants": [
+        "\"abandoned\"",
+        "\"complete\"",
+        "\"downloading\"",
+        "\"failed\"",
+        "\"grabbing\"",
+        "\"importing\"",
+        "\"offered\"",
+        "\"searching\"",
+        "\"skipped\""
+      ]
+    },
+    "WalkthroughStep": {
+      "fields": {},
+      "variants": [
+        "\"available\"",
+        "\"choosing\"",
+        "\"downloading\"",
+        "\"grabbing\"",
+        "\"importing\"",
+        "\"scanning\"",
+        "\"searching\""
+      ]
+    },
+    "WhenExceeded": {
+      "fields": {},
+      "variants": [
+        "\"continue\"",
+        "\"pause\"",
+        "\"throttle\""
+      ]
+    },
+    "Wiring": {
+      "fields": {
+        "connection": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "severity": {
+          "type": [
+            "ref:SeedSeverity"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:SeedState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "WizardReport": {
+      "fields": {
+        "asks": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "at": {
+          "type": [
+            "ref:WizardStep"
+          ],
+          "required": true
+        },
+        "offered": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "phase": {
+          "type": [
+            "ref:Phase"
+          ],
+          "required": true
+        },
+        "plan": {
+          "type": [
+            "array[ref:SettingReport]"
+          ],
+          "required": true
+        },
+        "proof": {
+          "type": [
+            "anyOf(null,ref:Validation)"
+          ],
+          "required": false
+        },
+        "ready_for_review": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "unanswered": {
+          "type": [
+            "array[ref:WizardStep]"
+          ],
+          "required": true
+        },
+        "written": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "WizardStep": {
+      "fields": {},
+      "variants": [
+        "\"autostart\"",
+        "\"credentials\"",
+        "\"data-location\"",
+        "\"household\"",
+        "\"library\"",
+        "\"notifications\"",
+        "\"preflight\"",
+        "\"prerequisites\"",
+        "\"protocols\"",
+        "\"provider\"",
+        "\"review\"",
+        "\"service-user\"",
+        "\"vpn\"",
+        "\"welcome\""
+      ]
+    }
+  }
+}

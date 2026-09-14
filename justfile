@@ -88,6 +88,24 @@ fmt:
 contract:
     cargo run --quiet --example contract -p lemonfiber-core > contract/web-api.contract.json
 
+# Rewrite the stable surface the contract is held to between releases.
+#
+# Not a second rendering of the artefact above: that one says what the surfaces
+# exchange now, and regenerating it without a diff proves only that it is not stale.
+# This one is names and types with every description stripped out, so it moves when
+# the interface moves and stays still when somebody rewrites a doc comment — and it
+# is what a removed or retyped field is caught against.
+#
+# It writes through a temporary file because the program reads the committed surface
+# before it replaces it: a redirect would truncate the thing it is about to compare
+# against. It exits non-zero, leaving the committed surface alone, where the new one
+# drops anything the old one describes under an unchanged `API_VERSION`.
+surface:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo run --quiet --example surface -p lemonfiber-core > contract/.surface.next
+    mv contract/.surface.next contract/web-api.surface.json
+
 # Rewrite the command reference from the declarations the binary parses with.
 reference:
     cargo run --quiet --example reference -p lemonfiber > reference/commands.md

@@ -83,12 +83,14 @@ pub(super) use reset::reset_connections;
 /// pushes them indexers. It then makes Jellyfin the identity source for Seerr, so
 /// the household signs in once. Bindery wiring lands next.
 pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
-    let manifest = ctx
+    let mut manifest = ctx
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
     let mut wirings = Vec::new();
+
+    wirings.extend(withheld(&mut manifest.services, &ctx.settings.unmanaged));
 
     // qBittorrent's password, the one credential lemonfiber mints. Collecting the
     // optional target into a list wires it where the stack has it and does nothing
@@ -243,7 +245,42 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         wirings,
         assessment,
         rehearsed: ctx.dry_run,
+        // Read from the manifest rather than from what this pass reached, because a
+        // service it cannot speak to is one it never tried — and a list assembled from
+        // what was attempted could only ever hold the attempts.
+        unsupported: super::targets::unsupported_here(&manifest.services, project.as_deref()),
     })
+}
+
+/// Take the services the operator declared unmanaged out of the manifest, and say what
+/// was taken, in the words they gave for taking it.
+///
+/// Removed at the top of a pass rather than gated at each of the dozen places that
+/// would otherwise write to one. A gate per write point is a gate somebody adds a thirteenth
+/// write beside, and the promise being kept — that lemonfiber observes and never
+/// writes — is one a thirteenth write breaks silently.
+///
+/// Reported rather than simply absent, and reported as settled information rather than
+/// as drift: a run that said nothing about a service the operator asked it to leave
+/// alone would be indistinguishable from one that forgot the service existed.
+fn withheld(
+    services: &mut Vec<lemonfiber_manifest::Service>,
+    declared: &[(String, String)],
+) -> Vec<crate::seed::Wiring> {
+    let mut observed = Vec::new();
+    services.retain(|service| {
+        let Some(because) = crate::unmanaged::covering(declared, &service.id) else {
+            return true;
+        };
+        observed.push(crate::seed::Wiring::settled(
+            service.name.clone(),
+            crate::seed::State::Observed {
+                reason: because.to_owned(),
+            },
+        ));
+        false
+    });
+    observed
 }
 
 /// The download-client wirings lemonfiber manages, as a caller that only reads them needs
@@ -358,6 +395,7 @@ mod tests {
     use super::arrs::servarr_arrs;
     use super::baseline::escalate_broken_roots;
     use super::clients::{category_for, download_clients, read_sabnzbd_key, sabnzbd_config_path};
+    use super::withheld;
     use crate::app::targets::{project_directory, recorded_qbittorrent_password, servarr_targets};
     use crate::app::{dispatch, Command, Ctx, Outcome};
     use crate::config::{store, Settings};
@@ -1241,8 +1279,28 @@ mod tests {
             None,
         );
         let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
-        let failed = report.wirings.iter().any(is_failed);
-        assert!(failed, "a rejected change is reported as failed");
+
+        // Both words are in this one report, and they send the operator to different
+        // places. A skip is a wiring this run could not attempt — the service has not
+        // finished starting — and the answer to it is to run seeding again. A failure
+        // is a service that was asked and said no, and running again will produce the
+        // same no. A run that reported the refusal as a skip would have the operator
+        // waiting for a stack that was never going to settle.
+        let failed = report
+            .wirings
+            .iter()
+            .filter(|wiring| is_failed(wiring))
+            .count();
+        let skipped = report
+            .wirings
+            .iter()
+            .filter(|wiring| is_skipped(wiring))
+            .count();
+        assert!(failed > 0, "a rejected change is reported as failed");
+        assert!(
+            skipped > 0,
+            "and the wirings this run never got to are skips rather than failures"
+        );
     }
 
     #[tokio::test]
@@ -2499,10 +2557,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(wiring.state, crate::seed::State::Skipped { .. }),
-            "{wiring:?}"
-        );
+        assert!(is_skipped(&wiring), "{wiring:?}");
         let written = std::fs::read_to_string(&env).unwrap_or_default();
         assert!(
             !written.contains("SEERR_API_KEY"),
@@ -3535,5 +3590,68 @@ mod tests {
             http.requests().iter().all(|asked| asked.body.is_none()),
             "a rehearsal pointed the finder at something"
         );
+    }
+
+    /// A service the operator declared unmanaged never reaches anything that writes,
+    /// because it never reaches the list those things are built from.
+    #[test]
+    fn a_service_declared_unmanaged_is_taken_out_of_the_pass_and_reported() {
+        let mut services = crate::test_support::stack()
+            .manifest()
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        let counted = services.len();
+        // Said rather than left to the assertions below, which an empty list satisfies
+        // while proving nothing: no service was taken out of a pass that held none.
+        assert!(counted > 0, "the embedded stack declares services");
+        let declared = vec![(
+            "sonarr".to_owned(),
+            "I tune this one by hand every season".to_owned(),
+        )];
+
+        let observed = withheld(&mut services, &declared);
+
+        assert_eq!(
+            services.len(),
+            counted - 1,
+            "the service is gone from the pass"
+        );
+        assert!(
+            !services.iter().any(|service| service.id == "sonarr"),
+            "and it is the one that was declared"
+        );
+        assert_eq!(observed.len(), 1, "{observed:?}");
+        assert!(
+            observed.first().is_some_and(|wiring| matches!(
+                &wiring.state,
+                crate::seed::State::Observed { reason } if reason.contains("by hand")
+            )),
+            "{observed:?}"
+        );
+        // Settled and informational, which is what keeps it out of the drift the
+        // operator is being asked to do something about.
+        assert!(observed
+            .first()
+            .is_some_and(|wiring| wiring.state.is_settled()));
+        assert!(observed
+            .first()
+            .is_some_and(|wiring| !wiring.severity.is_warning()));
+    }
+
+    /// Nothing declared takes nothing out and says nothing, which is every machine
+    /// where nobody has written anything down.
+    #[test]
+    fn nothing_declared_leaves_every_service_in_the_pass() {
+        let mut services = crate::test_support::stack()
+            .manifest()
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        let counted = services.len();
+        // Said rather than left to the assertions below, which an empty list satisfies
+        // while proving nothing: no service was taken out of a pass that held none.
+        assert!(counted > 0, "the embedded stack declares services");
+
+        assert!(withheld(&mut services, &[]).is_empty());
+        assert_eq!(services.len(), counted);
     }
 }

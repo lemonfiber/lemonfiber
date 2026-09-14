@@ -72,6 +72,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 
@@ -113,8 +119,14 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
       --indexer-url <URL>
           An indexer's API base URL
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
       --indexer-key <KEY>
           The indexer's API key
@@ -184,6 +196,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -215,6 +233,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -249,6 +273,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -277,6 +307,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -307,6 +343,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -336,6 +378,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -364,6 +412,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -400,6 +454,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -440,6 +500,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -469,6 +535,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -501,6 +573,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -529,6 +607,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -556,6 +640,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -599,6 +689,12 @@ Options:
 
           [default: 50]
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -629,6 +725,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -656,6 +758,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -698,6 +806,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -721,6 +835,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -751,6 +871,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -774,6 +900,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -802,6 +934,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -834,6 +972,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -857,6 +1001,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -892,6 +1042,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -917,6 +1073,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -946,6 +1108,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -985,8 +1153,14 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
       --yes
           Carry the repairs out without asking, having decided in advance
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
       --fix-disruptive
           Include the checks that disturb the running system while repairing.
@@ -1026,6 +1200,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -1060,6 +1240,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1099,6 +1285,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1133,6 +1325,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1171,6 +1369,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1212,6 +1416,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1252,6 +1462,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1281,6 +1497,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1314,6 +1536,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1349,6 +1577,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1380,6 +1614,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1413,6 +1653,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1438,6 +1684,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1469,6 +1721,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1492,6 +1750,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -1518,6 +1782,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1547,6 +1817,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1572,6 +1848,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1600,6 +1882,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1636,6 +1924,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1662,6 +1956,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1687,6 +1987,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1731,6 +2037,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1760,6 +2072,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1794,6 +2112,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1822,6 +2146,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1870,6 +2200,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1898,6 +2234,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1931,6 +2273,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -1985,6 +2333,12 @@ Options:
 
           Counts only lemonfiber's own download clients. Everything else in the house is on the same line and is not counted, so your provider's meter will read higher. `none` takes the cap away.
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
       --when-exceeded <WHAT>
           What happens when that cap is reached: `pause`, `throttle` or `continue`.
 
@@ -2019,6 +2373,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help
 ```
@@ -2044,6 +2404,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -2073,6 +2439,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -2104,6 +2476,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -2140,6 +2518,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -2173,6 +2557,12 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -2199,6 +2589,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help
@@ -2242,6 +2638,9 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
       --reveal <SETTING>
           Show one setting as it is, named exactly as the bundle names it.
 
@@ -2249,6 +2648,9 @@ Options:
 
       --confirm
           Confirm showing the settings named by `--reveal`
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -2294,10 +2696,16 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
       --set-password
           Set the password this surface asks for, before it starts.
 
           Asked for at the keyboard and never on this line: a password typed as an argument is a password in your shell's history and in the list of processes this machine is running.
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')
@@ -2333,6 +2741,12 @@ Options:
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')

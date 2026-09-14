@@ -105,7 +105,10 @@ pub(super) fn recorded(ctx: &Ctx, repair: &Repair, outcome: &Outcome) {
         // that stopped, was declined, or could not be proved either way has told us nothing
         // about whether lemonfiber is wrong about the cause, which is what the count means.
         Outcome::FixFailed => conditions.attempted(&repair.check),
-        Outcome::Stopped { .. } | Outcome::Declined | Outcome::WouldOverwrite => {}
+        Outcome::Stopped { .. }
+        | Outcome::Declined
+        | Outcome::WouldOverwrite
+        | Outcome::Unmanaged => {}
     }
     conditions::save(ctx, &conditions);
 

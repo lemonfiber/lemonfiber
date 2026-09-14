@@ -53,6 +53,7 @@ mod migration;
 mod music;
 mod notify;
 mod outbox;
+mod preflight;
 pub mod putting_back;
 mod quality;
 pub mod queue;

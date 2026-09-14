@@ -3,6 +3,7 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
+use lemonfiber_core::model::UnsupportedReport;
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
     State as SeedState,
@@ -28,6 +29,12 @@ fn connection(wiring: &lemonfiber_core::seed::Wiring) -> Lines {
         SeedState::Unmanaged => lines.put(format!(
             "  · {connection}   found already set — yours, left as is (run `{PRODUCT} adopt` to keep it)"
         )),
+        SeedState::Observed { reason } => {
+            lines.put(format!(
+                "  · {connection}   yours — you declared it unmanaged, so nothing was written"
+            ));
+            lines.put(format!("      {reason}"));
+        }
         SeedState::Stale => lines.put(format!(
             "  · {connection}   yours for now — a newer default is not yet applied"
         )),
@@ -83,6 +90,7 @@ pub(super) fn seeding(report: &SeedReport) -> Lines {
     for wiring in &report.wirings {
         lines.extend(connection(wiring));
     }
+    lines.extend(unwirable(&report.unsupported));
     let warnings = report.warnings();
     if !warnings.is_empty() {
         lines.spaced(format!(
@@ -154,6 +162,25 @@ fn would(yours: Option<&str>, ours: Option<&str>) -> String {
     }
 }
 
+/// The services a pass could not wire because it cannot speak to them, under the
+/// connections it did attempt.
+///
+/// Under rather than among, because these are not connections: nothing was tried, so
+/// there is no outcome to report beside the others. What there is is a reason, and an
+/// operator who wrote the declaration this is about is the only person who can act on
+/// it.
+fn unwirable(unsupported: &[UnsupportedReport]) -> Lines {
+    let mut lines = Lines::default();
+    if unsupported.is_empty() {
+        return lines;
+    }
+    lines.spaced("These were not wired, because lemonfiber cannot speak to them:");
+    for one in unsupported {
+        lines.put(format!("  {} — {}", one.what, one.because));
+    }
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,7 +198,13 @@ mod tests {
             wiring("c", SeedState::Drifted),
             wiring("d", SeedState::Adopted),
             wiring("e", SeedState::Unmanaged),
-            wiring("f", SeedState::Stale),
+            wiring(
+                "f",
+                SeedState::Observed {
+                    reason: "I tune this one by hand every season".to_owned(),
+                },
+            ),
+            wiring("l", SeedState::Stale),
             wiring(
                 "g",
                 SeedState::Conflicted {
@@ -235,6 +268,8 @@ mod tests {
             "yours, adopted",
             "found already set",
             "yours for now",
+            "you declared it unmanaged",
+            "I tune this one by hand every season",
             "conflict — both you and the default changed it",
             "you set “mine”",
             "you cleared it",
@@ -262,6 +297,7 @@ mod tests {
                 },
             )],
             assessment: SeedAssessment::Assessed,
+            unsupported: Vec::new(),
             rehearsed: true,
         };
         let text = seeding(&waiting).text();
@@ -275,11 +311,40 @@ mod tests {
         let settled = SeedReport {
             wirings: vec![wiring("a", SeedState::AlreadyWired)],
             assessment: SeedAssessment::Assessed,
+            unsupported: Vec::new(),
             rehearsed: true,
         };
         let done = seeding(&settled).text();
         assert!(done.contains("a real run would change nothing"), "{done}");
         assert!(done.contains("Nothing was written."), "{done}");
+    }
+
+    /// A service the pass could not speak to is named under the connections, with why,
+    /// rather than being absent from a report that otherwise reads as complete.
+    #[test]
+    fn a_service_nothing_could_be_wired_into_is_named_with_why() {
+        let report = SeedReport {
+            wirings: vec![wiring("a", SeedState::Wired)],
+            assessment: SeedAssessment::Assessed,
+            unsupported: vec![lemonfiber_core::model::UnsupportedReport {
+                what: "bookish".to_owned(),
+                because: "lemonfiber does not speak this service's API yet".to_owned(),
+            }],
+            rehearsed: false,
+        };
+        let text = seeding(&report).text();
+        assert!(text.contains("cannot speak to them"), "{text}");
+        assert!(
+            text.contains("bookish — lemonfiber does not speak"),
+            "{text}"
+        );
+    }
+
+    /// And a stack with nothing of the sort hears nothing about it.
+    #[test]
+    fn a_pass_that_could_speak_to_everything_says_nothing_about_it() {
+        let report = seed_report(vec![wiring("a", SeedState::Wired)]);
+        assert!(!seeding(&report).text().contains("cannot speak to them"));
     }
 
     #[test]
@@ -346,6 +411,7 @@ mod tests {
             wirings: vec![wiring("a", SeedState::Wired)],
             assessment: SeedAssessment::Unassessable,
             rehearsed: false,
+            unsupported: Vec::new(),
         };
         assert!(seeding(&report).text().contains("could not be read"));
     }
