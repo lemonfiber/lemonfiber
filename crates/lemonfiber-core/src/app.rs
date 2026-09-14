@@ -33,6 +33,7 @@ mod configuring;
 mod credentials;
 mod ctx;
 pub mod dashboard;
+pub mod disturbance;
 mod door;
 mod engine;
 mod expiring;
@@ -250,6 +251,11 @@ async fn mended(
 
 /// Carry out a command.
 ///
+/// What it takes away is said before anything is taken, and here rather than in
+/// the arm that does it: an operation stating its own cost is an operation that
+/// can be added without one, and the length is only any use to somebody who has
+/// not yet decided.
+///
 /// # Errors
 ///
 /// Returns the [`Problem`] a surface should render when the command could not
@@ -257,14 +263,16 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
+    disturbance::said(&command, ctx).await;
     routed(rehearsal::carried(command, ctx), ctx).await
 }
 
 /// The table itself: every command, and where it goes.
 ///
-/// Split from [`dispatch`] so that what a rehearsal means is asked once, above the
-/// table, rather than in an arm somebody can add without adding. Private, so this is
-/// reachable only through the question.
+/// Split from [`dispatch`] so that the two things asked of every command are asked
+/// once, above the table, rather than in an arm somebody can add without adding:
+/// whether a rehearsal means anything here, and what this is about to take away.
+/// Private, so this is reachable only through both.
 async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
