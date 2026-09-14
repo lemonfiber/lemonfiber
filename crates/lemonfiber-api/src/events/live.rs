@@ -7,7 +7,6 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_core::ports::Clock;
@@ -16,11 +15,11 @@ use tokio::sync::{broadcast, Mutex, Notify};
 use super::backlog::Backlog;
 use super::wire::{Event, Rendered, BEAT, BEAT_SAID};
 
-/// How often the source is gathered from when nobody has asked sooner.
-///
-/// The terminal dashboard's own tick, because it is the same gather: a figure
-/// that is a second old on one surface must not be a minute old on another.
-pub const TICK: Duration = Duration::from_secs(1);
+/// How often the source is gathered from when nobody has asked sooner: the
+/// screen's own tick, read from it rather than restated, because it is the same
+/// gather and a figure that is a second old on one surface must not be a minute
+/// old on another.
+pub use lemonfiber_core::dashboard::TICK;
 
 /// How far behind a listener may fall before it is cut loose.
 ///

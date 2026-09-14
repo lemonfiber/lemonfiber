@@ -22,6 +22,23 @@ use std::time::Duration;
 
 use serde::Serialize;
 
+/// How often a surface showing this screen gathers it afresh.
+///
+/// One second, which is what an operator reads as live. Here rather than on each
+/// surface because it is a promise about the screen and not about the renderer:
+/// a figure that is a second old in a terminal must not be a minute old in a
+/// browser, and the two agreeing is the whole of what makes them one dashboard.
+///
+/// It was stated in both places before, each saying it was the other's — which is
+/// a sentence claiming a parity that nothing was holding, and the kind of claim
+/// that goes on reading true for exactly as long as nobody tunes either number.
+///
+/// A surface may take longer than this and must not take less: gathering again
+/// only once the last gather finished is what keeps a stack that answers in three
+/// seconds refreshing every three, rather than queueing work it will never catch
+/// up on. This is the floor and the intent, not a deadline.
+pub const TICK: Duration = Duration::from_secs(1);
+
 use crate::docker::Service;
 use crate::health::{Reach, Summary};
 

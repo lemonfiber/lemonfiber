@@ -17,9 +17,6 @@ use crate::ports::docker::{LogLine, LogQuery};
 /// How often the engine is asked whether anything has changed.
 const POLL: std::time::Duration = std::time::Duration::from_millis(500);
 
-/// How many recent lines a service that would not start is asked for.
-const LAST_WORDS: u32 = 20;
-
 /// Wait until every service has settled, or until patience runs out.
 ///
 /// Polls rather than subscribes to engine events, because the question is about
@@ -174,7 +171,7 @@ pub(super) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
     let (closed, silent) = tokio::sync::mpsc::channel(1);
     drop(closed);
 
-    let query = LogQuery::recent(LAST_WORDS);
+    let query = LogQuery::last_words();
     let mut lines = ctx
         .engine
         .logs(&ctx.settings.project, services, query)
