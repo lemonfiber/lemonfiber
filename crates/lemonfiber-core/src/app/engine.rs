@@ -4,11 +4,11 @@
 //! these live in the parent module; this is the engine work each command carries out.
 
 use super::{Ctx, Outcome};
-use crate::docker::{condition, survey};
+use crate::docker::{condition, survey, undeclared};
 use crate::error::{Diagnose, Problem};
 use crate::model::{
-    FormReport, FormsReport, LifecycleReport, ProvenanceReport, StackEdit, StatusReport,
-    VersionReport,
+    CatalogueReport, FormReport, FormsReport, LifecycleReport, ProvenanceReport, StackEdit,
+    StatusReport, VersionReport,
 };
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
@@ -184,6 +184,7 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
     Ok(StatusReport {
         forms: forms.to_vec(),
         condition: condition(&services),
+        undeclared: undeclared(&manifest, &containers),
         services,
         disturbs: crate::model::Disturbances::all(ctx.patience),
     })
@@ -442,6 +443,29 @@ pub(super) fn provenance(ctx: &Ctx) -> Result<ProvenanceReport, Box<Problem>> {
         .map_err(|err| Box::new(err.problem()))?;
 
     Ok(ProvenanceReport::of(&manifest))
+}
+
+/// What each service this stack declares is for, and what became of the ones it
+/// dropped.
+///
+/// A read of the manifest and nothing else, the way the forms listing above is — and
+/// through the checked read rather than a bare one, which is what lets the answer be
+/// taken at face value: a removal listed here is one that named a reason, and one that
+/// named a replacement named something this stack knows about. A listing assembled
+/// from an unchecked manifest could say a service was replaced by something that does
+/// not exist, which is worse than saying nothing.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] a surface should render when the stack cannot be read, or
+/// when what it declares does not hold together. Boxed as the listing beside it is.
+pub(super) fn catalogue(ctx: &Ctx) -> Result<CatalogueReport, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+
+    Ok(CatalogueReport::of(&manifest))
 }
 
 /// The binary's version, and the engine's where it answers.

@@ -16,6 +16,7 @@ pub(crate) mod fixtures;
 
 mod archive;
 mod bandwidth;
+mod catalogue;
 mod changelog;
 mod clients;
 mod credentials;
@@ -247,6 +248,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Provenance(report) => provenance::comes_from(report),
+        Outcome::Catalogue(report) => catalogue::holds(report),
         Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::SelfUpdate(report) => self_update::standing(report),
@@ -1003,6 +1005,7 @@ mod tests {
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
                 condition: Condition::Inactive,
+                undeclared: Vec::new(),
                 services: Vec::new(),
                 disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             }),

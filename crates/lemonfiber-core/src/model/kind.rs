@@ -52,6 +52,8 @@ pub const BANDWIDTH: Kind = Kind("bandwidth");
 pub const BESIDE: Kind = Kind("beside");
 /// What a support bundle would hold, or where one went.
 pub const BUNDLE: Kind = Kind("bundle");
+/// What each service in the stack is for, and what became of the ones that went.
+pub const CATALOGUE: Kind = Kind("catalogue");
 /// The settings asked about, and what a change did to them.
 pub const CONFIG: Kind = Kind("config");
 /// Every credential this stack holds, and what became of acting on one.
@@ -164,6 +166,7 @@ pub const ALL: &[Kind] = &[
     BANDWIDTH,
     BESIDE,
     BUNDLE,
+    CATALOGUE,
     CONFIG,
     CREDENTIALS,
     DASHBOARD,

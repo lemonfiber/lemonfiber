@@ -175,6 +175,7 @@ const fn situation(command: &Command) -> Option<Situation> {
         // a machine taken away in silence is the failure this exists to prevent —
         // so a new one stops the build until somebody has decided.
         Command::Version
+        | Command::Catalogue
         | Command::Forms
         | Command::Preview { .. }
         | Command::Pull { .. }

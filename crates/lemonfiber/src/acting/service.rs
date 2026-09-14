@@ -277,6 +277,7 @@ pub(crate) mod tests {
         Service {
             id: id.to_owned(),
             name: name.to_owned(),
+            describes: format!("what {id} is for"),
             profile: "tv".to_owned(),
             state,
             criticality: Criticality::Core,

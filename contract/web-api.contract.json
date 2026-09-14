@@ -1588,6 +1588,159 @@
         }
       }
     },
+    "catalogue": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/CatalogueReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "CatalogueReport": {
+          "description": "What this stack holds, and what it used to.",
+          "type": "object",
+          "properties": {
+            "removed": {
+              "description": "The services this stack has dropped, in the order it records them.\n\nEmpty for a stack that has never dropped anything, which is a different thing\nfrom a stack that keeps no record — and told apart by the fact that a stack\nkeeping no record cannot be read as having dropped something it did.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RemovedService"
+              }
+            },
+            "services": {
+              "description": "The services, in the order the stack declares them.\n\nEvery service the manifest holds rather than the ones some form would start:\nwhat a service is *for* is the question being asked, and an answer narrowed to\nwhat is running would leave the operator unable to ask about the one they are\ndeciding whether to run.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CataloguedService"
+              }
+            }
+          },
+          "required": [
+            "services",
+            "removed"
+          ]
+        },
+        "CataloguedService": {
+          "description": "What one service is for, as the stack declares it.",
+          "type": "object",
+          "properties": {
+            "criticality": {
+              "description": "How much its absence matters.",
+              "$ref": "#/$defs/Criticality"
+            },
+            "describes": {
+              "description": "What it does for the operator, in plain language.",
+              "type": "string"
+            },
+            "id": {
+              "description": "The service's id, which is also its Compose service name.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "without_it": {
+              "description": "What going without it costs.\n\nCarried beside the description rather than left to a separate question,\nbecause the pair is what turns an inventory into a judgement: knowing that\nBazarr finds subtitles says nothing about whether its being down matters.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "describes",
+            "without_it",
+            "criticality"
+          ]
+        },
+        "Criticality": {
+          "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
+          "oneOf": [
+            {
+              "description": "Its failure has consequences outside the machine.",
+              "type": "string",
+              "const": "critical"
+            },
+            {
+              "description": "The form does not work without it.",
+              "type": "string",
+              "const": "core"
+            },
+            {
+              "description": "The form works, badly.",
+              "type": "string",
+              "const": "important"
+            },
+            {
+              "description": "Makes things better.",
+              "type": "string",
+              "const": "enhancing"
+            },
+            {
+              "description": "Nice to have.",
+              "type": "string",
+              "const": "optional"
+            }
+          ]
+        },
+        "RemovedService": {
+          "description": "A service this stack used to carry, and what became of it.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The id it was declared under, which is the name an operator will look for.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Why it went.",
+              "type": "string"
+            },
+            "removed_in": {
+              "description": "The stack version whose catalogue stopped carrying it.",
+              "type": "string"
+            },
+            "replaced_by": {
+              "description": "What took its place, where anything did.\n\nAbsent is an answer and the commonest one: most things that go are not\nreplaced, and a record that named the nearest surviving service to avoid an\nempty field would be pointing an operator at something that does not do the\njob they are looking for.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "removed_in",
+            "reason"
+          ]
+        }
+      }
+    },
     "clients": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -4250,6 +4403,10 @@
                 "type": "string"
               }
             },
+            "describes": {
+              "description": "What it does for the operator, in the stack's own words.\n\nCarried on the service rather than looked up where it is shown, because this\nis the one struct every surface reads: a listing, the machine-readable reply,\nthe web API and the terminal's panel all render this, and a description\nfetched separately by each of them would be four chances to render three.\n\nThe stack's words rather than lemonfiber's, for the reason its absence cost is:\na stack that adds a service should not need a lemonfiber release before it can\nsay what that service is for.",
+              "type": "string"
+            },
             "exit": {
               "description": "How it exited, where it has exited.",
               "type": [
@@ -4278,6 +4435,7 @@
           "required": [
             "id",
             "name",
+            "describes",
             "profile",
             "state",
             "criticality",
@@ -7357,6 +7515,10 @@
                 "type": "string"
               }
             },
+            "describes": {
+              "description": "What it does for the operator, in the stack's own words.\n\nCarried on the service rather than looked up where it is shown, because this\nis the one struct every surface reads: a listing, the machine-readable reply,\nthe web API and the terminal's panel all render this, and a description\nfetched separately by each of them would be four chances to render three.\n\nThe stack's words rather than lemonfiber's, for the reason its absence cost is:\na stack that adds a service should not need a lemonfiber release before it can\nsay what that service is for.",
+              "type": "string"
+            },
             "exit": {
               "description": "How it exited, where it has exited.",
               "type": [
@@ -7385,6 +7547,7 @@
           "required": [
             "id",
             "name",
+            "describes",
             "profile",
             "state",
             "criticality",
@@ -11004,6 +11167,10 @@
                 "type": "string"
               }
             },
+            "describes": {
+              "description": "What it does for the operator, in the stack's own words.\n\nCarried on the service rather than looked up where it is shown, because this\nis the one struct every surface reads: a listing, the machine-readable reply,\nthe web API and the terminal's panel all render this, and a description\nfetched separately by each of them would be four chances to render three.\n\nThe stack's words rather than lemonfiber's, for the reason its absence cost is:\na stack that adds a service should not need a lemonfiber release before it can\nsay what that service is for.",
+              "type": "string"
+            },
             "exit": {
               "description": "How it exited, where it has exited.",
               "type": [
@@ -11032,6 +11199,7 @@
           "required": [
             "id",
             "name",
+            "describes",
             "profile",
             "state",
             "criticality",
@@ -11113,12 +11281,20 @@
               "items": {
                 "$ref": "#/$defs/Service"
               }
+            },
+            "undeclared": {
+              "description": "The containers running under this project that the stack never declared.\n\nKept apart from the services rather than mixed in with them, because what is\nknown about each is different: a service has a profile, a criticality and a\ndescription, and one of these has a name and a state and nothing else. Shown\nall the same — something running under this project's name that lemonfiber did\nnot put there is the operator's business whether or not lemonfiber understands\nit.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Undeclared"
+              }
             }
           },
           "required": [
             "forms",
             "condition",
             "services",
+            "undeclared",
             "disturbs"
           ]
         },
@@ -11163,6 +11339,29 @@
                 "until"
               ]
             }
+          ]
+        },
+        "Undeclared": {
+          "description": "A container running under this project that the stack description never declared.\n\nIts own type rather than a [`Service`] with the fields left blank. A service\ncarries a profile and a criticality, and there is no honest value for either here:\nfilling them in would have lemonfiber asserting how much something matters when\nthe only thing it knows about it is that it exists.",
+          "type": "object",
+          "properties": {
+            "describes": {
+              "description": "What it does for the operator — which is exactly what is not known.",
+              "type": "string"
+            },
+            "id": {
+              "description": "The Compose service name the engine reports it under.",
+              "type": "string"
+            },
+            "state": {
+              "description": "What it is doing, read the same way a declared service's state is.",
+              "$ref": "#/$defs/ServiceState"
+            }
+          },
+          "required": [
+            "id",
+            "state",
+            "describes"
           ]
         }
       }

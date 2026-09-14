@@ -495,6 +495,7 @@ pub(crate) mod tests {
         snapshot.services = Panel::Ready(vec![lemonfiber_core::docker::Service {
             id: a_long(3),
             name: "Sonarr".to_owned(),
+            describes: "Watches for new episodes and fetches them".to_owned(),
             profile: "tv".to_owned(),
             state: lemonfiber_core::docker::State::Running,
             criticality: lemonfiber_core::docker::Criticality::Core,

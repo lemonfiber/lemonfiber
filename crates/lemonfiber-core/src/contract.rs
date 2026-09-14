@@ -60,12 +60,12 @@ use crate::dashboard::Snapshot;
 use crate::glossary::{Term, Vocabulary};
 use crate::model::{
     kind::{self, Kind},
-    Admitted, AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, Envelope,
-    FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdRemoval, HouseholdReport,
-    ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport,
-    QualityReport, ReplaceReport, ResetReport, SetupReport, Started, StatusReport, StuckReport,
-    SupervisionReport, TraceReport, UpdateReport, UpgradeReport, VersionReport, WalkthroughReport,
-    WizardReport, API_VERSION,
+    Admitted, AdoptReport, AlertReport, BesideReport, CatalogueReport, ConfigReport, DoctorReport,
+    Envelope, FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdRemoval,
+    HouseholdReport, ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport,
+    ProvenanceReport, QualityReport, ReplaceReport, ResetReport, SetupReport, Started,
+    StatusReport, StuckReport, SupervisionReport, TraceReport, UpdateReport, UpgradeReport,
+    VersionReport, WalkthroughReport, WizardReport, API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -137,6 +137,11 @@ fn the_first_kinds(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::BACKUP, schema_for!(Envelope<BackupReport>));
     describing(kinds, kind::BESIDE, schema_for!(Envelope<BesideReport>));
     describing(kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
+    describing(
+        kinds,
+        kind::CATALOGUE,
+        schema_for!(Envelope<CatalogueReport>),
+    );
     describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));
     describing(kinds, kind::CREDENTIALS, schema_for!(Envelope<Inventory>));
     describing(kinds, kind::DOCTOR, schema_for!(Envelope<DoctorReport>));
@@ -281,11 +286,11 @@ mod tests {
     use crate::app::Outcome;
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
-        AdoptReport, AlertReport, BesideReport, ConfigReport, DoctorReport, FormsReport,
-        FrontDoorReport, HistoryReport, HostingReport, HouseholdReport, ImportReport,
-        LifecycleReport, MigrationReport, MusicReport, ProvenanceReport, QualityReport,
-        ReplaceReport, ResetReport, ServiceProvenance, StatusReport, StuckReport,
-        SupervisionReport, TraceReport, UpdateReport, UpgradeReport, VersionReport,
+        AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, ConfigReport,
+        DoctorReport, FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdReport,
+        ImportReport, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport,
+        QualityReport, RemovedService, ReplaceReport, ResetReport, ServiceProvenance, StatusReport,
+        StuckReport, SupervisionReport, TraceReport, UpdateReport, UpgradeReport, VersionReport,
         WalkthroughReport, WizardReport,
     };
     use crate::stack::closure::Plan;
@@ -359,6 +364,7 @@ mod tests {
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
                 condition: crate::docker::Condition::Inactive,
+                undeclared: Vec::new(),
                 services: Vec::new(),
                 disturbs: crate::model::Disturbances::all(crate::app::PATIENCE),
             }),
@@ -540,6 +546,24 @@ mod tests {
                     upstream: "https://github.com/Sonarr/Sonarr".to_owned(),
                     image: "lscr.io/linuxserver/sonarr".to_owned(),
                     pinned: "4.0.15".to_owned(),
+                }],
+            }),
+            // One service and one removal rather than a whole stack: every field of
+            // both entries is on it, which is all the shape comparison reads, and a
+            // listing of nineteen would be nineteen copies of the same schema.
+            Outcome::Catalogue(CatalogueReport {
+                services: vec![CataloguedService {
+                    id: "bazarr".to_owned(),
+                    name: "Bazarr".to_owned(),
+                    describes: "Finds and downloads subtitles".to_owned(),
+                    without_it: "No automatic subtitles".to_owned(),
+                    criticality: lemonfiber_manifest::Criticality::Enhancing,
+                }],
+                removed: vec![RemovedService {
+                    id: "readarr".to_owned(),
+                    removed_in: "0.1.0".to_owned(),
+                    reason: "Discontinued upstream in 2025".to_owned(),
+                    replaced_by: Some("bindery".to_owned()),
                 }],
             }),
             Outcome::Stored(crate::stored::stored(

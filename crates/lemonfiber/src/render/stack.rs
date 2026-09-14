@@ -3,12 +3,13 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
-use lemonfiber_core::docker::{Condition, Service, State};
+use lemonfiber_core::docker::{Condition, Service, State, Undeclared};
 use lemonfiber_core::model::{
     LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
 };
 use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Plan, Protocol};
+use lemonfiber_core::text::plain;
 
 use super::Lines;
 
@@ -237,6 +238,44 @@ pub(super) fn status(report: &StatusReport) -> Lines {
     let mut lines = Lines::default();
     lines.put(describe(report.condition));
     lines.extend(show(&report.services));
+    lines.extend(strangers(&report.undeclared));
+    lines
+}
+
+/// The containers running under this project that the stack never declared.
+///
+/// Shown rather than left out, and shown apart rather than mixed in. An operator
+/// looking at what is running is entitled to see everything running under the name
+/// lemonfiber started things under, including the things lemonfiber did not start —
+/// a listing that quietly dropped them would be an answer about the stack description
+/// wearing the clothes of an answer about the machine. Apart, because the one thing
+/// said about each of them is that nothing here knows what it is, and putting that in
+/// the same column as nineteen real descriptions would read as a service whose
+/// description had gone missing.
+///
+/// Silent where there are none, which is every ordinary stack.
+fn strangers(undeclared: &[Undeclared]) -> Lines {
+    let mut lines = Lines::default();
+    if undeclared.is_empty() {
+        return lines;
+    }
+    lines.spaced(format!(
+        "{} container{} running under this project that the stack does not declare:",
+        undeclared.len(),
+        s(undeclared.len())
+    ));
+    for one in undeclared {
+        // The name is the engine's rather than the manifest's, so it is made plain
+        // before it is padded rather than after: the width has to be counted on what
+        // will actually be drawn, or a container named with control characters pushes
+        // every column after it out of true.
+        lines.put(format!(
+            "  {:<14} {:<14} {}",
+            plain(&one.id),
+            worded(one.state),
+            one.describes
+        ));
+    }
     lines
 }
 
@@ -257,31 +296,71 @@ pub(super) fn describe(condition: Condition) -> &'static str {
 /// the same container.
 pub(crate) fn doing(service: &Service) -> String {
     match service.state {
-        State::Absent => "absent".to_owned(),
-        State::Stopped => "stopped".to_owned(),
-        State::Starting => "starting".to_owned(),
-        State::Running => "running".to_owned(),
-        State::Healthy => "healthy".to_owned(),
-        State::Unhealthy => "unhealthy".to_owned(),
-        State::CrashLooping => "crash-looping".to_owned(),
-        State::HostManaged => "host-managed".to_owned(),
         // The code is the whole reason this is not simply "stopped", so it
         // is shown rather than left for the operator to go and find.
         State::Failed => match service.exit {
             Some(code) => format!("failed ({code})"),
             None => "failed".to_owned(),
         },
+        state => worded(state).to_owned(),
     }
 }
 
-/// What each service is doing, one per line.
+/// What one state is called, with nothing of the container it belongs to.
+///
+/// Split out from [`doing`] because a container the stack never declared has a state
+/// and no service behind it to ask for an exit code, and two spellings of
+/// `crash-looping` on one screen is two accounts of the same thing.
+const fn worded(state: State) -> &'static str {
+    match state {
+        State::Absent => "absent",
+        State::Stopped => "stopped",
+        State::Starting => "starting",
+        State::Running => "running",
+        State::Healthy => "healthy",
+        State::Unhealthy => "unhealthy",
+        State::CrashLooping => "crash-looping",
+        State::HostManaged => "host-managed",
+        State::Failed => "failed",
+    }
+}
+
+/// What each service is doing, one per line, with what it is for on the end of it.
+///
+/// The description rides the line the operator is already reading rather than waiting
+/// in a command they would have to think to run — which is the whole of what having it
+/// available where a service is referenced comes to. Last on the line, because the
+/// state is what somebody scanning the list is scanning for and a sentence in front of
+/// it would push the column that matters off the left of their attention.
+///
+/// A service the stack describes with nothing gets no dash rather than an empty one:
+/// the manifest requires a description of every service, so this is the fork a fork's
+/// own stack takes, and a trailing punctuation mark with nothing after it reads as a
+/// rendering that broke.
 pub(super) fn show(services: &[Service]) -> Lines {
     let mut lines = Lines::default();
     for service in services {
         let state = doing(service);
-        lines.put(format!("  {:<14} {state:<14} {}", service.id, service.name));
+        // The id and the name are made plain before they are padded, for the reason
+        // a log line's service is: both came from a stack description somebody can
+        // edit, and a width counted on characters a terminal will swallow is a column
+        // that lands somewhere else than where it was measured.
+        lines.put(format!(
+            "  {:<14} {state:<14} {}{}",
+            plain(&service.id),
+            plain(&service.name),
+            what_for(service)
+        ));
     }
     lines
+}
+
+/// What a service is for, as the tail of the line naming it.
+fn what_for(service: &Service) -> String {
+    if service.describes.trim().is_empty() {
+        return String::new();
+    }
+    format!(" — {}", service.describes)
 }
 
 /// The lines a finished watch renders to.
@@ -660,12 +739,135 @@ mod tests {
         let report = StatusReport {
             forms: vec!["media".to_owned()],
             condition: Condition::Degraded,
+            undeclared: Vec::new(),
             services: vec![service("sonarr", State::Unhealthy, None)],
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         };
         let text = status(&report).text();
         assert!(text.starts_with("running, and something needs attention"));
         assert!(text.contains("unhealthy"));
+    }
+
+    /// What a service is for rides the line an operator is already reading, which is
+    /// the whole of what having it available where a service is referenced comes to.
+    #[test]
+    fn a_service_is_listed_with_what_it_does_for_the_operator() {
+        let text = show(&[service("sonarr", State::Healthy, None)]).text();
+
+        assert!(text.contains("what sonarr is for"), "{text}");
+        assert!(
+            text.contains("sonarr service — what sonarr is for"),
+            "and after the name rather than in front of the state: {text}"
+        );
+    }
+
+    /// A stack that says nothing about a service gets no dangling dash, because a
+    /// punctuation mark with nothing after it reads as a rendering that broke.
+    #[test]
+    fn a_service_the_stack_describes_with_nothing_is_listed_without_a_dash() {
+        let quiet = Service {
+            describes: String::new(),
+            ..service("sonarr", State::Healthy, None)
+        };
+        let text = show(&[quiet]).text();
+
+        assert!(!text.contains('—'), "{text}");
+        assert!(text.contains("sonarr service"), "{text}");
+    }
+
+    /// A description is prose out of a file an operator can edit, and this is the one
+    /// new place such prose reaches a terminal — so what a terminal obeys is taken out
+    /// of it, and taken out before anything is measured.
+    ///
+    /// Two things are being held here rather than one. A control sequence in the
+    /// middle of a description would clear the screen the listing was being drawn on;
+    /// a newline in it would let one service's description draw a line that looked
+    /// like the next service's row, which is how a stack description comes to hide a
+    /// service that is down behind a service that is not.
+    #[test]
+    fn a_description_cannot_take_over_the_screen_or_forge_a_row() {
+        let hostile = Service {
+            describes: "fine\u{1b}[2J\nqbittorrent     healthy        all is well".to_owned(),
+            ..service("sonarr", State::Healthy, None)
+        };
+        let text = show(&[hostile]).text();
+
+        assert!(!text.contains('\u{1b}'), "{text:?}");
+        assert_eq!(
+            text.lines().count(),
+            1,
+            "one service is one row, whatever the description says: {text:?}"
+        );
+    }
+
+    /// A container nobody declared is shown with an unknown description rather than
+    /// dropped from the listing, and shown apart from the services — the one thing
+    /// that can be said about it is that nothing here knows what it is.
+    #[test]
+    fn a_container_the_stack_never_declared_is_shown_with_an_unknown_description() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            condition: Condition::Inactive,
+            undeclared: vec![Undeclared {
+                id: "something-of-their-own".to_owned(),
+                state: State::Running,
+                describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
+            }],
+            services: vec![service("sonarr", State::Absent, None)],
+        };
+        let text = status(&report).text();
+
+        assert!(
+            text.contains(
+                "1 container running under this project that the stack does not \
+                           declare:"
+            ),
+            "{text}"
+        );
+        assert!(text.contains("something-of-their-own"), "{text}");
+        assert!(text.contains("not declared by this stack"), "{text}");
+    }
+
+    /// A stranger that failed is said to have failed, and nothing more.
+    ///
+    /// The word is the whole of the answer here: a declared service that failed is
+    /// shown with the code it exited on, and there is no service behind a container
+    /// the manifest never named to ask one of. Two spellings of the same state on one
+    /// screen would read as two different things having happened.
+    #[test]
+    fn a_stranger_that_failed_is_worded_without_an_exit_code_to_quote() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            condition: Condition::Inactive,
+            undeclared: vec![Undeclared {
+                id: "something-that-fell-over".to_owned(),
+                state: State::Failed,
+                describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
+            }],
+            services: vec![service("sonarr", State::Absent, None)],
+        };
+        let text = status(&report).text();
+
+        assert!(text.contains("something-that-fell-over"), "{text}");
+        assert!(text.contains("failed"), "{text}");
+        assert!(
+            !text.contains("exit"),
+            "there is no service behind a stranger to ask for a code: {text}"
+        );
+    }
+
+    /// And an ordinary stack says nothing about it at all, rather than carrying a
+    /// heading over an empty list on every run.
+    #[test]
+    fn a_stack_with_nothing_strange_running_says_nothing_about_strangers() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            condition: Condition::Inactive,
+            undeclared: Vec::new(),
+            services: vec![service("sonarr", State::Absent, None)],
+        };
+
+        assert!(!status(&report).text().contains("does not declare"));
     }
 
     #[test]

@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{ApiKind, Date, Manifest, Protocol, Service};
+use crate::{ApiKind, Date, Manifest, Protocol, Removed, Service};
 
 /// Tags that move under you. A pin meaning "whatever is newest" is not a pin.
 const FLOATING_TAGS: &[&str] = &[
@@ -61,6 +61,7 @@ pub fn validate(manifest: &Manifest, today: Date) -> Vec<Violation> {
     let profiles = check_profiles(manifest, &mut found);
     check_forms(manifest, &profiles, &mut found);
     check_services(manifest, &profiles, today, &mut found);
+    check_removed(manifest, &mut found);
     found
 }
 
@@ -155,6 +156,107 @@ fn check_services(
             message,
         }));
     }
+}
+
+/// Everything a record of a dropped service has to get right.
+///
+/// Chained the way a service's rules are, and for the same reason: a fork that
+/// recorded a removal badly should be told everything about it at once rather than
+/// once per run.
+fn check_removed(manifest: &Manifest, found: &mut Vec<Violation>) {
+    let declared: BTreeSet<&str> = manifest
+        .services
+        .iter()
+        .map(|service| service.id.as_str())
+        .collect();
+    let recorded: BTreeSet<&str> = manifest
+        .removed
+        .iter()
+        .map(|removed| removed.id.as_str())
+        .collect();
+
+    let mut seen = BTreeSet::new();
+    for removed in &manifest.removed {
+        let repeated = (!seen.insert(removed.id.clone()))
+            .then(|| "another removal already has this id".to_owned());
+
+        let faults = repeated
+            .into_iter()
+            .chain(gone(removed, &declared))
+            .chain(dated(removed))
+            .chain(explained(removed))
+            .chain(replaced(removed, &declared, &recorded));
+
+        let location = format!("removed {}", removed.id);
+        found.extend(faults.map(|message| Violation {
+            location: location.clone(),
+            message,
+        }));
+    }
+}
+
+/// A service recorded as removed is not also declared.
+///
+/// The two records contradict each other outright, and the contradiction is silent
+/// where it matters most: an operator asking what became of a service would be told
+/// it went, while the stack goes on starting it.
+fn gone(removed: &Removed, declared: &BTreeSet<&str>) -> Option<String> {
+    declared
+        .contains(removed.id.as_str())
+        .then(|| "is recorded as removed and is still declared as a service".to_owned())
+}
+
+/// A removal says which stack version stopped carrying it.
+///
+/// Emptiness rather than shape. The manifest validates neither `stack_version` nor
+/// `min_cli_version` as semantic versions, and a rule here that parsed one would be
+/// stricter about the past than the contract is about the present — so what is checked
+/// is that the record names something, since a record that cannot be placed in the
+/// stack's own history answers *when did this go* with nothing.
+fn dated(removed: &Removed) -> Option<String> {
+    removed
+        .removed_in
+        .trim()
+        .is_empty()
+        .then(|| "records no stack version it went in".to_owned())
+}
+
+/// A removal says why, in something more than an empty string.
+///
+/// Emptiness rather than presence, because presence is what the parse already
+/// guarantees and an empty reason is the shape a record takes when somebody filled
+/// the table in to satisfy it. The requirement is that the reason is recorded; a
+/// field holding nothing records nothing.
+fn explained(removed: &Removed) -> Option<String> {
+    removed
+        .reason
+        .trim()
+        .is_empty()
+        .then(|| "records no reason for going".to_owned())
+}
+
+/// A replacement, where one is named, is something this stack knows about.
+///
+/// Either a service it declares or another service it recorded as removed — the
+/// second because replacements chain, and a stack that dropped the thing that
+/// replaced the thing it dropped has told the truth twice. A name that is neither
+/// points an operator at nothing, which is worse than recording no replacement at
+/// all, since it reads as an answer.
+fn replaced(
+    removed: &Removed,
+    declared: &BTreeSet<&str>,
+    recorded: &BTreeSet<&str>,
+) -> Option<String> {
+    let named = removed.replaced_by.as_deref()?;
+    if named.trim().is_empty() {
+        return Some("names an empty replacement rather than none at all".to_owned());
+    }
+    if named == removed.id {
+        return Some("is recorded as having replaced itself".to_owned());
+    }
+    (!declared.contains(named) && !recorded.contains(named)).then(|| {
+        format!("says {named} replaced it, and this stack neither declares nor records that")
+    })
 }
 
 /// A Servarr-shape service names the version of the API its client speaks.
@@ -506,6 +608,168 @@ mod tests {
         assert!(messages(&text)
             .iter()
             .any(|m| m.contains("another form already has this id")));
+    }
+
+    /// One removal recorded against the shipped stack, which declares the service it
+    /// names as a replacement.
+    ///
+    /// Named for nothing that ever existed, on purpose. The stack is a submodule that
+    /// moves, and it is about to start recording removals of its own — an id borrowed
+    /// from a real one would collide with the stack's own entry the day its pin moves,
+    /// and these tests would report a duplicate that is nobody's mistake.
+    const DROPPED: &str = r#"
+[[removed]]
+id = "an-old-thing"
+removed_in = "0.1.0"
+reason = "Discontinued upstream in 2025; the project is archived and releases nothing."
+replaced_by = "bindery"
+"#;
+
+    /// The shipped stack with one removal appended to it.
+    fn with_removal(record: &str) -> String {
+        format!("{STACK}{record}")
+    }
+
+    /// A record that says what went, why, and what took its place is a record with
+    /// nothing wrong with it — which is the half every other assertion here rests on.
+    #[test]
+    fn a_removal_recorded_properly_is_no_fault_at_all() {
+        assert_eq!(check(&with_removal(DROPPED)), Vec::new());
+    }
+
+    #[test]
+    fn a_removal_that_is_still_a_declared_service_is_caught() {
+        let text = with_removal(&DROPPED.replace(r#"id = "an-old-thing""#, r#"id = "bindery""#));
+        assert!(
+            messages(&text)
+                .iter()
+                .any(|m| m.contains("is recorded as removed and is still declared as a service")),
+            "a stack that goes on starting what it says it dropped must be named"
+        );
+    }
+
+    /// Emptiness rather than presence: an empty reason passes a parse and records
+    /// nothing, which is the shape a table filled in to satisfy a rule takes.
+    #[test]
+    fn a_removal_with_an_empty_reason_is_caught() {
+        let text = with_removal(&DROPPED.replacen("reason = ", "reason = \"\" # ", 1));
+        assert!(messages(&text)
+            .iter()
+            .any(|m| m.contains("records no reason for going")));
+    }
+
+    #[test]
+    fn a_replacement_this_stack_knows_nothing_about_is_caught() {
+        let text = with_removal(
+            &DROPPED.replace(r#"replaced_by = "bindery""#, r#"replaced_by = "ghost""#),
+        );
+        assert!(
+            messages(&text).iter().any(|m| m
+                .contains("says ghost replaced it, and this stack neither declares nor records")),
+            "a replacement pointing at nothing reads as an answer and is not one"
+        );
+    }
+
+    /// Replacements chain. A stack that dropped the thing that replaced the thing it
+    /// dropped has recorded two true facts, and refusing the second would make the
+    /// record less honest the longer the stack lives.
+    #[test]
+    fn a_removal_replaced_by_another_removal_is_accepted() {
+        let chained = format!(
+            "{}{}",
+            DROPPED.replace(
+                r#"replaced_by = "bindery""#,
+                r#"replaced_by = "an-older-thing""#
+            ),
+            r#"
+[[removed]]
+id = "an-older-thing"
+removed_in = "0.1.0"
+reason = "Unmaintained upstream; Audiobookshelf covers what it did."
+replaced_by = "audiobookshelf"
+"#
+        );
+        assert_eq!(check(&with_removal(&chained)), Vec::new());
+    }
+
+    /// Empty is not the same as absent, and the difference is the whole of what a
+    /// replacement field records. A removal that names nothing has said the service
+    /// went and nothing took over, which is a fact. One naming an empty string has
+    /// filled the box in to get past the rule, and an operator reading the record
+    /// afterwards is told there was a successor whose name nobody wrote down.
+    #[test]
+    fn a_replacement_named_as_an_empty_string_is_caught() {
+        let text =
+            with_removal(&DROPPED.replace(r#"replaced_by = "bindery""#, r#"replaced_by = "  ""#));
+        assert!(
+            messages(&text)
+                .iter()
+                .any(|m| m.contains("names an empty replacement rather than none at all")),
+            "a blank successor reads as a successor and is not one"
+        );
+    }
+
+    #[test]
+    fn a_removal_recorded_as_replacing_itself_is_caught() {
+        let text = with_removal(&DROPPED.replace(
+            r#"replaced_by = "bindery""#,
+            r#"replaced_by = "an-old-thing""#,
+        ));
+        assert!(messages(&text)
+            .iter()
+            .any(|m| m.contains("is recorded as having replaced itself")));
+    }
+
+    /// The version it went in is checked for holding something, the way the reason is:
+    /// a record that cannot be placed in the stack's own history answers *when* with
+    /// nothing at all.
+    #[test]
+    fn a_removal_with_no_stack_version_behind_it_is_caught() {
+        let text = with_removal(&DROPPED.replacen("removed_in = ", "removed_in = \"\" # ", 1));
+        assert!(messages(&text)
+            .iter()
+            .any(|m| m.contains("records no stack version it went in")));
+    }
+
+    #[test]
+    fn a_duplicate_removal_id_is_caught() {
+        let text = with_removal(&format!("{DROPPED}{DROPPED}"));
+        assert!(messages(&text)
+            .iter()
+            .any(|m| m.contains("another removal already has this id")));
+    }
+
+    /// The removals are walked in the same pass the services are, so a fork that got
+    /// both wrong hears about both — which is the whole reason this file reports
+    /// rather than returns at the first thing it finds.
+    #[test]
+    fn a_fault_in_a_removal_arrives_beside_a_fault_in_a_service() {
+        let text = edited(r#"license = "GPL-3.0-only""#, r#"license = "Nonesuch-1.0""#);
+        let both = messages(&format!(
+            "{text}{}",
+            DROPPED.replacen("reason = ", "reason = \"\" # ", 1)
+        ));
+        assert!(
+            both.iter()
+                .any(|m| m.contains("not a recognised OSI identifier")),
+            "{both:?}"
+        );
+        assert!(
+            both.iter()
+                .any(|m| m.contains("records no reason for going")),
+            "{both:?}"
+        );
+    }
+
+    /// Every violation says where it is, and a removal's location names the removal
+    /// rather than the service it shares an id with — there is no such service, which
+    /// is the point.
+    #[test]
+    fn a_removal_s_fault_is_placed_by_the_removal_it_is_about() {
+        let text = with_removal(&DROPPED.replacen("reason = ", "reason = \"\" # ", 1));
+        assert!(check(&text)
+            .iter()
+            .any(|violation| violation.location == "removed an-old-thing"));
     }
 
     #[test]

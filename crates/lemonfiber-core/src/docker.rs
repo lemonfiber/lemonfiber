@@ -13,7 +13,7 @@
 //! the application inside it is answering, and an operator told "started" who
 //! then gets connection refused has been lied to.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lemonfiber_manifest::Manifest;
 
@@ -97,6 +97,17 @@ pub struct Service {
     pub id: String,
     /// What it is called in front of an operator.
     pub name: String,
+    /// What it does for the operator, in the stack's own words.
+    ///
+    /// Carried on the service rather than looked up where it is shown, because this
+    /// is the one struct every surface reads: a listing, the machine-readable reply,
+    /// the web API and the terminal's panel all render this, and a description
+    /// fetched separately by each of them would be four chances to render three.
+    ///
+    /// The stack's words rather than lemonfiber's, for the reason its absence cost is:
+    /// a stack that adds a service should not need a lemonfiber release before it can
+    /// say what that service is for.
+    pub describes: String,
     /// The profile that declared it.
     pub profile: String,
     /// What it is doing.
@@ -179,6 +190,7 @@ pub fn survey(manifest: &Manifest, profiles: &[String], containers: &[Container]
         .map(|service| Service {
             id: service.id.clone(),
             name: service.name.clone(),
+            describes: service.describes.clone(),
             profile: service.profile.clone(),
             state: if service.host_managed {
                 State::HostManaged
@@ -201,6 +213,72 @@ pub fn survey(manifest: &Manifest, profiles: &[String], containers: &[Container]
             .then_with(|| left.id.cmp(&right.id))
     });
     services
+}
+
+/// What is said about a container the stack description has nothing to say about.
+///
+/// An unknown description rather than silence, and rather than a guess. Something is
+/// running under this project that lemonfiber did not put there, and the two things
+/// worth telling an operator about it are both in this sentence: it is here, and
+/// nothing here knows what it does.
+pub const UNDESCRIBED: &str = "not declared by this stack, so what it does is not recorded here";
+
+/// A container running under this project that the stack description never declared.
+///
+/// Its own type rather than a [`Service`] with the fields left blank. A service
+/// carries a profile and a criticality, and there is no honest value for either here:
+/// filling them in would have lemonfiber asserting how much something matters when
+/// the only thing it knows about it is that it exists.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Undeclared {
+    /// The Compose service name the engine reports it under.
+    pub id: String,
+    /// What it is doing, read the same way a declared service's state is.
+    pub state: State,
+    /// What it does for the operator — which is exactly what is not known.
+    pub describes: String,
+}
+
+/// The containers running under this project that the manifest never declared.
+///
+/// Reported rather than filtered out. [`survey`] walks the manifest, so anything the
+/// manifest does not name is invisible to it — which is the right answer for every
+/// question about what a form holds, and the wrong one for the question an operator
+/// is asking when they look at a list of what is running. A container somebody added
+/// to their own Compose override, or one left behind by a stack that has since
+/// dropped the service, is part of what is on this machine under this project's name;
+/// hiding it makes the listing a claim about the manifest rather than about the
+/// machine.
+///
+/// Kept out of [`survey`] on purpose, and it is not tidiness. Everything that waits
+/// for a stack to settle, decides what a form amounts to, or orders a stop reads that
+/// function, and an undeclared container arriving in any of them would have lemonfiber
+/// waiting on, grading, or stopping something that is not its own.
+///
+/// Ordered by name and reduced to one entry per name: two containers of one scaled
+/// service are one thing the operator does not recognise, not two.
+#[must_use]
+pub fn undeclared(manifest: &Manifest, containers: &[Container]) -> Vec<Undeclared> {
+    let declared: BTreeSet<&str> = manifest
+        .services
+        .iter()
+        .map(|service| service.id.as_str())
+        .collect();
+
+    let strangers: BTreeMap<&str, State> = containers
+        .iter()
+        .filter(|container| !declared.contains(container.service.as_str()))
+        .map(|container| (container.service.as_str(), read(container)))
+        .collect();
+
+    strangers
+        .into_iter()
+        .map(|(id, state)| Undeclared {
+            id: id.to_owned(),
+            state,
+            describes: UNDESCRIBED.to_owned(),
+        })
+        .collect()
 }
 
 /// What a set of services amounts to, as one word.
@@ -295,7 +373,10 @@ pub fn unsettled(services: &[Service]) -> Vec<&Service> {
 mod tests {
     use lemonfiber_manifest::{Criticality, Manifest};
 
-    use super::{condition, read, stopping_order, survey, unsettled, Condition, Service, State};
+    use super::{
+        condition, read, stopping_order, survey, undeclared, unsettled, Condition, Service, State,
+        UNDESCRIBED,
+    };
     use crate::ports::docker::{Container, Health, Lifecycle};
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
@@ -336,6 +417,7 @@ mod tests {
         Service {
             id: id.to_owned(),
             name: id.to_owned(),
+            describes: format!("what {id} is for"),
             profile: "torrent".to_owned(),
             state: State::Healthy,
             criticality: Criticality::Core,
@@ -786,5 +868,120 @@ profiles = ["media"]
             .iter()
             .any(|service| service.criticality != Criticality::Optional));
         assert!(services.iter().all(|service| !service.name.is_empty()));
+    }
+
+    /// What a service is for travels with what it is doing, so anything reading a
+    /// survey can say it without going back to the manifest for a second answer.
+    ///
+    /// Every one of them, rather than one: the field is required of every service the
+    /// manifest declares, and an assertion about the first would pass over a stack
+    /// that carried the description for one service and lost it for the rest.
+    #[test]
+    fn a_survey_carries_what_each_service_is_for() {
+        let services = media(Lifecycle::Running, Health::Healthy);
+
+        assert!(!services.is_empty(), "the stack was read");
+        // One closure rather than a filter and a map. The naming half of a pair only
+        // runs for what the filtering half let through, so on the passing run — the
+        // one this test exists to have — it is a body nothing enters, and the
+        // coverage gate counts it against this file.
+        let silent: Vec<&str> = services
+            .iter()
+            .filter_map(|service| {
+                service
+                    .describes
+                    .trim()
+                    .is_empty()
+                    .then_some(service.id.as_str())
+            })
+            .collect();
+        assert!(
+            silent.is_empty(),
+            "these reach a surface with nothing to say about themselves: {silent:?}"
+        );
+        assert!(
+            services
+                .iter()
+                .any(|service| service.describes.split_whitespace().count() > 2),
+            "and the words are the stack's own, not a label: {services:?}"
+        );
+    }
+
+    /// A container this stack never declared is reported, with the one honest thing
+    /// there is to say about it — that nothing here knows what it is for.
+    #[test]
+    fn a_container_the_stack_never_declared_is_shown_rather_than_hidden() {
+        let containers = vec![
+            container("sonarr", Lifecycle::Running, Health::Healthy),
+            container("something-of-their-own", Lifecycle::Running, Health::None),
+        ];
+        let strangers = manifest()
+            .map(|manifest| undeclared(&manifest, &containers))
+            .unwrap_or_default();
+
+        assert_eq!(
+            strangers
+                .iter()
+                .map(|one| (one.id.as_str(), one.state))
+                .collect::<Vec<_>>(),
+            vec![("something-of-their-own", State::Running)],
+            "the declared one is the survey's business, and this one is nobody else's"
+        );
+        assert!(
+            strangers
+                .first()
+                .is_some_and(|one| one.describes == UNDESCRIBED),
+            "an unknown description rather than an empty one: {strangers:?}"
+        );
+    }
+
+    /// And the survey it sits beside is untouched by it, which is the half that keeps
+    /// a strange container out of everything that waits on, grades or stops a stack.
+    #[test]
+    fn a_container_the_stack_never_declared_is_no_part_of_the_survey() {
+        let profiles = ["media".to_owned()];
+        let containers = vec![container(
+            "something-of-their-own",
+            Lifecycle::Running,
+            Health::None,
+        )];
+        let surveyed = manifest()
+            .map(|manifest| survey(&manifest, &profiles, &containers))
+            .unwrap_or_default();
+
+        assert!(
+            surveyed
+                .iter()
+                .all(|service| service.id != "something-of-their-own"),
+            "{surveyed:?}"
+        );
+        assert_eq!(
+            condition(&surveyed),
+            Condition::Inactive,
+            "a container nobody declared cannot make a stopped stack read as partly up"
+        );
+    }
+
+    /// One scaled service is one thing an operator does not recognise, and the answer
+    /// has to be stable — a listing whose order follows whatever the engine happened
+    /// to say is one nobody can compare against the last time they looked.
+    #[test]
+    fn two_containers_of_one_strange_service_are_named_once_and_in_order() {
+        let containers = vec![
+            container("zeta", Lifecycle::Running, Health::None),
+            container("alpha", Lifecycle::Running, Health::None),
+            container("alpha", Lifecycle::Running, Health::None),
+        ];
+        let strangers = manifest()
+            .map(|manifest| undeclared(&manifest, &containers))
+            .unwrap_or_default();
+
+        assert_eq!(
+            strangers
+                .iter()
+                .map(|one| one.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["alpha", "zeta"]
+        );
     }
 }

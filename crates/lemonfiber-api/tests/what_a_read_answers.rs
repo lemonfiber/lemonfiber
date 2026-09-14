@@ -707,6 +707,20 @@ async fn where_the_services_come_from_is_the_envelope_the_command_renders() {
 }
 
 #[tokio::test]
+async fn what_each_service_is_for_is_the_envelope_the_command_renders() {
+    // The read that answers what a list of nineteen names cannot: a page can print
+    // `bazarr` beside `prowlarr` and has no way of saying which of them the person
+    // reading it would miss.
+    let expected = as_the_command_renders_it(&world(running(), stack()), Command::Catalogue).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), reads::CATALOGUE).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+}
+
+#[tokio::test]
 async fn where_the_services_come_from_carries_the_licence_the_project_and_the_pin() {
     // Written out rather than derived, so a second serialisation could not pass this
     // by agreeing with itself. All three fields, because each on its own is something
@@ -719,6 +733,26 @@ async fn where_the_services_come_from_carries_the_licence_the_project_and_the_pi
             && body.contains(r#""license":"GPL-3.0-only""#)
             && body.contains(r#""upstream":"https://github.com/Prowlarr/Prowlarr""#)
             && body.contains(r#""image":"lscr.io/linuxserver/prowlarr""#)),
+        "where each service comes from, as a browser is served it"
+    );
+}
+
+#[tokio::test]
+async fn what_each_service_is_for_carries_the_cost_of_going_without_it() {
+    // Written out rather than derived, so a second serialisation could not pass this
+    // by agreeing with itself. Both fields, because a description on its own does not
+    // tell an operator whether a failure is serious — and the key the removals arrive
+    // under, because a caller cannot tell a stack that dropped nothing from one that
+    // keeps no record unless the key is there either way. The key rather than its
+    // contents: the stack is a submodule and what it records moves with its pin.
+    let seen = asked(world(running(), stack()), reads::CATALOGUE).await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"catalogue","data":{"services":[{"#)
+            && body.contains(r#""id":"prowlarr""#)
+            && body.contains(r#""without_it":"#)
+            && body.contains(r#""criticality":"critical""#)
+            && body.contains(r#""removed":["#)),
         "the listing a browser is served"
     );
 }
