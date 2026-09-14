@@ -14,7 +14,7 @@ mod common;
 
 use common::stack::project;
 use common::tunnel;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -472,4 +472,137 @@ async fn a_run_that_may_act_still_gets_the_checks_that_disturb() {
         "the killswitch was proven the only way it can be"
     );
     assert!(!engine.is_dropped(), "and the tunnel was put back");
+}
+
+/// A declaration reaches all the way through the sequence: the repair is agreed to,
+/// refused by the declaration, reported as refused, and never carried out.
+///
+/// From here rather than in-crate for the reason at the top of this file. The gate
+/// itself answers correctly whichever copy asks it — that is asserted beside it — and
+/// what this holds is that the runner *acts* on the answer, which is a claim about the
+/// sequence the binary ships.
+///
+/// The outcome is `Unmanaged` rather than the answer given for a value somebody
+/// changed: an operator told the wrong one goes looking for a change they did not make.
+/// And the mender is asked whether it was ever told to write, because a run that wrote
+/// and then reported `Unmanaged` would carry exactly the report this one does.
+#[tokio::test]
+async fn a_repair_the_declaration_refuses_is_reported_as_such_and_never_carried_out() {
+    let (report, wrote) = declared(&["sonarr"], "mending-unmanaged", &["sonarr"]).await;
+
+    assert_eq!(
+        report.mended.first().map(|mended| &mended.outcome),
+        Some(&Outcome::Unmanaged),
+        "{report:?}"
+    );
+    assert!(
+        !wrote.load(Ordering::Relaxed),
+        "the mender was asked to write an area the operator declared theirs"
+    );
+}
+
+/// And a declaration about somewhere else stops nothing: the same repair, the same
+/// agreement, and the mender is asked to carry it out.
+///
+/// The half that keeps the rule honest. A gate that refused everything would pass the
+/// test above and be useless, and an operator who declared one service theirs has said
+/// nothing about the rest of their stack.
+#[tokio::test]
+async fn a_repair_writing_outside_every_declared_area_is_carried_out() {
+    let (report, wrote) = declared(&["radarr"], "mending-elsewhere", &["sonarr"]).await;
+
+    assert!(
+        wrote.load(Ordering::Relaxed),
+        "the mender was never asked to write: {report:?}"
+    );
+    assert_ne!(
+        report.mended.first().map(|mended| &mended.outcome),
+        Some(&Outcome::Unmanaged),
+        "{report:?}"
+    );
+}
+
+/// The whole sequence over one check whose mender says what it writes, against a
+/// context holding the areas the operator declared theirs.
+///
+/// The flag comes back with the report because the mender itself is handed to the
+/// runner and not seen again, and "nothing was written" has to be a fact about the
+/// mender rather than something inferred from what the report says.
+async fn declared(areas: &[&str], name: &str, writes: &[&str]) -> (Report, Arc<AtomicBool>) {
+    let asked = Arc::new(AtomicBool::new(false));
+    let mender = Writes {
+        areas: writes.iter().map(|area| (*area).to_owned()).collect(),
+        asked: Arc::clone(&asked),
+    };
+    let checks: Vec<Box<dyn Check>> = vec![Box::new(Offering(mender))];
+    let mut context = ctx(name);
+    context.settings.unmanaged = areas
+        .iter()
+        .map(|area| ((*area).to_owned(), "mine to tune by hand".to_owned()))
+        .collect();
+
+    let report = mending(&context, &[], &checks, &checks, Stance::Ask, &Always(true)).await;
+    (report, asked)
+}
+
+/// A mender that declares what it would write, and records being asked to write it.
+struct Writes {
+    /// What a repair here would write to, by the names a declaration uses.
+    areas: Vec<String>,
+    /// Set the moment it is asked to carry a repair out.
+    asked: Arc<AtomicBool>,
+}
+
+#[async_trait]
+impl Mend for Writes {
+    fn repairs(&self, found: &[Finding]) -> Vec<Repair> {
+        found
+            .iter()
+            .map(|finding| Repair {
+                check: finding.check.clone(),
+                does: "put it right".to_owned(),
+                effects: Vec::new(),
+                reversible: false,
+            })
+            .collect()
+    }
+
+    async fn mend(&self, _repair: &Repair) -> Attempt {
+        self.asked.store(true, Ordering::Relaxed);
+        Attempt::carried()
+    }
+
+    fn writes_to(&self, _repair: &Repair) -> Vec<String> {
+        self.areas.clone()
+    }
+}
+
+/// A check that always finds the one fault that mender answers for, so a run driven
+/// through it always has something to offer.
+struct Offering(Writes);
+
+#[async_trait]
+impl Check for Offering {
+    fn category(&self) -> Category {
+        Category::Vpn
+    }
+
+    async fn run(&self) -> Vec<Finding> {
+        vec![Finding::in_category(
+            Category::Vpn,
+            CHECK,
+            "something this test can mend",
+            Verdict::Warn(Problem::new(
+                Code::new("TEST-1"),
+                Severity::Warning,
+                "it is wrong",
+                "it matters",
+                Remedy::new("put it right"),
+            )),
+        )]
+    }
+
+    fn mender(&self) -> Option<&dyn Mend> {
+        Some(&self.0)
+    }
 }
