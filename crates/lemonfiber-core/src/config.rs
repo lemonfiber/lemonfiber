@@ -12,10 +12,17 @@
 
 pub mod display;
 pub mod env;
+mod keys;
 pub mod paths;
 pub mod reaching;
 mod reading;
 pub mod store;
+
+// Taken whole rather than named one by one, the way the readers below are. Every
+// name in that module is a setting this one owns and passes on unchanged, so a list
+// here would be the same list written a second time — and of two copies of a list,
+// the one that goes stale is the one nobody reads.
+pub use keys::*;
 
 // Re-exported rather than reached for through the module they now live in: what a
 // recorded value comes to is this module's business, and moving the reading of one
@@ -53,10 +60,6 @@ pub struct Protocols {
     /// A VPN and torrent client are configured.
     pub torrent: bool,
 }
-
-mod names;
-
-pub use names::*;
 
 impl Protocols {
     /// Neither protocol configured — what a fresh install looks like.

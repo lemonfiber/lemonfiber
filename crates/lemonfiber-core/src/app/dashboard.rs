@@ -1236,6 +1236,7 @@ mod tests {
             profiles: Vec::new(),
             forms: Vec::new(),
             services: Vec::new(),
+            removed: Vec::new(),
         };
         let reading = read_vpn(
             &Reporting::absent(),

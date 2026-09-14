@@ -1,17 +1,15 @@
-//! What every setting is called.
+//! Every name lemonfiber writes into the environment file, and the list of them.
 //!
-//! The names the stack's environment file uses, and the list of the ones this
-//! product writes. Apart from the rest of `config` because they answer a
-//! different question: these say what a setting is *called*, and what stays
-//! behind says what a settings record *is* and what it does when a field is
-//! missing. Reading one has never required reading the other, and the file they
-//! shared had grown past the length at which anybody reads it in one sitting.
+//! Apart from the rest of `config` because they are a different kind of thing: the
+//! module around them decides what a recorded value comes to, and these decide
+//! nothing at all — they are the vocabulary that reading and writing both quote.
+//! Holding them here is also what keeps that module inside one sitting as the stack
+//! gains settings, which is the one thing about it certain to keep happening.
 //!
-//! Re-exported from the parent, so every caller still says `config::USENET_KEY`.
-//! The seam is for whoever opens the file, not for whoever uses it.
+//! The keys the reachability switches own live beside those switches and are
+//! imported here, because the list below has to name every setting lemonfiber has —
+//! and a list that names all but seven is one nothing can be held to.
 
-// The names for what this product may reach live with the rules about
-// reaching, and the list below is the union of every name it writes.
 use super::reaching::{
     OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
     REACH_UPDATES_KEY, REACH_USENET_KEY,

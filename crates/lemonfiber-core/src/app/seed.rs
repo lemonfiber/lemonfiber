@@ -356,6 +356,8 @@ mod tests {
             depends_on: Vec::new(),
             grants: Vec::new(),
             host_managed: false,
+            asks_for: None,
+            reaches: None,
         }
     }
 

@@ -48,9 +48,9 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
-    named, ALERTS, BANDWIDTH, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR, HISTORY,
-    HOSTING, MIGRATION, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED, STUCK, TRACE, UNINSTALL,
-    UPDATE, VERSION,
+    named, ALERTS, BANDWIDTH, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR,
+    HISTORY, HOSTING, MIGRATION, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED, STUCK, TRACE,
+    UNINSTALL, UPDATE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -233,6 +233,13 @@ static AFTER: &[Question] = &[
         name: "what leaves this machine",
         about: "every request lemonfiber makes, what it sends, and how to stop each one",
         read: OUTBOUND,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what each service is for",
+        about: "what every service does for you in plain language, what you lose while it \
+                is down, and anything this stack has dropped",
+        read: CATALOGUE,
         needs: Needed::Nothing,
     },
     Question {
