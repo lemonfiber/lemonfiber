@@ -368,6 +368,36 @@ async fn an_absent_engine_will_not_say_what_it_has_pulled() {
     assert!(matches!(refused, Err(Failure::Unreachable { .. })));
 }
 
+/// An engine that answers and then refuses the listing is refused too.
+///
+/// A different path from an engine that was never there, and a real one: the socket
+/// is accepted, the API version is agreed, and only then does the route say no. What
+/// must not happen is the refusal becoming an empty listing — an operator shown no
+/// images would conclude there are none and remove nothing, or worse, believe a
+/// cleanup had run.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_engine_that_will_not_list_its_images_refuses_rather_than_listing_none() {
+    let engine = fake::engine(
+        "images-refused",
+        vec![(
+            "images/json",
+            fake::Reply::Body(500, r#"{"message":"database is locked"}"#.to_owned()),
+        )],
+    );
+
+    let said = Daemon::at(&engine.socket).images().await.err().map_or_else(
+        || "it answered with a listing".to_owned(),
+        |failure| failure.to_string(),
+    );
+
+    assert!(
+        said.contains("not reachable"),
+        "a daemon that refuses a route has refused it: {said}"
+    );
+    engine.stop().await;
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn the_engine_s_own_api_version_is_agreed_before_anything_is_asked_of_it() {

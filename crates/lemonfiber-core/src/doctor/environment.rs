@@ -388,9 +388,10 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        parse_version, Category, Check, EnvironmentCheck, Verdict, API_MISMATCH, COMPOSE_UNUSABLE,
-        DAEMON_DOWN, DOCKER_ABSENT,
+        docker_version, parse_version, Category, Check, EnvironmentCheck, Verdict, API_MISMATCH,
+        COMPOSE_UNUSABLE, DAEMON_DOWN, DOCKER_ABSENT,
     };
+    use crate::ports::docker::{Origin, Target};
     use crate::ports::process::{Failure, Output, Runner};
 
     /// A runner that answers each argv with whatever the test scripted for it,
@@ -573,13 +574,13 @@ mod tests {
             .docker(Ok(spoke("27.1.1|1.47|1.47\n")))
             .compose(Ok(spoke("v2.32.1")));
         let findings = run(agreed).await;
+        let agreed_on = verdict(&findings, "environment.api");
         assert!(
             matches!(
-                verdict(&findings, "environment.api"),
+                agreed_on,
                 Some(Verdict::Pass { note: Some(note) }) if note == "1.47"
             ),
-            "{:?}",
-            verdict(&findings, "environment.api")
+            "{agreed_on:?}"
         );
         // The engine finding still shows the daemon's own release, unchanged by the
         // two fields that now ride along with it.
@@ -692,6 +693,42 @@ mod tests {
             verdict(&findings, "environment.compose"),
             Some(Verdict::Unverified { reason, .. }) if reason.contains("could not be read")
         ));
+    }
+
+    /// The versions have to describe the daemon the stack is actually run against.
+    ///
+    /// A client left to work out which daemon it means is a second opinion about
+    /// which machine this is, and it is wrong in exactly the case the numbers are
+    /// being asked for: two machines, updated at different times. So the endpoint is
+    /// named on the invocation, ahead of the subcommand, where it is a global flag.
+    #[test]
+    fn the_versions_are_asked_of_the_daemon_the_stack_is_run_against() {
+        let here = docker_version(&Target::local());
+        assert_eq!(here.first().map(String::as_str), Some("docker"));
+        assert_eq!(here.get(1).map(String::as_str), Some("version"));
+        assert!(
+            !here.iter().any(|word| word == "--host"),
+            "a local run is left to this machine's own conventions: {here:?}"
+        );
+
+        let there = docker_version(&Target::at("ssh://media@nas.local", Origin::Variable));
+        assert_eq!(
+            there.iter().take(4).cloned().collect::<Vec<_>>(),
+            vec![
+                "docker".to_owned(),
+                "--host".to_owned(),
+                "ssh://media@nas.local".to_owned(),
+                "version".to_owned(),
+            ],
+            "{there:?}"
+        );
+        assert!(
+            there
+                .last()
+                .is_some_and(|format| format.contains("Client.APIVersion")
+                    && format.contains("Server.APIVersion")),
+            "both ends are asked for in the one call: {there:?}"
+        );
     }
 
     #[test]

@@ -103,10 +103,24 @@ fn under(name: &str, docker: Option<&Path>) -> Target {
 
 /// Where Docker keeps its configuration for this operator, where that can be said.
 fn configuration() -> Option<PathBuf> {
-    if let Some(named) = said(CONFIGURATION) {
+    beneath(said(CONFIGURATION), said("HOME"))
+}
+
+/// Where Docker keeps its configuration, from what the environment said.
+///
+/// Apart from the reading so that both answers can be driven without setting a
+/// variable for the whole process. A test that exported one would be deciding for
+/// every test beside it, and the branch that goes untested is the one an operator
+/// who has moved their Docker configuration depends on entirely.
+///
+/// `DOCKER_CONFIG` is taken as it stands; otherwise it is the conventional directory
+/// beneath the home. Nowhere at all where the platform will say neither, which reads
+/// as an operator with no contexts rather than as a failure.
+fn beneath(configured: Option<String>, home: Option<String>) -> Option<PathBuf> {
+    if let Some(named) = configured {
         return Some(PathBuf::from(named));
     }
-    said("HOME").map(|home| PathBuf::from(home).join(BENEATH_HOME))
+    home.map(|home| PathBuf::from(home).join(BENEATH_HOME))
 }
 
 /// A variable that says something, which an unset or empty one does not.
@@ -170,7 +184,7 @@ fn endpoint_of(text: &str, name: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{endpoint_of, named_context, resolved, unverifiable};
+    use super::{beneath, endpoint_of, named_context, resolved, unverifiable, BENEATH_HOME};
     use lemonfiber_ports::docker::{Origin, Reach, Target};
     use std::path::{Path, PathBuf};
 
@@ -202,6 +216,13 @@ mod tests {
                 under.join("meta.json"),
                 format!(r#"{{"Name":"{name}","Endpoints":{{"docker":{{"Host":"{endpoint}"}}}}}}"#),
             );
+            self
+        }
+
+        /// Record a directory with nothing readable in it, as a half-removed context
+        /// leaves behind.
+        fn empty(&self, digest: &str) -> &Self {
+            let _ = std::fs::create_dir_all(self.0.join("contexts").join("meta").join(digest));
             self
         }
 
@@ -245,15 +266,50 @@ mod tests {
     }
 
     /// A context nobody recorded is refused rather than quietly answered locally.
+    ///
+    /// A directory holding nothing readable is put beside the good one on purpose.
+    /// Docker leaves those behind — a context removed mid-write, a half-created one —
+    /// and a reader that stopped at the first unreadable entry would report a context
+    /// this machine does have as one it does not.
     #[test]
     fn a_context_this_machine_does_not_have_is_not_the_local_daemon() {
         let recorded = Recorded::new("missing");
-        recorded.context("aaa", "nas", "ssh://media@nas.local");
+        recorded
+            .empty("000")
+            .context("aaa", "nas", "ssh://media@nas.local");
 
         let target = resolved(None, Some("typo"), false, Some(recorded.path()));
         assert_eq!(target.reach, Reach::Missing("typo".to_owned()));
         assert!(target.refusal().is_some(), "{target:?}");
         assert_eq!(target.endpoint(), None, "nothing is handed to Compose");
+
+        let found = resolved(None, Some("nas"), false, Some(recorded.path()));
+        assert_eq!(
+            found.endpoint(),
+            Some("ssh://media@nas.local"),
+            "the unreadable neighbour did not stop the search"
+        );
+    }
+
+    /// Where Docker keeps its configuration, both ways round.
+    ///
+    /// The named directory wins outright: an operator who moved it did so because the
+    /// conventional place is wrong for them, and reading the conventional place
+    /// anyway would answer with contexts they have stopped using.
+    #[test]
+    fn a_named_configuration_directory_beats_the_one_beneath_the_home() {
+        assert_eq!(
+            beneath(
+                Some("/srv/docker".to_owned()),
+                Some("/home/media".to_owned())
+            ),
+            Some(PathBuf::from("/srv/docker"))
+        );
+        assert_eq!(
+            beneath(None, Some("/home/media".to_owned())),
+            Some(PathBuf::from("/home/media").join(BENEATH_HOME))
+        );
+        assert_eq!(beneath(None, None), None, "a machine that says neither");
     }
 
     /// Nothing recorded anywhere is this machine's own daemon, which is the ordinary

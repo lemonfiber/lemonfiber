@@ -238,8 +238,20 @@ fn wording(error: &bollard::errors::Error) -> String {
     if let bollard::errors::Error::DockerResponseServerError { message, .. } = error {
         return message.clone();
     }
+    chained(error)
+}
+
+/// An error and everything under it, in order, without repeating itself.
+///
+/// Written over the standard trait rather than over the client library's own type,
+/// which is what lets every shape of chain be driven here: one that quotes its cause
+/// verbatim — the transparent wrappers do, and appending it again would say the same
+/// sentence twice — and one that does not, which is where the condition finally
+/// appears. A real chain of the second kind takes a socket to produce, so the thing
+/// that decides is separated from the thing that needs one.
+fn chained(error: &dyn std::error::Error) -> String {
     let mut said = error.to_string();
-    let mut cause = std::error::Error::source(error);
+    let mut cause = error.source();
     while let Some(under) = cause {
         let next = under.to_string();
         if !said.contains(&next) {
@@ -469,7 +481,93 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
 
 #[cfg(test)]
 mod tests {
-    use super::{gathered, refused_exec, spoken, Failure};
+    use super::{chained, connect, gathered, refused_exec, spoken, Failure};
+    use lemonfiber_ports::docker::{Origin, Target};
+
+    /// An error with an optional cause, for driving a chain without a socket.
+    ///
+    /// The chains that matter here come out of a client library several layers deep,
+    /// and producing a real one takes a real connection that fails a real way. What
+    /// is actually being decided — whether a cause says something the sentence above
+    /// it did not — needs neither, so it is driven over the standard trait instead.
+    #[derive(Debug)]
+    struct Said {
+        text: String,
+        under: Option<Box<Said>>,
+    }
+
+    impl Said {
+        fn new(text: &str) -> Self {
+            Self {
+                text: text.to_owned(),
+                under: None,
+            }
+        }
+
+        fn caused_by(mut self, under: Self) -> Self {
+            self.under = Some(Box::new(under));
+            self
+        }
+    }
+
+    impl std::fmt::Display for Said {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(&self.text)
+        }
+    }
+
+    impl std::error::Error for Said {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.under
+                .as_deref()
+                .map(|under| under as &(dyn std::error::Error + 'static))
+        }
+    }
+
+    /// The condition is at the bottom of the chain, so the chain is what is read.
+    ///
+    /// Both shapes are here because both are ordinary. A transparent wrapper renders
+    /// exactly what it wraps, and appending that again would say one sentence twice;
+    /// a wrapper with its own words hides the condition until the cause under it is
+    /// reached, which is the whole reason this walks rather than reading the top.
+    #[test]
+    fn what_a_failure_said_carries_its_causes_and_says_nothing_twice() {
+        let quoting = Said::new("client error: connection refused")
+            .caused_by(Said::new("connection refused"));
+        assert_eq!(chained(&quoting), "client error: connection refused");
+
+        let its_own_words = Said::new("error trying to connect")
+            .caused_by(Said::new("tcp connect error").caused_by(Said::new("Connection refused")));
+        assert_eq!(
+            chained(&its_own_words),
+            "error trying to connect: tcp connect error: Connection refused"
+        );
+
+        assert_eq!(chained(&Said::new("nothing under it")), "nothing under it");
+    }
+
+    /// A client is built for every transport this build can drive, and for none of
+    /// the endpoints it cannot.
+    ///
+    /// Building one connects to nothing, which is what lets both remote transports be
+    /// exercised here with no server on either. What the refused half proves is the
+    /// property the target exists for: an endpoint the reads cannot use is turned
+    /// away before a client exists, so it can never become one the writes use.
+    #[test]
+    fn a_client_is_built_for_each_transport_and_for_no_endpoint_beyond_them() {
+        for endpoint in ["tcp://127.0.0.1:2375", "ssh://media@nas.local"] {
+            let built = connect(&Target::at(endpoint, Origin::Variable)).is_ok();
+            assert!(built, "{endpoint}");
+        }
+
+        for beyond in [
+            Target::missing("nas"),
+            Target::at("https://nas.local:2376", Origin::Variable),
+        ] {
+            let turned_away = connect(&beyond).is_err();
+            assert!(turned_away, "{beyond:?}");
+        }
+    }
 
     /// Both refusals, one of which needs a daemon that answers badly.
     ///

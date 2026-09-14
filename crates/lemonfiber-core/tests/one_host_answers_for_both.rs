@@ -167,6 +167,64 @@ async fn a_context_this_machine_does_not_have_stops_the_reads_and_the_writes() {
     );
 }
 
+/// Three ways the pre-flight ends without a refusal, and all three let the command
+/// through.
+///
+/// A guard that refused on any of these would refuse a working setup, which is worse
+/// than the mistake it is there to catch: the endpoint offers no filesystem to put
+/// the question over, or the machine answered that the location is there, or it
+/// answered something that is neither yes nor no. Only the plain no is a refusal, and
+/// the specification names the rest as a state of its own rather than as a fault.
+#[tokio::test]
+async fn a_remote_run_the_pre_flight_cannot_refuse_is_let_through() {
+    let cases = [
+        (
+            "a TCP endpoint, which has no filesystem behind it to ask",
+            Target::at("tcp://nas.local:2375", Origin::Variable),
+            0,
+        ),
+        (
+            "a machine that says the location is there",
+            Target::at("ssh://media@nas.local", Origin::Variable),
+            0,
+        ),
+        (
+            "a machine that says something neither yes nor no",
+            Target::at("ssh://media@nas.local", Origin::Variable),
+            255,
+        ),
+    ];
+
+    for (what, target, status) in cases {
+        let runner = Arc::new(Recording::answering(Ok(Output {
+            status: Some(status),
+            stdout: String::new(),
+            stderr: String::new(),
+        })));
+        let over_ssh = target.over_ssh().is_some();
+        let settings = Settings {
+            data_root: Some(Path::new("/srv/media").to_path_buf()),
+            ..aimed_at(target)
+        };
+
+        let outcome = dispatch(Command::Up { forms: Vec::new() }, &ctx(settings, &runner)).await;
+
+        assert_eq!(
+            outcome.err().map(|problem| problem.code.to_string()),
+            None,
+            "{what} must not stop the command"
+        );
+        assert_eq!(
+            runner
+                .seen()
+                .iter()
+                .any(|argv| argv.first().is_some_and(|program| program == "ssh")),
+            over_ssh,
+            "{what}: the question is put exactly where there is something to put it over"
+        );
+    }
+}
+
 /// The location the stack mounts is looked for on the machine that will mount it.
 ///
 /// The path is on the laptop, which is exactly why the error an operator meets

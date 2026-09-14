@@ -565,19 +565,18 @@ mod tests {
         let mut codes = Vec::new();
         for failure in &failures {
             let problem = failure.problem();
+            let summary = problem.summary.clone();
             assert!(
-                problem.summary.contains("nas.local"),
-                "the host is named: {}",
-                problem.summary
+                summary.contains("nas.local"),
+                "the host is named: {summary}"
             );
-            assert!(!problem.remedies.is_empty(), "{:?}", problem.code);
+            assert!(!problem.remedies.is_empty(), "{summary}");
             assert!(
                 !problem
                     .remedies
                     .iter()
                     .any(|remedy| remedy.action.contains("Docker Desktop")),
-                "a remote failure is not a local Docker Desktop: {:?}",
-                problem.code
+                "a remote failure is not a local Docker Desktop: {summary}"
             );
             assert!(failure.to_string().contains("nas.local"));
             codes.push(problem.code);
@@ -585,6 +584,36 @@ mod tests {
         codes.dedup();
         assert_eq!(codes.len(), 3, "three conditions, three codes: {codes:?}");
         assert_ne!(codes.first(), Some(&super::ENGINE_UNREACHABLE));
+    }
+
+    /// A remote host that went quiet is its own answer, not the local engine's.
+    ///
+    /// The catch-all used to be the local one, and its remedy is to start Docker on
+    /// the machine the operator is sitting at — which, for somebody whose laptop is
+    /// talking to a server, is running. This is the honest end of the list: it names
+    /// the host, quotes the transport, and sends nobody to the wrong machine.
+    #[test]
+    fn a_remote_host_that_went_quiet_does_not_borrow_the_local_engines_answer() {
+        let problem = Failure::Unanswered {
+            host: "ssh://media@nas.local".to_owned(),
+            reason: "the stream ended unexpectedly".to_owned(),
+        }
+        .problem();
+
+        assert_eq!(problem.code, super::HOST_SILENT);
+        assert!(problem.summary.contains("nas.local"), "the host is named");
+        assert_eq!(
+            problem.detail.as_deref(),
+            Some("the stream ended unexpectedly"),
+            "and the transport keeps its own words"
+        );
+        assert!(
+            !problem
+                .remedies
+                .iter()
+                .any(|remedy| remedy.action.contains("Docker Desktop")),
+            "nobody is sent to the machine they are already sitting at"
+        );
     }
 
     /// An endpoint nothing here can drive is refused rather than half-driven.
