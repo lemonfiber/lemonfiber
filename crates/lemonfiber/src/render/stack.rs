@@ -827,6 +827,34 @@ mod tests {
         assert!(text.contains("not declared by this stack"), "{text}");
     }
 
+    /// A stranger that failed is said to have failed, and nothing more.
+    ///
+    /// The word is the whole of the answer here: a declared service that failed is
+    /// shown with the code it exited on, and there is no service behind a container
+    /// the manifest never named to ask one of. Two spellings of the same state on one
+    /// screen would read as two different things having happened.
+    #[test]
+    fn a_stranger_that_failed_is_worded_without_an_exit_code_to_quote() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            condition: Condition::Inactive,
+            undeclared: vec![Undeclared {
+                id: "something-that-fell-over".to_owned(),
+                state: State::Failed,
+                describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
+            }],
+            services: vec![service("sonarr", State::Absent, None)],
+        };
+        let text = status(&report).text();
+
+        assert!(text.contains("something-that-fell-over"), "{text}");
+        assert!(text.contains("failed"), "{text}");
+        assert!(
+            !text.contains("exit"),
+            "there is no service behind a stranger to ask for a code: {text}"
+        );
+    }
+
     /// And an ordinary stack says nothing about it at all, rather than carrying a
     /// heading over an empty list on every run.
     #[test]

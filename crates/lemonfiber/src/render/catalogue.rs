@@ -179,6 +179,36 @@ mod tests {
         );
     }
 
+    /// Every rank, because the five of them are what the whole column is: a scale with
+    /// two of its five values never rendered is a scale nobody has read end to end, and
+    /// the two nobody had are the two an operator meets most — the capability they lose
+    /// and the thing they never turned on.
+    #[test]
+    fn every_rank_the_manifest_allows_says_what_it_means() {
+        for (rank, meaning) in [
+            (
+                Criticality::Critical,
+                "critical — its failure has consequences beyond this machine",
+            ),
+            (
+                Criticality::Core,
+                "core — the stack cannot do its job without it",
+            ),
+            (
+                Criticality::Important,
+                "important — a significant capability is lost",
+            ),
+            (Criticality::Enhancing, "enhancing — quality of life"),
+            (
+                Criticality::Optional,
+                "optional — off unless you ask for it",
+            ),
+        ] {
+            let said = holds(&one(rank)).text();
+            assert!(said.contains(meaning), "{rank:?} reads as: {said}");
+        }
+    }
+
     /// The question underneath the listing, answered once at the bottom rather than by
     /// making somebody count nineteen lines.
     #[test]

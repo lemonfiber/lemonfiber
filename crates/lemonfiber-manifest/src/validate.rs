@@ -692,6 +692,23 @@ replaced_by = "audiobookshelf"
         assert_eq!(check(&with_removal(&chained)), Vec::new());
     }
 
+    /// Empty is not the same as absent, and the difference is the whole of what a
+    /// replacement field records. A removal that names nothing has said the service
+    /// went and nothing took over, which is a fact. One naming an empty string has
+    /// filled the box in to get past the rule, and an operator reading the record
+    /// afterwards is told there was a successor whose name nobody wrote down.
+    #[test]
+    fn a_replacement_named_as_an_empty_string_is_caught() {
+        let text =
+            with_removal(&DROPPED.replace(r#"replaced_by = "bindery""#, r#"replaced_by = "  ""#));
+        assert!(
+            messages(&text)
+                .iter()
+                .any(|m| m.contains("names an empty replacement rather than none at all")),
+            "a blank successor reads as a successor and is not one"
+        );
+    }
+
     #[test]
     fn a_removal_recorded_as_replacing_itself_is_caught() {
         let text = with_removal(&DROPPED.replace(

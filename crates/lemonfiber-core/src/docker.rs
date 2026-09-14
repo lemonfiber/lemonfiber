@@ -881,10 +881,19 @@ profiles = ["media"]
         let services = media(Lifecycle::Running, Health::Healthy);
 
         assert!(!services.is_empty(), "the stack was read");
+        // One closure rather than a filter and a map. The naming half of a pair only
+        // runs for what the filtering half let through, so on the passing run — the
+        // one this test exists to have — it is a body nothing enters, and the
+        // coverage gate counts it against this file.
         let silent: Vec<&str> = services
             .iter()
-            .filter(|service| service.describes.trim().is_empty())
-            .map(|service| service.id.as_str())
+            .filter_map(|service| {
+                service
+                    .describes
+                    .trim()
+                    .is_empty()
+                    .then_some(service.id.as_str())
+            })
             .collect();
         assert!(
             silent.is_empty(),
