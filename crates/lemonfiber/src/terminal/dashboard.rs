@@ -20,12 +20,12 @@ use crate::acting::{meaning, Acting, Wanted};
 use crate::exit::complain;
 use crate::say::{complain, say};
 
-/// How often the screen gathers afresh.
-///
-/// One second, which is what the operator sees as live. Only after the last one
-/// finished, so a stack that takes three seconds to answer refreshes every three
-/// rather than queueing gathers it will never catch up on.
-const TICK: Duration = Duration::from_secs(1);
+/// How often the screen gathers afresh, read from the screen rather than chosen
+/// here: the browser shows the same dashboard and must not be a minute behind
+/// this one. Gathered again only once the last gather finished, so a stack that
+/// takes three seconds to answer refreshes every three rather than queueing work
+/// it will never catch up on.
+use lemonfiber_core::dashboard::TICK;
 
 /// A narrator that puts each of a walk's steps on the screen that asked for it.
 ///

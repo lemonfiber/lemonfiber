@@ -19,12 +19,6 @@ use crate::router::Serving;
 
 use super::{enveloped, reading, unreadable, went_wrong};
 
-/// How many existing lines a log read begins with when it is not told.
-///
-/// The same number the command line begins with, so the two answer a request that
-/// says nothing about it with the same lines.
-const BEGIN_WITH: u32 = 50;
-
 /// The most existing lines this read will begin with.
 ///
 /// The command line hands each line on as it arrives and keeps none of them. This
@@ -160,7 +154,10 @@ fn one_per_line(said: &[LogLine]) -> Option<String> {
 /// How many existing lines to begin with, or nothing where what was asked for is
 /// not a number or is more than this read will gather.
 fn counted(said: Option<&str>) -> Option<u32> {
-    said.map_or(Some(BEGIN_WITH), |said| {
+    // The command line's own number, read from where it is decided rather than
+    // restated here, so the two really do answer a silent request with the same
+    // lines instead of only saying they do.
+    said.map_or(Some(LogQuery::BEGIN_WITH), |said| {
         said.parse().ok().filter(|count| *count <= AT_MOST)
     })
 }

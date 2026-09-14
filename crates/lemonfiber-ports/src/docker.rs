@@ -162,6 +162,25 @@ pub struct LogQuery {
 }
 
 impl LogQuery {
+    /// How many lines a read that was told nothing begins with.
+    ///
+    /// Fifty: enough to hold the thing that went wrong and its lead-up, short
+    /// enough to read. Here rather than on each surface because a caller that
+    /// said nothing about it said nothing on either — the command line and the
+    /// HTTP read must answer the same silence with the same lines, and each of
+    /// them saying so in a comment beside its own copy of the number is a
+    /// promise nothing was keeping.
+    pub const BEGIN_WITH: u32 = 50;
+
+    /// How many lines are quoted from a service that has gone wrong.
+    ///
+    /// Twenty: the last words, not the history. One question asked in two
+    /// places — of a service that would not start, and of a service a
+    /// walkthrough was watching — and the same answer is owed to both, because
+    /// what an operator is shown of a failure should not depend on which of
+    /// them noticed it.
+    pub const LAST_WORDS: u32 = 20;
+
     /// The last `tail` lines, and then nothing more.
     #[must_use]
     pub const fn recent(tail: u32) -> Self {
@@ -169,6 +188,15 @@ impl LogQuery {
             tail,
             follow: false,
         }
+    }
+
+    /// The last words of a service that has gone wrong.
+    ///
+    /// A call rather than a constant handed to [`Self::recent`], so that neither
+    /// caller names a number at all and there is nothing left to retype.
+    #[must_use]
+    pub const fn last_words() -> Self {
+        Self::recent(Self::LAST_WORDS)
     }
 }
 

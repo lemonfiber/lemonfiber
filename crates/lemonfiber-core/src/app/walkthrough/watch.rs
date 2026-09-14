@@ -24,9 +24,6 @@ use crate::walkthrough::{Line, Reason, Speed, Step};
 /// meaningfully in half a second.
 const POLL: std::time::Duration = std::time::Duration::from_secs(2);
 
-/// How many recent lines are quoted from a service when something goes wrong.
-const LAST_WORDS: u32 = 20;
-
 /// How the wait ended.
 pub(super) enum Landed {
     /// It reached the library on disk.
@@ -217,10 +214,7 @@ pub(super) async fn what_was_said(
     if named.is_empty() {
         return Vec::new();
     }
-    let query = LogQuery {
-        tail: LAST_WORDS,
-        follow: false,
-    };
+    let query = LogQuery::last_words();
     let Ok(mut lines) = ctx.engine.logs(&ctx.settings.project, &named, query).await else {
         return Vec::new();
     };
