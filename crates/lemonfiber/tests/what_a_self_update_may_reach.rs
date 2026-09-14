@@ -18,11 +18,18 @@ use source_tree::{production, sources};
 
 /// The seams the self-update family may reach, by the name they carry on a context.
 ///
-/// Four, and each is there because the check cannot be made without it: the
-/// filesystem says where this binary is and keeps what the last check read, the
-/// transport asks the release list, the settings say whether it may, and the clock
-/// says whether it is due. Nothing else is any of this command's business.
-const ALLOWED: [&str; 4] = ["filesystem", "http", "settings", "seconds"];
+/// Each is there because the check cannot be made without it: the filesystem says
+/// where this binary is and keeps what the last check read, the transport asks the
+/// release list, the settings say whether it may, the clock says whether it is due,
+/// and whether this run is a rehearsal decides the one write on the path — what it
+/// records is that this machine asked today, which moves the day the next real check
+/// falls due, so a run that was only asked what it *would* say must not make it.
+/// Nothing else is any of this command's business.
+///
+/// Not counted in the type. A list whose length is written beside it is a list that
+/// goes stale on whoever adds to it, in a test whose whole point is that adding is
+/// the thing to notice.
+const ALLOWED: &[&str] = &["filesystem", "http", "settings", "seconds", "dry_run"];
 
 /// Updating lemonfiber leaves the stack alone, and cannot do otherwise.
 ///

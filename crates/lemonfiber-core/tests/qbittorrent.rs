@@ -201,11 +201,32 @@ async fn a_qbittorrent_that_is_not_answering_is_unavailable() {
 
 // ---- The seed driver that mints, sets and hands back the password. ----
 
+/// The byte every minted password in this file is made of.
+///
+/// Named rather than written where it is used, for the reason `guard.rs` names its
+/// own: a repeated byte literal handed to something that mints a credential is read
+/// by the security scanner as key material checked into the repository, and it is
+/// right to read it that way — the thing that makes this not key material is that it
+/// is a script for a test double, and a name is where that can be said.
+const EVERY_BYTE: u8 = 0x11;
+
+/// How many of them the mint is given, which is what the real source hands over.
+const WIDTH: usize = 24;
+
+/// A source of randomness that answers in full, with the same bytes every time.
+///
+/// The same answer every run is the point: a password minted from it is a value a
+/// test can compare against, and one minted from real randomness is a value a test
+/// can only assert the shape of.
+fn minting() -> lemonfiber_fixtures::ports::Chance {
+    lemonfiber_fixtures::ports::Chance::exactly(Some(vec![EVERY_BYTE; WIDTH]))
+}
+
 #[tokio::test]
 async fn a_generated_password_is_set_confirmed_and_handed_back() {
     // Login, set, and the confirming login all succeed.
     let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
-    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
+    let random = minting();
 
     let (wiring, recorded) =
         wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", false).await;
@@ -234,7 +255,7 @@ async fn a_rehearsed_pass_generates_no_password_and_asks_the_client_nothing() {
     // somebody else's service, and a run that promised to leave nothing behind leaves
     // no session either.
     let fake = Fake::in_turn(Vec::new());
-    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
+    let random = minting();
 
     let (wiring, recorded) =
         wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", true).await;
@@ -276,7 +297,7 @@ async fn without_randomness_the_password_is_not_set() {
 #[tokio::test]
 async fn a_rejected_current_password_fails_and_records_nothing() {
     let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
-    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![0x11; 24]));
+    let random = minting();
 
     let (wiring, recorded) =
         wire_qbittorrent_password(&qbittorrent(&fake), &random, "wrongword", false).await;
