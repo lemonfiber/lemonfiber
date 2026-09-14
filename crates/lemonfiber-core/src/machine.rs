@@ -111,10 +111,20 @@ async fn supply(asking: &Asking) -> Option<Power> {
 /// The epoch second inside `{ sec = 1694612345, usec = 0 } Wed Sep 13 ...`.
 ///
 /// Split on the field name rather than parsed as a structure, because the text
-/// around it differs between releases and the number does not. The split lands on
-/// the first `sec =` rather than on `usec =`'s, which is the one that means seconds.
+/// around it differs between releases and the number does not.
+///
+/// The name is matched as a name, which is the whole difficulty: `usec =` ends in
+/// `sec =`, and a reader that took any occurrence would read the microseconds of a
+/// line whose seconds it could not find and report a machine as having started in
+/// 1970 — which is every run deciding this machine has just restarted. So a match
+/// is taken only where nothing lettered runs into it, and a line that names the
+/// microseconds alone is no answer rather than the wrong one.
 fn sysctl_moment(said: &str) -> Option<u64> {
-    let after = said.split("sec =").nth(1)?;
+    let after = said.match_indices("sec =").find_map(|(at, found)| {
+        let leading = said.get(..at)?.chars().next_back();
+        let its_own_word = leading.is_none_or(|char| !char.is_ascii_alphanumeric());
+        its_own_word.then(|| said.get(at + found.len()..))?
+    })?;
     let digits: String = after
         .trim_start()
         .chars()

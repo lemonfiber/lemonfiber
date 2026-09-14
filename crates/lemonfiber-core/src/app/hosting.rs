@@ -13,7 +13,7 @@
 //! operator believing a guarantee is in force while nothing is keeping it.
 //!
 //! Installing is asked for and never arrived at. No other command reaches this,
-//! and running one of the two long commands does not offer it: an operator who
+//! and running one of the long commands does not offer it: an operator who
 //! asked to guard a volume this afternoon has not asked for something on their
 //! machine that starts at every login.
 
@@ -275,7 +275,7 @@ fn nowhere_to_write() -> Problem {
 #[cfg(test)]
 mod tests {
     use super::{
-        hosting, keeping, settled, typed, Ctx, Held, Hostable, Hosting, Keeping, Standing,
+        hosting, keeping, settled, typed, Ctx, Held, Hostable, Hosting, Keeping, Standing, HOSTABLE,
     };
     use crate::config::Settings;
     use crate::model::HostingReport;
@@ -322,12 +322,25 @@ mod tests {
             .map(|command| command.standing)
     }
 
+    /// Every one of them, counted off the declaration rather than off a number here.
+    ///
+    /// A count written down twice is a count that drifts: the reading grew a third
+    /// command and this went on asserting two, which is the shape of failure this
+    /// test exists to catch reported as this test being out of date. Read from
+    /// `HOSTABLE` it cannot disagree, and a command added to the reading and left off
+    /// this list fails here by name rather than by arithmetic.
     #[tokio::test]
     async fn every_long_running_command_is_on_the_reading_whether_hosted_or_not() {
         let report = read(&a_machine(Fake::with(Manager::Launchd)), Keeping::Read).await;
-        assert_eq!(report.commands.len(), 2);
-        assert_eq!(standing(&report, "watch"), Some(Hosting::NotHosted));
-        assert_eq!(standing(&report, "expiring"), Some(Hosting::NotHosted));
+        assert_eq!(report.commands.len(), HOSTABLE.len());
+        for what in HOSTABLE {
+            assert_eq!(
+                standing(&report, what.name()),
+                Some(Hosting::NotHosted),
+                "{}",
+                what.name()
+            );
+        }
         assert_eq!(report.manager, Manager::Launchd);
         assert_eq!(report.instruction, None);
         assert_eq!(report.caveat, None);
@@ -650,7 +663,7 @@ mod tests {
         .await;
         assert!(matches!(
             asked,
-            Ok(crate::app::Outcome::Hosting(report)) if report.commands.len() == 2
+            Ok(crate::app::Outcome::Hosting(report)) if report.commands.len() == HOSTABLE.len()
         ));
     }
 
