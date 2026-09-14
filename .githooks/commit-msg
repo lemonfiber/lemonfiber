@@ -50,6 +50,28 @@ if ! printf '%s\n' "$body" | grep -qiE '^[ \t]*Spec:[ \t]*[^ \t]'; then
 "
 fi
 
+# The assistants `attribution_check.py` names. Spelled again because a POSIX
+# shell cannot read a Python tuple, and this hook must run where python3 does
+# not. The two lists have to move together — a name in the check and not here is
+# a trailer CI refuses after a push that this would have caught before one, and a
+# name here and not in the check is a hook refusing what no gate does, which
+# `Q-R57` forbids outright. `scripts/test_commit_msg_hook.py` in the spec repo
+# reads both and fails when they disagree, so the duplication is checked rather
+# than merely confessed to.
+assistants="claude|copilot|chatgpt|openai|anthropic|cursor|devin|codex|gemini|aider"
+
+# Anchored to the start of the line with no leading whitespace allowed, unlike
+# the two trailers above. This message, the requirement it serves and every
+# commit explaining either have to be able to name what is forbidden, and a
+# message showing somebody the line to remove quotes it one indent in. A rule
+# that fires on its own explanation is a rule people pass --no-verify, and the
+# bypassing takes the other three checks with it.
+if printf '%s\n' "$body" | grep -qiE "^Co-authored-by:.*($assistants)"; then
+	faults="${faults}  the record credits a tool. Remove the trailer (GOV-R46):
+      the work is the author's own and the record says so.
+"
+fi
+
 if [ -n "$faults" ]; then
 	echo "commit-msg: this is what CI would have said." >&2
 	echo "" >&2
