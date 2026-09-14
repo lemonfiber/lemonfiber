@@ -136,6 +136,7 @@ fn a_pass_where_everything_settled_is_complete() {
             wiring("SABnzbd into Sonarr", State::Wired),
             wiring("root folder in Radarr", State::AlreadyWired),
         ],
+        rehearsed: false,
     };
     assert!(report.is_complete());
     assert!(report.outstanding().is_empty());
@@ -160,6 +161,7 @@ fn a_skip_or_a_failure_leaves_a_pass_incomplete_and_named() {
                 },
             ),
         ],
+        rehearsed: false,
     };
     assert!(!report.is_complete());
     let outstanding: Vec<&str> = report
@@ -203,6 +205,7 @@ fn a_blocked_connection_is_named_apart_from_the_merely_outstanding() {
                 },
             ),
         ],
+        rehearsed: false,
     };
     assert!(!report.is_complete());
     let blocked: Vec<&str> = report
@@ -248,6 +251,7 @@ fn the_report_names_each_state_on_the_wire() {
             wiring("h", State::Adopted),
             wiring("i", State::Unmanaged),
         ],
+        rehearsed: false,
     };
     let json = serde_json::to_string(&report).unwrap_or_default();
     for state in [
@@ -282,6 +286,7 @@ fn the_report_draws_out_the_drifts_that_broke_the_stack() {
             wiring("ordinary", State::Drifted),
             wiring("fine", State::Wired),
         ],
+        rehearsed: false,
     };
     let warned: Vec<&str> = report
         .warnings()

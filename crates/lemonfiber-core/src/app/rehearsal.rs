@@ -633,7 +633,22 @@ mod tests {
     ///
     /// Each builds what it would have filled in and stops before the step it cannot
     /// take back.
+    ///
+    /// Three lists rather than one, because one of them outgrew the length rule and
+    /// the seams were already written into it as comments. They are the three ways a
+    /// command comes to rehearse: it always did, it was taught to, or it already had
+    /// an answer for an unconfirmed run and a rehearsal is that answer with the yes
+    /// taken back on the way in.
     fn reports() -> Vec<Command> {
+        let mut every = always_reported();
+        every.extend(taught_to_report());
+        every.extend(answering_twice());
+        every
+    }
+
+    /// The ones that reported before any of this: the flag was read where it mattered
+    /// and the write was never reached.
+    fn always_reported() -> Vec<Command> {
         vec![
             Command::Up { forms: Vec::new() },
             Command::Start {
@@ -700,8 +715,13 @@ mod tests {
                 agreement: None,
                 waiting: Waiting::Never,
             }),
-            // Taught to report rather than to act: each stops short of the write and
-            // says what the write would have been.
+        ]
+    }
+
+    /// Taught to report rather than to act: each stops short of the write and says
+    /// what the write would have been.
+    fn taught_to_report() -> Vec<Command> {
+        vec![
             examining_accepting(),
             Command::Watch { forms: Vec::new() },
             Command::Undo { run: None },
@@ -710,9 +730,16 @@ mod tests {
             }),
             Command::Setup(SetupAction::Apply),
             Command::Backup { service: None },
-            // The eight that answer twice. Each is here rather than under Untaught
-            // because the answer it gives unconfirmed is the report a rehearsal wants,
-            // and `carried` is what takes the yes back on the way in.
+        ]
+    }
+
+    /// The ones that answer twice.
+    ///
+    /// Here rather than under `Untaught` because the answer each gives unconfirmed is
+    /// the report a rehearsal wants, and `carried` is what takes the yes back on the
+    /// way in.
+    fn answering_twice() -> Vec<Command> {
+        vec![
             Command::Migrate(MigrateAction::Act {
                 mode: crate::migration::mode::Mode::Adopt,
                 confirmed: true,

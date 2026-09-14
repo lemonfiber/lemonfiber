@@ -11,65 +11,77 @@ use lemonfiber_core::PRODUCT;
 
 use super::Lines;
 
+/// One connection's lines: what became of it, and the breakage beneath it where
+/// the drift broke the stack.
+///
+/// Split out of the pass above because that one outgrew the length rule, and this
+/// is the seam it was already written along: everything here is about one wiring,
+/// and everything left there is about the pass as a whole.
+fn connection(wiring: &lemonfiber_core::seed::Wiring) -> Lines {
+    let mut lines = Lines::default();
+    let connection = &wiring.connection;
+    match &wiring.state {
+        SeedState::Wired => lines.put(format!("  ✓ {connection}   wired")),
+        SeedState::AlreadyWired => lines.put(format!("  ✓ {connection}   already wired")),
+        SeedState::Drifted => lines.put(format!("  · {connection}   left as you set it")),
+        SeedState::Adopted => lines.put(format!("  ✓ {connection}   yours, adopted")),
+        SeedState::Unmanaged => lines.put(format!(
+            "  · {connection}   found already set — yours, left as is (run `{PRODUCT} adopt` to keep it)"
+        )),
+        SeedState::Stale => lines.put(format!(
+            "  · {connection}   yours for now — a newer default is not yet applied"
+        )),
+        SeedState::Conflicted { yours, ours } => {
+            lines.put(format!(
+                "  ✗ {connection}   conflict — both you and the default changed it"
+            ));
+            match yours {
+                Some(yours) => lines.put(format!(
+                    "      you set “{yours}”, the default is now “{ours}” — left as you set it"
+                )),
+                None => lines.put(format!(
+                    "      you cleared it, the default is now “{ours}” — left as you set it"
+                )),
+            }
+        }
+        SeedState::WouldWire { yours, ours } => lines.put(format!(
+            "  → {connection}   {}",
+            would(yours.as_deref(), ours.as_deref())
+        )),
+        SeedState::WouldAdopt => lines.put(format!(
+            "  → {connection}   found already set — yours, would be adopted"
+        )),
+        SeedState::Skipped { reason } => {
+            lines.put(format!("  ? {connection}   skipped"));
+            lines.put(format!("      {reason}"));
+        }
+        SeedState::Failed { detail } => {
+            lines.put(format!("  ✗ {connection}   {detail}"));
+        }
+        SeedState::Refused { reason } => {
+            lines.put(format!("  ✗ {connection}   refused"));
+            lines.put(format!("      {reason}"));
+        }
+    }
+    // A drift that broke the stack is raised beneath the line it sits on, naming
+    // what broke and the fix — the warning severity a plain drift never carries.
+    if let SeedSeverity::Warning {
+        breakage,
+        remediation,
+    } = &wiring.severity
+    {
+        lines.put(format!("      ! {breakage}"));
+        lines.put(format!("        → {remediation}"));
+    }
+    lines
+}
+
 /// What seeding wired, connection by connection, with what a re-run still owes
 /// named last so it is the thing the operator is left looking at.
 pub(super) fn seeding(report: &SeedReport) -> Lines {
     let mut lines = Lines::default();
     for wiring in &report.wirings {
-        let connection = &wiring.connection;
-        match &wiring.state {
-            SeedState::Wired => lines.put(format!("  ✓ {connection}   wired")),
-            SeedState::AlreadyWired => lines.put(format!("  ✓ {connection}   already wired")),
-            SeedState::Drifted => lines.put(format!("  · {connection}   left as you set it")),
-            SeedState::Adopted => lines.put(format!("  ✓ {connection}   yours, adopted")),
-            SeedState::Unmanaged => lines.put(format!(
-                "  · {connection}   found already set — yours, left as is (run `{PRODUCT} adopt` to keep it)"
-            )),
-            SeedState::Stale => lines.put(format!(
-                "  · {connection}   yours for now — a newer default is not yet applied"
-            )),
-            SeedState::Conflicted { yours, ours } => {
-                lines.put(format!(
-                    "  ✗ {connection}   conflict — both you and the default changed it"
-                ));
-                match yours {
-                    Some(yours) => lines.put(format!(
-                        "      you set “{yours}”, the default is now “{ours}” — left as you set it"
-                    )),
-                    None => lines.put(format!(
-                        "      you cleared it, the default is now “{ours}” — left as you set it"
-                    )),
-                }
-            }
-            SeedState::WouldWire { yours, ours } => lines.put(format!(
-                "  → {connection}   {}",
-                would(yours.as_deref(), ours.as_deref())
-            )),
-            SeedState::WouldAdopt => lines.put(format!(
-                "  → {connection}   found already set — yours, would be adopted"
-            )),
-            SeedState::Skipped { reason } => {
-                lines.put(format!("  ? {connection}   skipped"));
-                lines.put(format!("      {reason}"));
-            }
-            SeedState::Failed { detail } => {
-                lines.put(format!("  ✗ {connection}   {detail}"));
-            }
-            SeedState::Refused { reason } => {
-                lines.put(format!("  ✗ {connection}   refused"));
-                lines.put(format!("      {reason}"));
-            }
-        }
-        // A drift that broke the stack is raised beneath the line it sits on, naming
-        // what broke and the fix — the warning severity a plain drift never carries.
-        if let SeedSeverity::Warning {
-            breakage,
-            remediation,
-        } = &wiring.severity
-        {
-            lines.put(format!("      ! {breakage}"));
-            lines.put(format!("        → {remediation}"));
-        }
+        lines.extend(connection(wiring));
     }
     let warnings = report.warnings();
     if !warnings.is_empty() {

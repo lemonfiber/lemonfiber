@@ -10,8 +10,8 @@
 use async_trait::async_trait;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientProbe, DownloadClient, Failure, Identity, RegisteredClient,
-    RegisteredFolder, RootFolder,
+    Category, Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity,
+    RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::seed::{wire_root_folders, Placing, State};
 use std::collections::BTreeMap;
@@ -357,4 +357,38 @@ pub async fn wire_on(service: &FakeService, wanted: &[RootFolder]) -> Vec<State>
     .into_iter()
     .map(|wiring| wiring.state)
     .collect()
+}
+
+/// A wanted download client, filed under the ordinary category.
+pub fn client(name: &str, host: &str, port: u16) -> DownloadClient {
+    client_with_category(name, host, port, "tv")
+}
+
+/// A wanted client whose category lemonfiber intends to file under `category` —
+/// for the drift tests, where lemonfiber's desired value is the thing that moves.
+pub fn client_with_category(name: &str, host: &str, port: u16, category: &str) -> DownloadClient {
+    DownloadClient {
+        name: name.to_owned(),
+        host: host.to_owned(),
+        port,
+        kind: ClientKind::Sabnzbd,
+        credential: Credential::ApiKey("sab-key".to_owned()),
+        category: Category {
+            field: "tvCategory".to_owned(),
+            value: category.to_owned(),
+        },
+    }
+}
+
+/// A client the service holds under a category, for the wholesale-drift checks.
+pub fn holding(id: &str, host: &str, port: u16, category: &str) -> RegisteredClient {
+    RegisteredClient {
+        id: id.to_owned(),
+        host: host.to_owned(),
+        port,
+        category: Some(Category {
+            field: "tvCategory".to_owned(),
+            value: category.to_owned(),
+        }),
+    }
 }

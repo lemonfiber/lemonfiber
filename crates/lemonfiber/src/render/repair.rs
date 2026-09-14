@@ -3,8 +3,8 @@
 //! The outcome leads every line, because that is the question being answered: not whether
 //! lemonfiber ran something, but whether the fault is gone.
 
-use lemonfiber_core::app::repair::{Left, Report, Reversal};
-use lemonfiber_core::journal::{Action, Undo};
+use lemonfiber_core::app::repair::{Report, Reversal};
+use lemonfiber_core::journal::Action;
 use lemonfiber_core::repair::{Outcome, ASK_FOR_REPAIRS};
 
 use super::Lines;
@@ -139,7 +139,8 @@ mod tests {
     use lemonfiber_core::error::Remedy;
     use lemonfiber_core::repair::{agreement, Outcome, Repair};
 
-    use super::{mended, reversed, Left};
+    use super::{mended, reversed, Reversal};
+    use lemonfiber_core::app::repair::Left;
     use lemonfiber_core::journal::{Action, Undo};
 
     fn repair() -> Repair {

@@ -10,34 +10,10 @@ use common::service::*;
 
 use lemonfiber_core::baseline::{Baseline, Origin, Record};
 use lemonfiber_core::journal::Journal;
-use lemonfiber_core::ports::service::{
-    Category, ClientKind, ClientProbe, Credential, DownloadClient, RegisteredClient,
-};
-use lemonfiber_core::seed::{
-    wholesale_drift, wire_download_clients, Baselines, Severity, State, Wiring,
-};
+use lemonfiber_core::ports::service::{Category, ClientProbe, DownloadClient, RegisteredClient};
+use lemonfiber_core::seed::{wire_download_clients, Baselines, Severity, State, Wiring};
 
 // ---- Download clients: the same driver, matched by endpoint not label. ----
-
-fn client(name: &str, host: &str, port: u16) -> DownloadClient {
-    client_with_category(name, host, port, "tv")
-}
-
-/// A wanted client whose category lemonfiber intends to file under `category` —
-/// for the drift tests, where lemonfiber's desired value is the thing that moves.
-fn client_with_category(name: &str, host: &str, port: u16, category: &str) -> DownloadClient {
-    DownloadClient {
-        name: name.to_owned(),
-        host: host.to_owned(),
-        port,
-        kind: ClientKind::Sabnzbd,
-        credential: Credential::ApiKey("sab-key".to_owned()),
-        category: Category {
-            field: "tvCategory".to_owned(),
-            value: category.to_owned(),
-        },
-    }
-}
 
 /// Run the client driver for the wanted clients, returning their resulting states
 /// and the number of changes journalled. The baseline it records into is discarded
@@ -432,58 +408,6 @@ async fn a_drift_the_test_does_not_cover_stays_informational() {
     )
     .await;
     assert!(breakage(wirings.first()).is_none());
-}
-
-/// A client the service holds under a category, for the wholesale-drift checks.
-fn holding(id: &str, host: &str, port: u16, category: &str) -> RegisteredClient {
-    RegisteredClient {
-        id: id.to_owned(),
-        host: host.to_owned(),
-        port,
-        category: Some(Category {
-            field: "tvCategory".to_owned(),
-            value: category.to_owned(),
-        }),
-    }
-}
-
-#[test]
-fn every_client_drifted_at_once_reads_as_wholesale() {
-    // lemonfiber recorded "tv"; the one client the service holds now reads "shows".
-    // With every managed value moved together, this is a schema change, not the
-    // operator editing each by hand.
-    let existing = vec![holding("1", "qbittorrent", 8080, "shows")];
-    let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
-    let wanted = [client("qBittorrent", "qbittorrent", 8080)];
-    assert!(wholesale_drift(&existing, &wanted, &expected, "sonarr"));
-}
-
-#[test]
-fn one_client_still_at_lemonfibers_value_is_not_wholesale() {
-    // Two clients the service holds: one drifted, one still at lemonfiber's value. Not
-    // every managed value moved, so it is the operator's edits — reported as drift, not
-    // re-baselined.
-    let existing = vec![
-        holding("1", "qbittorrent", 8080, "shows"),
-        holding("2", "sabnzbd", 8080, "tv"),
-    ];
-    let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
-    let wanted = [
-        client("qBittorrent", "qbittorrent", 8080),
-        client("SABnzbd", "sabnzbd", 8080),
-    ];
-    assert!(!wholesale_drift(&existing, &wanted, &expected, "sonarr"));
-}
-
-#[test]
-fn a_service_holding_none_of_the_wanted_clients_is_not_wholesale() {
-    // Nothing present drifted, so there is no wholesale drift to read — a client not
-    // there yet does not, on its own, stand in for a schema change.
-    let wanted = [client("qBittorrent", "qbittorrent", 8080)];
-    assert!(!wholesale_drift(&[], &wanted, &Baseline::new(), "sonarr"));
 }
 
 #[tokio::test]
