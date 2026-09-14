@@ -39,8 +39,17 @@ jobs:
       # one after another. The instrumented build is unchanged and so is what the gate
       # reads — 97,154 lines, none missed, either way — so this is the same measurement
       # taken in less time.
+      #
+      # `--no-fail-fast` because without it a single failing test stops the run and the
+      # profile is whatever had been reached by then. That is not reported as a stopped
+      # run: it is reported as the coverage figure, and one architecture test tripping on
+      # line 63 of 6,002 came back as ninety-seven thousand missed lines spread across
+      # every crate in the workspace. Whoever read that went looking for a coverage
+      # problem that did not exist, which is the most expensive way a green-or-red gate
+      # can be wrong. Running the rest costs minutes; reading the wrong cause costs an
+      # afternoon, and the failing test is still reported as a failing test.
       - name: Coverage (100% on applicable code — Q-R61)
-        run: cargo llvm-cov nextest --workspace --ignore-filename-regex "$SKIPPED" --fail-under-lines 100 --lcov --output-path lcov.info
+        run: cargo llvm-cov nextest --workspace --no-fail-fast --ignore-filename-regex "$SKIPPED" --fail-under-lines 100 --lcov --output-path lcov.info
       # A gate that says only "below the threshold" sends whoever tripped it looking for a
       # line the run already knew. `report` re-reads the profile just gathered — no build,
       # no tests, seconds — and names them.
