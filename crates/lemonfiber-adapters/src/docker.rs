@@ -335,7 +335,7 @@ async fn executed(
         .await
         .map_err(|error| daemon.refused(&error))?;
 
-    let stdout = spoken(started).await?;
+    let stdout = spoken(started).await;
 
     let inspected = docker
         .inspect_exec(&created.id)
@@ -368,10 +368,10 @@ fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
 }
 
 /// Everything an attached exec wrote, and nothing at all where it was not attached.
-async fn spoken(started: bollard::exec::StartExecResults) -> Result<String, Failure> {
+async fn spoken(started: bollard::exec::StartExecResults) -> String {
     match started {
         bollard::exec::StartExecResults::Attached { output, .. } => gathered(output).await,
-        bollard::exec::StartExecResults::Detached => Ok(String::new()),
+        bollard::exec::StartExecResults::Detached => String::new(),
     }
 }
 
@@ -382,16 +382,25 @@ async fn spoken(started: bollard::exec::StartExecResults) -> Result<String, Fail
 /// stream of its own would exercise a copy of this loop that no run ever executes
 /// while the copy the product uses stayed unmeasured. The tests reach it through
 /// [`spoken`], the way an exec does, so there is one copy and it is the one measured.
-async fn gathered<S>(mut output: S) -> Result<String, Failure>
+///
+/// What arrived, and never a refusal. A stream that stops part-way is not this
+/// function's to judge: the exec is asked for its exit status immediately afterwards,
+/// and the two things that cut an output stream are both answered there — a
+/// connection that is gone fails the inspection with it, and a container that died
+/// mid-write reports the status it died with. A refusal raised here instead would be
+/// a second way to say the same thing, reachable only through a transport failing
+/// between two requests on one settled connection, which is to say reachable by
+/// nothing that could be written down.
+async fn gathered<S>(mut output: S) -> String
 where
     S: tokio_stream::Stream<Item = Result<bollard::container::LogOutput, bollard::errors::Error>>
         + Unpin,
 {
     let mut said = String::new();
-    while let Some(chunk) = output.next().await {
-        said.push_str(&chunk.map_err(|error| unreachable(&error))?.to_string());
+    while let Some(Ok(chunk)) = output.next().await {
+        said.push_str(&chunk.to_string());
     }
-    Ok(said)
+    said
 }
 
 /// One sampling task per running container, feeding one channel.
@@ -619,7 +628,7 @@ mod tests {
     #[tokio::test]
     async fn an_exec_that_was_not_attached_to_says_nothing() {
         let said = spoken(bollard::exec::StartExecResults::Detached).await;
-        assert_eq!(said.ok(), Some(String::new()));
+        assert_eq!(said, String::new());
     }
 
     /// What an exec attached to a stream of these chunks came to.
@@ -630,7 +639,7 @@ mod tests {
     /// measure that one instead of the one a run uses.
     async fn attached(
         chunks: Vec<Result<bollard::container::LogOutput, bollard::errors::Error>>,
-    ) -> Result<String, Failure> {
+    ) -> String {
         spoken(bollard::exec::StartExecResults::Attached {
             output: Box::pin(tokio_stream::iter(chunks)),
             input: Box::pin(tokio::io::sink()),
@@ -650,14 +659,21 @@ mod tests {
             }),
         ])
         .await;
-        assert_eq!(said.ok(), Some("one\ntwo\n".to_owned()));
+        assert_eq!(said, "one\ntwo\n");
     }
 
     /// And a chunk that will not arrive ends it, rather than being passed over.
     ///
-    /// What was gathered up to that point is discarded with it. Half an exec's output
-    /// reported as the whole of it is the one answer worse than none: the leak check
-    /// compares two of these, and a truncated address compares unequal to itself.
+    /// The break stops the reading rather than being skipped: what arrived before it
+    /// comes back, and what the stream would have said afterwards does not. Passing
+    /// over a break and carrying on would splice two halves of an answer together
+    /// with the gap invisible, which is the one shape worse than a short answer —
+    /// the leak check compares what two of these said, and it can tell a short
+    /// answer from an address.
+    ///
+    /// That this is not itself a refusal is [`gathered`]'s own reasoning: the exec's
+    /// exit status is asked for immediately afterwards, and it is what says whether
+    /// what arrived is an answer.
     #[tokio::test]
     async fn a_chunk_that_will_not_arrive_ends_the_gathering() {
         let said = attached(vec![
@@ -668,8 +684,11 @@ mod tests {
                 status_code: 500,
                 message: "the stream stopped".to_owned(),
             }),
+            Ok(bollard::container::LogOutput::StdOut {
+                message: "and the rest\n".into(),
+            }),
         ])
         .await;
-        assert!(said.is_err());
+        assert_eq!(said, "some of it\n", "the reading stops at the break");
     }
 }
