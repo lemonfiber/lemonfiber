@@ -5,9 +5,9 @@
 //! socket, and what keeps a container runtime and a TLS stack out of a crate that must
 //! not be able to reach the network at all.
 //!
-//! A bundle rather than a longer argument list. There are ten of them, they are always
-//! supplied together, and a surface that had to name each one at every call would be a
-//! surface where adding a tenth is a change in sixty places.
+//! A bundle rather than a longer argument list. They are always supplied together, and
+//! a surface that had to name each one at every call would be a surface where adding
+//! another is a change in sixty places — which is what adding the tenth would have been.
 //!
 //! It holds no policy. Which implementation each field carries is the surface's answer,
 //! and the decisions taken over them — retrying a request, refusing one the operator's
