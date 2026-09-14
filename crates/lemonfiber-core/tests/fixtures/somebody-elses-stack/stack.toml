@@ -2,10 +2,15 @@
 # heard of.
 #
 # Two services and nothing else: one lemonfiber ships and knows how to speak to, and
-# one it does not — no API declaration, no entry in anything written down here, and a
-# name nothing in this workspace mentions. What the tests beside it hold is that the
-# second one is operated exactly like the first, and that the features which need to
-# know what a service *is* say so about it rather than passing over it in silence.
+# one it does not — no API declaration and a name nothing in this workspace mentions.
+# What the tests beside it hold is that the second one is operated exactly like the
+# first, and that the features which need to know what a service *is* say so about it
+# rather than passing over it in silence.
+#
+# Only the first says where it reaches, which is the other half of the same point. A
+# stack describes its own services, so a fork that has written that down for the
+# services it copied and not for the one it added is the ordinary case rather than a
+# malformed one — and it is what makes the inventory able to tell them apart.
 
 schema_version  = 1
 stack_version   = "1.0.0"
@@ -36,6 +41,8 @@ upstream     = "https://github.com/Sonarr/Sonarr"
 last_release = "2026-01-01"
 describes    = "Watches for series and files them into the library."
 without_it   = "Nothing files series; you move the downloads yourself."
+reaches      = "television metadata providers"
+asks_for     = "Reads series, season and episode information for what this operator's library holds."
 
 [service.api]
 kind       = "servarr"

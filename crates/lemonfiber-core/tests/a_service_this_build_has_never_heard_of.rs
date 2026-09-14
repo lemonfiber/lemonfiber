@@ -3,9 +3,10 @@
 //!
 //! Driven against a fork rather than against the stack this repository ships, because
 //! that is the only place the question arises: everything in the shipped stack is by
-//! definition something this build knows. The fixture beside this declares one service
-//! lemonfiber ships and one it does not — no API declaration, no entry in anything
-//! written down in this workspace, and a name nothing here mentions.
+//! definition something the stack describes. The fixture beside this declares one
+//! service lemonfiber ships and one it does not — no API declaration, a name nothing
+//! here mentions, and, unlike the service beside it, nothing said about where it
+//! reaches.
 //!
 //! Two halves, and they pull in opposite directions. The generic half must work: the
 //! unknown service gets a status row, a state, a criticality, and a place in the
@@ -176,7 +177,9 @@ async fn what_leaves_this_machine_lists_the_unknown_service_and_says_it_is_unkno
         theirs.is_some_and(|one| !one.destination.is_empty()),
         "{theirs:?}"
     );
-    // And the service beside it, which this build does know, is still answered about.
+    // And the service beside it, which this operator's own stack does describe, is
+    // answered about — from their manifest, which is the only place the answer comes
+    // from and the reason a fork can correct it.
     assert!(
         leaving
             .theirs
