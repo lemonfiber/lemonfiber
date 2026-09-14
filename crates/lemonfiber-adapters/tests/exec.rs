@@ -169,6 +169,41 @@ async fn an_exec_whose_stream_was_cut_is_not_reported_as_a_clean_answer() {
     engine.stop().await;
 }
 
+/// A daemon that answers the creation badly is unreachable, not a missing container.
+///
+/// The pair to the test below, and the reason both exist: those two answers send an
+/// operator to different places. A container that is not there is something they can
+/// put right by starting the stack; a daemon that answered `500` is not, and telling
+/// them the container is missing would have them looking for a container that is
+/// running.
+///
+/// Driven from here rather than only from the unit tests beside the code, which is
+/// the lesson this crate has already had to learn once: the library is compiled twice
+/// — once into its own test binary and once as the dependency these integration tests
+/// link — and a path entered in one of them is counted as never run in the other. The
+/// refusal is the same refusal; the copy of it that a real exec goes through is this
+/// one.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_daemon_that_will_not_create_the_exec_is_unreachable_rather_than_missing() {
+    let engine = fake::engine(
+        "exec-refused",
+        vec![(
+            "/exec",
+            fake::Reply::Body(500, r#"{"message":"the daemon is not well"}"#.to_owned()),
+        )],
+    );
+
+    let argv = ["true".to_owned()];
+    let refused = Daemon::at(&engine.socket).exec("gluetun", &argv).await;
+
+    assert!(
+        matches!(refused, Err(Failure::Unreachable { .. })),
+        "a daemon that answered badly is not a missing container: {refused:?}"
+    );
+    engine.stop().await;
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn a_command_aimed_at_a_container_that_is_not_there_says_which() {
