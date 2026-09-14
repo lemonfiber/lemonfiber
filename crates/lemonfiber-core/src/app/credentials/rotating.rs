@@ -22,10 +22,28 @@ use crate::app::seed::published_as;
 use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for};
 use crate::app::Ctx;
 use crate::config;
-use crate::credential::{Consumer, Held, Origin, Propagation, Rotation, Settled, CATALOGUE};
+use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
 use crate::ports::service::{Client, Failure};
 
-/// Replace the credential one inventory line names.
+/// What a rehearsal says about replacing the credential lemonfiber mints itself.
+const MINTING: &str = "a real run would generate a new web UI password, set it on the \
+     torrent client, sign in with it to prove the client had taken it, and only then \
+     record it. Nothing was generated here, and nothing was set.";
+
+/// What a rehearsal says about handing a service's own key back out.
+const REPUBLISHING: &str = "a real run would read the key the service wrote for itself, \
+     ask the service to identify itself with it, and — only if it answered — publish \
+     that key where the rest of the stack reads it. Nothing was read out and nothing \
+     was published.";
+
+/// Replace the credential one inventory line names — or, on a run that only says what
+/// it would do, say what replacing it would take.
+///
+/// The two paths that write hold that gate themselves rather than having it held here,
+/// and each holds it below everything about the machine that can be told without
+/// acting: a rehearsal is turned back wherever a real run would be turned back, and
+/// reports only where a real run would actually attempt something. The third path
+/// writes nothing on any run, so a rehearsal of it is the run.
 pub(super) async fn rotate(
     ctx: &Ctx,
     held: &Held,
@@ -37,6 +55,9 @@ pub(super) async fn rotate(
         Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {
             replaced(ctx, held, services).await
         }
+        // A credential whose replacement comes from somewhere else writes nothing on
+        // any run, so a rehearsal of it *is* the run: the same sentence, saying where a
+        // replacement does come from and that the existing one is untouched.
         Origin::Lemonfiber | Origin::Operator => Rotation::stopped(
             &held.name,
             Settled::Elsewhere {
@@ -44,6 +65,27 @@ pub(super) async fn rotate(
             },
         ),
     }
+}
+
+/// What a rotation would replace, where the value lives, and what would be owed after.
+///
+/// Nothing is generated and nothing is asked of the service. The consumers that still
+/// need something done are read off the same catalogue a landed rotation reports them
+/// from, so the list an operator plans around is the list they will be given — and the
+/// one consumer a rotation reaches by itself is left out, because it is not a step.
+fn would_rotate(held: &Held, how: &str) -> Rotation {
+    Rotation::would(
+        &held.name,
+        how,
+        &held.location,
+        reached(&held.setting)
+            .into_iter()
+            .filter_map(|one| match one.reach {
+                Reach::Pending { detail } => Some(format!("{} — {detail}", one.consumer)),
+                Reach::Updated | Reach::Failed { .. } => None,
+            })
+            .collect(),
+    )
 }
 
 /// Where a replacement for a credential this cannot rotate actually comes from.
@@ -107,6 +149,14 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
              authenticate with in order to change one; run `lemonfiber seed` to set one",
         );
     };
+    // Below everything that can be told without acting and above everything that
+    // cannot. A rehearsal has already been through the same two conditions a real run
+    // is refused by, so what it reports is what this run would actually attempt — and
+    // it stops one line before the replacement is generated, because a password minted
+    // to describe a rotation is a secret that exists because somebody asked a question.
+    if ctx.dry_run {
+        return would_rotate(held, MINTING);
+    }
     let Some(replacement) = crate::secret::generate(ctx.random.as_ref()) else {
         return unproven(
             held,
@@ -172,6 +222,14 @@ async fn republished(
             },
         );
     };
+    // Below the one condition that can be told without asking anything — whether this
+    // is a service whose key can be proved at all — and above the read of the key
+    // itself. Reading it would put a credential in this run's memory to describe a
+    // rotation, and asking the service to identify itself with it is an
+    // authentication attempt in somebody's log that nobody asked for.
+    if ctx.dry_run {
+        return would_rotate(held, REPUBLISHING);
+    }
     let Some(key) = target.key(ctx.filesystem.as_ref()).await else {
         return unproven(
             held,
@@ -253,7 +311,25 @@ fn reached(setting: &str) -> Vec<Propagation> {
 mod tests {
     use super::{elsewhere, reached};
     use crate::config;
-    use crate::credential::{Reach, CATALOGUE};
+    use crate::credential::{Reach, Rotation, Settled, CATALOGUE};
+
+    /// Where a rehearsed rotation says the value lives and what would still be owed
+    /// after it — or nothing where the rotation was not a rehearsal at all.
+    ///
+    /// Read into a pair rather than matched with a diverging arm: this crate denies
+    /// `panic!` everywhere, tests included, and a `let … else` needs one. One reader
+    /// rather than one per test, so the arm that answers for every other outcome is
+    /// written once and is driven by the test below that asks it about one.
+    fn rehearsed(rotation: &Rotation) -> Option<(String, Vec<String>)> {
+        match &rotation.settled {
+            Settled::Rehearsed {
+                location,
+                afterwards,
+                ..
+            } => Some((location.clone(), afterwards.clone())),
+            _ => None,
+        }
+    }
 
     #[test]
     fn the_torrent_password_reaches_its_own_service_and_leaves_the_rest_pending() {
@@ -305,6 +381,41 @@ mod tests {
         }
     }
 
+    /// A rehearsal names where the value lives and what is still owed after, and puts
+    /// no value of any kind on the report.
+    #[test]
+    fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
+        let held = crate::credential::Held {
+            name: "qBittorrent web UI password".to_owned(),
+            setting: config::QBITTORRENT_PASSWORD_KEY.to_owned(),
+            consumers: Vec::new(),
+            location: "the environment file".to_owned(),
+            origin: crate::credential::Origin::Lemonfiber,
+            state: crate::credential::State::Active,
+            fingerprint: None,
+            advisory: None,
+        };
+        let said = super::would_rotate(&held, super::MINTING);
+
+        assert!(said.kept_the_existing(), "nothing was replaced");
+        assert!(said.rehearsed(), "and it is not a rotation that failed");
+        assert!(
+            said.consumers.is_empty(),
+            "nothing was reached, so no consumer moved"
+        );
+        let settled = rehearsed(&said);
+        assert_eq!(
+            settled.as_ref().map(|(location, _)| location.as_str()),
+            Some("the environment file")
+        );
+        assert!(
+            settled.is_some_and(|(_, afterwards)| afterwards
+                .iter()
+                .any(|step| step.contains("lemonfiber seed"))),
+            "the consumers that need a further command are named"
+        );
+    }
+
     #[test]
     fn a_setting_nothing_knows_still_gets_an_answer_rather_than_nothing() {
         let said = elsewhere("SOMETHING_ELSE");
@@ -312,6 +423,30 @@ mod tests {
         assert!(
             said.contains("wherever this credential was issued"),
             "{said}"
+        );
+    }
+
+    /// A rotation that was not a rehearsal is not read as one.
+    ///
+    /// The distinction is the whole of what a surface prints from: a rehearsal says
+    /// where the value lives and what would be owed afterwards, and a rotation that was
+    /// stopped says what stopped it. Reading a stopped one as a rehearsal would print a
+    /// place and a list of steps for a replacement that was refused — which is the
+    /// sentence an operator acts on, telling them to go and finish something nothing
+    /// started.
+    #[test]
+    fn a_rotation_that_was_stopped_is_not_read_as_one_that_was_rehearsed() {
+        let stopped = Rotation::stopped(
+            "qBittorrent web UI password",
+            Settled::Refused {
+                detail: "the client refused the password lemonfiber holds".to_owned(),
+            },
+        );
+
+        assert_eq!(rehearsed(&stopped), None);
+        assert!(
+            !stopped.rehearsed(),
+            "a refusal answered to the question a rehearsal answers"
         );
     }
 }

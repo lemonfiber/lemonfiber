@@ -259,7 +259,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),
         Outcome::Repair(report) => repair::mended(report),
-        Outcome::Undo(report) => repair::reversed(&report.reversed, &report.left),
+        Outcome::Undo(report) => repair::reversed(report),
         Outcome::Seed(report) => seed::seeding(report),
         Outcome::Reset(report) => stack::reset(report),
         Outcome::Uninstall(report) => uninstall::removal(report),
@@ -1029,6 +1029,7 @@ mod tests {
                 sensitive: false,
                 pruned: Vec::new(),
                 pace: lemonfiber_core::backup::Pace::of(1_024),
+                rehearsed: false,
             }),
             // Nothing gathered, nothing revealed and nothing written: the answer a
             // bare run gives, which is the one with every optional paragraph absent.
@@ -1036,6 +1037,7 @@ mod tests {
                 contents: Contents::default(),
                 bytes: 0,
                 path: None,
+                would_go: None,
             }),
             Outcome::Restore(Restoration {
                 would: Preview {

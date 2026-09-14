@@ -35,6 +35,27 @@ pub enum Settled {
         /// Why nothing could be concluded.
         detail: String,
     },
+    /// Nothing was attempted, because this run only said what a rotation would do.
+    ///
+    /// Its own outcome rather than one of the refusals above, because it is not a
+    /// refusal: nothing went wrong, and what an operator is being told is what would
+    /// happen if they ran it again meaning it. Carrying its own three fields rather
+    /// than one sentence, because "it would rotate the qBittorrent password" is not a
+    /// report — where the value lives is what would be written over, and what is owed
+    /// afterwards is the half nobody finds out about until a consumer stops working.
+    ///
+    /// No value appears here and none is generated to put here. A replacement minted
+    /// to describe a rotation is a secret that exists because somebody asked a
+    /// question, and it would then have to be kept or thrown away — and one thrown
+    /// away may be one the service has already taken.
+    Rehearsed {
+        /// What a real run would do, step by step, in lemonfiber's own words.
+        detail: String,
+        /// Where the value that would be replaced is kept.
+        location: String,
+        /// What would still need doing before every consumer held the replacement.
+        afterwards: Vec<String>,
+    },
     /// Nothing in this stack holds a credential by that name.
     Unknown {
         /// The names that would have been accepted.
@@ -148,6 +169,25 @@ impl Rotation {
         }
     }
 
+    /// A rotation this run only said it would make.
+    ///
+    /// No consumers, for the reason [`Self::stopped`] carries none: nothing was
+    /// replaced, so nothing was reached. What would be owed afterwards travels inside
+    /// the outcome instead, where it reads as something still to do rather than as a
+    /// consumer that is already holding a new value.
+    #[must_use]
+    pub fn would(credential: &str, detail: &str, location: &str, afterwards: Vec<String>) -> Self {
+        Self {
+            credential: credential.to_owned(),
+            settled: Settled::Rehearsed {
+                detail: detail.to_owned(),
+                location: location.to_owned(),
+                afterwards,
+            },
+            consumers: Vec::new(),
+        }
+    }
+
     /// A rotation whose replacement was proven, with what became of each consumer.
     #[must_use]
     pub fn landed(credential: &str, observed: &str, consumers: Vec<Propagation>) -> Self {
@@ -169,6 +209,17 @@ impl Rotation {
     #[must_use]
     pub const fn kept_the_existing(&self) -> bool {
         !matches!(self.settled, Settled::Replaced { .. })
+    }
+
+    /// Whether this run only said what a rotation would do.
+    ///
+    /// Read where an outcome is scored, and the reason it is asked apart from
+    /// [`Self::kept_the_existing`]: every other way of not replacing something is a
+    /// rotation that was asked for and did not land, which is a failure worth a
+    /// non-zero exit. This one was never asked to replace anything.
+    #[must_use]
+    pub const fn rehearsed(&self) -> bool {
+        matches!(self.settled, Settled::Rehearsed { .. })
     }
 
     /// Every consumer the rotation could not update.

@@ -96,6 +96,16 @@ pub(crate) async fn open_servarrs(
 /// attempted and failed — worse than a failure they can read.
 pub(crate) async fn seerr_as_owner(ctx: &Ctx, base: String) -> Seerr {
     let seerr = Seerr::new(ctx.http.clone(), base, "seerr");
+    // **And not on a pass that only says what it would do.** A sign-in is a `POST` that
+    // opens a session on somebody else's service — state left behind by a run that
+    // promised to leave none — so a rehearsal takes the client unsigned on purpose.
+    // Every read it then makes answers unauthorised, which is this run declining to
+    // open a session rather than the service refusing a credential, and the caller says
+    // so in those words. Held here rather than at the call site because that is where
+    // the forgetting happened last time.
+    if ctx.dry_run {
+        return seerr;
+    }
     if let Some(password) = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY) {
         let _ = crate::ports::service::Requests::sign_in(
             &seerr,

@@ -22,11 +22,21 @@ use lemonfiber_core::bytes::humanize;
 
 use super::Lines;
 
-/// Where a backup went, and how private it is.
+/// Where a backup went, and how private it is — or where one would go.
+///
+/// One rendering in two tenses rather than two renderings, because a capture is
+/// settled before it is written: the destination, what it would hold, how large it is
+/// and which older archives retention has no room for are all worked out before the
+/// archive exists. Only the verbs move.
 pub(crate) fn backup(report: &Capture) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
-        "Backed up {} to {}",
+        "{} {} to {}",
+        if report.rehearsed {
+            "Would back up"
+        } else {
+            "Backed up"
+        },
         scope_name(&report.scope),
         report.path.display()
     ));
@@ -37,7 +47,16 @@ pub(crate) fn backup(report: &Capture) -> Lines {
         );
     }
     if !report.pruned.is_empty() {
-        lines.put(format!("Pruned {} older backup(s).", report.pruned.len()));
+        lines.put(format!(
+            "{} {} older backup(s): {}.",
+            if report.rehearsed {
+                "Would prune"
+            } else {
+                "Pruned"
+            },
+            report.pruned.len(),
+            report.pruned.join(", ")
+        ));
     }
     // Said only where there is something to say. A capture inside the budget is done
     // while somebody is still reading the line above it, and announcing that on every
@@ -50,6 +69,9 @@ pub(crate) fn backup(report: &Capture) -> Lines {
             humanize(report.pace.moved),
             humanize(report.pace.budget)
         ));
+    }
+    if report.rehearsed {
+        lines.spaced("Nothing has been written. Run it without --dry-run to take the backup.");
     }
     lines
 }
@@ -166,6 +188,13 @@ fn described(report: &Bundle) -> Lines {
             contents.terms.revealed.join(", "),
         ));
     }
+    // Where it would land, said with the sentence that says it has not been written.
+    // A description of what would be in the file and not of where the file would be is
+    // half an answer: an operator deciding at a shell wants to know what they would
+    // then have to go and find.
+    if let Some(at) = &report.would_go {
+        lines.spaced(format!("It would be written to {}.", at.display()));
+    }
     lines.spaced("Nothing has been written. Run `lemonfiber support --write` to produce it.");
     lines
 }
@@ -256,6 +285,7 @@ mod tests {
                 sensitive: false,
                 pruned: Vec::new(),
                 pace: lemonfiber_core::backup::Pace::of(moved),
+                rehearsed: false,
             })
             .text()
         };
@@ -276,11 +306,40 @@ mod tests {
             sensitive: true,
             pruned: vec!["older.tar.gz".to_owned()],
             pace: lemonfiber_core::backup::Pace::of(1_024),
+            rehearsed: false,
         })
         .text();
         assert!(said.contains("Backed up the whole stack to"), "{said}");
         assert!(said.contains("credentials"), "{said}");
-        assert!(said.contains("Pruned 1 older backup(s)."), "{said}");
+        assert!(said.contains("Pruned 1 older backup(s)"), "{said}");
+    }
+
+    /// A rehearsal says the same things in the tense that is true of them, and names
+    /// the archives retention would drop rather than only counting them.
+    #[test]
+    fn a_rehearsed_capture_says_where_it_would_go_and_what_it_would_drop() {
+        let said = backup(&Capture {
+            path: PathBuf::from("/data/lemonfiber/backups/full.tar.gz"),
+            scope: Scope::WholeStack,
+            sensitive: true,
+            pruned: vec!["older.tar.gz".to_owned()],
+            pace: lemonfiber_core::backup::Pace::of(1_024),
+            rehearsed: true,
+        })
+        .text();
+        assert!(
+            said.contains("Would back up the whole stack to /data/lemonfiber/backups/full.tar.gz"),
+            "{said}"
+        );
+        assert!(
+            said.contains("Would prune 1 older backup(s): older.tar.gz"),
+            "{said}"
+        );
+        assert!(said.contains("Nothing has been written."), "{said}");
+        assert!(
+            !said.contains("Backed up"),
+            "a rehearsal that reads as a capture is the defect this exists to stop: {said}"
+        );
     }
 
     /// A capture taken before a takeover is named for the setup it holds.
@@ -295,6 +354,7 @@ mod tests {
             sensitive: true,
             pruned: Vec::new(),
             pace: lemonfiber_core::backup::Pace::of(1_024),
+            rehearsed: false,
         })
         .text();
         assert!(said.contains("the setup media, taken over"), "{said}");
@@ -310,6 +370,7 @@ mod tests {
             sensitive: false,
             pruned: Vec::new(),
             pace: lemonfiber_core::backup::Pace::of(1_024),
+            rehearsed: false,
         })
         .text();
         assert!(said.contains("service sonarr"), "{said}");
@@ -409,12 +470,21 @@ mod tests {
             ),
             bytes: 2048,
             path: None,
+            would_go: Some(PathBuf::from(
+                "/data/lemonfiber/support/lemonfiber-support-1.tar.gz",
+            )),
         })
         .text();
         assert!(said.contains("A support bundle would hold:"), "{said}");
         assert!(said.contains("diagnosis.txt"), "{said}");
         assert!(said.contains("Could not be read:"), "{said}");
         assert!(said.contains("it is, because you asked"), "{said}");
+        assert!(
+            said.contains(
+                "It would be written to /data/lemonfiber/support/lemonfiber-support-1.tar.gz."
+            ),
+            "a description that does not say where the file would land is half an answer: {said}"
+        );
         assert!(said.contains("Nothing has been written."), "{said}");
     }
 
@@ -427,6 +497,7 @@ mod tests {
             ),
             bytes: 1,
             path: None,
+            would_go: None,
         })
         .text();
         assert!(said.contains("they are, because you asked"), "{said}");
@@ -439,6 +510,7 @@ mod tests {
             contents: holding(Vec::new(), Vec::new()),
             bytes: 4096,
             path: Some(PathBuf::from("/tmp/lemonfiber-support.tar.gz")),
+            would_go: None,
         })
         .text();
         assert!(

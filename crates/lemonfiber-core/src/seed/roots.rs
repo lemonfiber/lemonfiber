@@ -9,6 +9,25 @@ use super::{
     RootFolder, State, Wiring,
 };
 
+/// What a wanted root folder is judged against before it may be written: the paths
+/// another \*arr also claims, and the data tree lemonfiber mounts.
+///
+/// Two refusals answering one question — may this service file here? — so they arrive
+/// as one thing rather than as two parameters a caller could pass one of. Neither is a
+/// consequence of writing: both are read from what the operator's stack already is,
+/// which is why a pass that only says what it would do reports them exactly as a real
+/// run does.
+pub struct Placing<'a> {
+    /// Root-folder paths more than one \*arr wants, from [`contested_roots`]. A folder
+    /// named here is refused rather than written: two \*arrs on one root folder would
+    /// each manage the other's files.
+    pub contested: &'a BTreeMap<String, Vec<String>>,
+    /// The host data root every root folder must sit within. A folder outside it is
+    /// refused: the service would file where its downloads are neither hardlinked to
+    /// nor visible to the rest of the stack.
+    pub root: &'a str,
+}
+
 /// Wire a service's root folders: register the ones it lacks, leave the ones it
 /// already has, and record each write as a change.
 ///
@@ -19,22 +38,29 @@ use super::{
 /// read back before it is called wired, because a write is not done until the
 /// service reports it, and only then is it recorded.
 ///
-/// A folder another \*arr also wants — named in `contested` (from
-/// [`contested_roots`]) — is refused rather than written, because two \*arrs on
-/// one root folder would each manage the other's files. A folder outside `root`,
-/// the data tree lemonfiber mounts, is refused too: the service would file where
+/// A folder another \*arr also wants — named in [`Placing::contested`] — is refused
+/// rather than written, because two \*arrs on one root folder would each manage the
+/// other's files. A folder outside [`Placing::root`], the data tree lemonfiber
+/// mounts, is refused too: the service would file where
 /// its downloads are neither hardlinked to nor visible to the rest of the stack.
 /// Both refusals are made only once the service is reachable, so a service still
 /// starting is skipped and retried rather than handed a verdict a re-run cannot
 /// lift.
+///
+/// `rehearsing` changes one thing: a folder that would be registered is reported as
+/// the folder it would be rather than written. Everything above that — the read, the
+/// two refusals and the already-there match — is the same walk either way, because
+/// each of them is a fact about the service rather than a consequence of writing to
+/// it, and a rehearsal that reported them differently would be describing a different
+/// run from the one it claims to be describing.
 pub async fn wire_root_folders(
     client: &dyn Client,
     service: &str,
     wanted: &[RootFolder],
-    contested: &BTreeMap<String, Vec<String>>,
-    root: &str,
+    placing: Placing<'_>,
     journal: &mut Journal,
     at: &str,
+    rehearsing: bool,
 ) -> Vec<Wiring> {
     let existing = match observe_or_skip(client.root_folders().await, wanted, |folder| {
         describe(service, folder)
@@ -48,9 +74,9 @@ pub async fn wire_root_folders(
         let already = existing
             .iter()
             .any(|have| same_path(&have.path, &folder.path));
-        let state = if let Some(reason) = contest_reason(service, folder, contested) {
+        let state = if let Some(reason) = contest_reason(service, folder, placing.contested) {
             State::Refused { reason }
-        } else if let Some(reason) = outside_root_reason(folder, root) {
+        } else if let Some(reason) = outside_root_reason(folder, placing.root) {
             State::Refused { reason }
         } else if already {
             State::AlreadyWired
@@ -70,6 +96,10 @@ pub async fn wire_root_folders(
                 },
                 journal,
                 at,
+                rehearsing.then(|| State::WouldWire {
+                    yours: None,
+                    ours: Some(folder.path.clone()),
+                }),
             )
             .await
         };

@@ -229,8 +229,36 @@ async fn identity(
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
     let random = lemonfiber_fixtures::ports::Chance::exactly(random);
-    let (wiring, minted) =
-        wire_jellyfin_identity(&media, &seerr, &random, recorded, "http://jellyfin:8096").await;
+    let (wiring, minted) = wire_jellyfin_identity(
+        &media,
+        &seerr,
+        &random,
+        recorded,
+        "http://jellyfin:8096",
+        false,
+    )
+    .await;
+    (wiring.state, minted)
+}
+
+/// The same two services, asked what the pass would do rather than asked to do it.
+async fn would_identity(
+    media: FakeMedia,
+    seerr: FakeReq,
+    recorded: Option<&str>,
+) -> (State, Option<String>) {
+    // Randomness is available on purpose: what proves nothing was minted is that
+    // nothing came back, not that nothing could have.
+    let random = lemonfiber_fixtures::ports::Chance::exactly(Some(RANDOM.to_vec()));
+    let (wiring, minted) = wire_jellyfin_identity(
+        &media,
+        &seerr,
+        &random,
+        recorded,
+        "http://jellyfin:8096",
+        true,
+    )
+    .await;
     (wiring.state, minted)
 }
 
@@ -239,6 +267,44 @@ fn media(startup: Startup, create: Create) -> FakeMedia {
 }
 
 const RANDOM: [u8; 24] = [0x11; 24];
+
+/// A rehearsal against a fresh media server mints no admin password and creates no
+/// account, and says what a real pass would do without a value in it.
+#[tokio::test]
+async fn a_rehearsed_identity_mints_nothing_and_creates_no_account() {
+    let (state, minted) = would_identity(
+        // A creation that would be refused, so that reaching it at all would show.
+        media(Startup::Fresh, Create::Rejects),
+        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        None,
+    )
+    .await;
+
+    assert_eq!(
+        state,
+        State::WouldWire {
+            yours: None,
+            ours: None,
+        },
+        "a value here is a password that was generated to describe a question"
+    );
+    assert_eq!(minted, None, "and none was handed back to record");
+}
+
+/// And a request service the household already initialised is left alone on both
+/// runs, so a rehearsal of that case is the case.
+#[tokio::test]
+async fn a_rehearsed_identity_leaves_an_initialised_request_service_as_it_is() {
+    let (state, minted) = would_identity(
+        media(Startup::Completed, Create::Ok),
+        FakeReq::new(Init::Done, Init::Done, Configure::Rejects),
+        Some("recorded-already"),
+    )
+    .await;
+
+    assert_eq!(state, State::AlreadyWired);
+    assert_eq!(minted, None);
+}
 
 #[tokio::test]
 async fn a_jellyfin_that_is_not_answering_skips_the_identity() {
@@ -379,4 +445,38 @@ async fn a_read_back_that_cannot_be_reached_is_skipped() {
     )
     .await;
     assert!(matches!(state, State::Skipped { .. }), "{state:?}");
+}
+
+/// A rehearsal against a request service nobody has set up names the media server it
+/// would take the household's accounts from, and points it at nothing.
+///
+/// The other rehearsed case stops at the media server, because a wizard that has not
+/// run is an account a real pass would have to create. Here the wizard has run and the
+/// password is one lemonfiber already recorded, so the pass gets past that and reaches
+/// the second service — which is where the write that costs something lives: signing a
+/// fresh request service in creates its owner, and an operator asking what would happen
+/// is entitled to know which server those accounts would come from before it does.
+/// Both services are scripted to refuse, so reaching either would show as a failure
+/// rather than as a rehearsal.
+#[tokio::test]
+async fn a_rehearsed_identity_names_the_server_a_fresh_request_service_would_answer_to() {
+    let (state, minted) = would_identity(
+        media(Startup::Completed, Create::Rejects),
+        FakeReq::new(Init::Fresh, Init::Done, Configure::Rejects),
+        Some("recorded-already"),
+    )
+    .await;
+
+    assert_eq!(
+        state,
+        State::WouldWire {
+            yours: None,
+            ours: Some("http://jellyfin:8096".to_owned()),
+        },
+        "the address the household's accounts would come from is not on the report"
+    );
+    assert_eq!(
+        minted, None,
+        "a password already recorded was minted a second time"
+    );
 }

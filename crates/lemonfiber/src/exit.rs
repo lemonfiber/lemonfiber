@@ -363,12 +363,16 @@ fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
 /// The exit code a question about the credentials earns.
 ///
 /// Only a rotation that was asked for and did not land is a failure. A reading is a
-/// question; a reveal either printed or said why it did not; and a rotation that
-/// landed but left a consumer waiting on a restart is reported in words rather than
-/// as a failure, because nothing went wrong — the operator has one more command to
-/// run and the report names it.
+/// question; a reveal either printed or said why it did not; a rehearsal was never
+/// asked to replace anything; and a rotation that landed but left a consumer waiting
+/// on a restart is reported in words rather than as a failure, because nothing went
+/// wrong — the operator has one more command to run and the report names it.
 fn rotating(inventory: &lemonfiber_core::credential::Inventory) -> ExitCode {
     match &inventory.rotated {
+        // A rehearsal keeps the existing credential and is not a rotation that failed:
+        // nothing was attempted, and what came back is the answer that was asked for.
+        // Read before the failure below, because it satisfies that test too.
+        Some(rotated) if rotated.rehearsed() => ExitCode::SUCCESS,
         Some(rotated) if rotated.kept_the_existing() => ExitCode::from(FAILURE),
         // No rotation was asked for, or one was and it landed. Neither is a fault, so
         // they answer alike rather than through two arms saying the same thing.
@@ -457,6 +461,14 @@ pub(crate) fn repairing(report: &RepairReport) -> ExitCode {
 /// or failed may complete on a re-run, so it stays FAILURE. A script can then tell "fix
 /// your config" from "wait and retry".
 pub(crate) fn seed_exit(report: &lemonfiber_core::seed::Report) -> ExitCode {
+    // A pass that only said what it would do answered the question it was asked, and
+    // every connection it names as outstanding is one nobody has agreed to make yet.
+    // Read before completeness, because a rehearsal against a stack with anything left
+    // to wire is incomplete by construction — that is the report rather than a fault in
+    // it, and a script told otherwise would stop on the answer it asked for.
+    if report.rehearsed {
+        return ExitCode::SUCCESS;
+    }
     if report.is_complete() {
         ExitCode::SUCCESS
     } else if report.blocked().is_empty() {
@@ -821,6 +833,17 @@ mod tests {
             ))),
             success()
         );
+        // A rehearsal keeps the existing credential too, and a script that read that
+        // as a failed rotation would refuse to go on having asked a question.
+        assert_eq!(
+            asked(Inventory::of(Vec::new()).after(Rotation::would(
+                "qBittorrent web UI password",
+                "a real run would generate a new one",
+                "the environment file",
+                Vec::new(),
+            ))),
+            success()
+        );
     }
 
     /// Accounting for the disk is a question, however bad the answer is; a cleanup
@@ -1019,6 +1042,7 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            rehearsed: false,
         };
         assert_eq!(
             format!("{:?}", settled(&Outcome::Seed(settled_seed))),
@@ -1035,6 +1059,7 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            rehearsed: false,
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Seed(blocked))), success());
     }
@@ -1074,8 +1099,31 @@ mod tests {
                 severity: SeedSeverity::Informational,
             }],
             assessment: Assessment::Assessed,
+            rehearsed: false,
         };
         assert_ne!(format!("{:?}", settled(&Outcome::Seed(waiting))), success());
+    }
+
+    #[test]
+    fn a_seed_that_only_said_what_it_would_do_answered_the_question_it_was_asked() {
+        // The same report that earns a non-zero code from a run that wired things, on a
+        // run that wired nothing because it was not asked to.
+        let rehearsed = SeedReport {
+            wirings: vec![Wiring {
+                connection: "a".to_owned(),
+                state: SeedState::WouldWire {
+                    yours: None,
+                    ours: Some("http://sonarr:8989".to_owned()),
+                },
+                severity: SeedSeverity::Informational,
+            }],
+            assessment: Assessment::Assessed,
+            rehearsed: true,
+        };
+        assert_eq!(
+            format!("{:?}", settled(&Outcome::Seed(rehearsed))),
+            success()
+        );
     }
 
     #[test]
@@ -1215,6 +1263,7 @@ mod tests {
                 sensitive: true,
                 pruned: Vec::new(),
                 pace: lemonfiber_core::backup::Pace::of(1_024),
+                rehearsed: false,
             }))),
             success()
         );
@@ -1223,6 +1272,7 @@ mod tests {
                 contents: Contents::default(),
                 bytes: 0,
                 path: None,
+                would_go: None,
             }))),
             success()
         );
@@ -1303,6 +1353,7 @@ mod tests {
             forms: vec!["library".to_owned()],
             reason: "the data location is no longer present".to_owned(),
             stopped: false,
+            would: None,
         });
         assert_eq!(shown(settled(&stranded)), success());
     }

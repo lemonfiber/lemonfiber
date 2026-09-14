@@ -61,16 +61,22 @@ pub(super) async fn publish_keys(
     sabnzbd_key: Option<&str>,
 ) -> crate::seed::Wiring {
     let mut published = written_down(ctx, services, project).await;
+
+    // Before [`asked_for`], because asking is where this connection does its writing.
+    // Both of the keys it gathers are read by being made — the media server mints one
+    // when it is asked for one, and the listening server has no account at all until
+    // this makes it, with a password minted and recorded to go with it — so a pass that
+    // gathered them would have created the very things it promised only to describe,
+    // and left a secret behind for a question.
+    if ctx.dry_run {
+        return would_publish(ctx, services, published, sabnzbd_key);
+    }
+
     published.extend(asked_for(ctx, services).await);
     published.extend(pairs_with_a_password(ctx, services, sabnzbd_key));
 
     if published.is_empty() {
-        return crate::seed::Wiring::settled(
-            CONNECTION.to_owned(),
-            crate::seed::State::Skipped {
-                reason: "no service has written a key yet; a later run completes it".to_owned(),
-            },
-        );
+        return crate::seed::Wiring::settled(CONNECTION.to_owned(), nothing_to_publish());
     }
 
     for (name, key) in published {
@@ -78,6 +84,68 @@ pub(super) async fn publish_keys(
     }
 
     crate::seed::Wiring::settled(CONNECTION.to_owned(), crate::seed::State::Wired)
+}
+
+/// Why there is nothing to publish yet, in both tenses: the services write their keys
+/// on first start, and a stack that has not got that far has none to read.
+fn nothing_to_publish() -> crate::seed::State {
+    crate::seed::State::Skipped {
+        reason: "no service has written a key yet; a later run completes it".to_owned(),
+    }
+}
+
+/// What a rehearsal says this connection would do: name the settings, and not one
+/// character of what would go in them.
+///
+/// Every pair gathered here is a setting and the credential destined for it, and the
+/// report is serialized — so the names are the whole of what an operator is deciding
+/// about, and the values are the one thing a question must never make a second copy of.
+///
+/// Two of the names come from the stack rather than from a gathered key, because those
+/// two are the ones [`asked_for`] would have had to create to learn. A real run reaches
+/// this line having just minted the media server's admin password and made the
+/// listening server's first account; this one did neither, and taking the names from
+/// the services present says what a real run would fill without filling anything.
+fn would_publish(
+    ctx: &Ctx,
+    services: &[Service],
+    written: Vec<(String, String)>,
+    sabnzbd_key: Option<&str>,
+) -> crate::seed::Wiring {
+    let mut settings: Vec<String> = written.into_iter().map(|(name, _)| name).collect();
+    settings.extend(would_ask_for(services));
+    settings.extend(
+        pairs_with_a_password(ctx, services, sabnzbd_key)
+            .into_iter()
+            .map(|(name, _)| name),
+    );
+    settings.sort();
+    settings.dedup();
+    let state = if settings.is_empty() {
+        nothing_to_publish()
+    } else {
+        crate::seed::State::WouldWire {
+            yours: None,
+            ours: Some(settings.join(", ")),
+        }
+    };
+    crate::seed::Wiring::settled(CONNECTION.to_owned(), state)
+}
+
+/// The names the asked-for keys would be published under, taken without asking for
+/// them.
+///
+/// Named from the stack rather than from what the services answered, which is the only
+/// way to name them at all without making them: see [`would_publish`].
+fn would_ask_for(services: &[Service]) -> Vec<String> {
+    [
+        lemonfiber_manifest::ApiKind::Audiobookshelf,
+        lemonfiber_manifest::ApiKind::Jellyfin,
+    ]
+    .into_iter()
+    .filter_map(|kind| with_api(services, kind))
+    .map(|service| published_as(&service.id))
+    .collect()
 }
 
 /// A key published under the id of the service answering `kind`, where both the key

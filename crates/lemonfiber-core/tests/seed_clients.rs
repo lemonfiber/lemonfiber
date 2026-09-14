@@ -10,34 +10,10 @@ use common::service::*;
 
 use lemonfiber_core::baseline::{Baseline, Origin, Record};
 use lemonfiber_core::journal::Journal;
-use lemonfiber_core::ports::service::{
-    Category, ClientKind, ClientProbe, Credential, DownloadClient, RegisteredClient,
-};
-use lemonfiber_core::seed::{
-    wholesale_drift, wire_download_clients, Baselines, Severity, State, Wiring,
-};
+use lemonfiber_core::ports::service::{Category, ClientProbe, DownloadClient, RegisteredClient};
+use lemonfiber_core::seed::{wire_download_clients, Baselines, Severity, State, Wiring};
 
 // ---- Download clients: the same driver, matched by endpoint not label. ----
-
-fn client(name: &str, host: &str, port: u16) -> DownloadClient {
-    client_with_category(name, host, port, "tv")
-}
-
-/// A wanted client whose category lemonfiber intends to file under `category` —
-/// for the drift tests, where lemonfiber's desired value is the thing that moves.
-fn client_with_category(name: &str, host: &str, port: u16, category: &str) -> DownloadClient {
-    DownloadClient {
-        name: name.to_owned(),
-        host: host.to_owned(),
-        port,
-        kind: ClientKind::Sabnzbd,
-        credential: Credential::ApiKey("sab-key".to_owned()),
-        category: Category {
-            field: "tvCategory".to_owned(),
-            value: category.to_owned(),
-        },
-    }
-}
 
 /// Run the client driver for the wanted clients, returning their resulting states
 /// and the number of changes journalled. The baseline it records into is discarded
@@ -56,6 +32,7 @@ async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<S
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "t",
     )
@@ -84,12 +61,106 @@ async fn seed_clients_recording(
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "t",
     )
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, records)
+}
+
+/// Run the client driver as a rehearsal: the same pass over the same service, with
+/// the registering left out. `expected` is what lemonfiber last recorded, and `adopt`
+/// is whether this is the pass that promotes an operator's value rather than the one
+/// that pushes lemonfiber's.
+async fn would_seed_clients(
+    service: &FakeService,
+    wanted: &[DownloadClient],
+    expected: &Baseline,
+    adopt: bool,
+) -> (Vec<State>, usize) {
+    let mut journal = Journal::new();
+    let mut records = Baseline::new();
+    let wirings = wire_download_clients(
+        service,
+        "sonarr",
+        wanted,
+        &mut journal,
+        &mut Baselines {
+            expected,
+            records: &mut records,
+            adopt,
+            reset: false,
+            rehearsing: true,
+        },
+        "t",
+    )
+    .await;
+    let states = wirings.into_iter().map(|wiring| wiring.state).collect();
+    (states, journal.changes().len())
+}
+
+/// A rehearsal names the client it would register and the category it would file it
+/// under, and registers none of it.
+///
+/// The two halves together are the whole requirement: a report saying a connection
+/// would be made without saying what it would be made *to* is a count, and a count is
+/// what an operator asking what a run would do already has.
+#[tokio::test]
+async fn a_rehearsed_pass_names_what_it_would_push_and_pushes_none_of_it() {
+    let service = FakeService::with_clients(Mode::Normal, Vec::new());
+    let (states, recorded) = would_seed_clients(
+        &service,
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &Baseline::new(),
+        false,
+    )
+    .await;
+
+    assert_eq!(
+        states,
+        vec![State::WouldWire {
+            yours: None,
+            ours: Some("tv".to_owned()),
+        }]
+    );
+    assert_eq!(
+        recorded, 0,
+        "nothing was registered, so there was nothing to journal"
+    );
+}
+
+/// A rehearsal of an adopt pass says which value would be taken on, and does not say
+/// what it is — the rule an unmanaged value is already reported under, so a secret
+/// among the adopted is never put on display by a question.
+#[tokio::test]
+async fn a_rehearsed_adopt_names_the_connection_and_never_the_value() {
+    let service = FakeService::with_clients(
+        Mode::Normal,
+        vec![RegisteredClient {
+            id: "1".to_owned(),
+            host: "sabnzbd".to_owned(),
+            port: 8080,
+            category: Some(Category {
+                field: "tvCategory".to_owned(),
+                value: "my-own-tv".to_owned(),
+            }),
+        }],
+    );
+    let mut expected = Baseline::new();
+    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+
+    let (states, recorded) = would_seed_clients(
+        &service,
+        &[client("SABnzbd", "sabnzbd", 8080)],
+        &expected,
+        true,
+    )
+    .await;
+
+    assert_eq!(states, vec![State::WouldAdopt]);
+    assert_eq!(recorded, 0, "an adopt writes to no service on any run");
 }
 
 #[tokio::test]
@@ -159,6 +230,7 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "2",
     )
@@ -215,6 +287,7 @@ async fn seed_clients_probed(
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "2",
     )
@@ -337,58 +410,6 @@ async fn a_drift_the_test_does_not_cover_stays_informational() {
     assert!(breakage(wirings.first()).is_none());
 }
 
-/// A client the service holds under a category, for the wholesale-drift checks.
-fn holding(id: &str, host: &str, port: u16, category: &str) -> RegisteredClient {
-    RegisteredClient {
-        id: id.to_owned(),
-        host: host.to_owned(),
-        port,
-        category: Some(Category {
-            field: "tvCategory".to_owned(),
-            value: category.to_owned(),
-        }),
-    }
-}
-
-#[test]
-fn every_client_drifted_at_once_reads_as_wholesale() {
-    // lemonfiber recorded "tv"; the one client the service holds now reads "shows".
-    // With every managed value moved together, this is a schema change, not the
-    // operator editing each by hand.
-    let existing = vec![holding("1", "qbittorrent", 8080, "shows")];
-    let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
-    let wanted = [client("qBittorrent", "qbittorrent", 8080)];
-    assert!(wholesale_drift(&existing, &wanted, &expected, "sonarr"));
-}
-
-#[test]
-fn one_client_still_at_lemonfibers_value_is_not_wholesale() {
-    // Two clients the service holds: one drifted, one still at lemonfiber's value. Not
-    // every managed value moved, so it is the operator's edits — reported as drift, not
-    // re-baselined.
-    let existing = vec![
-        holding("1", "qbittorrent", 8080, "shows"),
-        holding("2", "sabnzbd", 8080, "tv"),
-    ];
-    let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
-    let wanted = [
-        client("qBittorrent", "qbittorrent", 8080),
-        client("SABnzbd", "sabnzbd", 8080),
-    ];
-    assert!(!wholesale_drift(&existing, &wanted, &expected, "sonarr"));
-}
-
-#[test]
-fn a_service_holding_none_of_the_wanted_clients_is_not_wholesale() {
-    // Nothing present drifted, so there is no wholesale drift to read — a client not
-    // there yet does not, on its own, stand in for a schema change.
-    let wanted = [client("qBittorrent", "qbittorrent", 8080)];
-    assert!(!wholesale_drift(&[], &wanted, &Baseline::new(), "sonarr"));
-}
-
 #[tokio::test]
 async fn a_wired_client_records_its_category_as_the_expected_baseline() {
     // What lemonfiber writes it remembers: the category is recorded, keyed by the
@@ -461,6 +482,7 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "2",
     )
@@ -507,6 +529,7 @@ async fn a_reset_reverts_a_drifted_category_to_lemonfibers() {
             records: &mut records,
             adopt: false,
             reset: true,
+            rehearsing: false,
         },
         "2",
     )
@@ -552,6 +575,7 @@ async fn a_reset_a_service_refuses_is_reported_as_failed_not_recorded() {
             records: &mut records,
             adopt: false,
             reset: true,
+            rehearsing: false,
         },
         "2",
     )
@@ -585,6 +609,7 @@ async fn a_reset_registers_nothing_a_preview_did_not_show() {
             records: &mut records,
             adopt: false,
             reset: true,
+            rehearsing: false,
         },
         "2",
     )
@@ -662,6 +687,7 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "2",
     )
@@ -705,6 +731,7 @@ async fn a_client_both_sides_changed_is_a_conflict() {
             records: &mut records,
             adopt: false,
             reset: false,
+            rehearsing: false,
         },
         "2",
     )
@@ -811,6 +838,7 @@ async fn seed_clients_with(
             records: &mut records,
             adopt,
             reset: false,
+            rehearsing: false,
         },
         "2",
     )

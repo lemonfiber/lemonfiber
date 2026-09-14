@@ -14,11 +14,11 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::error::{Code, Problem, Remedy, Severity, State};
-use crate::model::SupervisionReport;
+use crate::model::{SupervisionReport, Vigil};
 use crate::ports::filesystem::{Presence, Volume};
 use crate::stack::compose::Action;
 
-use super::engine::lifecycle;
+use super::engine::{invocation, lifecycle};
 use super::{Ctx, Outcome};
 
 /// How often a watch re-checks that the data root is still there.
@@ -34,6 +34,14 @@ pub const NOTHING_TO_WATCH: Code = Code::new("WATCH-1");
 /// Raised when the data location is already gone when the watch is asked to
 /// start.
 pub const ALREADY_GONE: Code = Code::new("WATCH-2");
+
+/// What a run that only said what a watch would do puts where the ending goes.
+///
+/// Said rather than left empty, because the field is read by a caller that has no
+/// reason to look at `would` first, and a blank reason reads as a watch that ended
+/// for no reason anybody wrote down.
+const NOTHING_WAS_WATCHED: &str = "nothing was watched: this run said what a watch \
+     would do and kept none";
 
 /// How a watch ended.
 enum Loss {
@@ -112,6 +120,18 @@ pub async fn supervise(
         Presence::Gone | Presence::Unknown => return Err(Box::new(already_gone(root))),
     };
 
+    // A rehearsal stops here, and it is the one command where that is not the same
+    // shape as everywhere else: the step this leaves out is not the last one but all
+    // of them, because a watch is a wait. Running it as a rehearsal would hold the
+    // terminal until somebody unplugged the drive, which is a worse answer than the
+    // refusal it replaces. What it reports instead is the watch itself — where it
+    // would look, how often, and the invocation it would run the moment that location
+    // went — and both gates above still apply, because a location that is not there
+    // is not one a watch would have held either.
+    if ctx.dry_run {
+        return would_watch(ctx, root, forms, interval);
+    }
+
     let loss = watch_until_lost(volume, root, baseline, interval).await;
 
     // The stop is attempted whatever its outcome: the data root is gone either
@@ -126,6 +146,37 @@ pub async fn supervise(
         forms: forms.to_vec(),
         reason: describe_loss(&loss),
         stopped,
+        would: None,
+    })
+}
+
+/// The watch this run would have kept, reported in place of keeping it.
+///
+/// The invocation comes from the same prelude a real stop is built by, rather than
+/// from a sentence written here that says what that prelude produces. Two accounts of
+/// one argv is one account nobody runs, and the one nobody runs is the one that stops
+/// being true — which on this command would not be found out until a drive was pulled.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] the stop itself would give where the stack cannot be read,
+/// resolved or written — met here, before the wait, rather than at the end of one.
+fn would_watch(
+    ctx: &Ctx,
+    root: &Path,
+    forms: &[String],
+    interval: Duration,
+) -> Result<SupervisionReport, Box<Problem>> {
+    let (command, _) = invocation(ctx, forms, &Action::Stop(Vec::new()))?;
+    Ok(SupervisionReport {
+        forms: forms.to_vec(),
+        reason: NOTHING_WAS_WATCHED.to_owned(),
+        stopped: false,
+        would: Some(Vigil {
+            root: root.display().to_string(),
+            every: interval.as_secs(),
+            command,
+        }),
     })
 }
 
@@ -348,6 +399,50 @@ mod tests {
             Some((true, true)),
             "the hiccup was held; the real loss stopped the services"
         );
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_watch_says_what_it_would_guard_and_never_takes_a_second_look() {
+        // The one command where stopping short of the last step would mean not
+        // stopping at all: a watch is a wait, so a rehearsal that ran it would hold
+        // until somebody unplugged the drive.
+        let ctx = watching(Ok(spoke("")), Some("/data")).rehearsing();
+        let drive = Drive::playing(vec![Presence::On(9), Presence::Gone]);
+        let report = supervise(
+            &ctx,
+            &drive,
+            &["library".to_owned()],
+            std::time::Duration::from_secs(5),
+        )
+        .await
+        .ok();
+
+        assert_eq!(
+            drive.cursor.load(Ordering::Relaxed),
+            1,
+            "it looked twice, which is watching"
+        );
+        let would = report.and_then(|report| report.would);
+        assert_eq!(
+            would
+                .as_ref()
+                .map(|would| (would.root.clone(), would.every)),
+            Some(("/data".to_owned(), 5))
+        );
+        assert!(
+            would.is_some_and(|would| would.command.iter().any(|word| word == "stop")),
+            "a rehearsal that printed no invocation, or one that was not the stop, \
+             printed nothing worth reading"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_rehearsed_watch_with_nothing_to_guard_is_refused_the_way_a_real_one_is() {
+        // The gates are facts about the machine rather than consequences of acting, so
+        // a rehearsal meets them where a real watch meets them.
+        let ctx = watching(Ok(spoke("")), None).rehearsing();
+        let refused = watch(&ctx, Drive::playing(vec![])).await.err();
+        assert_eq!(refused.map(|problem| problem.code), Some(NOTHING_TO_WATCH));
     }
 
     #[tokio::test]

@@ -86,6 +86,7 @@ pub(super) async fn seed_subtitles(
                     port,
                     api_key,
                 },
+                ctx.dry_run,
             )
             .await,
         ));
@@ -98,13 +99,36 @@ pub(super) async fn seed_subtitles(
 /// Read first, because the operator may have set this themselves or a previous run
 /// may have done it: writing regardless would be a second write that changes nothing
 /// and reports as though it had.
-async fn watch(finder: &crate::bazarr::Bazarr, watched: &Watched) -> crate::seed::State {
+async fn watch(
+    finder: &crate::bazarr::Bazarr,
+    watched: &Watched,
+    rehearsing: bool,
+) -> crate::seed::State {
     let held = match finder.watching(watched.which).await {
         Ok(held) => held,
         Err(failure) => return unreached(&failure),
     };
     if held.enabled && held.host == watched.host && held.port == watched.port && held.keyed {
         return crate::seed::State::AlreadyWired;
+    }
+    // Below the read, for the reason every other gate here is: a finder already
+    // watching this \*arr is left alone on a real run, so a rehearsal of that is the
+    // run. What is reported is the address a real one would point it at, and what it
+    // holds now where it holds anything at all — including whether it holds a key for
+    // it, because a finder pointed at the right \*arr with no key is exactly the case
+    // this connection exists to fix, and the two addresses on their own would read as
+    // a change to nothing.
+    if rehearsing {
+        let keyed = if held.keyed { "" } else { ", with no key" };
+        return crate::seed::State::WouldWire {
+            yours: held
+                .enabled
+                .then(|| format!("{}:{}{keyed}", held.host, held.port)),
+            ours: Some(format!(
+                "{}:{}, with lemonfiber's key",
+                watched.host, watched.port
+            )),
+        };
     }
     if let Err(failure) = finder.watch(watched).await {
         return unreached(&failure);

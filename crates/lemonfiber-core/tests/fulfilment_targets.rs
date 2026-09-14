@@ -63,7 +63,18 @@ fn registered() -> String {
 
 async fn wire(seerr: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
     let mut journal = Journal::new();
-    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z")
+    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z", false)
+        .await
+        .into_iter()
+        .map(|wiring| wiring.state)
+        .collect()
+}
+
+/// The same pass over the same request service, asked what it would hand over rather
+/// than asked to hand it over.
+async fn would_wire(seerr: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
+    let mut journal = Journal::new();
+    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z", true)
         .await
         .into_iter()
         .map(|wiring| wiring.state)
@@ -206,5 +217,67 @@ async fn a_target_list_that_will_not_read_back_is_refused_rather_than_taken_as_e
     assert!(
         said.contains("fulfilment targets could not be read"),
         "an unreadable list did not say so: {said}"
+    );
+}
+
+/// A rehearsal names the endpoint it would register an \*arr at, and registers none.
+///
+/// The address is the whole of what the operator is deciding about: the request
+/// service reaches an \*arr over the stack's own network, and a report that said only
+/// "a target would be added" would leave them unable to tell a correct run from one
+/// about to point the service at the wrong container. Asserted together with the
+/// traffic, because a report that reads right while the write still goes out is the
+/// one failure this flag exists to prevent wearing the right words.
+#[tokio::test]
+async fn a_rehearsed_pass_names_the_endpoint_it_would_register_and_registers_none() {
+    let (seerr, http) = holding("[]", "[]");
+
+    let states = would_wire(&seerr, &[sonarr()]).await;
+
+    assert_eq!(
+        states,
+        vec![State::WouldWire {
+            yours: None,
+            ours: Some("sonarr:8989".to_owned()),
+        }],
+        "{states:?}"
+    );
+    assert!(
+        !http
+            .requests()
+            .iter()
+            .any(|asked| asked.method == Method::Post),
+        "a rehearsal handed the *arr over"
+    );
+}
+
+/// A read a rehearsal makes as the owner says it could not tell, rather than naming a
+/// credential fault nobody has.
+///
+/// Every call here is authenticated and nothing but signing in opens a session — and
+/// signing in is a `POST` that leaves state on somebody else's service, which a run
+/// promising to leave none does not make. So the answer comes back unauthorised, and
+/// an operator told their key was refused would go looking for a broken credential and
+/// find a working one. What they are told instead is that this run declined to open a
+/// session and that a real one signs in and reports what it found.
+#[tokio::test]
+async fn a_rehearsed_read_as_the_owner_says_it_could_not_tell_rather_than_naming_a_fault() {
+    let http = Fake::by_path(vec![("/settings", Answer::reply(401, ""))]);
+    let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+
+    let states = would_wire(&seerr, &[sonarr()]).await;
+
+    let said = format!("{states:?}");
+    assert!(
+        said.starts_with("[Skipped"),
+        "a session this run chose not to open was reported as something else: {said}"
+    );
+    assert!(
+        said.contains("session"),
+        "the operator was not told why nothing could be read: {said}"
+    );
+    assert!(
+        !said.contains("credential") && !said.contains("refused"),
+        "a rehearsal put a credential fault in front of an operator who has none: {said}"
     );
 }

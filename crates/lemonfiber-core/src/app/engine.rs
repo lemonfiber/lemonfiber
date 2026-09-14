@@ -128,14 +128,16 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     })
 }
 
-/// The Compose invocation for `action` over the whole stack, and the operator's own
+/// The Compose invocation for `action` over the named forms, and the operator's own
 /// edits it left in place while materialising.
 ///
-/// The same prelude every lifecycle command runs, offered to the one caller that
-/// drives Compose service by service rather than form by form: an update starts each
-/// service on its own and waits for that one alone, which is a different wait from
-/// the whole-plan one beside it. Building the invocation twice would be two accounts
-/// of where the stack is and which files were written to get there.
+/// The same prelude every lifecycle command runs, offered to the two callers that
+/// need the invocation without the run. An update drives Compose service by service
+/// rather than form by form, because it starts each service on its own and waits for
+/// that one alone, which is a different wait from the whole-plan one beside it; and a
+/// rehearsed watch has to say what it would run at the end of a wait it will never
+/// take. Building the invocation a second time would be two accounts of where the
+/// stack is and which files were written to get there.
 ///
 /// # Errors
 ///
@@ -143,9 +145,10 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
 /// resolved, or written.
 pub(super) fn invocation(
     ctx: &Ctx,
+    forms: &[String],
     action: &Action,
 ) -> Result<(Vec<String>, Vec<StackEdit>), Box<Problem>> {
-    let composed = compose(ctx, &[], action)?;
+    let composed = compose(ctx, forms, action)?;
     Ok((composed.command, composed.stack_edits))
 }
 

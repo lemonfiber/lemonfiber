@@ -65,6 +65,18 @@ pub struct Bundle {
     pub bytes: u64,
     /// Where it was written, or nothing where a run that writes nothing described it.
     pub path: Option<PathBuf>,
+    /// Where it would be written, on the run that only describes one.
+    ///
+    /// The other half of what a description is for. What goes in the file and how
+    /// large it is answer *whether* to make it; where it lands answers *where to find
+    /// it*, and an operator deciding at a shell needs both at the one moment the
+    /// answer can still change what they do. Resolved by the same function the run
+    /// that writes resolves it with, so the path shown and the path written are one.
+    ///
+    /// Absent on a run that wrote one — `path` is then where it went — and absent on a
+    /// machine that would not say where lemonfiber keeps its own files, which is the
+    /// one destination of the three that needs that answer.
+    pub would_go: Option<PathBuf>,
 }
 
 /// Describe a bundle, or produce one.
@@ -89,36 +101,58 @@ pub async fn run(
         .await
         .ok_or_else(|| Box::new(without_marks()))?;
 
+    // Worked out before the branch, because both halves of this command need the same
+    // answer: it is what a run that writes nothing reports, and it is where the run
+    // that writes one puts the file. Resolved twice it could resolve differently, and
+    // a description of somewhere other than where the file lands is the shape of
+    // report this module exists not to produce.
+    let at = landing(
+        ctx.archives
+            .as_ref()
+            .map(|archives| archives.paths.bundles()),
+        &contents,
+        dest,
+    );
+
     if !write_it {
         let bytes = measure(&contents)?;
         return Ok(Bundle {
             contents,
             bytes,
             path: None,
+            would_go: at,
         });
     }
-    // Asked for once for both halves of writing: the adapter that packs the file,
-    // and — where the caller named no path — the directory it goes in. Asked twice
-    // it could be answered twice, and a bundle written by one run's adapter into
-    // another run's directory is a file in a place nothing looks.
-    let archives = ctx
-        .archives
-        .as_ref()
-        .ok_or_else(|| Box::new(nowhere_to_keep()))?;
-    let at = match dest {
-        Destination::At(path) => path.clone(),
-        Destination::Beside => PathBuf::from(named_for_the_moment(&contents)),
-        Destination::Kept => archives
-            .paths
-            .bundles()
-            .join(named_for_the_moment(&contents)),
+    // Both halves of writing, asked for once: the adapter that packs the file, and the
+    // directory it goes in where the caller named no path. A bundle written by one
+    // run's adapter into a path this run could not resolve is a file in a place
+    // nothing looks, so a run holding neither is refused here rather than half of it.
+    let (Some(archives), Some(at)) = (ctx.archives.as_ref(), at) else {
+        return Err(Box::new(nowhere_to_keep()));
     };
     let written = write(archives.vault.as_ref(), &contents, &at).await?;
     Ok(Bundle {
         contents,
         bytes: written.bytes,
         path: Some(written.path),
+        would_go: None,
     })
+}
+
+/// Where a bundle goes: the path the operator named, one beside them, or one with
+/// lemonfiber's own files.
+///
+/// `bundles` is the directory this run keeps its own archives in, absent on a machine
+/// that would not say where those go — which is the one destination of the three that
+/// needs the answer. A named path and one written beside the operator are knowable
+/// either way, and a description that withheld them because of a directory it was not
+/// going to use would be withholding the answer it was asked for.
+fn landing(bundles: Option<PathBuf>, contents: &Contents, dest: &Destination) -> Option<PathBuf> {
+    match dest {
+        Destination::At(path) => Some(path.clone()),
+        Destination::Beside => Some(PathBuf::from(named_for_the_moment(contents))),
+        Destination::Kept => Some(bundles?.join(named_for_the_moment(contents))),
+    }
 }
 
 /// The file a bundle is written as.
@@ -237,7 +271,7 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
-    use super::{held, Held, NOT_HELD, NOWHERE_HELD};
+    use super::{held, landing, Destination, Held, NOT_HELD, NOWHERE_HELD};
     use crate::app::fixtures::{scratch, FakeArchive};
     use crate::app::Ctx;
     use crate::archive::Archiving;
@@ -302,6 +336,40 @@ mod tests {
         assert!(
             refused.is_some_and(|problem| problem.summary.contains("lemonfiber-support-9.tar.gz")),
             "the name is quoted back so a mistyped one can be seen"
+        );
+    }
+
+    /// The run that writes nothing and the run that writes are asked one question about
+    /// where the file goes, so what an operator is shown before they decide is where it
+    /// lands when they do.
+    #[test]
+    fn where_a_bundle_would_land_is_answered_from_what_this_run_can_answer() {
+        let contents = crate::bundle::Contents::default();
+        let theirs = std::path::PathBuf::from("/tmp/theirs.tar.gz");
+
+        assert_eq!(
+            landing(None, &contents, &Destination::At(theirs.clone())),
+            Some(theirs),
+            "a path the operator named needs nothing of ours to be knowable"
+        );
+        assert!(
+            landing(None, &contents, &Destination::Beside)
+                .is_some_and(|at| at.to_string_lossy().ends_with(".tar.gz")),
+            "and neither does one beside them"
+        );
+        assert_eq!(
+            landing(None, &contents, &Destination::Kept),
+            None,
+            "the one that needs our own directory is the one a machine can withhold"
+        );
+        assert!(
+            landing(
+                Some(std::path::PathBuf::from("/data/lemonfiber/support")),
+                &contents,
+                &Destination::Kept
+            )
+            .is_some_and(|at| at.starts_with("/data/lemonfiber/support")),
+            "and it lands under that directory when there is one"
         );
     }
 

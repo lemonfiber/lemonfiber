@@ -49,17 +49,44 @@ pub const NOWHERE_TO_KEEP: Code = Code::new("BACKUP-5");
 /// would prune each other's archives.
 pub const KEEP: usize = 5;
 
+/// What a capture does once its reckoning is done.
+///
+/// One value rather than two arguments, and the two belong together: both are about
+/// what happens *after* the room is measured and the destination derived — the archive
+/// written, and the surplus pruned behind it — and a run that only says what it would
+/// take does neither of them. Named as a pair so the one call that takes it cannot be
+/// given a retention without an answer to the other question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Taking {
+    /// How many archives of this scope to keep once one has been written.
+    pub retention: Retention,
+    /// Whether this run only says what it would capture, writing nothing.
+    pub rehearsing: bool,
+}
+
+impl Taking {
+    /// A capture keeping `retention`'s worth of archives, taken or only said.
+    #[must_use]
+    pub const fn of(retention: Retention, rehearsing: bool) -> Self {
+        Self {
+            retention,
+            rehearsing,
+        }
+    }
+}
+
 /// What a capture produced.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "BackupReport")]
 pub struct Report {
-    /// Where the archive was written.
+    /// Where the archive was written, or — on a run that only said what it would
+    /// capture — where it would have gone.
     pub path: PathBuf,
     /// What the backup covers.
     pub scope: Scope,
     /// Whether it carries credentials, and so must be handled as sensitive.
     pub sensitive: bool,
-    /// The older backups retention pruned, oldest first.
+    /// The older backups retention pruned, oldest first — or would prune.
     pub pruned: Vec<String>,
     /// What the capture moved, against what a capture is meant to stay inside.
     ///
@@ -67,6 +94,14 @@ pub struct Report {
     /// were walked to decide whether the archive would fit, and this is the same number
     /// put to a second use.
     pub pace: Pace,
+    /// Whether this run only said what it would capture.
+    ///
+    /// A flag rather than a second shape, because every other field means the same
+    /// thing either way: a capture is settled before it is written — the room is
+    /// measured, the manifest described, the name and the path derived, and retention
+    /// worked out — so what a rehearsal reports is what a real run would report, with
+    /// the one write left out. What changes is the tense a surface says it in.
+    pub rehearsed: bool,
 }
 
 /// Capture a configuration to a backup archive under `paths`, pruning older ones
@@ -83,6 +118,14 @@ pub struct Report {
 /// The services whose state this captures must already be quiesced; see the
 /// module note.
 ///
+/// A rehearsing [`Taking`] stops it one step short of the archive and nowhere else.
+/// Everything a capture reports is settled before the write — the room is measured, the
+/// manifest described, the name and destination derived, and retention worked out
+/// against what is already there — so a rehearsal answers with the report a real run
+/// would fill in and writes neither the archive nor the pruning it would have done.
+/// Held here rather than at the caller because the one irreversible step is here, and a
+/// caller trusted to stop before it is a caller that can be written without stopping.
+///
 /// # Errors
 ///
 /// Returns a [`Problem`] where the room could not be measured, where it would not
@@ -94,7 +137,7 @@ pub async fn capture(
     product_version: &str,
     stamp: &str,
     data_root: &str,
-    retention: Retention,
+    taking: Taking,
     archive: &dyn Archive,
 ) -> Result<Report, Box<Problem>> {
     let plan = backup::plan(paths, &scope);
@@ -111,12 +154,22 @@ pub async fn capture(
     let manifest = Manifest::describe(&plan, product_version, stamp, data_root);
     let name = archive_name(&scope, stamp);
     let dest = dir.join(&name);
+    if taking.rehearsing {
+        return Ok(Report {
+            path: dest,
+            scope: manifest.scope,
+            sensitive: manifest.sensitive,
+            pruned: surplus(&dir, taking.retention, &scope, &name, archive).await,
+            pace: Pace::of(space.needed),
+            rehearsed: true,
+        });
+    }
     archive
         .write(&dest, &manifest, &plan.items)
         .await
         .map_err(|fault| Box::new(not_written(&fault)))?;
 
-    let pruned = prune(&dir, retention, &scope, &name, archive).await;
+    let pruned = prune(&dir, taking.retention, &scope, &name, archive).await;
 
     Ok(Report {
         path: dest,
@@ -124,6 +177,7 @@ pub async fn capture(
         sensitive: manifest.sensitive,
         pruned,
         pace: Pace::of(space.needed),
+        rehearsed: false,
     })
 }
 
@@ -176,7 +230,7 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
         env!("CARGO_PKG_VERSION"),
         &ctx.stamp(),
         &data_root,
-        Retention::keeping(KEEP),
+        Taking::of(Retention::keeping(KEEP), ctx.dry_run),
         archives.vault.as_ref(),
     )
     .await
@@ -231,7 +285,7 @@ pub async fn existing(
         env!("CARGO_PKG_VERSION"),
         &ctx.stamp(),
         &data_root(ctx),
-        Retention::keeping(KEEP),
+        Taking::of(Retention::keeping(KEEP), ctx.dry_run),
         archives.vault.as_ref(),
     )
     .await
@@ -300,6 +354,29 @@ async fn prune(
     fresh: &str,
     archive: &dyn Archive,
 ) -> Vec<String> {
+    let mut removed = Vec::new();
+    for name in surplus(dir, retention, scope, fresh, archive).await {
+        if archive.remove(dir, &name).await.is_ok() {
+            removed.push(name);
+        }
+    }
+    removed
+}
+
+/// Which archives of this scope retention has no more room for, oldest first.
+///
+/// The deciding half of [`prune`], apart from the removing half so a rehearsal can
+/// report what a capture would drop without dropping it. One reckoning rather than
+/// two: a preview worked out separately would be a second opinion about what retention
+/// keeps, and the one nobody runs is the one that goes wrong — here, by naming an
+/// archive as safe that the next real capture deletes.
+async fn surplus(
+    dir: &std::path::Path,
+    retention: Retention,
+    scope: &Scope,
+    fresh: &str,
+    archive: &dyn Archive,
+) -> Vec<String> {
     let Ok(existing) = archive.existing(dir).await else {
         return Vec::new();
     };
@@ -308,13 +385,12 @@ async fn prune(
         .into_iter()
         .filter(|backup| backup.name.starts_with(&prefix))
         .collect();
-    let mut removed = Vec::new();
-    for old in retention.prune(mine) {
-        if old.name != fresh && archive.remove(dir, &old.name).await.is_ok() {
-            removed.push(old.name);
-        }
-    }
-    removed
+    retention
+        .prune(mine)
+        .into_iter()
+        .map(|old| old.name)
+        .filter(|name| name != fresh)
+        .collect()
 }
 
 /// The problem for a capture that will not fit the disk.
@@ -365,7 +441,7 @@ mod tests {
     use lemonfiber_fixtures::support::Reporting;
 
     use super::{
-        capture, existing as capture_existing, run, Report, NOT_MEASURED, NOT_WRITTEN,
+        capture, existing as capture_existing, run, Report, Taking, NOT_MEASURED, NOT_WRITTEN,
         NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
     };
     use crate::app::fixtures::{keeping, paths, FakeArchive};
@@ -381,7 +457,24 @@ mod tests {
             "0.3.0",
             "2026-07-30T00:00:00Z",
             "/srv/media",
-            Retention::keeping(2),
+            Taking::of(Retention::keeping(2), false),
+            archive,
+        )
+        .await
+    }
+
+    /// The same capture, said rather than taken.
+    async fn rehearsing(
+        archive: &FakeArchive,
+        retention: Retention,
+    ) -> Result<Report, Box<super::super::Problem>> {
+        capture(
+            &paths(),
+            Scope::WholeStack,
+            "0.3.0",
+            "2026-07-30T00:00:00Z",
+            "/srv/media",
+            Taking::of(retention, true),
             archive,
         )
         .await
@@ -407,6 +500,37 @@ mod tests {
     /// The name a whole-stack capture at the stamp `capturing` uses is written
     /// under — the fresh archive retention must never prune.
     const FRESH: &str = "lemonfiber-full-2026-07-30T00-00-00Z.tar.gz";
+
+    #[tokio::test]
+    async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
+        // The whole of the claim: the destination, the size and what retention would
+        // drop are all settled before the write, so the report is the real one and the
+        // archive directory is untouched.
+        let archive = FakeArchive::keeping_backups(&[
+            ("lemonfiber-full-2026-07-01T00-00-00Z.tar.gz", "2026-07-01"),
+            ("lemonfiber-full-2026-07-02T00-00-00Z.tar.gz", "2026-07-02"),
+        ]);
+        let report = rehearsing(&archive, Retention::keeping(1))
+            .await
+            .map_err(|problem| *problem);
+
+        assert_eq!(
+            report
+                .as_ref()
+                .ok()
+                .map(|report| (report.rehearsed, report.path.clone())),
+            Some((true, paths().backups().join(FRESH)))
+        );
+        assert_eq!(
+            report.map(|report| report.pruned),
+            Ok(vec![
+                "lemonfiber-full-2026-07-01T00-00-00Z.tar.gz".to_owned()
+            ]),
+            "a rehearsal that only counted them would not say which is about to go"
+        );
+        assert!(archive.writes().is_empty(), "the archive was written");
+        assert!(archive.removes().is_empty(), "an older archive was pruned");
+    }
 
     #[tokio::test]
     async fn a_capture_writes_the_archive_under_the_backups_directory_and_reports_it() {
@@ -437,7 +561,7 @@ mod tests {
             "0.3.0",
             "2026-07-30T00:00:00Z",
             "/srv/media",
-            Retention::keeping(2),
+            Taking::of(Retention::keeping(2), false),
             &archive,
         )
         .await
@@ -490,7 +614,7 @@ mod tests {
             "0.3.0",
             "2026-07-30T00:00:00Z",
             "/srv/media",
-            Retention::keeping(1),
+            Taking::of(Retention::keeping(1), false),
             &archive,
         )
         .await
@@ -526,7 +650,7 @@ mod tests {
             "0.3.0",
             "2026-07-30T00:00:00Z",
             "/srv/media",
-            Retention::keeping(1),
+            Taking::of(Retention::keeping(1), false),
             &archive,
         )
         .await
@@ -605,7 +729,7 @@ mod tests {
             "0.3.0",
             "2026-07-30T00:00:00Z",
             "/srv/media",
-            Retention::keeping(1),
+            Taking::of(Retention::keeping(1), false),
             &archive,
         )
         .await

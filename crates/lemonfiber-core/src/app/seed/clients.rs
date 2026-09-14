@@ -131,6 +131,22 @@ pub(super) async fn seed_qbittorrent_password(
     // spent the first time. Checked against the client rather than assumed from
     // the recording, because a container rebuilt from nothing holds neither.
     if let Some(recorded) = super::super::targets::recorded_qbittorrent_password(ctx) {
+        // Signing in is how this question is answered, and signing in is a POST — state
+        // left on the client by a run that promised to leave none. So a rehearsal says
+        // what it could not tell rather than guessing: the recorded password is usually
+        // still the one in force, and on a container rebuilt from nothing it is not,
+        // and the difference is exactly what the sign-in exists to find out.
+        if ctx.dry_run {
+            return (
+                crate::seed::Wiring::settled(
+                    connection,
+                    crate::seed::State::Skipped {
+                        reason: UNTOLD_WITHOUT_SIGNING_IN.to_owned(),
+                    },
+                ),
+                None,
+            );
+        }
         if client.accepts(&recorded).await.is_ok() {
             return (
                 crate::seed::Wiring::settled(connection, crate::seed::State::AlreadyWired),
@@ -149,11 +165,27 @@ pub(super) async fn seed_qbittorrent_password(
         return (wiring, None);
     };
 
-    let (wiring, recorded) =
-        crate::seed::wire_qbittorrent_password(&client, ctx.random.as_ref(), &temporary).await;
+    let (wiring, recorded) = crate::seed::wire_qbittorrent_password(
+        &client,
+        ctx.random.as_ref(),
+        &temporary,
+        ctx.dry_run,
+    )
+    .await;
 
-    if let Some(password) = &recorded {
+    // A rehearsal generates nothing, so there is nothing here to record and the
+    // condition is already false. Said as a pair with the flag above rather than left
+    // to that, because a value arriving from anywhere else would be written down by a
+    // run that promised to write nothing.
+    if let Some(password) = recorded.as_ref().filter(|_| !ctx.dry_run) {
         record_qbittorrent_password(ctx, password);
     }
     (wiring, recorded)
 }
+
+/// What a rehearsal says about a torrent client whose recorded password it will not
+/// sign in to test.
+const UNTOLD_WITHOUT_SIGNING_IN: &str = "whether the password lemonfiber recorded is \
+     still the one in force is answered by signing in, which is a write and which a run \
+     that only says what it would do does not make; a real run mints and sets a new one \
+     where it is not";

@@ -31,6 +31,7 @@ pub(super) fn seed_report(wirings: Vec<Wiring>) -> SeedReport {
     SeedReport {
         wirings,
         assessment: SeedAssessment::Assessed,
+        rehearsed: false,
     }
 }
 
@@ -185,6 +186,7 @@ pub(super) fn a_watch() -> SupervisionReport {
         forms: vec!["media".to_owned()],
         reason: "the data location went away".to_owned(),
         stopped: true,
+        would: None,
     }
 }
 

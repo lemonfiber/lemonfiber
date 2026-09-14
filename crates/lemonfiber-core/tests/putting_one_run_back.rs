@@ -193,6 +193,82 @@ async fn one_run_goes_back_as_a_unit_and_the_others_stand() {
     );
 }
 
+/// A reversal reports what it put back and never the value it put back — on this road
+/// to `Outcome::Undo` as much as on the one `doctor --undo` takes.
+///
+/// The list is printed at a terminal and served at `/api/undo`, so a credential left in
+/// it is the record sealed and the door held open. The undo itself still carries the
+/// value, because that is what the reversal is carried out *with*.
+#[tokio::test]
+async fn a_reversal_reports_a_credential_without_reporting_its_value() {
+    let root = scratch("withheld");
+    env_holds(&root, "QBITTORRENT_PASSWORD=after\n");
+    journalled(
+        &root,
+        &[set(
+            "1000",
+            SEED,
+            "QBITTORRENT_PASSWORD",
+            Some("before"),
+            "after",
+        )],
+    );
+
+    let reversal = put_back(&root, "1000").await;
+    let said = format!("{reversal:?}");
+    let env = reading(&root);
+
+    assert!(
+        env.contains("QBITTORRENT_PASSWORD=before"),
+        "the value still went back: {env}"
+    );
+    assert!(
+        !said.contains("before") && !said.contains("after"),
+        "a value the reversal handled is on the report: {said}"
+    );
+}
+
+/// A rehearsal names the run it would put back, and the file it would have rewritten is
+/// the file it was.
+#[tokio::test]
+async fn a_rehearsed_reversal_names_what_would_go_back_and_touches_nothing() {
+    let root = scratch("rehearsed-run");
+    env_holds(&root, "ONE=new\n");
+    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    let recorded = std::fs::read_to_string(paths(&root).journal()).unwrap_or_default();
+
+    let reversal = dispatch(
+        Command::Undo {
+            run: Some("1000".to_owned()),
+        },
+        &ctx(&root).rehearsing(),
+    )
+    .await
+    .ok()
+    .and_then(|outcome| match outcome {
+        Outcome::Undo(reversal) => Some(reversal),
+        _ => None,
+    })
+    .unwrap_or_default();
+
+    assert!(reversal.rehearsed, "{reversal:?}");
+    assert_eq!(
+        reversal.reversed.len(),
+        1,
+        "a rehearsal that named nothing said nothing: {reversal:?}"
+    );
+    assert!(
+        reading(&root).contains("ONE=new"),
+        "a rehearsal put the value back: {}",
+        reading(&root)
+    );
+    assert_eq!(
+        std::fs::read_to_string(paths(&root).journal()).unwrap_or_default(),
+        recorded,
+        "a rehearsal recorded a reversal it did not make"
+    );
+}
+
 /// A stamp naming no run is refused, and says so rather than reporting nothing done.
 #[tokio::test]
 async fn a_stamp_naming_no_run_is_refused_explicitly() {
@@ -505,5 +581,94 @@ async fn a_stack_that_cannot_be_read_stops_the_reversal() {
     assert!(
         reading(&root).contains("ONE=new"),
         "and nothing was put back"
+    );
+}
+
+/// One field of a service's own record, as a run of changes left it.
+///
+/// The other kind of change entirely: a setting lives in a file anything can write, and
+/// this lives inside the service, where nothing on the host can reach it.
+fn configured(at: &str, operation: &str, target: &str) -> Change {
+    Change {
+        at: at.to_owned(),
+        operation: operation.to_owned(),
+        target: target.to_owned(),
+        kind: Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "7".to_owned(),
+            field: "tvCategory".to_owned(),
+            previous: Some("tv-sonarr".to_owned()),
+            current: "tv".to_owned(),
+        },
+    }
+}
+
+/// A rehearsal tells the two kinds of change apart and says which half it cannot
+/// promise.
+///
+/// The split is read off each change rather than found out by trying it. Finding out
+/// the other way would mean a rehearsal opening a client and setting a field in order
+/// to discover that it could — the write, made to describe itself. So what the operator
+/// is handed is a judgement with a caveat on exactly the part that has one: the setting
+/// goes back from here whatever the stack is doing, and the field inside the service
+/// goes back only where that service is answering when they run it for real. A
+/// rehearsal that promised both would be promising something it had not asked anybody
+/// about.
+#[tokio::test]
+async fn a_rehearsed_reversal_separates_what_needs_the_service_from_what_does_not() {
+    let root = scratch("rehearsed-split");
+    env_holds(&root, "ONE=new\n");
+    journalled(
+        &root,
+        &[
+            set("1000", SEED, "ONE", Some("old"), "new"),
+            configured("1000", SEED, "sonarr"),
+        ],
+    );
+    let recorded = std::fs::read_to_string(paths(&root).journal()).unwrap_or_default();
+
+    let reversal = dispatch(
+        Command::Undo {
+            run: Some("1000".to_owned()),
+        },
+        &ctx(&root).rehearsing(),
+    )
+    .await
+    .ok()
+    .and_then(|outcome| match outcome {
+        Outcome::Undo(reversal) => Some(reversal),
+        _ => None,
+    })
+    .unwrap_or_default();
+
+    assert!(reversal.rehearsed, "{reversal:?}");
+    assert_eq!(
+        reversal.reversed.len(),
+        1,
+        "the change that goes back from here was not named on its own: {reversal:?}"
+    );
+    assert_eq!(
+        reversal.left.first().map(|one| one.target.clone()),
+        Some("sonarr".to_owned()),
+        "the change that lives inside a service was promised anyway: {reversal:?}"
+    );
+    let why = reversal
+        .left
+        .first()
+        .map(|one| one.because.clone())
+        .unwrap_or_default();
+    assert!(
+        why.contains("through the service"),
+        "the caveat does not say what it depends on: {why}"
+    );
+    let env = reading(&root);
+    assert!(
+        env.contains("ONE=new"),
+        "a rehearsal put the setting back: {env}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(paths(&root).journal()).unwrap_or_default(),
+        recorded,
+        "a rehearsal recorded a reversal it did not make"
     );
 }

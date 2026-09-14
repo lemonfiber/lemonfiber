@@ -39,7 +39,7 @@ pub(super) async fn seed_aggregators(
 
     vec![crate::seed::Wiring::settled(
         CONNECTION.to_owned(),
-        told(&client, &aggregator).await,
+        told(&client, &aggregator, ctx.dry_run).await,
     )]
 }
 
@@ -70,7 +70,11 @@ async fn aggregator_to_pull_from(
 /// key it did not understand and answers success, so one already there is only already
 /// wired if it holds a key — otherwise it is the failure this exists to prevent,
 /// wearing the shape of a connection that was made.
-async fn told(client: &crate::bindery::Bindery, aggregator: &Aggregator) -> crate::seed::State {
+async fn told(
+    client: &crate::bindery::Bindery,
+    aggregator: &Aggregator,
+    rehearsing: bool,
+) -> crate::seed::State {
     let held = match client.aggregators().await {
         Ok(held) => held,
         Err(failure) => return unreached(&failure),
@@ -80,6 +84,14 @@ async fn told(client: &crate::bindery::Bindery, aggregator: &Aggregator) -> crat
         .any(|known| known.url == aggregator.url && known.keyed)
     {
         return crate::seed::State::AlreadyWired;
+    }
+    // Below the read and the already-there check, because both are true of a real run
+    // too: what a rehearsal leaves out is the registration, and nothing above it.
+    if rehearsing {
+        return crate::seed::State::WouldWire {
+            yours: None,
+            ours: Some(aggregator.url.clone()),
+        };
     }
     if let Err(failure) = client.add_aggregator(aggregator).await {
         return unreached(&failure);

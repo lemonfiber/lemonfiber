@@ -39,7 +39,39 @@ use identity::seed_jellyfin_identity;
 pub(super) use reset::reset_connections;
 
 /// Wire the stack's services to each other, idempotently, and report what was
-/// wired and what a re-run still owes.
+/// wired and what a re-run still owes — or, on a run that only says what it would do,
+/// report the same pass with every write left out.
+///
+/// **A rehearsal issues nothing but reads, and that is the rule rather than a summary
+/// of one.** It is stricter than "registers no connection", because several of the
+/// things this pass would call reading are `POST`s: a sign-in opens a session on
+/// somebody else's service, a torrent client answers a password test the same way, and
+/// two of the keys published at the end are read by being minted. Each is state left
+/// behind by a run that promised to leave none, so none of them is made.
+///
+/// Four things the rule costs, each reported as something this pass could not tell
+/// rather than told wrong:
+///
+/// - whether the torrent password lemonfiber recorded is still the one in force, which
+///   is answered by signing in;
+/// - what the household is told, and which \*arrs the request service hands a request
+///   to — both read as the owner, and the owner's session is a sign-in;
+/// - whether a drifted download client still reaches anything, which the \*arr answers
+///   only by being asked to test it. The drift is reported; what is left out is the
+///   claim that it broke something.
+///
+/// And the keys the stack's own services read are named rather than gathered: the media
+/// server mints its key when it is asked for one, and the listening server has no
+/// account at all until this pass makes one. A question that gathered them would have
+/// created the very things it promised only to describe.
+///
+/// Everything else is the same walk — the same reads, the same three-way comparison,
+/// the same words — with the registering and the minting not done.
+///
+/// The gate is held at each write rather than above the pass, because the pass is where
+/// the report comes from: a rehearsal that stopped at the door would have nothing to
+/// say, and one that surveyed separately would be a second opinion about what
+/// lemonfiber intends — and the one nobody runs is the one that goes wrong.
 ///
 /// One connection is unlike the rest: qBittorrent's web UI password, the
 /// credential lemonfiber mints rather than reads — its temporary password is
@@ -190,7 +222,15 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // unless the record was lost and this is not an adopt pass, in which case the
     // lost record is left as it is rather than silently replaced, and re-baselining is
     // left to the deliberate `adopt`.
-    if !lost || adopt {
+    //
+    // And unless this run only said what it would do. The baseline is the only memory
+    // of what lemonfiber wrote, so a rehearsal that saved one would have the next real
+    // run compare against a record of connections nobody made — which is the drift
+    // question answered wrong in the one direction that silently overwrites an
+    // operator's own value. The whole pass records into `baseline` in memory either
+    // way, because that is what the comparison is made from; this is the line that
+    // makes the difference between a question and an answer.
+    if (!lost || adopt) && !ctx.dry_run {
         save_baseline(ctx, &baseline);
     }
 
@@ -202,6 +242,7 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     Ok(crate::seed::Report {
         wirings,
         assessment,
+        rehearsed: ctx.dry_run,
     })
 }
 
@@ -557,6 +598,11 @@ mod tests {
         matches!(wiring.state, crate::seed::State::Failed { .. })
     }
 
+    /// Whether a wiring is one a real pass would make, on one line for the same reason.
+    fn is_would_wire(wiring: &crate::seed::Wiring) -> bool {
+        matches!(wiring.state, crate::seed::State::WouldWire { .. })
+    }
+
     /// A context whose engine says the given qBittorrent log line, answering
     /// seeding's HTTP from `replies` and its randomness from `bytes`.
     fn seed_ctx(
@@ -647,6 +693,56 @@ mod tests {
 
         let written = std::fs::read_to_string(&env).unwrap_or_default();
         assert!(written.contains("QBITTORRENT_PASSWORD="));
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// The whole claim, over a whole pass: the same walk against the same log and the
+    /// same services, with nothing set, nothing recorded and nothing kept for the next
+    /// run to compare against.
+    ///
+    /// The counterpart above is the same context without `rehearsing`, and it asserts
+    /// the password *is* recorded — so these two together say the difference is the
+    /// flag rather than a fixture that could not have written anyway.
+    #[tokio::test]
+    async fn a_rehearsed_seed_names_what_it_would_do_and_records_none_of_it() {
+        let env = config_scratch("seed-rehearsed");
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+        let ctx = seed_ctx(
+            Some(TEMP_LOG),
+            true,
+            exchange(),
+            Some(vec![0x11; 24]),
+            Some(env.clone()),
+        )
+        .rehearsing();
+
+        let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+
+        assert!(report.rehearsed, "{report:?}");
+        assert!(
+            report.wirings.iter().any(is_would_wire),
+            "a rehearsal that named nothing it would do said nothing: {report:?}"
+        );
+        assert!(
+            !report
+                .wirings
+                .iter()
+                .any(|wiring| wiring.state == crate::seed::State::Wired),
+            "something was wired: {report:?}"
+        );
+
+        let written = std::fs::read_to_string(&env).unwrap_or_default();
+        assert!(
+            !written.contains("QBITTORRENT_PASSWORD="),
+            "a password was recorded: {written}"
+        );
+        assert!(
+            !env.with_file_name("baseline.json").exists(),
+            "the record a later run compares against was written by a question"
+        );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
@@ -1477,6 +1573,55 @@ mod tests {
         );
     }
 
+    /// A rehearsal will not sign in to find out whether the recorded password is still
+    /// the one in force, and says that rather than guessing either way.
+    ///
+    /// Signing in is how that question is answered and signing in is a `POST` — a
+    /// session left on somebody else's service by a run that promised to leave nothing.
+    /// The recorded password usually *is* still the one in force, and on a container
+    /// rebuilt from nothing it is not; the difference is exactly what the sign-in exists
+    /// to find out, so neither answer can honestly be reported without asking. The
+    /// client is scripted to accept everything on purpose, so a run that reached for it
+    /// would come back `AlreadyWired` and this would catch it.
+    #[tokio::test]
+    async fn a_rehearsed_pass_will_not_sign_in_to_test_the_password_it_recorded() {
+        let path = config_scratch("qbt-rehearsed");
+        let _ = store::set(
+            &path,
+            crate::config::QBITTORRENT_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let http = Fake::always(Answer::reply(200, "Ok."));
+        let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), None, Some(path))
+            .with_http(http.clone())
+            .rehearsing();
+
+        let (wiring, recorded) = super::seed_qbittorrent_password(
+            &ctx,
+            &("qbittorrent".to_owned(), "http://127.0.0.1:8081".to_owned()),
+        )
+        .await;
+
+        // Nothing this call answered with is put in an assertion message. The pair
+        // carries a minted password in its second half, and a failing assertion
+        // prints its message into the run's log — so each check below says what went
+        // wrong rather than showing what came back.
+        assert!(
+            is_skipped(&wiring),
+            "a rehearsal answered the question only a sign-in can answer"
+        );
+        assert!(
+            format!("{wiring:?}").contains("signing in"),
+            "the operator was not told why this run could not tell"
+        );
+        assert!(recorded.is_none(), "a rehearsal minted a password");
+        let asked = http.requests();
+        assert!(
+            asked.is_empty(),
+            "a rehearsal opened a session on the torrent client: {asked:?}"
+        );
+    }
+
     #[tokio::test]
     async fn a_later_seed_offers_qbittorrent_from_its_recorded_password() {
         // The temporary password is gone, so nothing is minted this run; the
@@ -2025,6 +2170,41 @@ mod tests {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// A rehearsal of a stack whose services have written no key names nothing, in the
+    /// same words a real run uses for it.
+    ///
+    /// The names are the whole of what this connection would do, and where there are
+    /// none the honest answer is the one a real pass gives: the services write their
+    /// keys on first start and this stack has not got that far. Reporting a connection
+    /// that would be made would have an operator waiting for settings no later run is
+    /// going to fill in either.
+    #[tokio::test]
+    async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
+        let env = config_scratch("publish-rehearsed");
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
+            .rehearsing();
+
+        let wiring = super::published::publish_keys(
+            &ctx,
+            &[arr("sonarr", 8989, "tv")],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            None,
+        )
+        .await;
+
+        assert!(is_skipped(&wiring), "{wiring:?}");
+        let said = format!("{wiring:?}");
+        assert!(
+            said.contains("a later run completes it"),
+            "a stack still starting was reported as one with nothing coming: {said}"
+        );
+        assert!(
+            !env.exists(),
+            "a run that had nothing to publish wrote a settings file anyway"
+        );
+    }
+
     /// The book \*arr, as a manifest service whose key lemonfiber mints for it.
     fn bindery_svc() -> lemonfiber_manifest::Service {
         manifest_service(
@@ -2244,6 +2424,48 @@ mod tests {
         assert!(
             matches!(state, Some(&crate::seed::State::Failed { .. })),
             "a refused registration was not reported: {wirings:?}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A rehearsal names the aggregator the book \*arr would be told to pull from, and
+    /// tells it nothing.
+    ///
+    /// The read and the already-there check are true of a real run too, so what a
+    /// rehearsal leaves out is the registration and nothing above it — which is why the
+    /// address is there to report: the book \*arr pulls from whatever it is pointed at,
+    /// and an operator checking this is checking that it would be pointed at the
+    /// aggregator on the stack's own network rather than at a host address no container
+    /// can reach.
+    #[tokio::test]
+    async fn a_rehearsed_pass_names_the_aggregator_it_would_register_and_registers_none() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("bindery-rehearsed");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .rehearsing();
+
+        let wirings = super::aggregators::seed_aggregators(
+            &ctx,
+            &[prowlarr(), bindery_svc()],
+            Some(stack_root()),
+        )
+        .await;
+
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::WouldWire {
+                yours: None,
+                ours: Some("http://prowlarr:9696".to_owned()),
+            }),
+            "{wirings:?}"
+        );
+        assert!(
+            http.requests().iter().all(|asked| asked.body.is_none()),
+            "a rehearsal registered the aggregator it was only asked about"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
@@ -2471,6 +2693,65 @@ mod tests {
         assert!(
             signed_in.is_some_and(|opened| registered.is_some_and(|told| opened < told)),
             "signed in at {signed_in:?}, registered at {registered:?}: the session has to come first"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// A rehearsal reads the request service as nobody, and so opens no session.
+    ///
+    /// Every call this step makes is an authenticated one, and the only thing that
+    /// opens a session is a sign-in — which is a `POST` that leaves state on somebody
+    /// else's service. So the client a rehearsal takes is deliberately unsigned, the
+    /// reads that follow come back unauthorised, and each wanted \*arr says it could not
+    /// be told rather than naming a credential fault nobody has. Asserted on the traffic
+    /// rather than on the report, because a report that reads right while the sign-in
+    /// still goes out is the failure this flag exists to prevent.
+    #[tokio::test]
+    async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_session() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("targets-rehearsed");
+        let http = Fake::by_path(vec![
+            (
+                "/qualityprofile",
+                Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#),
+            ),
+            (
+                "/rootfolder",
+                Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#),
+            ),
+            ("/auth/jellyfin", Answer::reply(200, "")),
+            ("/settings", Answer::reply(200, "[]")),
+        ]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http.clone())
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+            .rehearsing();
+
+        let wirings = super::seed_fulfilment_targets(
+            &ctx,
+            &[arr("sonarr", 8989, "tv"), seerr_svc()],
+            Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        )
+        .await;
+
+        assert_eq!(
+            wirings.first().map(|wiring| &wiring.state),
+            Some(&crate::seed::State::WouldWire {
+                yours: None,
+                ours: Some("sonarr:8989".to_owned()),
+            }),
+            "{wirings:?}"
+        );
+        let asked = http.requests();
+        assert!(
+            !asked
+                .iter()
+                .any(|request| request.url.contains("/auth/jellyfin")),
+            "a rehearsal signed in to the request service: {asked:?}"
+        );
+        assert!(
+            asked.iter().all(|request| request.method == Method::Get),
+            "a rehearsal wrote to a service: {asked:?}"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
@@ -3203,6 +3484,56 @@ mod tests {
                 .iter()
                 .all(|wiring| matches!(wiring.state, crate::seed::State::Failed { .. })),
             "{wirings:?}"
+        );
+    }
+
+    /// What the finder holds: pointed at one \*arr somewhere else, and not watching the
+    /// other at all.
+    const WATCHING_ELSEWHERE: &str = r#"{
+        "general": { "use_sonarr": true, "use_radarr": false },
+        "sonarr": { "ip": "somewhere-else", "port": 1234, "apikey": "set" }
+    }"#;
+
+    /// A rehearsal says where the finder is looking now and where it would be pointed,
+    /// and points it nowhere.
+    ///
+    /// Two \*arrs, because what the finder holds is not one shape. One it is already
+    /// watching at the wrong address with a key, and the other it is not watching at
+    /// all — and the difference matters to the operator reading this: the first is a
+    /// setting of theirs about to be replaced, the second is a connection that has
+    /// never existed. The key is named too, because a finder pointed at the right
+    /// \*arr with no key is exactly the case this connection exists to fix, and two
+    /// addresses on their own would read as a change to nothing.
+    #[tokio::test]
+    async fn a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere() {
+        let http = Fake::by_path(vec![(
+            "/api/system/settings",
+            Answer::reply(200, WATCHING_ELSEWHERE),
+        )]);
+        let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG)).rehearsing();
+
+        let wirings =
+            super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+
+        let states: Vec<crate::seed::State> =
+            wirings.iter().map(|wiring| wiring.state.clone()).collect();
+        assert_eq!(
+            states,
+            vec![
+                crate::seed::State::WouldWire {
+                    yours: Some("somewhere-else:1234".to_owned()),
+                    ours: Some("sonarr:8989, with lemonfiber's key".to_owned()),
+                },
+                crate::seed::State::WouldWire {
+                    yours: None,
+                    ours: Some("radarr:7878, with lemonfiber's key".to_owned()),
+                },
+            ],
+            "{wirings:?}"
+        );
+        assert!(
+            http.requests().iter().all(|asked| asked.body.is_none()),
+            "a rehearsal pointed the finder at something"
         );
     }
 }

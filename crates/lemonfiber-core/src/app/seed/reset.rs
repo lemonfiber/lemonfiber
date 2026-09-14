@@ -81,6 +81,9 @@ pub(super) async fn reset_arr_connections(
                 records,
                 adopt: false,
                 reset: true,
+                // A reset is never a rehearsal: an unconfirmed one previews through
+                // `preview_reverts` above and never reaches the writing pass at all.
+                rehearsing: false,
             },
             at,
         )

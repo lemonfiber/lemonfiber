@@ -137,7 +137,8 @@ pub(super) async fn seed_fulfilment_targets(
     // it comes back as a refusal about a credential.
     let seerr = super::super::targets::seerr_as_owner(ctx, base).await;
     let mut journal = crate::journal::Journal::new();
-    crate::seed::wire_fulfilment_targets(&seerr, &wanted, &mut journal, &ctx.stamp()).await
+    crate::seed::wire_fulfilment_targets(&seerr, &wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
+        .await
 }
 
 #[cfg(test)]

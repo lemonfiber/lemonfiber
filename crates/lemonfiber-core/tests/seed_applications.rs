@@ -99,7 +99,7 @@ fn app(base_url: &str) -> Application {
 /// and the number of changes journalled.
 async fn seed_applications(prowlarr: FakeProwlarr, wanted: &[Application]) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_applications(&prowlarr, "prowlarr", wanted, &mut journal, "t").await;
+    let wirings = wire_applications(&prowlarr, "prowlarr", wanted, &mut journal, "t", false).await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }
@@ -233,4 +233,43 @@ async fn a_prowlarr_that_stops_answering_after_the_write_is_skipped() {
         "{states:?}"
     );
     assert_eq!(recorded, 0, "an unconfirmed write is not recorded as done");
+}
+
+/// Run the same driver as a rehearsal: the same pass over the same Prowlarr, with the
+/// registering left out. The journal is handed back for the half that matters most —
+/// a rehearsal that recorded a change would leave the next `undo` offering to reverse
+/// something nobody made.
+async fn would_register(prowlarr: &FakeProwlarr, wanted: &[Application]) -> (Vec<State>, usize) {
+    let mut journal = Journal::new();
+    let wirings = wire_applications(prowlarr, "prowlarr", wanted, &mut journal, "t", true).await;
+    (
+        wirings.into_iter().map(|wiring| wiring.state).collect(),
+        journal.changes().len(),
+    )
+}
+
+/// A rehearsal names the address it would register the \*arr at, and registers none.
+///
+/// The address is what identity is decided by here, so it is also the whole of what an
+/// operator can check: a report saying only that an application would be added leaves
+/// them unable to tell a correct pass from one about to point Prowlarr at a container
+/// that is not there. Read back off Prowlarr afterwards rather than believed from the
+/// state, because reporting `WouldWire` while still writing would look right in the
+/// first assertion and be the defect this flag exists to prevent.
+#[tokio::test]
+async fn a_rehearsed_pass_names_the_address_it_would_register_and_registers_none() {
+    let prowlarr = FakeProwlarr::with(Mode::Normal, Vec::new());
+
+    let (states, recorded) = would_register(&prowlarr, &[app("http://sonarr:8989")]).await;
+
+    assert_eq!(
+        states,
+        vec![State::WouldWire {
+            yours: None,
+            ours: Some("http://sonarr:8989".to_owned()),
+        }]
+    );
+    assert_eq!(recorded, 0, "a rehearsal journalled a change nobody made");
+    let held = prowlarr.applications().await.unwrap_or_default();
+    assert!(held.is_empty(), "the application was registered: {held:?}");
 }

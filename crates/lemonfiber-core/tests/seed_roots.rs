@@ -11,6 +11,46 @@ use std::collections::BTreeMap;
 use lemonfiber_core::ports::service::RegisteredFolder;
 use lemonfiber_core::seed::{contested_roots, State};
 
+/// A rehearsal names the folder it would register, registers none, and leaves the
+/// service holding exactly what it held.
+///
+/// The second half is what the first cannot prove on its own: a pass reporting the
+/// right words while the write went through is the failure the whole flag exists to
+/// prevent, and the fake keeps what it was handed so the question can be asked of the
+/// service rather than of the report.
+#[tokio::test]
+async fn a_rehearsed_pass_names_the_folder_it_would_register_and_registers_none() {
+    let service = FakeService::with(Mode::Normal, Vec::new());
+    let states = would_wire(&service, &[folder("/data/media/tv")]).await;
+
+    assert_eq!(
+        states,
+        vec![State::WouldWire {
+            yours: None,
+            ours: Some("/data/media/tv".to_owned()),
+        }]
+    );
+    assert!(
+        service.registered().is_empty(),
+        "the folder was registered anyway"
+    );
+}
+
+/// And the refusals still refuse. They are facts about the stack rather than
+/// consequences of writing to it, so a rehearsal meets them where a real run does —
+/// otherwise it would report a folder as one a real run would make when a real run
+/// would turn it down.
+#[tokio::test]
+async fn a_rehearsed_pass_refuses_a_folder_a_real_pass_would_refuse() {
+    let service = FakeService::with(Mode::Normal, Vec::new());
+    let states = would_wire(&service, &[folder("/elsewhere/tv")]).await;
+
+    assert!(
+        matches!(states.as_slice(), [State::Refused { .. }]),
+        "{states:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_write_that_landed_before_an_interruption_is_not_duplicated_on_the_next_run() {
     // The load-bearing interruption: the write reached the service, but the run died

@@ -2232,6 +2232,7 @@ mod tests {
             sensitive: false,
             pruned: Vec::new(),
             pace: lemonfiber_core::backup::Pace::of(1_024),
+            rehearsed: false,
         }
     }
 
@@ -3133,6 +3134,7 @@ mod tests {
             contents: Contents::default(),
             bytes: 4096,
             path: None,
+            would_go: None,
         }
     }
 
@@ -3559,6 +3561,7 @@ mod tests {
             forms: vec!["full".to_owned()],
             reason: "the data location is no longer present".to_owned(),
             stopped: true,
+            would: None,
         })));
         let ending = showing(&ended);
         assert!(ending.contains("no longer present"), "{ending}");

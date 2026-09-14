@@ -46,6 +46,42 @@ pub enum State {
     /// drift, so an existing setup is taken on instead of flagged wholesale. Its
     /// value is not shown, so a secret among the adopted is never put on display.
     Unmanaged,
+    /// Not there, or not at what lemonfiber would have it be, and this run only said
+    /// so.
+    ///
+    /// The one outcome a pass that writes nothing can reach where a pass that writes
+    /// would have written. What a real run would leave the service holding sits beside
+    /// what it holds now, because a report saying a connection would be made without
+    /// saying what it would be made *to* is a count rather than an account — and a
+    /// count is what an operator asking for a rehearsal already has.
+    ///
+    /// Both values are serialized, so a secret-bearing field must not report through
+    /// this variant carrying one. It does not have to: `ours` is absent exactly where
+    /// a real run would generate the value rather than read it, which is the only
+    /// place a credential arises — the torrent client's web UI password and the media
+    /// server's admin account. A value minted to describe a rehearsal is a secret that
+    /// exists because somebody asked a question, and it would then have to be kept or
+    /// thrown away.
+    ///
+    /// `yours` is absent where the service holds nothing, and where this run could not
+    /// ask without writing — reading the household's telling means signing in as the
+    /// owner, and a session is state on somebody else's service.
+    WouldWire {
+        /// What the service holds now, or `None` where it holds nothing or could not
+        /// be asked.
+        yours: Option<String>,
+        /// What a real run would leave it holding, or `None` where that value would be
+        /// generated rather than read.
+        ours: Option<String>,
+    },
+    /// An operator's own value a real run would take on as the accepted state, and
+    /// this one did not.
+    ///
+    /// Apart from [`Self::WouldWire`] because it is the other direction: nothing would
+    /// be written to the service at all, and what would move is lemonfiber's record of
+    /// what it expects. Its value is not shown, exactly as [`Self::Unmanaged`] does not
+    /// show one, so a secret among the adopted is never put on display by a question.
+    WouldAdopt,
     /// Prerequisite unavailable; a later run will complete it.
     Skipped {
         /// Why it could not be attempted.
@@ -73,6 +109,11 @@ impl State {
     /// is theirs to keep, or lemonfiber's own value that is merely behind its newer
     /// intent. A skip, a failure, a refusal or a conflict is
     /// not settled: a re-run or an operator's decision must return to it.
+    ///
+    /// Neither of the two a rehearsal reports is settled, and that is the whole of what
+    /// a rehearsal's last line says: these are the connections a real run would still
+    /// have to make. A pass that only said what it would do settled nothing by saying
+    /// it.
     #[must_use]
     pub const fn is_settled(&self) -> bool {
         matches!(
@@ -177,6 +218,14 @@ pub struct Report {
     pub wirings: Vec<Wiring>,
     /// Whether drift could be assessed, or the expected-state record was lost.
     pub assessment: Assessment,
+    /// Whether this pass only said what it would do.
+    ///
+    /// A flag rather than a second shape, because every connection above means the
+    /// same thing either way: what the service holds is what it holds, and what
+    /// lemonfiber would write is what it would write. What changes is that two of the
+    /// states are reachable only here, and that the last line of the report is an
+    /// instruction to run it for real rather than to run it again.
+    pub rehearsed: bool,
 }
 
 impl Report {
@@ -248,6 +297,33 @@ pub(super) fn unreached(failure: &Failure) -> State {
     }
 }
 
+/// What a read that would have needed a session comes to on a pass that opens none.
+///
+/// A rehearsal signs in to nothing: a session is state left on somebody else's service,
+/// and the rule a rehearsed seed keeps is that it issues nothing but reads. So an
+/// unauthorised answer to one of the reads made as the owner is this run declining to
+/// open a session, not the service refusing a credential — and reporting the second
+/// would put a fault in front of an operator that nobody has.
+///
+/// What it reports instead is that it could not tell. Naming what a real run would
+/// write here would be a guess: what the service already holds is exactly what the
+/// session would have shown, and a rehearsal that guesses at the half it could not see
+/// has done its one job wrong. Every other failure is the failure it is, in both
+/// tenses.
+pub(super) fn unread(failure: &Failure, rehearsing: bool) -> State {
+    if rehearsing && matches!(failure, Failure::Unauthorised { .. }) {
+        return State::Skipped {
+            reason: WITHOUT_A_SESSION.to_owned(),
+        };
+    }
+    unreached(failure)
+}
+
+/// Why a rehearsal has nothing to say about a connection it reads as the owner.
+const WITHOUT_A_SESSION: &str = "reading this needs a session with the service, and \
+     opening one is a write that a run only saying what it would do does not make; a \
+     real run signs in and reports what it found";
+
 /// A service's existing resources, observed once — or, where it could not be
 /// reached, every wanted connection as the state that unreachability leaves it in.
 /// Each driver opens the same way; this is that opening, so the three do not each
@@ -260,6 +336,27 @@ pub(super) fn observe_or_skip<T, W>(
 ) -> Result<Vec<T>, Vec<Wiring>> {
     observed.map_err(|failure| {
         let state = unreached(&failure);
+        wanted
+            .iter()
+            .map(|want| Wiring::settled(describe(want), state.clone()))
+            .collect()
+    })
+}
+
+/// [`observe_or_skip`] for a read made as the owner, which a pass that opens no session
+/// cannot make.
+///
+/// The same opening, with the unauthorised answer read through [`unread`] rather than
+/// [`unreached`] — so a rehearsal says it could not be told instead of naming a
+/// credential fault the operator would go looking for and not find.
+pub(super) fn observe_or_untold<T, W>(
+    observed: Result<Vec<T>, Failure>,
+    wanted: &[W],
+    describe: impl Fn(&W) -> String,
+    rehearsing: bool,
+) -> Result<Vec<T>, Vec<Wiring>> {
+    observed.map_err(|failure| {
+        let state = unread(&failure, rehearsing);
         wanted
             .iter()
             .map(|want| Wiring::settled(describe(want), state.clone()))

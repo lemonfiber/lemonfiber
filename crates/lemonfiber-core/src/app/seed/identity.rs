@@ -33,10 +33,15 @@ pub(super) async fn seed_jellyfin_identity(
         ctx.random.as_ref(),
         recorded.as_deref(),
         &jellyfin.network_url,
+        ctx.dry_run,
     )
     .await;
 
-    if let Some(password) = &minted {
+    // A rehearsal mints nothing, so there is nothing here to record — the condition is
+    // already false. Written as a pair with the sign-in below rather than left to that
+    // coincidence, because a value that arrived from anywhere else would be recorded by
+    // a run that promised to write nothing.
+    if let Some(password) = minted.as_ref().filter(|_| !ctx.dry_run) {
         record_jellyfin_password(ctx, password);
     }
 
@@ -51,7 +56,17 @@ pub(super) async fn seed_jellyfin_identity(
     // without finishing anybody's setup. A failure is left to the telling to report:
     // it is about to say the same thing in its own words, and saying it twice would
     // be two failures where the operator has one problem.
-    if let Some(password) = minted.as_deref().or(recorded.as_deref()) {
+    //
+    // And not on a run that only says what it would do. A sign-in is a POST that opens
+    // a session on somebody else's service: state left behind by a run that promised to
+    // leave none, and the rule this pass keeps is that it issues nothing but reads. The
+    // telling is then read without one and answers unauthorised, which it reports as
+    // what a real run would set rather than as the service refusing a credential.
+    if let Some(password) = minted
+        .as_deref()
+        .or(recorded.as_deref())
+        .filter(|_| !ctx.dry_run)
+    {
         let _ = crate::ports::service::Requests::sign_in(
             &seerr_client,
             crate::config::JELLYFIN_ADMIN_USER,
@@ -63,6 +78,7 @@ pub(super) async fn seed_jellyfin_identity(
     let (told, held) = crate::seed::wire_household_telling(
         &seerr_client,
         expected.entry(SEERR, crate::seed::TELLING),
+        ctx.dry_run,
     )
     .await;
     remember(&mut records, &told.state, held, &ctx.stamp());

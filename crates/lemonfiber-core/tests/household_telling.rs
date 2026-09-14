@@ -127,7 +127,7 @@ async fn a_service_nobody_configured_is_set_up_to_tell_the_household() {
     )]);
     let seerr = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
 
-    let (wiring, _) = lemonfiber_core::seed::wire_household_telling(&seerr, None).await;
+    let (wiring, _) = lemonfiber_core::seed::wire_household_telling(&seerr, None, false).await;
 
     assert_eq!(
         wiring.state,

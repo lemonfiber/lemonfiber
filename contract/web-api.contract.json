@@ -394,15 +394,19 @@
               "$ref": "#/$defs/Pace"
             },
             "path": {
-              "description": "Where the archive was written.",
+              "description": "Where the archive was written, or — on a run that only said what it would\ncapture — where it would have gone.",
               "type": "string"
             },
             "pruned": {
-              "description": "The older backups retention pruned, oldest first.",
+              "description": "The older backups retention pruned, oldest first — or would prune.",
               "type": "array",
               "items": {
                 "type": "string"
               }
+            },
+            "rehearsed": {
+              "description": "Whether this run only said what it would capture.\n\nA flag rather than a second shape, because every other field means the same\nthing either way: a capture is settled before it is written — the room is\nmeasured, the manifest described, the name and the path derived, and retention\nworked out — so what a rehearsal reports is what a real run would report, with\nthe one write left out. What changes is the tense a surface says it in.",
+              "type": "boolean"
             },
             "scope": {
               "description": "What the backup covers.",
@@ -418,7 +422,8 @@
             "scope",
             "sensitive",
             "pruned",
-            "pace"
+            "pace",
+            "rehearsed"
           ]
         },
         "Pace": {
@@ -1470,6 +1475,13 @@
             },
             "path": {
               "description": "Where it was written, or nothing where a run that writes nothing described it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "would_go": {
+              "description": "Where it would be written, on the run that only describes one.\n\nThe other half of what a description is for. What goes in the file and how\nlarge it is answer *whether* to make it; where it lands answers *where to find\nit*, and an operator deciding at a shell needs both at the one moment the\nanswer can still change what they do. Resolved by the same function the run\nthat writes resolves it with, so the path shown and the path written are one.\n\nAbsent on a run that wrote one — `path` is then where it went — and absent on a\nmachine that would not say where lemonfiber keeps its own files, which is the\none destination of the three that needs that answer.",
               "type": [
                 "string",
                 "null"
@@ -2810,6 +2822,37 @@
               "required": [
                 "settled",
                 "detail"
+              ]
+            },
+            {
+              "description": "Nothing was attempted, because this run only said what a rotation would do.\n\nIts own outcome rather than one of the refusals above, because it is not a\nrefusal: nothing went wrong, and what an operator is being told is what would\nhappen if they ran it again meaning it. Carrying its own three fields rather\nthan one sentence, because \"it would rotate the qBittorrent password\" is not a\nreport — where the value lives is what would be written over, and what is owed\nafterwards is the half nobody finds out about until a consumer stops working.\n\nNo value appears here and none is generated to put here. A replacement minted\nto describe a rotation is a secret that exists because somebody asked a\nquestion, and it would then have to be kept or thrown away — and one thrown\naway may be one the service has already taken.",
+              "type": "object",
+              "properties": {
+                "afterwards": {
+                  "description": "What would still need doing before every consumer held the replacement.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "detail": {
+                  "description": "What a real run would do, step by step, in lemonfiber's own words.",
+                  "type": "string"
+                },
+                "location": {
+                  "description": "Where the value that would be replaced is kept.",
+                  "type": "string"
+                },
+                "settled": {
+                  "type": "string",
+                  "const": "rehearsed"
+                }
+              },
+              "required": [
+                "settled",
+                "detail",
+                "location",
+                "afterwards"
               ]
             },
             {
@@ -9775,6 +9818,10 @@
               "description": "Whether drift could be assessed, or the expected-state record was lost.",
               "$ref": "#/$defs/Assessment"
             },
+            "rehearsed": {
+              "description": "Whether this pass only said what it would do.\n\nA flag rather than a second shape, because every connection above means the\nsame thing either way: what the service holds is what it holds, and what\nlemonfiber would write is what it would write. What changes is that two of the\nstates are reachable only here, and that the last line of the report is an\ninstruction to run it for real rather than to run it again.",
+              "type": "boolean"
+            },
             "wirings": {
               "description": "Every connection attempted, and how each turned out.",
               "type": "array",
@@ -9785,7 +9832,8 @@
           },
           "required": [
             "wirings",
-            "assessment"
+            "assessment",
+            "rehearsed"
           ]
         },
         "SeedSeverity": {
@@ -9929,6 +9977,46 @@
                 "state": {
                   "type": "string",
                   "const": "unmanaged"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "Not there, or not at what lemonfiber would have it be, and this run only said\nso.\n\nThe one outcome a pass that writes nothing can reach where a pass that writes\nwould have written. What a real run would leave the service holding sits beside\nwhat it holds now, because a report saying a connection would be made without\nsaying what it would be made *to* is a count rather than an account — and a\ncount is what an operator asking for a rehearsal already has.\n\nBoth values are serialized, so a secret-bearing field must not report through\nthis variant carrying one. It does not have to: `ours` is absent exactly where\na real run would generate the value rather than read it, which is the only\nplace a credential arises — the torrent client's web UI password and the media\nserver's admin account. A value minted to describe a rehearsal is a secret that\nexists because somebody asked a question, and it would then have to be kept or\nthrown away.\n\n`yours` is absent where the service holds nothing, and where this run could not\nask without writing — reading the household's telling means signing in as the\nowner, and a session is state on somebody else's service.",
+              "type": "object",
+              "properties": {
+                "ours": {
+                  "description": "What a real run would leave it holding, or `None` where that value would be\ngenerated rather than read.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "const": "would-wire"
+                },
+                "yours": {
+                  "description": "What the service holds now, or `None` where it holds nothing or could not\nbe asked.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "description": "An operator's own value a real run would take on as the accepted state, and\nthis one did not.\n\nApart from [`Self::WouldWire`] because it is the other direction: nothing would\nbe written to the service at all, and what would move is lemonfiber's record of\nwhat it expects. Its value is not shown, exactly as [`Self::Unmanaged`] does not\nshow one, so a secret among the adopted is never put on display by a question.",
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "const": "would-adopt"
                 }
               },
               "required": [
@@ -12468,14 +12556,18 @@
           "type": "object",
           "properties": {
             "left": {
-              "description": "What was not put back, each with the reason it was not.\n\nA reversal an operator asked for by name has to say what it did *not* do. Five\nchanges asked back and three carried out is a machine in a state nobody has been\ntold about, and \"some of it worked\" is the sentence that makes somebody go\nlooking by hand. Empty where everything went back, which is the common case.",
+              "description": "What was not put back, each with the reason it was not.\n\nA reversal an operator asked for by name has to say what it did *not* do. Five\nchanges asked back and three carried out is a machine in a state nobody has been\ntold about, and \"some of it worked\" is the sentence that makes somebody go\nlooking by hand. Empty where everything went back, which is the common case.\n\nOn a run that only said what it would do, this is what it cannot promise: a\nchange that goes back through the service that made it goes back only where that\nservice is answering, and a rehearsal has not asked one.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/UndoLeft"
               }
             },
+            "rehearsed": {
+              "description": "Whether this run only said what it would put back.\n\nA flag rather than a second shape, because the two lists mean the same thing\neither way and a caller reading them should read one document. What changes is\nthe tense a surface says them in.",
+              "type": "boolean"
+            },
             "reversed": {
-              "description": "What was put back, in the order it was.",
+              "description": "What was put back, in the order it was — or, on a run that only said what it\nwould do, what would go back.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/Undo"
@@ -12484,7 +12576,8 @@
           },
           "required": [
             "reversed",
-            "left"
+            "left",
+            "rehearsed"
           ]
         }
       }
@@ -14411,18 +14504,57 @@
               }
             },
             "reason": {
-              "description": "Why the watch ended: the data root vanished, or a different volume took\nits place.",
+              "description": "Why the watch ended: the data root vanished, or a different volume took\nits place — or, on a run that only said what a watch would do, that nothing\nwas watched at all.",
               "type": "string"
             },
             "stopped": {
               "description": "Whether stopping the services succeeded.",
               "type": "boolean"
+            },
+            "would": {
+              "description": "The watch this run would have kept, where it only said what it would do.\n\nA guard is the one command with no ending of its own, so a rehearsal of it\ncannot be the command with its last step left out — it would hold until the\ndrive was pulled. What it answers with is this instead, and the fields above\nthen describe a watch that never began: nothing ended, and nothing was\nstopped. Absent on every watch that actually ran.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Vigil"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
             "forms",
             "reason",
             "stopped"
+          ]
+        },
+        "Vigil": {
+          "description": "The watch a run would keep, and what it would do at the end of it.",
+          "type": "object",
+          "properties": {
+            "command": {
+              "description": "The invocation it would run the moment that location went, word for word.\n\nBuilt by the same path a real watch stops the services through, rather than\ndescribed beside it: an argv reported from a second reckoning is one nobody\nruns, and the one nobody runs is the one that stops being right.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "every": {
+              "description": "How often it would look, in seconds.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "root": {
+              "description": "The data location it would hold.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "root",
+            "every",
+            "command"
           ]
         }
       }
