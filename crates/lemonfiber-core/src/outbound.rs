@@ -28,7 +28,6 @@ use crate::config::Settings;
 use lemonfiber_manifest::Service;
 
 pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RELEASE_LIST};
-pub use theirs::ELSEWHERE;
 
 /// One of the requests lemonfiber makes on its own account.
 ///
