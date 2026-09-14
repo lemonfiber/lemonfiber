@@ -14,20 +14,22 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/spec-check.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/spec-check.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
   hygiene:
-    uses: lemonfiber/spec/.github/workflows/hygiene.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/hygiene.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
   security:
-    uses: lemonfiber/spec/.github/workflows/security.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/security.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
   dco:
-    uses: lemonfiber/spec/.github/workflows/dco.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/dco.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
+  attribution:
+    uses: lemonfiber/spec/.github/workflows/attribution.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
   commitlint:
-    uses: lemonfiber/spec/.github/workflows/commitlint.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/commitlint.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
   labeler:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/labeler.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
   # OPS-R39, OPS-R40 and OPS-R42: label a PR that advances the staged version,
   # put it in that version's milestone, comment which goals it moves, and route
   # one that cites only out-of-scope requirements to the next version. The
@@ -42,4 +44,4 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@1c4c9fecdfb03b6b71a79652ab465840878de54e # main
