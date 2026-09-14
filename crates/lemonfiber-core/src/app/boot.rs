@@ -441,7 +441,7 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use super::{on_battery_said, reported, waited, ALREADY_DONE, CHECK};
+    use super::{confirmed, on_battery_said, reported, waited, ALREADY_DONE, CHECK};
     use crate::app::{Ctx, Outcome};
     use crate::autostart::Returning;
     use crate::condition::Fault;
@@ -451,7 +451,7 @@ mod tests {
     use crate::ports::machine::{Power, Started, Supply};
     use crate::ports::process::Output;
     use crate::ports::Narrator;
-    use crate::test_support::{a_context, refused, spoke, Reporting, Scripted};
+    use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripted};
     use lemonfiber_fixtures::http::Fake;
 
     /// A machine that says when it started and where its power comes from, or will
@@ -865,10 +865,32 @@ mod tests {
             None,
             "a stack that came back whole has nothing to file against it"
         );
-        let said = heard.lines();
+        let said = heard.lines().join("\n");
         assert!(
-            !said.iter().any(|line| line.contains("trying again")),
-            "and a start that worked is not tried a second time: {said:?}"
+            !said.contains("trying again"),
+            "and a start that worked is not tried a second time: {said}"
+        );
+    }
+
+    /// A stack that cannot be read leaves the question unanswered rather than answered.
+    ///
+    /// The confirmation behind a boot start asks the trust checks what is wrong with
+    /// the tunnel, and those need the stack read before any of them can run. Where it
+    /// cannot be, the honest answer is that nothing was established — so nothing is
+    /// filed. Filing it as a failed boot would be the comfortable falsehood: the
+    /// operator would be told at their next interaction that the stack did not come
+    /// back, on the strength of a check that never ran, and the thing actually wrong
+    /// with their machine is that lemonfiber cannot find the stack at all.
+    #[tokio::test]
+    async fn a_confirmation_that_could_not_run_files_nothing_against_the_boot() {
+        let ctx = a_context().over(nowhere()).build();
+
+        confirmed(&ctx).await;
+
+        assert_eq!(
+            standing(&ctx),
+            None,
+            "a check that could not run has established nothing to report"
         );
     }
 
