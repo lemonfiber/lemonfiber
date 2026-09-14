@@ -189,6 +189,28 @@ pub struct Service {
     pub describes: String,
     /// The consequence of not running it.
     pub without_it: String,
+    /// Where this service's own requests go, in the terms an operator would
+    /// recognise — not in protocol names.
+    ///
+    /// An empty string is an answer: this service reaches nothing. That is not the
+    /// same as the field being absent, which is the stack declining to say, and the
+    /// two must never be read as one — an inventory of what leaves a machine that
+    /// rendered "we were not told" as "nothing leaves" would be making a privacy
+    /// claim out of its own ignorance.
+    ///
+    /// Optional because a stack written before this existed says nothing, and a build
+    /// that refused such a manifest would refuse the stack it ships with. Where it is
+    /// absent, lemonfiber answers from what it knows about the services it ships, and
+    /// reports that it knows nothing where it does not.
+    #[serde(default)]
+    pub reaches: Option<String>,
+    /// What it asks for out there, in the same terms.
+    ///
+    /// Declared with [`Self::reaches`] or not at all: one without the other is half
+    /// an answer, and validation refuses it by name rather than quietly using the
+    /// half that is there.
+    #[serde(default)]
+    pub asks_for: Option<String>,
     /// Which media types it handles.
     #[serde(default)]
     pub media_types: Vec<String>,
