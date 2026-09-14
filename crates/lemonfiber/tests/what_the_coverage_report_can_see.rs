@@ -1,9 +1,9 @@
 //! What the coverage report can and cannot watch being decided.
 //!
-//! Its own file rather than more of `architecture.rs`, and not only because that one
-//! is at its length cap: the rules there are about where a *name* may appear, and this
-//! is about where a *decision* may sit. A reader looking for one is not looking for
-//! the other.
+//! Its own file because the rules it sits beside are about where a *name* may
+//! appear, and this is about where a *decision* may sit. A reader looking for one is
+//! not looking for the other. Those rules used to share one file and no longer do,
+//! for the reason this file was split out ahead of them.
 
 mod source_tree;
 
