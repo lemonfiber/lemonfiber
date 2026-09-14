@@ -29,6 +29,8 @@ use crate::stack::Source;
 use crate::validate::{Live, Validator};
 use crate::walkthrough::{Narrator as Stepwise, Unheard};
 
+mod moment;
+
 /// Everything a command needs that is not part of the command itself.
 pub struct Ctx {
     /// Whether to report what would happen and change nothing.
@@ -454,71 +456,6 @@ impl Ctx {
         self
     }
 
-    /// Today, as the manifest's date rules mean it.
-    ///
-    /// A clock before the epoch, or one far enough ahead to overflow a calendar,
-    /// falls back to the epoch: refusing to do anything because the machine's
-    /// clock is absurd would be a worse answer than checking dates against a
-    /// date that is merely wrong.
-    /// The moment now, as the opaque stamp durable records carry.
-    ///
-    /// Seconds since the epoch, read through the clock port rather than from the
-    /// system directly, so a test can say what time it is and a record written on
-    /// one run can be compared with one written on another.
-    pub(super) fn stamp(&self) -> String {
-        self.seconds().to_string()
-    }
-
-    /// The same moment as a number, for the records that compare two of them.
-    ///
-    /// Beside the stamp rather than parsed back out of one: what reads this asks
-    /// whether enough time has passed since the last run, and two strings cannot be
-    /// subtracted. A clock that will not answer reads as the epoch, which is a machine
-    /// that has waited long enough for anything.
-    pub(super) fn seconds(&self) -> u64 {
-        self.clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_secs())
-            .unwrap_or_default()
-    }
-
-    /// The moment a given number of hours ago, written as the media server writes
-    /// its own records: an ISO-8601 instant ending in `Z`.
-    ///
-    /// The calendar is left to [`Date::from_unix_seconds`], which already knows
-    /// about leap years; only the time of day is arithmetic on what is left over.
-    /// Written out rather than reached for from a date library, because this is the
-    /// one place in the product that needs an instant rather than a day.
-    pub(super) fn hours_ago(&self, hours: i64) -> String {
-        let now = self
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
-            .unwrap_or_default();
-        let then = now.saturating_sub(hours.saturating_mul(3600));
-        let day = lemonfiber_manifest::Date::from_unix_seconds(then).unwrap_or(EPOCH);
-        let past = then.rem_euclid(86_400);
-        let (hour, minute, second) = (past / 3600, (past % 3600) / 60, past % 60);
-        format!(
-            "{:04}-{:02}-{:02}T{hour:02}:{minute:02}:{second:02}Z",
-            day.year, day.month, day.day
-        )
-    }
-
-    pub(super) fn today(&self) -> lemonfiber_manifest::Date {
-        let seconds = self
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
-            .unwrap_or_default();
-        lemonfiber_manifest::Date::from_unix_seconds(seconds).unwrap_or(EPOCH)
-    }
-
     /// The same context, in rehearsal.
     #[must_use]
     pub fn rehearsing(mut self) -> Self {
@@ -538,14 +475,6 @@ impl Ctx {
         self
     }
 }
-
-/// The first day the calendar rules can name, used when the clock cannot be
-/// believed at all.
-const EPOCH: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
-    year: 1970,
-    month: 1,
-    day: 1,
-};
 
 /// How long starting waits for every service to settle.
 ///
