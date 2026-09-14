@@ -15,7 +15,9 @@
 mod fake;
 
 use lemonfiber_adapters::Daemon;
-use lemonfiber_ports::docker::{Engine as _, Failure, Health, Images as _, Lifecycle, LogQuery};
+use lemonfiber_ports::docker::{
+    Engine as _, Failure, Health, Images as _, Lifecycle, LogQuery, Origin, Target,
+};
 
 /// Two containers as a listing, one running and one that fell over.
 #[cfg(unix)]
@@ -890,4 +892,38 @@ async fn the_engine_this_machine_is_configured_for_is_reachable_or_reported_abse
         matches!(outcome, Ok(_) | Err(Failure::Unreachable { .. })),
         "{outcome:?}"
     );
+}
+
+/// A client is built for each remote transport by the run that uses one.
+///
+/// The endpoint's scheme picks the client, one arm per transport, and the two remote
+/// arms arrived with remote operation. They had a test beside the code and nothing
+/// driving them through the adapter a run reaches — and this library is compiled
+/// twice, once into its own test binary and once as the dependency these integration
+/// tests link, so an arm entered only in the first is an arm no run has been shown to
+/// take.
+///
+/// Neither endpoint answers and neither is meant to. A client that could not be built
+/// at all is refused before a request is made — that is the other rule this adapter
+/// holds — so a refusal that arrives *from the request* is the proof that the client
+/// was built, and it names the endpoint it was built for. Both point at a port on this
+/// machine that nothing listens on, so the answer arrives at once rather than after
+/// the connection timeout, and nothing leaves the machine.
+#[tokio::test]
+async fn a_client_is_built_for_each_remote_transport_by_a_run_that_uses_one() {
+    for endpoint in ["tcp://127.0.0.1:1", "ssh://nobody@127.0.0.1:1"] {
+        let refused = Daemon::reaching(Target::at(endpoint, Origin::Variable))
+            .list("lemonfiber")
+            .await;
+
+        let said = format!("{refused:?}");
+        assert!(
+            refused.is_err(),
+            "{endpoint} answered, and nothing is listening there: {said}"
+        );
+        assert!(
+            said.contains(endpoint),
+            "a refusal from somewhere else says which somewhere: {said}"
+        );
+    }
 }

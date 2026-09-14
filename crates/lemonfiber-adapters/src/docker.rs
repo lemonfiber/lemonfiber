@@ -368,11 +368,18 @@ fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
 }
 
 /// Everything an attached exec wrote, and nothing at all where it was not attached.
+///
+/// Written as a value that starts empty and is filled where there is something to
+/// read, rather than as two arms. The other arm is the detached one, and this adapter
+/// never asks to detach — so as an arm of its own it is a line no run can enter,
+/// which is a line the coverage gate counts against every honest line beside it. As
+/// an absence it says the same thing: an exec nobody attached to wrote nothing here.
 async fn spoken(started: bollard::exec::StartExecResults) -> String {
-    match started {
-        bollard::exec::StartExecResults::Attached { output, .. } => gathered(output).await,
-        bollard::exec::StartExecResults::Detached => String::new(),
+    let mut said = String::new();
+    if let bollard::exec::StartExecResults::Attached { output, .. } = started {
+        said = gathered(output).await;
     }
+    said
 }
 
 /// Everything a stream of exec output said, joined in the order it arrived.
