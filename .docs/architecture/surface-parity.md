@@ -117,7 +117,7 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the forty-six requests, forty-two reach the web in full, three reach it in
+Of the forty-seven requests, forty-three reach the web in full, three reach it in
 part, zero do not reach it at all, and one — `ui` — is an honest exception. Three gaps
 and one exception is close to the split `G1-R1` asks for, and the split is
 deliberately lopsided: an exception has to survive being argued, and almost nothing
@@ -150,7 +150,7 @@ otherwise. What moved is the sentence underneath it. The reminder that names an
 expiry period no longer says flatly that nothing runs it — it says that while
 nothing does, and says what is running it once something is.
 
-On the other side of the table forty reach the terminal in full, five reach
+On the other side of the table forty-one reach the terminal in full, five reach
 the terminal in part, one reaches the terminal but for an exception, and zero have
 no terminal form — which is where three stood nine slices ago, nine before the one
 ahead of that, and twenty before the one that began it. Every request the command
