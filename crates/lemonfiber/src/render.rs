@@ -1003,6 +1003,7 @@ mod tests {
                 forms: Vec::new(),
                 condition: Condition::Inactive,
                 services: Vec::new(),
+                disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             }),
             Outcome::Doctor(DoctorReport {
                 overall: Overall::Healthy,

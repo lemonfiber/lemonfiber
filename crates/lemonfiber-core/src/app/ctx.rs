@@ -505,4 +505,9 @@ const EPOCH: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
 ///
 /// Long enough for the slowest first run on a spinning disk, and bounded
 /// because a wait with no end is indistinguishable from a hang.
-const PATIENCE: Duration = Duration::from_secs(180);
+///
+/// Reachable because two other places state this length rather than choose it:
+/// the sample the contract publishes, and the test that reads back the sentences
+/// a wait produces. Both were a hand-copied `180` and would have gone on passing
+/// after this was tuned, saying a length no run was held to.
+pub const PATIENCE: Duration = Duration::from_secs(180);

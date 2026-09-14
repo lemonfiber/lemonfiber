@@ -631,6 +631,7 @@ mod tests {
             forms: vec!["media".to_owned()],
             condition: Condition::Degraded,
             services: vec![service("sonarr", State::Unhealthy, None)],
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         };
         let text = status(&report).text();
         assert!(text.starts_with("running, and something needs attention"));

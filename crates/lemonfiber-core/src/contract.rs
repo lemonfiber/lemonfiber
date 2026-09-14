@@ -359,6 +359,7 @@ mod tests {
                 forms: Vec::new(),
                 condition: crate::docker::Condition::Inactive,
                 services: Vec::new(),
+                disturbs: crate::model::Disturbances::all(crate::app::PATIENCE),
             }),
             Outcome::Doctor(DoctorReport {
                 overall: crate::doctor::Overall::Healthy,

@@ -1142,6 +1142,7 @@ mod tests {
                 forms: Vec::new(),
                 condition: lemonfiber_core::docker::Condition::Inactive,
                 services: Vec::new(),
+                disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             }),
         ] {
             assert_eq!(format!("{:?}", settled(&outcome)), success());

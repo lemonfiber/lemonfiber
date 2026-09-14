@@ -179,6 +179,7 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         forms: forms.to_vec(),
         condition: condition(&services),
         services,
+        disturbs: crate::model::Disturbances::all(ctx.patience),
     })
 }
 

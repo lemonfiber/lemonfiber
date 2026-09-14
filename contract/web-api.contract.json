@@ -10583,6 +10583,16 @@
         "data"
       ],
       "$defs": {
+        "Awaiting": {
+          "description": "What an operation with no bound on it is waiting for.\n\nA case rather than a sentence, so what an operation is waiting for is a value\nsomething can be asked about. The words are built from it in one place below;\na phrase carried here instead would be a phrase every later surface had to\nparse back into the fact it came from.",
+          "oneOf": [
+            {
+              "description": "Everything still coming down has finished arriving.",
+              "type": "string",
+              "const": "downloads"
+            }
+          ]
+        },
         "Condition": {
           "description": "What a whole set of services amounts to.",
           "oneOf": [
@@ -10636,6 +10646,39 @@
               "type": "string",
               "const": "optional"
             }
+          ]
+        },
+        "Disturbances": {
+          "description": "What acting on this stack would take away, one answer per way of acting.\n\nNamed by the situation rather than by the verb, because the verb has two\nspellings: the command line stops named services with `stop` and the HTTP\nsurface spells that same operation `down`. These bytes are what both surfaces\nanswer with, so a table keyed by verb would be right for one caller and wrong\nfor the other. A field each caller maps its own word onto is right for both.\n\nCarried on the status reading because a surface deciding whether to stop\nsomething has already read that, and because none of these lengths depends on\nwhat the stack is currently doing — they are the clocks the run is held to,\nwhich is a property of the configuration. A second read to learn a length is\na read a surface would skip, and then it would estimate.",
+          "type": "object",
+          "properties": {
+            "restarting": {
+              "description": "Restarting services.",
+              "$ref": "#/$defs/TakesAway"
+            },
+            "starting": {
+              "description": "Bringing services up, whether a whole form or named services inside one.",
+              "$ref": "#/$defs/TakesAway"
+            },
+            "stopping": {
+              "description": "Taking services down, interrupting anything still arriving.",
+              "$ref": "#/$defs/TakesAway"
+            },
+            "stopping_after_downloads": {
+              "description": "Taking the stack down once everything still arriving has landed.\n\nWhole forms only: stopping named services has no such wait to ask for,\nand a caller that asks for both at once is refused.",
+              "$ref": "#/$defs/TakesAway"
+            },
+            "switching": {
+              "description": "Changing the running set, which stops whatever falls outside the new one.",
+              "$ref": "#/$defs/TakesAway"
+            }
+          },
+          "required": [
+            "starting",
+            "stopping",
+            "stopping_after_downloads",
+            "restarting",
+            "switching"
           ]
         },
         "Service": {
@@ -10745,6 +10788,10 @@
               "description": "What the services amount to, as one word.",
               "$ref": "#/$defs/Condition"
             },
+            "disturbs": {
+              "description": "How long each way of acting on these services takes them away for.\n\nHere so that a surface can say it before it asks the operator to confirm,\nwhich is the only moment saying it is any use.",
+              "$ref": "#/$defs/Disturbances"
+            },
             "forms": {
               "description": "The forms asked about; empty means the whole stack was.",
               "type": "array",
@@ -10763,7 +10810,51 @@
           "required": [
             "forms",
             "condition",
-            "services"
+            "services",
+            "disturbs"
+          ]
+        },
+        "TakesAway": {
+          "description": "How long one way of acting on the stack takes something away for.\n\nTwo cases rather than a length and a flag, because *no bound* is not a long\nbound and a surface offered a number plus a \"really, though?\" beside it will\nshow the number. A reader that handles both arms has said both things; one\nthat handles only the first does not compile.",
+          "oneOf": [
+            {
+              "description": "It ends, and this is the longest the run is held to.",
+              "type": "object",
+              "properties": {
+                "bound": {
+                  "type": "string",
+                  "const": "bounded"
+                },
+                "seconds": {
+                  "description": "The length, in seconds.\n\nSeconds rather than the engine's own duration shape, because every\ncaller of this turns it into a sentence and none of them wants\nnanoseconds to do it.",
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "bound",
+                "seconds"
+              ]
+            },
+            {
+              "description": "Nothing bounds it, and this is what it is waiting for.",
+              "type": "object",
+              "properties": {
+                "bound": {
+                  "type": "string",
+                  "const": "open-ended"
+                },
+                "until": {
+                  "description": "What has to happen before it ends.",
+                  "$ref": "#/$defs/Awaiting"
+                }
+              },
+              "required": [
+                "bound",
+                "until"
+              ]
+            }
           ]
         }
       }

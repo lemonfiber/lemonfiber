@@ -71,8 +71,7 @@ mod tests {
     use super::{due, said, EVERY};
     use std::time::Duration;
 
-    /// The budget a real start is given, so what these read is what an operator reads.
-    const PATIENCE: Duration = Duration::from_secs(180);
+    use crate::app::PATIENCE;
 
     /// Every line one wait produces, asked for at the poll's own rate.
     ///

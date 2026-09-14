@@ -87,7 +87,7 @@ pub use command::{
     Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
 };
 mod outcome;
-pub use ctx::Ctx;
+pub use ctx::{Ctx, PATIENCE};
 pub use outcome::Outcome;
 pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};
 pub use setup::SetupAction;

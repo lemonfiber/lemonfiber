@@ -41,10 +41,86 @@ pub enum Disturbance {
 /// something can be asked about. The words are built from it in one place below;
 /// a phrase carried here instead would be a phrase every later surface had to
 /// parse back into the fact it came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum Awaiting {
     /// Everything still coming down has finished arriving.
     Downloads,
+}
+
+/// One of the ways a lifecycle verb puts the stack out.
+///
+/// Between the command and the length is a situation: several commands put the
+/// stack in the same one, and two surfaces spell the same command differently.
+/// Naming the situation gives both the length to read off — [`of`] maps a command
+/// onto it, [`everything`] lists every one of them — so a verb's bound and a
+/// payload's bound are one answer rather than two that agree today.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Situation {
+    /// Services are being brought up.
+    Starting,
+    /// Services are being taken down, interrupting anything still arriving.
+    Stopping,
+    /// The stack is being taken down once everything still arriving has landed.
+    StoppingAfterDownloads,
+    /// Services are being restarted.
+    Restarting,
+    /// The running set is being changed to a different one.
+    Switching,
+}
+
+impl Situation {
+    /// Every situation there is.
+    ///
+    /// A payload that states all of them reads this rather than listing them a
+    /// second time. Kept honest by [`Situation::called`], whose match has no
+    /// wildcard: a new situation fails to compile there, and the test that reads
+    /// both then refuses any payload that has not grown a field for it.
+    pub const EVERY: &'static [Self] = &[
+        Self::Starting,
+        Self::Stopping,
+        Self::StoppingAfterDownloads,
+        Self::Restarting,
+        Self::Switching,
+    ];
+
+    /// What a payload calls this situation.
+    ///
+    /// The field name, so that the list above and the shape on the wire can be
+    /// held against each other by something that reads them both.
+    #[must_use]
+    pub const fn called(self) -> &'static str {
+        match self {
+            Self::Starting => "starting",
+            Self::Stopping => "stopping",
+            Self::StoppingAfterDownloads => "stopping_after_downloads",
+            Self::Restarting => "restarting",
+            Self::Switching => "switching",
+        }
+    }
+
+    /// How long this situation lasts.
+    ///
+    /// The patience is handed in because it is a knob: an operator on a slow disk
+    /// runs with a longer one, and a length stated from a constant would be the
+    /// wrong length for exactly the run that needed the knob.
+    #[must_use]
+    pub const fn takes(self, patience: Duration) -> Disturbance {
+        match self {
+            // Starting is bounded by how long the run waits for services to
+            // settle, which is the same knob that decides when it gives up. A
+            // start that has to fetch an image spends that time before this one
+            // begins, and it is narrated as it happens rather than promised in
+            // advance.
+            Self::Starting | Self::Restarting | Self::Switching => Disturbance::Bounded(patience),
+            Self::Stopping => Disturbance::Bounded(GRACE),
+            // A teardown told to let the downloads finish is the one operation
+            // here with nothing to bound it: what it waits for is a torrent at
+            // ninety-four per cent, and how long that takes belongs to whoever
+            // is seeding it.
+            Self::StoppingAfterDownloads => Disturbance::Until(Awaiting::Downloads),
+        }
+    }
 }
 
 /// What this command disturbs, or nothing where this does not yet say.
@@ -61,23 +137,33 @@ pub enum Awaiting {
 /// wrong length for exactly the run that needed the knob.
 #[must_use]
 pub const fn of(command: &Command, patience: Duration) -> Option<Disturbance> {
+    let Some(situation) = situation(command) else {
+        return None;
+    };
+    Some(situation.takes(patience))
+}
+
+/// Which situation this command puts the stack in, or none where this does not
+/// yet say.
+///
+/// Split from [`of`] so that what a command *is* and how long that *takes* are
+/// answered in different places: the first is a routing decision this file owns,
+/// the second is a length the run is held to. A payload listing every situation
+/// reads the second half without going near the first.
+#[must_use]
+const fn situation(command: &Command) -> Option<Situation> {
     match command {
-        // Starting is bounded by how long the run waits for services to settle,
-        // which is the same knob that decides when it gives up. A start that
-        // has to fetch an image spends that time before this one begins, and it
-        // is narrated as it happens rather than promised in advance.
-        Command::Up { .. }
-        | Command::Start { .. }
-        | Command::Restart { .. }
-        | Command::Switch { .. } => Some(Disturbance::Bounded(patience)),
-        // A teardown told to let the downloads finish is the one operation here
-        // with nothing to bound it: what it waits for is a torrent at ninety-four
-        // per cent, and how long that takes belongs to whoever is seeding it.
+        // Apart from one another because they are apart in [`Command`], and a
+        // day where a service start is held to a different clock from a form
+        // start is a day this reads as two lines rather than being rewritten.
+        Command::Up { .. } | Command::Start { .. } => Some(Situation::Starting),
+        Command::Restart { .. } => Some(Situation::Restarting),
+        Command::Switch { .. } => Some(Situation::Switching),
         Command::Down {
             wait: Waiting::ForTheDownloads,
             ..
-        } => Some(Disturbance::Until(Awaiting::Downloads)),
-        Command::Down { .. } | Command::Halt { .. } => Some(Disturbance::Bounded(GRACE)),
+        } => Some(Situation::StoppingAfterDownloads),
+        Command::Down { .. } | Command::Halt { .. } => Some(Situation::Stopping),
         // Everything else, listed rather than left to a wildcard. A command
         // added here would otherwise answer *disturbs nothing* by default, and
         // a machine taken away in silence is the failure this exists to prevent —
@@ -289,6 +375,182 @@ mod tests {
         assert!(
             !said.contains("seconds"),
             "a wait with no bound must not be given one in words: {said}"
+        );
+    }
+
+    /// The payload states every situation there is, and nothing else.
+    ///
+    /// This is the join that keeps the two halves from drifting apart. A new
+    /// situation fails to compile in [`Situation::called`], which sends whoever
+    /// added it to [`Situation::EVERY`], which lands here — and this stays red
+    /// until the payload has grown a field for it. Without the join, a situation
+    /// could be added, routed, and held to a clock while every surface went on
+    /// publishing the four it knew about, which reads to an operator as though
+    /// the new verb costs nothing.
+    ///
+    /// Both directions, because a field nothing routes to is the same silence
+    /// wearing the opposite hat: a published length no command is ever held to.
+    #[test]
+    fn the_payload_states_every_situation_there_is_and_nothing_else() {
+        let published =
+            serde_json::to_value(crate::model::Disturbances::all(WAITED)).unwrap_or_default();
+        let fields = published.as_object().cloned().unwrap_or_default();
+
+        assert!(
+            !fields.is_empty(),
+            "the payload serialised to nothing, so the rest of this rule read nothing"
+        );
+
+        for situation in Situation::EVERY.iter().copied() {
+            assert!(
+                fields.contains_key(situation.called()),
+                "{situation:?} is a situation the stack can be put in and no surface \
+                 can read what it costs"
+            );
+        }
+
+        assert_eq!(
+            fields.len(),
+            Situation::EVERY.len(),
+            "the payload publishes a length nothing is ever held to: {:?} against {:?}",
+            fields.keys().collect::<Vec<_>>(),
+            Situation::EVERY
+                .iter()
+                .map(|s| s.called())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// What a surface reads off the payload is what the command it then runs is
+    /// held to.
+    ///
+    /// The whole point of publishing the lengths is that a surface states one and
+    /// then acts; if the two were arrived at separately, the day they diverged
+    /// would be a day an operator was told a number nothing honoured — and
+    /// nothing on either side would ever compare them, so it would never be
+    /// found. This is that comparison, made once, for every command that has a
+    /// length at all.
+    #[test]
+    fn the_payload_and_the_command_agree_on_every_length() {
+        let forms = || vec!["media".to_owned()];
+        let services = || vec!["sonarr".to_owned()];
+        let payload = crate::model::Disturbances::all(WAITED);
+
+        let pairs = [
+            (Command::Up { forms: forms() }, payload.starting),
+            (
+                Command::Start {
+                    forms: forms(),
+                    services: services(),
+                },
+                payload.starting,
+            ),
+            (
+                Command::Down {
+                    forms: forms(),
+                    wait: Waiting::Never,
+                },
+                payload.stopping,
+            ),
+            (
+                Command::Halt {
+                    forms: forms(),
+                    services: services(),
+                },
+                payload.stopping,
+            ),
+            (
+                Command::Down {
+                    forms: forms(),
+                    wait: Waiting::ForTheDownloads,
+                },
+                payload.stopping_after_downloads,
+            ),
+            (
+                Command::Restart {
+                    forms: forms(),
+                    services: services(),
+                },
+                payload.restarting,
+            ),
+            (Command::Switch { forms: forms() }, payload.switching),
+        ];
+
+        for (command, published) in pairs {
+            // Compared as options rather than unwrapped, so that a command which
+            // stops having a length at all fails here saying which one, instead of
+            // ending the run at a line that names nothing.
+            assert_eq!(
+                of(&command, WAITED).map(crate::model::TakesAway::from),
+                Some(published),
+                "{command:?} is held to one length and the payload publishes another, \
+                 so a surface states a number no run honours"
+            );
+        }
+    }
+
+    /// Addressing a form and addressing the services inside it take the same
+    /// length away.
+    ///
+    /// This is what lets one published field answer for two commands. It is
+    /// asserted rather than assumed, because the day a service stop is held to a
+    /// different clock from a teardown, the payload has to grow a field — and the
+    /// failure that says so has to arrive here, not in an operator being told the
+    /// wrong number.
+    #[test]
+    fn a_form_and_the_services_inside_it_are_held_to_the_same_clock() {
+        let forms = vec!["media".to_owned()];
+        let services = vec!["sonarr".to_owned()];
+
+        let same = [
+            (
+                Command::Up {
+                    forms: forms.clone(),
+                },
+                Command::Start {
+                    forms: forms.clone(),
+                    services: services.clone(),
+                },
+            ),
+            (
+                Command::Down {
+                    forms: forms.clone(),
+                    wait: Waiting::Never,
+                },
+                Command::Halt {
+                    forms: forms.clone(),
+                    services,
+                },
+            ),
+        ];
+
+        for (whole, named) in same {
+            assert_eq!(
+                of(&whole, WAITED),
+                of(&named, WAITED),
+                "{whole:?} and {named:?} no longer cost the same, so one published \
+                 field can no longer answer for both"
+            );
+        }
+    }
+
+    /// The published lengths are the knob's, not a constant's.
+    ///
+    /// An operator on a slow disk runs with a longer patience, and a payload that
+    /// answered from a constant would state the length somebody else's stack was
+    /// held to — plausibly, and wrong in exactly the case the knob exists for.
+    #[test]
+    fn a_longer_patience_is_a_longer_published_start() {
+        let brief = crate::model::Disturbances::all(Duration::from_secs(30));
+        let patient = crate::model::Disturbances::all(Duration::from_secs(600));
+
+        assert_ne!(
+            brief.starting, patient.starting,
+            "the published start ignores the knob it is supposed to be reading"
+        );
+        assert_eq!(
+            brief.stopping, patient.stopping,
+            "stopping is held to the engine's grace, which the start knob does not move"
         );
     }
 }
