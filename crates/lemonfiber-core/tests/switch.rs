@@ -162,6 +162,7 @@ async fn a_real_switch_stops_then_starts_then_waits() {
                 "seerr",
                 "calibre-web-automated",
                 "audiobookshelf",
+                "navidrome",
                 "qbittorrent",
             ],
             Lifecycle::Running,

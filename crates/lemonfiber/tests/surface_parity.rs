@@ -361,7 +361,10 @@ fn the_count_the_page_states_is_the_count_of_its_rows() {
             "the summary says `{said} {what}` for what its rows carry ({number})"
         );
     }
-    assert_eq!(intrinsic, 1, "one exception, which the page names as `ui`");
+    assert_eq!(
+        intrinsic, 2,
+        "two exceptions, which the page names as `ui` and `plugin`"
+    );
 }
 
 #[test]

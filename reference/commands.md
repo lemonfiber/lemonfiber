@@ -25,6 +25,7 @@ Commands:
   alerts        Choose how much lemonfiber tells you about, in plain language
   quality       Choose how good your media should look, in plain language
   doctor        Run the checks that prove the stack is doing what it should
+  plugin        Read what a plugin may claim, where it may contribute, and how it is written
   watch         Guard the data location while forms run, stopping them if it disappears
   hosting       Say what this machine keeps running when no terminal is open
   trace         Follow one show or film across the services — "where is my show?"
@@ -1171,6 +1172,144 @@ Options:
           Put back what the last repair changed.
 
           Asked for the same way a repair is, because it is the same errand read backwards. It reverses that one repair and nothing else: the wiring lemonfiber seeded and the choices your first run wrote are left where they are.
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin`
+
+```text
+Read what a plugin may claim, where it may contribute, and how it is written.
+
+For somebody writing a plugin rather than running a stack. Everything under this word is a read of a document this build publishes and attaches to every release: the capabilities a service can claim, the places a plugin may extend lemonfiber itself, and the schema an editor validates `plugin.toml` against.
+
+Every one of them answers with no network, no catalogue and no stack running, and says which generation it is reporting — so an author who has to know whether a difference is their build or their manifest can tell.
+
+Usage: lemonfiber plugin [OPTIONS] <COMMAND>
+
+Commands:
+  capabilities      List the capabilities a service can claim, and what claiming one undertakes
+  extension-points  List the places a plugin may extend lemonfiber itself
+  schema            Print the schema an editor validates `plugin.toml` against
+  help              Print this message or the help of the given subcommand(s)
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin capabilities`
+
+```text
+List the capabilities a service can claim, and what claiming one undertakes.
+
+A capability is a named, contracted thing a service can do, so that wiring can ask for one rather than name a service. Each carries the prose a claimant is held to, which bundled services already declare it, and the probes a claim has to bind — the vocabulary says what must be shown, and the claimant says where to ask.
+
+A name here is the only kind a plugin may claim without namespacing it. A plugin's own capability is written `<plugin-id>:<name>` and is inert until something asks for it.
+
+Usage: lemonfiber plugin capabilities [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin extension-points`
+
+```text
+List the places a plugin may extend lemonfiber itself.
+
+A point is a register lemonfiber already runs, and the point names where a plugin may put another row in it — never a hook and never code. Each says what a row carries, what is already standing in that register, and the capability a manifest has to ask for in order to contribute there.
+
+Usage: lemonfiber plugin extension-points [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin schema`
+
+```text
+Print the schema an editor validates `plugin.toml` against.
+
+Generated from the types lemonfiber reads a manifest with, so it describes the reader rather than claiming something about it. Always machine-readable: it is a document for an editor rather than a listing for a person.
+
+Usage: lemonfiber plugin schema [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
 
   -h, --help
           Print help (see a summary with '-h')

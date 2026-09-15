@@ -1,0 +1,952 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PluginManifest",
+  "description": "A whole plugin manifest.",
+  "type": "object",
+  "properties": {
+    "claim": {
+      "description": "The core capabilities this plugin claims, and the probes each is shown by.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Claim"
+      }
+    },
+    "contribution": {
+      "description": "The rows it adds at the points lemonfiber publishes.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Contribution"
+      }
+    },
+    "override": {
+      "description": "Every bundled thing it will change.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Override"
+      }
+    },
+    "plugin": {
+      "description": "Who the plugin is, and where it came from.",
+      "$ref": "#/$defs/Plugin"
+    },
+    "proof": {
+      "description": "What must hold before it is installed.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Proof"
+      }
+    },
+    "recipe": {
+      "description": "The ordered calls that configure what it installed.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Recipe"
+      }
+    },
+    "requires": {
+      "description": "What the plugin needs of lemonfiber.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Requires"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema_version": {
+      "description": "The manifest format generation.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "secret": {
+      "description": "Every value it will hold.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Secret"
+      }
+    },
+    "service": {
+      "description": "What runs. Exactly one, in this generation.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PluginService"
+      }
+    },
+    "wiring": {
+      "description": "How the stack's own proxy and dashboard reach it.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Wiring"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plugin"
+  ],
+  "$defs": {
+    "Capture": {
+      "description": "A value taken out of an answer.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "Where in the answer it is read from.",
+          "type": "string"
+        },
+        "name": {
+          "description": "What the value is called, for a later call to name.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "Whose value it is.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "from",
+        "origin"
+      ]
+    },
+    "Claim": {
+      "description": "The core capability a plugin claims, and the probes it is demonstrated by.\n\nThe vocabulary owns what must be shown; this owns where to ask. A capability is\none contract with many claimants, each answering at a path of its own, so the\npublished probe declares the question and the statuses that answer it, and the\nbinding declares the method, the path and the recorded response.",
+      "type": "object",
+      "properties": {
+        "capability": {
+          "description": "A core name, which must also appear in the service's `provides`.",
+          "type": "string"
+        },
+        "probe": {
+          "description": "One binding per probe the capability declares. Every one of them, exactly once.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ClaimProbe"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "capability"
+      ]
+    },
+    "ClaimProbe": {
+      "description": "One probe of a claimed capability, bound to a request on this plugin's service.",
+      "type": "object",
+      "properties": {
+        "expect": {
+          "description": "What the answer must be, within what the probe permits.",
+          "$ref": "#/$defs/Expect"
+        },
+        "fixture": {
+          "description": "The recorded response.\n\nRequired here where it is optional on a proof: a claim nobody can demonstrate\nwithout owning the service is a claim the catalogue's own checks cannot make.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Names a probe the capability declares.",
+          "type": "string"
+        },
+        "request": {
+          "description": "Method and path on this plugin's own service.",
+          "$ref": "#/$defs/PluginRequest"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "request",
+        "expect",
+        "fixture"
+      ]
+    },
+    "Contribution": {
+      "description": "A row in a register lemonfiber already runs.\n\nThe fields beyond `at` and `id` are the row its point declares, and the point is\npublished — so the required set, the optional set, the closed sets and the bounds\nare read from `extension-points.json` rather than restated here. What this type\nfixes is that a contribution is declared in this block and nowhere else, and that\nit carries nothing outside the union of the rows the published points take.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "description": "What to do, in the imperative.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "at": {
+          "description": "A point the build publishes. One it does not is refused by name.",
+          "type": "string"
+        },
+        "category": {
+          "description": "Which family a check is narrowed to.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "detail": {
+          "description": "The technical half of a remedy, which must not lead.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "expect": {
+          "description": "What the answer must be.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Expect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fixture": {
+          "description": "The recorded response the check is proved against.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "for": {
+          "description": "The check a remedy is for, which must be one this same plugin declared.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "id": {
+          "description": "Namespaced with the declaring plugin's id, always.",
+          "type": "string"
+        },
+        "request": {
+          "description": "Method and path on the plugin's own service.\n\nThere is no field for a host, so a check cannot be pointed at another service,\nat the machine, or off it. A plugin wanting to say something about a service it\ndid not install is asking to speak for somebody else's software.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginRequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "service": {
+          "description": "Which service the finding is about. Defaults to the plugin's own.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "timeout_s": {
+          "description": "How long a check may run, within the bounds the point declares.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
+        "title": {
+          "description": "The one-line summary of what was checked.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "why": {
+          "description": "Why this is worth checking.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "at",
+        "id"
+      ]
+    },
+    "Expect": {
+      "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal, which is the one answer no port proxy can\nproduce.",
+      "type": "object",
+      "properties": {
+        "body_starts_with": {
+          "description": "What the body must begin with, where it is not JSON.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "content_type": {
+          "description": "A substring of the content type the answer was served as.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "json": {
+          "description": "Keys the answer must carry, each with the exact value it must hold.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/Expected"
+          }
+        },
+        "json_array_min": {
+          "description": "The answer read as an array, with at least this many entries.\n\nA catalogue is very often a list rather than an object, and none of the\nobject-shaped constraints can say anything about one.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
+        "json_at_least": {
+          "description": "Keys the answer must carry, each with a number it must not be below.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "default": null
+        },
+        "json_has_keys": {
+          "description": "Keys the answer must carry, whatever they hold.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "string"
+          }
+        },
+        "json_is_absent": {
+          "description": "The answer did not parse as JSON at all.\n\nWhich is what a service that serves its application shell for every path it does\nnot implement answers — and the reason a status alone proves nothing against\none: the shell comes back `200` whether the API behind it exists or not, so what\nhas to be said is that the body was *not* a document.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "json_types": {
+          "description": "Keys the answer must carry, each with the kind of value it must be.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/Kind"
+          }
+        },
+        "status": {
+          "description": "The status the answer must carry.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Expected": {
+      "description": "Exactly what a key must hold.\n\nThree kinds and no nesting, which is the whole of what an expectation has ever\nneeded to say: a flag that must be set, a number that must match, or a word. A\nshape deeper than this is asking about a document rather than about a claim, and\nthe key-wise constraints beside this one are how that is said.",
+      "anyOf": [
+        {
+          "description": "A true or a false.",
+          "type": "boolean"
+        },
+        {
+          "description": "A whole number.",
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "description": "A word.",
+          "type": "string"
+        }
+      ]
+    },
+    "Kind": {
+      "description": "The kind of value a key must hold.\n\nFive, and closed. A name outside them is one no runner could evaluate, and an\nassertion nothing evaluates is a proof that silently checks less than it says —\nwhich is worse than one that fails.",
+      "oneOf": [
+        {
+          "description": "A true or a false.",
+          "type": "string",
+          "const": "bool"
+        },
+        {
+          "description": "A whole number.",
+          "type": "string",
+          "const": "int"
+        },
+        {
+          "description": "A string.",
+          "type": "string",
+          "const": "str"
+        },
+        {
+          "description": "An array.",
+          "type": "string",
+          "const": "list"
+        },
+        {
+          "description": "An object.",
+          "type": "string",
+          "const": "dict"
+        }
+      ]
+    },
+    "Override": {
+      "description": "A bundled thing the plugin will change.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Which bundled setting is changed.",
+          "type": "string"
+        },
+        "why": {
+          "description": "What changing it is for.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "why"
+      ]
+    },
+    "Pair": {
+      "description": "One value, and the one destination it may reach.",
+      "type": "object",
+      "properties": {
+        "to": {
+          "description": "Where it may be carried.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The captured value, by the name the capture gave it.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "to"
+      ]
+    },
+    "Plugin": {
+      "description": "Who the plugin is, and where it came from.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "What it does *for the operator*.",
+          "type": "string"
+        },
+        "forms": {
+          "description": "Which forms the service joins.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "id": {
+          "description": "Unique, lowercase. The name it is installed and journalled under.",
+          "type": "string"
+        },
+        "license": {
+          "description": "SPDX identifier.\n\nRecorded and shown rather than constrained. The bundled set is a curated list\nthis project stands behind and is OSI-licensed throughout; a plugin is the\noperator's own choice, and refusing to install proprietary software on somebody\nelse's machine would be the tool standing between an operator and their stack.\nA plugin whose licence is absent is refused; one whose licence is merely not\nopen is installed and said so.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-facing.",
+          "type": "string"
+        },
+        "upstream": {
+          "description": "Project URL, so the operator can judge the thing rather than the wrapper.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Semver. The plugin's own content version, moved by its author.",
+          "type": "string"
+        },
+        "without_it": {
+          "description": "The consequence of its absence.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "without_it",
+        "upstream",
+        "license",
+        "forms"
+      ]
+    },
+    "PluginBind": {
+      "description": "Which tier a plugin's port is published on.\n\nA tier, not an address. lemonfiber renders it to an address exactly as it does for\na bundled service, so the two-tier policy stays a property of the system rather\nthan a request the plugin makes.",
+      "oneOf": [
+        {
+          "description": "Reachable only from the host.",
+          "type": "string",
+          "const": "loopback"
+        },
+        {
+          "description": "Reachable from the local network.",
+          "type": "string",
+          "const": "lan"
+        }
+      ]
+    },
+    "PluginCriticality": {
+      "description": "How much a plugin's service costs when it is absent.\n\nFour rather than the stack's five. `critical` means *its failure has consequences\noutside the machine*, and in the bundled stack exactly one service holds it; it is\nnot a severity a contributor assigns to their own work, because the classification\ndrives how failures are reported and how hard lemonfiber tries to stop the operator\nproceeding. A manifest declaring it is refused by name, with these four listed.",
+      "oneOf": [
+        {
+          "description": "The form does not work without it.",
+          "type": "string",
+          "const": "core"
+        },
+        {
+          "description": "The form works, badly.",
+          "type": "string",
+          "const": "important"
+        },
+        {
+          "description": "Makes things better.",
+          "type": "string",
+          "const": "enhancing"
+        },
+        {
+          "description": "Nice to have.",
+          "type": "string",
+          "const": "optional"
+        }
+      ]
+    },
+    "PluginHealth": {
+      "description": "How to tell a plugin's service has started.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Which kind of probe to use.",
+          "$ref": "#/$defs/PluginHealthKind"
+        },
+        "path": {
+          "description": "HTTP path, for `http` probes.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "timeout_s": {
+          "description": "How long to wait before calling it unhealthy.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ]
+    },
+    "PluginHealthKind": {
+      "description": "The kinds of health probe a plugin's service can declare.",
+      "oneOf": [
+        {
+          "description": "Fetch a path on the service's port.",
+          "type": "string",
+          "const": "http"
+        },
+        {
+          "description": "Open a connection to the service's port.",
+          "type": "string",
+          "const": "tcp"
+        },
+        {
+          "description": "Trust the container's own reported state.",
+          "type": "string",
+          "const": "container"
+        }
+      ]
+    },
+    "PluginRequest": {
+      "description": "What is asked, and where.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "description": "The HTTP method.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The path on the service being asked.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "path"
+      ]
+    },
+    "PluginService": {
+      "description": "What runs.\n\nDeclared in the stack manifest's service vocabulary, restricted to these fields.\nThe restriction is the substance of it: the set of fields *is* the set of things a\nplugin may ask for, so \"what can this plugin reach\" is answerable from the format\nrather than from the instance.",
+      "type": "object",
+      "properties": {
+        "bind": {
+          "description": "Which tier the port is published on.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginBind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config_path": {
+          "description": "Where inside the container the one configuration directory is mounted.\n\n`/config` is a LinuxServer.io convention rather than a standard, and assuming\nit made a whole class of image uninstallable: a plugin whose image reads its\nconfiguration somewhere else would be generated a container mounting a\ndirectory the application never reads, passing its health probe and losing\neverything it had written the moment the container was replaced.\n\nThe target is data; the source is still lemonfiber's, and there is still\nexactly one of it.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "criticality": {
+          "description": "How much its absence costs.",
+          "$ref": "#/$defs/PluginCriticality"
+        },
+        "digest": {
+          "description": "`sha256:…`. What actually runs.\n\nA tag is not a pin: it is a name the publisher can repoint, so the image\nreviewed and the image run can differ with nothing in the manifest changing.\nThe digest is what lemonfiber writes into the generated entry.",
+          "type": "string"
+        },
+        "health": {
+          "description": "How to tell the service has actually started.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginHealth"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "description": "Unique across the stack **and** every installed plugin.",
+          "type": "string"
+        },
+        "image": {
+          "description": "Registry path, without tag or digest.",
+          "type": "string"
+        },
+        "media_types": {
+          "description": "Which media types it handles, in the stack manifest's vocabulary.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "Human-facing.",
+          "type": "string"
+        },
+        "port": {
+          "description": "Primary UI or API port, absent for a service with no listener.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "provides": {
+          "description": "The capabilities this service claims.\n\nA core name comes from the published vocabulary and means the contracted thing\nthat vocabulary defines; a plugin's own must be namespaced with the plugin's id\nand is inert until something asks for it.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "tag": {
+          "description": "The human-readable version the digest corresponds to. Recorded and shown;\nnever resolved.",
+          "type": "string"
+        },
+        "takes_data": {
+          "description": "Whether it needs the data root mounted.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "image",
+        "digest",
+        "tag",
+        "criticality"
+      ]
+    },
+    "Proof": {
+      "description": "What must hold before a plugin is installed.",
+      "type": "object",
+      "properties": {
+        "expect": {
+          "description": "What the answer must be.",
+          "$ref": "#/$defs/Expect"
+        },
+        "fixture": {
+          "description": "A recorded response to run against where no instance exists.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "id": {
+          "description": "Unique within the plugin. What a verdict is reported against.",
+          "type": "string"
+        },
+        "request": {
+          "description": "Method and path.",
+          "$ref": "#/$defs/PluginRequest"
+        },
+        "title": {
+          "description": "What it establishes, in one line.",
+          "type": "string"
+        },
+        "why": {
+          "description": "Why this is worth asserting. A proof nobody can justify is one nobody will\nmaintain.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "request",
+        "expect",
+        "why"
+      ]
+    },
+    "Recipe": {
+      "description": "One named flow of calls.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Unique within the plugin.",
+          "type": "string"
+        },
+        "pair": {
+          "description": "Every value this flow could carry to every destination it could reach.\n\nA flow with no pair behind it fails validation before a call is made, which is\nwhat makes \"what does this plugin tell whom\" answerable from the manifest.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pair"
+          }
+        },
+        "step": {
+          "description": "The calls, in the order they are made.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          }
+        },
+        "title": {
+          "description": "What the flow accomplishes, in one line.",
+          "type": "string"
+        },
+        "why": {
+          "description": "Why it is worth running.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "why"
+      ]
+    },
+    "Requires": {
+      "description": "What the plugin needs of lemonfiber.\n\nNamed capabilities and never a version. A plugin written a year ago against a\nstack it has never met keeps working for exactly as long as the things it actually\nuses still exist, and when it stops working the message says which thing went — a\nversion number cannot say that, because it conflates \"older\" with \"missing\nsomething you needed\".",
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "description": "What lemonfiber must offer for this plugin to be installable.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Secret": {
+      "description": "A value the plugin will hold.\n\nDeclared before anything can capture one, because the rule is that a secret\ncaptured but not declared fails validation — and a rule that cannot be stated for\nwant of a field is not being enforced.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "What the value is, within the plugin.",
+          "type": "string"
+        },
+        "of": {
+          "description": "Whose credential it is.",
+          "type": "string"
+        },
+        "why": {
+          "description": "What holding it is for.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "of",
+        "why"
+      ]
+    },
+    "Step": {
+      "description": "One call in a flow.",
+      "type": "object",
+      "properties": {
+        "call": {
+          "description": "What is called, and where.",
+          "$ref": "#/$defs/StepCall"
+        },
+        "capture": {
+          "description": "The values taken out of the answer, for a later call to substitute.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Capture"
+          }
+        },
+        "expect": {
+          "description": "What the answer must be for the flow to go on.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Expect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "description": "Unique within the recipe.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "call"
+      ]
+    },
+    "StepCall": {
+      "description": "What one step calls.\n\n`headers` and `body` are where an earlier capture is substituted, and they are the\nwhole of it. Without somewhere to put one, a recipe could name a destination and\ncapture a value and had no way to carry the one to the other — which is every\nfirst-run flow there is: creating an account and reading back a token is worth\nnothing if the token cannot then be presented.\n\nThey are also what makes the set of flows a recipe could produce computable by\nreading it: every substitution inside a call is a flow from that value to that\ncall's destination, and a call with nowhere to substitute into produces none.",
+      "type": "object",
+      "properties": {
+        "body": {
+          "description": "The body the call carries. A value may substitute an earlier capture.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "headers": {
+          "description": "Headers the call carries. A value may substitute an earlier capture.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": null
+        },
+        "method": {
+          "description": "The HTTP method.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The path on it.",
+          "type": "string"
+        },
+        "to": {
+          "description": "A service id in this stack, or a DNS name outside it. Never an address.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "to",
+        "path"
+      ]
+    },
+    "Wiring": {
+      "description": "How the stack's own services reach a plugin's service.\n\nThe tier governs, not the plugin. Only a `lan` service is proxied, because the\nbundled policy is that an admin surface does not get a hostname — and a plugin\nthat could publish its own address could put an admin surface on the household\nnetwork without touching anything the web-security checks inspect.",
+      "type": "object",
+      "properties": {
+        "dashboard_group": {
+          "description": "Which group on the bundled dashboard it appears under. Defaults to the group\nthe stack uses for its tier.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "hostname": {
+          "description": "The label in front of the operator's domain. A single DNS label — not a name,\nan address or a port. Defaults to the plugin's id.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

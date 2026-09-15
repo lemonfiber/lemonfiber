@@ -9,6 +9,10 @@ repository.workspace = true
 
 [dependencies]
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+# The plugin manifest types, the capability vocabulary and the extension points —
+# the three things this crate generates a published artefact from. One way only:
+# nothing there reaches back here, which is what lets it be read with no stack.
+lemonfiber-plugin = { path = "../lemonfiber-plugin" }
 lemonfiber-ports = { path = "../lemonfiber-ports" }
 argon2 = { workspace = true }
 async-trait = { workspace = true }

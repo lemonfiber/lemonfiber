@@ -69,11 +69,13 @@ use lemonfiber_fixtures::walking::Walking;
 
 /// The subcommands that never become a [`Command`], and why.
 ///
-/// Named rather than filtered by shape, so that adding a third means saying what it
-/// is. Following a log is a stream rather than an answer, and the terminal is a
-/// program that then issues commands of its own — each of which arrives here under
-/// its own name.
-const NOT_DISPATCHED: [&str; 3] = ["logs", "ui", "help"];
+/// Named rather than filtered by shape, so that adding a fourth means saying what it
+/// is. Following a log is a stream rather than an answer; the terminal is a program
+/// that then issues commands of its own, each of which arrives here under its own
+/// name; and the documents a plugin author reads are generated at build time and
+/// carried in the binary, so reading one asks nothing of this machine and there is
+/// nothing for a rehearsal to spare.
+const NOT_DISPATCHED: [&str; 4] = ["logs", "ui", "plugin", "help"];
 
 /// What a rehearsal of each subcommand is driven with.
 ///

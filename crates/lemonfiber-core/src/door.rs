@@ -95,6 +95,7 @@ impl Facing {
 const NAMED: &[(&str, Facing)] = &[
     ("calibre-web-automated", Facing::Shelf),
     ("audiobookshelf", Facing::Shelf),
+    ("navidrome", Facing::Shelf),
     ("homepage", Facing::Operators),
     ("caddy", Facing::Carriage),
 ];
@@ -191,6 +192,7 @@ pub(crate) mod fixtures {
             describes: "a service".to_owned(),
             without_it: "nothing".to_owned(),
             media_types: Vec::new(),
+            provides: Vec::new(),
             depends_on: Vec::new(),
             grants: Vec::new(),
             host_managed: false,

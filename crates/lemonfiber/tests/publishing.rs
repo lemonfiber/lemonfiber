@@ -79,6 +79,10 @@ const HOUSEHOLD: &[(&str, &str)] = &[
         "caddy",
         "the hostnames and certificates every other household service is reached by",
     ),
+    (
+        "navidrome",
+        "a speaker in another room plays the music, and the speaker is not the host",
+    ),
 ];
 
 /// One published port: which service publishes it, on what address, and where

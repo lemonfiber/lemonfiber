@@ -26,11 +26,12 @@ use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 use tokio::sync::Mutex;
 
 /// Everything the `library` form declares.
-const LIBRARY: [&str; 4] = [
+const LIBRARY: [&str; 5] = [
     "jellyfin",
     "seerr",
     "calibre-web-automated",
     "audiobookshelf",
+    "navidrome",
 ];
 
 /// The budget a start is given, which is what these waits elapse.
@@ -51,9 +52,14 @@ struct Following {
 
 impl Following {
     /// Started now, at a fixed wall-clock moment.
+    ///
+    /// Far enough forward that nothing the shipped stack records has aged out of its
+    /// own freshness rule. A start reads the manifest before it waits, so a moment
+    /// behind the newest pin refuses the run — and a refused run says nothing, which
+    /// reads here as a wait that went quiet rather than as a date that went stale.
     fn started() -> Arc<Self> {
         Arc::new(Self {
-            from: SystemTime::UNIX_EPOCH + Duration::from_secs(1_786_968_000),
+            from: SystemTime::UNIX_EPOCH + Duration::from_secs(1_790_812_800),
             since: tokio::time::Instant::now(),
         })
     }
@@ -162,8 +168,8 @@ async fn the_first_line_arrives_seconds_in_rather_than_minutes_in() {
     assert_eq!(
         said.first().map(String::as_str),
         Some(
-            "Still starting: audiobookshelf, calibre-web-automated, jellyfin, seerr \
-             — 5 seconds so far, of 180."
+            "Still starting: audiobookshelf, calibre-web-automated, jellyfin, navidrome, \
+             seerr — 5 seconds so far, of 180."
         )
     );
 }

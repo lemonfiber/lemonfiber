@@ -38,8 +38,8 @@ use lemonfiber_ports::docker::{Health, Lifecycle};
 /// A date the shipped stack is current at, for the freshness rule the reader applies.
 const TODAY: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
     year: 2026,
-    month: 8,
-    day: 14,
+    month: 10,
+    day: 1,
 };
 
 /// The stack this repository carries, read from disk.

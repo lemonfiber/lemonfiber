@@ -106,6 +106,33 @@ surface:
     cargo run --quiet --example surface -p lemonfiber-core > contract/.surface.next
     mv contract/.surface.next contract/web-api.surface.json
 
+# Rewrite the schema a plugin author's editor validates `plugin.toml` against.
+#
+# From the types lemonfiber deserialises, never written: a hand-written one would be a
+# second description of the same contract that can disagree with the parser, and the
+# disagreement surfaces as a plugin that validates in an author's editor and is refused
+# on an operator's machine.
+plugin-schema:
+    cargo run --quiet --example plugin_schema -p lemonfiber-core > contract/plugin-manifest.schema.json
+
+# Rewrite the capability vocabulary from the types and the stack this build pins.
+#
+# Who declares each capability is read out of `assets/media-stack/stack.toml` rather
+# than restated, so moving the stack pin can move this file — which is the intended
+# behaviour. It refuses to write one that is untrue: a capability no bundled service
+# declares, or a name a bundled service declares that the vocabulary does not carry,
+# fails here rather than reaching a plugin author who would trust it.
+capabilities:
+    cargo run --quiet --example capabilities -p lemonfiber-core > contract/capability-vocabulary.json
+
+# Rewrite the extension points from the registers they name.
+#
+# The identities the bundled rows already hold come out of the doctor's own register,
+# so a check that is renamed moves this file rather than leaving a stale name a
+# contribution could take.
+extension-points:
+    cargo run --quiet --example extension_points -p lemonfiber-core > contract/extension-points.json
+
 # Rewrite the command reference from the declarations the binary parses with.
 reference:
     cargo run --quiet --example reference -p lemonfiber > reference/commands.md

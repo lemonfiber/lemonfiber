@@ -1,0 +1,29 @@
+# What a test that never finishes costs, and how long it may cost it.
+#
+# The suite runs in about three minutes. A fixture that named four services while the
+# stack declared five made five tests wait for a service that would never answer, and
+# because nothing bounded them the coverage job sat for fifty-one minutes and was
+# cancelled — on its way to the forge's six-hour limit, where it would have reported a
+# timeout naming nothing.
+#
+# That is the failure worth spending a setting on. A gate that goes red names what
+# broke; a gate that disappears leaves whoever reads it with a job id and no sentence.
+#
+# Ten minutes rather than something tighter, and the number is a real constraint rather
+# than a round one. Six setup tests drive a walk against an engine that never comes up,
+# so each of them sits out the start's whole patience budget on the wall clock — around
+# three minutes, and longer on a loaded machine with all six overlapping. A bound below
+# that would turn a slow test into a red one, which is the failure this is meant to
+# prevent wearing the opposite coat. Ten minutes is comfortably clear of them and two
+# orders of magnitude clear of the forge's own limit.
+#
+# Per-test, not per-run: the bound is on the one test that hangs rather than on the
+# suite around it, so the other thousand still report.
+[profile.default]
+slow-timeout = { period = "120s", terminate-after = 5 }
+
+# CI runs the same bound. A local run that abandoned a test and a CI run that waited
+# for it would be two answers to whether the suite finishes, and the one that matters
+# is the one nobody is watching.
+[profile.ci]
+slow-timeout = { period = "120s", terminate-after = 5 }

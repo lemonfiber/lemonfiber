@@ -15,8 +15,8 @@ use clap::Subcommand;
 
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
-    QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawDoctor, RawRemoving, RawSetup,
-    RawUi, UpdateCommand,
+    PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawDoctor,
+    RawRemoving, RawSetup, RawUi, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -160,6 +160,21 @@ pub enum Request {
     },
     /// Run the checks that prove the stack is doing what it should.
     Doctor(RawDoctor),
+    /// Read what a plugin may claim, where it may contribute, and how it is written.
+    ///
+    /// For somebody writing a plugin rather than running a stack. Everything under this
+    /// word is a read of a document this build publishes and attaches to every release:
+    /// the capabilities a service can claim, the places a plugin may extend lemonfiber
+    /// itself, and the schema an editor validates `plugin.toml` against.
+    ///
+    /// Every one of them answers with no network, no catalogue and no stack running,
+    /// and says which generation it is reporting — so an author who has to know whether
+    /// a difference is their build or their manifest can tell.
+    Plugin {
+        /// Which of the three documents to read.
+        #[command(subcommand)]
+        read: PluginCommand,
+    },
     /// Guard the data location while forms run, stopping them if it disappears.
     Watch {
         /// The forms to stop if the data location is lost.

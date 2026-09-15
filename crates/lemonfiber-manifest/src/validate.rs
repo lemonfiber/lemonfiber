@@ -149,6 +149,7 @@ fn check_services(
             .chain(permitted(service))
             .chain(versioned(service))
             .chain(outbound(service))
+            .chain(offered(service))
             .chain(depended(service, &of_service));
 
         let location = format!("service {}", service.id);
@@ -337,6 +338,32 @@ fn released(service: &Service, today: Date) -> Option<String> {
         )),
         Some(_) => None,
     }
+}
+
+/// A service offers each capability by a core name, and offers none of them twice.
+///
+/// Shape and nothing else. Whether a name is one the published vocabulary carries is
+/// that vocabulary's question and not this crate's — it is generated from this field,
+/// so a reader holding the set would be the cycle, and one holding a copy would be a
+/// second answer. What can be settled here is that a core name is `area.verb`: one dot,
+/// lowercase, and no colon, which is the shape a plugin's own namespaced capability
+/// takes and a bundled service may not.
+fn offered(service: &Service) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    service
+        .provides
+        .iter()
+        .flat_map(|named| {
+            let shape = (named.matches('.').count() != 1
+                || named.contains(':')
+                || named.split('.').any(str::is_empty)
+                || named.chars().any(|letter| letter.is_ascii_uppercase()))
+            .then(|| format!("provides {named}, which is not a core capability name"));
+            let repeated =
+                (!seen.insert(named.as_str())).then(|| format!("provides {named} more than once"));
+            shape.into_iter().chain(repeated)
+        })
+        .collect()
 }
 
 /// A service asks only for the kernel capabilities the stack is willing to grant.
@@ -578,6 +605,80 @@ mod tests {
 
     /// The line every service in the shipped stack has, which these cases add to.
     const AN_ID: &str = "id = \"prowlarr\"";
+
+    /// The first `provides` the shipped stack declares, which these cases stand in for.
+    ///
+    /// Read out of the stack rather than written here, so a stack that stops declaring
+    /// it is a test that fails loudly instead of one quietly proving nothing.
+    const OFFERS: &str = "provides = [\"indexer.search\"]";
+
+    /// The stack with one service declaring the given capabilities instead.
+    ///
+    /// Replaced rather than added beside: every service something can ask for declares
+    /// one now, and a second key in the same table is a parse failure rather than the
+    /// rule under test.
+    fn offering(named: &str) -> String {
+        edited(OFFERS, &format!("provides = [{named}]"))
+    }
+
+    /// A core name is `area.verb`, and the three ways it can fail to be one.
+    ///
+    /// Together rather than one test each, because they are one rule read three ways
+    /// and what matters is that each is *named* — a service told its capability is
+    /// wrong without being told which one is a service somebody has to go and diff.
+    #[test]
+    fn a_capability_that_is_not_a_core_name_is_caught() {
+        for wrong in [
+            "\"mediaserve\"",
+            "\"media.serve.now\"",
+            "\"komga:opds\"",
+            "\"Media.Serve\"",
+            "\"media.\"",
+        ] {
+            let said = messages(&offering(wrong));
+            assert!(
+                said.iter().any(
+                    |fault| fault.contains("which is not a core capability name")
+                        && fault.contains(wrong.trim_matches('"'))
+                ),
+                "{wrong} was not named: {said:?}"
+            );
+        }
+    }
+
+    /// One service declaring the same capability twice says it once and confuses the
+    /// count of who declares it.
+    #[test]
+    fn a_capability_declared_twice_by_one_service_is_caught() {
+        let said = messages(&offering("\"media.serve\", \"media.serve\""));
+        assert!(
+            said.iter()
+                .any(|fault| fault.contains("provides media.serve more than once")),
+            "{said:?}"
+        );
+    }
+
+    /// The shape rule and nothing beyond it: a core name this crate has never heard of
+    /// passes here, because what the vocabulary carries is the vocabulary's question.
+    #[test]
+    fn a_core_name_this_crate_knows_nothing_about_is_left_alone() {
+        // Joined rather than searched through a closure, which an empty list never
+        // enters — and an assertion whose only interesting half is a line no run
+        // reaches is an assertion the coverage gate is right to call missing.
+        let said = messages(&offering("\"media.serve\", \"nothing.here\"")).join("\n");
+        assert!(!said.contains("provides"), "{said}");
+    }
+
+    /// Every capability the shipped stack declares is a core name, and none is twice.
+    ///
+    /// The stack is the only caller of this rule that anybody actually reads, so the
+    /// case that matters most is the one where it is right — four of the twenty
+    /// services declare nothing at all, which is an answer rather than an omission.
+    #[test]
+    fn every_capability_the_shipped_stack_declares_passes_the_shape_rule() {
+        let said = messages(STACK).join("\n");
+        assert!(!said.contains("provides"), "{said}");
+    }
 
     /// The first of the two outbound lines the shipped stack carries, and the second.
     ///

@@ -68,6 +68,38 @@ jobs:
           gh release upload "$TAG" "$contract" --clobber --repo "$REPO"
           echo "attached $contract to $TAG"
 
+      # The three a plugin author's tooling reads, on the same terms and for the
+      # same reason. An editor validating `plugin.toml`, and a catalogue checking a
+      # claim against the vocabulary it was written for, both want the copy generated
+      # against the release they are targeting rather than whatever is on the trunk
+      # today (ARCH-R108). The names are unversioned so a consumer can ask a release
+      # for a fixed name and get that release's copy.
+      - name: Attach what a plugin is authored against
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for artefact in \
+            contract/plugin-manifest.schema.json \
+            contract/capability-vocabulary.json \
+            contract/extension-points.json
+          do
+            # A release missing one leaves an author's editor with nothing to validate
+            # against and a catalogue unable to check a claim, which is better
+            # discovered here than by a consumer.
+            if [ ! -s "$artefact" ]; then
+              echo "::error::$artefact is missing or empty at $TAG"
+              exit 1
+            fi
+
+            python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$artefact"
+
+            gh release upload "$TAG" "$artefact" --clobber --repo "$REPO"
+            echo "attached $artefact to $TAG"
+          done
+
       # A release says which manifest generation its stack carries, so that a copy
       # reading the release list can tell whether an update brings one it cannot read.
       # The declaration is the *name*: names arrive in the same reply the version is
