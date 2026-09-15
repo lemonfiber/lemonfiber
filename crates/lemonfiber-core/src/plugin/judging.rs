@@ -283,6 +283,23 @@ mod tests {
         assert_eq!(faults, vec!["isClaimed is false, and it declares true"]);
     }
 
+    /// A body that does not begin as declared says what it does begin with.
+    ///
+    /// The only fault of the nine that no case produced: the rule was demonstrated
+    /// accepting a body and never refusing one, which is the same hole the other way
+    /// round from the three above.
+    #[test]
+    fn a_body_that_begins_otherwise_says_what_it_begins_with() {
+        let faults = judge(
+            &expects(r#"{"body_starts_with": "<?xml"}"#),
+            &answered(r#"{"status": 200, "body_starts_with": "<!DOCTYPE html>"}"#),
+        );
+        assert_eq!(
+            faults,
+            vec![r#"the body begins "<!DOCTYPE html>", and it declares "<?xml""#]
+        );
+    }
+
     #[test]
     fn a_key_of_the_wrong_kind_names_both_kinds() {
         let faults = judge(

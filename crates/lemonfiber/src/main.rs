@@ -414,11 +414,10 @@ fn claims(path: &std::path::Path, json: bool) -> ExitCode {
 
 /// The capability vocabulary, in whichever form was asked for.
 ///
-/// Its own function because it is the one of the three documents that can refuse: it is
-/// read
-/// against the stack this build pins, and a stack that disagreed with the vocabulary
-/// would have failed generation long before here. Reported as this build's own fault
-/// rather than the operator's, because it is.
+/// Its own function because it is the one of the three documents that can refuse: it
+/// is read against the stack this build pins, and a stack that disagreed with the
+/// vocabulary would have failed generation long before here. Reported as this build's
+/// own fault rather than the operator's, because it is.
 fn capabilities(json: bool) -> Result<Option<render::Lines>, ExitCode> {
     match lemonfiber_core::plugin::capabilities() {
         Ok(_) if json => Ok(lemonfiber_core::plugin::vocabulary()

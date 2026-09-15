@@ -777,6 +777,11 @@ why    = "Until somebody does, the first caller on the household network becomes
                     .collect()
             })
             .unwrap_or_default();
+        // Built on a line that always runs: a message an assertion computes for itself
+        // only runs where it fails, which is a line nothing covers.
+        let refused: Vec<String> = read
+            .map(|read| read.refusals.iter().map(ToString::to_string).collect())
+            .unwrap_or_default();
         assert_eq!(
             said,
             vec![
@@ -785,12 +790,7 @@ why    = "Until somebody does, the first caller on the household network becomes
                  account"
                     .to_owned(),
             ],
-            "refusals: {:?}",
-            read.map(|read| read
-                .refusals
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>())
+            "refusals: {refused:?}"
         );
     }
 
