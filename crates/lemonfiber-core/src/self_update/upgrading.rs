@@ -12,7 +12,7 @@
 //! naming no version would be a command that fails. Where the version cannot be
 //! read, nothing is printed rather than something that will not work.
 
-use crate::migration::version::{against, Standing};
+use crate::migration::version::{among_versions, Standing};
 
 use super::installed::Installed;
 
@@ -155,7 +155,7 @@ pub fn carries(reads: &[u32], offered: Option<u32>) -> String {
 /// two cannot be ordered, that is said instead of a claim about which came first.
 #[must_use]
 pub fn configuration(named: &str, running: &str) -> String {
-    match against(named, running) {
+    match among_versions(named, running) {
         Standing::Earlier => format!(
             "{named} is behind the copy running, and reads this machine's configuration as it \
              stands. Settings are names and values in one file, nothing lemonfiber keeps \

@@ -67,6 +67,9 @@ RELEASES = "https://github.com/lemonfiber/lemonfiber/releases/tag"
 # A tag this project cuts a release from.
 TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
+# A tag cut ahead of a release, which is not one.
+AHEAD = re.compile(r"^v\d+\.\d+\.\d+-")
+
 # The forge reference a squash merge leaves on the subject, which is a fact about
 # where the change was reviewed rather than part of what changed.
 REVIEWED = re.compile(r"\s*\(#(\d+)\)\s*$")
@@ -266,6 +269,37 @@ def withdrawal(version: str, held: dict[str, dict], carried: dict[str, str]) -> 
     return None
 
 
+def folded(context: list[dict]) -> list[dict]:
+    """Sections with each pre-release merged into the release it precedes.
+
+    `git cliff` gives a tag cut ahead of a release a section of its own, and `release`
+    refuses it — its version is not a release. Left there, every commit under it would
+    land in no release at all and the record would lose them without saying so, which
+    is the one thing a changelog must never do.
+
+    Sections arrive newest-first, so the release a pre-release precedes is the one
+    already kept, and the pre-release's commits are the older half of that release's.
+    Where nothing has been released since, that is the unreleased section, which is
+    exactly where they belong until the release tag arrives — and where there is no
+    section at all to hold them, one is made rather than dropping them on the floor.
+    """
+    kept: list[dict] = []
+    for section in context:
+        if AHEAD.match(section.get("version") or "") is None:
+            kept.append(section)
+            continue
+        if not kept:
+            kept.append({"version": None, "commits": []})
+        # Copied rather than edited in place. What arrives here is `git cliff`'s own
+        # answer, and a function that rewrites its argument gives a different result
+        # the second time it is called on it — which is how a self-test came to read
+        # one commit twice and call the merge broken.
+        newer = dict(kept[-1])
+        newer["commits"] = (section.get("commits") or []) + (newer.get("commits") or [])
+        kept[-1] = newer
+    return kept
+
+
 def release(
     section: dict,
     held: dict[str, dict],
@@ -309,7 +343,7 @@ def record_of(context: list[dict], spec: pathlib.Path) -> dict:
     index: dict[str, Requirement] = {}
     releases = [
         found
-        for section in context
+        for section in folded(context)
         if (found := release(section, held, carried, catalogue, index)) is not None
     ]
     return {
@@ -502,6 +536,10 @@ def self_test() -> int:
     context = [
         {"version": None, "commits": [commit("not out yet", "<!-- 0 -->Features", "A6-R1")]},
         {
+            "version": "v0.2.1-pre.1",
+            "commits": [commit("cut ahead of the patch (#8)", "<!-- 1 -->Fixes", "A6-R2")],
+        },
+        {
             "version": "v0.2.1",
             "commits": [commit("put the broken pin back (#9)", "<!-- 1 -->Fixes", "A6-R2")],
         },
@@ -532,7 +570,7 @@ def self_test() -> int:
     index: dict[str, Requirement] = {}
     releases = [
         found
-        for section in context
+        for section in folded(context)
         if (found := release(section, held, carried, catalogue, index)) is not None
     ]
     record = {
@@ -541,8 +579,22 @@ def self_test() -> int:
     }
 
     # Nothing that has not shipped reaches the record, and every tag that has does.
+    # A tag cut ahead of a release is not one of them, and its commits are not lost:
+    # they belong to the release it precedes, which here is the unreleased section.
     if [one["version"] for one in releases] != ["0.2.1", "0.2.0", "0.1.0"]:
         failures.append(f"the releases are not the tags: {[one['version'] for one in releases]}")
+    if any("cut ahead of the patch" in str(one) for one in releases):
+        failures.append("a pre-release's commits reached a release it did not ship in")
+    ahead = folded(context)[0]
+    if [one["message"] for one in ahead["commits"]] != [
+        "cut ahead of the patch (#8)",
+        "not out yet",
+    ]:
+        failures.append(f"a pre-release's commits were dropped rather than folded: {ahead}")
+    if folded([{"version": "v0.3.0-pre.1", "commits": [commit("first", "g", None)]}])[0][
+        "version"
+    ] is not None:
+        failures.append("a pre-release with nothing after it lost its commits")
     if "A6-R1" in record["requirements"] and record["requirements"]["A6-R1"]["shipped_in"] != ["0.2.0"]:
         failures.append("an unreleased commit reached the record")
 

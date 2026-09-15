@@ -59,6 +59,45 @@ pub fn against(one: &str, two: &str) -> Standing {
     }
 }
 
+/// A version split into the release it names and the identifier standing before it.
+fn split(version: &str) -> (&str, Option<&str>) {
+    match version.split_once('-') {
+        Some((release, identifier)) => (release, Some(identifier)),
+        None => (version, None),
+    }
+}
+
+/// How `one` stands against `two`, reading a semver pre-release identifier.
+///
+/// [`against`] is written for image tags, where what follows a hyphen is a build
+/// variant: `4.0.15-ls123` is the same upstream release packaged differently rather
+/// than an earlier one, and reading it as precedence there would flip a downgrade
+/// refusal — the failure that comparison exists to prevent. lemonfiber's own version
+/// is a different thing. A hyphen there is semver's pre-release identifier, and
+/// `0.15.0-pre.1` precedes `0.15.0` because it is a build cut ahead of it.
+///
+/// So the two readings are two functions rather than one with a flag, and each is
+/// used where its meaning is the true one: this for the program's own version,
+/// [`against`] for the tags of the images it runs.
+#[must_use]
+pub fn among_versions(one: &str, two: &str) -> Standing {
+    let (first, ahead) = split(one);
+    let (second, behind) = split(two);
+    match against(first, second) {
+        Standing::Same => match (ahead, behind) {
+            (None, None) => Standing::Same,
+            (Some(_), None) => Standing::Earlier,
+            (None, Some(_)) => Standing::Later,
+            (Some(one), Some(two)) if one == two => Standing::Same,
+            // Two builds cut ahead of one release. Semver orders them by their
+            // identifiers; nothing here needs that answer, and guessing it is how a
+            // comparison built to refuse guesses starts making them.
+            (Some(_), Some(_)) => Standing::Untellable,
+        },
+        ordered => ordered,
+    }
+}
+
 /// How large a step from one version to another is.
 ///
 /// Named after the part of the version that moved rather than after a size, because
@@ -113,7 +152,42 @@ fn numbers(tag: &str) -> Option<Vec<u64>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{against, step, Jump, Standing};
+    use super::{against, among_versions, step, Jump, Standing};
+
+    #[test]
+    fn a_build_cut_ahead_of_a_release_precedes_it() {
+        assert_eq!(among_versions("0.15.0-pre.1", "0.15.0"), Standing::Earlier);
+        assert_eq!(among_versions("0.15.0", "0.15.0-pre.1"), Standing::Later);
+        assert_eq!(
+            among_versions("0.15.0-pre.1", "0.15.0-pre.1"),
+            Standing::Same
+        );
+    }
+
+    #[test]
+    fn two_builds_ahead_of_one_release_are_not_ordered_against_each_other() {
+        assert_eq!(
+            among_versions("0.15.0-pre.1", "0.15.0-pre.2"),
+            Standing::Untellable
+        );
+    }
+
+    #[test]
+    fn the_release_a_build_precedes_is_what_orders_it_against_everything_else() {
+        assert_eq!(among_versions("0.15.0-pre.1", "0.14.0"), Standing::Later);
+        assert_eq!(among_versions("0.15.0-pre.1", "0.16.0"), Standing::Earlier);
+        assert_eq!(
+            among_versions("not-a-version", "0.14.0"),
+            Standing::Untellable
+        );
+    }
+
+    #[test]
+    fn an_image_tag_keeps_the_reading_written_for_image_tags() {
+        // `4.0.15-ls123` is the same upstream release packaged differently, and
+        // `against` says so by refusing to order it rather than calling it earlier.
+        assert_eq!(against("4.0.15-ls123", "4.0.15"), Standing::Untellable);
+    }
 
     #[test]
     fn the_same_tag_is_the_same_version() {
