@@ -18,7 +18,7 @@
 
 use serde::Deserialize;
 
-use crate::migration::version::{against, Standing};
+use crate::migration::version::{against, among_versions, Standing};
 use crate::ports::http::{Method, Request};
 
 /// How many of the most recent releases to read.
@@ -107,6 +107,9 @@ pub fn newest(answered: &str) -> Option<String> {
     let mut best: Option<String> = None;
     for release in released.into_iter().filter(|release| !release.draft) {
         let version = release.tag_name.trim_start_matches('v').to_owned();
+        if cut_ahead(&version) {
+            continue;
+        }
         let later = match &best {
             None => ordered(&version),
             Some(held) => against(&version, held) == Standing::Later,
@@ -168,6 +171,18 @@ fn ordered(version: &str) -> bool {
     against(version, "0.0.0") != Standing::Untellable
 }
 
+/// Whether a tag names a build cut ahead of a release rather than a release.
+///
+/// Read here rather than left to the comparison, and the difference is the whole
+/// point. A pre-release goes out while its version is still staged, carrying the
+/// goals the release gate calls unmet; offering it would be recommending it. It used
+/// to be skipped by accident — the tag is not a dotted run of numbers, so nothing
+/// could order it — and an accident is a property that survives exactly until
+/// somebody makes the parser cleverer, which is what [`among_versions`] just did.
+fn cut_ahead(version: &str) -> bool {
+    version.contains('-')
+}
+
 /// Where the running version stands against the newest released one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Availability {
@@ -182,7 +197,7 @@ pub enum Availability {
 /// Where `running` stands against `offered`.
 #[must_use]
 pub fn standing(running: &str, offered: &str) -> Availability {
-    match against(running, offered) {
+    match among_versions(running, offered) {
         Standing::Earlier => Availability::Newer(offered.to_owned()),
         Standing::Same | Standing::Later => Availability::Current,
         Standing::Untellable => Availability::Untellable,
@@ -364,8 +379,23 @@ mod tests {
     }
 
     #[test]
+    fn a_build_cut_ahead_of_a_release_is_offered_that_release() {
+        // This used to answer `Untellable`, and the reason was an accident: the tag
+        // is not a dotted run of numbers, so nothing could order it. Somebody running
+        // a build cut ahead of 0.13.0 is exactly the person who wants 0.13.0 when it
+        // arrives, and telling them the question cannot be answered is a worse reply
+        // than the true one.
+        assert_eq!(
+            standing("0.13.0-pre.1", "0.13.0"),
+            Availability::Newer("0.13.0".to_owned())
+        );
+        assert_eq!(standing("0.13.0-pre.1", "0.12.0"), Availability::Current);
+    }
+
+    #[test]
     fn two_versions_that_cannot_be_ordered_claim_nothing_about_either() {
-        assert_eq!(standing("0.13.0-rc1", "0.13.0"), Availability::Untellable);
+        assert_eq!(standing("nightly", "0.13.0"), Availability::Untellable);
+        assert_eq!(standing("0.13.0", "nightly"), Availability::Untellable);
     }
 
     /// The same reply shape, with the files a release publishes beside each entry.

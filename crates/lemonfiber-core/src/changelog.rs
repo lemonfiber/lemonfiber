@@ -27,7 +27,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::migration::version::{against, Standing};
+use crate::migration::version::{among_versions, Standing};
 
 /// Where the generated record is kept, relative to the workspace root.
 pub const RECORD_PATH: &str = "reference/changelog.json";
@@ -246,7 +246,7 @@ pub fn told(record: Option<&Record>, running: &str) -> Notes {
 /// that contradicts what went out as though it agreed.
 fn state(record: &Record, running: &str) -> State {
     for release in &record.releases {
-        match against(&release.version, running) {
+        match among_versions(&release.version, running) {
             Standing::Later | Standing::Untellable => return State::Stale,
             Standing::Earlier | Standing::Same => {}
         }
@@ -367,6 +367,24 @@ mod tests {
             said.running.map(|release| release.withdrawn),
             Some(Some("the installer shipped a broken pin".to_owned()))
         );
+    }
+
+    #[test]
+    fn a_build_cut_ahead_of_its_release_is_pending_rather_than_stale() {
+        // `0.3.0-pre.1` precedes `0.3.0`. The record holds 0.1.0 and 0.2.0 and so
+        // claims nothing this build could not have shipped — what is missing is notes
+        // for a release that has not happened, which is the lag `Pending` names.
+        // Read whole, the version is not a dotted run of numbers and every comparison
+        // answers untellable, which would have called an honest record a contradiction.
+        assert_eq!(told(two().as_ref(), "0.3.0-pre.1").state, State::Pending);
+    }
+
+    #[test]
+    fn a_version_that_is_not_one_is_still_a_contradiction() {
+        // Dropping a suffix from something that was never a version leaves something
+        // that still is not, so the answer this exists to give is unchanged.
+        assert_eq!(told(two().as_ref(), "not-a-version").state, State::Stale);
+        assert_eq!(told(two().as_ref(), "garbage").state, State::Stale);
     }
 
     #[test]
