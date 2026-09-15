@@ -1192,6 +1192,7 @@ Commands:
   capabilities      List the capabilities a service can claim, and what claiming one undertakes
   extension-points  List the places a plugin may extend lemonfiber itself
   schema            Print the schema an editor validates `plugin.toml` against
+  claims            Read a plugin's source and say what its claims come to
   help              Print this message or the help of the given subcommand(s)
 
 Options:
@@ -1291,6 +1292,46 @@ Print the schema an editor validates `plugin.toml` against.
 Generated from the types lemonfiber reads a manifest with, so it describes the reader rather than claiming something about it. Always machine-readable: it is a document for an editor rather than a listing for a person.
 
 Usage: lemonfiber plugin schema [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin claims`
+
+```text
+Read a plugin's source and say what its claims come to.
+
+The three documents above say what may be written; this says what one manifest wrote. Everything it declares is held to the published vocabulary and the published points in one pass, every probe a claim binds is run against the recording it names, and each capability is reported as demonstrated, unproven or refuted rather than as claimed.
+
+It then says what asking for each capability would come to on the stack this build pins: filled by one service, contested between several — which lemonfiber refuses to settle by install order — or inert, which is what a capability of the plugin's own is until something asks for it.
+
+A refusal, or a claim its own recordings refute, exits non-zero. Nothing is installed, nothing is written, and no service is asked anything.
+
+Usage: lemonfiber plugin claims [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The plugin's source: its directory, or the `plugin.toml` inside it
 
 Options:
       --json

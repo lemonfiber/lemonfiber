@@ -26,6 +26,7 @@
 //! | [`config`] | What the operator chose, and where it is kept |
 //! | [`doctor`] | Checks that prove things rather than assuming them |
 //! | [`plugin`] | The three artefacts a plugin author reads, generated |
+//! | [`filling`] | Which service fills a capability a wiring asks for |
 //! | [`prerequisites`] | What the operator must obtain, from what they chose |
 //! | [`seed`] | Wiring the services to each other |
 //! | [`journal`] | What was changed, so it can be undone |
@@ -70,6 +71,7 @@ pub mod docker;
 pub mod doctor;
 pub mod door;
 mod endpoint;
+pub mod filling;
 pub mod frontend;
 pub mod glossary;
 pub mod health;

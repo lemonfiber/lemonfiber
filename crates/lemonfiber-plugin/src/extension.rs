@@ -230,6 +230,22 @@ const DOCTOR_REMEDY: Point = Point {
 /// Every point this build publishes, in the order the artefact lists them.
 pub const POINTS: &[Point] = &[DOCTOR_CHECK, DOCTOR_REMEDY];
 
+/// The point a finding is contributed at.
+///
+/// Exposed because one rule is about these two points in particular — every check
+/// carries a remedy, and a remedy names a check — and a rule holding its own copy of
+/// either name is a rule a rename switches off without failing.
+#[must_use]
+pub const fn check() -> &'static str {
+    DOCTOR_CHECK.name
+}
+
+/// The point the remedy for a finding is contributed at.
+#[must_use]
+pub const fn remedy() -> &'static str {
+    DOCTOR_REMEDY.name
+}
+
 /// The categories a contributed check may be narrowed to.
 ///
 /// Exposed so the register that owns them can be held to this list rather than this
@@ -285,6 +301,15 @@ mod tests {
     fn it_publishes_the_two_points_a_plugin_may_contribute_at() {
         let named: Vec<&str> = POINTS.iter().map(|point| point.name).collect();
         assert_eq!(named, vec!["doctor.check", "doctor.remedy"]);
+    }
+
+    /// The two a rule elsewhere is about are the two this publishes, by identity rather
+    /// than by a name written down twice.
+    #[test]
+    fn the_two_points_a_rule_names_are_the_two_that_are_published() {
+        assert!(POINTS.iter().any(|point| point.name == super::check()));
+        assert!(POINTS.iter().any(|point| point.name == super::remedy()));
+        assert_ne!(super::check(), super::remedy());
     }
 
     #[test]

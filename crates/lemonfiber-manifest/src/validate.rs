@@ -22,7 +22,40 @@ const FLOATING_TAGS: &[&str] = &[
 /// Deliberately one entry. A kernel capability is a hole in the isolation the
 /// stack otherwise relies on, and the tunnel genuinely needs this one to build
 /// an interface. Anything else should have to argue for itself in a spec change.
-const ALLOWED_GRANTS: &[&str] = &["NET_ADMIN"];
+///
+/// Public because it is one of two sets of things called capabilities in this system,
+/// and the rule that no name may be in both is only checkable by something that can
+/// see both.
+pub const ALLOWED_GRANTS: &[&str] = &["NET_ADMIN"];
+
+/// Whether a name has the shape of a core capability: an area, a dot and a verb.
+///
+/// The one definition of that shape. Which kind a name is has to be decidable by
+/// reading it — that is what lets a plugin's own namespaced capability be told from
+/// lemonfiber's in a listing neither of them wrote, and what makes a core-looking name
+/// no vocabulary carries a name that is *missing* rather than somebody's namespace.
+///
+/// Here rather than beside the vocabulary because both readers of the shape are
+/// downstream of this crate: a stack's `provides` is checked here, a plugin's against
+/// the published set, and two spellings of one shape is a name one reader accepts and
+/// the other refuses.
+#[must_use]
+pub fn is_core_name(name: &str) -> bool {
+    let mut halves = name.split('.');
+    match (halves.next(), halves.next(), halves.next()) {
+        (Some(area), Some(verb), None) => word(area) && word(verb),
+        _ => false,
+    }
+}
+
+/// One half of a core name: lowercase, starting with a letter, hyphens inside it.
+fn word(half: &str) -> bool {
+    half.starts_with(|first: char| first.is_ascii_lowercase())
+        && !half.ends_with('-')
+        && half
+            .chars()
+            .all(|each| each.is_ascii_lowercase() || each.is_ascii_digit() || each == '-')
+}
 
 /// The OSI-approved identifiers a service licence may use.
 const OSI: &str = include_str!("spdx_osi.txt");
@@ -354,11 +387,8 @@ fn offered(service: &Service) -> Vec<String> {
         .provides
         .iter()
         .flat_map(|named| {
-            let shape = (named.matches('.').count() != 1
-                || named.contains(':')
-                || named.split('.').any(str::is_empty)
-                || named.chars().any(|letter| letter.is_ascii_uppercase()))
-            .then(|| format!("provides {named}, which is not a core capability name"));
+            let shape = (!is_core_name(named))
+                .then(|| format!("provides {named}, which is not a core capability name"));
             let repeated =
                 (!seen.insert(named.as_str())).then(|| format!("provides {named} more than once"));
             shape.into_iter().chain(repeated)

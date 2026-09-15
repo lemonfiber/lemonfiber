@@ -223,6 +223,22 @@ pub fn carried() -> &'static [Capability] {
     CARRIED
 }
 
+/// Every name a published generation carried and this one does not.
+///
+/// Read by the reader that refuses a manifest naming one, so that a name which *went*
+/// is reported as having gone rather than as never having existed — the two are
+/// different facts and only one of them has somewhere to point.
+#[must_use]
+pub fn removed() -> &'static [Removed] {
+    REMOVED
+}
+
+// The shape of a core name is the stack manifest's, re-exported rather than restated.
+// A bundled service's `provides` is checked against it there and a plugin's is checked
+// against it here, and two spellings of one shape is a name one reader accepts and the
+// other refuses — with nothing to say which is right.
+pub use lemonfiber_manifest::is_core_name;
+
 /// The vocabulary as it is published against a given set of bundled services.
 ///
 /// `declared_by` is read out of the stack manifest rather than written beside each
@@ -288,7 +304,11 @@ pub fn published(
 
 #[cfg(test)]
 mod tests {
-    use super::{carried, published, Constraint, Credential, Unpublishable, VOCABULARY_VERSION};
+    use std::collections::BTreeSet;
+
+    use super::{
+        carried, is_core_name, published, Constraint, Credential, Unpublishable, VOCABULARY_VERSION,
+    };
 
     /// A stack declaring every capability this generation carries, one service each.
     ///
@@ -457,19 +477,88 @@ mod tests {
 
     /// A core name is `area.verb`, which is what lets a plugin's own be told apart
     /// from one of these by reading the name.
+    ///
+    /// Asked through the same function a manifest's names are asked through, rather
+    /// than by a second reading of the rule here: a shape these names satisfied and a
+    /// plugin's were refused for would be two rules wearing one name.
     #[test]
     fn every_core_name_is_an_area_and_a_verb_and_nothing_else() {
         let wrong: Vec<&str> = carried()
             .iter()
             .map(|held| held.name)
-            .filter(|name| {
-                name.matches('.').count() != 1
-                    || name.contains(':')
-                    || name != &name.to_lowercase()
-                    || name.split('.').any(str::is_empty)
-            })
+            .filter(|name| !is_core_name(name))
             .collect();
         assert!(wrong.is_empty(), "these are not `area.verb`: {wrong:?}");
+    }
+
+    /// The shapes that are not core names, each for its own reason.
+    ///
+    /// A namespaced name is the one that matters — it is what a plugin's own capability
+    /// looks like, and reading one as a core name would have the vocabulary refuse it
+    /// as unknown instead of accepting it as inert.
+    #[test]
+    fn a_name_that_is_not_an_area_and_a_verb_is_not_a_core_name() {
+        for odd in [
+            "komga:opds",
+            "media",
+            "media.serve.now",
+            "Media.Serve",
+            "media.",
+            ".serve",
+            "media.serve-",
+            "1media.serve",
+            "media serve",
+        ] {
+            assert!(!is_core_name(odd), "{odd} reads as a core name");
+        }
+        assert!(is_core_name("media.serve"), "the ordinary shape");
+        assert!(
+            is_core_name("network.egress-guard"),
+            "a hyphen inside a half"
+        );
+    }
+
+    /// No name is in both of the two sets called capabilities, and the two cannot be
+    /// confused by somebody who does not know which document they are reading.
+    ///
+    /// One is what a *service* can do and the other is a hole in a container's
+    /// isolation, and they were one word until the stack manifest's field was renamed.
+    /// The rule that kept them apart afterwards was that nobody would pick the same
+    /// name twice, which is not a rule. Shape decides it instead: a kernel grant is
+    /// shouted and carries no dot, a capability is an area and a verb, and neither can
+    /// be read as the other.
+    #[test]
+    fn no_name_is_both_a_capability_and_a_kernel_grant() {
+        let granted: BTreeSet<&str> = lemonfiber_manifest::ALLOWED_GRANTS
+            .iter()
+            .copied()
+            .collect();
+        assert!(!granted.is_empty(), "there are kernel grants to be unlike");
+        let shared: Vec<&str> = carried()
+            .iter()
+            .map(|held| held.name)
+            .filter(|name| granted.contains(name))
+            .collect();
+        assert!(shared.is_empty(), "these are in both sets: {shared:?}");
+
+        let readable: Vec<&str> = granted
+            .iter()
+            .copied()
+            .filter(|grant| is_core_name(grant))
+            .collect();
+        assert!(
+            readable.is_empty(),
+            "these kernel grants read as capabilities: {readable:?}"
+        );
+        let shouted: Vec<&str> = carried()
+            .iter()
+            .map(|held| held.name)
+            .filter(|name| *name == name.to_uppercase())
+            .collect();
+        assert!(
+            shouted.is_empty(),
+            "these capabilities read as kernel grants: {shouted:?}"
+        );
     }
 
     /// A probe asked with nothing held that required a body would be asking a question

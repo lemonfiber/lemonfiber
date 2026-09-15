@@ -11,7 +11,10 @@
 //! whether the difference is their build or their file, and the generation is the only
 //! thing that answers that.
 
-use lemonfiber_core::plugin::{Capabilities, Credential, Points, Probe};
+use lemonfiber_core::filling::Filling;
+use lemonfiber_core::plugin::{
+    Capabilities, Claimed, Claiming, Credential, Points, Probe, Ran, Verdict,
+};
 
 use super::Lines;
 
@@ -129,9 +132,413 @@ fn taken(occupied: &[String]) -> String {
     format!("{} — {}", occupied.len(), occupied.join(", "))
 }
 
+/// What one plugin's source claims, in whichever form was asked for.
+///
+/// The machine-readable form is the report as it stands rather than a second shape
+/// written beside it: what an author's CI branches on and what a person reads are the
+/// same answer, and two renderings of one answer is the disagreement this avoids.
+pub(crate) fn claimed(read: &Claimed, json: bool) -> Option<Lines> {
+    if json {
+        return serde_json::to_string_pretty(read)
+            .ok()
+            .as_deref()
+            .map(document);
+    }
+    Some(claims(read))
+}
+
+/// What one plugin's source claims, and what this build makes of it.
+///
+/// The refusals come first and are the whole answer where there are any: a manifest
+/// that contradicts what this build publishes is refused outright rather than partly
+/// applied, so reporting what its claims would have come to would be describing an
+/// install that is not going to happen.
+fn claims(read: &Claimed) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{} {} — {}", read.id, read.version, read.name));
+    lines.put(format!(
+        "held to capability vocabulary generation {} and extension points generation {}.",
+        read.vocabulary_version, read.extension_points_version
+    ));
+
+    if !read.refusals.is_empty() {
+        lines.spaced(format!(
+            "Refused, {}:",
+            counted(read.refusals.len(), "violation")
+        ));
+        for refusal in &read.refusals {
+            lines.put(format!("  {} — {}", refusal.location, refusal.message));
+        }
+    }
+
+    if read.capabilities.is_empty() {
+        lines.spaced("It claims no capabilities, so nothing can ask for what it installs.");
+    } else {
+        lines.spaced("What it can do");
+        for claiming in &read.capabilities {
+            capability(&mut lines, claiming);
+        }
+    }
+
+    if !read.contributions.is_empty() {
+        lines.spaced("What it adds to lemonfiber's own registers");
+        for row in &read.contributions {
+            let about = row
+                .about
+                .as_ref()
+                .map_or_else(String::new, |check| format!("  (for {check})"));
+            lines.put(format!("  {} {}{about}", row.at, row.id));
+            if !row.says.is_empty() {
+                lines.put(format!("    {}", row.says));
+            }
+        }
+    }
+
+    lines.spaced(if read.installable {
+        "Nothing here stops it being installed. No service was asked anything: every \
+         verdict above is against the recordings this plugin ships."
+    } else {
+        "As it stands this would not be installed."
+    });
+    lines
+}
+
+/// One capability, its probes, and what asking for it would come to.
+fn capability(lines: &mut Lines, claiming: &Claiming) {
+    lines.put(format!(
+        "  {}  [{}]",
+        claiming.name,
+        claiming.shown.as_str()
+    ));
+    for ran in &claiming.probes {
+        lines.put(format!("    probe {} — {}", ran.probe, verdict(ran)));
+    }
+    if !claiming.shown.can_fill() && claiming.filling.is_some() {
+        // What follows is what asking for the capability comes to, and this claim is not
+        // part of it. Said before the line rather than after, because a list of
+        // claimants under a refuted claim otherwise reads as the claim standing.
+        lines.put(format!(
+            "    this claim is {} and does not fill it",
+            claiming.shown.as_str()
+        ));
+    }
+    // Which of the two kinds this is decides the line, rather than whether there is an
+    // answer about what fills it. There is no answer for a core name the vocabulary
+    // does not carry either, and calling that one *this plugin's own* would describe a
+    // capability the refusal above has just said does not exist.
+    if claiming.own {
+        lines.put(
+            "    this plugin's own, and inert: nothing asks for it, and no published \
+             contract defines it"
+                .to_owned(),
+        );
+        return;
+    }
+    match &claiming.filling {
+        None => lines
+            .put("    nothing published carries this name, so nothing can ask for it".to_owned()),
+        Some(Filling::By { service }) => {
+            lines.put(format!("    asking for it reaches {service}"));
+        }
+        Some(Filling::Contested { claimants }) => {
+            lines.put(format!(
+                "    contested between {} — nothing wires to it until the operator chooses, and \
+                 lemonfiber does not choose by install order",
+                claimants.join(", ")
+            ));
+        }
+        Some(Filling::Unfilled) => lines.put(
+            "    nothing fills it: this claim is not one that can, and nothing else claims it"
+                .to_owned(),
+        ),
+    }
+}
+
+/// What one probe came to, in one line.
+fn verdict(ran: &Ran) -> String {
+    match &ran.verdict {
+        Verdict::Passed => "the recording answers it".to_owned(),
+        Verdict::Failed { faults } => format!("refuted: {}", faults.join("; ")),
+        Verdict::Unproven { why } => format!("unproven: {why}"),
+    }
+}
+
+/// A count and the thing counted, pluralised where it is not one.
+fn counted(number: usize, thing: &str) -> String {
+    if number == 1 {
+        format!("{number} {thing}")
+    } else {
+        format!("{number} {thing}s")
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{capabilities, document, points};
+    use lemonfiber_core::filling::{Filling, Shown};
+    use lemonfiber_core::plugin::{Claimed, Claiming, Contributed, Ran, Verdict, Violation};
+
+    use super::{capabilities, claimed, claims, document, points};
+
+    /// One capability as the reader hands it over, with one probe that passed.
+    fn claiming(name: &str, shown: Shown, filling: Option<Filling>) -> Claiming {
+        with(name, shown, filling, Verdict::Passed)
+    }
+
+    /// The same, with whatever the probe came to.
+    fn with(name: &str, shown: Shown, filling: Option<Filling>, verdict: Verdict) -> Claiming {
+        Claiming {
+            name: name.to_owned(),
+            service: "kavita".to_owned(),
+            own: !name.contains('.'),
+            shown,
+            probes: vec![Ran {
+                probe: "guarded".to_owned(),
+                verdict,
+            }],
+            filling,
+        }
+    }
+
+    /// One plugin as the reader hands it over, carrying the capabilities given.
+    fn read(capabilities: Vec<Claiming>, refusals: Vec<Violation>) -> Claimed {
+        Claimed {
+            id: "kavita".to_owned(),
+            name: "Kavita".to_owned(),
+            version: "1.0.0".to_owned(),
+            vocabulary_version: 1,
+            extension_points_version: 1,
+            installable: refusals.is_empty(),
+            refusals,
+            capabilities,
+            contributions: vec![Contributed {
+                at: "doctor.check".to_owned(),
+                id: "kavita:settings-guarded".to_owned(),
+                says: "The settings are not readable by the household".to_owned(),
+                about: None,
+            }],
+        }
+    }
+
+    /// Each of the three answers an ask can come to reaches the page in its own words.
+    #[test]
+    fn what_asking_for_a_capability_comes_to_is_said_three_ways() {
+        let text = claims(&read(
+            vec![
+                claiming(
+                    "media.serve",
+                    Shown::Demonstrated,
+                    Some(Filling::Contested {
+                        claimants: vec!["jellyfin".to_owned(), "kavita (plugin kavita)".to_owned()],
+                    }),
+                ),
+                claiming(
+                    "identity.source",
+                    Shown::Demonstrated,
+                    Some(Filling::By {
+                        service: "jellyfin".to_owned(),
+                    }),
+                ),
+                claiming("request.intake", Shown::Refuted, Some(Filling::Unfilled)),
+            ],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            text.contains("contested between jellyfin, kavita (plugin kavita)"),
+            "{text}"
+        );
+        assert!(text.contains("does not choose by install order"), "{text}");
+        assert!(text.contains("asking for it reaches jellyfin"), "{text}");
+        assert!(text.contains("nothing fills it"), "{text}");
+        assert!(
+            text.contains("this claim is refuted and does not fill it"),
+            "{text}"
+        );
+    }
+
+    /// A plugin adding nothing to lemonfiber's own registers gets no heading for one.
+    ///
+    /// Read here rather than left to the test that drives the binary, because this file
+    /// is compiled twice under coverage — once for these cases and once for the binary
+    /// those drive — and a branch taken in only one of the two is a line the summary
+    /// counts as missed and the line list cannot name.
+    #[test]
+    fn a_plugin_that_contributes_nothing_gets_no_heading_for_it() {
+        let mut read = read(
+            vec![claiming("media.serve", Shown::Demonstrated, None)],
+            Vec::new(),
+        );
+        read.contributions = Vec::new();
+        let text = claims(&read).text();
+        assert!(
+            !text.contains("What it adds to lemonfiber's own registers"),
+            "{text}"
+        );
+        assert!(text.contains("media.serve"), "{text}");
+    }
+
+    /// A remedy names the check it is for, and a row saying nothing takes no line for it.
+    ///
+    /// Both halves of a contributed row's line. A row carrying neither a title nor an
+    /// action is one the rules refuse — and the listing is rendered anyway, because an
+    /// author needs to see the row that was refused rather than a plugin with nothing in
+    /// it. So the empty line is reachable from a manifest rather than defensive.
+    #[test]
+    fn a_contributed_row_names_what_it_is_for_and_says_nothing_where_it_holds_nothing() {
+        let mut read = read(Vec::new(), Vec::new());
+        read.contributions = vec![
+            Contributed {
+                at: "doctor.remedy".to_owned(),
+                id: "kavita:close-the-settings".to_owned(),
+                says: "Stop Kavita and check what is in front of it".to_owned(),
+                about: Some("kavita:settings-guarded".to_owned()),
+            },
+            Contributed {
+                at: "doctor.check".to_owned(),
+                id: "kavita:holds-nothing".to_owned(),
+                says: String::new(),
+                about: None,
+            },
+        ];
+        let text = claims(&read).text();
+        assert!(
+            text.contains("doctor.remedy kavita:close-the-settings  (for kavita:settings-guarded)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("doctor.check kavita:holds-nothing\n"),
+            "{text}"
+        );
+        assert!(!text.contains("kavita:holds-nothing\n    \n"), "{text}");
+    }
+
+    /// A capability of the plugin's own is inert; a core name nothing publishes is not
+    /// the same thing, and calling it one would describe a capability that does not
+    /// exist.
+    #[test]
+    fn a_name_nothing_publishes_is_not_reported_as_the_plugins_own() {
+        let text = claims(&read(
+            vec![claiming("media.stream", Shown::Unproven, None)],
+            vec![Violation {
+                location: "service kavita.provides".to_owned(),
+                message: "media.stream names no capability the published vocabulary carries"
+                    .to_owned(),
+            }],
+        ))
+        .text();
+        assert!(
+            text.contains("nothing published carries this name"),
+            "{text}"
+        );
+        assert!(!text.contains("this plugin's own"), "{text}");
+        assert!(text.contains("Refused, 1 violation"), "{text}");
+        assert!(text.contains("would not be installed"), "{text}");
+    }
+
+    /// The two forms are two renderings of one answer, and the machine-readable one is
+    /// the report itself rather than a shape written beside it.
+    #[test]
+    fn the_machine_readable_form_is_the_same_answer_as_the_page() {
+        let read = read(
+            vec![claiming("kavita:opds", Shown::Claimed, None)],
+            Vec::new(),
+        );
+        let document = claimed(&read, true)
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+        assert!(document.contains(r#""installable": true"#), "{document}");
+        assert!(document.contains(r#""name": "kavita:opds""#), "{document}");
+        let page = claimed(&read, false)
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+        assert_eq!(page, claims(&read).text());
+    }
+
+    /// What a probe came to is said in its own words, whichever of the three it was —
+    /// and a refutation carries what was wrong with the answer rather than the fact
+    /// that something was.
+    #[test]
+    fn each_of_the_three_verdicts_says_itself() {
+        let text = claims(&read(
+            vec![
+                with(
+                    "media.serve",
+                    Shown::Refuted,
+                    Some(Filling::Unfilled),
+                    Verdict::Failed {
+                        faults: vec![
+                            "answered 200 where it declares 401".to_owned(),
+                            "the body carries no content".to_owned(),
+                        ],
+                    },
+                ),
+                with(
+                    "identity.source",
+                    Shown::Unproven,
+                    Some(Filling::Unfilled),
+                    Verdict::Unproven {
+                        why: "fixtures/identity.json: could not be read".to_owned(),
+                    },
+                ),
+            ],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            text.contains(
+                "refuted: answered 200 where it declares 401; the body carries no content"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("unproven: fixtures/identity.json: could not be read"),
+            "{text}"
+        );
+    }
+
+    /// One violation and several are counted as they are read.
+    #[test]
+    fn a_page_counts_what_it_refused() {
+        let refusal = |what: &str| Violation {
+            location: "service kavita.provides".to_owned(),
+            message: what.to_owned(),
+        };
+        let one = claims(&read(Vec::new(), vec![refusal("the first")])).text();
+        assert!(one.contains("Refused, 1 violation:"), "{one}");
+        let several = claims(&read(
+            Vec::new(),
+            vec![refusal("the first"), refusal("the second")],
+        ))
+        .text();
+        assert!(several.contains("Refused, 2 violations:"), "{several}");
+        assert!(
+            several.contains("It claims no capabilities"),
+            "and a plugin that claims nothing says so: {several}"
+        );
+    }
+
+    /// The plugin's own capability says what inert means rather than leaving a blank.
+    #[test]
+    fn a_capability_of_the_plugins_own_says_what_inert_means() {
+        let text = claims(&read(
+            vec![claiming("kavita:opds", Shown::Claimed, None)],
+            Vec::new(),
+        ))
+        .text();
+        assert!(text.contains("this plugin's own, and inert"), "{text}");
+        assert!(
+            text.contains("held to capability vocabulary generation 1"),
+            "an author is told which generation refused them: {text}"
+        );
+        assert!(
+            text.contains("doctor.check kavita:settings-guarded"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Nothing here stops it being installed"),
+            "{text}"
+        );
+    }
 
     /// The capability listing this build produces.
     ///

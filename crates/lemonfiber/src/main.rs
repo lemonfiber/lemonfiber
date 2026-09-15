@@ -8,11 +8,8 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{
-    Cli, Mending, PluginCommand, RawDoctor, RawSetup, RawUi, Request, UpdateCommand,
-};
+use lemonfiber::cli::{Cli, Mending, PluginCommand, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
-use lemonfiber_core::app::update;
 use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
 
 mod acting;
@@ -66,17 +63,6 @@ async fn read_logs(
     } else {
         stream(ctx, forms, services, follow, tail, json).await
     }
-}
-
-/// The one thing a walk was asked for, or nothing at all.
-///
-/// Taken as words so it can be typed unquoted, and joined back into the title as
-/// said. Nothing named is a request in its own right rather than an omission: a
-/// walk asked for nothing in particular suggests something likely to work, which
-/// is what an operator with an empty library needs.
-fn named(words: &[String]) -> Option<String> {
-    let said = words.join(" ");
-    (!said.trim().is_empty()).then_some(said)
 }
 
 /// Where a walk's steps go while it runs.
@@ -192,31 +178,6 @@ async fn doctoring(ctx: &Ctx, asked: RawDoctor, json: bool) -> Result<Command, E
     diagnosing(asked.only.as_deref(), asked.disruptive, asked.accept).map_err(ExitCode::from)
 }
 
-/// Which of the two things that can be moved forward was named, as the core carries it.
-///
-/// Apart from the arm that reads it for the reason the bundle beside it is: the stack's
-/// three fields spelled out twice is nine lines of the one function that has to stay
-/// readable, and the wait is the flag a teardown spells the same way.
-///
-/// The two go to different commands rather than to one carrying a mode. What each
-/// answers with does not resemble the other — a list of services and the steps they
-/// would take, against where one binary stands and which tool owns it — so a shared
-/// shape would be a shape neither of them fits.
-fn moving(object: UpdateCommand) -> Command {
-    match object {
-        UpdateCommand::Stack {
-            service,
-            confirm,
-            wait,
-        } => Command::Update(update::Asked {
-            service,
-            confirm,
-            wait: wait.into(),
-        }),
-        UpdateCommand::Itself { to } => Command::SelfUpdate { to },
-    }
-}
-
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -327,7 +288,9 @@ async fn main() -> ExitCode {
         // something.
         Request::Walkthrough { item } => {
             ctx = ctx.narrating_steps(walking(cli.json));
-            Command::Walkthrough { item: named(&item) }
+            Command::Walkthrough {
+                item: translate::named(&item),
+            }
         }
         // Naming a word says what it means and naming none lists them, and both are
         // answered from a table compiled into the binary rather than from a stack.
@@ -360,7 +323,7 @@ async fn main() -> ExitCode {
         // Which of the two was named is the whole of what tells them apart, and clap
         // has already refused a run that named neither — which is the only place
         // somebody can be told what the two objects are while they are still typing.
-        Request::Update { object } => moving(object),
+        Request::Update { object } => translate::moving(object),
         Request::Backup { service } => Command::Backup { service },
         Request::Support(asked) => bundling(asked),
         // The web surface holds the process until it is stopped, and answers many
@@ -386,15 +349,15 @@ async fn main() -> ExitCode {
     answered(command, &ctx, cli.json).await
 }
 
-/// Print one of the three documents this build publishes about writing a plugin.
+/// Answer one of the four things a plugin author asks this binary.
 ///
-/// No context, no dispatch and no stack. Each is generated at build time from
-/// lemonfiber's own types, so the answer is the same on a machine with nothing
+/// No context, no dispatch and no stack. Three are documents generated at build time
+/// from lemonfiber's own types, so the answer is the same on a machine with nothing
 /// installed as on one running everything — which is the whole of what an author needs
-/// it to be.
+/// them to be. The fourth reads a manifest the author is writing.
 ///
 /// The schema is always the document, because it is a thing an editor reads rather than
-/// a listing a person does. The other two have a form for each.
+/// a listing a person does. The other three have a form for each.
 fn published(read: &PluginCommand, json: bool) -> ExitCode {
     let lines = match read {
         PluginCommand::Schema => lemonfiber_core::plugin::schema().as_deref().map(document),
@@ -408,6 +371,7 @@ fn published(read: &PluginCommand, json: bool) -> ExitCode {
             Ok(lines) => lines,
             Err(code) => return code,
         },
+        PluginCommand::Claims { path } => return claims(path, json),
     };
     let Some(lines) = lines else {
         complain!("error: the published document could not be written");
@@ -417,12 +381,43 @@ fn published(read: &PluginCommand, json: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// What one plugin's source claims, held to what this build publishes.
+///
+/// The one request under this word that reads something the operator has rather than
+/// something lemonfiber published, and the one that can come back with an exit status
+/// worth branching on: a manifest the vocabularies refuse, or a claim its own
+/// recordings refute, is a plugin that would not be installed — which is what an
+/// author's CI is asking.
+///
+/// Nothing is written and no service is asked anything. Every verdict is against the
+/// recordings the plugin ships, which is what lets this run in a checkout with no stack
+/// and no instance of the software anywhere.
+fn claims(path: &std::path::Path, json: bool) -> ExitCode {
+    let read = match lemonfiber_core::plugin::claimed(path) {
+        Ok(read) => read,
+        Err(unreadable) => {
+            complain!("error: {unreadable}");
+            return ExitCode::from(FAILURE);
+        }
+    };
+    let Some(lines) = render::plugin::claimed(&read, json) else {
+        complain!("error: what was read could not be written as JSON");
+        return ExitCode::from(FAILURE);
+    };
+    lines.print();
+    if read.installable {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(FAILURE)
+    }
+}
+
 /// The capability vocabulary, in whichever form was asked for.
 ///
-/// Its own function because it is the one of the three that can refuse: it is read
-/// against the stack this build pins, and a stack that disagreed with the vocabulary
-/// would have failed generation long before here. Reported as this build's own fault
-/// rather than the operator's, because it is.
+/// Its own function because it is the one of the three documents that can refuse: it
+/// is read against the stack this build pins, and a stack that disagreed with the
+/// vocabulary would have failed generation long before here. Reported as this build's
+/// own fault rather than the operator's, because it is.
 fn capabilities(json: bool) -> Result<Option<render::Lines>, ExitCode> {
     match lemonfiber_core::plugin::capabilities() {
         Ok(_) if json => Ok(lemonfiber_core::plugin::vocabulary()
