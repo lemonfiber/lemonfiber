@@ -295,6 +295,22 @@ mod tests {
     }
 
     #[test]
+    fn a_pre_release_is_never_what_an_operator_is_offered() {
+        // A pre-release goes out while its version is still staged, carrying the goals
+        // the release gate calls unmet. Offering it would be recommending it, and the
+        // tag is what says not to: `0.15.0-pre.1` is not a dotted run of numbers, so it
+        // cannot be ordered and is passed over rather than ranked. The behaviour is the
+        // general rule about untellable tags, and this holds it to this case.
+        let answered = released(&[("v0.15.0-pre.1", false), ("v0.14.0", false)]);
+        assert_eq!(newest(&answered).as_deref(), Some("0.14.0"));
+
+        // And with nothing else in the list there is no newest at all, rather than a
+        // pre-release standing in for one.
+        let alone = released(&[("v0.15.0-pre.1", false)]);
+        assert_eq!(newest(&alone), None);
+    }
+
+    #[test]
     fn the_newest_published_release_is_the_answer_whatever_order_they_arrive_in() {
         let answered = released(&[("v0.12.0", false), ("v0.13.0", false), ("v0.9.1", false)]);
         assert_eq!(newest(&answered).as_deref(), Some("0.13.0"));
