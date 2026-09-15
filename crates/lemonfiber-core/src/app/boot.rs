@@ -130,7 +130,7 @@ async fn waited(
     // down as acted on here: an engine that never came up is a boot worth trying
     // again, and the operator running anything at all is when it gets tried.
     if !reachable(ctx, looks, again).await {
-        raised(ctx, ENGINE_NEVER_CAME);
+        raised(ctx, ENGINE_NEVER_CAME, NOTHING_CAME_BACK);
         return Ok(Outcome::Lifecycle(nothing_started(ENGINE_NEVER_CAME)));
     }
 
@@ -138,11 +138,11 @@ async fn waited(
     acted(ctx).await;
     match outcome {
         Err(problem) => {
-            raised(ctx, &problem.summary);
+            raised(ctx, &problem.summary, NOTHING_CAME_BACK);
             Err(problem)
         }
         Ok(outcome) if !came_up(&outcome) => {
-            raised(ctx, COMPOSE_REFUSED);
+            raised(ctx, COMPOSE_REFUSED, NOTHING_CAME_BACK);
             Ok(outcome)
         }
         Ok(outcome) => {
@@ -296,7 +296,7 @@ fn came_up(outcome: &Outcome) -> bool {
 async fn confirmed(ctx: &Ctx) {
     match wrong(ctx).await {
         None => observed(ctx, None),
-        Some(said) => raised(ctx, &said),
+        Some(said) => raised(ctx, &said, TUNNEL_UNPROVEN),
     }
 }
 
@@ -327,16 +327,31 @@ async fn wrong(ctx: &Ctx) -> Option<String> {
     ))
 }
 
-/// Record that this boot did not come back, with the reason.
-fn raised(ctx: &Ctx, said: &str) {
+/// Record that this boot did not come back, with the reason and what it costs.
+///
+/// The cost is passed in rather than fixed here: a stack that never started and one
+/// that started without a proven tunnel are the same check and not the same loss,
+/// and one sentence covering both would be true of neither.
+fn raised(ctx: &Ctx, said: &str, means: &str) {
     let fault = Fault::new(
         KIND,
         Severity::Warning,
         said,
+        means,
         "Run `lemonfiber up` to bring it back, then `lemonfiber doctor` to see what stopped it",
     );
     observed(ctx, Some(&fault));
 }
+
+/// What a machine that restarted without its stack costs the operator.
+const NOTHING_CAME_BACK: &str =
+    "nothing has been running since this machine started — no downloads, no imports, and \
+     nothing to watch";
+
+/// What a stack that came back without a proven tunnel costs.
+const TUNNEL_UNPROVEN: &str =
+    "the stack is back but its tunnel is not established, so the download client's traffic \
+     cannot be assumed to be protected";
 
 /// Put what this boot came to into the store the next interaction reads.
 ///
@@ -421,6 +436,7 @@ fn owed(condition: &Condition) -> Alert {
         moment: Moment::Onset,
         severity: condition.severity,
         summary: condition.summary.clone(),
+        meaning: condition.meaning.clone(),
         remedies: condition.remedies.clone(),
         affected: vec![CHECK.to_owned()],
     }
@@ -1016,6 +1032,7 @@ mod tests {
                 "boot.failed",
                 Severity::Warning,
                 "the stack would not start",
+                "nothing has been running since",
                 "Run `lemonfiber up`",
             )),
             "1000",

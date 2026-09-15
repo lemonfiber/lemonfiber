@@ -1079,6 +1079,7 @@ mod tests {
             moment,
             severity: lemonfiber_core::error::Severity::Warning,
             summary: summary.to_owned(),
+            meaning: "nothing that needs it is working".to_owned(),
             remedies: vec!["start it".to_owned()],
             affected: vec!["service.sonarr".to_owned()],
         }

@@ -48,6 +48,10 @@ pub struct Alert {
     pub severity: Severity,
     /// What happened, in the words the condition was raised with.
     pub summary: String,
+    /// What it costs the operator, which is the half between the event and the
+    /// fix. "The tunnel dropped" and "restart the gateway" leave whoever reads
+    /// them to work out for themselves whether anything leaked.
+    pub meaning: String,
     /// What to do about it, most likely first. An alert that says what happened
     /// and not what to do is a notification, which is a different and worse thing.
     pub remedies: Vec<String>,
@@ -76,6 +80,7 @@ impl Alert {
             moment,
             severity: condition.severity,
             summary: condition.summary.clone(),
+            meaning: condition.meaning.clone(),
             remedies: condition.remedies.clone(),
             affected: vec![condition.check.clone()],
         })
@@ -115,9 +120,15 @@ mod tests {
     use crate::condition::{Condition, Fault};
     use crate::error::Severity;
 
-    /// What a check reports, with something to do about it.
+    /// What a check reports, with what it costs and something to do about it.
     fn wrong(severity: Severity, summary: &str) -> Fault {
-        Fault::new("queue.stalled", severity, summary, "look at it")
+        Fault::new(
+            "queue.stalled",
+            severity,
+            summary,
+            "nothing is arriving for them",
+            "look at it",
+        )
     }
 
     /// A condition raised at a fixed moment.
@@ -127,6 +138,40 @@ mod tests {
             &wrong(Severity::Warning, "two downloads have not moved"),
             "1000",
         )
+    }
+
+    #[test]
+    fn an_alert_carries_what_happened_what_it_means_and_what_to_do() {
+        // All three or it is a notification, which is a different and worse thing:
+        // an operator handed an event and an instruction has to supply the
+        // judgement in between, which is the work this was supposed to save.
+        let parts =
+            Alert::of(&raised(), None).map(|alert| (alert.summary, alert.meaning, alert.remedies));
+        assert_eq!(
+            parts,
+            Some((
+                "two downloads have not moved".to_owned(),
+                "nothing is arriving for them".to_owned(),
+                vec!["look at it".to_owned()],
+            ))
+        );
+    }
+
+    #[test]
+    fn a_resolution_carries_the_same_three_parts_as_its_onset() {
+        // Good news said in fewer parts than bad news is how the resolution reads
+        // as an afterthought rather than as the other half of what was said.
+        let mut condition = raised();
+        condition.clear("1100");
+        let told = Alert::of(&condition, Some(0)).map(|alert| {
+            (
+                alert.moment,
+                alert.summary.is_empty(),
+                alert.meaning.is_empty(),
+                alert.remedies.is_empty(),
+            )
+        });
+        assert_eq!(told, Some((Moment::Resolved, false, false, false)));
     }
 
     #[test]
@@ -175,7 +220,13 @@ mod tests {
         // "The critical thing is over" deserves the attention the critical thing had.
         let mut condition = Condition::raised(
             "vpn.leak",
-            &Fault::new("vpn.leak", Severity::Critical, "leaking", "look at it"),
+            &Fault::new(
+                "vpn.leak",
+                Severity::Critical,
+                "leaking",
+                "this connection's address is visible to every peer",
+                "look at it",
+            ),
             "1000",
         );
         condition.clear("later");
@@ -189,7 +240,13 @@ mod tests {
     fn only_a_critical_onset_interrupts_someone_who_asked_for_quiet() {
         let critical = Condition::raised(
             "vpn.leak",
-            &Fault::new("vpn.leak", Severity::Critical, "leaking", "look at it"),
+            &Fault::new(
+                "vpn.leak",
+                Severity::Critical,
+                "leaking",
+                "this connection's address is visible to every peer",
+                "look at it",
+            ),
             "1000",
         );
         assert!(Alert::of(&critical, None).is_some_and(|a| a.overrides_quiet()));

@@ -4,11 +4,13 @@
 //! fault is what the check says now; the condition is the history that accumulates
 //! around it.
 //!
-//! A remedy is required to construct one, for the reason [`crate::error::Problem`]
-//! requires it: a fault an operator can do nothing about is a dead end, and
-//! "I'll add the remedy later" is how a model like this erodes one message at a
-//! time. Everything that raises a condition therefore has to have thought about
-//! what the operator should do, at the point of raising it.
+//! A meaning and a remedy are both required to construct one, for the reason
+//! [`crate::error::Problem`] requires them: a fault an operator can do nothing
+//! about is a dead end, one whose consequence they have to work out for themselves
+//! is a notification, and "I'll add it later" is how a model like this erodes one
+//! message at a time. Everything that raises a condition therefore has to have
+//! thought about what it costs the operator and what they should do, at the point
+//! of raising it.
 //!
 //! Every word of one is redacted on the way in, on the support bundle's own
 //! rules. A fault's summary is frequently a service's own message repeated back,
@@ -41,6 +43,12 @@ pub struct Fault {
     pub severity: Severity,
     /// What is wrong, in one line.
     pub summary: String,
+    /// What it costs the operator, in their terms rather than the machine's.
+    ///
+    /// Distinct from the summary, which is the event: "the tunnel dropped" is what
+    /// happened and "nothing is downloading, and nothing leaked" is what that is
+    /// worth knowing for. A fault carrying only the first is a notification.
+    pub meaning: String,
     /// What to do about it, most likely first. Never empty.
     pub remedies: Vec<String>,
     /// The check whose fault this one is downstream of, where it is known to be.
@@ -51,13 +59,15 @@ pub struct Fault {
 }
 
 impl Fault {
-    /// A fault, with the one thing an operator should do about it.
+    /// A fault: what happened, what it means, and the one thing an operator
+    /// should do about it.
     #[must_use]
-    pub fn new(kind: &str, severity: Severity, summary: &str, remedy: &str) -> Self {
+    pub fn new(kind: &str, severity: Severity, summary: &str, meaning: &str, remedy: &str) -> Self {
         Self {
             kind: kind.to_owned(),
             severity,
             summary: withheld(summary),
+            meaning: withheld(meaning),
             remedies: vec![withheld(remedy)],
             caused_by: None,
         }
@@ -91,11 +101,49 @@ mod tests {
             "storage.full",
             Severity::Error,
             "the disk is full",
+            "nothing can be written until something goes",
             "delete something",
         );
         assert_eq!(fault.remedies, vec!["delete something".to_owned()]);
         assert_eq!(fault.caused_by, None);
         assert_eq!(fault.kind, "storage.full");
+    }
+
+    #[test]
+    fn a_fault_says_what_it_costs_as_well_as_what_happened_and_what_to_do() {
+        // The middle part, and the one that is quietly dropped: an event and an
+        // instruction leave whoever reads them to work out for themselves whether
+        // this is worth getting up for.
+        let fault = Fault::new(
+            "vpn.egress.leaking",
+            Severity::Critical,
+            "the download client's traffic is not going through the tunnel",
+            "every peer it talks to can see this connection's own address",
+            "stop the download client",
+        );
+        assert_eq!(
+            fault.meaning,
+            "every peer it talks to can see this connection's own address"
+        );
+        assert!(!fault.summary.is_empty());
+        assert!(!fault.remedies.is_empty());
+    }
+
+    #[test]
+    fn what_a_fault_means_is_withheld_on_the_same_rules_as_the_rest_of_it() {
+        // The consequence of a failed login is the obvious place to quote the
+        // credential that failed, and a sentence nobody thought of as evidence is
+        // the one that reaches a phone unredacted.
+        let quoted = format!("nothing will authenticate while {}=hunter2 stands", "TOKEN");
+        let fault = Fault::new(
+            "service.refused",
+            Severity::Error,
+            "the login failed",
+            &quoted,
+            "check the key",
+        );
+        assert!(!fault.meaning.contains("hunter2"), "{}", fault.meaning);
+        assert!(fault.meaning.contains("nothing will authenticate"));
     }
 
     #[test]
@@ -105,6 +153,7 @@ mod tests {
             "storage.full",
             Severity::Error,
             "the disk is full",
+            "nothing can be written until something goes",
             "delete something",
         )
         .or_else("move the library to a larger volume");
@@ -123,6 +172,7 @@ mod tests {
             "import.failed",
             Severity::Error,
             "the import failed",
+            "it stays out of the library until it lands",
             "retry the import",
         )
         .caused_by("storage.space");
@@ -135,7 +185,13 @@ mod tests {
         // hand, and that message becomes a summary, a stored condition, a digest,
         // and a push to somebody's phone.
         let leaked = format!("sonarr refused: {}=abcdef123456", "api_key");
-        let fault = Fault::new("service.refused", Severity::Error, &leaked, "check the key");
+        let fault = Fault::new(
+            "service.refused",
+            Severity::Error,
+            &leaked,
+            "nothing that needs it is working",
+            "check the key",
+        );
         assert!(!fault.summary.contains("abcdef123456"), "{}", fault.summary);
         assert!(
             fault.summary.contains("sonarr refused"),
@@ -149,8 +205,14 @@ mod tests {
         // A remedy that quotes the offending line is the obvious way for one to get
         // out, and the least obvious place to look for it.
         let quoted = format!("set {}=hunter2 in the environment file", "PASSWORD");
-        let fault = Fault::new("config.wrong", Severity::Error, "the login failed", &quoted)
-            .or_else(&quoted);
+        let fault = Fault::new(
+            "config.wrong",
+            Severity::Error,
+            "the login failed",
+            "the service will not answer until it is right",
+            &quoted,
+        )
+        .or_else(&quoted);
         assert!(
             fault
                 .remedies
@@ -167,7 +229,13 @@ mod tests {
         // only the one with an equals sign would be a rule that holds until the
         // next service words its error differently.
         let leaked = format!("sonarr refused: {}: abcdef123456", "api_key");
-        let fault = Fault::new("service.refused", Severity::Error, &leaked, "check the key");
+        let fault = Fault::new(
+            "service.refused",
+            Severity::Error,
+            &leaked,
+            "nothing that needs it is working",
+            "check the key",
+        );
         assert!(!fault.summary.contains("abcdef123456"), "{}", fault.summary);
         assert!(fault.summary.contains("api_key"), "{}", fault.summary);
     }
@@ -180,6 +248,7 @@ mod tests {
             "service.crash-looping",
             Severity::Error,
             plain,
+            "nothing that needs it is working",
             "read its logs",
         );
         assert_eq!(fault.summary, plain);

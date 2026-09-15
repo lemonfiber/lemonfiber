@@ -61,6 +61,7 @@ mod tests {
                 "queue.stalled",
                 Severity::Warning,
                 "two downloads have not moved",
+                "nothing is arriving for them",
                 "check the indexer is answering",
             )),
             "1000",

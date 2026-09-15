@@ -273,6 +273,7 @@ fn fault_for(item: &Item, stall: Stall, shared: Option<(&str, usize)>) -> Fault 
         &format!("{CHECK}.{}", kind_of(stall)),
         severity,
         &summary,
+        stall.means(),
         &stall.first_remedy(),
     );
     for remedy in stall.remedies().into_iter().skip(1) {

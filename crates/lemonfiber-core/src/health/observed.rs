@@ -93,6 +93,8 @@ fn tunnel(egress: Egress, services: &[Service]) -> Option<Fault> {
             LEAKING,
             Severity::Critical,
             "the download client's traffic is not going through the tunnel",
+            "every peer it talks to can see this connection's own address, and stopping the stack \
+             afterwards does not take that back",
             "stop the download client until the tunnel is proven to carry its traffic",
         )
         .or_else("check the gateway container is running and connected"),
@@ -100,6 +102,8 @@ fn tunnel(egress: Egress, services: &[Service]) -> Option<Fault> {
             UNVERIFIED,
             Severity::Warning,
             "whether the download client is behind the tunnel could not be established",
+            "the reason for running it behind a tunnel is unproven, so its traffic is best treated \
+             as exposed until it is",
             "check the gateway container is running",
         )
         .or_else("set an IP-echo address so the egress can be compared"),
@@ -130,6 +134,7 @@ fn service_fault(service: &Service, services: &[Service]) -> Option<Fault> {
         kind_of(service),
         severity_of(service.criticality),
         &summary_of(service),
+        &meaning_of(service),
         &remedy_of(service),
     )
     .or_else("read its logs for what it said before it stopped");
@@ -180,6 +185,28 @@ fn summary_of(service: &Service) -> String {
             Some(code) => format!("{name} stopped on its own (exit {code})"),
             None => format!("{name} stopped on its own"),
         },
+    }
+}
+
+/// What one service's absence costs, from how much the form depends on it.
+///
+/// Read off the criticality the manifest already declares rather than guessed per
+/// service: the manifest is where "how much does this matter" is decided, and a
+/// second opinion here would be a second thing to keep in step with it.
+fn meaning_of(service: &Service) -> String {
+    let name = &service.name;
+    match service.criticality {
+        Criticality::Critical => {
+            format!("what depends on {name} is not safe to keep running while it is down")
+        }
+        Criticality::Core => format!("the stack does not do what it is for without {name}"),
+        Criticality::Important => {
+            format!("the rest carries on; the part {name} does is not happening")
+        }
+        Criticality::Enhancing => {
+            format!("nothing essential stops — {name} is what makes the rest nicer")
+        }
+        Criticality::Optional => format!("nothing depends on {name}; the stack is unaffected"),
     }
 }
 
@@ -328,6 +355,33 @@ mod tests {
                 "{criticality:?}"
             );
         }
+    }
+
+    #[test]
+    fn what_a_failure_costs_is_said_differently_at_every_criticality() {
+        // A sentence shared between two rungs would make the distinction
+        // decorative, and an operator learns quickly which distinctions are.
+        let said: Vec<String> = [
+            Criticality::Critical,
+            Criticality::Core,
+            Criticality::Important,
+            Criticality::Enhancing,
+            Criticality::Optional,
+        ]
+        .into_iter()
+        .filter_map(|criticality| {
+            let services = [service("x", State::Failed, criticality)];
+            observed(&services, Egress::NotApplicable)
+                .into_iter()
+                .find_map(|(_, fault)| fault.map(|fault| fault.meaning))
+        })
+        .collect();
+
+        let mut distinct = said.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(distinct.len(), 5, "{said:?}");
+        assert!(said.iter().all(|meaning| meaning.contains('x')), "{said:?}");
     }
 
     #[test]

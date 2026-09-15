@@ -118,6 +118,8 @@ pub async fn notify(
                     CHANNEL_REFUSED,
                     Severity::Warning,
                     &problem.reason,
+                    "nothing is reaching this channel, so an alert raised while it stays down is \
+                     waiting on the screen rather than arriving anywhere",
                     "check the channel's configuration; the alert is kept in-app either way",
                 );
                 conditions.observe(&check, Some(&fault), &now);
@@ -221,6 +223,7 @@ mod tests {
                 "queue.stalled",
                 Severity::Warning,
                 "two downloads have not moved",
+                "nothing is arriving for them",
                 "check the indexer is answering",
             )),
             "1000",
@@ -339,6 +342,7 @@ mod tests {
                 "storage.full",
                 Severity::Error,
                 "no room left",
+                "nothing can be written until something goes",
                 "delete something, or move the library",
             )),
             "2000",
@@ -477,6 +481,7 @@ mod tests {
                 "vpn.leak",
                 Severity::Critical,
                 "traffic left outside the tunnel",
+                "this connection's address is visible to every peer",
                 "stop the client",
             )),
             "1",

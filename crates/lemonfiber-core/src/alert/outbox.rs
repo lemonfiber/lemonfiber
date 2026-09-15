@@ -138,6 +138,7 @@ mod tests {
             moment,
             severity: Severity::Warning,
             summary: "it broke".to_owned(),
+            meaning: "nothing that needs it is working".to_owned(),
             remedies: vec!["start it again".to_owned()],
             affected: vec![check.to_owned()],
         }

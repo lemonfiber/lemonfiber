@@ -48,6 +48,10 @@ pub struct Affected {
     pub severity: Severity,
     /// What is wrong, in one line.
     pub summary: String,
+    /// What it costs the operator. The line expands to items an operator can act
+    /// on, and an item that states only the event leaves the judgement it was
+    /// supposed to save them.
+    pub meaning: String,
     /// What to do about it, most likely first.
     pub remedies: Vec<String>,
     /// What is also wrong because of this, counted with it rather than again.
@@ -87,6 +91,7 @@ impl Summary {
                 check: condition.check.clone(),
                 severity: condition.severity,
                 summary: condition.summary.clone(),
+                meaning: condition.meaning.clone(),
                 remedies: condition.remedies.clone(),
                 downstream: Self::downstream_of(&condition.check, &steady),
             })
@@ -210,7 +215,13 @@ mod tests {
     fn wrong(check: &str, severity: Severity, summary: &str) -> Condition {
         Condition::raised(
             check,
-            &Fault::new(check, severity, summary, "look at it"),
+            &Fault::new(
+                check,
+                severity,
+                summary,
+                "nothing that needs it is working",
+                "look at it",
+            ),
             RAISED,
         )
     }
@@ -219,7 +230,14 @@ mod tests {
     fn caused_by(check: &str, severity: Severity, summary: &str, cause: &str) -> Condition {
         Condition::raised(
             check,
-            &Fault::new(check, severity, summary, "look at it").caused_by(cause),
+            &Fault::new(
+                check,
+                severity,
+                summary,
+                "nothing that needs it is working",
+                "look at it",
+            )
+            .caused_by(cause),
             RAISED,
         )
     }
@@ -431,6 +449,7 @@ mod tests {
                 "service.stopped",
                 Severity::Error,
                 "sonarr stopped",
+                "nothing that needs it is working",
                 "look at it",
             ),
             "1200",
@@ -472,6 +491,7 @@ mod tests {
                 "service.stopped",
                 Severity::Error,
                 "sonarr stopped",
+                "nothing that needs it is working",
                 "look at it",
             ),
             "1200",
@@ -509,6 +529,30 @@ mod tests {
             .map(|item| item.remedies.clone())
             .collect();
         assert_eq!(remedies, vec![vec!["look at it".to_owned()]]);
+    }
+
+    #[test]
+    fn the_expansion_carries_what_each_thing_costs_as_well_as_what_to_do() {
+        // The line expands so the operator has something to act on. An item that
+        // states the event and the fix and not what stands between them hands back
+        // the judgement the summary exists to make for them.
+        let stalled = wrong("queue.stalled", Severity::Warning, "nothing is moving");
+        let summary = Summary::of(Reach::Running, &[&stalled], SETTLED);
+        let read: Vec<(&str, &str, usize)> = summary
+            .affected
+            .iter()
+            .map(|item| {
+                (
+                    item.summary.as_str(),
+                    item.meaning.as_str(),
+                    item.remedies.len(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            read,
+            vec![("nothing is moving", "nothing that needs it is working", 1)]
+        );
     }
 
     #[test]
