@@ -133,7 +133,7 @@ pub struct Request {
 /// connection before knowing whether anything inside is listening. So a status alone
 /// is not evidence — except for a refusal, which is the one answer no port proxy can
 /// produce.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Expect {
     /// The status the answer must carry.

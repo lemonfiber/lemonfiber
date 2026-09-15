@@ -409,15 +409,16 @@ why    = "Until somebody does, the first caller on the household network becomes
 
     /// What the rules say about a manifest, as one string per violation.
     fn against(text: &str) -> Vec<String> {
-        Manifest::from_toml(text).map_or_else(
-            |unreadable| vec![format!("unreadable: {unreadable}")],
-            |manifest| {
-                violations(&manifest, OCCUPIED)
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect()
-            },
-        )
+        // Both halves on lines that always run: a fixture this build cannot read is a
+        // mistake in the test rather than a refusal, and it says so in the list rather
+        // than in an arm nothing can enter.
+        let read = Manifest::from_toml(text);
+        let unreadable = read.as_ref().err().map(|why| format!("unreadable: {why}"));
+        let found = read.map(|manifest| violations(&manifest, OCCUPIED));
+        unreadable
+            .into_iter()
+            .chain(found.unwrap_or_default().iter().map(ToString::to_string))
+            .collect()
     }
 
     /// The same, with one line of the claimant replaced — which is how every negative
@@ -567,12 +568,8 @@ why       = "Two rows, one name."
     /// to refuse, so it is named on its own rather than left to the probe rules.
     #[test]
     fn a_core_name_with_no_claim_block_is_refused_as_an_assertion() {
-        let Some((before, rest)) = CLAIMANT.split_once("[[claim]]") else {
-            unreachable!("the fixture claims something")
-        };
-        let Some((_, after)) = rest.split_once("[requires]") else {
-            unreachable!("the fixture asks for something")
-        };
+        let (before, rest) = CLAIMANT.split_once("[[claim]]").unwrap_or_default();
+        let (_, after) = rest.split_once("[requires]").unwrap_or_default();
         let said = against(&format!("{before}[requires]{after}"));
         assert!(
             says(&said, &["media.serve", "demonstrated, not asserted"]),
@@ -693,19 +690,17 @@ why       = "Two rows, one name."
             ),
             (Constraint::BodyStartsWith, "body_starts_with = \"<\""),
         ];
+        let empty = toml::from_str::<Expect>("");
         for (constraint, declared) in each {
-            let Ok(expect) = toml::from_str::<Expect>(declared) else {
-                unreachable!("the expectation reads: {declared}")
-            };
             assert!(
-                super::carries(&expect, constraint),
+                toml::from_str::<Expect>(declared)
+                    .is_ok_and(|expect| super::carries(&expect, constraint)),
                 "{declared} does not read as {constraint:?}"
             );
-            let Ok(empty) = toml::from_str::<Expect>("") else {
-                unreachable!("an expectation that says nothing reads")
-            };
             assert!(
-                !super::carries(&empty, constraint),
+                empty
+                    .as_ref()
+                    .is_ok_and(|nothing| !super::carries(nothing, constraint)),
                 "an expectation that says nothing reads as {constraint:?}"
             );
         }
@@ -719,6 +714,17 @@ why       = "Two rows, one name."
             "json_array_min = 0",
         );
         assert_eq!(said, Vec::<String>::new());
+    }
+
+    /// A plugin that adds nothing to lemonfiber's own registers is asked nothing about
+    /// them — including whether it asked for the capability that taking one requires.
+    #[test]
+    fn a_plugin_that_contributes_nothing_is_asked_nothing_about_contributions() {
+        let (before, _) = CLAIMANT.split_once("[[contribution]]").unwrap_or_default();
+        assert_eq!(
+            against(&before.replace("[\"doctor.contribute\"]", "[]")),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
@@ -881,10 +887,9 @@ for       = "p:two"
 action    = "a"
 detail    = "d"
 "#;
-        let Ok(entry) = toml::from_str::<crate::Contribution>(whole) else {
-            unreachable!("the whole row reads")
-        };
-        let readable = present(&entry);
+        let readable = toml::from_str::<crate::Contribution>(whole)
+            .map(|entry| present(&entry))
+            .unwrap_or_default();
         let declared: std::collections::BTreeSet<&str> = POINTS
             .iter()
             .flat_map(|point| point.row.required.iter().chain(point.row.optional))
@@ -901,12 +906,11 @@ detail    = "d"
     /// other would quietly stop deciding.
     #[test]
     fn a_bounded_field_reads_back_as_a_number_and_a_closed_one_as_a_word() {
-        let Ok(entry) = toml::from_str::<crate::Contribution>(
+        let readable = toml::from_str::<crate::Contribution>(
             "at = \"doctor.check\"\nid = \"p:one\"\ncategory = \"services\"\ntimeout_s = 7\n",
-        ) else {
-            unreachable!("the row reads")
-        };
-        let readable = present(&entry);
+        )
+        .map(|entry| present(&entry))
+        .unwrap_or_default();
         assert_eq!(readable.get("timeout_s"), Some(&Held::Number(7)));
         assert_eq!(
             readable.get("category"),

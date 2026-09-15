@@ -48,7 +48,7 @@ pub struct Asked {
 }
 
 /// What came back, in the terms an expectation can constrain.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Answer {
     /// The status.
@@ -216,11 +216,13 @@ mod tests {
     #[test]
     fn a_recording_of_another_call_is_not_of_this_one() {
         let recording: Result<Recording, _> = serde_json::from_str(WHOLE);
-        let Ok(recording) = recording else {
-            unreachable!("the recording reads")
+        let asked = |method: &str, path: &str| {
+            recording
+                .as_ref()
+                .is_ok_and(|one| records(one, method, path))
         };
-        assert!(records(&recording, "GET", "/api/v1/series"));
-        assert!(!records(&recording, "POST", "/api/v1/series"));
-        assert!(!records(&recording, "GET", "/api/v1/libraries"));
+        assert!(asked("GET", "/api/v1/series"), "the call it records");
+        assert!(!asked("POST", "/api/v1/series"), "another method");
+        assert!(!asked("GET", "/api/v1/libraries"), "another path");
     }
 }

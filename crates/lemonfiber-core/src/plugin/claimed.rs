@@ -524,13 +524,17 @@ fixture = "fixtures/catalogue.json"
                 ("fixtures/catalogue.json", catalogue()),
             ],
         );
-        let Some((shown, verdicts)) = core(&at) else {
-            unreachable!("the plugin reads")
-        };
-        assert_eq!(shown, Shown::Refuted);
+        let read = core(&at);
+        assert_eq!(
+            read.as_ref().map(|(shown, _)| shown.clone()),
+            Some(Shown::Refuted)
+        );
         assert!(
-            matches!(verdicts.first(), Some(Verdict::Failed { faults }) if !faults.is_empty()),
-            "got: {verdicts:?}"
+            read.as_ref().is_some_and(|(_, verdicts)| matches!(
+                verdicts.first(),
+                Some(Verdict::Failed { faults }) if !faults.is_empty()
+            )),
+            "got: {read:?}"
         );
         assert!(claimed(&at).is_ok_and(|read| !read.installable));
     }
@@ -540,13 +544,17 @@ fixture = "fixtures/catalogue.json"
     #[test]
     fn a_recording_that_is_absent_leaves_the_claim_unproven_rather_than_false() {
         let at = source("absent", MANIFEST, &[("fixtures/guarded.json", guarded())]);
-        let Some((shown, verdicts)) = core(&at) else {
-            unreachable!("the plugin reads")
-        };
-        assert_eq!(shown, Shown::Unproven);
+        let read = core(&at);
+        assert_eq!(
+            read.as_ref().map(|(shown, _)| shown.clone()),
+            Some(Shown::Unproven)
+        );
         assert!(
-            matches!(verdicts.get(1), Some(Verdict::Unproven { why }) if why.contains("catalogue")),
-            "got: {verdicts:?}"
+            read.as_ref().is_some_and(|(_, verdicts)| matches!(
+                verdicts.get(1),
+                Some(Verdict::Unproven { why }) if why.contains("catalogue")
+            )),
+            "got: {read:?}"
         );
         assert!(claimed(&at).is_ok_and(|read| read.installable));
     }
@@ -567,14 +575,18 @@ fixture = "fixtures/catalogue.json"
                 ("fixtures/catalogue.json", catalogue()),
             ],
         );
-        let Some((shown, verdicts)) = core(&at) else {
-            unreachable!("the plugin reads")
-        };
-        assert_eq!(shown, Shown::Unproven);
+        let read = core(&at);
+        assert_eq!(
+            read.as_ref().map(|(shown, _)| shown.clone()),
+            Some(Shown::Unproven)
+        );
         assert!(
-            matches!(verdicts.first(), Some(Verdict::Unproven { why })
-                     if why.contains("/api/v2/series") && why.contains("/api/series")),
-            "got: {verdicts:?}"
+            read.as_ref().is_some_and(|(_, verdicts)| matches!(
+                verdicts.first(),
+                Some(Verdict::Unproven { why })
+                    if why.contains("/api/v2/series") && why.contains("/api/series")
+            )),
+            "got: {read:?}"
         );
     }
 
@@ -596,16 +608,21 @@ fixture = "fixtures/catalogue.json"
                 ("fixtures/catalogue.json", catalogue()),
             ],
         );
-        let Ok(read) = claimed(&at) else {
-            unreachable!("the plugin reads")
-        };
-        let said: Vec<String> = read.refusals.iter().map(ToString::to_string).collect();
+        let read = claimed(&at).ok();
+        let said: Vec<String> = read
+            .as_ref()
+            .map(|read| read.refusals.iter().map(ToString::to_string).collect())
+            .unwrap_or_default();
         assert!(
             said.iter()
                 .any(|one| one.contains("fixtures/guarded.json") && one.contains("0000000")),
             "got: {said:?}"
         );
-        assert!(!read.installable, "a refusal stops the install");
+        assert_eq!(
+            read.as_ref().map(|read| read.installable),
+            Some(false),
+            "a refusal stops the install"
+        );
         // Refused rather than run against: the recording answers what the binding
         // declares, and a verdict off it would be about the wrong image.
         assert_eq!(
@@ -624,16 +641,15 @@ fixture = "fixtures/catalogue.json"
     #[test]
     fn a_core_capability_the_bundled_stack_also_claims_is_contested_and_names_everyone() {
         let at = whole("contested");
-        let Ok(read) = claimed(&at) else {
-            unreachable!("the plugin reads")
-        };
-        let filling = read
-            .capabilities
-            .iter()
-            .find(|claiming| !claiming.own)
-            .and_then(|claiming| claiming.filling.clone());
-        let Some(Filling::Contested { claimants }) = filling else {
-            unreachable!("more than one service serves media: {filling:?}")
+        let filling = claimed(&at).ok().and_then(|read| {
+            read.capabilities
+                .into_iter()
+                .find(|claiming| !claiming.own)
+                .and_then(|claiming| claiming.filling)
+        });
+        let claimants = match filling {
+            Some(Filling::Contested { claimants }) => claimants,
+            other => Vec::from([format!("{other:?}")]),
         };
         assert!(
             claimants.iter().any(|one| one.contains("jellyfin")),
@@ -650,43 +666,34 @@ fixture = "fixtures/catalogue.json"
     #[test]
     fn a_capability_of_the_plugins_own_is_inert_rather_than_unfilled() {
         let at = whole("inert");
-        let Ok(read) = claimed(&at) else {
-            unreachable!("the plugin reads")
-        };
-        let own = read.capabilities.iter().find(|claiming| claiming.own);
-        assert_eq!(
-            own.map(|claiming| (
-                claiming.name.clone(),
-                claiming.filling.clone(),
-                claiming.shown.clone()
-            )),
-            Some(("kavita:opds".to_owned(), None, Shown::Claimed))
-        );
+        let own = claimed(&at).ok().and_then(|read| {
+            read.capabilities
+                .into_iter()
+                .find(|claiming| claiming.own)
+                .map(|claiming| (claiming.name, claiming.filling, claiming.shown))
+        });
+        assert_eq!(own, Some(("kavita:opds".to_owned(), None, Shown::Claimed)));
     }
 
-    /// A core name asserted and demonstrated by nothing is unproven, not claimed.
-    ///
-    /// The refusal beside it is the vocabulary's, and the state is this reader's: there
-    /// were no probes to run, so nothing about the service was established — which is a
-    /// different sentence from the manifest being wrong, and both are said.
     #[test]
     fn a_core_name_with_no_claim_is_unproven_as_well_as_refused() {
-        let Some((before, rest)) = MANIFEST.split_once("[[claim]]") else {
-            unreachable!("the manifest claims something")
-        };
-        let _ = rest;
+        let (before, _) = MANIFEST.split_once("[[claim]]").unwrap_or_default();
         let at = source("unclaimed", before, &[]);
-        let Ok(read) = claimed(&at) else {
-            unreachable!("the plugin reads")
-        };
+        let read = claimed(&at).ok();
         assert_eq!(
-            read.capabilities
-                .iter()
-                .find(|claiming| !claiming.own)
-                .map(|claiming| claiming.shown.clone()),
+            read.as_ref().and_then(|read| {
+                read.capabilities
+                    .iter()
+                    .find(|claiming| !claiming.own)
+                    .map(|claiming| claiming.shown.clone())
+            }),
             Some(Shown::Unproven)
         );
-        assert!(!read.refusals.is_empty(), "and the vocabulary says why");
+        assert_eq!(
+            read.as_ref().map(|read| read.refusals.is_empty()),
+            Some(false),
+            "and the vocabulary says why"
+        );
     }
 
     /// A core-looking name nothing publishes has no answer about what fills it, and
@@ -699,15 +706,21 @@ fixture = "fixtures/catalogue.json"
             &MANIFEST.replace("media.serve", "media.stream"),
             &[("fixtures/guarded.json", guarded())],
         );
-        let Ok(read) = claimed(&at) else {
-            unreachable!("the plugin reads")
-        };
-        let claiming = read.capabilities.iter().find(|claiming| !claiming.own);
+        let read = claimed(&at).ok();
         assert_eq!(
-            claiming.map(|claiming| (claiming.name.clone(), claiming.filling.clone())),
+            read.as_ref().and_then(|read| {
+                read.capabilities
+                    .iter()
+                    .find(|claiming| !claiming.own)
+                    .map(|claiming| (claiming.name.clone(), claiming.filling.clone()))
+            }),
             Some(("media.stream".to_owned(), None))
         );
-        assert!(!read.installable, "and the manifest is refused");
+        assert_eq!(
+            read.as_ref().map(|read| read.installable),
+            Some(false),
+            "and the manifest is refused"
+        );
     }
 
     #[test]
@@ -715,6 +728,39 @@ fixture = "fixtures/catalogue.json"
         let at = std::env::temp_dir().join("lemonfiber-claimed-nothing-here");
         let _ = std::fs::remove_dir_all(&at);
         assert!(matches!(claimed(&at), Err(Unreadable::NoManifest(_))));
+    }
+
+    /// Each way a source can be unreadable says which one it was.
+    ///
+    /// Four refusals with nothing to do with each other: a path holding no plugin, a
+    /// file that cannot be read, a manifest this build cannot read, and this build's
+    /// own pinned stack failing to publish. Whoever hit one needs a different answer to
+    /// each, which is the whole reason they are not one "invalid plugin".
+    #[test]
+    fn each_way_a_source_is_unreadable_says_which_one_it_was() {
+        let said = |problem: Unreadable| problem.to_string();
+        assert!(
+            said(Unreadable::NoManifest(PathBuf::from("/somewhere"))).contains("/somewhere"),
+            "the path it looked in is named"
+        );
+        assert!(
+            said(Unreadable::Unopenable(std::io::Error::other("a disk"))).contains("a disk"),
+            "and what the disk said"
+        );
+        assert!(
+            said(Unreadable::Refused(
+                lemonfiber_plugin::Error::UnsupportedSchema {
+                    found: 9,
+                    supported: vec![1],
+                }
+            ))
+            .contains('9'),
+            "and the generation a manifest declared"
+        );
+        assert!(
+            said(Unreadable::Stack(super::Ungenerated::Unrenderable)).contains("JSON"),
+            "and this build's own failure to publish"
+        );
     }
 
     /// The file and the directory are both what somebody has to hand.

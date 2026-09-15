@@ -196,19 +196,17 @@ mod tests {
                 "request": {{"method": "GET", "path": "/"}}, "response": {response}}}"#,
             "0".repeat(64)
         );
-        let read: Result<Recording, _> = serde_json::from_str(&text);
-        match read {
-            Ok(recording) => recording.response,
-            Err(unreadable) => unreachable!("the recording reads: {unreadable}"),
-        }
+        serde_json::from_str::<Recording>(&text)
+            .map(|recording| recording.response)
+            .unwrap_or_default()
     }
 
     /// An expectation, read the way a manifest's is: through its own deserialiser.
+    ///
+    /// One that does not read comes back saying nothing, which fails the assertion
+    /// under it rather than ending the run — and leaves no arm a test cannot enter.
     fn expects(declared: &str) -> Expect {
-        match serde_json::from_str(declared) {
-            Ok(expect) => expect,
-            Err(unreadable) => unreachable!("the expectation reads: {unreadable}"),
-        }
+        serde_json::from_str(declared).unwrap_or_default()
     }
 
     #[test]
