@@ -18,7 +18,7 @@ pub use schema::{
     Api, ApiKind, Bind, Criticality, Form, Health, HealthKind, KeySource, Manifest, Profile,
     Protocol, Removed, Service,
 };
-pub use validate::{validate, Violation};
+pub use validate::{is_core_name, validate, Violation, ALLOWED_GRANTS};
 
 /// The manifest schema version this crate prefers.
 pub const SCHEMA_VERSION: u32 = 1;

@@ -12,6 +12,7 @@
 //! vocabulary from [`vocabulary`], the extension points from [`extension`] — so a
 //! shape that changes without its artefact changing with it fails the build.
 
+pub mod claiming;
 mod error;
 pub mod extension;
 mod recognising;

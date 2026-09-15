@@ -17,6 +17,10 @@
 //! not carry, are both refused by name. An untested contract is worse than an absent
 //! one, because a plugin author will trust it.
 
+mod claimed;
+mod judging;
+mod recorded;
+
 use lemonfiber_manifest::Manifest;
 use schemars::schema_for;
 use serde::Serialize;
@@ -24,11 +28,16 @@ use thiserror::Error;
 
 use crate::doctor::BUNDLED_CHECKS;
 
+pub use claimed::{claimed, Claimed, Claiming, Contributed, Ran, Unreadable, Verdict};
+pub use recorded::{Answer, Asked, Recording};
+
 // Re-exported so a surface rendering one of these reads it through the module that
 // publishes it, rather than reaching past this crate for a type it was handed. The
 // same arrangement the ports have, and for the same reason: where a shape comes from
 // is this crate's business, and moving one would otherwise be a change at every call
 // site that names it.
+// The refusal a manifest is read against, reached through the module that publishes
+// the reading rather than by a surface naming a crate it does not depend on.
 pub use lemonfiber_plugin::extension::{
     Bounded, Closed, Limits, Occupied, Point, Published as Points, Row,
 };
@@ -36,6 +45,7 @@ pub use lemonfiber_plugin::vocabulary::{
     Capability, Constraint, Credential, Declared, Probe, Published as Capabilities, Removed,
     Requirement, Unpublishable,
 };
+pub use lemonfiber_plugin::Violation;
 
 /// The stack this build pins, which is what says who declares each capability.
 const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");

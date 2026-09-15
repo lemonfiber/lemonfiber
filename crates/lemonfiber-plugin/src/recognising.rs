@@ -18,7 +18,7 @@ use toml::Value;
 use crate::schema::{Bind, Criticality, HealthKind};
 
 /// One thing a manifest got wrong, and where.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Violation {
     /// Which declaration it is about, in the manifest's own terms.
     pub location: String,
