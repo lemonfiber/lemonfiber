@@ -258,6 +258,65 @@ mod tests {
         assert_eq!(faults, vec!["type is a number, and it declares a string"]);
     }
 
+    /// Every kind an expectation can name, against a body holding each of them.
+    ///
+    /// A table rather than a case each, because what is being held is a mapping: the
+    /// five words a manifest may write and the six shapes a body can come back as. A
+    /// kind this could not tell apart would let a proof pass on the wrong sort of value.
+    #[test]
+    fn every_kind_is_told_from_every_other() {
+        let holding = [
+            ("bool", r#"{"a": true}"#, "a true or a false"),
+            ("int", r#"{"a": 3}"#, "a number"),
+            ("str", r#"{"a": "x"}"#, "a string"),
+            ("list", r#"{"a": []}"#, "a list"),
+            ("dict", r#"{"a": {}}"#, "an object"),
+        ];
+        for (kind, body, said) in holding {
+            let answer = answered(&format!(r#"{{"status": 200, "json": {body}}}"#));
+            let right = expects(&format!(r#"{{"json_types": {{"a": "{kind}"}}}}"#));
+            assert_eq!(judge(&right, &answer), Vec::<String>::new(), "{kind} holds");
+
+            for (other, _, wanted) in holding {
+                if other == kind {
+                    continue;
+                }
+                let wrong = expects(&format!(r#"{{"json_types": {{"a": "{other}"}}}}"#));
+                assert_eq!(
+                    judge(&wrong, &answer),
+                    vec![format!("a is {said}, and it declares {wanted}")],
+                    "{kind} read as {other}"
+                );
+            }
+        }
+        // The sixth shape a body can come back as, which no kind names: a key that is
+        // there and holds nothing is not a key that is missing.
+        let nothing = answered(r#"{"status": 200, "json": {"a": null}}"#);
+        assert_eq!(
+            judge(&expects(r#"{"json_types": {"a": "str"}}"#), &nothing),
+            vec!["a is nothing, and it declares a string"]
+        );
+    }
+
+    /// The three things a key may be declared to hold, each named as it was written.
+    #[test]
+    fn a_flag_a_number_and_a_word_are_each_said_back_as_they_were_declared() {
+        let answer =
+            answered(r#"{"status": 200, "json": {"flag": false, "count": 1, "word": "no"}}"#);
+        let faults = judge(
+            &expects(r#"{"json": {"flag": true, "count": 2, "word": "yes"}}"#),
+            &answer,
+        );
+        assert_eq!(
+            faults,
+            vec![
+                "count is 1, and it declares 2",
+                "flag is false, and it declares true",
+                "word is \"no\", and it declares \"yes\"",
+            ]
+        );
+    }
+
     #[test]
     fn a_number_below_what_was_declared_says_both() {
         let faults = judge(

@@ -8,6 +8,7 @@
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
+use lemonfiber_core::app::update;
 use lemonfiber_core::app::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting,
@@ -26,7 +27,7 @@ use crate::say::complain;
 use lemonfiber::cli::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
     QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawRemoval, RawRemoving,
-    RawUnrated,
+    RawUnrated, UpdateCommand,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -437,13 +438,49 @@ pub(crate) fn credentials(asked: RawCredentials) -> Command {
     })
 }
 
+/// The one thing a walk was asked for, or nothing at all.
+///
+/// Taken as words so it can be typed unquoted, and joined back into the title as
+/// said. Nothing named is a request in its own right rather than an omission: a
+/// walk asked for nothing in particular suggests something likely to work, which
+/// is what an operator with an empty library needs.
+pub(crate) fn named(words: &[String]) -> Option<String> {
+    let said = words.join(" ");
+    (!said.trim().is_empty()).then_some(said)
+}
+
+/// Which of the two things that can be moved forward was named, as the core carries it.
+///
+/// Apart from the arm that reads it for the reason the bundle beside it is: the stack's
+/// three fields spelled out twice is nine lines of the one function that has to stay
+/// readable, and the wait is the flag a teardown spells the same way.
+///
+/// The two go to different commands rather than to one carrying a mode. What each
+/// answers with does not resemble the other — a list of services and the steps they
+/// would take, against where one binary stands and which tool owns it — so a shared
+/// shape would be a shape neither of them fits.
+pub(crate) fn moving(object: UpdateCommand) -> Command {
+    match object {
+        UpdateCommand::Stack {
+            service,
+            confirm,
+            wait,
+        } => Command::Update(update::Asked {
+            service,
+            confirm,
+            wait: wait.into(),
+        }),
+        UpdateCommand::Itself { to } => Command::SelfUpdate { to },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::app::{Allowance, Command, QualityAction, Setting, Waiting};
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
-    use super::{alerts, diagnosing, narrowed};
+    use super::{alerts, diagnosing, moving, named, narrowed};
     use super::{
         bundling, configuration, credentials, hosting, household, invitation, letting, quality,
         restarting, sharing, traced, Answer, Arranged, Asking, Chosen, Decision, Destination,
@@ -452,13 +489,45 @@ mod tests {
     use crate::exit::USAGE;
     use lemonfiber::cli::{
         AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
-        RawAllowance, RawBandwidth, RawCredentials, RawUnrated,
+        RawAllowance, RawBandwidth, RawCredentials, RawUnrated, UpdateCommand,
     };
     use lemonfiber_core::alert::Appetite;
     use lemonfiber_core::app::{AlertAction, BandwidthAsked};
     use lemonfiber_core::bundle::Filenames;
     use lemonfiber_core::doctor::Narrowing;
     use lemonfiber_core::ports::service::Unrated;
+
+    /// What a walk was asked for is words joined back into a title, and asking for
+    /// nothing in particular is a request rather than an omission.
+    #[test]
+    fn a_walk_is_asked_for_by_words_or_by_nothing() {
+        let said = ["the".to_owned(), "big".to_owned(), "lebowski".to_owned()];
+        assert_eq!(named(&said), Some("the big lebowski".to_owned()));
+        assert_eq!(named(&[]), None);
+        assert_eq!(named(&["   ".to_owned()]), None);
+    }
+
+    /// The two things a single word can move forward go to two commands, because what
+    /// each answers with does not resemble the other.
+    #[test]
+    fn the_two_things_an_update_can_mean_go_to_two_commands() {
+        let stack = moving(UpdateCommand::Stack {
+            service: Some("sonarr".to_owned()),
+            confirm: true,
+            wait: true,
+        });
+        assert!(
+            matches!(stack, Command::Update(asked)
+                     if asked.service.as_deref() == Some("sonarr")
+                     && asked.confirm
+                     && asked.wait == Waiting::ForTheDownloads),
+            "the stack's own three fields are carried"
+        );
+        assert_eq!(
+            moving(UpdateCommand::Itself { to: None }),
+            Command::SelfUpdate { to: None }
+        );
+    }
 
     /// One choice about what the household may ask for, as the command line took it.
     fn allowing(

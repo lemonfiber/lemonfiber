@@ -132,13 +132,28 @@ fn taken(occupied: &[String]) -> String {
     format!("{} — {}", occupied.len(), occupied.join(", "))
 }
 
+/// What one plugin's source claims, in whichever form was asked for.
+///
+/// The machine-readable form is the report as it stands rather than a second shape
+/// written beside it: what an author's CI branches on and what a person reads are the
+/// same answer, and two renderings of one answer is the disagreement this avoids.
+pub(crate) fn claimed(read: &Claimed, json: bool) -> Option<Lines> {
+    if json {
+        return serde_json::to_string_pretty(read)
+            .ok()
+            .as_deref()
+            .map(document);
+    }
+    Some(claims(read))
+}
+
 /// What one plugin's source claims, and what this build makes of it.
 ///
 /// The refusals come first and are the whole answer where there are any: a manifest
 /// that contradicts what this build publishes is refused outright rather than partly
 /// applied, so reporting what its claims would have come to would be describing an
 /// install that is not going to happen.
-pub(crate) fn claims(read: &Claimed) -> Lines {
+fn claims(read: &Claimed) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("{} {} — {}", read.id, read.version, read.name));
     lines.put(format!(
@@ -161,7 +176,7 @@ pub(crate) fn claims(read: &Claimed) -> Lines {
     } else {
         lines.spaced("What it can do");
         for claiming in &read.capabilities {
-            claimed(&mut lines, claiming);
+            capability(&mut lines, claiming);
         }
     }
 
@@ -189,7 +204,7 @@ pub(crate) fn claims(read: &Claimed) -> Lines {
 }
 
 /// One capability, its probes, and what asking for it would come to.
-fn claimed(lines: &mut Lines, claiming: &Claiming) {
+fn capability(lines: &mut Lines, claiming: &Claiming) {
     lines.put(format!(
         "  {}  [{}]",
         claiming.name,
@@ -262,10 +277,15 @@ mod tests {
     use lemonfiber_core::filling::{Filling, Shown};
     use lemonfiber_core::plugin::{Claimed, Claiming, Contributed, Ran, Verdict, Violation};
 
-    use super::{capabilities, claims, document, points};
+    use super::{capabilities, claimed, claims, document, points};
 
-    /// One capability as the reader hands it over.
+    /// One capability as the reader hands it over, with one probe that passed.
     fn claiming(name: &str, shown: Shown, filling: Option<Filling>) -> Claiming {
+        with(name, shown, filling, Verdict::Passed)
+    }
+
+    /// The same, with whatever the probe came to.
+    fn with(name: &str, shown: Shown, filling: Option<Filling>, verdict: Verdict) -> Claiming {
         Claiming {
             name: name.to_owned(),
             service: "kavita".to_owned(),
@@ -273,7 +293,7 @@ mod tests {
             shown,
             probes: vec![Ran {
                 probe: "guarded".to_owned(),
-                verdict: Verdict::Passed,
+                verdict,
             }],
             filling,
         }
@@ -357,6 +377,88 @@ mod tests {
         assert!(!text.contains("this plugin's own"), "{text}");
         assert!(text.contains("Refused, 1 violation"), "{text}");
         assert!(text.contains("would not be installed"), "{text}");
+    }
+
+    /// The two forms are two renderings of one answer, and the machine-readable one is
+    /// the report itself rather than a shape written beside it.
+    #[test]
+    fn the_machine_readable_form_is_the_same_answer_as_the_page() {
+        let read = read(
+            vec![claiming("kavita:opds", Shown::Claimed, None)],
+            Vec::new(),
+        );
+        let document = claimed(&read, true)
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+        assert!(document.contains(r#""installable": true"#), "{document}");
+        assert!(document.contains(r#""name": "kavita:opds""#), "{document}");
+        let page = claimed(&read, false)
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+        assert_eq!(page, claims(&read).text());
+    }
+
+    /// What a probe came to is said in its own words, whichever of the three it was —
+    /// and a refutation carries what was wrong with the answer rather than the fact
+    /// that something was.
+    #[test]
+    fn each_of_the_three_verdicts_says_itself() {
+        let text = claims(&read(
+            vec![
+                with(
+                    "media.serve",
+                    Shown::Refuted,
+                    Some(Filling::Unfilled),
+                    Verdict::Failed {
+                        faults: vec![
+                            "answered 200 where it declares 401".to_owned(),
+                            "the body carries no content".to_owned(),
+                        ],
+                    },
+                ),
+                with(
+                    "identity.source",
+                    Shown::Unproven,
+                    Some(Filling::Unfilled),
+                    Verdict::Unproven {
+                        why: "fixtures/identity.json: could not be read".to_owned(),
+                    },
+                ),
+            ],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            text.contains(
+                "refuted: answered 200 where it declares 401; the body carries no content"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("unproven: fixtures/identity.json: could not be read"),
+            "{text}"
+        );
+    }
+
+    /// One violation and several are counted as they are read.
+    #[test]
+    fn a_page_counts_what_it_refused() {
+        let refusal = |what: &str| Violation {
+            location: "service kavita.provides".to_owned(),
+            message: what.to_owned(),
+        };
+        let one = claims(&read(Vec::new(), vec![refusal("the first")])).text();
+        assert!(one.contains("Refused, 1 violation:"), "{one}");
+        let several = claims(&read(
+            Vec::new(),
+            vec![refusal("the first"), refusal("the second")],
+        ))
+        .text();
+        assert!(several.contains("Refused, 2 violations:"), "{several}");
+        assert!(
+            several.contains("It claims no capabilities"),
+            "and a plugin that claims nothing says so: {several}"
+        );
     }
 
     /// The plugin's own capability says what inert means rather than leaving a blank.

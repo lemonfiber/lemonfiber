@@ -664,6 +664,52 @@ fixture = "fixtures/catalogue.json"
         );
     }
 
+    /// A core name asserted and demonstrated by nothing is unproven, not claimed.
+    ///
+    /// The refusal beside it is the vocabulary's, and the state is this reader's: there
+    /// were no probes to run, so nothing about the service was established — which is a
+    /// different sentence from the manifest being wrong, and both are said.
+    #[test]
+    fn a_core_name_with_no_claim_is_unproven_as_well_as_refused() {
+        let Some((before, rest)) = MANIFEST.split_once("[[claim]]") else {
+            unreachable!("the manifest claims something")
+        };
+        let _ = rest;
+        let at = source("unclaimed", before, &[]);
+        let Ok(read) = claimed(&at) else {
+            unreachable!("the plugin reads")
+        };
+        assert_eq!(
+            read.capabilities
+                .iter()
+                .find(|claiming| !claiming.own)
+                .map(|claiming| claiming.shown.clone()),
+            Some(Shown::Unproven)
+        );
+        assert!(!read.refusals.is_empty(), "and the vocabulary says why");
+    }
+
+    /// A core-looking name nothing publishes has no answer about what fills it, and
+    /// that is not the answer a namespaced one gets: one is a capability that does not
+    /// exist and the other is inert by design.
+    #[test]
+    fn a_core_name_the_vocabulary_does_not_carry_fills_nothing_and_is_not_inert() {
+        let at = source(
+            "unpublished",
+            &MANIFEST.replace("media.serve", "media.stream"),
+            &[("fixtures/guarded.json", guarded())],
+        );
+        let Ok(read) = claimed(&at) else {
+            unreachable!("the plugin reads")
+        };
+        let claiming = read.capabilities.iter().find(|claiming| !claiming.own);
+        assert_eq!(
+            claiming.map(|claiming| (claiming.name.clone(), claiming.filling.clone())),
+            Some(("media.stream".to_owned(), None))
+        );
+        assert!(!read.installable, "and the manifest is refused");
+    }
+
     #[test]
     fn a_path_with_no_manifest_says_that_rather_than_anything_about_a_plugin() {
         let at = std::env::temp_dir().join("lemonfiber-claimed-nothing-here");

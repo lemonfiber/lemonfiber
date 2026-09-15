@@ -328,7 +328,9 @@ mod tests {
     use super::violations;
     use crate::extension::POINTS;
     use crate::vocabulary::carried;
+    use crate::vocabulary::Constraint;
     use crate::vocabulary::Removed;
+    use crate::Expect;
     use crate::Manifest;
 
     /// The identities the doctor's register holds in these tests.
@@ -668,6 +670,45 @@ why       = "Two rows, one name."
             says(&counted, &["totalElements at least 1", "gates an install"]),
             "got: {counted:?}"
         );
+    }
+
+    /// Every kind of body constraint is one this can recognise in an expectation.
+    ///
+    /// Asked of each in turn rather than through the vocabulary, because the capabilities
+    /// this generation carries ask for five of the nine — and the other four would be a
+    /// rule that reads as written and decides nothing the day a capability asks for one.
+    #[test]
+    fn every_kind_of_body_constraint_is_one_an_expectation_can_carry() {
+        let each = [
+            (Constraint::Status, "status = 200"),
+            (Constraint::Json, "json = { a = 1 }"),
+            (Constraint::JsonHasKeys, "json_has_keys = [\"a\"]"),
+            (Constraint::JsonTypes, "json_types = { a = \"int\" }"),
+            (Constraint::JsonAtLeast, "json_at_least = { a = 0 }"),
+            (Constraint::JsonArrayMin, "json_array_min = 0"),
+            (Constraint::JsonIsAbsent, "json_is_absent = true"),
+            (
+                Constraint::ContentType,
+                "content_type = \"application/json\"",
+            ),
+            (Constraint::BodyStartsWith, "body_starts_with = \"<\""),
+        ];
+        for (constraint, declared) in each {
+            let Ok(expect) = toml::from_str::<Expect>(declared) else {
+                unreachable!("the expectation reads: {declared}")
+            };
+            assert!(
+                super::carries(&expect, constraint),
+                "{declared} does not read as {constraint:?}"
+            );
+            let Ok(empty) = toml::from_str::<Expect>("") else {
+                unreachable!("an expectation that says nothing reads")
+            };
+            assert!(
+                !super::carries(&empty, constraint),
+                "an expectation that says nothing reads as {constraint:?}"
+            );
+        }
     }
 
     /// A count of zero says the answer reads as a list, which is about shape.
