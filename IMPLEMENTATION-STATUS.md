@@ -24,15 +24,21 @@ after it, and one of them already has work landed.
   separate change drifts; one that moves with the code cannot.
 - Status is per *deliverable*, mirroring the roadmap's own tables. The landing
   column cites the PR or commit that made it true, so a claim here is checkable.
-- **Never name an unfinished requirement inside a ✅ row**, not even to say it is
-  deferred. The release gate reads done-ness by finding an ID in a ticked row, so
-  a sentence explaining that something is *not* done marks it done. Give the
-  unfinished ones a row of their own.
-- **Never write the tick character in a row that is not ticked.** `gate.py` and
-  `status_lint.py` both decide a row by whether its *line* holds the glyph, so a
-  ◐ or ☐ row whose prose says "inside a ✅ row" is read as done — which is how
-  three unmet requirements came to be counted as met. Write "a ticked row"
-  instead. The word is safe; the character is not.
+- **Never name an unfinished requirement inside a ticked row**, not even to say
+  it is deferred. The release gate reads done-ness by finding an ID in a ticked
+  row, so a sentence explaining that something is *not* done marks it done.
+  `status_lint.py` refuses an ID that no ticked row claims in its own column;
+  give the unfinished ones a row of their own.
+- **The tick character belongs in the Status column and nowhere else on a row.**
+  This used to be a request. `gate.py` and `status_lint.py` both decided a row by
+  whether its *line* held the glyph, so a ◐ or ☐ row whose prose said "inside a ✅
+  row" was read as done — which is how three unmet requirements came to be
+  counted as met, and a fourth moved the release gate from 69 of 72 to 70 on a
+  row that visibly said ◐. Both gates now read the status **column** its own
+  table's header names, and `status_lint.py` refuses the character written
+  anywhere else on a row — including a ticked one, where it is a trap for
+  whoever next edits the status cell and leaves the sentence behind. Write "a
+  ticked row". The word is still safe, and now the character is caught.
 
 **Legend:** ✅ done · ◐ partial · ☐ not started
 
