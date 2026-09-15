@@ -356,6 +356,27 @@ mod tests {
         );
     }
 
+    /// A plugin adding nothing to lemonfiber's own registers gets no heading for one.
+    ///
+    /// Read here rather than left to the test that drives the binary, because this file
+    /// is compiled twice under coverage — once for these cases and once for the binary
+    /// those drive — and a branch taken in only one of the two is a line the summary
+    /// counts as missed and the line list cannot name.
+    #[test]
+    fn a_plugin_that_contributes_nothing_gets_no_heading_for_it() {
+        let mut read = read(
+            vec![claiming("media.serve", Shown::Demonstrated, None)],
+            Vec::new(),
+        );
+        read.contributions = Vec::new();
+        let text = claims(&read).text();
+        assert!(
+            !text.contains("What it adds to lemonfiber's own registers"),
+            "{text}"
+        );
+        assert!(text.contains("media.serve"), "{text}");
+    }
+
     /// A remedy names the check it is for, and a row saying nothing takes no line for it.
     ///
     /// Both halves of a contributed row's line. A row carrying neither a title nor an
