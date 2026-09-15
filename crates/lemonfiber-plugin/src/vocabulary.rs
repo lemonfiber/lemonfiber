@@ -358,38 +358,44 @@ mod tests {
     ///
     /// In the order the stack declares them rather than sorted, because the stack's
     /// order is the one an operator reading the manifest already has.
+    ///
+    /// Asked of every capability in turn rather than of the first, and not only for
+    /// thoroughness: "the first" is an option, and an arm for a vocabulary carrying
+    /// nothing is a line no run can ever enter.
     #[test]
     fn every_service_declaring_a_capability_is_named_against_it() {
-        let Some(first) = carried().first() else {
-            unreachable!("the vocabulary carries capabilities")
-        };
-        let text = format!(
-            "{}{}",
-            declaring_everything(),
-            service("also", &[first.name])
-        );
-        let claimants = published(&services(&text))
-            .ok()
-            .and_then(|artefact| artefact.capabilities.into_iter().next())
-            .map(|capability| capability.declared_by);
-        assert_eq!(claimants, Some(vec!["s0".to_owned(), "also".to_owned()]));
+        for (at, held) in carried().iter().enumerate() {
+            let text = format!(
+                "{}{}",
+                declaring_everything(),
+                service("also", &[held.name])
+            );
+            let claimants = published(&services(&text))
+                .ok()
+                .and_then(|artefact| artefact.capabilities.into_iter().nth(at))
+                .map(|capability| capability.declared_by);
+            assert_eq!(
+                claimants,
+                Some(vec![format!("s{at}"), "also".to_owned()]),
+                "{}",
+                held.name
+            );
+        }
     }
 
     /// A capability nothing declares fails generation, and is named.
     #[test]
     fn a_capability_no_bundled_service_declares_refuses_to_be_published() {
-        let Some(first) = carried().first() else {
-            unreachable!("the vocabulary carries capabilities")
-        };
-        let text = declaring_everything().replace(&format!("\"{}\"", first.name), "");
-        let refusal = published(&services(&text)).err().unwrap_or_default();
-        assert_eq!(refusal, vec![Unpublishable::Unclaimed(first.name)]);
-        assert!(
-            refusal
-                .first()
-                .is_some_and(|said| said.to_string().contains(first.name)),
-            "the refusal names the capability: {refusal:?}"
-        );
+        for held in carried() {
+            let text = declaring_everything().replace(&format!("\"{}\"", held.name), "");
+            let refusal = published(&services(&text)).err().unwrap_or_default();
+            assert_eq!(refusal, vec![Unpublishable::Unclaimed(held.name)]);
+            let said: String = refusal.iter().map(ToString::to_string).collect();
+            assert!(
+                said.contains(held.name),
+                "the refusal names the capability: {said}"
+            );
+        }
     }
 
     /// A name the vocabulary does not carry fails generation, and names both.
@@ -413,14 +419,13 @@ mod tests {
     /// Both faults in one pass, because a stack is likelier to carry several.
     #[test]
     fn both_disagreements_are_reported_together() {
-        let Some(first) = carried().first() else {
-            unreachable!("the vocabulary carries capabilities")
-        };
-        let text = format!(
-            "{}{}",
-            declaring_everything().replace(&format!("\"{}\"", first.name), ""),
-            service("odd", &["not.here"])
-        );
+        // The first name, reached without asking whether there is one: an arm for a
+        // vocabulary that carries nothing is a line no run can enter.
+        let mut text = declaring_everything();
+        for held in carried().iter().take(1) {
+            text = text.replace(&format!("\"{}\"", held.name), "");
+        }
+        let text = format!("{text}{}", service("odd", &["not.here"]));
         let refusal = published(&services(&text)).err().unwrap_or_default();
         assert_eq!(refusal.len(), 2, "both of them: {refusal:?}");
     }

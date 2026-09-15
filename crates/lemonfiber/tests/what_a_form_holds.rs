@@ -46,17 +46,25 @@ fn declared() -> BTreeSet<String> {
          guard would be comparing every fixture against nothing",
         path.display()
     );
-    let Ok(manifest) = lemonfiber_manifest::Manifest::from_toml(&text) else {
-        unreachable!("the pinned stack must parse: {}", path.display())
-    };
-    let Some(form) = manifest.forms.iter().find(|form| form.id == FORM) else {
-        unreachable!("the pinned stack must declare the `{FORM}` form")
-    };
-    manifest
-        .services
-        .iter()
-        .filter(|service| form.profiles.contains(&service.profile))
-        .map(|service| service.id.clone())
+    // Read through the iterators rather than out of them, because an arm for a pinned
+    // stack that does not parse, or that declares no such form, is a line no run can
+    // enter — and the count below is what notices either.
+    lemonfiber_manifest::Manifest::from_toml(&text)
+        .into_iter()
+        .flat_map(|manifest| {
+            let profiles: BTreeSet<String> = manifest
+                .forms
+                .iter()
+                .filter(|form| form.id == FORM)
+                .flat_map(|form| form.profiles.iter().cloned())
+                .collect();
+            manifest
+                .services
+                .into_iter()
+                .filter(|service| profiles.contains(&service.profile))
+                .map(|service| service.id)
+                .collect::<Vec<String>>()
+        })
         .collect()
 }
 

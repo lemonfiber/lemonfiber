@@ -662,11 +662,11 @@ mod tests {
     /// passes here, because what the vocabulary carries is the vocabulary's question.
     #[test]
     fn a_core_name_this_crate_knows_nothing_about_is_left_alone() {
-        let said = messages(&offering("\"media.serve\", \"nothing.here\""));
-        assert!(
-            !said.iter().any(|fault| fault.contains("provides")),
-            "{said:?}"
-        );
+        // Joined rather than searched through a closure, which an empty list never
+        // enters — and an assertion whose only interesting half is a line no run
+        // reaches is an assertion the coverage gate is right to call missing.
+        let said = messages(&offering("\"media.serve\", \"nothing.here\"")).join("\n");
+        assert!(!said.contains("provides"), "{said}");
     }
 
     /// Every capability the shipped stack declares is a core name, and none is twice.
@@ -676,11 +676,8 @@ mod tests {
     /// services declare nothing at all, which is an answer rather than an omission.
     #[test]
     fn every_capability_the_shipped_stack_declares_passes_the_shape_rule() {
-        let said = messages(STACK);
-        assert!(
-            !said.iter().any(|fault| fault.contains("provides")),
-            "{said:?}"
-        );
+        let said = messages(STACK).join("\n");
+        assert!(!said.contains("provides"), "{said}");
     }
 
     /// The first of the two outbound lines the shipped stack carries, and the second.

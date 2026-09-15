@@ -11,7 +11,7 @@
 //! whether the difference is their build or their file, and the generation is the only
 //! thing that answers that.
 
-use lemonfiber_core::plugin::{Capabilities, Credential, Declared, Points, Probe};
+use lemonfiber_core::plugin::{Capabilities, Credential, Points, Probe};
 
 use super::Lines;
 
@@ -34,7 +34,10 @@ pub(crate) fn capabilities(published: &Capabilities) -> Lines {
         lines.spaced(capability.name.to_owned());
         lines.put(format!("  {}", capability.summary));
         lines.put(format!("  {}", capability.contract));
-        lines.put(format!("  declared by  {}", published_by(capability)));
+        lines.put(format!(
+            "  declared by  {}",
+            capability.declared_by.join(", ")
+        ));
         for probe in capability.probes {
             lines.put(format!("  probe {} — {}", probe.id, probe.title));
             lines.put(format!("    asks     {}", probe.asks));
@@ -47,18 +50,6 @@ pub(crate) fn capabilities(published: &Capabilities) -> Lines {
          written <plugin-id>:<name>, and nothing asks for one yet.",
     );
     lines
-}
-
-/// Which bundled services declare a capability, or that none does.
-///
-/// Never an empty list. Generation refuses a capability nothing declares, so an empty
-/// one here would be a state that cannot arise — but saying so costs a word and is the
-/// difference between a reader believing the line and wondering about it.
-fn published_by(capability: &Declared) -> String {
-    if capability.declared_by.is_empty() {
-        return "nothing bundled".to_owned();
-    }
-    capability.declared_by.join(", ")
 }
 
 /// Who a probe is asked as, in the words an author would use.
@@ -142,17 +133,21 @@ fn taken(occupied: &[String]) -> String {
 mod tests {
     use super::{capabilities, document, points};
 
-    /// The vocabulary this build publishes, as the binary would read it.
-    fn vocabulary() -> lemonfiber_core::plugin::Capabilities {
-        match lemonfiber_core::plugin::capabilities() {
-            Ok(published) => published,
-            Err(problem) => unreachable!("this build's own vocabulary must publish: {problem}"),
-        }
+    /// The capability listing this build produces.
+    ///
+    /// Taken through the result rather than out of it, because an arm for a build whose
+    /// own vocabulary does not publish is a line no run can enter. Such a build renders
+    /// nothing at all here, which every assertion below notices rather than passes over.
+    fn listed() -> String {
+        lemonfiber_core::plugin::capabilities()
+            .iter()
+            .map(|published| capabilities(published).text())
+            .collect()
     }
 
     #[test]
     fn a_capability_carries_its_contract_its_claimants_and_its_probes() {
-        let text = capabilities(&vocabulary()).text();
+        let text = listed();
         assert!(text.contains("generation 1"), "{text}");
         assert!(text.contains("media.serve"), "{text}");
         assert!(text.contains("declared by  jellyfin"), "{text}");
@@ -167,7 +162,7 @@ mod tests {
     /// than leaving the line blank.
     #[test]
     fn a_probe_that_constrains_only_a_status_says_that_is_the_whole_of_it() {
-        let text = capabilities(&vocabulary()).text();
+        let text = listed();
         assert!(
             text.contains("401 or 403 — the status is the whole of it"),
             "{text}"
@@ -178,14 +173,17 @@ mod tests {
     /// Every capability the vocabulary carries reaches the listing.
     #[test]
     fn nothing_the_vocabulary_carries_is_left_out() {
-        let published = vocabulary();
-        let text = capabilities(&published).text();
-        let missing: Vec<&str> = published
-            .capabilities
+        let text = listed();
+        let missing: Vec<&str> = lemonfiber_core::plugin::capabilities()
             .iter()
+            .flat_map(|published| published.capabilities.iter())
             .map(|capability| capability.name)
             .filter(|name| !text.contains(name))
             .collect();
+        assert!(
+            !text.is_empty(),
+            "this build published no vocabulary at all"
+        );
         assert!(missing.is_empty(), "{missing:?}");
     }
 

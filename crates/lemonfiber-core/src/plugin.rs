@@ -86,9 +86,9 @@ fn each(found: &[Unpublishable]) -> String {
 ///
 /// `None` only where the value cannot serialise, which none of these can.
 fn rendered<T: Serialize>(artefact: &T) -> Option<String> {
-    let mut text = serde_json::to_string_pretty(artefact).ok()?;
-    text.push('\n');
-    Some(text)
+    serde_json::to_string_pretty(artefact)
+        .ok()
+        .map(|text| text + "\n")
 }
 
 /// The published schema for `plugin.toml`, from the types lemonfiber deserialises.
@@ -120,7 +120,8 @@ pub fn points() -> Option<String> {
 /// [`Ungenerated`] where the pinned stack cannot be read, or where it and the
 /// vocabulary disagree about what is declared.
 pub fn vocabulary() -> Result<String, Ungenerated> {
-    rendered(&capabilities_of(STACK)?).ok_or(Ungenerated::Unrenderable)
+    capabilities_of(STACK)
+        .and_then(|published| rendered(&published).ok_or(Ungenerated::Unrenderable))
 }
 
 /// The published capability vocabulary, as a value rather than as the artefact.
@@ -210,41 +211,60 @@ mod tests {
         ));
     }
 
+    /// The pinned stack with one capability taken out of every service declaring it.
+    ///
+    /// The comma goes with the name. A service declaring two leaves `[, "other"]`
+    /// behind otherwise, which is a stack that does not parse — and a test that then
+    /// proves the reader refuses bad TOML rather than what it was written for.
+    fn without(name: &str) -> String {
+        STACK
+            .replace(&format!("\"{name}\", "), "")
+            .replace(&format!(", \"{name}\""), "")
+            .replace(&format!("\"{name}\""), "")
+    }
+
     /// A capability no bundled service declares fails generation, naming it.
+    ///
+    /// Every one of them in turn rather than the first, and not only for thoroughness:
+    /// "the first" is an option, and an arm for a vocabulary carrying nothing is a line
+    /// no run can ever enter.
     #[test]
     fn a_capability_nothing_declares_fails_generation_by_name() {
-        let Some(first) = lemonfiber_plugin::vocabulary::carried().first() else {
-            unreachable!("the vocabulary carries capabilities")
-        };
-        let short = STACK.replace(&format!("\"{}\"", first.name), "");
-        let said = capabilities_of(&short)
-            .err()
-            .map(|refused| refused.to_string())
-            .unwrap_or_default();
-        assert!(said.contains(first.name), "got: {said}");
-        assert!(
-            said.contains("declared by no bundled service"),
-            "got: {said}"
-        );
+        let mut asked = 0;
+        for held in lemonfiber_plugin::vocabulary::carried() {
+            let said = capabilities_of(&without(held.name))
+                .err()
+                .map(|refused| refused.to_string())
+                .unwrap_or_default();
+            assert!(said.contains(held.name), "got: {said}");
+            assert!(
+                said.contains("declared by no bundled service"),
+                "got: {said}"
+            );
+            asked += 1;
+        }
+        assert!(asked > 1, "the vocabulary carries more than one capability");
     }
 
     /// A bundled service declaring a name the vocabulary lacks fails generation,
     /// naming both.
     #[test]
     fn a_service_declaring_a_name_the_vocabulary_lacks_fails_generation_by_name() {
-        let Some(first) = lemonfiber_plugin::vocabulary::carried().first() else {
-            unreachable!("the vocabulary carries capabilities")
-        };
-        let odd = STACK.replacen(
-            &format!("\"{}\"", first.name),
-            &format!("\"{}\", \"nothing.here\"", first.name),
-            1,
-        );
-        let said = capabilities_of(&odd)
-            .err()
-            .map(|refused| refused.to_string())
-            .unwrap_or_default();
-        assert!(said.contains("nothing.here"), "got: {said}");
+        let mut asked = 0;
+        for held in lemonfiber_plugin::vocabulary::carried() {
+            let odd = STACK.replacen(
+                &format!("\"{}\"", held.name),
+                &format!("\"{}\", \"nothing.here\"", held.name),
+                1,
+            );
+            let said = capabilities_of(&odd)
+                .err()
+                .map(|refused| refused.to_string())
+                .unwrap_or_default();
+            assert!(said.contains("nothing.here"), "got: {said}");
+            asked += 1;
+        }
+        assert!(asked > 1, "the vocabulary carries more than one capability");
     }
 
     /// The failure that cannot happen still says what it would mean.

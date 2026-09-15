@@ -104,10 +104,7 @@ mod tests {
         let mut read = Vec::new();
         let mut looking = vec![here];
         while let Some(at) = looking.pop() {
-            let Ok(entries) = fs::read_dir(&at) else {
-                continue;
-            };
-            for entry in entries.flatten() {
+            for entry in fs::read_dir(&at).into_iter().flatten().flatten() {
                 let path = entry.path();
                 if path.is_dir() {
                     looking.push(path);
@@ -137,19 +134,17 @@ mod tests {
     fn emitted(text: &str) -> BTreeSet<String> {
         let mut found = BTreeSet::new();
         for piece in text.split('"').skip(1).step_by(2) {
-            let Some((family, _)) = piece.split_once('.') else {
+            let Some((family, rest)) = piece.split_once('.') else {
                 continue;
             };
             if !families().contains(&family) {
                 continue;
             }
-            let named = piece.split('{').next().unwrap_or(piece);
-            let Some(tail) = named
-                .strip_prefix(family)
-                .and_then(|rest| rest.strip_prefix('.'))
-            else {
-                continue;
-            };
+            // Everything up to the first substitution. The dot in front of it is kept,
+            // which is what tells the two shapes apart in the published list:
+            // `services.releases` is one check, and `services.releases.` is a family
+            // with one finding per curating service under it.
+            let tail = rest.split('{').next().unwrap_or(rest);
             // An empty tail is a family, and only a substitution can leave one. A bare
             // `"providers."` written out in the source would be a string nothing ever
             // reports a finding against.
@@ -162,7 +157,7 @@ mod tests {
             if tail.contains(|letter: char| !matches!(letter, 'a'..='z' | '0'..='9' | '-' | '.')) {
                 continue;
             }
-            found.insert(named.to_owned());
+            found.insert(format!("{family}.{tail}"));
         }
         found
     }
@@ -181,17 +176,42 @@ mod tests {
     /// comparison below pass and mean nothing.
     #[test]
     fn the_doctor_s_own_modules_were_actually_read() {
-        let read = shipped();
+        // Counted into names before the assertions rather than inside their messages,
+        // which are evaluated only where an assertion fails — and a rendering nothing
+        // runs is a rendering nothing holds to being readable.
+        let files = shipped().len();
+        let identities = every_identity().len();
         assert!(
-            read.len() > 10,
-            "the sweep found {} files under src/doctor, which means it is looking in the \
-             wrong place",
-            read.len()
+            files > 10,
+            "the sweep found {files} files under src/doctor, which means it is looking \
+             in the wrong place"
         );
         assert!(
-            every_identity().len() > 20,
-            "the sweep read {} identities out of them, which is fewer than the doctor has",
-            every_identity().len()
+            identities > 20,
+            "the sweep read {identities} identities out of them, which is fewer than the \
+             doctor has"
+        );
+    }
+
+    /// What is left after the family has to look like the rest of an identity.
+    ///
+    /// The line that keeps a sentence mentioning a family, or a path that begins with
+    /// one, from reading as a check nobody can find — and the one nothing in the
+    /// doctor's own source happens to exercise, which is exactly when a filter stops
+    /// being a filter.
+    #[test]
+    fn a_family_followed_by_something_that_is_not_an_identity_is_not_one() {
+        let read =
+            emitted(r#" "storage.Space" "storage.space/two" "vpn." "vpn.{}" "storage.space" "#);
+        assert_eq!(
+            read,
+            ["storage.space", "vpn."]
+                .into_iter()
+                .map(ToOwned::to_owned)
+                .collect::<BTreeSet<String>>(),
+            "an uppercase tail and a path separator are not identities, a family \
+             written out with no substitution behind it is not one either, and the two \
+             that are survive"
         );
     }
 
