@@ -265,7 +265,15 @@ fn against(
         Err(unrunnable) => return Verdict::Unproven { why: unrunnable.0 },
     };
     if let Some(wrong) = elsewhere(&recording, service, &binding.fixture) {
+        // Refused *rather than run against*. Judging it anyway would report a probe as
+        // answered by an image nobody is installing, which is the passing verdict this
+        // refusal exists to stop somebody reading.
+        // The whole refusal rather than its message, so the verdict names the recording
+        // it is about: a probe reported unproven beside a dozen others is read on its
+        // own line, away from the refusal that explains it.
+        let why = wrong.to_string();
         refusals.push(wrong);
+        return Verdict::Unproven { why };
     }
     if !recorded::records(&recording, &binding.request.method, &binding.request.path) {
         return Verdict::Unproven {
@@ -598,6 +606,17 @@ fixture = "fixtures/catalogue.json"
             "got: {said:?}"
         );
         assert!(!read.installable, "a refusal stops the install");
+        // Refused rather than run against: the recording answers what the binding
+        // declares, and a verdict off it would be about the wrong image.
+        assert_eq!(
+            core(&at).map(|(shown, verdicts)| (shown, verdicts.first().cloned())),
+            Some((
+                Shown::Unproven,
+                Some(Verdict::Unproven {
+                    why: said.first().cloned().unwrap_or_default()
+                })
+            ))
+        );
     }
 
     /// The claim a bundled service also makes is contested, and every claimant is
