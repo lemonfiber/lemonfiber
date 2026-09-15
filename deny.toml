@@ -4,10 +4,18 @@ yanked = "deny"
 
 [bans]
 multiple-versions = "warn"
-# Telemetry is refused as a dependency, not merely avoided as a habit. These are
-# stems of crate families that exist to report somewhere; the same list is swept
-# over the resolved graph by `nothing_reports_on_you.rs`, which matches a family
-# by its prefix where this matches one name at a time. Add to both or neither.
+# Two families are refused as dependencies rather than merely avoided as a habit,
+# and both are stems: a family is published under one prefix, and banning the one
+# somebody reaches for first would leave the rest.
+#
+# The first exists to report somewhere. The second can load a unit of code or
+# evaluate a program handed to it at runtime, which is how a plugin would stop
+# being data — the property everything about extensions rests on.
+#
+# The same stems are swept over the resolved graph by the guards in
+# `crates/lemonfiber/tests/refused/`, which match a family by its prefix where this
+# matches one name at a time, and which hold this list to theirs. Add to both or
+# neither.
 deny = [
   "amplitude",
   "aptabase",
@@ -23,6 +31,31 @@ deny = [
   "segment",
   "sentry",
   "snowplow",
+  "abi_stable",
+  "dlopen",
+  "libloading",
+  "sharedlib",
+  "boa_engine",
+  "deno_core",
+  "dyon",
+  "extism",
+  "gluon",
+  "hlua",
+  "koto",
+  "lua",
+  "mlua",
+  "quickjs",
+  "rhai",
+  "rlua",
+  "rquickjs",
+  "rustpython",
+  "starlark",
+  "v8",
+  "wasm3",
+  "wasmedge",
+  "wasmer",
+  "wasmi",
+  "wasmtime",
 ]
 
 [licenses]

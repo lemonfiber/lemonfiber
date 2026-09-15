@@ -25,35 +25,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod refused;
 mod source_tree;
 
-use source_tree::{shipped, workspace_root};
-
-/// Package names that would mean this product had started collecting.
-///
-/// Stems rather than exact names: a family of crates is published under one
-/// prefix — an exporter, a core, an integration — and banning the one somebody
-/// happens to reach for first would leave the rest. A package matches a stem when
-/// its name is the stem, or begins with the stem and a separator.
-///
-/// This is not a guess at what is out there. It is the list `deny.toml` carries, so
-/// the two cannot drift, and the test below holds them to each other.
-const COLLECTORS: &[&str] = &[
-    "amplitude",
-    "aptabase",
-    "bugsnag",
-    "countly",
-    "datadog",
-    "google-analytics",
-    "libhoney",
-    "mixpanel",
-    "opentelemetry",
-    "posthog",
-    "rollbar",
-    "segment",
-    "sentry",
-    "snowplow",
-];
+use refused::{banned, belongs, every_stem, resolved, COLLECTORS};
+use source_tree::shipped;
 
 /// Whether lemonfiber itself sends a request to a host it names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,73 +172,6 @@ const MINTED_BY: (&str, &str) = ("Random", ".bytes(");
 /// it reaches it with.
 const OS_RANDOMNESS: (&str, &str) = ("crates/lemonfiber-adapters/src/random.rs", "getrandom");
 
-/// A package this workspace is known to depend on, so a reader of `Cargo.lock` that
-/// found nothing is told apart from a graph that holds nothing.
-const KNOWN_DEPENDENCY: &str = "reqwest";
-
-/// Whether a package name is one of the stems.
-fn collects(name: &str) -> bool {
-    COLLECTORS.iter().any(|stem| {
-        name == *stem
-            || name
-                .strip_prefix(stem)
-                .is_some_and(|rest| rest.starts_with('-') || rest.starts_with('_'))
-    })
-}
-
-/// Every package in the resolved dependency graph.
-fn resolved() -> BTreeSet<String> {
-    let root = workspace_root();
-    let Ok(text) = std::fs::read_to_string(root.join("Cargo.lock")) else {
-        unreachable!("the workspace this test is compiled from has a lock file")
-    };
-    let Ok(lock) = text.parse::<toml::Table>() else {
-        unreachable!("the lock file cargo writes is TOML")
-    };
-    let found: BTreeSet<String> = lock
-        .get("package")
-        .and_then(toml::Value::as_array)
-        .map(|packages| {
-            packages
-                .iter()
-                .filter_map(|package| package.get("name"))
-                .filter_map(toml::Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default();
-    assert!(
-        found.contains(KNOWN_DEPENDENCY),
-        "the graph does not hold {KNOWN_DEPENDENCY}, which means this is reading the wrong \
-         file — every claim below it would be a claim about nothing"
-    );
-    found
-}
-
-/// The names cargo-deny is told to refuse.
-fn banned() -> BTreeSet<String> {
-    let root = workspace_root();
-    let Ok(text) = std::fs::read_to_string(root.join("deny.toml")) else {
-        unreachable!("the workspace this test is compiled from configures cargo-deny")
-    };
-    let Ok(config) = text.parse::<toml::Table>() else {
-        unreachable!("cargo-deny's configuration is TOML")
-    };
-    config
-        .get("bans")
-        .and_then(|bans| bans.get("deny"))
-        .and_then(toml::Value::as_array)
-        .map(|entries| {
-            entries
-                .iter()
-                .filter_map(|entry| entry.get("name").or(Some(entry)))
-                .filter_map(toml::Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 /// The text inside double quotes on one line.
 fn quoted(line: &str) -> impl Iterator<Item = &str> {
     line.split('"').skip(1).step_by(2)
@@ -324,7 +233,7 @@ fn hosts() -> BTreeMap<String, Vec<String>> {
 fn nothing_this_binary_is_built_from_collects() {
     let carried: Vec<String> = resolved()
         .into_iter()
-        .filter(|name| collects(name))
+        .filter(|name| belongs(name, COLLECTORS))
         .collect();
     assert!(
         carried.is_empty(),
@@ -333,20 +242,24 @@ fn nothing_this_binary_is_built_from_collects() {
     );
 }
 
-/// The ban list and the list above name the same things.
+/// The ban list names every stem a guard sweeps for, and nothing else.
 ///
 /// Two gates over one claim, and they answer different questions: this test reads
 /// the graph as resolved and matches a family by its stem, while `cargo deny` reads
 /// a name at a time and is the one that runs on a dependency bump nobody opened.
 /// Neither is redundant, and a stem on one and not the other is a stem nothing
 /// enforces on the path it was written for.
+///
+/// Held against both families rather than this file's own, because `deny.toml`
+/// carries one list for two subjects. Asserting the collectors alone would pass
+/// while reading as though it had checked the file, and every stem the other guard
+/// added would be a stem this one silently declared surplus.
 #[test]
-fn what_the_dependency_gate_refuses_is_what_this_names() {
-    let listed: BTreeSet<String> = COLLECTORS.iter().map(|stem| (*stem).to_owned()).collect();
+fn what_the_dependency_gate_refuses_is_what_the_guards_name() {
     assert_eq!(
         banned(),
-        listed,
-        "the ban list cargo-deny reads and the stems this test sweeps for disagree — one of \
+        every_stem(),
+        "the ban list cargo-deny reads and the stems these guards sweep for disagree — one of \
          them is enforcing something the other is not"
     );
 }
