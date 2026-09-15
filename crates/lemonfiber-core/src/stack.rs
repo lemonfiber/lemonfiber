@@ -508,7 +508,7 @@ mod tests {
             .manifest()
             .ok()
             .map(|manifest| (manifest.schema_version, manifest.services.len()));
-        assert_eq!(read, Some((1, 19)));
+        assert_eq!(read, Some((1, 20)));
     }
 
     #[test]
@@ -532,7 +532,7 @@ mod tests {
             .manifest()
             .ok()
             .map(|manifest| (manifest.schema_version, manifest.services.len()));
-        assert_eq!(read, Some((1, 19)));
+        assert_eq!(read, Some((1, 20)));
     }
 
     #[test]
@@ -715,8 +715,8 @@ mod tests {
     const fn today() -> lemonfiber_manifest::Date {
         lemonfiber_manifest::Date {
             year: 2026,
-            month: 8,
-            day: 14,
+            month: 10,
+            day: 1,
         }
     }
 

@@ -748,7 +748,8 @@ composable = false
                 "jellyfin",
                 "seerr",
                 "calibre-web-automated",
-                "audiobookshelf"
+                "audiobookshelf",
+                "navidrome"
             ])),
             "the stack's own order, so the preview reads like the stack"
         );

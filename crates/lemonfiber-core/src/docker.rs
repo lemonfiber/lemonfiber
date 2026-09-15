@@ -659,11 +659,12 @@ mod tests {
     }
 
     /// Everything the `media` profile declares.
-    const MEDIA: [&str; 4] = [
+    const MEDIA: [&str; 5] = [
         "jellyfin",
         "seerr",
         "calibre-web-automated",
         "audiobookshelf",
+        "navidrome",
     ];
 
     /// A stack where the operating system owns one of the services.

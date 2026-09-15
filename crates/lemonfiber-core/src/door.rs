@@ -95,6 +95,7 @@ impl Facing {
 const NAMED: &[(&str, Facing)] = &[
     ("calibre-web-automated", Facing::Shelf),
     ("audiobookshelf", Facing::Shelf),
+    ("navidrome", Facing::Shelf),
     ("homepage", Facing::Operators),
     ("caddy", Facing::Carriage),
 ];

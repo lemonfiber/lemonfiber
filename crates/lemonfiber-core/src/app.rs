@@ -3666,6 +3666,7 @@ mod tests {
                     "seerr",
                     "calibre-web-automated",
                     "audiobookshelf",
+                    "navidrome",
                     "qbittorrent",
                 ],
                 Lifecycle::Running,
@@ -4042,11 +4043,12 @@ mod tests {
     }
 
     /// Everything the `library` form declares.
-    const LIBRARY: [&str; 4] = [
+    const LIBRARY: [&str; 5] = [
         "jellyfin",
         "seerr",
         "calibre-web-automated",
         "audiobookshelf",
+        "navidrome",
     ];
 
     #[tokio::test]

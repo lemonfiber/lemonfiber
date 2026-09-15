@@ -566,11 +566,12 @@ mod tests {
     }
 
     /// Every service the `library` form declares.
-    const LIBRARY: [&str; 4] = [
+    const LIBRARY: [&str; 5] = [
         "jellyfin",
         "seerr",
         "calibre-web-automated",
         "audiobookshelf",
+        "navidrome",
     ];
 
     #[tokio::test]

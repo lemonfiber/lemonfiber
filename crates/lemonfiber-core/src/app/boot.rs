@@ -502,11 +502,12 @@ mod tests {
     /// invented one: the two questions *behind* the start are about a stack that
     /// genuinely settled, and a stack settles when the engine reports the services the
     /// manifest says the named form holds.
-    const LIBRARY: [&str; 4] = [
+    const LIBRARY: [&str; 5] = [
         "jellyfin",
         "seerr",
         "calibre-web-automated",
         "audiobookshelf",
+        "navidrome",
     ];
 
     /// An engine that answers listings straight away and holds nothing.

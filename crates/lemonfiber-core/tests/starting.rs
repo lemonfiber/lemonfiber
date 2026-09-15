@@ -26,11 +26,12 @@ use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
 /// Everything the `library` form declares — the services carrying the `media`
 /// profile, which is the one that form holds.
-const LIBRARY: [&str; 4] = [
+const LIBRARY: [&str; 5] = [
     "jellyfin",
     "seerr",
     "calibre-web-automated",
     "audiobookshelf",
+    "navidrome",
 ];
 
 /// A context whose Compose answers this way, with the stack reported healthy.
