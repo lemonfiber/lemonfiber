@@ -356,6 +356,41 @@ mod tests {
         );
     }
 
+    /// A remedy names the check it is for, and a row saying nothing takes no line for it.
+    ///
+    /// Both halves of a contributed row's line. A row carrying neither a title nor an
+    /// action is one the rules refuse — and the listing is rendered anyway, because an
+    /// author needs to see the row that was refused rather than a plugin with nothing in
+    /// it. So the empty line is reachable from a manifest rather than defensive.
+    #[test]
+    fn a_contributed_row_names_what_it_is_for_and_says_nothing_where_it_holds_nothing() {
+        let mut read = read(Vec::new(), Vec::new());
+        read.contributions = vec![
+            Contributed {
+                at: "doctor.remedy".to_owned(),
+                id: "kavita:close-the-settings".to_owned(),
+                says: "Stop Kavita and check what is in front of it".to_owned(),
+                about: Some("kavita:settings-guarded".to_owned()),
+            },
+            Contributed {
+                at: "doctor.check".to_owned(),
+                id: "kavita:holds-nothing".to_owned(),
+                says: String::new(),
+                about: None,
+            },
+        ];
+        let text = claims(&read).text();
+        assert!(
+            text.contains("doctor.remedy kavita:close-the-settings  (for kavita:settings-guarded)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("doctor.check kavita:holds-nothing\n"),
+            "{text}"
+        );
+        assert!(!text.contains("kavita:holds-nothing\n    \n"), "{text}");
+    }
+
     /// A capability of the plugin's own is inert; a core name nothing publishes is not
     /// the same thing, and calling it one would describe a capability that does not
     /// exist.
