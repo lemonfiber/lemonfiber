@@ -394,7 +394,7 @@ fn contributed(entry: &lemonfiber_plugin::Contribution) -> Contributed {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{claimed, Shown, Unreadable, Verdict};
+    use super::{claimed, Shown, Unreadable, Verdict, BUNDLED_CHECKS};
     use crate::filling::Filling;
 
     /// A plugin's source, as one lands on a reviewer's disk.
@@ -728,6 +728,47 @@ fixture = "fixtures/catalogue.json"
         let at = std::env::temp_dir().join("lemonfiber-claimed-nothing-here");
         let _ = std::fs::remove_dir_all(&at);
         assert!(matches!(claimed(&at), Err(Unreadable::NoManifest(_))));
+    }
+
+    /// The register a contribution is held against is the doctor's own, not an empty
+    /// list handed in from here.
+    ///
+    /// The rule that a contributed row may not take a bundled identity is only a rule
+    /// while the identities it is asked about are the real ones — and nothing else in
+    /// this crate would notice if this reader started passing none.
+    #[test]
+    fn a_contribution_is_held_against_the_identities_the_doctor_actually_holds() {
+        let colliding = format!(
+            r#"{MANIFEST}
+[[contribution]]
+at        = "doctor.check"
+id        = "{}"
+title     = "A row wearing a bundled name"
+category  = "storage"
+request   = {{ method = "GET", path = "/api/health" }}
+expect    = {{ status = 200 }}
+fixture   = "fixtures/guarded.json"
+why       = "It should be refused for the name rather than for the row."
+"#,
+            BUNDLED_CHECKS.first().copied().unwrap_or_default()
+        );
+        let at = source(
+            "occupied",
+            &colliding,
+            &[
+                ("fixtures/guarded.json", guarded()),
+                ("fixtures/catalogue.json", catalogue()),
+            ],
+        );
+        let said: Vec<String> = claimed(&at)
+            .ok()
+            .map(|read| read.refusals.iter().map(ToString::to_string).collect())
+            .unwrap_or_default();
+        assert!(
+            said.iter()
+                .any(|one| one.contains("bundled row already holds")),
+            "got: {said:?}"
+        );
     }
 
     /// Each way a source can be unreadable says which one it was.
