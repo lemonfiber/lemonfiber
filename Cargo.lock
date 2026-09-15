@@ -1381,6 +1381,7 @@ dependencies = [
  "lemonfiber-adapters",
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
+ "lemonfiber-plugin",
  "lemonfiber-ports",
  "schemars",
  "serde",
@@ -1405,6 +1406,18 @@ version = "0.15.0"
 dependencies = [
  "schemars",
  "serde",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
+name = "lemonfiber-plugin"
+version = "0.15.0"
+dependencies = [
+ "lemonfiber-manifest",
+ "schemars",
+ "serde",
+ "serde_json",
  "thiserror",
  "toml",
 ]

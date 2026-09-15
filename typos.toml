@@ -22,8 +22,13 @@ Servarr = "Servarr"
 # misspellings that no edit can ever fix. `target` is Cargo's build directory,
 # which is not hidden but is reached the same way — through a directory this
 # would otherwise start walking.
+# The stack is a submodule with a spell check of its own, and it carries settings
+# this repository has no reason to hold — Navidrome's `ND_*` variables read as a
+# misspelling of "and" here and are excluded there. Reading it from this side means
+# this repository's list grows every time the stack names something, for words
+# nobody here wrote.
 ignore-hidden = false
-extend-exclude = ["assets/web", ".git/"]
+extend-exclude = ["assets/web", "assets/media-stack", ".git/"]
 
 [default.extend-identifiers]
 # A crate name, not a misspelling of "flat". Found the moment the checker could

@@ -92,7 +92,7 @@ impl ProvidersCheck {
             return Vec::new();
         };
         match client.accounts().await {
-            Err(failure) => vec![unread("usenet", "Usenet accounts", &failure)],
+            Err(failure) => vec![unread("providers.usenet", "Usenet accounts", &failure)],
             Ok(accounts) => accounts
                 .iter()
                 .filter(|account| account.enabled)
@@ -107,7 +107,7 @@ impl ProvidersCheck {
             return Vec::new();
         };
         match aggregator.indexers(self.now).await {
-            Err(failure) => vec![unread("indexers", "Indexers", &failure)],
+            Err(failure) => vec![unread("providers.indexers", "Indexers", &failure)],
             Ok(listed) => indexers::findings(&listed),
         }
     }
@@ -146,10 +146,10 @@ async fn ran(check: &ProvidersCheck) -> Vec<Finding> {
 /// Unverified rather than a failure: a client that will not answer says nothing about
 /// whether the accounts behind it are healthy, and reporting silence as a healthy
 /// account is how an operator comes to trust a figure nobody measured.
-fn unread(slug: &str, title: &str, failure: &Failure) -> Finding {
+fn unread(check: &str, title: &str, failure: &Failure) -> Finding {
     Finding::in_category(
         Category::Providers,
-        &format!("providers.{slug}"),
+        check,
         title,
         Verdict::Unverified {
             reason: format!("{failure}, so what the accounts have left could not be read"),

@@ -25,6 +25,7 @@
 //! | [`dashboard`] | One screen of what the stack is doing, assembled honestly |
 //! | [`config`] | What the operator chose, and where it is kept |
 //! | [`doctor`] | Checks that prove things rather than assuming them |
+//! | [`plugin`] | The three artefacts a plugin author reads, generated |
 //! | [`prerequisites`] | What the operator must obtain, from what they chose |
 //! | [`seed`] | Wiring the services to each other |
 //! | [`journal`] | What was changed, so it can be undone |
@@ -88,6 +89,7 @@ pub mod outbound;
 pub mod platform;
 pub use lemonfiber_ports::plural;
 pub mod network;
+pub mod plugin;
 pub mod prerequisites;
 pub mod provider;
 pub mod prowlarr;

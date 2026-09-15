@@ -1,0 +1,99 @@
+{
+  "extension_points_version": 1,
+  "points": [
+    {
+      "name": "doctor.check",
+      "summary": "A check the doctor runs, alongside the bundled ones.",
+      "register": "the diagnostics register",
+      "engine": "the check engine — independent, bounded, four verdicts, a remedy on anything that does not pass",
+      "row": {
+        "required": [
+          "id",
+          "title",
+          "category",
+          "request",
+          "expect",
+          "why",
+          "fixture"
+        ],
+        "optional": [
+          "timeout_s",
+          "service"
+        ],
+        "bounds": {
+          "timeout_s": {
+            "min": 1,
+            "max": 30,
+            "default": 10
+          }
+        },
+        "enums": {
+          "category": [
+            "environment",
+            "storage",
+            "network",
+            "vpn",
+            "credentials",
+            "services",
+            "providers",
+            "queue",
+            "config"
+          ]
+        }
+      },
+      "occupied": [
+        "config.credential-permissions",
+        "config.download-client",
+        "config.household-telling",
+        "credentials.",
+        "credentials.indexer",
+        "environment.api",
+        "environment.autostart",
+        "environment.compose",
+        "environment.engine",
+        "network.bindings",
+        "providers.indexer.",
+        "providers.indexers",
+        "providers.usenet",
+        "providers.usenet.",
+        "services.quality-guides",
+        "services.releases",
+        "services.releases.",
+        "storage.hardlinks",
+        "storage.mode",
+        "storage.permissions",
+        "storage.quality-headroom",
+        "storage.single-mount",
+        "storage.space",
+        "vpn.egress-match",
+        "vpn.egress-sources",
+        "vpn.killswitch",
+        "vpn.port-forward",
+        "vpn.port-forward-client",
+        "vpn.tunnel",
+        "vpn.tunnel-restored",
+        "vpn.unprotected"
+      ],
+      "requires": "doctor.contribute"
+    },
+    {
+      "name": "doctor.remedy",
+      "summary": "What to do about a contributed check that did not pass.",
+      "register": "the remedies a finding carries",
+      "engine": "the error renderer — rendered, never executed",
+      "row": {
+        "required": [
+          "id",
+          "for",
+          "action",
+          "why"
+        ],
+        "optional": [
+          "detail"
+        ]
+      },
+      "occupied": [],
+      "requires": "doctor.contribute"
+    }
+  ]
+}

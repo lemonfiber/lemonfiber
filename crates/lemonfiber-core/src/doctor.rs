@@ -17,6 +17,7 @@
 pub mod acknowledged;
 pub mod autostart;
 pub mod bindings;
+mod bundled;
 pub mod credentials;
 pub mod environment;
 pub mod guides;
@@ -42,6 +43,8 @@ use crate::model::DoctorReport;
 use crate::repair::{Attempt, Repair, Writing};
 
 pub use narrowing::Narrowing;
+
+pub use bundled::BUNDLED_CHECKS;
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///

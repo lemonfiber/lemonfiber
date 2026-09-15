@@ -432,6 +432,7 @@ mod tests {
             describes: "an example service".to_owned(),
             without_it: "nothing works".to_owned(),
             media_types: Vec::new(),
+            provides: Vec::new(),
             depends_on: Vec::new(),
             grants: Vec::new(),
             host_managed: false,

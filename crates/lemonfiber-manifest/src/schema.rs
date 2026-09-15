@@ -214,6 +214,15 @@ pub struct Service {
     /// Which media types it handles.
     #[serde(default)]
     pub media_types: Vec<String>,
+    /// What this service can be asked for, as named capabilities.
+    ///
+    /// An open list of strings here and checked for shape only, deliberately. The
+    /// published vocabulary is the set these names come from, and it is generated from
+    /// this field — a reader that held the set as well would be a cycle, and one that
+    /// held a copy of it would be a second answer to what the vocabulary carries. The
+    /// generator refuses a name the vocabulary does not carry, by name.
+    #[serde(default)]
+    pub provides: Vec<String>,
     /// Same-profile dependencies only.
     #[serde(default)]
     pub depends_on: Vec<String>,
@@ -725,6 +734,6 @@ replaced_by = "qbittorrent"
                 manifest.services.len(),
             )
         });
-        assert_eq!(counted, Some((12, 11, 19)));
+        assert_eq!(counted, Some((12, 11, 20)));
     }
 }

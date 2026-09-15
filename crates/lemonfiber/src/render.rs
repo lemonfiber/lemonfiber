@@ -30,6 +30,7 @@ mod hosting;
 mod invitation;
 mod migration;
 mod outbound;
+pub(crate) mod plugin;
 mod provenance;
 mod qr;
 mod quality;
