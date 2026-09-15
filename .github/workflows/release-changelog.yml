@@ -55,12 +55,26 @@ jobs:
         run: |
           set -euo pipefail
           # The generated workflow's tag filter is a glob wide enough to match
-          # things that are not versions; this one is the release shape exactly.
+          # things that are not versions; these two are the release shape exactly
+          # and the pre-release shape exactly, and they are told apart here rather
+          # than downstream — what goes above cargo-dist's body is a changelog for
+          # one and a readiness verdict for the other.
           if printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "tag=${REF}" >> "$GITHUB_OUTPUT"
-            echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
+            {
+              echo "tag=${REF}"
+              echo "version=${REF#v}"
+              echo "prerelease=false"
+            } >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z][0-9A-Za-z.]*$'; then
+            line="${REF%%-*}"
+            {
+              echo "tag=${REF}"
+              echo "version=${REF#v}"
+              echo "line=${line#v}"
+              echo "prerelease=true"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::${REF} is not a release tag; nothing to write."
+            echo "::notice::${REF} is neither a release nor a pre-release tag; nothing to write."
             echo "tag=" >> "$GITHUB_OUTPUT"
           fi
 
@@ -87,7 +101,7 @@ jobs:
           persist-credentials: false
 
       - name: Both renderers hold their own claims
-        if: steps.tag.outputs.tag != ''
+        if: steps.tag.outputs.tag != '' && steps.tag.outputs.prerelease != 'true'
         run: |
           set -euo pipefail
           python3 scripts/the_requirements_an_entry_names.py --self-test
@@ -104,7 +118,7 @@ jobs:
       # nowhere near, and a release pipeline is the last place to find out which
       # one applies.
       - name: Take git-cliff, and check it is the one asked for
-        if: steps.tag.outputs.tag != ''
+        if: steps.tag.outputs.tag != '' && steps.tag.outputs.prerelease != 'true'
         env:
           CLIFF: "2.14.1"
           DIGEST: cba6ae86f0a4205784eed8ef049fe53c904138806e33a1bda2e25026b17198eb
@@ -119,7 +133,7 @@ jobs:
           git-cliff --version
 
       - name: Read the history, and write the record it leaves
-        if: steps.tag.outputs.tag != ''
+        if: steps.tag.outputs.tag != '' && steps.tag.outputs.prerelease != 'true'
         env:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
@@ -135,6 +149,62 @@ jobs:
           python3 scripts/the_record_a_release_leaves.py \
             --markdown "$VERSION" < notes/record.json > notes/changelog.md
           echo "generated $(wc -l < notes/changelog.md) lines."
+
+      # What a pre-release publishes instead of a changelog. The verdict is not
+      # recomputed here — it is read from the record the pre-release lane wrote on
+      # the version's manifest before the tag, so the artefact and the record
+      # cannot disagree about which goals were unmet when it went out (OPS-R62).
+      #
+      # A record that is absent fails the run rather than leaving the body as
+      # cargo-dist wrote it. A pre-release whose artefact does not carry its
+      # verdict is the thing OPS-R62 refuses, and a red check before a maintainer
+      # clicks Publish is where that refusal has to land.
+      - name: Write the verdict a pre-release goes out carrying (OPS-R62)
+        if: steps.tag.outputs.prerelease == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          LINE: ${{ steps.tag.outputs.line }}
+        run: |
+          set -euo pipefail
+          mkdir -p notes
+          python3 - > notes/changelog.md <<'PY'
+          import os, pathlib, sys, tomllib
+
+          tag, line = os.environ["TAG"], os.environ["LINE"]
+          manifest = pathlib.Path(".spec-canonical/70-operations/versions") / f"{line}.toml"
+          if not manifest.is_file():
+              sys.exit(f"::error::{tag} names no version the spec has a manifest for")
+          data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+          record = next((r for r in data.get("prerelease", []) if r.get("tag") == tag), None)
+          if record is None:
+              sys.exit(
+                  f"::error::the spec's {line} manifest holds no record of {tag}; "
+                  "a pre-release that cannot carry its verdict is refused (OPS-R62)"
+              )
+
+          unmet = record.get("unmet", [])
+          print(f"## {tag} — a pre-release, not the release\n")
+          print(
+              f"This is **not** `{line}`. It is built from the same commit on the trunk by the"
+              f" same pipeline, and it goes out while `{line}` is `{data.get('status')}` rather"
+              " than releasable.\n"
+          )
+          if unmet:
+              print(f"**{len(unmet)} goal(s) of {len(data.get('goals', []))} unmet when this was cut:**\n")
+              for goal in unmet:
+                  print(f"- `{goal}`")
+              print(
+                  "\nAn unmet goal is work the release gate refuses to call done. Install this"
+                  " to test it, not to rely on it.\n"
+              )
+          else:
+              print(
+                  f"Every goal `{line}` locks was satisfied when this was cut. It is still a"
+                  " pre-release: the version has not been through `execute-version`.\n"
+              )
+          print(f"The changelog is written for `{line}`, which this precedes.\n")
+          PY
+          echo "wrote $(wc -l < notes/changelog.md) lines of verdict for ${TAG}."
 
       - name: Upload it
         if: steps.tag.outputs.tag != ''

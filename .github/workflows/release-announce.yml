@@ -1,6 +1,24 @@
 # Announce a published release to the public #releases channel, mentioning the
 # opt-in role when DISCORD_RELEASE_ROLE_ID is set — never @everyone. Fires on
 # publish (not draft), so nothing is announced until the release is real. OPS-R23.
+#
+# A pre-release is not a published release and does not go there (OPS-R63).
+#
+# **It is told apart by its tag, not by the forge's pre-release flag**, and that is
+# not a preference. cargo-dist marks every version below 1.0.0 as a pre-release, so
+# all fourteen releases this project has shipped carry that flag and it separates
+# nothing. A guard written on it would have announced no release at all — and the
+# failure would have been silent, because a channel that stays quiet looks exactly
+# like a channel nobody posted to yet. The tag is the thing OPS-R61 makes carry the
+# distinction, so the tag is what is read: `v0.15.0` announces, `v0.15.0-pre.1`
+# does not.
+#
+# The refusal is here rather than in whether the webhook is configured, because a
+# channel that is quiet because nobody set it up is one release-day mistake away
+# from being loud, and publishing outside the organisation cannot be taken back.
+#
+# It is not silent either. A pre-release posts to the private maintainer channel,
+# so the people who asked for it are told it is up and everybody else is not.
 name: release-announce
 on:
   release:
@@ -9,6 +27,7 @@ permissions:
   contents: read
 jobs:
   announce:
+    if: ${{ !contains(github.event.release.tag_name, '-') }}
     uses: lemonfiber/spec/.github/workflows/discord-notify.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
     with:
       content: ${{ vars.DISCORD_RELEASE_ROLE_ID && format('<@&{0}>', vars.DISCORD_RELEASE_ROLE_ID) || '' }}
@@ -20,3 +39,16 @@ jobs:
       thread: "🍋 Lemonfiber ${{ github.event.release.tag_name }}"
     secrets:
       webhook: ${{ secrets.DISCORD_ANNOUNCE_WEBHOOK }}
+
+  # No role ping and no thread: this is a text channel and nobody in it opted into
+  # anything. The title says what it is before the tag does.
+  maintainers:
+    if: ${{ contains(github.event.release.tag_name, '-') }}
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@a269e7f347ed92988cbf03394130b6fee93347da # main
+    with:
+      title: "🧪 Pre-release ${{ github.event.release.tag_name }} — not the release"
+      body: ${{ github.event.release.body }}
+      url: ${{ github.event.release.html_url }}
+      color: "10181046"
+    secrets:
+      webhook: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
