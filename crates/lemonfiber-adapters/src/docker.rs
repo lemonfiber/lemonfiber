@@ -31,12 +31,13 @@ use tokio::sync::OnceCell;
 use tokio_stream::StreamExt as _;
 
 use lemonfiber_ports::docker::{
-    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, LogLine, LogQuery, Reach,
-    Stats, Stream, Target,
+    Container, Engine, ExecOutput, Failure, Image, Images, Lifecycle, Locations, LogLine, LogQuery,
+    Presence, Reach, Stats, Stream, Target,
 };
 
 pub mod context;
 mod images;
+mod presence;
 mod refusal;
 mod translate;
 
@@ -175,6 +176,13 @@ impl Daemon {
             .list_containers(Some(options))
             .await
             .map_err(|error| self.refused(&error))
+    }
+}
+
+#[async_trait]
+impl Locations for Daemon {
+    async fn located(&self, path: &Path) -> Result<Presence, Failure> {
+        presence::looked(self, path).await
     }
 }
 

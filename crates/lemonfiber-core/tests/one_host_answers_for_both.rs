@@ -17,7 +17,9 @@
 
 mod common;
 
-use std::path::Path;
+use async_trait::async_trait;
+
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::stack::project;
@@ -27,11 +29,15 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, ABSENT_THERE};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::error::Diagnose as _;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::docker::{Engine as _, Health, Lifecycle, Origin, Target};
+use lemonfiber_core::ports::docker::{
+    Engine as _, Health, Lifecycle, Locations, Origin, Presence, Target,
+};
 use lemonfiber_core::ports::process::Output;
+use lemonfiber_core::ports::Narrator;
 use lemonfiber_core::stack::closure::resolve;
 use lemonfiber_core::stack::compose::{build, Action};
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::located::Located;
 use lemonfiber_fixtures::support::{Recording, Reporting};
 use lemonfiber_manifest::Manifest;
 
@@ -67,9 +73,31 @@ fn aimed_at(target: Target) -> Settings {
     }
 }
 
+/// Everything the pre-flight said out loud, in the order it said it.
+#[derive(Default)]
+struct Heard(tokio::sync::Mutex<Vec<String>>);
+
+#[async_trait]
+impl Narrator for Heard {
+    async fn say(&self, said: &str) {
+        self.0.lock().await.push(said.to_owned());
+    }
+}
+
+impl Heard {
+    /// Everything it has heard so far, joined so a case can ask one question of it.
+    async fn said(&self) -> String {
+        self.0.lock().await.join(" / ")
+    }
+}
+
 /// A run over a scripted world, whose engine holds nothing and whose programs all
 /// answer the same way.
-fn ctx(settings: Settings, runner: &Arc<Recording>) -> Ctx {
+///
+/// The machine it would ask about a path is scripted too, and deliberately not the
+/// engine fake: what these vary is what is on the machine under the daemon, which is
+/// the one question the engine itself is never asked.
+fn ctx(settings: Settings, runner: &Arc<Recording>, machine: Arc<dyn Locations>) -> Ctx {
     Ctx::new(
         Arc::clone(runner) as Arc<dyn lemonfiber_core::ports::Runner>,
         Arc::new(Reporting::holding(&[], Lifecycle::Running, Health::Healthy)),
@@ -82,7 +110,17 @@ fn ctx(settings: Settings, runner: &Arc<Recording>) -> Ctx {
         settings,
         Environment::MacOs,
     )
+    .locating_with(machine)
     .rehearsing()
+}
+
+/// A runner that answers everything the same way, since none of these are about it.
+fn runner() -> Arc<Recording> {
+    Arc::new(Recording::answering(Ok(Output {
+        status: Some(0),
+        stdout: String::new(),
+        stderr: String::new(),
+    })))
 }
 
 /// A run against this machine names nothing, which is what keeps every existing
@@ -151,7 +189,7 @@ async fn a_context_this_machine_does_not_have_stops_the_reads_and_the_writes() {
     })));
     let refused = dispatch(
         Command::Up { forms: Vec::new() },
-        &ctx(aimed_at(target), &runner),
+        &ctx(aimed_at(target), &runner, Located::holding(&[])),
     )
     .await;
 
@@ -167,99 +205,231 @@ async fn a_context_this_machine_does_not_have_stops_the_reads_and_the_writes() {
     );
 }
 
-/// Three ways the pre-flight ends without a refusal, and all three let the command
-/// through.
+/// The location the stack mounts is looked for wherever the daemon is, and over
+/// whichever transport reaches it.
 ///
-/// A guard that refused on any of these would refuse a working setup, which is worse
-/// than the mistake it is there to catch: the endpoint offers no filesystem to put
-/// the question over, or the machine answered that the location is there, or it
-/// answered something that is neither yes nor no. Only the plain no is a refusal, and
-/// the specification names the rest as a state of its own rather than as a fault.
+/// TCP is the case this exists for. A daemon answering over a socket offers no shell
+/// to put the question to and no key to put it with, which is why this check used to
+/// skip it entirely — and an operator with `DOCKER_HOST=tcp://…` got no pre-flight at
+/// all while being told nothing about that. The engine is asked instead of a shell,
+/// so the endpoint makes no difference to whether the question can be put.
 #[tokio::test]
-async fn a_remote_run_the_pre_flight_cannot_refuse_is_let_through() {
-    let cases = [
-        (
-            "a TCP endpoint, which has no filesystem behind it to ask",
-            Target::at("tcp://nas.local:2375", Origin::Variable),
-            0,
-        ),
-        (
-            "a machine that says the location is there",
-            Target::at("ssh://media@nas.local", Origin::Variable),
-            0,
-        ),
-        (
-            "a machine that says something neither yes nor no",
-            Target::at("ssh://media@nas.local", Origin::Variable),
-            255,
-        ),
-    ];
+async fn a_location_that_is_not_on_the_other_machine_stops_the_command_over_any_transport() {
+    let endpoints = ["tcp://nas.local:2375", "ssh://media@nas.local"];
 
-    for (what, target, status) in cases {
-        let runner = Arc::new(Recording::answering(Ok(Output {
-            status: Some(status),
-            stdout: String::new(),
-            stderr: String::new(),
-        })));
-        let over_ssh = target.over_ssh().is_some();
+    for endpoint in endpoints {
+        let runner = runner();
+        let machine = Located::holding(&[]);
         let settings = Settings {
-            data_root: Some(Path::new("/srv/media").to_path_buf()),
-            ..aimed_at(target)
+            data_root: Some(Path::new("/Volumes/media").to_path_buf()),
+            ..aimed_at(Target::at(endpoint, Origin::Variable))
         };
 
-        let outcome = dispatch(Command::Up { forms: Vec::new() }, &ctx(settings, &runner)).await;
+        let refused = dispatch(
+            Command::Up { forms: Vec::new() },
+            &ctx(
+                settings,
+                &runner,
+                Arc::clone(&machine) as Arc<dyn Locations>,
+            ),
+        )
+        .await;
 
+        // Compared against the constant rather than against the number it currently
+        // carries: a code moves when two declarations collide, and a test spelling the
+        // number is a second place that has to be found when one does.
         assert_eq!(
-            outcome.err().map(|problem| problem.code.to_string()),
-            None,
-            "{what} must not stop the command"
+            refused.err().map(|problem| problem.code),
+            Some(ABSENT_THERE),
+            "{endpoint} must be refused for the location it has not got"
         );
         assert_eq!(
-            runner
-                .seen()
-                .iter()
-                .any(|argv| argv.first().is_some_and(|program| program == "ssh")),
-            over_ssh,
-            "{what}: the question is put exactly where there is something to put it over"
+            machine.asked(),
+            vec![Path::new("/Volumes/media").to_path_buf()],
+            "{endpoint}: the machine was asked about the location, and about nothing else"
+        );
+        assert!(
+            !runner.ran("compose"),
+            "{endpoint}: nothing was composed against it: {:?}",
+            runner.seen()
         );
     }
 }
 
-/// The location the stack mounts is looked for on the machine that will mount it.
+/// A machine that has the location is let through, and is asked twice before it is.
 ///
-/// The path is on the laptop, which is exactly why the error an operator meets
-/// without this names a directory that is plainly there. The runner answers every
-/// command with the exit status a missing directory produces, so what is asserted is
-/// that the question was asked at all and that its answer stopped the command.
+/// The second question is the one worth keeping: it is put about somewhere that
+/// cannot be there, and only an answer of "not there" makes the first answer mean
+/// anything. See the guard below for what happens when it does not come back.
 #[tokio::test]
-async fn a_location_that_is_not_on_the_other_machine_stops_the_command() {
-    let runner = Arc::new(Recording::answering(Ok(Output {
-        status: Some(1),
-        stdout: String::new(),
-        stderr: String::new(),
-    })));
+async fn a_machine_that_has_the_location_is_let_through_on_a_check_that_proved_itself() {
+    let runner = runner();
+    let machine = Located::holding(&["/srv/media"]);
+    let heard = Arc::new(Heard::default());
     let settings = Settings {
-        data_root: Some(Path::new("/Volumes/media").to_path_buf()),
+        data_root: Some(Path::new("/srv/media").to_path_buf()),
+        ..aimed_at(Target::at("tcp://nas.local:2375", Origin::Variable))
+    };
+
+    let outcome = dispatch(
+        Command::Up { forms: Vec::new() },
+        &ctx(
+            settings,
+            &runner,
+            Arc::clone(&machine) as Arc<dyn Locations>,
+        )
+        .narrating(Arc::clone(&heard) as Arc<dyn Narrator>),
+    )
+    .await;
+
+    assert_eq!(outcome.err().map(|problem| problem.code), None);
+    let asked = machine.asked();
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    assert_eq!(
+        asked.first().map(PathBuf::as_path),
+        Some(Path::new("/srv/media"))
+    );
+    assert_eq!(
+        asked.get(1).and_then(|path| path.parent()),
+        Some(Path::new("/srv/media")),
+        "the control question goes to the same machine under the same location: {asked:?}"
+    );
+    let said = heard.said().await;
+    assert!(
+        !said.contains("check") && !said.contains("unverified"),
+        "a check that worked has nothing to report about itself: {said}"
+    );
+}
+
+/// A check that can no longer say no does not get to say yes.
+///
+/// This is the failure the whole shape guards against, and it cannot be produced by
+/// asking a real daemon nicely: the reading rests on the order an engine validates a
+/// request in, which nothing promises and a release could change. If it changed,
+/// every path would start reading as present and this guard would report green for
+/// the rest of its life — so a machine that says yes to somewhere that cannot be
+/// there is treated as an instrument that has stopped measuring.
+///
+/// It lets the command through, because there is nothing wrong with the operator's
+/// setup and refusing would be a product that stopped working on a Docker release.
+/// It says so instead, and says whose fault it is, because that reader is not the
+/// operator.
+#[tokio::test]
+async fn a_machine_that_says_yes_to_everywhere_is_not_believed_about_anywhere() {
+    let runner = runner();
+    let heard = Arc::new(Heard::default());
+    let settings = Settings {
+        data_root: Some(Path::new("/srv/media").to_path_buf()),
         ..aimed_at(Target::at("ssh://media@nas.local", Origin::Variable))
     };
 
-    let refused = dispatch(Command::Up { forms: Vec::new() }, &ctx(settings, &runner)).await;
+    let outcome = dispatch(
+        Command::Up { forms: Vec::new() },
+        &ctx(settings, &runner, Located::saying(Presence::There))
+            .narrating(Arc::clone(&heard) as Arc<dyn Narrator>),
+    )
+    .await;
 
-    // Compared against the constant rather than against the number it currently
-    // carries: a code moves when two declarations collide, and a test spelling the
-    // number is a second place that has to be found when one does.
     assert_eq!(
-        refused.err().map(|problem| problem.code),
-        Some(ABSENT_THERE)
+        outcome.err().map(|problem| problem.code),
+        None,
+        "a check that has stopped working is not a reason to refuse a working machine"
     );
-    let asked = runner.seen();
-    let over_ssh = asked.iter().any(|argv| {
-        argv.first().is_some_and(|program| program == "ssh")
-            && argv.iter().any(|word| word == "media@nas.local")
-    });
-    assert!(over_ssh, "the other machine was the one asked: {asked:?}");
+    let said = heard.said().await;
+    assert!(
+        said.contains("stopped working") && said.contains("fault in lemonfiber"),
+        "the run is told the check failed rather than the location: {said}"
+    );
+    assert!(
+        said.contains("/srv/media") && said.contains("nas.local"),
+        "{said}"
+    );
+}
+
+/// A machine that answers something neither yes nor no is let through, and said so.
+///
+/// The specification has a state for a remote context whose files are not confirmed,
+/// and this is it. What it must not be is silent: an operator whose pre-flight did
+/// not happen and who was never told is in exactly the position the pre-flight was
+/// written to keep them out of.
+#[tokio::test]
+async fn a_run_that_could_not_be_checked_is_let_through_and_told_so() {
+    let runner = runner();
+    let heard = Arc::new(Heard::default());
+    let settings = Settings {
+        data_root: Some(Path::new("/srv/media").to_path_buf()),
+        ..aimed_at(Target::at("tcp://nas.local:2375", Origin::Variable))
+    };
+
+    let outcome = dispatch(
+        Command::Up { forms: Vec::new() },
+        &ctx(settings, &runner, Located::saying(Presence::Unknown))
+            .narrating(Arc::clone(&heard) as Arc<dyn Narrator>),
+    )
+    .await;
+
+    assert_eq!(outcome.err().map(|problem| problem.code), None);
+    let said = heard.said().await;
+    assert!(
+        said.contains("could not check") && said.contains("empty directory"),
+        "an unverified run is told what it is risking: {said}"
+    );
+    assert!(
+        !said.contains("fault in lemonfiber"),
+        "and is not sent to report a fault that may well be its own daemon: {said}"
+    );
+}
+
+/// A machine that cannot be reached is refused here rather than three commands later.
+///
+/// The distinctions the connection draws — a name that went nowhere, a port that
+/// declined, a key that was refused — are worth more in front of the command than
+/// inside whatever Compose eventually prints.
+#[tokio::test]
+async fn a_machine_that_cannot_be_reached_is_refused_in_the_engines_own_words() {
+    let runner = runner();
+    let settings = Settings {
+        data_root: Some(Path::new("/srv/media").to_path_buf()),
+        ..aimed_at(Target::at("ssh://media@nas.local", Origin::Variable))
+    };
+
+    let refused = dispatch(
+        Command::Up { forms: Vec::new() },
+        &ctx(settings, &runner, Located::unreachable("no route to host")),
+    )
+    .await;
+
+    assert!(
+        refused.is_err(),
+        "a machine that will not answer is not a machine to start a stack on"
+    );
     assert!(
         !runner.ran("compose"),
-        "and nothing was composed against it: {asked:?}"
+        "and nothing was composed against it: {:?}",
+        runner.seen()
     );
+}
+
+/// An operator who has not chosen a location yet has nothing to be checked.
+///
+/// The pre-flight asks about the location the stack mounts, so with no location
+/// there is no question — and inventing one would refuse a machine over a setting
+/// the operator has not made.
+#[tokio::test]
+async fn a_run_with_no_location_chosen_asks_the_machine_nothing() {
+    let runner = runner();
+    let machine = Located::holding(&[]);
+
+    let outcome = dispatch(
+        Command::Up { forms: Vec::new() },
+        &ctx(
+            aimed_at(Target::at("tcp://nas.local:2375", Origin::Variable)),
+            &runner,
+            Arc::clone(&machine) as Arc<dyn Locations>,
+        ),
+    )
+    .await;
+
+    assert_eq!(outcome.err().map(|problem| problem.code), None);
+    assert!(machine.asked().is_empty(), "{:?}", machine.asked());
 }

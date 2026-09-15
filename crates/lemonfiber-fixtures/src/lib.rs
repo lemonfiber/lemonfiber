@@ -41,6 +41,7 @@ pub mod erasing;
 pub mod files;
 pub mod hosting;
 pub mod http;
+pub mod located;
 pub mod ports;
 pub mod program;
 pub mod pulled;
