@@ -409,15 +409,15 @@ why    = "Until somebody does, the first caller on the household network becomes
 
     /// What the rules say about a manifest, as one string per violation.
     fn against(text: &str) -> Vec<String> {
-        // Both halves on lines that always run: a fixture this build cannot read is a
-        // mistake in the test rather than a refusal, and it says so in the list rather
-        // than in an arm nothing can enter.
+        // A fixture this build cannot read is a mistake in the test rather than a
+        // refusal, and it has to stop the case rather than come back as an empty list
+        // that every "says nothing" assertion below would pass on.
         let read = Manifest::from_toml(text);
-        let unreadable = read.as_ref().err().map(|why| format!("unreadable: {why}"));
-        let found = read.map(|manifest| violations(&manifest, OCCUPIED));
-        unreadable
-            .into_iter()
-            .chain(found.unwrap_or_default().iter().map(ToString::to_string))
+        assert!(read.is_ok(), "the fixture does not read: {read:?}");
+        read.map(|manifest| violations(&manifest, OCCUPIED))
+            .unwrap_or_default()
+            .iter()
+            .map(ToString::to_string)
             .collect()
     }
 
@@ -706,14 +706,21 @@ why       = "Two rows, one name."
         }
     }
 
-    /// A count of zero says the answer reads as a list, which is about shape.
+    /// A count of zero says the answer reads as a list, or carries a number at a key,
+    /// which is about shape. Both keys, because the rule is written twice and a pass
+    /// demonstrated on one of them says nothing about the other.
     #[test]
     fn a_count_of_zero_is_a_shape_and_is_allowed() {
-        let said = changed(
+        let list = changed(
             "json_has_keys = [\"content\", \"totalElements\"]",
             "json_array_min = 0",
         );
-        assert_eq!(said, Vec::<String>::new());
+        assert_eq!(list, Vec::<String>::new());
+        let counted = changed(
+            "json_has_keys = [\"content\", \"totalElements\"]",
+            "json_at_least = { totalElements = 0 }",
+        );
+        assert_eq!(counted, Vec::<String>::new());
     }
 
     /// A plugin that adds nothing to lemonfiber's own registers is asked nothing about

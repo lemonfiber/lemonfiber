@@ -218,6 +218,42 @@ mod tests {
         assert_eq!(faults, Vec::<String>::new());
     }
 
+    /// Every constraint a manifest can write, against an answer that meets it.
+    ///
+    /// Each rule below is otherwise only ever shown refusing. A rule that never passes
+    /// is indistinguishable from a rule that always refuses, and the probe it decides
+    /// would then be a proof no plugin could ever hold — three of these had no case
+    /// demonstrating that the answer they accept exists.
+    #[test]
+    fn an_answer_meeting_every_constraint_it_declares_has_nothing_wrong_with_it() {
+        let object = judge(
+            &expects(
+                r#"{"status": 200, "json": {"isClaimed": true, "count": 3, "kind": "x"},
+                    "json_has_keys": ["isClaimed"], "json_types": {"count": "int"},
+                    "json_at_least": {"count": 2}, "content_type": "application/json",
+                    "body_starts_with": "{"}"#,
+            ),
+            &answered(
+                r#"{"status": 200, "headers": {"content-type": "application/json"},
+                    "body_starts_with": "{\"isClaimed\"",
+                    "json": {"isClaimed": true, "count": 3, "kind": "x"}}"#,
+            ),
+        );
+        assert_eq!(object, Vec::<String>::new());
+
+        let list = judge(
+            &expects(r#"{"json_array_min": 2}"#),
+            &answered(r#"{"status": 200, "json": [1, 2, 3]}"#),
+        );
+        assert_eq!(list, Vec::<String>::new());
+
+        let nothing = judge(
+            &expects(r#"{"json_is_absent": true}"#),
+            &answered(r#"{"status": 204}"#),
+        );
+        assert_eq!(nothing, Vec::<String>::new());
+    }
+
     #[test]
     fn a_status_that_is_not_the_declared_one_says_both() {
         let faults = judge(

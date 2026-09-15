@@ -395,7 +395,6 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::{claimed, Shown, Unreadable, Verdict, BUNDLED_CHECKS};
-    use crate::filling::Filling;
 
     /// A plugin's source, as one lands on a reviewer's disk.
     const MANIFEST: &str = r#"
@@ -647,17 +646,17 @@ fixture = "fixtures/catalogue.json"
                 .find(|claiming| !claiming.own)
                 .and_then(|claiming| claiming.filling)
         });
-        let claimants = match filling {
-            Some(Filling::Contested { claimants }) => claimants,
-            other => Vec::from([format!("{other:?}")]),
-        };
+        // Read off the rendering rather than destructured, because an arm for the
+        // answers this is not would be a line no run enters.
+        let said = format!("{filling:?}");
+        assert!(said.contains("Contested"), "got: {said}");
         assert!(
-            claimants.iter().any(|one| one.contains("jellyfin")),
-            "the bundled claimants are named: {claimants:?}"
+            said.contains("jellyfin"),
+            "the bundled claimants are named: {said}"
         );
         assert!(
-            claimants.iter().any(|one| one == "kavita (plugin kavita)"),
-            "and so is the plugin's own: {claimants:?}"
+            said.contains("kavita (plugin kavita)"),
+            "and so is the plugin's own: {said}"
         );
     }
 
@@ -728,6 +727,71 @@ fixture = "fixtures/catalogue.json"
         let at = std::env::temp_dir().join("lemonfiber-claimed-nothing-here");
         let _ = std::fs::remove_dir_all(&at);
         assert!(matches!(claimed(&at), Err(Unreadable::NoManifest(_))));
+    }
+
+    /// What a manifest contributes comes back in the terms a listing shows it.
+    ///
+    /// Both halves of the line a row is shown by: a check says its title, a remedy has
+    /// none and says its action instead. Nothing else here reads an accepted
+    /// contribution at all, so the listing was only ever seen on a refused one.
+    #[test]
+    fn a_contributed_row_is_listed_by_what_it_says() {
+        let contributing = format!(
+            r#"{MANIFEST}
+[requires]
+capabilities = ["doctor.contribute"]
+
+[[contribution]]
+at        = "doctor.check"
+id        = "kavita:claimed"
+title     = "Kavita has an administrator"
+category  = "credentials"
+request   = {{ method = "GET", path = "/api/health" }}
+expect    = {{ status = 200 }}
+fixture   = "fixtures/guarded.json"
+why       = "An unclaimed Kavita hands administrator to whoever asks first."
+
+[[contribution]]
+at     = "doctor.remedy"
+for    = "kavita:claimed"
+id     = "kavita:claim-it"
+action = "Open Kavita and create the administrator account"
+why    = "Until somebody does, the first caller on the household network becomes it."
+"#
+        );
+        let at = source(
+            "contributing",
+            &contributing,
+            &[
+                ("fixtures/guarded.json", guarded()),
+                ("fixtures/catalogue.json", catalogue()),
+            ],
+        );
+        let read = claimed(&at).ok();
+        let said: Vec<String> = read
+            .as_ref()
+            .map(|read| {
+                read.contributions
+                    .iter()
+                    .map(|row| format!("{} {} {}", row.at, row.id, row.says))
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert_eq!(
+            said,
+            vec![
+                "doctor.check kavita:claimed Kavita has an administrator".to_owned(),
+                "doctor.remedy kavita:claim-it Open Kavita and create the administrator \
+                 account"
+                    .to_owned(),
+            ],
+            "refusals: {:?}",
+            read.map(|read| read
+                .refusals
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>())
+        );
     }
 
     /// The register a contribution is held against is the doctor's own, not an empty
