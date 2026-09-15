@@ -196,17 +196,20 @@ mod tests {
                 "request": {{"method": "GET", "path": "/"}}, "response": {response}}}"#,
             "0".repeat(64)
         );
-        serde_json::from_str::<Recording>(&text)
-            .map(|recording| recording.response)
-            .unwrap_or_default()
+        let read = serde_json::from_str::<Recording>(&text);
+        assert!(read.is_ok(), "the recording does not read: {read:?}");
+        read.map(|recording| recording.response).unwrap_or_default()
     }
 
     /// An expectation, read the way a manifest's is: through its own deserialiser.
     ///
-    /// One that does not read comes back saying nothing, which fails the assertion
-    /// under it rather than ending the run — and leaves no arm a test cannot enter.
+    /// `Expect` refuses a field it does not know, so one mistyped key here would come
+    /// back as an expectation saying nothing — against which every answer is faultless
+    /// and a case asserting exactly that would pass having tested no rule at all.
     fn expects(declared: &str) -> Expect {
-        serde_json::from_str(declared).unwrap_or_default()
+        let read = serde_json::from_str(declared);
+        assert!(read.is_ok(), "the expectation does not read: {read:?}");
+        read.unwrap_or_default()
     }
 
     #[test]
