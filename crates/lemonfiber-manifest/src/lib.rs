@@ -8,6 +8,7 @@
 
 mod date;
 mod error;
+pub mod names;
 mod recognising;
 mod schema;
 mod validate;

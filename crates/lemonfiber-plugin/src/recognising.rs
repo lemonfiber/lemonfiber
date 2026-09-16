@@ -1,19 +1,21 @@
-//! Whether the names a plugin manifest uses are ones this build knows.
+//! Which of `plugin.toml`'s declarations are names, and which type owns each set.
 //!
-//! Asked of the untyped tree, before the contract is read into types, for the one
-//! reason a typed read cannot answer it: a deserialiser stops at the first word it
-//! does not know, and a third-party author then learns their mistakes one run at a
-//! time. Here every declaration is asked independently, so the answer is the whole
-//! list — which matters more for a plugin than for a stack, because a manifest
-//! nobody in this project wrote is likelier to carry several faults at once.
+//! The table and nothing else. How a table is walked, and how a refusal is placed in
+//! the manifest's own terms, is [`lemonfiber_manifest::names`] — the same walk the
+//! stack manifest uses, asked here of a different set of fields.
 //!
-//! Nothing here holds a list of names. Each field is handed to the type that owns
-//! the set, and the type's own refusal is what gets reported — which is what keeps
-//! this from becoming a second copy of an enumeration, silently disagreeing with
-//! the first about what a plugin is allowed to say.
+//! Sharing it matters more than it looks. The point of a names-before-types read is
+//! that an author is told every mistake in one run instead of one per run, and a
+//! third-party author needs that more than anybody adapting a fork does — so the two
+//! manifests answering in the same words, and placing a faulty entry the same way, is
+//! the whole of what makes the read worth having.
+//!
+//! Nothing here holds a list of names. Each field is handed to the type that owns the
+//! set, and the type's own refusal is what gets reported — which is what keeps this
+//! from becoming a second copy of an enumeration, silently disagreeing with the first
+//! about what a plugin is allowed to say.
 
-use serde::de::DeserializeOwned;
-use toml::Value;
+use lemonfiber_manifest::names::{refused, scan, Closed};
 
 use crate::schema::{Bind, Criticality, HealthKind};
 
@@ -30,14 +32,6 @@ impl std::fmt::Display for Violation {
     fn fmt(&self, into: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(into, "{}: {}", self.location, self.message)
     }
-}
-
-/// A declaration whose value has to be a name, and the type that knows the names.
-struct Closed {
-    /// Where it sits inside one entry, spelled as the manifest spells it.
-    at: &'static str,
-    /// Asks the type itself, and carries back what it said if the answer is no.
-    reads: fn(&Value) -> Option<String>,
 }
 
 /// What a plugin's service declares by name, its health probe included.
@@ -60,86 +54,25 @@ const ON_SERVICE: &[Closed] = &[
 const DECLARED: &[(&str, &[Closed])] = &[("service", ON_SERVICE)];
 
 /// Everything the manifest declares that this build does not recognise.
+///
+/// The walk answers with a location and a message; what a fault *is* to this crate is
+/// this crate's own — it is serialised into a report, which the stack manifest's never
+/// is — so the pair becomes a [`Violation`] here rather than there.
 pub(crate) fn unrecognised(text: &str) -> Vec<Violation> {
     scan(text, DECLARED)
-}
-
-/// The same, against a given table, which is what lets the table be tested short.
-///
-/// Silent on a file that is not TOML at all: there is nothing to walk, and the read
-/// that follows describes that failure far better than a scan could.
-fn scan(text: &str, declared: &[(&str, &[Closed])]) -> Vec<Violation> {
-    toml::from_str::<Value>(text)
-        .map(|tree| {
-            declared
-                .iter()
-                .flat_map(|(kind, closed)| entries(&tree, kind, closed))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// Every declared entry of one kind, asked about each of its closed fields.
-fn entries(tree: &Value, kind: &str, closed: &[Closed]) -> Vec<Violation> {
-    tree.get(kind)
-        .and_then(Value::as_array)
-        .map_or_else(Vec::new, |declared| {
-            declared
-                .iter()
-                .enumerate()
-                .flat_map(|(at, entry)| asked(kind, at, entry, closed))
-                .collect()
-        })
-}
-
-/// One entry's refusals, each naming the field it came from.
-fn asked(kind: &str, at: usize, entry: &Value, closed: &[Closed]) -> Vec<Violation> {
-    closed
-        .iter()
-        .filter_map(|field| {
-            inside(entry, field.at)
-                .and_then(field.reads)
-                .map(|said| Violation {
-                    location: where_it_is(kind, at, entry),
-                    message: format!("{}: {said}", field.at),
-                })
+        .into_iter()
+        .map(|refusal| Violation {
+            location: refusal.location,
+            message: refusal.message,
         })
         .collect()
 }
 
-/// The value at a dotted path inside one entry, where the entry declares it.
-fn inside<'a>(entry: &'a Value, path: &str) -> Option<&'a Value> {
-    path.split('.').try_fold(entry, |here, step| here.get(step))
-}
-
-/// Where an entry is, in the manifest's own terms.
-///
-/// By the id it declares, and by position when it has not declared one — an entry
-/// can be missing its id and still say something unrecognised, and "the second
-/// service" beats no location at all.
-fn where_it_is(kind: &str, at: usize, entry: &Value) -> String {
-    entry
-        .get("id")
-        .and_then(Value::as_str)
-        .map_or_else(|| format!("{kind} {at}"), |id| format!("{kind} {id}"))
-}
-
-/// What the owning type says about a word, when it does not accept it.
-///
-/// Only a string is a name. A field holding a number or a table is a type error and
-/// a different question from the one asked here — and one the read that follows
-/// answers better, with the line it is on.
-fn refused<T: DeserializeOwned>(value: &Value) -> Option<String> {
-    let word = value.as_str()?;
-    Value::from(word)
-        .try_into::<T>()
-        .err()
-        .map(|said| said.to_string().trim_end().to_owned())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{scan, unrecognised, Closed, Violation, DECLARED, ON_SERVICE};
+    use lemonfiber_manifest::names::{scan, Closed};
+
+    use super::{unrecognised, Violation, DECLARED, ON_SERVICE};
 
     #[test]
     fn a_violation_names_where_it_is_before_what_it_is() {
