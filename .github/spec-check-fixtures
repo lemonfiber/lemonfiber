@@ -1,0 +1,21 @@
+# Files whose job is to name identifiers that do not resolve.
+#
+# The citation gate asks that every identifier a change writes into a file exists
+# on the spec's default branch. Most of the time that is exactly right: a number
+# in a refusal message or a doc heading is a citation to whoever follows it, and
+# a slipped digit sends them nowhere.
+#
+# These four are the other case. A renderer that proves it strikes a withdrawn
+# requirement through has to render one; a reader that proves it refuses a number
+# past the ceiling has to ask for one past the ceiling. Written out of real
+# requirement numbers instead, they would pass today and start failing the week
+# the spec moves — which is the gate making the tests worse rather than better.
+#
+# Exact paths, never a pattern, and a path that is not here any more is refused
+# rather than skipped: the day one of these moves, the gate says which line to
+# correct. Every one of them is printed on every run, because an exemption nobody
+# sees is an exemption nobody revisits.
+crates/lemonfiber/src/render/changelog.rs
+crates/lemonfiber/src/render/fixtures.rs
+scripts/the_requirements_an_entry_names.py
+scripts/the_record_a_release_leaves.py
