@@ -3,196 +3,14 @@
 //! Driven from outside the crate, because what a caller can reach is the thing worth
 //! holding still — and because everything here is asynchronous, which is a shape the
 //! coverage gate reads properly only from out here.
+//!
+//! What a caller may ask for *once* the door has named them is next door, in
+//! `what_a_member_may_ask_for`. Who gets in and what they may then have are two
+//! questions, and a file answering both would be found by neither reader.
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+mod door;
 
-use axum::body::{to_bytes, Body};
-use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
-use lemonfiber_api::admission::sessions::Opened;
-use lemonfiber_api::admission::{Admitting, Caller, RETRY_AFTER, SESSION};
-use lemonfiber_api::events::live::Live;
-use lemonfiber_api::events::Streaming;
-use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
-use lemonfiber_api::jobs::Jobs;
-use lemonfiber_api::router::{routes, Serving};
-use lemonfiber_core::admission::{credential, Credential};
-use lemonfiber_core::app::Ctx;
-use lemonfiber_core::config::Settings;
-use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::service::{
-    Allowed, Certificate, Failure, Household, Invited, Member, NamedLibrary,
-};
-use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::Fake;
-use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
-use lemonfiber_fixtures::support::{a_password, Reporting};
-use tower::ServiceExt as _;
-
-/// The second the stopped clock reads.
-const NOW: u64 = 1_700_000_000;
-
-/// The port this surface says it is listening on.
-const PORT: u16 = 8471;
-
-/// Serving this machine and nowhere else.
-fn bound() -> Binding {
-    Binding::here(PORT)
-}
-
-/// What a request has to say to have come from here.
-fn from_here() -> Vec<(&'static str, String)> {
-    vec![("host", format!("127.0.0.1:{PORT}"))]
-}
-
-/// The moment every one of these runs at.
-fn moment() -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_secs(NOW)
-}
-
-/// A directory of this test's own, emptied first so a rerun starts fresh.
-fn a_directory(named: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-door-{named}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    dir
-}
-
-/// The password the operator chose, built rather than written down.
-fn chosen() -> String {
-    a_password()
-}
-
-/// The credential that password makes.
-fn a_credential(password: &str) -> Credential {
-    let Ok(held) = Credential::set(password, &Chance::cycling()) else {
-        unreachable!("a full-length password and a source that answers make a record")
-    };
-    held
-}
-
-/// A machine keeping that password, and where it keeps it.
-fn keeping(named: &str) -> PathBuf {
-    let path = a_directory(named).join("admission.json");
-    let held = a_credential(&chosen());
-    let Ok(()) = credential::keep(&path, &held) else {
-        unreachable!("a scratch directory can be written")
-    };
-    path
-}
-
-/// The world these requests run against: a stopped clock, and randomness a test chose.
-fn world(admission: Option<PathBuf>, random: Chance) -> Ctx {
-    Ctx::new(
-        Arc::new(Idle),
-        Arc::new(Reporting::absent()),
-        Stopped::at(NOW),
-        lemonfiber_adapters::live(),
-        Source::External(Path::new("/lemonfiber/no/such/stack")),
-        Settings {
-            admission,
-            ..Settings::default()
-        },
-        Environment::MacOs,
-    )
-    .with_http(Fake::silent())
-    .with_random(Arc::new(random))
-}
-
-/// The whole surface over that world, and the register it admits from.
-fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Arc<Token>) {
-    let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
-        unreachable!("a cycling source always mints one")
-    };
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
-    let serving = Serving {
-        ctx: Arc::new(ctx),
-        token: Arc::clone(&token),
-        bound: bound(),
-        jobs: Jobs::default(),
-        admitting: Arc::clone(admitting),
-        live: Arc::clone(&live),
-    };
-    let streaming = Arc::new(Streaming {
-        token: Arc::clone(&token),
-        bound: bound(),
-        admitting: Arc::clone(admitting),
-        live,
-    });
-    (routes(serving, streaming), token)
-}
-
-/// A surface keeping the password at `path`, sharing one register with the test.
-fn door(path: Option<PathBuf>, random: Chance) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        kept: path.clone(),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(world(path, random), &admitting);
-    (router, token, admitting)
-}
-
-/// What one request was answered with: the status, the body, and how long is left.
-struct Answer {
-    /// The status it came back under.
-    status: StatusCode,
-    /// What it said.
-    body: String,
-    /// The wait it named, where it named one.
-    left: Option<String>,
-}
-
-/// One request, and what it was answered with.
-async fn asked(
-    router: axum::Router,
-    method: &str,
-    path: &str,
-    pairs: &[(&str, String)],
-    body: &str,
-) -> Answer {
-    let mut building = Request::builder()
-        .method(method)
-        .uri(path)
-        .header(header::CONTENT_TYPE, "application/json");
-    for (name, value) in pairs {
-        building = building.header(*name, value);
-    }
-    let Ok(request) = building.body(Body::from(body.to_owned())) else {
-        unreachable!("the request a test writes is one that can be built")
-    };
-    let Ok(response) = router.oneshot(request).await;
-    let status = response.status();
-    let left = response
-        .headers()
-        .get(RETRY_AFTER)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned);
-    let Ok(read) = to_bytes(response.into_body(), 64 * 1024).await else {
-        unreachable!("an answer this surface produces is one that can be read")
-    };
-    Answer {
-        status,
-        body: String::from_utf8_lossy(&read).into_owned(),
-        left,
-    }
-}
-
-/// The body a password is offered in.
-fn offering(password: &str) -> String {
-    format!("{{\"password\":{}}}", serde_json::json!(password))
-}
-
-/// The secret an answer handed back, where it handed one back.
-fn session(body: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .as_ref()
-        .and_then(|opened| opened.pointer("/data/token"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned()
-}
+use door::*;
 
 #[tokio::test]
 async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_takes() {
@@ -577,18 +395,6 @@ fn exactly_one_path_is_let_through_without_a_token() {
     );
 }
 
-/// One request's headers, carrying the secret offered as the surface's own header.
-fn carrying(secret: Option<&str>) -> HeaderMap {
-    let mut headers = HeaderMap::new();
-    if let Some(secret) = secret {
-        let Ok(value) = HeaderValue::from_str(secret) else {
-            return headers;
-        };
-        headers.insert(TOKEN_HEADER, value);
-    }
-    headers
-}
-
 #[tokio::test]
 async fn the_token_printed_at_the_machine_answers_as_the_machine() {
     let path = keeping("who-machine");
@@ -657,108 +463,11 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
     let _ = fs::remove_dir_all(a_directory("who-nobody"));
 }
 
-/// A household that answers one question and refuses the rest.
-///
-/// Only `whoever` is reached from the door, and a stand-in answering more than the
-/// thing under test is one that can pass a test the surface would fail.
-struct AHousehold {
-    /// Who a name and password prove somebody to be, where it recognises them.
-    known: Option<String>,
-    /// Whether asking it fails outright, which is a different answer from not
-    /// recognising somebody.
-    unreachable: bool,
-}
-
-impl AHousehold {
-    /// One that knows this account and nobody else.
-    fn knowing(id: &str) -> Arc<Self> {
-        Arc::new(Self {
-            known: Some(id.to_owned()),
-            unreachable: false,
-        })
-    }
-
-    /// One that recognises nobody.
-    fn knowing_nobody() -> Arc<Self> {
-        Arc::new(Self {
-            known: None,
-            unreachable: false,
-        })
-    }
-
-    /// One that could not be asked at all.
-    fn unreachable() -> Arc<Self> {
-        Arc::new(Self {
-            known: None,
-            unreachable: true,
-        })
-    }
-}
-
-#[async_trait::async_trait]
-impl Household for AHousehold {
-    async fn whoever(&self, _: &str, _: &str) -> Result<Option<String>, Failure> {
-        if self.unreachable {
-            return Err(Failure::Unavailable {
-                service: "jellyfin".to_owned(),
-            });
-        }
-        Ok(self.known.clone())
-    }
-
-    async fn household(&self) -> Result<Vec<Member>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn invite(&self, _: &str) -> Result<Member, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn unclaim(&self, _: &str) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn withdraw(&self, _: &str) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn when_invited(&self, _: &str) -> Result<Vec<Invited>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn allow(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-}
-
-/// A door with a household behind it as well as a password.
-fn door_with(
-    path: Option<PathBuf>,
-    household: Arc<AHousehold>,
-) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        kept: path.clone(),
-        household: Some(household),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(world(path, Chance::cycling()), &admitting);
-    (router, token, admitting)
-}
-
-/// A name and a password, as a member sends them.
-fn offering_as(name: &str, password: &str) -> String {
-    format!(
-        "{{\"name\":{},\"password\":{}}}",
-        serde_json::json!(name),
-        serde_json::json!(password)
-    )
-}
-
 #[tokio::test]
 async fn a_member_the_household_knows_is_let_in_as_that_member() {
     let path = keeping("member-in");
-    let (router, token, admitting) = door_with(Some(path), AHousehold::knowing("a7f3"));
+    let (router, _token, admitting) =
+        door_with(Some(path), AHousehold::knowing("a7f3"), Chance::cycling());
 
     let answer = asked(
         router,
@@ -789,7 +498,7 @@ async fn the_machines_own_password_is_tried_before_the_household_is_asked() {
     // Two doors and nothing chooses between them. The one that needs no network
     // answers first, so a household that is down cannot keep the operator out.
     let path = keeping("operator-first");
-    let (router, _, _) = door_with(Some(path), AHousehold::unreachable());
+    let (router, _, _) = door_with(Some(path), AHousehold::unreachable(), Chance::cycling());
 
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
 
@@ -806,7 +515,7 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
     // The safe direction, and the honest one: nothing proved anything, so nobody
     // is let in on it.
     let path = keeping("household-down");
-    let (router, _, _) = door_with(Some(path), AHousehold::unreachable());
+    let (router, _, _) = door_with(Some(path), AHousehold::unreachable(), Chance::cycling());
 
     let answer = asked(
         router,
@@ -824,7 +533,7 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
 #[tokio::test]
 async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong() {
     let path = keeping("member-unknown");
-    let (router, _, _) = door_with(Some(path), AHousehold::knowing_nobody());
+    let (router, _, _) = door_with(Some(path), AHousehold::knowing_nobody(), Chance::cycling());
 
     let stranger = asked(
         router.clone(),
