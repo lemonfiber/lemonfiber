@@ -93,6 +93,19 @@ def decide(steps: list[Step]) -> tuple[int, list[str]]:
     if not steps:
         return 1, ["::error::the gate asked nothing, so it proved nothing"]
 
+    # A warning from a check that *passed* is kept. The first cut printed a
+    # step's words only when it failed, which threw away the one line saying a
+    # requirement is locked by no version at all — a real hole, reported by a
+    # gate that then exited zero, which is the shape of silence this file exists
+    # to refuse.
+    for step in steps:
+        if step.ok:
+            lines.extend(
+                f"      {said.strip()}"
+                for said in step.said.splitlines()
+                if "::warning::" in said
+            )
+
     refused = [step for step in steps if not step.ok]
     for step in refused:
         if step.said:
@@ -218,9 +231,22 @@ def self_test() -> int:
     if code == 0 or not any("asked nothing" in line for line in said):
         broken.append("a run that checked nothing was not refused")
 
-    code, _ = decide([Step("a", True), Step("b", True)])
+    code, said = decide([Step("a", True), Step("b", True)])
     if code != 0:
         broken.append("a run where everything passed was refused")
+
+    # A passing check with something to say. The no-stub gate warns, and exits
+    # zero, when a requirement is locked by no version at all — which is a real
+    # debt, and was thrown away by the first cut of `decide`.
+    code, said = decide([Step("a", True, "::warning::a requirement nothing locks"), Step("b", True)])
+    joined = "\n".join(said)
+    if code != 0:
+        broken.append("a warning from a passing check turned into a refusal")
+    if "a requirement nothing locks" not in joined:
+        broken.append("a warning from a passing check was thrown away")
+    code, said = decide([Step("a", True, "chatter nobody needs")])
+    if "chatter" in "\n".join(said):
+        broken.append("a passing check's ordinary output was printed as well")
 
     for spoiled in range(2):
         steps = [Step("a", True), Step("b", True)]
@@ -240,7 +266,8 @@ def self_test() -> int:
         print(f"::error::self-test: {len(broken)} claim(s) this gate makes are not true")
         return 1
     print("self-test: nothing passes quietly — an empty run and every single "
-          "failure are refused, by name and with what they said.")
+          "failure are refused, by name and with what they said, and a warning "
+          "from a check that passed is kept.")
     return 0
 
 
