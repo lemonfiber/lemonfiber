@@ -13,18 +13,21 @@
 //! shape that changes without its artefact changing with it fails the build.
 
 pub mod claiming;
+mod conforming;
 mod error;
 pub mod extension;
-mod recognising;
+pub mod offering;
+pub mod refusing;
 mod schema;
 pub mod vocabulary;
 
+pub use conforming::Violation;
 pub use error::Error;
-pub use recognising::Violation;
+pub use refusing::refusals;
 pub use schema::{
     Bind, Capture, Claim, ClaimProbe, Contribution, Criticality, Expect, Expected, Health,
     HealthKind, Kind, Manifest, Override, Pair, Plugin, Proof, Recipe, Request, Requires, Secret,
-    Service, Step, StepCall, Wiring,
+    Service, Step, StepCall, Wiring, RUN,
 };
 
 /// The manifest schema version this crate prefers.

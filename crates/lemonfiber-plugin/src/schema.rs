@@ -15,11 +15,11 @@ mod recipe;
 
 use serde::Deserialize;
 
-use crate::recognising::unrecognised;
+use crate::conforming::nonconforming;
 use crate::{is_compatible, Error, SUPPORTED_SCHEMA_VERSIONS};
 
 pub use evidence::{Claim, ClaimProbe, Contribution, Expect, Expected, Kind, Proof, Request};
-pub use recipe::{Capture, Pair, Recipe, Step, StepCall};
+pub use recipe::{Capture, Pair, Recipe, Step, StepCall, RUN};
 
 /// A whole plugin manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
@@ -70,8 +70,8 @@ impl Manifest {
     ///
     /// Returns [`Error::Syntax`] if the text is not a well-formed manifest,
     /// [`Error::UnsupportedSchema`] if it declares a generation this build does not
-    /// read, and [`Error::Unrecognised`] if it declares anything by a name this build
-    /// does not know.
+    /// read, and [`Error::Nonconforming`] if what it declares is not what the published
+    /// schema describes.
     pub fn from_toml(text: &str) -> Result<Self, Error> {
         // Read only the generation first. A newer generation may add or drop fields
         // the full parse would reject as unknown; reading it alone lets an old binary
@@ -85,13 +85,13 @@ impl Manifest {
             });
         }
 
-        // Names before types. The read below stops at the first word it does not know
-        // and calls it a syntax error; asking each declaration separately first is
-        // what lets an author be told everything they have to change, in the
-        // vocabulary they wrote rather than the parser's.
-        let unknown = unrecognised(text);
-        if !unknown.is_empty() {
-            return Err(Error::Unrecognised(unknown));
+        // The published schema before the types. The read below stops at the first
+        // fault it reaches and calls it a syntax error; holding the file to a schema
+        // generated from these very types first is what lets an author be told
+        // everything they have to change, each placed where they wrote it.
+        let refused = nonconforming(text);
+        if !refused.is_empty() {
+            return Err(Error::Nonconforming(refused));
         }
 
         Ok(toml::from_str(text)?)
@@ -325,7 +325,7 @@ pub enum HealthKind {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{Bind, Contribution, Criticality, Expected, HealthKind, Kind, Manifest};
     use crate::Error;
 
@@ -334,7 +334,7 @@ mod tests {
     /// Whole rather than minimal, because what these tests are for is that the types
     /// mirror the contract field for field — and a fixture carrying only the required
     /// half would leave the optional half describing nothing.
-    const WHOLE: &str = r#"
+    pub(crate) const WHOLE: &str = r#"
 schema_version = 1
 
 [plugin]
@@ -415,13 +415,19 @@ title = "Point it at the comics the stack already files"
 why   = "The stack already files comics, and a fresh Komga knows nothing about them."
 
 [[recipe.step]]
+id      = "sign-in"
+call    = { method = "POST", to = "komga", path = "/api/v1/login", body = "{\"password\": \"read from the operator's store\"}" }
+expect  = { status = 200 }
+capture = [{ name = "token", from = "json.token", origin = "stack-service" }]
+
+[[recipe.step]]
 id      = "create"
 call    = { method = "POST", to = "komga", path = "/api/v1/libraries", headers = { Authorization = "Bearer {{token}}" }, body = "{\"name\": \"Comics\"}" }
 expect  = { status = 200 }
 capture = [{ name = "library", from = "json.id", origin = "stack-service" }]
 
 [[recipe.pair]]
-value = "library"
+value = "token"
 to    = "komga"
 
 [[secret]]
@@ -434,7 +440,7 @@ id  = "homepage.services"
 why = "Add its own entry to the bundled dashboard"
 
 [requires]
-capabilities = ["service.add", "service.health.http"]
+capabilities = ["doctor.contribute", "recipe.run"]
 "#;
 
     /// Parsed, or absent.
@@ -754,7 +760,7 @@ capabilities = ["service.add", "service.health.http"]
         let read = parse(WHOLE)
             .and_then(|manifest| manifest.recipes.into_iter().next())
             .map(|recipe| {
-                let step = recipe.steps.into_iter().next();
+                let step = recipe.steps.into_iter().find(|step| step.id == "create");
                 let pair = recipe.pairs.into_iter().next();
                 (
                     recipe.id,
@@ -798,7 +804,7 @@ capabilities = ["service.add", "service.health.http"]
                         "stack-service".to_owned()
                     )),
                 )),
-                Some(("library".to_owned(), "komga".to_owned())),
+                Some(("token".to_owned(), "komga".to_owned())),
             ))
         );
     }
@@ -826,8 +832,8 @@ capabilities = ["service.add", "service.health.http"]
                 Some(("api-key".to_owned(), "komga".to_owned(), false)),
                 Some(("homepage.services".to_owned(), false)),
                 Some(vec![
-                    "service.add".to_owned(),
-                    "service.health.http".to_owned()
+                    "doctor.contribute".to_owned(),
+                    "recipe.run".to_owned()
                 ]),
             ))
         );
@@ -938,8 +944,16 @@ forms       = ["library"]
         let text = WHOLE.replace("takes_data  = true", "takes_data = true\nprivileged = true");
         let refusal = Manifest::from_toml(&text)
             .err()
-            .map(|err| matches!(err, Error::Syntax(_)));
-        assert_eq!(refusal, Some(true));
+            .map(|refused| refused.to_string())
+            .unwrap_or_default();
+        assert!(
+            refusal.contains("service komga.privileged"),
+            "names the field and the entry it was declared on: {refusal}"
+        );
+        assert!(
+            refusal.contains("config_path"),
+            "and lists what may be declared instead: {refusal}"
+        );
     }
 
     /// The names it does not know are reported together, not one per run.

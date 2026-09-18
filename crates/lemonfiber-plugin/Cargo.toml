@@ -14,14 +14,11 @@ repository.workspace = true
 lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 schemars = { workspace = true }
 serde = { workspace = true }
+# The generated schema is a JSON document, and holding a manifest to it means reading
+# that document. Already in the tree through `schemars`, which is itself built on it.
+serde_json = "1"
 thiserror = { workspace = true }
 toml = { workspace = true }
-
-
-[dev-dependencies]
-# Reading back the words the published artefact is written in, in the one test that
-# holds them to the contract's own spelling. Nothing this crate ships serialises.
-serde_json = "1"
 
 [lints]
 workspace = true

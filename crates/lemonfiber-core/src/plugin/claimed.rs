@@ -156,7 +156,7 @@ pub fn claimed(path: &Path) -> Result<Claimed, Unreadable> {
     let manifest = Manifest::from_toml(&std::fs::read_to_string(&at)?)?;
     let published = capabilities()?;
 
-    let mut refusals = lemonfiber_plugin::claiming::violations(&manifest, BUNDLED_CHECKS);
+    let mut refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     let mut capabilities = Vec::new();
     for service in &manifest.services {
         for name in &service.provides {
