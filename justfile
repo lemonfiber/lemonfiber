@@ -42,6 +42,18 @@ release-tag VERSION:
         echo "HEAD is not origin/main — the tag must name what shipped" >&2
         exit 1
     fi
+    # The same gate the one-click lane runs, because this cuts the same tag and
+    # starts the same pipeline. A lane that skips it is how v0.15.0 went out with
+    # a goal unmet. The spec is taken at `main` every time: a stale checkout here
+    # would hold the release to the goal set as it was.
+    if [ -d .spec-canonical/.git ]; then
+        git -C .spec-canonical fetch --quiet origin main
+        git -C .spec-canonical checkout --quiet FETCH_HEAD
+    else
+        git clone --quiet --filter=blob:none \
+            https://github.com/lemonfiber/spec.git .spec-canonical
+    fi
+    python3 scripts/the_gate_a_tag_must_pass.py --version "{{VERSION}}"
     git tag -s "v{{VERSION}}" -m "lemonfiber v{{VERSION}}"
     git push origin "v{{VERSION}}"
     echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
@@ -224,6 +236,7 @@ scripts:
     python3 scripts/every_proof_runs.py --self-test
     python3 scripts/the_requirements_an_entry_names.py --self-test
     python3 scripts/no_open_codeql_alert.py --self-test
+    python3 scripts/the_gate_a_tag_must_pass.py --self-test
 
 deny:
     cargo deny check
