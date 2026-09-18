@@ -12,17 +12,31 @@ next upgrade is a diff rather than an archaeology exercise.
 
 A version cargo-dist has moved on from is a hard failure rather than a silent skip:
 an unpinned action that nobody noticed is exactly what this exists to prevent.
+
+Each entry holds two things, because the tag cargo-dist reaches an action by and
+the version this repository has settled on are not the same and had come apart.
+Dependabot moved `actions/checkout` to v7.0.1 across every workflow here;
+cargo-dist still writes `@v6`; this table still held v6's commit. So the recipe
+put the older action back — in the one workflow where that matters most, and
+without a word, because the result is still a SHA and still pinned.
 """
 
 import pathlib
 import sys
 
-# action@version -> the commit that version pointed at when it was pinned.
+# What `dist generate` writes -> the commit this repository pins it to, and the
+# version that commit is. The key is cargo-dist's; the pair is ours.
 PINNED = {
-    "actions/attest@v4": "1e69f48acb82d1966a394da916b4c1698aa569d6",
-    "actions/checkout@v6": "d23441a48e516b6c34aea4fa41551a30e30af803",
-    "actions/download-artifact@v8": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-    "actions/upload-artifact@v7": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "actions/attest@v4": ("1e69f48acb82d1966a394da916b4c1698aa569d6", "v4"),
+    "actions/checkout@v6": ("3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1"),
+    "actions/download-artifact@v8": (
+        "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+        "v8",
+    ),
+    "actions/upload-artifact@v7": (
+        "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "v7",
+    ),
 }
 
 WORKFLOW = pathlib.Path(".github/workflows/release.yml")
@@ -39,8 +53,8 @@ def main() -> int:
         )
         return 1
 
-    for ref, sha in PINNED.items():
-        action, version = ref.split("@")
+    for ref, (sha, version) in PINNED.items():
+        action = ref.split("@")[0]
         text = text.replace(f"uses: {ref}\n", f"uses: {action}@{sha} # {version}\n")
 
     WORKFLOW.write_text(text, encoding="utf-8")
