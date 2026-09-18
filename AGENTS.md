@@ -57,10 +57,11 @@ the logic and the rendering must stay separate.
 - Behaviour change? The spec PR merged first.
 - The [definition of done](https://github.com/lemonfiber/spec/blob/main/40-quality/definition-of-done.md) is met.
 
-**Push, and let CI run the slow gates.** `just ci` and `just coverage` are the same
-commands CI's own jobs run — `sonar` runs that coverage line character for character
-— and CI runs them on an exclusive build cache, in parallel with twenty-odd other
-checks. Running them here first tells you nothing CI will not tell you sooner, and
+**Push, and let CI run the slow gates.** `just coverage` is the line `sonar` runs,
+character for character, `--no-fail-fast` included; `just ci` is everything the
+`build` job reads plus spelling and the scripts, and the `justfile` names what it
+leaves out. CI runs both on an exclusive build cache, in parallel with twenty-odd
+other checks. Running them here first tells you nothing CI will not tell you sooner, and
 costs ten minutes and more of a shared machine. Reach for one locally only when a
 named check comes back red, and when that check is coverage run `just uncovered`,
 which re-reads the profile already gathered rather than building and running the
@@ -70,8 +71,18 @@ the functions the run never entered, which is the shape an unnamed miss takes.
 
 ## Working in a worktree
 
-Every worktree under `~/Development/lemonfiber` shares one build cache, deliberately
-— `.cargo/config.toml` says why, and names the cost. Two things follow from it.
+Every worktree under `~/Development/lemonfiber` shares one build cache, deliberately.
+It is set by a `.cargo/config.toml` in the directory *above* the checkout rather than
+by anything in this repository: cargo reads that file from the current directory
+upward, so one copy covers every clone and worktree beneath it, and it names an
+absolute path on one machine, which is why no repository can carry it.
+
+The reason is disk. A full workspace build is 10–14 GB and the parallel-PR workflow
+keeps a worktree per open pull request; six at once cost about 70 GB, and cargo
+reclaims none of it — a rebase invalidates most of a cache and the next build writes
+a fresh copy beside it. The cost is that builds in different worktrees serialise on
+cargo's lock, and switching between worktrees that differ in features rebuilds more
+than separate caches would. Two more things follow from it.
 
 **Remove your worktree once your PR merges.** That cache is sized for a handful of
 them. Cargo hashes a package id relative to the workspace root, so two worktrees
