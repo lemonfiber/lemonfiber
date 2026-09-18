@@ -518,17 +518,18 @@ mod tests {
         );
     }
 
-    /// No name is in both of the two sets called capabilities, and the two cannot be
-    /// confused by somebody who does not know which document they are reading.
+    /// No name is in two of the three sets called capabilities, and none of the three
+    /// can be confused by somebody who does not know which document they are reading.
     ///
-    /// One is what a *service* can do and the other is a hole in a container's
-    /// isolation, and they were one word until the stack manifest's field was renamed.
-    /// The rule that kept them apart afterwards was that nobody would pick the same
-    /// name twice, which is not a rule. Shape decides it instead: a kernel grant is
-    /// shouted and carries no dot, a capability is an area and a verb, and neither can
-    /// be read as the other.
+    /// One is what a *service* can do, one is what lemonfiber offers the manifest
+    /// reading it, and one is a hole in a container's isolation. The last two were one
+    /// word until the stack manifest's field was renamed, and the rule that kept them
+    /// apart afterwards was that nobody would pick the same name twice, which is not a
+    /// rule. Shape decides it instead: a kernel grant is shouted and carries no dot, and
+    /// the other two are an area and a verb — so the third is held apart by membership,
+    /// which is what this asks.
     #[test]
-    fn no_name_is_both_a_capability_and_a_kernel_grant() {
+    fn no_name_is_in_two_of_the_three_sets_called_capabilities() {
         let granted: BTreeSet<&str> = lemonfiber_manifest::ALLOWED_GRANTS
             .iter()
             .copied()
@@ -540,6 +541,22 @@ mod tests {
             .filter(|name| granted.contains(name))
             .collect();
         assert!(shared.is_empty(), "these are in both sets: {shared:?}");
+
+        let offered = crate::offering::offered();
+        assert!(
+            !offered.is_empty(),
+            "there are offers to be unlike; an empty set would agree with anything"
+        );
+        let twice: Vec<&str> = carried()
+            .iter()
+            .map(|held| held.name)
+            .chain(granted.iter().copied())
+            .filter(|name| offered.contains(name))
+            .collect();
+        assert!(
+            twice.is_empty(),
+            "these are what lemonfiber offers and something else too: {twice:?}"
+        );
 
         let readable: Vec<&str> = granted
             .iter()

@@ -12,6 +12,13 @@ use serde::Deserialize;
 
 use super::Expect;
 
+/// The capability a manifest asks for in order to declare a recipe.
+///
+/// Named beside the block that asks for it rather than in the register of what this
+/// build offers, so that it stays a fact about recipes: the register answers whether an
+/// offer is made, and the name of the thing being asked for belongs with the thing.
+pub const RUN: &str = "recipe.run";
+
 /// One named flow of calls.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]

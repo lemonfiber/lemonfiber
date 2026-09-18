@@ -48,10 +48,12 @@ pub enum PluginCommand {
     /// Read a plugin's source and say what its claims come to.
     ///
     /// The three documents above say what may be written; this says what one manifest
-    /// wrote. Everything it declares is held to the published vocabulary and the
-    /// published points in one pass, every probe a claim binds is run against the
-    /// recording it names, and each capability is reported as demonstrated, unproven or
-    /// refuted rather than as claimed.
+    /// wrote. Everything it declares is held to the published schema, to the published
+    /// vocabulary and to the published points in one pass — the fields, the kinds, the
+    /// digest that fixes what runs, the paths, and the capabilities it asks of this
+    /// build — every probe a claim binds is run against the recording it names, and each
+    /// capability is reported as demonstrated, unproven or refuted rather than as
+    /// claimed.
     ///
     /// It then says what asking for each capability would come to on the stack this
     /// build pins: filled by one service, contested between several — which lemonfiber
