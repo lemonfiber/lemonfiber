@@ -530,6 +530,38 @@ mod tests {
         assert!(!redacted.contains(&key));
     }
 
+    /// The other place a URL carries a credential, and the one this missed. A short
+    /// password is the case that matters: the residual scan behind this only recognises
+    /// a run of twenty characters or more, so nothing else would have caught it.
+    #[test]
+    fn a_password_in_front_of_the_host_does_not_ride_out_with_the_address() {
+        let redacted = settings(
+            "INDEXER_URL=https://operator:hunter2@indexer.example.com/api\nPUID=1000",
+            &marks(salt()),
+            &Terms::default(),
+        );
+        assert!(
+            !redacted.contains("hunter2"),
+            "the password went into a file an operator is told to attach to a thread: \
+             {redacted}"
+        );
+        assert!(
+            redacted.contains("https://operator:"),
+            "and the account it names is still there to be recognised: {redacted}"
+        );
+        assert!(redacted.contains("PUID=1000"));
+
+        // Both halves at once, which is the shape an indexer behind a proxy actually has.
+        let key = key_shaped();
+        let both = settings(
+            &format!("INDEXER_URL=https://operator:hunter2@indexer.example.com/api?apikey={key}"),
+            &marks(salt()),
+            &Terms::default(),
+        );
+        assert!(!both.contains("hunter2"));
+        assert!(!both.contains(&key));
+    }
+
     /// A name with nothing after it is a setting that is not set, which is worth seeing:
     /// an empty credential and a wrong one are different faults.
     #[test]
