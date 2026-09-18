@@ -1,8 +1,9 @@
 """Check that `.github/workflows/release.yml` still carries every patch.
 
-`dist generate` writes that file, and three scripts then rewrite parts of what it
+`dist generate` writes that file, and four scripts then rewrite parts of what it
 wrote: the release is left as a draft, every installer is checked against a
-pinned digest, every action is pinned to a commit, and the token that can write a
+pinned digest, every action is pinned to a commit, the tag reaches each command
+through the environment rather than as script, and the token that can write a
 release belongs to the one job that writes one. `just release-workflow` applies
 all of it in order.
 
@@ -10,12 +11,14 @@ Regenerating the file without running that recipe drops every patch at once, and
 the result is a workflow that reads as normal: it builds, it signs, it publishes.
 Nothing about it looks different until a release is already out.
 
-Five claims are read from the tree, and each is a claim rather than a string:
+Six claims are read from the tree, and each is a claim rather than a string:
 
   draft        every `gh release create` carries `--draft`
   installers   every step that downloads and runs a script pins the URL and the
                  digest, reads the digest, and checks it
   pins         every action is used at a commit SHA
+  tag          every step that runs a release command reads the tag from its own
+                 env, and no step pastes it into a script
   token        the jobs holding `contents: write` are exactly the jobs that
                  create a release, and the workflow grants none
   allow-dirty  `[workspace.metadata.dist]` still carries `allow-dirty = ["ci"]`
@@ -38,6 +41,7 @@ import tomllib
 
 import pin_release_actions
 import scope_release_permissions as permissions
+import the_tag_a_shell_never_sees as by_env
 import verify_dist_installer as installers
 import yaml
 
@@ -152,6 +156,61 @@ def claim_pins(workflow: dict, _cargo: dict) -> list[str]:
     return problems
 
 
+def claim_tag(workflow: dict, _cargo: dict) -> list[str]:
+    """The tag arrives as an argument, and the release is cut against it.
+
+    Three things rather than one, because no one of them survives a regeneration
+    alone. A file that pastes the tag nowhere may also read it nowhere. A step
+    may declare the env and paste the tag beside it. And a release may be cut
+    against a value none of that looked at, which is the one of the three that
+    would ship.
+
+    Which steps need a tag is not asked here, and deliberately: `dist` has
+    subcommands that take one and subcommands that do not, and a rule guessing
+    between them from a command line is a rule that will be wrong later. The
+    patch script refuses outright when any of its seven sites has moved, so a
+    regeneration cannot quietly produce a file with fewer of them.
+    """
+    problems = []
+    reading = 0
+    for job, step in steps(workflow):
+        run = step.get("run") or ""
+        spot = where(job, step)
+        named = by_env.pasted(run)
+        if named:
+            problems.append(
+                f"{spot} pastes `{named}` into its script, so a tag carrying a "
+                "`$(...)` in its name runs as this job"
+            )
+        handed = by_env.PASSED_AS in (step.get("env") or {})
+        reads = f"${by_env.PASSED_AS}" in run
+        reading += 1 if reads else 0
+        if handed and not reads:
+            problems.append(f"{spot} is handed the tag and never reads it")
+        if reads and not handed:
+            problems.append(
+                f"{spot} reads {by_env.PASSED_AS} without declaring it, so what it "
+                "builds depends on a name set somewhere this cannot see"
+            )
+        problems.extend(
+            f"{spot} cuts the release against something other than "
+            f"{by_env.PASSED_AS}: {line.strip()}"
+            for line in run.splitlines()
+            if RELEASE_CREATE in line and f"${by_env.PASSED_AS}" not in line
+        )
+    if not reading:
+        problems.append(
+            f"no step here reads {by_env.PASSED_AS}, so this claim read nothing"
+        )
+    outputs = ((workflow.get("jobs") or {}).get("plan") or {}).get("outputs") or {}
+    if by_env.DROPPED in outputs:
+        problems.append(
+            f"the plan job publishes `{by_env.DROPPED}` again, an output whose only "
+            "use is to be pasted into a shell"
+        )
+    return problems
+
+
 def claim_token(workflow: dict, _cargo: dict) -> list[str]:
     problems = []
     granted = (workflow.get("permissions") or {}).get("contents")
@@ -222,6 +281,8 @@ CLAIMS = {
     "draft": claim_draft,
     "installers": claim_installers,
     "pins": claim_pins,
+    "tag": claim_tag,
+    "tag-inside-a-format": claim_tag,
     "token": claim_token,
     "token-can-write": claim_token,
     "allow-dirty": claim_allow_dirty,
@@ -236,6 +297,14 @@ BREAKS = {
         c,
     ),
     "pins": lambda w, c: (unpinned(w), c),
+    "tag": lambda w, c: (w.replace(by_env.HOST_BY_ENV, by_env.HOST_GENERATED), c),
+    # The same claim against the plan step, whose expression wraps the tag in a
+    # `format('… {0}', …)`. The brace in `{0}` is why: a first version of the
+    # reader stopped at it and passed the widest-reaching site of the five.
+    "tag-inside-a-format": lambda w, c: (
+        w.replace(by_env.PLAN_BY_ENV, by_env.PLAN_GENERATED),
+        c,
+    ),
     "token": lambda w, c: (w.replace(permissions.HOST_SCOPED, permissions.HOST), c),
     "token-can-write": lambda w, c: (
         w.replace(permissions.CREATES_WITH_TOKEN, permissions.CREATES),

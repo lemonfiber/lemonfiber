@@ -280,12 +280,16 @@ typos:
 #    wants a tag to leave a DRAFT a maintainer publishes, and there is no config
 #    for "stay drafted", so we flip that one flag.
 #
-# The generated file is then re-hardened: actions get pinned to commit SHAs, and
+# The generated file is then re-hardened: actions get pinned to commit SHAs,
 # every installer gets fetched and checked against a pinned digest instead of
-# being piped from a mutable URL straight into `sh`. `verify_release_workflow.py`
-# reads the result and says whether each patch is in it; CI runs the same script
-# on every pull request, so a regeneration that skipped this recipe is red rather
-# than unnoticed. Python (not sed -i) keeps this portable across macOS/Linux.
+# being piped from a mutable URL straight into `sh`, and the tag reaches each
+# command through the environment rather than as script — cargo-dist pastes
+# `github.ref_name` into five `run:` blocks, and a git tag may carry a `$(...)`.
+#
+# `verify_release_workflow.py` reads the result and says whether each patch is in
+# it; CI runs the same script on every pull request, so a regeneration that
+# skipped this recipe is red rather than unnoticed. Python (not sed -i) keeps
+# this portable across macOS/Linux.
 release-workflow:
     python3 -c "import pathlib; p=pathlib.Path('Cargo.toml'); p.write_text(p.read_text().replace('allow-dirty = [\"ci\"]\n', ''))"
     dist generate
@@ -294,6 +298,7 @@ release-workflow:
     python3 scripts/pin_release_actions.py
     python3 scripts/verify_dist_installer.py
     python3 scripts/scope_release_permissions.py
+    python3 scripts/the_tag_a_shell_never_sees.py
     python3 scripts/verify_release_workflow.py
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.
