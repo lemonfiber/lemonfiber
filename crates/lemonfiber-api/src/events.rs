@@ -75,11 +75,11 @@ pub fn routes(streaming: Arc<Streaming>) -> Router {
 /// which is an assembly mistake that would otherwise leave it open.
 pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap) -> Response<Body> {
     let now = std::time::SystemTime::now();
-    let known = streaming
+    let caller = streaming
         .admitting
         .carried(&headers, &streaming.token, now)
         .await;
-    if let Err(refusal) = admitted(known, &headers, streaming.bound) {
+    if let Err(refusal) = admitted(caller.is_some(), &headers, streaming.bound) {
         return refused(refusal);
     }
     let seen = headers

@@ -108,24 +108,53 @@ impl Admitting {
         self.kept.as_deref().and_then(credential::at)
     }
 
-    /// Whether the secret a request carried is one this run admits.
+    /// Who the secret a request carried proves it to be, or nothing.
     ///
-    /// Two secrets answer to the one header. The per-run token is what the operator
-    /// at this machine was given; a session is what somebody who proved the password
-    /// was given. Both are compared over every byte, so how long either takes says
-    /// nothing about how much of a guess was right.
-    pub async fn carried(&self, headers: &HeaderMap, token: &Token, now: SystemTime) -> bool {
+    /// Two secrets answer to the one header and they are not the same claim. The
+    /// per-run token is what somebody at this machine's terminal was given; a
+    /// session is what somebody who proved the password was given. Both are
+    /// compared over every byte, so how long either takes says nothing about how
+    /// much of a guess was right.
+    ///
+    /// `None` is every refusal. There is one of those rather than several because
+    /// a caller learning *which* secret was wrong learns which one to keep
+    /// guessing at.
+    pub async fn carried(
+        &self,
+        headers: &HeaderMap,
+        token: &Token,
+        now: SystemTime,
+    ) -> Option<Caller> {
         let offered = headers
             .get(TOKEN_HEADER)
             .and_then(|value| value.to_str().ok());
         if token.carried_by(offered) {
-            return true;
+            return Some(Caller::Machine);
         }
         match self.credential() {
-            Some(held) => self.sessions.holds(offered, now, &held).await,
-            None => false,
+            Some(held) if self.sessions.holds(offered, now, &held).await => Some(Caller::Operator),
+            _ => None,
         }
     }
+}
+
+/// Who a request proved itself to be.
+///
+/// The guard used to answer whether a caller was admitted and never who, so every
+/// route below it saw one indistinguishable *yes*. A surface that must refuse one
+/// person what it offers another cannot be built on that answer: it would have to
+/// decide for itself which person is looking, and a control withheld on that basis
+/// is withheld by whoever drew the screen.
+///
+/// So the question the guard answers is the subject rather than the verdict. What
+/// each caller may then do is decided where it is known — never here, and never by
+/// a client reading this and drawing its own conclusion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Caller {
+    /// Somebody at this machine's terminal, carrying the token printed there.
+    Machine,
+    /// Somebody who proved the password this machine keeps.
+    Operator,
 }
 
 /// The password offered, as a caller sends it.

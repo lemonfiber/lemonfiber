@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
-use lemonfiber_api::admission::{Admitting, RETRY_AFTER, SESSION};
+use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
+use lemonfiber_api::admission::{Admitting, Caller, RETRY_AFTER, SESSION};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
@@ -564,4 +564,84 @@ fn exactly_one_path_is_let_through_without_a_token() {
             .is_some_and(|line| line.contains("crate::admission::SESSION")),
         "the one path let through is not the door: {exempt:?}"
     );
+}
+
+/// One request's headers, carrying the secret offered as the surface's own header.
+fn carrying(secret: Option<&str>) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    if let Some(secret) = secret {
+        let Ok(value) = HeaderValue::from_str(secret) else {
+            return headers;
+        };
+        headers.insert(TOKEN_HEADER, value);
+    }
+    headers
+}
+
+#[tokio::test]
+async fn the_token_printed_at_the_machine_answers_as_the_machine() {
+    let path = keeping("who-machine");
+    let (_, token, admitting) = door(Some(path), Chance::cycling());
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(token.as_str())), &token, moment())
+            .await,
+        Some(Caller::Machine),
+        "the token printed at this machine named somebody other than the machine"
+    );
+    let _ = fs::remove_dir_all(a_directory("who-machine"));
+}
+
+#[tokio::test]
+async fn a_session_the_password_bought_answers_as_the_operator() {
+    let path = keeping("who-operator");
+    let (router, _, admitting) = door(Some(path), Chance::cycling());
+
+    let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
+    let opened = session(&answer.body);
+
+    // Checked against a token that is not this session, which is every machine but
+    // the one that minted it. The fixture's randomness is cycled letters, so a
+    // session and a per-run token of the same width are the same string here — and
+    // a check that let the machine arm answer first would be reporting on that
+    // rather than on the session.
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'z'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Some(Caller::Operator),
+        "a session bought with the password named somebody other than the operator"
+    );
+    let _ = fs::remove_dir_all(a_directory("who-operator"));
+}
+
+#[tokio::test]
+async fn nothing_and_a_wrong_secret_are_the_same_silence() {
+    // One answer for both, because a caller told which secret was wrong is a caller
+    // told which one to go on guessing at.
+    let path = keeping("who-nobody");
+    let (_, token, admitting) = door(Some(path), Chance::cycling());
+
+    assert_eq!(
+        admitting.carried(&carrying(None), &token, moment()).await,
+        None,
+        "a request carrying no secret was admitted as somebody"
+    );
+    assert_eq!(
+        admitting
+            .carried(
+                &carrying(Some("not a secret this run minted")),
+                &token,
+                moment()
+            )
+            .await,
+        None,
+        "a secret this run never minted was admitted as somebody"
+    );
+    let _ = fs::remove_dir_all(a_directory("who-nobody"));
 }
