@@ -376,8 +376,9 @@ mod tests {
     use std::collections::BTreeSet;
 
     use serde_json::Value as Json;
+    use toml::Value as Toml;
 
-    use super::{nonconforming, published, Violation};
+    use super::{against, listed, named, nonconforming, published, Violation};
 
     /// What each refusal said, as one line per fault.
     fn said(text: &str) -> Vec<String> {
@@ -578,6 +579,85 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
     #[test]
     fn a_file_that_is_not_toml_is_left_to_the_reader() {
         assert!(nonconforming("= not toml").is_empty());
+    }
+
+    /// The walk is told to hold a shape the generated schema does not yet write.
+    ///
+    /// A generated schema is a thing that changes with the types behind it, and the
+    /// walk answers about the whole of JSON Schema's small vocabulary rather than
+    /// about the subset in use today. Driven directly, because reaching these through
+    /// a manifest would mean a type this crate has no reason to declare.
+    #[test]
+    fn the_walk_answers_about_every_shape_a_generated_schema_can_take() {
+        let held = |value: Toml, schema: &str| {
+            let schema: Json = serde_json::from_str(schema).unwrap_or(Json::Null);
+            let mut found = Vec::new();
+            against(&value, &schema, &schema, "at", &mut found);
+            found
+        };
+
+        // A number, which a float satisfies and a word does not.
+        assert!(held(Toml::Float(1.5), r#"{"type":"number"}"#).is_empty());
+        let said = held(Toml::String("x".to_owned()), r#"{"type":"number"}"#);
+        assert!(
+            said.first()
+                .is_some_and(|one| one.message.contains("a number")),
+            "got: {said:?}"
+        );
+
+        // A range, at both ends.
+        let range = r#"{"type":"integer","minimum":1,"maximum":9}"#;
+        assert!(held(Toml::Integer(5), range).is_empty());
+        assert!(held(Toml::Integer(0), range)
+            .first()
+            .is_some_and(|one| one.message.contains("below")));
+        assert!(held(Toml::Integer(99), range)
+            .first()
+            .is_some_and(|one| one.message.contains("above")));
+
+        // A fixed flag and a fixed number, which are constants like a fixed word.
+        assert!(held(Toml::Boolean(true), r#"{"const":true}"#).is_empty());
+        assert!(held(Toml::Integer(2), r#"{"const":2}"#).is_empty());
+        assert!(!held(Toml::Boolean(false), r#"{"const":true}"#).is_empty());
+        assert!(!held(Toml::Integer(3), r#"{"const":2}"#).is_empty());
+
+        // A schema saying nothing about a value accepts it.
+        assert!(held(Toml::Float(2.5), r#"{"description":"anything"}"#).is_empty());
+
+        // And a list of alternatives with none in it has nothing to offer.
+        let said = held(Toml::Integer(1), r#"{"anyOf":[]}"#);
+        assert!(
+            said.first()
+                .is_some_and(|one| one.message.contains("no shape")),
+            "got: {said:?}"
+        );
+    }
+
+    /// A fault with nowhere to place it reads as the message alone.
+    #[test]
+    fn a_violation_about_the_whole_file_is_not_prefixed_with_an_empty_place() {
+        let one = Violation {
+            location: String::new(),
+            message: "the file is not a manifest".to_owned(),
+        };
+        assert_eq!(one.to_string(), "the file is not a manifest");
+    }
+
+    /// Several names in one line read as a list, whatever kind of thing they are.
+    #[test]
+    fn names_are_listed_in_one_stable_order_without_repeats() {
+        assert_eq!(listed(["b", "a", "b"].into_iter()), "a, b");
+        assert_eq!(listed(std::iter::empty::<&str>()), "");
+    }
+
+    /// A date is a kind of value TOML has and this format declares nowhere.
+    #[test]
+    fn a_kind_the_format_never_declares_is_still_named_rather_than_guessed_at() {
+        let stamp = "1979-05-27T07:32:00Z"
+            .parse::<toml::value::Datetime>()
+            .ok()
+            .map(Toml::Datetime);
+        assert_eq!(stamp.as_ref().map(named), Some("a date"));
     }
 
     /// Every field the published schema declares anywhere in it.

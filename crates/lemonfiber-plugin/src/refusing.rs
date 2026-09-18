@@ -235,12 +235,7 @@ fn requiring(manifest: &Manifest, found: &mut Vec<Violation>) {
         found.push(Violation {
             location: "requires.capabilities".to_owned(),
             message: format!(
-                "{name} is not something this build offers a plugin; what it offers is: {}",
-                if listed.is_empty() {
-                    "nothing yet — each arrives with the mechanism that provides it".to_owned()
-                } else {
-                    listed.clone()
-                }
+                "{name} is not something this build offers a plugin; what it offers is: {listed}"
             ),
         });
     }
@@ -606,6 +601,25 @@ capabilities = ["doctor.contribute"]
             "got: {:?}",
             said(&text)
         );
+    }
+
+    #[test]
+    fn a_plugin_joining_no_form_is_refused() {
+        let said = without(r#"forms       = ["library"]"#, "forms       = []");
+        assert!(names(&said, &["plugin.forms"]), "got: {said:?}");
+    }
+
+    #[test]
+    fn a_digest_with_no_readable_name_beside_it_is_refused() {
+        let said = without(r#"tag         = "1.11.0""#, r#"tag         = """#);
+        assert!(names(&said, &["service komga.tag"]), "got: {said:?}");
+    }
+
+    /// A file the schema refuses never reaches the rules over values.
+    #[test]
+    fn a_manifest_that_is_not_one_is_answered_by_the_reader_rather_than_here() {
+        let said = said("schema_version = 1\n[plugin]\nid = \"komga\"\n");
+        assert!(names(&said, &["does not conform"]), "got: {said:?}");
     }
 
     #[test]

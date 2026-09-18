@@ -304,6 +304,57 @@ mod tests {
         assert!(names(&said, &["call.method", "TRACE"]), "got: {said:?}");
     }
 
+    /// Two of anything a verdict is reported against is two things one name means.
+    #[test]
+    fn a_recipe_a_step_or_a_capture_declared_twice_is_refused() {
+        let twice = WHOLE.replace(
+            "[[recipe.pair]]\nvalue = \"token\"\nto    = \"komga\"",
+            "[[recipe.step]]\nid      = \"sign-in\"\n\
+             call    = { method = \"GET\", to = \"komga\", path = \"/again\" }\n\
+             capture = [{ name = \"token\", from = \"json.token\", origin = \"stack-service\" }]\n\n\
+             [[recipe.pair]]\nvalue = \"token\"\nto    = \"komga\"",
+        );
+        let twice_said = said(&twice);
+        assert!(
+            names(&twice_said, &["step sign-in", "declared twice"]),
+            "got: {twice_said:?}"
+        );
+        assert!(
+            names(&twice_said, &["capture", "captured twice"]),
+            "got: {twice_said:?}"
+        );
+
+        let doubled = format!(
+            "{WHOLE}\n[[recipe]]\nid    = \"adopt-existing-library\"\n\
+             title = \"t\"\nwhy   = \"w\"\n"
+        );
+        let doubled_said = said(&doubled);
+        assert!(
+            names(
+                &doubled_said,
+                &["recipe adopt-existing-library", "declared twice"]
+            ),
+            "got: {doubled_said:?}"
+        );
+    }
+
+    /// A body carries a value exactly as a header does, and is read the same way.
+    #[test]
+    fn a_value_substituted_into_a_body_is_read_as_a_flow_too() {
+        let said = without(
+            r#"body = "{\"name\": \"Comics\"}" }"#,
+            r#"body = "{\"name\": \"{{nothing}}\"}" }"#,
+        );
+        assert!(names(&said, &["call.body", "nothing"]), "got: {said:?}");
+    }
+
+    /// A file the schema refuses never reaches these rules.
+    #[test]
+    fn a_manifest_that_is_not_one_is_answered_by_the_reader_rather_than_here() {
+        let said = said("schema_version = 1\n[plugin]\nid = \"komga\"\n");
+        assert!(names(&said, &["does not conform"]), "got: {said:?}");
+    }
+
     #[test]
     fn an_address_is_told_from_a_name_by_its_last_label() {
         assert!(looks_like_an_address("10.0.0.5"));
