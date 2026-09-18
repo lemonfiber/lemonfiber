@@ -16,6 +16,8 @@
 //! anything about the image, and each is reported as the question not having been
 //! put.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use base64::Engine as _;
 use lemonfiber_ports::http::{Http, Method, Request};
@@ -29,13 +31,19 @@ const MANIFESTS: &str = "application/vnd.oci.image.manifest.v1+json, \
                          application/vnd.docker.distribution.manifest.v2+json";
 
 /// Reads an OCI registry over whatever speaks HTTP.
-pub struct Oci<T: Http> {
-    reaching: T,
+///
+/// The transport arrives as a shared handle rather than by type. A generic here is a
+/// second set of coverage counters for every instantiation the workspace makes, and
+/// the one this binary builds in production is the one no test enters — which reads
+/// as a body nothing covers while every line of it is exercised.
+pub struct Oci {
+    reaching: Arc<dyn Http>,
 }
 
-impl<T: Http> Oci<T> {
+impl Oci {
     /// A registry reader over one transport.
-    pub const fn new(reaching: T) -> Self {
+    #[must_use]
+    pub const fn new(reaching: Arc<dyn Http>) -> Self {
         Self { reaching }
     }
 }
@@ -70,9 +78,9 @@ fn beside(digest: &str) -> String {
 }
 
 #[async_trait]
-impl<T: Http> Registry for Oci<T> {
+impl Registry for Oci {
     async fn signatures(&self, image: &Image) -> Result<Vec<Offered>, Unanswerable> {
-        asking(&self.reaching, image).await
+        asking(self.reaching.as_ref(), image).await
     }
 }
 
@@ -82,7 +90,7 @@ impl<T: Http> Registry for Oci<T> {
 /// body into a generated future, and the coverage report attributes nothing inside it
 /// to the lines it came from — so every refusal below would be a branch that could go
 /// untaken for ever with the gate saying nothing. Here each one is watched.
-async fn asking<T: Http>(reaching: &T, image: &Image) -> Result<Vec<Offered>, Unanswerable> {
+async fn asking(reaching: &dyn Http, image: &Image) -> Result<Vec<Offered>, Unanswerable> {
     let (host, path) = addressed(&image.repository);
     let manifest = format!(
         "https://{host}/v2/{path}/manifests/{}",
@@ -242,6 +250,45 @@ mod tests {
             r#"{"schemaVersion":2,"layers":[{"digest":"sha256:bbb","annotations":{}}]}"#,
         )));
         assert_eq!(Oci::new(asked).signatures(&komga()).await, Ok(Vec::new()));
+    }
+
+    /// A layer that says it carries a signature and does not is unanswerable.
+    ///
+    /// Each of these is the registry answering in a shape this build cannot read,
+    /// which says nothing about the image — so none of them may come back as a
+    /// repository with nothing signed in it.
+    #[tokio::test]
+    async fn a_layer_this_build_cannot_read_is_a_question_nobody_put() {
+        let cases = [
+            (
+                "a signature that is not base64",
+                r#"{"schemaVersion":2,"layers":[{"digest":"sha256:aaa","annotations":{"dev.cosignproject.cosign/signature":"!!!!"}}]}"#,
+            ),
+            (
+                "a signature layer naming no blob",
+                r#"{"schemaVersion":2,"layers":[{"annotations":{"dev.cosignproject.cosign/signature":"AQID"}}]}"#,
+            ),
+        ];
+        assert_eq!(cases.len(), 2, "no layer was put in front of this");
+        for (what, manifest) in cases {
+            let asked = reaching(Fake::always(Answer::reply(200, manifest)));
+            assert!(
+                Oci::new(asked).signatures(&komga()).await.is_err(),
+                "{what} was read as an answer about the image"
+            );
+        }
+    }
+
+    /// The blob is the thing that was signed, and a registry that will not serve it
+    /// has not said anything about the image either.
+    #[tokio::test]
+    async fn a_payload_the_registry_would_not_serve_is_a_question_nobody_put() {
+        let asked = reaching(Fake::by_path(vec![
+            ("/manifests/", Answer::reply(200, MANIFEST)),
+            ("/blobs/", Answer::reply(500, "")),
+        ]));
+        let found = Oci::new(asked).signatures(&komga()).await;
+        assert!(found.is_err(), "a blob nobody served became a signature");
     }
 
     #[test]

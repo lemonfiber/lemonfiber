@@ -154,11 +154,21 @@ pub struct Claimed {
 /// [`Unreadable`] where there is no manifest at the path, or where this build cannot
 /// read the one that is there.
 pub fn read(path: &Path) -> Result<Manifest, Unreadable> {
+    sourced(path).map(|(_, manifest)| manifest)
+}
+
+/// The plugin's root and the manifest inside it, or why neither could be had.
+///
+/// The one answer to *where a plugin's manifest is*, because the two reads above
+/// would otherwise each carry their own and be free to disagree about whether a
+/// directory or the file inside it was meant.
+fn sourced(path: &Path) -> Result<(PathBuf, Manifest), Unreadable> {
     let (root, at) = source(path);
     if !at.is_file() {
         return Err(Unreadable::NoManifest(root));
     }
-    Ok(Manifest::from_toml(&std::fs::read_to_string(&at)?)?)
+    let manifest = Manifest::from_toml(&std::fs::read_to_string(&at)?)?;
+    Ok((root, manifest))
 }
 
 /// What the plugin whose source is at this path claims, and what it comes to.
@@ -168,11 +178,7 @@ pub fn read(path: &Path) -> Result<Manifest, Unreadable> {
 /// [`Unreadable`] where there is no manifest at the path, where this build cannot read
 /// the one that is there, or where the stack this build pins cannot be read.
 pub fn claimed(path: &Path) -> Result<Claimed, Unreadable> {
-    let (root, at) = source(path);
-    if !at.is_file() {
-        return Err(Unreadable::NoManifest(root));
-    }
-    let manifest = Manifest::from_toml(&std::fs::read_to_string(&at)?)?;
+    let (root, manifest) = sourced(path)?;
     let published = capabilities()?;
 
     let mut refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);

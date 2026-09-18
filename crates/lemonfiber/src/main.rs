@@ -273,7 +273,7 @@ async fn main() -> ExitCode {
         // The documents a plugin author reads are this build's own, so they are
         // answered here and never dispatched: there is no stack to ask, nothing to
         // decide, and a context to build would be a context nothing reached through.
-        Request::Plugin { read } => return authoring::published(&read, cli.json).await,
+        Request::Plugin { read } => return for_an_author(&read, cli.json).await,
         Request::Trace {
             term,
             season,
@@ -348,6 +348,25 @@ async fn main() -> ExitCode {
     };
 
     answered(command, &ctx, cli.json).await
+}
+
+/// Put a plugin author's answer in front of them, and end with its code.
+///
+/// The one part of that errand this file keeps: which adapter reaches a registry is
+/// the edge's to choose, and so is writing to a stream. What to say and what to exit
+/// with is decided in [`authoring`], where a test can hold it.
+async fn for_an_author(read: &lemonfiber::cli::PluginCommand, json: bool) -> ExitCode {
+    let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::new(
+        lemonfiber_adapters::http::Web::new(),
+    ));
+    let answered = authoring::published(read, json, &asking).await;
+    if let Some(fault) = answered.fault {
+        complain!("error: {fault}");
+    }
+    if let Some(lines) = answered.lines {
+        lines.print();
+    }
+    ExitCode::from(answered.code)
 }
 
 /// The app this binary serves a browser.

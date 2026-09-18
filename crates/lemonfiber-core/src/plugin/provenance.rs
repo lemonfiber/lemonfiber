@@ -548,16 +548,16 @@ mod tests {
         assert!(read.as_ref().is_some_and(Provenance::is_signed), "{read:?}");
     }
 
-    /// A registry that answers from a script, so a whole plugin can be asked about.
-    struct Answering(Vec<Result<Vec<Offered>, Unanswerable>>);
+    /// A registry with one answer, so a whole plugin can be asked about.
+    ///
+    /// One rather than a script: every case here pins a single image, and a script
+    /// needs an arm for running out that no case would ever reach.
+    struct Answering(Result<Vec<Offered>, Unanswerable>);
 
     #[async_trait::async_trait]
     impl lemonfiber_ports::registry::Registry for Answering {
-        async fn signatures(&self, image: &Image) -> Result<Vec<Offered>, Unanswerable> {
-            self.0
-                .first()
-                .cloned()
-                .unwrap_or_else(|| Err(Unanswerable::about(image, "the script ran out")))
+        async fn signatures(&self, _image: &Image) -> Result<Vec<Offered>, Unanswerable> {
+            self.0.clone()
         }
     }
 
@@ -607,7 +607,7 @@ criticality = "important"
 
     #[tokio::test]
     async fn an_image_nobody_signed_does_not_stop_an_install() {
-        let asking = Answering(vec![Ok(Vec::new())]);
+        let asking = Answering(Ok(Vec::new()));
         let read = read(|_| (), &[], &asking).await;
 
         assert_eq!(
@@ -624,17 +624,18 @@ criticality = "important"
         );
     }
 
+    /// The fixture plugin read against a registry offering one signature we made.
+    async fn offered_for(about: &str) -> Option<Vouched> {
+        let (key, signature) = signed(about)?;
+        let asking = Answering(Ok(offering(about, signature)));
+        read(|_| (), &[key], &asking).await
+    }
+
     #[tokio::test]
     async fn an_image_whose_signature_does_not_hold_stops_one() {
         let about =
             payload("sha256:0000000000000000000000000000000000000000000000000000000000000000");
-        let asked = match signed(&about) {
-            Some((key, signature)) => {
-                let asking = Answering(vec![Ok(offering(&about, signature))]);
-                read(|_| (), &[key], &asking).await
-            }
-            None => None,
-        };
+        let asked = offered_for(&about).await;
 
         assert_eq!(
             asked.as_ref().map(|one| one.installable),
@@ -650,7 +651,7 @@ criticality = "important"
     /// nothing.
     #[tokio::test]
     async fn a_plugin_that_pins_no_image_is_not_read_as_one_nobody_objects_to() {
-        let asking = Answering(vec![Ok(Vec::new())]);
+        let asking = Answering(Ok(Vec::new()));
         let read = read(|one| one.services.clear(), &[], &asking).await;
 
         assert_eq!(read.as_ref().map(|one| one.images.is_empty()), Some(true));
