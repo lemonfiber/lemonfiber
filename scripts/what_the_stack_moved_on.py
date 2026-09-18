@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """What the vendored stack has moved on since this repository took it.
 
-`assets/media-stack` is a submodule pinned by revision, and four files inside it
-are read at compile time — three `include_str!` of `stack.toml` and one of
-`scripts/spdx_osi.txt`. The binary therefore carries whatever those files said
-at the pinned revision, and every test that validates against them validates
-against that.
+`assets/media-stack` is a submodule pinned by revision, and some of the files
+inside it are read at compile time through `include_str!`. The binary therefore
+carries whatever those files said at the pinned revision, and every test that
+validates against them validates against that.
 
 A pin is meant to lag. Bumping one changes what ships, so it is a release
 decision rather than something that drifts under a build, and nothing here fails
@@ -18,13 +17,20 @@ added there and not taken here is a licence the stack permits and this binary
 refuses, and every test in this repository agrees with the refusal, because they
 are all reading the same stale copy.
 
-The paths are read out of the source rather than written down, for the reason
-the list of workflows in `the_toolchain_a_job_gets.py` is: a list kept by hand
-goes stale the moment somebody adds a fifth `include_str!`, and goes stale
-quietly, because what it then reports is a true answer about the four it knows.
+Which paths those are is read out of the source rather than written down, for the
+reason the list of workflows in `the_toolchain_a_job_gets.py` is: a list kept by
+hand goes stale the moment somebody adds another `include_str!`, and goes stale
+quietly, because what it then reports is a true answer about the ones it knows.
+
+This paragraph named them until somebody added one and the run above kept
+answering about the two it had been told about. The code was right — it never
+read the list — and the sentence describing the code was the stale copy, which is
+the same failure wearing a different hat. Neither this docstring nor the report
+counts them now; the run says how many it found.
 
 `--self-test` drives the judgement against answers it did not fetch, so the
-reading is proved before a forge is asked.
+reading is proved before a forge is asked — including the one reading that has to
+be made about the answer itself, which is whether the forge gave all of it.
 
 Usage:
   what_the_stack_moved_on.py
@@ -43,6 +49,13 @@ import sys
 
 SUBMODULE = "assets/media-stack"
 UPSTREAM = "lemonfiber/lemonfiber-media-stack"
+
+# How many files the forge will return from one comparison. Past this the `files`
+# array is cut short, and nothing in the response says so — so a comparison that
+# ran over the limit answers this check with a list that is missing whatever sat
+# past the cut. The report would be "none of them moved", said about files the
+# forge never mentioned, and the further behind the pin the likelier it gets.
+CAP = 300
 
 #: `include_str!("../../../assets/media-stack/<path>")`, however deep the crate.
 EMBEDS = re.compile(
@@ -102,7 +115,21 @@ def touched(pin: str) -> list[str]:
             f"{done.stderr.strip() or done.stdout.strip() or 'no output'}. "
             f"Nothing was compared, so this run says nothing about the pin."
         )
-    return json.loads(done.stdout or "[]")
+    files = json.loads(done.stdout or "[]")
+    if cut_off(files):
+        raise SystemExit(
+            f"::error::the forge returned {len(files)} file(s) comparing {pin[:8]} "
+            f"with {UPSTREAM} main, which is as many as it returns from one "
+            f"comparison. The list is cut short and a file read here may sit past "
+            f"the cut, so this run says nothing about the pin. Bump the submodule, "
+            f"or compare against a nearer revision."
+        )
+    return files
+
+
+def cut_off(files: list[str]) -> bool:
+    """Whether the forge gave back all it will, so there may be more it did not."""
+    return len(files) >= CAP
 
 
 PROVED = [
@@ -146,6 +173,14 @@ def self_test() -> int:
         got = moved_on(read, changed)
         if got != want:
             problems.append(f"{said}: read {got}, expected {want}")
+
+    # The forge's limit, either side of it. This half cannot prove the call —
+    # that needs a network — but the judgement about what came back is the part
+    # that was wrong, and it is here rather than out there.
+    if cut_off(["a"] * (CAP - 1)):
+        problems.append("a comparison under the forge's limit was called cut short")
+    if not cut_off(["a"] * CAP):
+        problems.append("a comparison at the forge's limit was not called cut short")
 
     # The reading, against this repository rather than against a fixture. A
     # judgement that is perfect over a list nothing fills is a judgement about

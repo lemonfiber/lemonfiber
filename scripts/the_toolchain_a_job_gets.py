@@ -72,8 +72,18 @@ def in_scope(job: dict, step: dict) -> str | None:
 
 
 def claim_selected(workflows: dict[str, dict]) -> list[str]:
-    """A job naming a toolchain runs cargo with that toolchain, not the pinned one."""
+    """A job naming a toolchain runs cargo with that toolchain, not the pinned one.
+
+    With a floor under it, because everything above walks a tree and reports what
+    it objects to — and a tree it found nothing in reads identically to a tree it
+    found nothing wrong in. `INSTALLS` is one action's name and `toolchain` one
+    of its inputs; rename either upstream, or move the step into a composite
+    action, and every job stops naming a toolchain at once. The claim would go on
+    holding, silently, over nothing — for exactly the two jobs whose reason to
+    exist is running a compiler this repository does not pin.
+    """
     found = []
+    examined = 0
     for file, workflow in workflows.items():
         for name, job in jobs(workflow).items():
             asked = named(job)
@@ -82,6 +92,7 @@ def claim_selected(workflows: dict[str, dict]) -> list[str]:
             for step in job.get("steps") or []:
                 if not RUNS_CARGO.search(str(step.get("run") or "")):
                     continue
+                examined += 1
                 holds = in_scope(job, step)
                 where = f"{file} job {name}, step {step.get('name') or step.get('run')!r}"
                 if holds is None:
@@ -93,6 +104,11 @@ def claim_selected(workflows: dict[str, dict]) -> list[str]:
                     found.append(
                         f"{where} asks for {asked!r} and runs with {OVERRIDE}={holds!r}"
                     )
+    if not examined:
+        found.append(
+            f"no job in {WORKFLOWS} asks {INSTALLS.rstrip('@')} for a toolchain and "
+            "then runs cargo, so this claim held over nothing"
+        )
     return found
 
 
@@ -131,6 +147,7 @@ def claim_promise(workflows: dict[str, dict]) -> list[str]:
 
 CLAIMS = {
     "selected": claim_selected,
+    "selected-asked-nothing": claim_selected,
     "promise": claim_promise,
 }
 
@@ -138,6 +155,13 @@ CLAIMS = {
 BREAKS = {
     "selected": lambda texts: {
         file: text.replace(f"      {OVERRIDE}: nightly\n", "")
+        for file, text in texts.items()
+    },
+    # The floor, put in front of the tree it is a floor under: with no job naming
+    # a toolchain there is nothing to disagree with, which is the reading the
+    # floor exists to refuse.
+    "selected-asked-nothing": lambda texts: {
+        file: re.sub(r"\n\s+toolchain: [^\n]+", "", text)
         for file, text in texts.items()
     },
     "promise": lambda texts: {
