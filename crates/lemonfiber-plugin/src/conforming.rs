@@ -135,7 +135,7 @@ fn table_against(
 
     let closed = schema.get("additionalProperties") == Some(&Json::Bool(false));
     if closed {
-        let takes = listed(properties.keys().map(String::as_str));
+        let takes = listed(properties.keys().cloned());
         for key in table.keys().filter(|key| !properties.contains_key(*key)) {
             found.push(Violation {
                 location: under(at, key),
@@ -324,20 +324,21 @@ fn named(value: &Toml) -> &'static str {
 
 /// The kinds a schema will accept, in the words TOML uses for them.
 fn wanted(kinds: &[&str]) -> String {
-    let words: Vec<&str> = kinds
-        .iter()
-        .filter(|kind| **kind != "null")
-        .map(|kind| match *kind {
-            "string" => "a string",
-            "integer" => "a whole number",
-            "number" => "a number",
-            "boolean" => "a true or a false",
-            "array" => "a list",
-            "object" => "a table",
-            other => other,
-        })
-        .collect();
-    listed(words.into_iter())
+    listed(
+        kinds
+            .iter()
+            .filter(|kind| **kind != "null")
+            .map(|kind| match *kind {
+                "string" => "a string",
+                "integer" => "a whole number",
+                "number" => "a number",
+                "boolean" => "a true or a false",
+                "array" => "a list",
+                "object" => "a table",
+                other => other,
+            })
+            .map(str::to_owned),
+    )
 }
 
 /// A field inside a location, spelled the way the manifest spells it.
@@ -357,9 +358,13 @@ fn placed(at: &str, index: usize, entry: &Toml) -> String {
 }
 
 /// Names in one line, in a stable order and without repeats.
-fn listed<S: AsRef<str>>(names: impl Iterator<Item = S>) -> String {
+///
+/// One item type rather than anything that reads as a string. A generic here is
+/// compiled once per type it is asked with, which is two sets of counters over one
+/// set of lines — and a line taken in one of them and missed in the other is a miss
+/// the coverage summary counts and its own line list cannot show.
+fn listed(names: impl Iterator<Item = String>) -> String {
     names
-        .map(|name| name.as_ref().to_owned())
         .collect::<BTreeSet<String>>()
         .into_iter()
         .fold(String::new(), |mut line, name| {
@@ -641,7 +646,19 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
         let free = r#"{"type":"object","additionalProperties":{"type":"string"}}"#;
         let mut table = toml::map::Map::new();
         table.insert("anything".to_owned(), Toml::Integer(1));
-        assert!(!held(Toml::Table(table), free).is_empty());
+        assert!(!held(Toml::Table(table.clone()), free).is_empty());
+
+        // And the two shapes a table can be that constrain nothing: one naming no
+        // fields and saying nothing about the rest, and an open record, which takes
+        // the fields it names and tolerates the others. A schema this build generates
+        // is neither today, and a walk that refused them would be refusing the format
+        // its own types could grow into.
+        assert!(held(Toml::Table(table.clone()), r#"{"type":"object"}"#).is_empty());
+        let open = r#"{"type":"object","properties":{"named":{"type":"string"}}}"#;
+        let mut record = toml::map::Map::new();
+        record.insert("named".to_owned(), Toml::String("x".to_owned()));
+        record.insert("beside".to_owned(), Toml::Integer(1));
+        assert!(held(Toml::Table(record), open).is_empty());
     }
 
     /// Every kind of value has a name, and every kind a schema asks for has one too.
@@ -710,8 +727,9 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
     /// Several names in one line read as a list, whatever kind of thing they are.
     #[test]
     fn names_are_listed_in_one_stable_order_without_repeats() {
-        assert_eq!(listed(["b", "a", "b"].into_iter()), "a, b");
-        assert_eq!(listed(std::iter::empty::<&str>()), "");
+        let three = ["b", "a", "b"].into_iter().map(str::to_owned);
+        assert_eq!(listed(three), "a, b");
+        assert_eq!(listed(["only".to_owned()].into_iter()), "only");
     }
 
     /// A date is a kind of value TOML has and this format declares nowhere.
@@ -784,10 +802,10 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
         let published = published();
         let mut named = BTreeSet::new();
         every_field(published.as_value(), &mut named);
+        let counted = named.len();
         assert!(
-            named.len() > 40,
-            "the schema was read and it declares {} fields",
-            named.len()
+            counted > 40,
+            "the schema was read and it declares {counted} fields"
         );
         for absent in ABSENT {
             assert!(
