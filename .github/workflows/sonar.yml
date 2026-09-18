@@ -201,29 +201,18 @@ jobs:
       # past a tolerance, which is what `Q-R64` asks for and what every other
       # repository in the organisation already declares.
       #
-      # **One, and briefly.** It reached zero and has been pushed off it a second
-      # time by the same mechanism as the first: an analyser rule that reads
-      # workflow files began refusing a `pip` install without `--only-binary
-      # :all:`, and backdated the findings to the commits that wrote those lines.
-      # Neither is new work and no pull request introduced them.
+      # It has been off zero twice, both times the same way: an analyser enabled a
+      # rule and backdated every finding to the commit that wrote the line. First
+      # `rust:S7493`, twenty-seven blocking calls inside `async fn` bodies, all of
+      # them real and none of them new; then `githubactions:S8541`, three `pip`
+      # installs that could take a source distribution and run its `setup.py`.
       #
-      # Two became one, and then one stayed: the rule reports a file at a time,
-      # so closing the first finding in `build.yml` revealed a second in the same
-      # file — the identical install step, fixed in the other workflow that
-      # carries it and missed in this one. That is the shape of the mistake worth
-      # writing down here, not the count.
-      #
-      # This names that backlog and nothing past it, which is the only kind of
-      # raise `Q-R67` allows — and it is a fall from the two that stood before,
-      # which needs no permission. The pull request declaring it is the one that
-      # fixes the last of them, so the count against `main` goes to zero the
-      # moment it lands, and then this comes back to zero: a ceiling above what
-      # stands is headroom, and headroom is what this number exists not to be.
-      #
-      # The gate could not have been cleared any other way. It reads the open
-      # count against `main` rather than against a pull request, so a branch that
-      # fixes the issues still reads two until it is merged, and every pull
-      # request in the repository is blocked meanwhile.
-      allowed-open: 1
+      # Both times the ceiling named what stood, the findings were fixed, and it
+      # came back here. That is the whole cycle this number is for, and the
+      # sentence worth keeping from the second pass is about the count rather than
+      # the rule: the analyser reports a file at a time, so three findings arrived
+      # as two and then as one, and a sweep that trusted the count stopped a step
+      # early. Read the tree, not the tally.
+      allowed-open: 0
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
