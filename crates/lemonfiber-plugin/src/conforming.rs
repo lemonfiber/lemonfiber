@@ -378,7 +378,10 @@ mod tests {
     use serde_json::Value as Json;
     use toml::Value as Toml;
 
-    use super::{against, listed, named, nonconforming, published, Violation};
+    use super::{
+        against, is, listed, named, nonconforming, published, rendered, said as spoken, wanted,
+        Violation,
+    };
 
     /// What each refusal said, as one line per fault.
     fn said(text: &str) -> Vec<String> {
@@ -631,6 +634,67 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
                 .is_some_and(|one| one.message.contains("no shape")),
             "got: {said:?}"
         );
+
+        // A list whose items the schema says nothing about, and a table whose keys
+        // are the author's own — the two ways a walk carries on without a shape.
+        assert!(held(Toml::Array(vec![Toml::Integer(1)]), r#"{"type":"array"}"#).is_empty());
+        let free = r#"{"type":"object","additionalProperties":{"type":"string"}}"#;
+        let mut table = toml::map::Map::new();
+        table.insert("anything".to_owned(), Toml::Integer(1));
+        assert!(!held(Toml::Table(table), free).is_empty());
+    }
+
+    /// Every kind of value has a name, and every kind a schema asks for has one too.
+    ///
+    /// Both lists are read out of a match, and a match arm nothing reaches is a word
+    /// an author would be shown that nobody has ever seen.
+    #[test]
+    fn every_kind_is_named_in_the_words_its_side_uses() {
+        let named_as: Vec<&str> = [
+            Toml::String(String::new()),
+            Toml::Integer(0),
+            Toml::Float(0.0),
+            Toml::Boolean(false),
+            Toml::Array(Vec::new()),
+            Toml::Table(toml::map::Map::new()),
+        ]
+        .iter()
+        .map(named)
+        .collect();
+        assert_eq!(
+            named_as,
+            vec![
+                "a string",
+                "a whole number",
+                "a number",
+                "a true or a false",
+                "a list",
+                "a table"
+            ]
+        );
+
+        for (asked, shown) in [
+            ("string", "a string"),
+            ("integer", "a whole number"),
+            ("number", "a number"),
+            ("boolean", "a true or a false"),
+            ("array", "a list"),
+            ("object", "a table"),
+            ("oddity", "oddity"),
+        ] {
+            assert_eq!(wanted(&[asked, "null"]), shown, "asked for {asked}");
+        }
+    }
+
+    /// A value is said back as an author wrote it, and a shape has no spelling.
+    #[test]
+    fn a_value_is_quoted_as_a_word_and_a_shape_is_named_as_one() {
+        assert_eq!(spoken(&Toml::String("wan".to_owned())), "`wan`");
+        assert_eq!(spoken(&Toml::Integer(7)), "7");
+        assert_eq!(spoken(&Toml::Boolean(true)), "true");
+        assert_eq!(spoken(&Toml::Array(Vec::new())), "a list");
+        assert_eq!(rendered(&Json::Bool(true)), "true");
+        assert!(!is(&Toml::Float(1.0), &Json::Null));
     }
 
     /// A fault with nowhere to place it reads as the message alone.
