@@ -275,6 +275,17 @@ mod tests {
             progress_at(&paths),
         )
         .await;
+        // Finished, so nothing is left to resume — and *from where it stopped*, so
+        // what the interrupted run had already written stays. Starting over is the
+        // choice that takes the journal with it.
+        assert!(
+            !paths.setup_progress().exists(),
+            "an apply that finished left a run still to resume"
+        );
+        assert!(
+            paths.journal().exists(),
+            "resuming discarded what had already been written"
+        );
         let _ = code;
     }
 
@@ -288,6 +299,13 @@ mod tests {
             progress_at(&paths),
         )
         .await;
+        // Applied again rather than abandoned: the answers are still the answers, so
+        // the run that follows the undo reaches the end and leaves nothing to resume.
+        assert!(paths.env_file().exists(), "it did not apply again");
+        assert!(
+            !paths.setup_progress().exists(),
+            "an apply that ran again left a run still to resume"
+        );
         let _ = code;
     }
 
@@ -338,7 +356,13 @@ mod tests {
             None,
         )
         .await;
-        let _ = code;
+        // Afresh, and a fresh run with nobody there is told which flags it needs
+        // rather than reporting success over a walk nobody answered.
+        assert_ne!(shown(code), success());
+        assert!(
+            !paths.env_file().exists(),
+            "a run nobody answered wrote settings anyway"
+        );
     }
 
     /// What the interrupted run recorded, read back the way setup reads it.

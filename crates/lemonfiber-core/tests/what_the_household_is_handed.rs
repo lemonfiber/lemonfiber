@@ -169,7 +169,16 @@ async fn a_setting_cannot_talk_the_answer_into_naming_an_administrative_service(
     // to this machine is put to it in turn, because a rule that held for the one
     // somebody thought of is not a rule.
     let services = declared();
-    for service in administrative(&services) {
+    let kept_to_this_machine = administrative(&services);
+    // The filter is what makes this a rule about administrative services, and it is
+    // also the way this stops being a rule at all: a stack where every service became
+    // reachable would run the sweep below over nothing and report that none of them
+    // can be named.
+    assert!(
+        !kept_to_this_machine.is_empty(),
+        "no service is kept to this machine, so nothing was put to the door"
+    );
+    for service in kept_to_this_machine {
         let report = answered(Some(&service.id)).await;
         assert_eq!(
             report.service.as_deref(),

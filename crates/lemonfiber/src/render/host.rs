@@ -96,7 +96,7 @@ mod tests {
     /// what a door puts where is the architecture test's to guard, and reading this
     /// process's own stream would be a harness rather than a test.
     #[test]
-    fn a_run_aimed_elsewhere_says_so_once_and_not_twice() {
+    fn settling_the_same_target_twice_in_one_process_is_one_run() {
         let there = Target::at("ssh://media@nas.local", Origin::Variable);
 
         super::settle(&there);

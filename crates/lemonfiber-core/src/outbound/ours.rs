@@ -417,7 +417,14 @@ mod tests {
 
     #[test]
     fn each_of_the_others_answers_its_own_switch() {
-        for reach in EVERY.iter().filter(|reach| **reach != Reach::Echo) {
+        let others: Vec<&Reach> = EVERY
+            .iter()
+            .filter(|reach| **reach != Reach::Echo)
+            .collect();
+        // The filter is what makes this a sweep of *the others*, and it is also what
+        // would leave it a sweep of nothing if the set were ever reduced to one.
+        assert!(!others.is_empty(), "there are others to sweep");
+        for reach in others {
             let refused = Settings {
                 reaching: Reaching::none(),
                 ..Settings::default()

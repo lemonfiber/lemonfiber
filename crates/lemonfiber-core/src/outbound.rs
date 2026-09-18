@@ -181,7 +181,11 @@ mod tests {
 
     #[test]
     fn each_entry_says_where_it_goes_why_what_it_sends_and_what_refusing_costs() {
-        for entry in leaving(&Settings::default(), &a_stack()).ours {
+        let ours = leaving(&Settings::default(), &a_stack()).ours;
+        // An empty list of what leaves this machine is the answer a reader would most
+        // like to be true and the one this must not report by accident.
+        assert!(!ours.is_empty(), "nothing was listed as leaving");
+        for entry in ours {
             let name = entry.reach.as_str();
             assert!(!name.is_empty());
             for (field, said) in [

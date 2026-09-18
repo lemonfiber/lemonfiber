@@ -60,7 +60,18 @@ mod tests {
     /// And nothing offered under that prefix is a mode nobody has heard of.
     #[test]
     fn every_migration_action_offered_names_a_mode() {
-        for offered in OFFERED.iter().filter(|name| name.starts_with("migrate-")) {
+        let under_the_prefix: Vec<&&str> = OFFERED
+            .iter()
+            .filter(|name| name.starts_with("migrate-"))
+            .collect();
+        // A filter is where a sweep quietly stops sweeping: rename the prefix, or
+        // take the migration actions out, and the loop below runs over nothing while
+        // reporting that every one of them names a mode.
+        assert!(
+            !under_the_prefix.is_empty(),
+            "nothing is offered under the prefix this is about"
+        );
+        for offered in under_the_prefix {
             assert!(named(offered).is_some(), "{offered} names a mode");
         }
     }

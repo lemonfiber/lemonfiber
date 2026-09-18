@@ -6,6 +6,7 @@
 
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use lemonfiber::cli::RawSetup;
 use lemonfiber_core::platform::Environment;
@@ -18,14 +19,25 @@ use super::{Answers, Terminal};
 /// A question past the end is answered with nothing, which is what a person
 /// pressing enter — or an input that has ended — gives.
 pub(crate) struct Script {
-    lines: RefCell<Vec<String>>,
+    lines: Rc<RefCell<Vec<String>>>,
 }
 
 impl Script {
     pub(crate) fn of(lines: &[&str]) -> Self {
         Self {
-            lines: RefCell::new(lines.iter().rev().map(|line| (*line).to_owned()).collect()),
+            lines: Rc::new(RefCell::new(
+                lines.iter().rev().map(|line| (*line).to_owned()).collect(),
+            )),
         }
+    }
+
+    /// The answers nobody has been asked for yet, shared with whoever built this.
+    ///
+    /// Whether a question was put is the one thing about a prompt that is decidable
+    /// without reading back this process's own output, and it is the half of "the
+    /// operator is waited on" that can actually be held.
+    pub(crate) fn unasked(&self) -> Rc<RefCell<Vec<String>>> {
+        Rc::clone(&self.lines)
     }
 }
 
@@ -42,10 +54,20 @@ impl Answers for Script {
 /// A terminal answered by the given script, on a platform that offers a native
 /// media server so the choice that depends on it can be reached.
 pub(crate) fn answered(lines: &[&str]) -> Terminal {
-    Terminal::answered_by(
-        Environment::MacOs,
-        PathBuf::from("/srv/media"),
-        Box::new(Script::of(lines)),
+    answered_watching(lines).0
+}
+
+/// The same, handing back what the script has not been asked for.
+pub(crate) fn answered_watching(lines: &[&str]) -> (Terminal, Rc<RefCell<Vec<String>>>) {
+    let script = Script::of(lines);
+    let unasked = script.unasked();
+    (
+        Terminal::answered_by(
+            Environment::MacOs,
+            PathBuf::from("/srv/media"),
+            Box::new(script),
+        ),
+        unasked,
     )
 }
 

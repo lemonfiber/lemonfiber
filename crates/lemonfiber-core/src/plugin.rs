@@ -300,20 +300,11 @@ mod tests {
             .iter()
             .copied()
             .collect();
-        let recognised: BTreeSet<&str> = [
-            Category::Environment,
-            Category::Storage,
-            Category::Network,
-            Category::Vpn,
-            Category::Credentials,
-            Category::Services,
-            Category::Providers,
-            Category::Queue,
-            Category::Config,
-        ]
-        .into_iter()
-        .map(Category::as_str)
-        .collect();
+        let recognised: BTreeSet<&str> = Category::every()
+            .into_iter()
+            .map(Category::as_str)
+            .collect();
+        assert!(!recognised.is_empty(), "there are families to compare");
         assert_eq!(published, recognised);
     }
 }

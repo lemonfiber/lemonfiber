@@ -488,6 +488,9 @@ mod tests {
         // item a whole-stack capture takes sits under the data directory's non
         // -lemonfiber areas — the exclusion is structural, not a filter.
         let plan = whole_stack_plan();
+        // A plan that captured nothing excludes the library trivially, and would be
+        // the one plan nobody should ship.
+        assert!(!plan.items.is_empty(), "the capture takes nothing at all");
         for item in &plan.items {
             assert!(
                 item.source.starts_with("/home/op/.config/lemonfiber")
