@@ -1,0 +1,193 @@
+"""Pass the release tag to `dist` and `gh` through the environment, never a script.
+
+A release here is triggered by pushing a version tag, so the tag's *name* is the
+one piece of the release pipeline chosen by a person at the moment they push. Git
+lets that name carry `$`, a backtick, `;`, `&` and `|` — `check-ref-format`
+forbids spaces, `~`, `^`, `:`, `?`, `*`, `[` and control characters, and stops
+there.
+
+`dist generate` writes that name into five `run:` blocks as a `${{ }}`
+expression. GitHub substitutes an expression *before* the shell sees the line, so
+the tag is not an argument at that point: it is source. A tag named
+`v9.9.9$(curl -sL …|sh)` is a legal tag, matches the workflow's own trigger
+pattern, and runs as the job it landed in. Two of those jobs build and attest the
+artefacts people download; the fifth is the step holding the App token that can
+write a release.
+
+The generator already knew the principle and applied it to everything else in
+that last step — the announcement title and body go through `env:` with a comment
+saying why — and left the one attacker-named value inline.
+
+So each site reads `RELEASE_TAG` from its own `env:` and builds the argument in
+the shell, where a variable's value is never rescanned for substitutions. An
+empty value (every pull-request run) has to mean *no `--tag` argument at all*
+rather than an empty one, which is what `set --` is doing.
+
+`tag-flag` goes with them: it existed only to be pasted into a script, and an
+output nobody may use is an invitation to use it again.
+
+Run from `just release-workflow`, after `dist generate` has overwritten the file.
+Anything it cannot find, or finds twice, is a hard failure rather than a silent
+skip: a patch that stops applying leaves the workflow as generated, and the whole
+point is that the file on disk is not what the generator wrote.
+"""
+
+import pathlib
+import re
+import sys
+
+WORKFLOW = pathlib.Path(".github/workflows/release.yml")
+
+# The name the tag arrives under, everywhere it arrives.
+PASSED_AS = "RELEASE_TAG"
+
+# The output that existed to be interpolated, and is removed with the last use.
+DROPPED = "tag-flag"
+
+# The tag reaching a script as an expression rather than as an argument: any
+# `${{ … }}` with one of these names inside it.
+#
+# Two patterns rather than one that spans both. "Everything up to the name, but
+# no closing brace" was the obvious way to write it and is wrong here — the
+# generated plan step reads `format('… --tag={0}', github.ref_name)`, and the
+# brace in `{0}` ends the run before the name is reached. The one site with the
+# widest blast radius was the one site it did not see.
+EXPRESSION = re.compile(r"\$\{\{.*?\}\}", re.DOTALL)
+TAG_NAME = re.compile(r"\b(?:github\.ref_name|github\.ref\b|needs\.plan\.outputs\.tag)")
+
+# Why each site does what it does. Short, and pointing at the one place the
+# reasoning is written out: four copies of the same paragraph is four things to
+# keep true rather than one.
+WHY = """          # The tag is a name a person chose, so it arrives as an argument
+          # rather than as script (scripts/the_tag_a_shell_never_sees.py).
+"""
+
+PLAN_GENERATED = """      - id: plan
+        run: |
+          dist ${{ (!github.event.pull_request && format('host --steps=create --tag={0}', github.ref_name)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+"""
+
+PLAN_BY_ENV = f"""      - id: plan
+        env:
+          {PASSED_AS}: ${{{{ !github.event.pull_request && github.ref_name || '' }}}}
+        run: |
+{WHY}          if [ -n "${PASSED_AS}" ]; then
+            set -- host --steps=create "--tag=${PASSED_AS}"
+          else
+            set -- plan
+          fi
+          dist "$@" --output-format=json > plan-dist-manifest.json
+"""
+
+# The three steps that pass the tag on to a build or a host, and the one shell
+# that turns an empty value into no argument rather than an empty one.
+TAKES_THE_TAG = f"""          set --
+          if [ -n "${PASSED_AS}" ]; then
+            set -- "--tag=${PASSED_AS}"
+          fi
+"""
+
+DECLARES = f"""        env:
+          {PASSED_AS}: ${{{{ needs.plan.outputs.tag }}}}
+"""
+
+LOCAL_GENERATED = """      - name: Build artifacts
+        run: |
+          # Actually do builds and make zips and whatnot
+          dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+"""
+
+LOCAL_BY_ENV = f"""      - name: Build artifacts
+{DECLARES}        run: |
+          # Actually do builds and make zips and whatnot
+{WHY}{TAKES_THE_TAG}          dist build "$@" --print=linkage --output-format=json ${{{{ matrix.dist_args }}}} > dist-manifest.json
+"""
+
+GLOBAL_GENERATED = """      - id: cargo-dist
+        shell: bash
+        run: |
+          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
+"""
+
+GLOBAL_BY_ENV = f"""      - id: cargo-dist
+        shell: bash
+{DECLARES}        run: |
+{WHY}{TAKES_THE_TAG}          dist build "$@" --output-format=json "--artifacts=global" > dist-manifest.json
+"""
+
+HOST_GENERATED = """      - id: host
+        shell: bash
+        run: |
+          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
+"""
+
+HOST_BY_ENV = f"""      - id: host
+        shell: bash
+{DECLARES}        run: |
+{WHY}{TAKES_THE_TAG}          dist host "$@" --steps=upload --steps=release --output-format=json > dist-manifest.json
+"""
+
+# The step that creates the release. Everything else it needs already comes
+# through `env:`; the tag did not.
+CREATES_GENERATED = """          RELEASE_COMMIT: "${{ github.sha }}"
+"""
+
+CREATES_BY_ENV = f"""          RELEASE_COMMIT: "${{{{ github.sha }}}}"
+          {PASSED_AS}: "${{{{ needs.plan.outputs.tag }}}}"
+"""
+
+RELEASED_GENERATED = 'gh release create --draft "${{ needs.plan.outputs.tag }}"'
+RELEASED_BY_ENV = f'gh release create --draft "${PASSED_AS}"'
+
+# The output that only ever existed to be pasted into a shell.
+FLAG_GENERATED = """      tag-flag: ${{ !github.event.pull_request && format('--tag={0}', github.ref_name) || '' }}
+"""
+
+PATCHES = (
+    ("the plan step", PLAN_GENERATED, PLAN_BY_ENV),
+    ("the local build step", LOCAL_GENERATED, LOCAL_BY_ENV),
+    ("the global build step", GLOBAL_GENERATED, GLOBAL_BY_ENV),
+    ("the host step", HOST_GENERATED, HOST_BY_ENV),
+    ("the release step's env", CREATES_GENERATED, CREATES_BY_ENV),
+    ("the release itself", RELEASED_GENERATED, RELEASED_BY_ENV),
+    ("the tag-flag output", FLAG_GENERATED, ""),
+)
+
+
+def pasted(script: str) -> str | None:
+    """The first expression in this script that carries the tag, if any."""
+    found = (one.group(0) for one in EXPRESSION.finditer(script))
+    return next((one for one in found if TAG_NAME.search(one)), None)
+
+
+def main() -> int:
+    if not WORKFLOW.is_file():
+        print(f"{WORKFLOW} is not there; run `dist generate` first.", file=sys.stderr)
+        return 1
+
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    # Counted, not merely found. `str.replace` with a count of one is silent
+    # about a second occurrence, and a second occurrence here is a sixth place
+    # the tag reaches a shell — which is precisely what this is for.
+    for what, generated, _ in PATCHES:
+        found = text.count(generated)
+        if found != 1:
+            print(
+                f"{WORKFLOW} carries {what} {found} time(s) rather than once. "
+                "cargo-dist has changed what it writes, so read the new file and "
+                "decide again rather than trusting this.",
+                file=sys.stderr,
+            )
+            return 1
+
+    for _, generated, by_env in PATCHES:
+        text = text.replace(generated, by_env, 1)
+
+    WORKFLOW.write_text(text, encoding="utf-8")
+    print("release.yml: the tag reaches every step as an argument, never as script")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
