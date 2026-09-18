@@ -142,6 +142,25 @@ pub struct Claimed {
     pub installable: bool,
 }
 
+/// The manifest at this path, read and refused the same way `claimed` reads one.
+///
+/// Its own entry point because two reads want the file and only one of them wants a
+/// verdict about the claims in it. A second copy of *where a plugin's manifest is*
+/// would be free to disagree about whether a directory or the file inside it was
+/// meant, which is the one thing both callers have to agree on.
+///
+/// # Errors
+///
+/// [`Unreadable`] where there is no manifest at the path, or where this build cannot
+/// read the one that is there.
+pub fn read(path: &Path) -> Result<Manifest, Unreadable> {
+    let (root, at) = source(path);
+    if !at.is_file() {
+        return Err(Unreadable::NoManifest(root));
+    }
+    Ok(Manifest::from_toml(&std::fs::read_to_string(&at)?)?)
+}
+
 /// What the plugin whose source is at this path claims, and what it comes to.
 ///
 /// # Errors

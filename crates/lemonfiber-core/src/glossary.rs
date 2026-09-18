@@ -243,6 +243,18 @@ pub const TERMS: &[Term] = &[
         "A rule that nudges a profile for or against particular releases — a \
                 preferred group, or a thing you never want.",
     ),
+    Term::new(
+        "PEM",
+        "How a key is written down as text rather than as bytes. A file in this \
+                form opens with a line of dashes saying what it holds, which is how \
+                you can tell at a glance that you have the right one.",
+    )
+    .explained(
+        "lemonfiber reads one where you name a key to check a plugin's images against. \
+             It wants the public half — the file whose first line says PUBLIC KEY — and \
+             refuses anything else by name rather than reading the end of it as a key and \
+             reporting that nothing matched.",
+    ),
 ];
 
 /// Every word this product explains, for somebody who asked what there is to ask
