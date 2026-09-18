@@ -234,6 +234,7 @@ scripts:
     uvx ruff@0.16.4 check scripts/
     python3 scripts/every_proof_runs.py
     python3 scripts/every_proof_runs.py --self-test
+    python3 scripts/counted_but_not_named.py --self-test
     python3 scripts/the_requirements_an_entry_names.py --self-test
     python3 scripts/no_open_codeql_alert.py --self-test
     python3 scripts/the_gate_a_tag_must_pass.py --self-test

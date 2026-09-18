@@ -4,7 +4,8 @@
 A recurring sentence in this directory is that a gate nobody has watched fail is
 a gate nobody knows works, and each of these scripts answers it the same way: a
 `--self-test` that breaks its own claims in turn and fails unless each one
-refuses the break. Seven scripts carry one.
+refuses the break. Most of the scripts here carry one; the count is not written
+down, because a count written down is a count that goes stale quietly.
 
 Nothing checked that they run. `just ci` reached exactly one of the seven, and
 four of the others were proven only by a workflow that fires on a release — so a
@@ -17,6 +18,10 @@ So this asks, of every script carrying `--self-test`: is it run somewhere that
 happens *before* a release. `just ci` counts. A workflow on `pull_request` or
 `push` counts. A workflow on `release` or `workflow_run` does not, because by
 then the release is already going out.
+
+Nor does a step behind `if: failure()`, which is a step that runs when the run is
+already red. The call is in the file either way, so this reads the steps rather
+than the text.
 
 A script that genuinely cannot be proven earlier says so here, with the reason,
 the way `test_coverage_reads_every_script.py` in `lemonfiber/spec` makes an
@@ -73,10 +78,31 @@ SELF_TEST = re.compile(
     r'|"--self-test"\s+in\s+(sys\.)?argv'
 )
 
+# A condition that holds only once something has already gone wrong. A proof
+# behind one of these runs when the run is already red, which is not a chance to
+# fail while somebody can still act on it — by then it is a diagnostic.
+AFTER_A_FAILURE = re.compile(r"\b(?:failure|cancelled)\s*\(\s*\)")
+
 
 def carries_a_proof(text: str) -> bool:
     """Whether this script acts on a `--self-test` flag, rather than mentioning one."""
     return bool(SELF_TEST.search(text))
+
+
+def parse(workflow: str) -> dict | None:
+    """A workflow as a mapping, or `None` where it could not be read as one.
+
+    `None` rather than an empty mapping, and rather than an exception. A workflow
+    this cannot parse is not a workflow that fires on nothing and runs nothing —
+    reading it that way would quietly drop a proof that does run and fail the
+    script carrying it. It is somebody else's problem (actionlint's), so it is
+    reported and not guessed at.
+    """
+    try:
+        parsed = yaml.safe_load(workflow) or {}
+    except yaml.YAMLError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def when(workflow: str) -> set[str] | None:
@@ -84,23 +110,43 @@ def when(workflow: str) -> set[str] | None:
 
     `on` is the YAML 1.1 boolean `True` once parsed, which is a trap worth
     handling once here rather than in each caller.
-
-    `None` rather than an empty set, and rather than an exception. A workflow
-    this cannot parse is not a workflow that fires on nothing — reading it that
-    way would quietly drop a proof that does run and fail the script carrying it.
-    It is somebody else's problem (actionlint's), so it is reported and not
-    guessed at.
     """
-    try:
-        parsed = yaml.safe_load(workflow) or {}
-    except yaml.YAMLError:
-        return None
-    if not isinstance(parsed, dict):
+    parsed = parse(workflow)
+    if parsed is None:
         return None
     fires = parsed.get(True, parsed.get("on"))
     if isinstance(fires, (dict, list)):
         return set(fires)
     return {fires} if isinstance(fires, str) else set()
+
+
+def after_a_failure(spec: dict) -> bool:
+    """Whether this job or step is reached only once something has gone wrong."""
+    return bool(AFTER_A_FAILURE.search(str(spec.get("if", ""))))
+
+
+def runs(workflow: str, call: str) -> bool:
+    """Whether a step an ordinary green run reaches makes this call.
+
+    Not "the call appears in the file". A step guarded by `if: failure()` is in
+    the file and does not run, and that is not hypothetical: the only proof
+    `counted_but_not_named.py` had was one of those, sitting under the coverage
+    gate it explains. Its claims had never been exercised by a passing run, and
+    this file reported it as proven — which is this file's own failure mode, one
+    level up.
+    """
+    parsed = parse(workflow)
+    if parsed is None:
+        return False
+    for job in (parsed.get("jobs") or {}).values():
+        if not isinstance(job, dict) or after_a_failure(job):
+            continue
+        for step in job.get("steps") or []:
+            if not isinstance(step, dict) or after_a_failure(step):
+                continue
+            if call in str(step.get("run") or ""):
+                return True
+    return False
 
 
 def proven_in_time(name: str, justfile: str, workflows: dict[str, str]) -> list[str]:
@@ -114,7 +160,7 @@ def proven_in_time(name: str, justfile: str, workflows: dict[str, str]) -> list[
         found.append("justfile")
     for path, text in workflows.items():
         fires = when(text)
-        if call in text and fires is not None and fires & IN_TIME:
+        if fires is not None and fires & IN_TIME and runs(text, call):
             found.append(path)
     return found
 
@@ -216,6 +262,30 @@ def self_test() -> int:
         failures.append("a proof run by the justfile was not found")
     if proven_in_time("a.py", "", {"w.yml": runs_on_release}):
         failures.append("a proof run only at release time was called run in time")
+
+    # A step reached only by a red run. The call is in the file, and running it
+    # is conditional on the thing it was meant to catch having already happened.
+    def guarded(where: str, how: str) -> str:
+        job = "  a:\n" + (how if where == "job" else "")
+        step = "      - " + (how.strip() + "\n        " if where == "step" else "")
+        return (
+            "on:\n  pull_request:\njobs:\n"
+            + job
+            + "    steps:\n"
+            + step
+            + "run: python3 a.py --self-test\n"
+        )
+
+    for where in ("job", "step"):
+        for how in ("    if: failure()\n", "    if: ${{ always() && failure() }}\n"):
+            if proven_in_time("a.py", "", {"w.yml": guarded(where, how)}):
+                failures.append(
+                    f"a proof behind `{how.strip()}` on the {where} was counted as run"
+                )
+    # And one that is conditional on something other than a failure, which does
+    # run — a rule that refused every `if:` would be a different, wronger rule.
+    if not proven_in_time("a.py", "", {"w.yml": guarded("step", "    if: matrix.slow\n")}):
+        failures.append("a proof on one leg of a matrix was not counted as run")
     if proven_in_time("a.py", "", {"w.yml": "- unreadable\n" + "a.py --self-test"}):
         failures.append("a proof in a workflow that could not be read was counted")
 
