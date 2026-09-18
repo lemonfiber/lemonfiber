@@ -63,7 +63,10 @@ jobs:
       # silently joined into one. A mistake here reads as a broken workflow
       # rather than as a broken checker.
       - name: The gate scripts themselves
-        run: pipx run ruff==0.16.4 check scripts/
+        # `--only-binary :all:` refuses a source distribution, and with it the
+        # `setup.py` pip would run to build one. A linter fetched at CI time is
+        # code this workflow executes; a wheel is data it unpacks.
+        run: pipx run --pip-args="--only-binary :all:" ruff==0.16.4 check scripts/
 
       - name: Install the yaml reader
         run: |
@@ -90,6 +93,11 @@ jobs:
         run: python3 scripts/every_proof_runs.py --self-test
       - name: What a changelog entry must name
         run: python3 scripts/the_requirements_an_entry_names.py --self-test
+      # The release gate's own proof. It runs here rather than at a release for
+      # the reason the two steps above do: a gate found broken during a release
+      # is found at the worst moment available, and this one refuses the tag.
+      - name: Nothing passes the release gate quietly
+        run: python3 scripts/the_gate_a_tag_must_pass.py --self-test
 
   msrv:
     runs-on: ubuntu-latest
