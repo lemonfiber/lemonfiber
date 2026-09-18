@@ -127,6 +127,15 @@ pub(super) fn held_from(reach: &Reach) -> Held {
     match reach {
         Reach::Address(seen) => Held::No { seen: seen.clone() },
         Reach::Blocked | Reach::Down => Held::Yes,
+        // The client answered while the tunnel was down, and what it answered is
+        // not an address. Something left the container, which is the one thing
+        // this test exists to detect — but the answer does not name where it
+        // went, so it is unproven rather than either verdict.
+        Reach::Unreadable => Held::NotAttempted {
+            reason: "the download client answered while the tunnel was down and the answer \
+                     could not be read as an address, so nothing was proven either way"
+                .to_owned(),
+        },
         Reach::Unknown => Held::NotAttempted {
             reason: "the download client could not be asked while the tunnel was down".to_owned(),
         },
@@ -413,6 +422,29 @@ mod tests {
         assert_eq!(held_from(&Reach::Blocked), Held::Yes);
         assert_eq!(held_from(&Reach::Down), Held::Yes);
         assert!(shown(&verdict(&Held::Yes)).starts_with("Pass"));
+    }
+
+    #[test]
+    fn a_client_that_answered_unreadably_is_not_a_killswitch_that_held() {
+        // The dangerous half of what used to be one state. `Blocked` meant both
+        // "wget could not transfer" and "wget transferred and the body is not an
+        // address" — and the second is a completed round trip to a public host
+        // while the tunnel was down, reported as the guarantee proven.
+        //
+        // A captive portal, an ISP interception page, an echo answering JSON, and
+        // any 4xx or 5xx from a server that did answer all produce it.
+        let unreadable = held_from(&Reach::Unreadable);
+        assert_ne!(
+            unreadable,
+            Held::Yes,
+            "the client reached something, which is the opposite of traffic stopping"
+        );
+        let said = shown(&verdict(&unreadable));
+        assert!(said.starts_with("Unverified"), "{said}");
+        assert!(
+            !said.starts_with("Pass"),
+            "nothing about this proves the killswitch: {said}"
+        );
     }
 
     #[test]

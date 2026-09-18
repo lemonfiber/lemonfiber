@@ -398,6 +398,59 @@ async fn a_contained_client_with_no_connectivity_is_a_warning() {
     );
 }
 
+/// What a captive portal answers: a page, with a zero exit status.
+const A_PAGE_RATHER_THAN_AN_ADDRESS: &str = "<html>Sign in to continue</html>";
+
+#[tokio::test]
+async fn a_client_that_reached_a_portal_is_not_a_client_with_no_connectivity() {
+    // The transfer succeeded, so something left the container and a public host
+    // answered it. Read as no connectivity — which is what a non-address answer
+    // used to mean — this is the isolated warning, whose text says "Nothing is
+    // leaking" about a client that has just proven it can reach the internet.
+    let findings = check(vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        Behavior::up("qbittorrent", Some(A_PAGE_RATHER_THAN_AN_ADDRESS)),
+    ])
+    .run()
+    .await;
+    assert_ne!(
+        problem(&findings, "vpn.egress-match").map(|problem| problem.code),
+        Some(CLIENT_ISOLATED),
+        "an answer from outside the container is not an absence of connectivity"
+    );
+    assert!(
+        matches!(
+            verdict(&findings, "vpn.egress-match"),
+            Some(Verdict::Unverified { .. })
+        ),
+        "where its traffic went was not established: {:?}",
+        verdict(&findings, "vpn.egress-match")
+    );
+}
+
+#[tokio::test]
+async fn a_tunnel_that_answered_unreadably_is_not_proof_the_client_leaked() {
+    // The other direction of the same conflation. The gateway reached something
+    // and the answer is not an address, so its own address is unknown rather
+    // than proven absent — and a critical leak cannot be claimed against a
+    // client that is behaving on the strength of it.
+    let findings = check(vec![
+        Behavior::up("gluetun", Some(A_PAGE_RATHER_THAN_AN_ADDRESS)),
+        Behavior::up("qbittorrent", Some("81.2.3.4")),
+    ])
+    .run()
+    .await;
+    assert_ne!(
+        problem(&findings, "vpn.egress-match").map(|problem| problem.code),
+        Some(LEAKING),
+        "an unreadable tunnel is not evidence the client went around it"
+    );
+    assert!(matches!(
+        verdict(&findings, "vpn.egress-match"),
+        Some(Verdict::Unverified { .. })
+    ));
+}
+
 #[tokio::test]
 async fn both_unreachable_cannot_confirm_safety() {
     let findings = check(vec![
