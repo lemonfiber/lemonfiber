@@ -28,6 +28,7 @@ jobs:
       - name: Install the yaml reader
         run: |
           python3 -m pip install --quiet --disable-pip-version-check \
+            --only-binary :all: \
             --require-hashes -r .github/requirements/yaml.txt
 
       - name: The release workflow still carries every patch

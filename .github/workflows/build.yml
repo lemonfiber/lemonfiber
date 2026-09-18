@@ -63,7 +63,10 @@ jobs:
       # silently joined into one. A mistake here reads as a broken workflow
       # rather than as a broken checker.
       - name: The gate scripts themselves
-        run: pipx run ruff==0.16.4 check scripts/
+        # `--only-binary :all:` refuses a source distribution, and with it the
+        # `setup.py` pip would run to build one. A linter fetched at CI time is
+        # code this workflow executes; a wheel is data it unpacks.
+        run: pipx run --pip-args="--only-binary :all:" ruff==0.16.4 check scripts/
 
       - name: Install the yaml reader
         run: |
