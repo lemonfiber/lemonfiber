@@ -404,7 +404,7 @@ async fn the_token_printed_at_the_machine_answers_as_the_machine() {
         admitting
             .carried(&carrying(Some(token.as_str())), &token, moment())
             .await,
-        Some(Caller::Machine),
+        Knocking::Known(Caller::Machine),
         "the token printed at this machine named somebody other than the machine"
     );
     let _ = fs::remove_dir_all(a_directory("who-machine"));
@@ -431,7 +431,7 @@ async fn a_session_the_password_bought_answers_as_the_operator() {
         admitting
             .carried(&carrying(Some(&opened)), &elsewhere, moment())
             .await,
-        Some(Caller::Operator),
+        Knocking::Known(Caller::Operator),
         "a session bought with the password named somebody other than the operator"
     );
     let _ = fs::remove_dir_all(a_directory("who-operator"));
@@ -446,7 +446,7 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
 
     assert_eq!(
         admitting.carried(&carrying(None), &token, moment()).await,
-        None,
+        Knocking::Nobody,
         "a request carrying no secret was admitted as somebody"
     );
     assert_eq!(
@@ -457,7 +457,7 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
                 moment()
             )
             .await,
-        None,
+        Knocking::Nobody,
         "a secret this run never minted was admitted as somebody"
     );
     let _ = fs::remove_dir_all(a_directory("who-nobody"));
@@ -474,7 +474,7 @@ async fn a_member_the_household_knows_is_let_in_as_that_member() {
         "POST",
         SESSION,
         &from_here(),
-        &offering_as("ana", "hers, not the machine's"),
+        &offering_as("ana", &hers()),
     )
     .await;
     assert_eq!(answer.status, StatusCode::OK);
@@ -487,7 +487,7 @@ async fn a_member_the_household_knows_is_let_in_as_that_member() {
         admitting
             .carried(&carrying(Some(&opened)), &elsewhere, moment())
             .await,
-        Some(Caller::Member("a7f3".to_owned())),
+        Knocking::Known(Caller::Member("a7f3".to_owned())),
         "a session the household bought named somebody other than that member"
     );
     let _ = fs::remove_dir_all(a_directory("member-in"));
@@ -522,7 +522,7 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
         "POST",
         SESSION,
         &from_here(),
-        &offering_as("ana", "hers, not the machine's"),
+        &offering_as("ana", &hers()),
     )
     .await;
 
@@ -540,17 +540,10 @@ async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong
         "POST",
         SESSION,
         &from_here(),
-        &offering_as("nobody", "nothing"),
+        &offering_as("nobody", &nobodys()),
     )
     .await;
-    let wrong = asked(
-        router,
-        "POST",
-        SESSION,
-        &from_here(),
-        &offering("not the machine's password"),
-    )
-    .await;
+    let wrong = asked(router, "POST", SESSION, &from_here(), &offering(&nobodys())).await;
 
     assert_eq!(stranger.status, wrong.status);
     assert_eq!(
@@ -558,4 +551,88 @@ async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong
         "the refusals differ, so they say which door was meant"
     );
     let _ = fs::remove_dir_all(a_directory("member-unknown"));
+}
+
+/// The sequence a removed identity is described by, staged end to end.
+///
+/// Signing in, working, being taken off the server, and then the *next* call —
+/// which is the word the requirement uses. A check that ran at sign-in and not
+/// afterwards would pass a test that only signed in, and would leave somebody
+/// removed on Monday still reading the household on Tuesday.
+#[tokio::test]
+async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
+    let path = keeping("member-withdrawn");
+    let household = AHousehold::knowing("a7f3");
+    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Known(Caller::Member("a7f3".to_owned())),
+        "the session was not answering as the member who bought it"
+    );
+
+    household.withdraw();
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Nobody,
+        "a session outlived the account it was bought with"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-withdrawn"));
+}
+
+/// Gone and could-not-be-asked are different facts and must not arrive alike.
+///
+/// Collapsing them would sign a household out for the length of a media-server
+/// reboot and tell them their accounts had been removed — the same mistake the
+/// sign-in door one floor down is built to avoid, made where it is harder to see.
+/// Both are staged from the same signed-in session, so the only thing that differs
+/// between the two answers is what the household said.
+#[tokio::test]
+async fn a_household_that_cannot_be_asked_is_not_a_household_that_said_no() {
+    let path = keeping("member-unasked");
+    let household = AHousehold::knowing("a7f3");
+    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    household.go_dark();
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Unconfirmed,
+        "a household that could not be asked was read as one that answered no"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-unasked"));
 }

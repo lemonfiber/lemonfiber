@@ -24,6 +24,8 @@ pub enum Refusal {
     Elsewhere,
     /// It proved who it is, and this is not theirs.
     NotYours,
+    /// Whether it is still anybody could not be established.
+    Unconfirmed,
 }
 
 impl Refusal {
@@ -48,6 +50,15 @@ impl Refusal {
             // there is nothing left to guess and a household member reading it is owed
             // the actual reason rather than a silence that reads as a fault.
             Self::NotYours => "This is not something this account may ask for.",
+            // Neither of the two above, and it must not be said as either. A session
+            // whose account could not be checked has not been turned away and has
+            // not been found missing — it has not been asked about, and the person
+            // holding it needs to know that the thing to fix is the media server
+            // rather than their own account.
+            Self::Unconfirmed => {
+                "This account could not be checked with the media server, so nobody \
+                 was identified. Nothing about the account has changed."
+            }
         }
     }
 }

@@ -20,18 +20,9 @@ use door::*;
 /// The id the media server files the member under, and the account they sign in to.
 const MEMBER: &str = "a7f3";
 
-/// The name and password that member signs in with.
-const THEIRS: (&str, &str) = ("ana", "hers, not the machine's");
-
-/// A source that cannot hand out a session equal to the per-run token.
-///
-/// The token is minted inside the surface from `Chance::cycling()`; anything minting
-/// sessions from the same source hands back the same thirty-two bytes, and the guard
-/// tries the token first. Every test here would then be admitted as the machine and
-/// would prove nothing about a member.
-fn not_the_token() -> Chance {
-    Chance::exactly(Some(vec![b'm'; 32]))
-}
+/// The name that member signs in with. The password beside it is built rather than
+/// written, in `door`, for the reason every other one here is.
+const WHO: &str = "ana";
 
 /// A surface with a household in it, and the headers a member's own session travels
 /// on.
@@ -41,13 +32,12 @@ async fn as_a_member(named: &str) -> (axum::Router, Vec<(&'static str, String)>)
         AHousehold::knowing(MEMBER),
         not_the_token(),
     );
-    let (name, password) = THEIRS;
     let answer = asked(
         router.clone(),
         "POST",
         SESSION,
         &from_here(),
-        &offering_as(name, password),
+        &offering_as(WHO, &hers()),
     )
     .await;
     assert_eq!(

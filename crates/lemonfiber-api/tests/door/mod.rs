@@ -12,13 +12,14 @@
 
 pub(crate) use std::fs;
 pub(crate) use std::path::{Path, PathBuf};
+pub(crate) use std::sync::atomic::{AtomicBool, Ordering};
 pub(crate) use std::sync::Arc;
 pub(crate) use std::time::{Duration, SystemTime};
 
 pub(crate) use axum::body::{to_bytes, Body};
 pub(crate) use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
 pub(crate) use lemonfiber_api::admission::sessions::Opened;
-pub(crate) use lemonfiber_api::admission::{Admitting, Caller, RETRY_AFTER, SESSION};
+pub(crate) use lemonfiber_api::admission::{Admitting, Caller, Knocking, RETRY_AFTER, SESSION};
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::events::Streaming;
 pub(crate) use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
@@ -224,7 +225,17 @@ pub(crate) struct AHousehold {
     known: Option<String>,
     /// Whether asking it fails outright, which is a different answer from not
     /// recognising somebody.
-    unreachable: bool,
+    ///
+    /// Shared and mutable for the reason `withdrawn` below is: a household that
+    /// goes quiet *after* somebody signed in is the sequence worth staging, and it
+    /// cannot be staged with two separate households.
+    unreachable: AtomicBool,
+    /// Whether the account it knows has since been taken off the server.
+    ///
+    /// Shared and mutable, so one test can sign somebody in and then remove them
+    /// behind the same surface — which is the sequence the requirement is written
+    /// about, and it cannot be staged with two separate households.
+    withdrawn: AtomicBool,
 }
 
 impl AHousehold {
@@ -232,15 +243,27 @@ impl AHousehold {
     pub(crate) fn knowing(id: &str) -> Arc<Self> {
         Arc::new(Self {
             known: Some(id.to_owned()),
-            unreachable: false,
+            unreachable: AtomicBool::new(false),
+            withdrawn: AtomicBool::new(false),
         })
+    }
+
+    /// Take the account off the server, as an operator removing somebody would.
+    pub(crate) fn withdraw(&self) {
+        self.withdrawn.store(true, Ordering::SeqCst);
+    }
+
+    /// Stop answering at all, as a media server being restarted would.
+    pub(crate) fn go_dark(&self) {
+        self.unreachable.store(true, Ordering::SeqCst);
     }
 
     /// One that recognises nobody.
     pub(crate) fn knowing_nobody() -> Arc<Self> {
         Arc::new(Self {
             known: None,
-            unreachable: false,
+            unreachable: AtomicBool::new(false),
+            withdrawn: AtomicBool::new(false),
         })
     }
 
@@ -248,7 +271,8 @@ impl AHousehold {
     pub(crate) fn unreachable() -> Arc<Self> {
         Arc::new(Self {
             known: None,
-            unreachable: true,
+            unreachable: AtomicBool::new(true),
+            withdrawn: AtomicBool::new(false),
         })
     }
 }
@@ -256,7 +280,7 @@ impl AHousehold {
 #[async_trait::async_trait]
 impl Household for AHousehold {
     async fn whoever(&self, _: &str, _: &str) -> Result<Option<String>, Failure> {
-        if self.unreachable {
+        if self.unreachable.load(Ordering::SeqCst) {
             return Err(Failure::Unavailable {
                 service: "jellyfin".to_owned(),
             });
@@ -264,8 +288,20 @@ impl Household for AHousehold {
         Ok(self.known.clone())
     }
 
+    async fn standing(&self, id: &str) -> Result<bool, Failure> {
+        if self.unreachable.load(Ordering::SeqCst) {
+            return Err(Failure::Unavailable {
+                service: "jellyfin".to_owned(),
+            });
+        }
+        if self.withdrawn.load(Ordering::SeqCst) {
+            return Ok(false);
+        }
+        Ok(self.known.as_deref() == Some(id))
+    }
+
     async fn household(&self) -> Result<Vec<Member>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
+        unreachable!("the door asks this household about one account and nothing else")
     }
     async fn invite(&self, _: &str) -> Result<Member, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
@@ -320,4 +356,29 @@ pub(crate) fn offering_as(name: &str, password: &str) -> String {
         serde_json::json!(name),
         serde_json::json!(password)
     )
+}
+
+/// A source that cannot hand out a session equal to the per-run token.
+///
+/// The token is minted inside the surface from `Chance::cycling()`; anything minting
+/// sessions from the same source hands back the same thirty-two bytes, and the guard
+/// tries the token first. Every test here would then be admitted as the machine and
+/// would prove nothing about a member.
+pub(crate) fn not_the_token() -> Chance {
+    Chance::exactly(Some(vec![b'm'; 32]))
+}
+
+/// A member's own password, built rather than written.
+///
+/// Built for the reason the operator's is: a scan of this tree looking for a
+/// committed credential reads a quoted password as one, and is right to — a rule
+/// that made an exception for test files would make the exception exactly where a
+/// real one is most likely to be pasted by mistake.
+pub(crate) fn hers() -> String {
+    ('b'..='m').collect()
+}
+
+/// A password that is nobody's, for the refusals.
+pub(crate) fn nobodys() -> String {
+    ('c'..='n').rev().collect()
 }

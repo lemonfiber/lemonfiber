@@ -16,7 +16,8 @@
 //! named — so there is no path on which the core is asked for somebody else's row,
 //! let alone sends one. Filtering afterwards would read every row and rely on the
 //! device to draw one of them, which is a promise about a screen where this is a
-//! fact about the wire. That is what `N3-R9` asks for.
+//! fact about the wire, and it is what the requirement about one member seeing
+//! another's requests asks for.
 
 use lemonfiber_core::app::Command;
 
@@ -42,7 +43,8 @@ pub enum Permitted {
 /// Every command reaches this, whether it was asked for as a read, at the actions
 /// door or as a step of setup, and whether it is answered now or handed to a job —
 /// so a control a member is not entitled to is refused by the core rather than by
-/// the app having omitted it, which is what `N3-R3` asks for. A hand-written
+/// the app having omitted it, which is what the requirement about a control a
+/// member is not entitled to asks for. A hand-written
 /// request gets no further here than a tapped button does.
 #[must_use]
 pub fn may(caller: &Caller, command: Command) -> Permitted {

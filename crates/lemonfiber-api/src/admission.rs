@@ -156,17 +156,12 @@ impl Admitting {
     /// `None` is every refusal. There is one of those rather than several because
     /// a caller learning *which* secret was wrong learns which one to keep
     /// guessing at.
-    pub async fn carried(
-        &self,
-        headers: &HeaderMap,
-        token: &Token,
-        now: SystemTime,
-    ) -> Option<Caller> {
+    pub async fn carried(&self, headers: &HeaderMap, token: &Token, now: SystemTime) -> Knocking {
         let offered = headers
             .get(TOKEN_HEADER)
             .and_then(|value| value.to_str().ok());
         if token.carried_by(offered) {
-            return Some(Caller::Machine);
+            return Knocking::Known(Caller::Machine);
         }
         // The credential is offered rather than required: a machine keeping none
         // still has member sessions to answer for, and reading its absence as
@@ -177,11 +172,56 @@ impl Admitting {
             .holds(offered, now, self.credential().as_ref())
             .await
         {
-            Some(Opened::Operator(_)) => Some(Caller::Operator),
-            Some(Opened::Member(id)) => Some(Caller::Member(id)),
-            None => None,
+            Some(Opened::Operator(_)) => Knocking::Known(Caller::Operator),
+            // Re-read on every call, the way the operator's credential above it is.
+            // A session is a claim about an identity and only the media server can
+            // say whether that identity is still one, so an account removed there
+            // reaches the person holding it at their next call rather than at their
+            // next sign-in.
+            Some(Opened::Member(id)) => self.still_standing(id).await,
+            None => Knocking::Nobody,
         }
     }
+
+    /// Whether the household still holds this member, as an answer to knock with.
+    ///
+    /// **Three answers, because there are three facts.** Still here is that member.
+    /// Gone is nobody, and is the whole reason this is asked on every call rather
+    /// than at sign-in. Could-not-ask is neither:
+    /// collapsing it into *gone* would sign a household out for the length of a
+    /// media-server reboot and tell them their account had been removed, which is
+    /// the same mistake the sign-in door is built to avoid one floor down.
+    async fn still_standing(&self, id: String) -> Knocking {
+        let Some(household) = self.household.as_ref() else {
+            // A build with no household behind it has no member sessions to hold,
+            // so one arriving here is a session this run cannot vouch for.
+            return Knocking::Unconfirmed;
+        };
+        match household.standing(&id).await {
+            Ok(true) => Knocking::Known(Caller::Member(id)),
+            Ok(false) => Knocking::Nobody,
+            Err(_) => Knocking::Unconfirmed,
+        }
+    }
+}
+
+/// What the guard learned when somebody knocked.
+///
+/// Three answers rather than two, and the third is the whole point of the type.
+/// **Nobody** is a secret this run does not admit, or an identity the household no
+/// longer holds — both are settled facts and both refuse. **Unconfirmed** is neither
+/// of those: the question was asked and could not be answered, so nobody has been
+/// identified, which is a different thing from having identified nobody. A guard
+/// that answered both with the same silence would tell a household their accounts
+/// were gone on the day their media server was restarting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Knocking {
+    /// Proved to be this caller.
+    Known(Caller),
+    /// Proved nothing this run admits, or proved an identity that no longer stands.
+    Nobody,
+    /// Could not be established, which is not the same as nobody.
+    Unconfirmed,
 }
 
 /// Who a request proved itself to be.

@@ -231,6 +231,10 @@ impl crate::ports::service::Household for Jellyfin {
         whoever(self, name, password).await
     }
 
+    async fn standing(&self, id: &str) -> Result<bool, Failure> {
+        standing(self, id).await
+    }
+
     async fn invite(&self, name: &str) -> Result<Member, Failure> {
         // No password: that is the invitation. The account exists from this moment,
         // which is why nothing has to be running for somebody to claim it later.
@@ -325,6 +329,47 @@ impl crate::ports::service::Household for Jellyfin {
             })
             .collect())
     }
+}
+
+/// The status the server answers about an account it does not hold.
+///
+/// One status and not the pair [`REFUSED`] carries. Those two say the credential
+/// this build signed in with was turned away, which is a fault on our side of the
+/// call — reading them as *there is no such account* would sign out an entire
+/// household the day the media server's own admin password changed.
+const GONE: u16 = 404;
+
+/// Whether an account still stands.
+///
+/// Beside the impl rather than inside it because it decides, and an `#[async_trait]`
+/// body is one the coverage report attributes nothing inside.
+///
+/// One account read rather than the household listed. Both would answer, and this is
+/// the cheaper of the two on a server whose household is large — which matters
+/// because it is asked on every call a member makes.
+async fn standing(jellyfin: &Jellyfin, id: &str) -> Result<bool, Failure> {
+    let request = jellyfin
+        .as_admin(Method::Get, &format!("/Users/{id}"), None)
+        .await?;
+    let response = jellyfin.endpoint.send(&request).await?;
+
+    // Gone is an answer rather than a fault, and it is the answer this exists for.
+    if response.status == GONE {
+        return Ok(false);
+    }
+
+    let held: UserResource = jellyfin.endpoint.decode(
+        &response,
+        "whether the account still stands could not be read",
+    )?;
+
+    // **An answer carrying no policy is an account that exists**, which is what this
+    // was asked. Reading it as disabled instead would lock out everybody on a server
+    // that stopped sending the field — permanently, since the next call reads the
+    // same answer — where the requirement this serves is about an identity that was
+    // *removed*, and removal is the status above. The flag is honoured where the
+    // server states it and nothing is inferred where it does not.
+    Ok(held.policy.is_none_or(|policy| !policy.disabled))
 }
 
 /// Who a name and a password prove somebody to be.
