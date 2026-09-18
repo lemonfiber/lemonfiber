@@ -24,13 +24,25 @@ mod source_tree;
 /// freely, which is how a row explains itself, and citing one is not claiming it.
 #[test]
 fn each_requirement_is_claimed_by_one_row() {
-    let file = fs::read_to_string("../../IMPLEMENTATION-STATUS.md").unwrap_or_default();
+    // From the workspace root rather than from the working directory. The path
+    // was relative and the read fell back to an empty string, so a runner that
+    // started anywhere else — or a file renamed, or unreadable — left this
+    // walking no rows, finding no duplicate, and passing about nothing.
+    let at = source_tree::workspace_root().join("IMPLEMENTATION-STATUS.md");
+    let Ok(file) = fs::read_to_string(&at) else {
+        unreachable!("the workspace this test is compiled from carries {at:?}");
+    };
     let mut claimed: BTreeMap<String, usize> = BTreeMap::new();
     for row in file.lines().filter(|line| line.starts_with('|')) {
         for id in requirements(column(row, 1)) {
             *claimed.entry(id).or_default() += 1;
         }
     }
+    assert!(
+        claimed.len() > 100,
+        "the tracker was read: {} requirements claimed",
+        claimed.len()
+    );
     let twice: Vec<&String> = claimed
         .iter()
         .filter(|(_, rows)| **rows > 1)
@@ -40,6 +52,53 @@ fn each_requirement_is_claimed_by_one_row() {
         twice.is_empty(),
         "claimed by more than one row, so the gate reads whichever it finds first: {twice:?}"
     );
+}
+
+/// A range written backwards claims nothing, which is a row that says nothing.
+///
+/// `X-R4..R1` is an empty range, so the row's whole claim disappears and every
+/// identifier in it reads as claimed by no row at all — which is the state this
+/// file exists to make impossible, arriving by a typo rather than by a second
+/// row.
+#[test]
+fn a_range_written_backwards_is_refused_rather_than_read_as_nothing() {
+    assert_eq!(requirements("`A1-R1..R3`").len(), 3);
+    assert!(
+        requirements("`A1-R3..R1`").is_empty(),
+        "a backwards range is what this asserts cannot appear in the tracker"
+    );
+
+    let at = source_tree::workspace_root().join("IMPLEMENTATION-STATUS.md");
+    let Ok(file) = fs::read_to_string(&at) else {
+        unreachable!("the workspace this test is compiled from carries {at:?}");
+    };
+    let backwards: Vec<&str> = file
+        .lines()
+        .filter(|line| line.starts_with('|'))
+        .flat_map(|row| column(row, 1).split('`').skip(1).step_by(2))
+        .filter(|token| reversed(token))
+        .collect();
+    assert!(
+        backwards.is_empty(),
+        "these claim nothing at all, so nothing holds them: {backwards:?}"
+    );
+}
+
+/// Whether a token is a range whose end is below its start.
+fn reversed(token: &str) -> bool {
+    let Some((_, numbers)) = token.split_once("-R") else {
+        return false;
+    };
+    let Some((first, last)) = numbers.split_once("..") else {
+        return false;
+    };
+    let (Ok(first), Ok(last)) = (
+        first.parse::<u32>(),
+        last.trim_start_matches('R').parse::<u32>(),
+    ) else {
+        return false;
+    };
+    last < first
 }
 /// One cell of a table row, or nothing where the row is too short.
 fn column(row: &str, at: usize) -> &str {
