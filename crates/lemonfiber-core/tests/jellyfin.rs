@@ -594,3 +594,66 @@ async fn a_choice_nobody_made_leaves_the_accounts_own_answer_standing() {
         "an offer naming no libraries changed which ones are open: {written}"
     );
 }
+
+/// A sign-in that hands back the account it proved, which is what a member's is read for.
+const SIGNED_IN_AS: &str = r#"{"AccessToken":"token","User":{"Id":"a7f3","Name":"ana"}}"#;
+
+#[tokio::test]
+async fn a_pair_the_server_knows_answers_with_the_account_it_proved() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN_AS)]);
+
+    assert_eq!(
+        jellyfin(&fake).whoever("ana", "hers").await.ok().flatten(),
+        Some("a7f3".to_owned())
+    );
+    // The member's own credentials, and the admin's nowhere near it: this is the one
+    // call where somebody else's password travels, and it travels only to the route
+    // where it is being proved.
+    let asked: Vec<&str> = fake
+        .requests()
+        .iter()
+        .map(|request| request.url.as_str())
+        .filter(|url| url.ends_with("/Users/AuthenticateByName"))
+        .map(|_| "authenticate")
+        .collect();
+    assert_eq!(asked, ["authenticate"], "the member was proved elsewhere");
+}
+
+#[tokio::test]
+async fn a_pair_the_server_refuses_is_nobody_rather_than_a_fault() {
+    // Both statuses, because a server tells an unknown account and a wrong password
+    // apart and this deliberately does not.
+    for refused in [401, 403] {
+        let fake = Fake::in_turn(vec![Answer::reply(refused, r#"{"error":"no"}"#)]);
+
+        let said = jellyfin(&fake).whoever("ana", "not hers").await;
+        assert!(
+            matches!(said, Ok(None)),
+            "a refusal at {refused} was read as something other than nobody"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_server_that_could_not_answer_is_not_a_pair_that_was_wrong() {
+    // The distinction the nested shape exists for. Collapsed, this would tell
+    // somebody their password was wrong for as long as the server was down.
+    let fake = Fake::in_turn(vec![Answer::reply(500, "upstream is unwell")]);
+
+    assert!(
+        jellyfin(&fake).whoever("ana", "hers").await.is_err(),
+        "a server that could not answer was read as a pair that was wrong"
+    );
+}
+
+#[tokio::test]
+async fn an_account_with_no_id_is_nobody() {
+    // An empty id would match every other account that answered the same way, so it
+    // is read as nobody rather than as somebody with no name.
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"AccessToken":"t","User":{}}"#)]);
+
+    assert!(matches!(
+        jellyfin(&fake).whoever("ana", "hers").await,
+        Ok(None)
+    ));
+}

@@ -27,6 +27,25 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn household(&self) -> Result<Vec<Member>, Failure>;
 
+    /// Who a name and a password prove somebody to be, or nothing where they prove
+    /// nobody.
+    ///
+    /// The media server holds the household's accounts, so it is what decides
+    /// whether somebody is one of them. Answering here rather than keeping a second
+    /// list means a member removed there is removed from everything, and a password
+    /// changed there is changed once.
+    ///
+    /// Three answers rather than two, and the third is why this returns a nested
+    /// shape: **wrong** is `Ok(None)` and **could not ask** is `Err`. A surface that
+    /// collapsed them would tell somebody their password was wrong on the day the
+    /// media server was down, and would go on telling them that until it came back.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses to answer —
+    /// never for a name and password it simply does not recognise.
+    async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure>;
+
     /// Make an account somebody can claim by setting a password on it.
     ///
     /// # Errors

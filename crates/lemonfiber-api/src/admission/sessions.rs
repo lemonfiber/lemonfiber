@@ -40,12 +40,26 @@ const WIDTH: usize = 32;
 /// is next in the house.
 pub const LASTS: Duration = Duration::from_secs(12 * 60 * 60);
 
-/// One session: when it ends, and what it was opened against.
+/// One session: when it ends, and who it was opened for.
 struct Session {
     /// The moment it stops being one.
     until: SystemTime,
-    /// The credential that was on disk when it was opened.
-    against: Credential,
+    /// Who proved themselves to open it.
+    who: Opened,
+}
+
+/// Who a session was opened for.
+///
+/// Kept on the session rather than worked out from the secret, because the secret
+/// says nothing: two of them are the same width and the same alphabet, and which
+/// door somebody came through is not recoverable from what they were handed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Opened {
+    /// The operator, against the credential that was on disk when it opened. Held
+    /// so a password changed afterwards voids it.
+    Operator(Credential),
+    /// A household member, by the id the media server files them under.
+    Member(String),
 }
 
 /// Every session this run has opened.
@@ -68,40 +82,39 @@ impl Sessions {
         &self,
         random: &dyn Random,
         now: SystemTime,
-        against: &Credential,
+        who: Opened,
     ) -> Option<Admitted> {
         let token = crate::guard::minted(random, WIDTH)?;
         let until = now.checked_add(LASTS)?;
         let opened = Admitted::opened(token.clone(), until)?;
         let mut held = self.held.lock().await;
         held.retain(|_, session| session.until > now);
-        held.insert(
-            token.clone(),
-            Session {
-                until,
-                against: against.clone(),
-            },
-        );
+        held.insert(token.clone(), Session { until, who });
         Some(opened)
     }
 
-    /// Whether this secret is a session that is still one.
+    /// Who this secret is a session for, where it is still one.
     ///
-    /// Against the verifier as it stands now rather than as it stood then: that is
-    /// the whole of how a password change reaches a session somebody else is
-    /// holding.
+    /// An operator's is checked against the verifier as it stands **now** rather
+    /// than as it stood then: that is the whole of how a password change reaches a
+    /// session somebody else is holding. A member's is not checked here at all —
+    /// the media server is what holds their account, and asking it is a separate
+    /// errand from remembering what was proved.
     pub async fn holds(
         &self,
         offered: Option<&str>,
         now: SystemTime,
-        against: &Credential,
-    ) -> bool {
-        let Some(offered) = offered else {
-            return false;
-        };
+        against: Option<&Credential>,
+    ) -> Option<Opened> {
+        let offered = offered?;
         let mut held = self.held.lock().await;
         held.retain(|_, session| session.until > now);
-        held.get(offered)
-            .is_some_and(|session| &session.against == against)
+        match &held.get(offered)?.who {
+            Opened::Operator(opened) if Some(opened) == against => {
+                Some(Opened::Operator(opened.clone()))
+            }
+            Opened::Operator(_) => None,
+            Opened::Member(id) => Some(Opened::Member(id.clone())),
+        }
     }
 }

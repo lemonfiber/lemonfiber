@@ -11,6 +11,7 @@ use std::time::{Duration, SystemTime};
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
+use lemonfiber_api::admission::sessions::Opened;
 use lemonfiber_api::admission::{Admitting, Caller, RETRY_AFTER, SESSION};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
@@ -21,6 +22,9 @@ use lemonfiber_core::admission::{credential, Credential};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
+use lemonfiber_core::ports::service::{
+    Allowed, Certificate, Failure, Household, Invited, Member, NamedLibrary,
+};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
@@ -211,11 +215,13 @@ async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_t
     );
     // And what it handed back is a secret the rest of the surface takes, which is the
     // whole of what being given one is worth.
-    assert!(
+    assert_eq!(
         admitting
             .sessions
-            .holds(Some(&opened), moment(), &a_credential(&chosen()))
-            .await
+            .holds(Some(&opened), moment(), Some(&a_credential(&chosen())))
+            .await,
+        Some(Opened::Operator(a_credential(&chosen()))),
+        "the secret handed back was not a session the rest of the surface takes"
     );
     let _ = fs::remove_dir_all(a_directory("exchanged"));
 }
@@ -367,30 +373,28 @@ async fn a_session_ends_when_it_expires_and_when_the_password_changes() {
     let held = a_credential(&chosen());
     let opened = admitting
         .sessions
-        .opened(&Chance::cycling(), moment(), &held)
+        .opened(&Chance::cycling(), moment(), Opened::Operator(held.clone()))
         .await;
     let Some(opened) = opened else {
         unreachable!("a cycling source mints a session")
     };
 
-    assert!(
-        admitting
-            .sessions
-            .holds(Some(&opened.token), moment(), &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&opened.token), moment(), Some(&held))
+        .await
+        .is_some());
     // A day later it is gone, because a window left open all week is not evidence
     // that whoever opened it is still there.
-    assert!(
-        !admitting
-            .sessions
-            .holds(
-                Some(&opened.token),
-                moment() + Duration::from_secs(24 * 60 * 60),
-                &held
-            )
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(
+            Some(&opened.token),
+            moment() + Duration::from_secs(24 * 60 * 60),
+            Some(&held)
+        )
+        .await
+        .is_none());
     let _ = fs::remove_dir_all(a_directory("ending"));
 }
 
@@ -406,43 +410,48 @@ async fn opening_one_lets_go_of_the_ones_that_have_ended_and_keeps_the_rest() {
 
     let first = admitting
         .sessions
-        .opened(&Chance::cycling(), moment(), &held)
+        .opened(&Chance::cycling(), moment(), Opened::Operator(held.clone()))
         .await;
     let second = admitting
         .sessions
-        .opened(&Chance::exactly(Some(vec![0x7b; 32])), moment(), &held)
+        .opened(
+            &Chance::exactly(Some(vec![0x7b; 32])),
+            moment(),
+            Opened::Operator(held.clone()),
+        )
         .await;
     let Some((first, second)) = first.zip(second) else {
         unreachable!("both sources mint a session")
     };
     assert_ne!(first.token, second.token);
-    assert!(
-        admitting
-            .sessions
-            .holds(Some(&first.token), moment(), &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&first.token), moment(), Some(&held))
+        .await
+        .is_some());
 
     // A day on, both have ended, and opening a third is what lets go of them.
     let third = admitting
         .sessions
-        .opened(&Chance::exactly(Some(vec![0x2c; 32])), later, &held)
+        .opened(
+            &Chance::exactly(Some(vec![0x2c; 32])),
+            later,
+            Opened::Operator(held.clone()),
+        )
         .await;
     let Some(third) = third else {
         unreachable!("a source that answers mints a session")
     };
-    assert!(
-        !admitting
-            .sessions
-            .holds(Some(&first.token), later, &held)
-            .await
-    );
-    assert!(
-        admitting
-            .sessions
-            .holds(Some(&third.token), later, &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&first.token), later, Some(&held))
+        .await
+        .is_none());
+    assert!(admitting
+        .sessions
+        .holds(Some(&third.token), later, Some(&held))
+        .await
+        .is_some());
     let _ = fs::remove_dir_all(a_directory("several"));
 }
 
@@ -453,7 +462,7 @@ async fn a_password_change_ends_a_session_somebody_else_is_holding() {
     let held = a_credential(&chosen());
     let opened = admitting
         .sessions
-        .opened(&Chance::cycling(), moment(), &held)
+        .opened(&Chance::cycling(), moment(), Opened::Operator(held.clone()))
         .await;
     let Some(opened) = opened else {
         unreachable!("a cycling source mints a session")
@@ -464,12 +473,11 @@ async fn a_password_change_ends_a_session_somebody_else_is_holding() {
     let another = a_credential(&chosen().to_uppercase());
     assert!(credential::keep(&path, &another).is_ok());
 
-    assert!(
-        !admitting
-            .sessions
-            .holds(Some(&opened.token), moment(), &another)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&opened.token), moment(), Some(&another))
+        .await
+        .is_none());
     let _ = fs::remove_dir_all(a_directory("changed"));
 }
 
@@ -479,13 +487,16 @@ async fn a_secret_this_run_never_handed_out_is_no_session_and_nor_is_nothing() {
     let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
     let held = a_credential(&chosen());
 
-    assert!(!admitting.sessions.holds(None, moment(), &held).await);
-    assert!(
-        !admitting
-            .sessions
-            .holds(Some("not a session"), moment(), &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(None, moment(), Some(&held))
+        .await
+        .is_none());
+    assert!(admitting
+        .sessions
+        .holds(Some("not a session"), moment(), Some(&held))
+        .await
+        .is_none());
     let _ = fs::remove_dir_all(a_directory("unknown"));
 }
 
@@ -644,4 +655,198 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
         "a secret this run never minted was admitted as somebody"
     );
     let _ = fs::remove_dir_all(a_directory("who-nobody"));
+}
+
+/// A household that answers one question and refuses the rest.
+///
+/// Only `whoever` is reached from the door, and a stand-in answering more than the
+/// thing under test is one that can pass a test the surface would fail.
+struct AHousehold {
+    /// Who a name and password prove somebody to be, where it recognises them.
+    known: Option<String>,
+    /// Whether asking it fails outright, which is a different answer from not
+    /// recognising somebody.
+    unreachable: bool,
+}
+
+impl AHousehold {
+    /// One that knows this account and nobody else.
+    fn knowing(id: &str) -> Arc<Self> {
+        Arc::new(Self {
+            known: Some(id.to_owned()),
+            unreachable: false,
+        })
+    }
+
+    /// One that recognises nobody.
+    fn knowing_nobody() -> Arc<Self> {
+        Arc::new(Self {
+            known: None,
+            unreachable: false,
+        })
+    }
+
+    /// One that could not be asked at all.
+    fn unreachable() -> Arc<Self> {
+        Arc::new(Self {
+            known: None,
+            unreachable: true,
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl Household for AHousehold {
+    async fn whoever(&self, _: &str, _: &str) -> Result<Option<String>, Failure> {
+        if self.unreachable {
+            return Err(Failure::Unavailable {
+                service: "jellyfin".to_owned(),
+            });
+        }
+        Ok(self.known.clone())
+    }
+
+    async fn household(&self) -> Result<Vec<Member>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn invite(&self, _: &str) -> Result<Member, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn unclaim(&self, _: &str) -> Result<(), Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn withdraw(&self, _: &str) -> Result<(), Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn when_invited(&self, _: &str) -> Result<Vec<Invited>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn allow(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+}
+
+/// A door with a household behind it as well as a password.
+fn door_with(
+    path: Option<PathBuf>,
+    household: Arc<AHousehold>,
+) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
+    let admitting = Arc::new(Admitting {
+        kept: path.clone(),
+        household: Some(household),
+        ..Admitting::default()
+    });
+    let (router, token) = surface(world(path, Chance::cycling()), &admitting);
+    (router, token, admitting)
+}
+
+/// A name and a password, as a member sends them.
+fn offering_as(name: &str, password: &str) -> String {
+    format!(
+        "{{\"name\":{},\"password\":{}}}",
+        serde_json::json!(name),
+        serde_json::json!(password)
+    )
+}
+
+#[tokio::test]
+async fn a_member_the_household_knows_is_let_in_as_that_member() {
+    let path = keeping("member-in");
+    let (router, token, admitting) = door_with(Some(path), AHousehold::knowing("a7f3"));
+
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", "hers, not the machine's"),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Some(Caller::Member("a7f3".to_owned())),
+        "a session the household bought named somebody other than that member"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-in"));
+}
+
+#[tokio::test]
+async fn the_machines_own_password_is_tried_before_the_household_is_asked() {
+    // Two doors and nothing chooses between them. The one that needs no network
+    // answers first, so a household that is down cannot keep the operator out.
+    let path = keeping("operator-first");
+    let (router, _, _) = door_with(Some(path), AHousehold::unreachable());
+
+    let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
+
+    assert_eq!(
+        answer.status,
+        StatusCode::OK,
+        "the machine's own password was refused because the household could not be asked"
+    );
+    let _ = fs::remove_dir_all(a_directory("operator-first"));
+}
+
+#[tokio::test]
+async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
+    // The safe direction, and the honest one: nothing proved anything, so nobody
+    // is let in on it.
+    let path = keeping("household-down");
+    let (router, _, _) = door_with(Some(path), AHousehold::unreachable());
+
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", "hers, not the machine's"),
+    )
+    .await;
+
+    assert_eq!(answer.status, StatusCode::UNAUTHORIZED);
+    let _ = fs::remove_dir_all(a_directory("household-down"));
+}
+
+#[tokio::test]
+async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong() {
+    let path = keeping("member-unknown");
+    let (router, _, _) = door_with(Some(path), AHousehold::knowing_nobody());
+
+    let stranger = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("nobody", "nothing"),
+    )
+    .await;
+    let wrong = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering("not the machine's password"),
+    )
+    .await;
+
+    assert_eq!(stranger.status, wrong.status);
+    assert_eq!(
+        stranger.body, wrong.body,
+        "the refusals differ, so they say which door was meant"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-unknown"));
 }

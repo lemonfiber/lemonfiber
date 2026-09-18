@@ -32,7 +32,10 @@
 pub mod attempts;
 pub mod sessions;
 
+use sessions::Opened;
+
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use axum::body::Body;
@@ -44,6 +47,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::admission::{credential, Credential};
 use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::ports::service::Household;
 use serde::Deserialize;
 
 use crate::guard::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER};
@@ -89,6 +93,9 @@ pub struct Admitting {
     /// Where the operator's password is kept, where this machine has anywhere to
     /// keep one.
     pub kept: Option<PathBuf>,
+    /// The household this machine keeps, where one is reachable. Asked who somebody
+    /// is when the machine's own password does not know them.
+    pub household: Option<Arc<dyn Household>>,
 }
 
 impl Admitting {
@@ -106,6 +113,35 @@ impl Admitting {
     #[must_use]
     pub fn credential(&self) -> Option<Credential> {
         self.kept.as_deref().and_then(credential::at)
+    }
+
+    /// Who a name and a password prove somebody to be, or nothing.
+    ///
+    /// **Two doors, tried in order, and nothing chooses between them.** The machine's
+    /// own password is checked first because it needs no network and no media server;
+    /// what it does not match is offered to the household, which is what holds the
+    /// accounts everybody else signs in with.
+    ///
+    /// The cost is deliberate and is paid once here: a refusal cannot say which door
+    /// was meant. It says the pair was not recognised, because the alternative is
+    /// telling somebody which half of their guess to keep working on.
+    ///
+    /// A household that could not be asked refuses rather than admitting. That is the
+    /// safe direction and the honest one — nothing here proved anything, so nobody is
+    /// let in on it.
+    async fn whoever(&self, given: &Given) -> Option<Opened> {
+        if let Some(held) = self
+            .credential()
+            .filter(|held| held.verifies(&given.password))
+        {
+            return Some(Opened::Operator(held));
+        }
+        let (household, name) = (self.household.as_ref()?, given.name.as_deref()?);
+
+        (household.whoever(name, &given.password).await)
+            .ok()
+            .flatten()
+            .map(Opened::Member)
     }
 
     /// Who the secret a request carried proves it to be, or nothing.
@@ -131,9 +167,18 @@ impl Admitting {
         if token.carried_by(offered) {
             return Some(Caller::Machine);
         }
-        match self.credential() {
-            Some(held) if self.sessions.holds(offered, now, &held).await => Some(Caller::Operator),
-            _ => None,
+        // The credential is offered rather than required: a machine keeping none
+        // still has member sessions to answer for, and reading its absence as
+        // *nobody is admitted* would sign out a household the day the operator
+        // deleted their own password.
+        match self
+            .sessions
+            .holds(offered, now, self.credential().as_ref())
+            .await
+        {
+            Some(Opened::Operator(_)) => Some(Caller::Operator),
+            Some(Opened::Member(id)) => Some(Caller::Member(id)),
+            None => None,
         }
     }
 }
@@ -155,11 +200,19 @@ pub enum Caller {
     Machine,
     /// Somebody who proved the password this machine keeps.
     Operator,
+    /// Somebody the media server holds an account for, by the id it files them
+    /// under. What they may then do is the core's answer and is decided where it is
+    /// known — never from this, and never by a client reading it.
+    Member(String),
 }
 
-/// The password offered, as a caller sends it.
+/// What a caller offers at the door.
 #[derive(Debug, Deserialize)]
 struct Given {
+    /// Who they say they are, where they say so. Absent from an operator signing in
+    /// with the machine's own password, which is nobody's name.
+    #[serde(default)]
+    name: Option<String>,
     /// What was typed.
     password: String,
 }
@@ -193,8 +246,7 @@ async fn opening(
     if let Some(left) = serving.admitting.attempts.waiting(now).await {
         return waiting(left.as_secs().max(1));
     }
-    let held = serving.admitting.credential();
-    let Some(held) = held.filter(|held| held.verifies(&given.password)) else {
+    let Some(who) = serving.admitting.whoever(&given).await else {
         serving.admitting.attempts.wrong(now).await;
         return said(StatusCode::UNAUTHORIZED, NOT_THE_PASSWORD);
     };
@@ -202,7 +254,7 @@ async fn opening(
     let opened = serving
         .admitting
         .sessions
-        .opened(serving.ctx.random.as_ref(), now, &held)
+        .opened(serving.ctx.random.as_ref(), now, who)
         .await;
     enveloped(
         StatusCode::OK,

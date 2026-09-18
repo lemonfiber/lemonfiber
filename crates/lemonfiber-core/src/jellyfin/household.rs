@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 
-use super::Jellyfin;
+use super::{Jellyfin, AUTHORIZATION};
 use crate::ports::http::Method;
 use crate::ports::service::{
     Access, Allowed, Certificate, Failure, Invited, Member, NamedLibrary, Unrated,
@@ -227,6 +227,35 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(held.into_iter().map(UserResource::member).collect())
     }
 
+    async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure> {
+        // The member's own credentials, not the admin's, and not stored anywhere:
+        // what comes back is the account this pair belongs to and nothing is kept
+        // of how it was proved.
+        let body = serde_json::json!({ "Username": name, "Pw": password }).to_string();
+        let mut request = self.request(Method::Post, "/Users/AuthenticateByName", Some(body));
+        request
+            .headers
+            .push(("X-Emby-Authorization".to_owned(), AUTHORIZATION.to_owned()));
+        let response = self.endpoint.send(&request).await?;
+
+        // A pair the server does not recognise is an answer rather than a fault, and
+        // the two must not arrive the same way: a surface that read them alike would
+        // tell somebody their password was wrong on the day the server was down, and
+        // would go on telling them so until it came back.
+        if REFUSED.contains(&response.status) {
+            return Ok(None);
+        }
+
+        let signed: SignedIn = self
+            .endpoint
+            .decode(&response, "the sign-in was not accepted")?;
+
+        // An account with no id is an answer this build cannot use. Read as nobody
+        // rather than as somebody with an empty name, because an empty id would
+        // match every other account that answered the same way.
+        Ok(Some(signed.user.id).filter(|id| !id.is_empty()))
+    }
+
     async fn invite(&self, name: &str) -> Result<Member, Failure> {
         // No password: that is the invitation. The account exists from this moment,
         // which is why nothing has to be running for somebody to claim it later.
@@ -364,4 +393,24 @@ async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), F
         .await?;
     let response = jellyfin.endpoint.send(&request).await?;
     jellyfin.endpoint.expect_success(&response)
+}
+
+/// The statuses a media server refuses a name and password with.
+///
+/// Both, because a server tells an unknown account and a wrong password apart and
+/// this deliberately does not: which half was wrong is the half worth guessing at.
+const REFUSED: [u16; 2] = [401, 403];
+
+/// What a sign-in answers with, of which one field is read.
+#[derive(serde::Deserialize)]
+struct SignedIn {
+    #[serde(rename = "User", default)]
+    user: SignedInUser,
+}
+
+/// The account a sign-in proved, by the id the media server files it under.
+#[derive(serde::Deserialize, Default)]
+struct SignedInUser {
+    #[serde(rename = "Id", default)]
+    id: String,
 }
