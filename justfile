@@ -58,7 +58,8 @@ release-tag VERSION:
     git push origin "v{{VERSION}}"
     echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
 
-# Everything CI runs, and the hooks turned on if they are not already.
+# Format, clippy, the suite, the toolchain and the dependency audit — which is
+# what the `build` job reads — plus spelling, the scripts, and the hooks turned on.
 #
 # Not the command to run before a push. CI runs all of this on an exclusive build
 # cache, in parallel with twenty-odd other checks, the moment you push — so running
@@ -68,6 +69,25 @@ release-tag VERSION:
 #
 # The loop to run before a push is `just rebased`, then clippy and the tests for what
 # you touched.
+#
+# It is not CI and does not say it is. These are not here, and none of them can be:
+#
+#   commitlint, dco, attribution,   `.githooks/commit-msg` refuses all four before
+#   the citation gate               the push, and `hooks` turns it on
+#   coverage                        `just coverage` — the same line, now including
+#                                   `--no-fail-fast`; `sonar` runs it on the forge
+#   msrv, changelog, fuzz           part of `build.yml` and `fuzz.yml`, and each
+#                                   wants a toolchain or a corpus this does not
+#   hygiene                         actionlint, links, markdown, the invite check
+#                                   and shared-files; `typos` below is the one of
+#                                   them that is here
+#   pins, workflow-pins             ask the forge which commits a pin has not taken
+#   CodeQL, gitleaks, osv-scanner,  forge-side
+#   sonar, label, goals, the
+#   reference comment, the release
+#   verifier
+#
+# Everything the `build` job reads, plus spelling and the scripts — not CI.
 ci: hooks fmt-check lint scripts test typos deny toolchain
 
 build:
@@ -331,12 +351,20 @@ release-workflow:
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-adapters/src/nntp\.rs|crates/.*/examples/.*\.rs)'
 
+# `--no-fail-fast` because `sonar.yml` passes it and this has to be the same line.
+# Without it one failing test stops the run and the profile is whatever had been
+# reached by then — reported not as a stopped run but as the coverage figure, which
+# is how a single architecture test tripping came back as ninety-seven thousand
+# missed lines across every crate.
+#
 # A failing gate says which lines it failed on, from the profile already gathered —
 # `report` re-reads it rather than building and running anything a second time. Without
 # this the gate says only that a number is below a number, and finding out which line it
 # meant costs a full run somebody has to think to make.
+#
+# 100% on applicable code, the line `sonar` runs.
 coverage:
-    cargo llvm-cov nextest --workspace --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
+    cargo llvm-cov nextest --workspace --no-fail-fast --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
         || { just uncovered; exit 1; }
 
 # What the gate counted and could not name, from the profile already gathered.
