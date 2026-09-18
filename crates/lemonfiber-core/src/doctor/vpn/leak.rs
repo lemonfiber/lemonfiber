@@ -19,9 +19,18 @@ pub const CLIENT_ISOLATED: Code = Code::new("VPN-3");
 pub(super) enum Reach {
     /// A usable public address.
     Address(String),
-    /// The command ran but returned no usable address — no connectivity, or an
-    /// unreadable answer.
+    /// The command ran and could not transfer, which is no connectivity.
     Blocked,
+    /// The command ran, succeeded, and answered something that is not an address.
+    ///
+    /// Held apart from [`Self::Blocked`] because the two are opposite facts about
+    /// the only thing being measured. A transfer that failed proves nothing left
+    /// the container; a transfer that succeeded proves something did, and what
+    /// came back being unreadable says only that the far end is not the echo
+    /// service — a captive portal, an interception page, or an endpoint answering
+    /// JSON rather than a bare address all land here, and every one of them is a
+    /// round trip to a public host.
+    Unreadable,
     /// The container is not running, so it could not be asked.
     Down,
     /// The command could not be run at all.
@@ -49,7 +58,7 @@ pub(super) fn tunnel_verdict(gateway: &Reach, gateway_id: &str, note: Option<Str
             )
             .in_state(crate::error::State::Guided),
         ),
-        Reach::Blocked | Reach::Unknown => Verdict::Unverified {
+        Reach::Blocked | Reach::Unreadable | Reach::Unknown => Verdict::Unverified {
             reason: "the VPN container did not return an address, which the tunnel \
                      being down and the check service being unreachable both produce"
                 .to_owned(),
@@ -76,7 +85,10 @@ pub(super) fn egress_verdict(gateway: &Reach, client: &Reach, pair: &Pair) -> Ve
             // tunnel merely unaskable is not: its address is unknown, not proven
             // absent, so a leak cannot be established and is never claimed.
             Reach::Down | Reach::Blocked => Verdict::Fail(uncontained(pair)),
-            Reach::Unknown => Verdict::Unverified {
+            // Not a leak: the tunnel reached something and what came back was
+            // not an address, so its own address is unknown rather than proven
+            // absent, and nothing can be compared against it.
+            Reach::Unreadable | Reach::Unknown => Verdict::Unverified {
                 reason: format!(
                     "{} returned an address, but {}'s own address could not be read, so egress \
                      could not be compared",
@@ -94,6 +106,17 @@ pub(super) fn egress_verdict(gateway: &Reach, client: &Reach, pair: &Pair) -> Ve
                     .to_owned(),
                 remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
             },
+        },
+        // The client reached something and could not be read. That is the one
+        // state this must never call contained: the warning above says "nothing
+        // is leaking", and what is known here is that traffic left.
+        Reach::Unreadable => Verdict::Unverified {
+            reason: format!(
+                "{} answered from outside the container and the answer could not be read as an \
+                 address, so where its traffic went was not established",
+                pair.client
+            ),
+            remedy: Remedy::new("Check what the address service is returning, then run this again"),
         },
         Reach::Down => Verdict::Skipped {
             reason: format!(

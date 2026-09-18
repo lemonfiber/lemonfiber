@@ -62,7 +62,7 @@ pub(super) async fn addresses(
         let answer = public_address(engine, container, echo).await;
         heard.push(match &answer {
             Reach::Address(address) => Some(address.clone()),
-            Reach::Blocked | Reach::Down | Reach::Unknown => None,
+            Reach::Blocked | Reach::Unreadable | Reach::Down | Reach::Unknown => None,
         });
         // The first definite answer about the container itself stands: a later
         // source failing says something about that source, not about the container.
@@ -73,8 +73,14 @@ pub(super) async fn addresses(
     let seen = Seen::of(&heard);
     // Sources that contradict each other leave no address anybody can rely on, so
     // the reachability is downgraded to match rather than carrying one of them.
+    //
+    // To unknown rather than to blocked, which is what it was. A disagreement is
+    // several sources each of which answered, so reading it as no connectivity
+    // made the leak check say "nothing is leaking" about a client whose answers
+    // differ — which is what a split tunnel looks like — and made a gateway whose
+    // sources disagree read as a critical leak by a client that is behaving.
     let reach = match (&seen, reach) {
-        (Seen::Disagreed(_), _) => Reach::Blocked,
+        (Seen::Disagreed(_), _) => Reach::Unknown,
         (_, reach) => reach,
     };
     (reach, seen)
@@ -95,10 +101,13 @@ pub(super) async fn public_address(
         Err(_) => Reach::Unknown,
         Ok(output) => {
             let body = output.stdout.trim();
-            if output.status == Some(0) && looks_like_ip(body) {
-                Reach::Address(body.to_owned())
-            } else {
-                Reach::Blocked
+            match (output.status, looks_like_ip(body)) {
+                (Some(0), true) => Reach::Address(body.to_owned()),
+                // The transfer succeeded and what came back is not an address.
+                // Something left the container and a public host answered it,
+                // which is the opposite of the arm below and must not share it.
+                (Some(0), false) => Reach::Unreadable,
+                _ => Reach::Blocked,
             }
         }
     }

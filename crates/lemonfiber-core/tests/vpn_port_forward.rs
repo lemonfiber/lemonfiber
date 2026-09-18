@@ -297,6 +297,22 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
             .any(|finding| matches!(finding.verdict, Verdict::Pass { .. })),
         "nothing passes on an address nobody agreed"
     );
+
+    // Nor does anything claim the opposite. A disagreement used to be read as no
+    // connectivity, so a gateway whose sources contradicted each other while the
+    // client answered normally was reported as a critical leak — an alarm raised
+    // about the client on the strength of two strangers not agreeing.
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| matches!(finding.verdict, Verdict::Fail(_))),
+        "a disagreement among sources is not evidence of a leak either: {:?}",
+        findings
+            .iter()
+            .filter(|finding| matches!(finding.verdict, Verdict::Fail(_)))
+            .map(|finding| finding.check.clone())
+            .collect::<Vec<_>>()
+    );
 }
 
 #[tokio::test]

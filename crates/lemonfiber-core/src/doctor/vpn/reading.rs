@@ -112,7 +112,7 @@ pub(crate) async fn read_vpn(
             }
         }
         Reach::Down => VpnReading::Unavailable("the VPN tunnel is not running".to_owned()),
-        Reach::Blocked => {
+        Reach::Blocked | Reach::Unreadable => {
             VpnReading::Unavailable("the VPN tunnel did not return an exit address".to_owned())
         }
         Reach::Unknown => {
