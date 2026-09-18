@@ -228,32 +228,7 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure> {
-        // The member's own credentials, not the admin's, and not stored anywhere:
-        // what comes back is the account this pair belongs to and nothing is kept
-        // of how it was proved.
-        let body = serde_json::json!({ "Username": name, "Pw": password }).to_string();
-        let mut request = self.request(Method::Post, "/Users/AuthenticateByName", Some(body));
-        request
-            .headers
-            .push(("X-Emby-Authorization".to_owned(), AUTHORIZATION.to_owned()));
-        let response = self.endpoint.send(&request).await?;
-
-        // A pair the server does not recognise is an answer rather than a fault, and
-        // the two must not arrive the same way: a surface that read them alike would
-        // tell somebody their password was wrong on the day the server was down, and
-        // would go on telling them so until it came back.
-        if REFUSED.contains(&response.status) {
-            return Ok(None);
-        }
-
-        let signed: SignedIn = self
-            .endpoint
-            .decode(&response, "the sign-in was not accepted")?;
-
-        // An account with no id is an answer this build cannot use. Read as nobody
-        // rather than as somebody with an empty name, because an empty id would
-        // match every other account that answered the same way.
-        Ok(Some(signed.user.id).filter(|id| !id.is_empty()))
+        whoever(self, name, password).await
     }
 
     async fn invite(&self, name: &str) -> Result<Member, Failure> {
@@ -350,6 +325,45 @@ impl crate::ports::service::Household for Jellyfin {
             })
             .collect())
     }
+}
+
+/// Who a name and a password prove somebody to be.
+///
+/// Beside the impl rather than inside it because it decides. An `#[async_trait]`
+/// body is rewritten into a generated future and the coverage report attributes
+/// nothing inside it to the lines it came from, so the refusal below could stop
+/// being taken and the gate that says this workspace is covered would say nothing.
+async fn whoever(
+    jellyfin: &Jellyfin,
+    name: &str,
+    password: &str,
+) -> Result<Option<String>, Failure> {
+    // The member's own credentials, not the admin's, and not stored anywhere: what
+    // comes back is the account this pair belongs to and nothing is kept of how it
+    // was proved.
+    let body = serde_json::json!({ "Username": name, "Pw": password }).to_string();
+    let mut request = jellyfin.request(Method::Post, "/Users/AuthenticateByName", Some(body));
+    request
+        .headers
+        .push(("X-Emby-Authorization".to_owned(), AUTHORIZATION.to_owned()));
+    let response = jellyfin.endpoint.send(&request).await?;
+
+    // A pair the server does not recognise is an answer rather than a fault, and the
+    // two must not arrive the same way: a surface that read them alike would tell
+    // somebody their password was wrong on the day the server was down, and would go
+    // on telling them so until it came back.
+    if REFUSED.contains(&response.status) {
+        return Ok(None);
+    }
+
+    let signed: SignedIn = jellyfin
+        .endpoint
+        .decode(&response, "the sign-in was not accepted")?;
+
+    // An account with no id is an answer this build cannot use. Read as nobody rather
+    // than as somebody with an empty name, because an empty id would match every
+    // other account that answered the same way.
+    Ok(Some(signed.user.id).filter(|id| !id.is_empty()))
 }
 
 async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), Failure> {
