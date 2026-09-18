@@ -255,19 +255,49 @@ fn within(expect: &Expect, probe: &Probe, at: &str, found: &mut Vec<Violation>) 
 /// Whether an expectation says the thing a constraint is.
 ///
 /// A key that is present and asserts nothing does not count. `json_is_absent = false`
-/// is the case: it reads as a constraint and no runner evaluates it, so treating it as
-/// evidence would let a claim satisfy a body requirement by writing a word.
+/// is the case the rule was written for: it reads as a constraint and no runner
+/// evaluates it, so treating it as evidence would let a claim satisfy a body
+/// requirement by writing a word.
+///
+/// The same is true of every empty collection, and the rule was applied to one case out
+/// of seven. `json_has_keys = []`, `json = {}`, `json_types = {}` and
+/// `json_at_least = {}` all deserialise to `Some(empty)`, so each satisfied the body
+/// requirement — and then the runner iterated an empty collection, found nothing wrong,
+/// and reported the capability demonstrated on the evidence that something answered
+/// `200`. A port proxy answers `200`.
+///
+/// `content_type = ""` and `body_starts_with = ""` are the string form of it: `contains`
+/// and `starts_with` are both true of every body.
+///
+/// `json_array_min = 0` stays a constraint, and the difference is real: the shape check
+/// behind it still requires the body to parse as an array, which is what the vocabulary
+/// says *reads as a list* means.
 fn carries(expect: &Expect, constraint: Constraint) -> bool {
     match constraint {
         Constraint::Status => expect.status.is_some(),
-        Constraint::Json => expect.json.is_some(),
-        Constraint::JsonHasKeys => expect.json_has_keys.is_some(),
-        Constraint::JsonTypes => expect.json_types.is_some(),
-        Constraint::JsonAtLeast => expect.json_at_least.is_some(),
+        Constraint::Json => expect.json.as_ref().is_some_and(|held| !held.is_empty()),
+        Constraint::JsonHasKeys => expect
+            .json_has_keys
+            .as_ref()
+            .is_some_and(|keys| !keys.is_empty()),
+        Constraint::JsonTypes => expect
+            .json_types
+            .as_ref()
+            .is_some_and(|held| !held.is_empty()),
+        Constraint::JsonAtLeast => expect
+            .json_at_least
+            .as_ref()
+            .is_some_and(|held| !held.is_empty()),
         Constraint::JsonArrayMin => expect.json_array_min.is_some(),
         Constraint::JsonIsAbsent => expect.json_is_absent == Some(true),
-        Constraint::ContentType => expect.content_type.is_some(),
-        Constraint::BodyStartsWith => expect.body_starts_with.is_some(),
+        Constraint::ContentType => expect
+            .content_type
+            .as_ref()
+            .is_some_and(|kind| !kind.is_empty()),
+        Constraint::BodyStartsWith => expect
+            .body_starts_with
+            .as_ref()
+            .is_some_and(|front| !front.is_empty()),
     }
 }
 
@@ -702,6 +732,32 @@ why       = "Two rows, one name."
                     .as_ref()
                     .is_ok_and(|nothing| !super::carries(nothing, constraint)),
                 "an expectation that says nothing reads as {constraint:?}"
+            );
+        }
+    }
+
+    /// The form that is present and asserts nothing, which is the gap this test
+    /// had: it held the populated form and the wholly-absent one, and every
+    /// constraint that can be written empty sat between them.
+    ///
+    /// `json_array_min = 0` is not here, and that is the one real difference:
+    /// the shape check behind it still requires the body to parse as an array.
+    #[test]
+    fn a_constraint_written_empty_constrains_nothing_and_does_not_count() {
+        let each = [
+            (Constraint::Json, "json = {}"),
+            (Constraint::JsonHasKeys, "json_has_keys = []"),
+            (Constraint::JsonTypes, "json_types = {}"),
+            (Constraint::JsonAtLeast, "json_at_least = {}"),
+            (Constraint::ContentType, "content_type = \"\""),
+            (Constraint::BodyStartsWith, "body_starts_with = \"\""),
+        ];
+        for (constraint, declared) in each {
+            assert!(
+                toml::from_str::<Expect>(declared)
+                    .is_ok_and(|expect| !super::carries(&expect, constraint)),
+                "{declared} reads as {constraint:?}, so a claim could be demonstrated \
+                 on the evidence that something answered at all"
             );
         }
     }
