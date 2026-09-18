@@ -71,6 +71,7 @@ jobs:
       - name: Install the yaml reader
         run: |
           python3 -m pip install --quiet --disable-pip-version-check \
+            --only-binary :all: \
             --require-hashes -r .github/requirements/yaml.txt
       - name: Every job runs the compiler it asks for
         run: python3 scripts/the_toolchain_a_job_gets.py
