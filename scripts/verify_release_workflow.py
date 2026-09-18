@@ -11,12 +11,14 @@ Regenerating the file without running that recipe drops every patch at once, and
 the result is a workflow that reads as normal: it builds, it signs, it publishes.
 Nothing about it looks different until a release is already out.
 
-Six claims are read from the tree, and each is a claim rather than a string:
+Seven claims are read from the tree, and each is a claim rather than a string:
 
+  applied      the file carries each patch's output verbatim, comments included
   draft        every `gh release create` carries `--draft`
   installers   every step that downloads and runs a script pins the URL and the
                  digest, reads the digest, and checks it
-  pins         every action is used at a commit SHA
+  pins         every action is used at a commit SHA, and every action this repo
+                 pins is used at the commit recorded for it
   tag          every step that runs a release command reads the tag from its own
                  env, and no step pastes it into a script
   token        the jobs holding `contents: write` are exactly the jobs that
@@ -142,17 +144,37 @@ def claim_installers(workflow: dict, _cargo: dict) -> list[str]:
 
 
 def claim_pins(workflow: dict, _cargo: dict) -> list[str]:
+    """Every action is at a commit, and every pinned one is at the recorded commit.
+
+    The second half is the one that was missing, and its absence is not
+    theoretical. This asked only whether each pinned action still appeared by
+    name; Dependabot moved `actions/checkout` to v7.0.1 here and everywhere else
+    in this tree, the table went on holding v6's commit, and the next
+    `just release-workflow` would have put v6 back. The result is still a SHA and
+    still pinned, so nothing about the file would have looked wrong.
+    """
     problems = []
     for job, step in steps(workflow):
         uses = step.get("uses")
         if uses and not COMMIT_SHA.match(uses):
             problems.append(f"{where(job, step)} uses {uses}, which is not a commit")
-    wanted = {ref.split("@")[0] for ref in pin_release_actions.PINNED}
-    used = {(step.get("uses") or "").split("@")[0] for _, step in steps(workflow)}
-    problems.extend(
-        f"{action} is no longer in the workflow, so its pin is pinning nothing"
-        for action in sorted(wanted - used)
-    )
+    for ref, (sha, _) in pin_release_actions.PINNED.items():
+        action = ref.split("@")[0]
+        used = {
+            str(step.get("uses"))
+            for _, step in steps(workflow)
+            if str(step.get("uses") or "").startswith(f"{action}@")
+        }
+        if not used:
+            problems.append(
+                f"{action} is no longer in the workflow, so its pin is pinning nothing"
+            )
+        elif used != {f"{action}@{sha}"}:
+            problems.append(
+                f"{action} is used at {', '.join(sorted(used))} and recorded here at "
+                f"{action}@{sha}, so the next regeneration would put the recorded one "
+                "back — a bump that only moved this file is a bump that gets undone"
+            )
     return problems
 
 
@@ -209,6 +231,37 @@ def claim_tag(workflow: dict, _cargo: dict) -> list[str]:
             "use is to be pasted into a shell"
         )
     return problems
+
+
+# The exact text each patch writes into the file.
+#
+# Every other claim here asks what the workflow *does*. This asks whether it is
+# the file the recipe produces, which is a different question and the one nobody
+# was asking — so the answer had drifted: the comment above the minted token
+# named `tests/release_token.rs`, deleted three releases ago, and said `dist init`
+# for a regeneration that goes through `just release-workflow`. Both of those are
+# instructions to whoever reads the file next.
+WRITTEN = {
+    "the workflow's own permission": permissions.SCOPED,
+    "the host job's scope": permissions.HOST_SCOPED,
+    "the minted token": permissions.HOST_MINTS,
+    "the release step's token": permissions.CREATES_WITH_TOKEN,
+    "the plan step": by_env.PLAN_BY_ENV,
+    "the local build step": by_env.LOCAL_BY_ENV,
+    "the global build step": by_env.GLOBAL_BY_ENV,
+    "the host step": by_env.HOST_BY_ENV,
+    "the release step's tag": by_env.CREATES_BY_ENV,
+}
+
+
+def claim_applied(_workflow: dict, _cargo: dict, text: str) -> list[str]:
+    """The file carries each patch's output verbatim, comments included."""
+    return [
+        f"{what} is not in the file as the patch writes it, so what is committed "
+        "is not what `just release-workflow` produces"
+        for what, written in WRITTEN.items()
+        if written not in text
+    ]
 
 
 def claim_token(workflow: dict, _cargo: dict) -> list[str]:
@@ -272,15 +325,26 @@ def claim_allow_dirty(_workflow: dict, cargo: dict) -> list[str]:
 
 def unpinned(workflow_text: str) -> str:
     """One action put back on the moving tag `dist generate` reaches it by."""
-    ref, sha = next(iter(pin_release_actions.PINNED.items()))
-    action, version = ref.split("@")
+    ref, (sha, version) = next(iter(pin_release_actions.PINNED.items()))
+    action = ref.split("@")[0]
     return workflow_text.replace(f"uses: {action}@{sha} # {version}", f"uses: {ref}")
 
 
+def bumped(workflow_text: str) -> str:
+    """One action moved to another commit, the way a bump bot moves it."""
+    ref, (sha, version) = next(iter(pin_release_actions.PINNED.items()))
+    action = ref.split("@")[0]
+    return workflow_text.replace(
+        f"uses: {action}@{sha} # {version}", f"uses: {action}@{'f' * 40} # {version}"
+    )
+
+
 CLAIMS = {
+    "applied": claim_applied,
     "draft": claim_draft,
     "installers": claim_installers,
     "pins": claim_pins,
+    "pins-at-the-recorded-commit": claim_pins,
     "tag": claim_tag,
     "tag-inside-a-format": claim_tag,
     "token": claim_token,
@@ -288,15 +352,24 @@ CLAIMS = {
     "allow-dirty": claim_allow_dirty,
 }
 
+# Claims that read the file rather than the parsed workflow. YAML drops comments,
+# and two of the things a patch writes are comments.
+READS_THE_TEXT = frozenset({claim_applied})
+
 # Each claim, and the smallest edit to the tree that takes it away. The edits are
 # the patches run backwards, taken from the scripts that apply them.
 BREAKS = {
+    "applied": lambda w, c: (
+        w.replace(permissions.HOST_MINTS, permissions.HOST_STEPS),
+        c,
+    ),
     "draft": lambda w, c: (w.replace(f"{RELEASE_CREATE} --draft ", f"{RELEASE_CREATE} "), c),
     "installers": lambda w, c: (
         w.replace(installers.DIST_VERIFIED, installers.DIST_GENERATED),
         c,
     ),
     "pins": lambda w, c: (unpinned(w), c),
+    "pins-at-the-recorded-commit": lambda w, c: (bumped(w), c),
     "tag": lambda w, c: (w.replace(by_env.HOST_BY_ENV, by_env.HOST_GENERATED), c),
     # The same claim against the plan step, whose expression wraps the tag in a
     # `format('… {0}', …)`. The brace in `{0}` is why: a first version of the
@@ -328,7 +401,10 @@ def read() -> tuple[str, str]:
 def judge(workflow_text: str, cargo_text: str, name: str) -> list[str]:
     workflow = yaml.safe_load(workflow_text)
     cargo = tomllib.loads(cargo_text)
-    return CLAIMS[name](workflow, cargo)
+    claim = CLAIMS[name]
+    if claim in READS_THE_TEXT:
+        return claim(workflow, cargo, workflow_text)
+    return claim(workflow, cargo)
 
 
 def self_test() -> int:

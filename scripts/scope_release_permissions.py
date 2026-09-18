@@ -58,6 +58,12 @@ HOST_MINTS = """    outputs:
       # workflow permission is `read` at both org and repo, and a job may only ask
       # for what the default allows. So the release is created with the App the
       # record, the site and the contract move already use.
+      #
+      # Kept across regenerations by `verify_release_workflow.py`'s
+      # `token-can-write` claim, which refuses a file that has lost this step. A
+      # file that lost it answers 403 at the last step of a release, after every
+      # artefact has been built, against a tag this repository will not let
+      # anybody move. 0.9.0 is where that was found.
       - name: Mint a token that may create a release
         id: token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
