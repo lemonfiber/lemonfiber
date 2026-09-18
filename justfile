@@ -351,15 +351,18 @@ release-workflow:
 # NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
 skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-adapters/src/nntp\.rs|crates/.*/examples/.*\.rs)'
 
-# A failing gate says which lines it failed on, from the profile already gathered —
-# `report` re-reads it rather than building and running anything a second time. Without
-# this the gate says only that a number is below a number, and finding out which line it
-# meant costs a full run somebody has to think to make.
 # `--no-fail-fast` because `sonar.yml` passes it and this has to be the same line.
 # Without it one failing test stops the run and the profile is whatever had been
 # reached by then — reported not as a stopped run but as the coverage figure, which
 # is how a single architecture test tripping came back as ninety-seven thousand
 # missed lines across every crate.
+#
+# A failing gate says which lines it failed on, from the profile already gathered —
+# `report` re-reads it rather than building and running anything a second time. Without
+# this the gate says only that a number is below a number, and finding out which line it
+# meant costs a full run somebody has to think to make.
+#
+# 100% on applicable code, the line `sonar` runs.
 coverage:
     cargo llvm-cov nextest --workspace --no-fail-fast --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
         || { just uncovered; exit 1; }
