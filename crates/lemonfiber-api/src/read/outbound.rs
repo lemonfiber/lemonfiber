@@ -11,6 +11,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::OUTBOUND;
 use crate::router::Serving;
 
@@ -23,6 +24,10 @@ pub(super) fn routes() -> Router<Serving> {
 
 /// Every request lemonfiber makes on its own account, and every one the stack's own
 /// services make, with the setting that switches each of lemonfiber's off.
-async fn outbound(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, OUTBOUND, query.as_deref()).await
+async fn outbound(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, OUTBOUND, query.as_deref()).await
 }

@@ -29,6 +29,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::body::to_bytes;
 use axum::http::StatusCode;
+use axum::Extension;
+use lemonfiber_api::admission::Caller;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
@@ -129,14 +131,19 @@ fn routed(ctx: lemonfiber_core::app::Ctx) -> axum::Router {
     let Some(token) = Token::mint(&Chance::cycling()) else {
         unreachable!("cycling letters always supply bytes");
     };
-    lemonfiber_api::read::routes().with_state(Serving {
-        ctx: Arc::new(ctx),
-        token: Arc::new(token),
-        bound: lemonfiber_api::guard::Binding::here(8471),
-        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
-        jobs: Jobs::default(),
-        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
-    })
+    lemonfiber_api::read::routes()
+        .with_state(Serving {
+            ctx: Arc::new(ctx),
+            token: Arc::new(token),
+            bound: lemonfiber_api::guard::Binding::here(8471),
+            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
+            jobs: Jobs::default(),
+            live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        })
+        // The subject the guard puts on every request it admits. Mounted here because a
+        // test builds these routes without the layer that carries it, and a handler that
+        // asks who is calling is answered by the guard in a run rather than by the route.
+        .layer(Extension(Caller::Machine))
 }
 
 /// What a path answered with: its status, its headers, and its body.

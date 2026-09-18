@@ -14,6 +14,8 @@ use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
+use axum::Extension;
+use lemonfiber_api::admission::Caller;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
@@ -97,7 +99,15 @@ fn homeless() -> Option<axum::Router> {
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
     };
-    Some(lemonfiber_api::setup::routes().with_state(serving))
+    Some(
+        lemonfiber_api::setup::routes()
+            .with_state(serving)
+            // The subject the guard puts on every request it admits. Mounted here
+            // because this builds the setup routes without the layer that carries
+            // it, and a handler that asks who is calling is answered by the guard
+            // in a run rather than by the route.
+            .layer(Extension(Caller::Machine)),
+    )
 }
 
 /// The setup routes alone, over that world.
@@ -106,7 +116,15 @@ fn homeless() -> Option<axum::Router> {
 /// *answers* is this file's business, and that a request reaches it only with a
 /// token is the router's, proven once below.
 fn routed(paths: &Paths) -> Option<axum::Router> {
-    Some(lemonfiber_api::setup::routes().with_state(serving(paths)?))
+    Some(
+        lemonfiber_api::setup::routes()
+            .with_state(serving(paths)?)
+            // The subject the guard puts on every request it admits. Mounted here
+            // because this builds the setup routes without the layer that carries
+            // it, and a handler that asks who is calling is answered by the guard
+            // in a run rather than by the route.
+            .layer(Extension(Caller::Machine)),
+    )
 }
 
 /// One request to a setup endpoint, and what it was answered with.

@@ -27,6 +27,7 @@ use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::support::{held, Held};
 
+use crate::admission::Caller;
 use crate::reads::{wanted, BACKUPS, BUNDLE};
 use crate::router::Serving;
 use crate::serve::carrying;
@@ -58,8 +59,12 @@ pub(super) fn routes() -> Router<Serving> {
 /// a browser cannot, and a name nothing could tell it is a name it cannot use — so
 /// the listing is a command both surfaces read rather than a directory one of them
 /// walks.
-async fn backups(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, BACKUPS, query.as_deref()).await
+async fn backups(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, BACKUPS, query.as_deref()).await
 }
 
 /// One support bundle this run kept, handed over whole.

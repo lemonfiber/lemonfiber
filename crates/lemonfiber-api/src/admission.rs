@@ -40,7 +40,8 @@ use std::time::SystemTime;
 
 use axum::body::Body;
 use axum::extract::rejection::JsonRejection;
-use axum::extract::State;
+use axum::extract::{FromRequestParts, State};
+use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::routing::post;
@@ -53,7 +54,7 @@ use serde::Deserialize;
 use crate::guard::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER};
 use crate::read::enveloped;
 use crate::router::Serving;
-use crate::serve::{carrying, SENTENCE};
+use crate::serve::{carrying, refused, Refusal, SENTENCE};
 
 pub use attempts::Attempts;
 pub use sessions::Sessions;
@@ -204,6 +205,26 @@ pub enum Caller {
     /// under. What they may then do is the core's answer and is decided where it is
     /// known — never from this, and never by a client reading it.
     Member(String),
+}
+
+/// Who is asking, taken from what the guard admitted.
+///
+/// One impl rather than a branch per handler: the guard puts the subject on the
+/// request, and a handler that needs it says so in its signature. Absent means the
+/// request reached a handler without the guard having named anybody, which past the
+/// guard happens only at the one door that opens without a secret — so it is
+/// answered as what it is, a request carrying nothing this run admits, rather than
+/// served as though somebody had proved something.
+impl<S: Send + Sync> FromRequestParts<S> for Caller {
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
+            .get::<Self>()
+            .cloned()
+            .ok_or_else(|| refused(Refusal::Unknown))
+    }
 }
 
 /// What a caller offers at the door.

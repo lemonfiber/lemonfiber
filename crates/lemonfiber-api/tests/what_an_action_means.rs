@@ -18,8 +18,10 @@ mod acting;
 
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
+use axum::Extension;
 use lemonfiber_api::actions;
 use lemonfiber_api::actions::{answering, declined, named, Answering, Arguments, Refused, OFFERED};
+use lemonfiber_api::admission::Caller;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
@@ -706,14 +708,19 @@ fn routed(random: Chance) -> axum::Router {
     let Some(token) = Token::mint(&Chance::cycling()) else {
         unreachable!("cycling letters always supply bytes");
     };
-    actions::routes().with_state(Serving {
-        ctx: Arc::new(ctx().with_random(Arc::new(random))),
-        token: Arc::new(token),
-        bound: lemonfiber_api::guard::Binding::here(8471),
-        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
-        jobs: Jobs::default(),
-        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
-    })
+    actions::routes()
+        .with_state(Serving {
+            ctx: Arc::new(ctx().with_random(Arc::new(random))),
+            token: Arc::new(token),
+            bound: lemonfiber_api::guard::Binding::here(8471),
+            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
+            jobs: Jobs::default(),
+            live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        })
+        // The subject the guard puts on every request it admits. Mounted here because a
+        // test builds these routes without the layer that carries it, and a handler that
+        // asks who is calling is answered by the guard in a run rather than by the route.
+        .layer(Extension(Caller::Machine))
 }
 
 /// What the route answered, as the status it answered under and what it said.

@@ -12,6 +12,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::ALERTS;
 use crate::router::Serving;
 
@@ -23,6 +24,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// The preset in force, what it means, and what is set apart from it.
-async fn alerts(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, ALERTS, query.as_deref()).await
+async fn alerts(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, ALERTS, query.as_deref()).await
 }

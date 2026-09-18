@@ -10,6 +10,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::{REQUESTS, STUCK, TRACE};
 use crate::router::Serving;
 
@@ -24,16 +25,28 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// What the household has asked for, and where each request stands.
-async fn requests(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, REQUESTS, query.as_deref()).await
+async fn requests(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, REQUESTS, query.as_deref()).await
 }
 
 /// Where one item is, followed by the words a person would name it with.
-async fn trace(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, TRACE, query.as_deref()).await
+async fn trace(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, TRACE, query.as_deref()).await
 }
 
 /// The items whose downloads have stopped, each named so it can be followed.
-async fn stuck(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, STUCK, query.as_deref()).await
+async fn stuck(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, STUCK, query.as_deref()).await
 }

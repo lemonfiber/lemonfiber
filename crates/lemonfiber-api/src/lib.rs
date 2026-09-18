@@ -11,6 +11,7 @@
 
 pub mod actions;
 pub mod admission;
+pub mod entitled;
 pub mod events;
 mod following;
 pub mod frontend;

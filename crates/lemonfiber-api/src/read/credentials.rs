@@ -17,6 +17,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::CREDENTIALS;
 use crate::router::Serving;
 
@@ -28,6 +29,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// Every credential, with none of their values.
-async fn credentials(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, CREDENTIALS, query.as_deref()).await
+async fn credentials(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, CREDENTIALS, query.as_deref()).await
 }

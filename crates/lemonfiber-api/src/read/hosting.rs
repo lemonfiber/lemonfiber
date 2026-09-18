@@ -14,6 +14,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::HOSTING;
 use crate::router::Serving;
 
@@ -25,6 +26,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// What stands between each long-running command and this machine.
-async fn hosting(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, HOSTING, query.as_deref()).await
+async fn hosting(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, HOSTING, query.as_deref()).await
 }

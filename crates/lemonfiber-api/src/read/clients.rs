@@ -10,6 +10,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::CLIENTS;
 use crate::router::Serving;
 
@@ -22,6 +23,10 @@ pub(super) fn routes() -> Router<Serving> {
 
 /// Which app to use on each kind of device, and where the answer is to use
 /// something else instead.
-async fn clients(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, CLIENTS, query.as_deref()).await
+async fn clients(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, CLIENTS, query.as_deref()).await
 }

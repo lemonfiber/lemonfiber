@@ -15,6 +15,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::UPDATE;
 use crate::router::Serving;
 
@@ -26,6 +27,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// Where this copy of lemonfiber stands, and what moving it would come to.
-async fn update(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, UPDATE, query.as_deref()).await
+async fn update(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, UPDATE, query.as_deref()).await
 }

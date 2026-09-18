@@ -22,6 +22,8 @@ pub enum Refusal {
     Unknown,
     /// It said it came from somewhere this server is not.
     Elsewhere,
+    /// It proved who it is, and this is not theirs.
+    NotYours,
 }
 
 impl Refusal {
@@ -40,6 +42,12 @@ impl Refusal {
         match self {
             Self::Unknown => "This request carried no token or session this run admits.",
             Self::Elsewhere => "This request said it came from somewhere this server is not.",
+            // Said plainly, where the two above are deliberately vague. Those answer
+            // somebody who has proved nothing, and naming what was wrong would help
+            // them guess again. This one answers somebody who proved who they are, so
+            // there is nothing left to guess and a household member reading it is owed
+            // the actual reason rather than a silence that reads as a fault.
+            Self::NotYours => "This is not something this account may ask for.",
         }
     }
 }
