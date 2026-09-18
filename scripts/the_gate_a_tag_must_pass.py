@@ -44,6 +44,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +69,19 @@ SELF = "lemonfiber"
 #: resolves the catalogue from its working directory, so it has to run inside the
 #: spec checkout, and it refuses a path outside it.
 TRACKER = "IMPLEMENTATION-STATUS.md"
+
+#: The names of the two questions that *are* this gate. Everything else it asks
+#: is a precondition for asking these, and a run reaching the end without both of
+#: them has proved nothing however many other steps passed.
+#:
+#: Named rather than counted, so that deleting a call fails here instead of
+#: printing a smaller number nobody was watching. `decide` refuses an empty run
+#: for the same reason; this is that argument applied to a run that is merely
+#: incomplete.
+MUST_ASK = (
+    "every locked goal is satisfied",
+    "no requirement it locks is unbuilt",
+)
 
 
 @dataclass(frozen=True)
@@ -116,6 +130,18 @@ def decide(steps: list[Step]) -> tuple[int, list[str]]:
             f"checks did not pass: {', '.join(step.name for step in refused)}"
         )
         return 1, lines
+
+    # A run that stopped early stops early with a refusal, so this is only ever
+    # reached by a run where everything passed — which is exactly when a question
+    # nobody asked is invisible. Deleting one of the two calls below left the
+    # gate printing "every goal this version locks is proved" over four steps.
+    unasked = [name for name in MUST_ASK if name not in {step.name for step in steps}]
+    if unasked:
+        lines.append(
+            "::error::this tag is refused — the gate never asked: "
+            f"{', '.join(unasked)}"
+        )
+        return 1, lines
     lines.append(f"every goal this version locks is proved at this commit ({len(steps)} checks).")
     return 0, lines
 
@@ -132,10 +158,25 @@ def ran(*args: str, cwd: Path | None = None) -> tuple[bool, str]:
 
 
 def searched(spec: Path, version: str) -> list[str]:
-    """The repositories this version's manifest says its goals were satisfied in."""
+    """The repositories this version's manifest says its goals were satisfied in.
+
+    An empty list is not the same as an absent key, and `or` could not tell them
+    apart: a manifest whose `satisfied_in` had been emptied by an edit fell all
+    the way through to this repository alone, and `gather` then added no step, so
+    nothing in the report said the list had been read as empty.
+    """
     manifest = spec / "70-operations" / "versions" / f"{version}.toml"
     data = tomllib.loads(manifest.read_text(encoding="utf-8"))
-    return list(data.get("satisfied_in") or data.get("repos") or [SELF])
+    for field in ("satisfied_in", "repos"):
+        if field in data:
+            named = list(data[field])
+            if not named:
+                raise ValueError(
+                    f"{manifest.name} names no repository in `{field}`, so there is "
+                    "nowhere to read citations from"
+                )
+            return named
+    return [SELF]
 
 
 def gather(spec: Path, version: str, work: Path) -> tuple[list[Step], list[str]]:
@@ -147,7 +188,11 @@ def gather(spec: Path, version: str, work: Path) -> tuple[list[Step], list[str]]
     """
     steps: list[Step] = []
     args: list[str] = [f"--repo={SELF}=."]
-    for name in searched(spec, version):
+    try:
+        names = searched(spec, version)
+    except (ValueError, OSError, tomllib.TOMLDecodeError) as why:
+        return [Step("the manifest names where its goals were satisfied", False, str(why))], args
+    for name in names:
         if name == SELF:
             continue
         into = work / name
@@ -155,6 +200,19 @@ def gather(spec: Path, version: str, work: Path) -> tuple[list[Step], list[str]]
             "git", "clone", "--quiet", "--filter=blob:none",
             f"https://github.com/lemonfiber/{name}.git", str(into),
         )
+        # `git clone` exits 0 for an empty repository and for one whose default
+        # branch was renamed away — it warns and leaves a tree with no commits in
+        # it. Handed on, that is a repository whose every citation is unfindable,
+        # reported as a goal nobody did. The shallow-clone argument in the
+        # docstring above is this one, and it was applied only to `ROOT`.
+        if ok:
+            counted, howmany = ran("git", "-C", str(into), "rev-list", "--count", "HEAD")
+            carries = counted and howmany.strip().isdigit() and int(howmany.strip()) > 0
+            if not carries:
+                ok, said = False, (
+                    f"the clone of {name} carries no commit, so every citation in it "
+                    f"would be unfindable ({howmany.strip() or 'no count'})"
+                )
         steps.append(Step(f"clone {name}", ok, said))
         if ok:
             args.append(f"--repo={name}={into.as_posix()}")
@@ -174,6 +232,25 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
                      f"no {manifest.as_posix()} — a version the train does not carry is "
                      "not one to tag")]
     steps.append(Step(f"{version} has a manifest", True))
+
+    # The docstring above makes a claim about this checkout — the spec is read at
+    # `main`, deliberately unpinned — and the claim was enforced by each of the
+    # two callers separately and by nothing here. Anyone following this file's own
+    # `Run:` line against a `.spec-canonical` fetched last week got a verdict
+    # about a goal set that has moved, which is the stand-in failure the docstring
+    # names: right about a moment that has passed.
+    here, said = ran("git", "rev-parse", "HEAD", cwd=spec)
+    there, remote = ran("git", "ls-remote", "https://github.com/lemonfiber/spec.git", "main")
+    ahead = remote.split()[0] if there and remote.split() else ""
+    at_main = here and there and said.strip() and said.strip() == ahead
+    steps.append(Step(
+        f"the spec at {SPEC} is spec@main",
+        bool(at_main),
+        said if not here else remote if not there else
+        f"{SPEC} is at {said.strip()[:12]} and spec@main is at {ahead[:12]}",
+    ))
+    if not at_main:
+        return steps
 
     tracker = ROOT / TRACKER
     if not tracker.is_file():
@@ -206,13 +283,21 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
     # and the version directory from its working directory, and refuses a status
     # file outside it. A copy is what the tree being tagged holds, which is the
     # commit this gate is about.
-    beside = spec / TRACKER
-    shutil.copyfile(tracker, beside)
-    ok, said = ran(
-        sys.executable, "scripts/check_no_stubs.py",
-        f"--version={version}", f"--status={TRACKER}", cwd=spec,
-    )
-    beside.unlink(missing_ok=True)
+    #
+    # Under a name nothing else uses, and removed whatever happens. The copy was
+    # `IMPLEMENTATION-STATUS.md` with no check that one was not already there, so
+    # running this by hand against a working spec clone that had one overwrote it
+    # and then deleted it.
+    beside = Path(tempfile.mkdtemp(prefix=".release-gate-", dir=spec)) / TRACKER
+    try:
+        shutil.copyfile(tracker, beside)
+        ok, said = ran(
+            sys.executable, "scripts/check_no_stubs.py",
+            f"--version={version}", f"--status={beside.relative_to(spec).as_posix()}",
+            cwd=spec,
+        )
+    finally:
+        shutil.rmtree(beside.parent, ignore_errors=True)
     steps.append(Step("no requirement it locks is unbuilt", ok, said))
     return steps
 
@@ -231,25 +316,44 @@ def self_test() -> int:
     if code == 0 or not any("asked nothing" in line for line in said):
         broken.append("a run that checked nothing was not refused")
 
-    code, said = decide([Step("a", True), Step("b", True)])
+    passed = [Step(name, True) for name in MUST_ASK]
+    code, said = decide(passed)
     if code != 0:
         broken.append("a run where everything passed was refused")
+
+    # The property the rest of this file cannot establish: that both questions
+    # were asked. Dropping one leaves a run where nothing failed, which is the
+    # only state in which a missing question is invisible.
+    for dropped in range(len(MUST_ASK)):
+        short = [step for index, step in enumerate(passed) if index != dropped]
+        code, said = decide([*short, Step("something else", True)])
+        joined = "\n".join(said)
+        if code == 0:
+            broken.append(f"a run that never asked {MUST_ASK[dropped]!r} was not refused")
+        if MUST_ASK[dropped] not in joined:
+            broken.append(f"the refusal did not name the question {MUST_ASK[dropped]!r}")
+
+    code, said = decide([Step(MUST_ASK[0], False, "why"), *passed[1:]])
+    joined = "\n".join(said)
+    if "never asked" in joined:
+        broken.append("a question that was asked and failed was reported as never asked")
 
     # A passing check with something to say. The no-stub gate warns, and exits
     # zero, when a requirement is locked by no version at all — which is a real
     # debt, and was thrown away by the first cut of `decide`.
-    code, said = decide([Step("a", True, "::warning::a requirement nothing locks"), Step("b", True)])
+    warned = [Step(MUST_ASK[0], True, "::warning::a requirement nothing locks"), *passed[1:]]
+    code, said = decide(warned)
     joined = "\n".join(said)
     if code != 0:
         broken.append("a warning from a passing check turned into a refusal")
     if "a requirement nothing locks" not in joined:
         broken.append("a warning from a passing check was thrown away")
-    code, said = decide([Step("a", True, "chatter nobody needs")])
+    code, said = decide([Step(MUST_ASK[0], True, "chatter nobody needs"), *passed[1:]])
     if "chatter" in "\n".join(said):
         broken.append("a passing check's ordinary output was printed as well")
 
-    for spoiled in range(2):
-        steps = [Step("a", True), Step("b", True)]
+    for spoiled in range(len(MUST_ASK)):
+        steps = list(passed)
         steps[spoiled] = Step(steps[spoiled].name, False, "why it failed")
         code, said = decide(steps)
         joined = "\n".join(said)
@@ -265,9 +369,10 @@ def self_test() -> int:
     if broken:
         print(f"::error::self-test: {len(broken)} claim(s) this gate makes are not true")
         return 1
-    print("self-test: nothing passes quietly — an empty run and every single "
-          "failure are refused, by name and with what they said, and a warning "
-          "from a check that passed is kept.")
+    print("self-test: nothing passes quietly — an empty run, a run missing "
+          "either of the two questions, and every single failure are refused, by "
+          "name and with what they said, and a warning from a check that passed "
+          "is kept.")
     return 0
 
 
