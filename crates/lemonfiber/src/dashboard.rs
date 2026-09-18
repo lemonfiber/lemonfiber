@@ -359,7 +359,11 @@ pub(crate) mod tests {
         // Degrading by carrying less at a time, never by overlapping: a corrupted
         // screen is worse than a tall one.
         let text = drawn(&a_snapshot(), 60, 90);
-        for (panel, _) in sections(&a_snapshot(), &[]) {
+        let panels = sections(&a_snapshot(), &[]);
+        // Carrying *the same* panels means there are panels to carry; a screen that
+        // declared none would satisfy the sweep below without drawing anything.
+        assert!(!panels.is_empty(), "the screen declares no panel");
+        for (panel, _) in panels {
             assert!(text.contains(panel), "{panel} is missing:\n{text}");
         }
     }

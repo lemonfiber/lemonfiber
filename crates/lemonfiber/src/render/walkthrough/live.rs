@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn both_narrators_accept_a_line_and_neither_says_the_choosing_one() {
+    fn both_narrators_accept_every_step_a_walk_reaches() {
         // One prints and one does not; what matters is that a run whose answer is a
         // document has somewhere to send its narration that is not the document — and
         // that neither repeats back the thing the operator has just typed.

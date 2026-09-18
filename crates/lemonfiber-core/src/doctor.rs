@@ -92,13 +92,14 @@ impl Category {
         }
     }
 
-    /// The category an operator named, when it is one lemonfiber knows.
+    /// Every category, in the order an operator meets them.
     ///
-    /// An unknown name is `None` rather than a silent empty run, so a surface can
-    /// tell the operator they mistyped rather than reporting that nothing was
-    /// wrong.
+    /// One list, because everything that has to enumerate them — parsing a name,
+    /// and holding the set a plugin may contribute into against this one — was
+    /// otherwise writing the list again. A copy is a place the tenth category does
+    /// not arrive, and a comparison between two copies that both forgot it passes.
     #[must_use]
-    pub fn parse(name: &str) -> Option<Self> {
+    pub const fn every() -> [Self; 9] {
         [
             Self::Environment,
             Self::Storage,
@@ -110,8 +111,18 @@ impl Category {
             Self::Queue,
             Self::Config,
         ]
-        .into_iter()
-        .find(|category| category.as_str() == name)
+    }
+
+    /// The category an operator named, when it is one lemonfiber knows.
+    ///
+    /// An unknown name is `None` rather than a silent empty run, so a surface can
+    /// tell the operator they mistyped rather than reporting that nothing was
+    /// wrong.
+    #[must_use]
+    pub fn parse(name: &str) -> Option<Self> {
+        Self::every()
+            .into_iter()
+            .find(|category| category.as_str() == name)
     }
 }
 

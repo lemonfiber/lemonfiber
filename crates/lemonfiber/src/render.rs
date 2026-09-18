@@ -659,7 +659,7 @@ mod tests {
     }
 
     #[test]
-    fn printing_puts_every_line_out() {
+    fn every_shape_this_module_prints_is_reachable() {
         // The one place this module reaches the terminal, exercised so it cannot rot.
         let mut lines = Lines::default();
         lines.put("printed");
@@ -1267,7 +1267,11 @@ mod tests {
     fn every_outcome_renders_and_every_outcome_renders_as_json() {
         // Every arm of the dispatch renders something, and every one of them also
         // renders as an envelope a script can parse.
-        for outcome in every_outcome() {
+        let outcomes = every_outcome();
+        // *Every* outcome, so the list has to be one: a fixture that came back empty
+        // would satisfy both claims below without rendering anything.
+        assert!(!outcomes.is_empty(), "no outcome was gathered to render");
+        for outcome in outcomes {
             assert!(!answer(&outcome, false).text().is_empty());
             let json = answer(&outcome, true).text();
             assert!(json.contains(r#""api_version""#), "{json}");

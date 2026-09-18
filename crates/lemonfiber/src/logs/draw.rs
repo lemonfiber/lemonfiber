@@ -761,7 +761,14 @@ mod tests {
         viewer.take(line("qbittorrent", "[Warn] the tracker did not answer"));
         viewer.take(complained("sabnzbd", "queue paused"));
 
-        for shown in viewer.showing(20) {
+        let lines = viewer.showing(20);
+        // Five lines went in. A viewer handing back none would make the sweep below
+        // hold about nothing, which is the reading a severity gate must not produce.
+        assert!(
+            !lines.is_empty(),
+            "the viewer showed none of what it was given"
+        );
+        for shown in lines {
             assert_eq!(
                 shown.level,
                 declared(&shown.said),

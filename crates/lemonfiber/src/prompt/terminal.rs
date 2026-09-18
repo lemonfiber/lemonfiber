@@ -424,7 +424,7 @@ mod tests {
     use lemonfiber_core::wizard::{Answer, Indexer, Library, Plan, Provider, Wizard};
 
     use super::{reviewed, Terminal, MASKED};
-    use crate::prompt::fixtures::{answered, wizard, Script};
+    use crate::prompt::fixtures::{answered, answered_watching, wizard, Script};
 
     /// Worth reading the first time and noise every time after — the rule the
     /// footnote block follows inside one report, carried across the questions of one
@@ -540,11 +540,10 @@ mod tests {
     }
 
     #[test]
-    fn a_terminal_reads_from_the_keyboard_unless_told_otherwise() {
-        // Constructing it asks nothing — the keyboard is only reached when a
-        // question is actually put, which is why this is safe to build here and
-        // why nothing is asked of it: a real question would read real input and
-        // the test would sit there forever.
+    fn a_terminal_can_be_built_without_reaching_the_keyboard() {
+        // The keyboard is only reached when a question is actually put, which is
+        // why this is safe to build here and why nothing is asked of it: a real
+        // question would read real input and the test would sit there forever.
         drop(Terminal::new(
             Environment::MacOs,
             PathBuf::from("/srv/media"),
@@ -570,13 +569,29 @@ mod tests {
         }
     }
 
+    /// A run with prerequisites waits on the operator; one with none does not.
+    ///
+    /// The waiting is the half of this that can be held. A library-only run needs
+    /// nothing and is told so rather than shown an empty list — an end state, not a
+    /// lesser one — and keeping somebody at a prompt for it would be asking them to
+    /// acknowledge a list that is not there. What each item says is written to the
+    /// terminal, and reading this process's own stream back would be a harness.
     #[test]
-    fn the_prerequisites_are_listed_and_waited_on() {
-        // A library-only run needs nothing, and is told so rather than shown an
-        // empty list — an end state, not a lesser one.
-        answered(&[]).prerequisites(&prerequisites(Protocols::none()));
-        // Otherwise each item is named, costed, and the operator is waited on.
-        answered(&[""]).prerequisites(&prerequisites(Protocols::both()));
+    fn a_run_with_prerequisites_waits_on_the_operator_and_one_with_none_does_not() {
+        let (terminal, unasked) = answered_watching(&[""]);
+        terminal.prerequisites(&prerequisites(Protocols::none()));
+        assert_eq!(
+            unasked.borrow().len(),
+            1,
+            "nobody was kept waiting for an empty list"
+        );
+
+        let (terminal, unasked) = answered_watching(&[""]);
+        terminal.prerequisites(&prerequisites(Protocols::both()));
+        assert!(
+            unasked.borrow().is_empty(),
+            "the operator was shown a list and not waited on"
+        );
     }
 
     #[test]
@@ -588,13 +603,19 @@ mod tests {
         );
     }
 
+    /// Explaining hardlinking is telling, never asking, whichever way it was found.
+    ///
+    /// Both branches are reached so neither can rot, and the property held is that
+    /// the operator is not stopped for either: an explanation that asked a question
+    /// would put a prompt in the middle of a walk that is not asking anything.
     #[test]
-    fn what_hardlinking_means_is_said_either_way() {
-        let terminal = answered(&[]);
+    fn explaining_hardlinking_asks_the_operator_nothing_either_way() {
+        let (terminal, unasked) = answered_watching(&["unused"]);
         // Proven on the location itself.
         terminal.hardlinks(Path::new("/srv/media"), None);
         // Inferred from the parent, and said to be inferred.
         terminal.hardlinks(Path::new("/srv/media"), Some(Path::new("/srv")));
+        assert_eq!(unasked.borrow().len(), 1, "nothing was asked");
     }
 
     #[test]

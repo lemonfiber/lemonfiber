@@ -115,11 +115,31 @@ def anchor_of(text: str) -> str | None:
     return None
 
 
+#: Directories under a spec checkout that hold text the spec did not write.
+#:
+#: The spec's own `integrity.elsewhere` is the canonical answer and cannot be
+#: imported: this runs against a checkout of the spec's *content*, which need not
+#: be a checkout of its scripts — the same reason `REQ_DEF` is spelled above. What
+#: matters is that the answer agrees. A dot-directory is whatever a tool put there,
+#: and the one that bites is an agent's worktree: it is a second clone of the spec,
+#: so every requirement in it is defined a second time and the page a citation
+#: resolves to depends on which copy the walk reached first.
+ELSEWHERE = ("checkouts", "vendor", "node_modules", "dist")
+
+
+def elsewhere(source: pathlib.Path, spec: pathlib.Path) -> bool:
+    """Whether a path sits under something the spec did not write."""
+    return any(
+        part in ELSEWHERE or part.startswith(".")
+        for part in source.relative_to(spec).parts
+    )
+
+
 def pages(spec: pathlib.Path) -> dict[str, Page]:
     """Every requirement the spec defines, mapped to the page defining it."""
     found: dict[str, Page] = {}
     for source in sorted(spec.rglob("*.md")):
-        if ".git" in source.parts:
+        if elsewhere(source, spec):
             continue
         text = source.read_text(encoding="utf-8", errors="ignore")
         ids = REQ_DEF.findall(text)

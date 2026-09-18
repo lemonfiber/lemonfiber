@@ -305,7 +305,12 @@ mod tests {
                 torrent: false,
             },
         ] {
-            for item in prerequisites(protocols).items {
+            let items = prerequisites(protocols).items;
+            // A protocol that needs nothing is an answer this file has a shape for —
+            // `library_only` — so a set of items that came back empty here means the
+            // walk below asked nothing of anything.
+            assert!(!items.is_empty(), "{protocols:?} listed no prerequisite");
+            for item in items {
                 assert!(
                     !item.what.is_empty(),
                     "{} has no plain description",
@@ -328,7 +333,9 @@ mod tests {
         // Recommending or linking a provider is exactly what this must not do;
         // criteria describe the choice instead. A URL is the easiest way that
         // rule breaks, so it is the one asserted against.
-        for item in prerequisites(Protocols::both()).items {
+        let items = prerequisites(Protocols::both()).items;
+        assert!(!items.is_empty(), "nothing was checked for a vendor's name");
+        for item in items {
             let corpus = format!("{} {} {}", item.what, item.why, item.criteria.join(" "));
             assert!(
                 !corpus.contains("http") && !corpus.contains("www."),

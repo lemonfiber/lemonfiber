@@ -919,6 +919,17 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
+        // Picked up rather than begun again: the saved run is consumed and the walk
+        // it was in the middle of reaches the end. A run that started from the first
+        // question would leave the saved one where it found it.
+        assert!(
+            !paths.setup_progress().exists(),
+            "the saved run was left behind rather than picked up"
+        );
+        assert!(
+            paths.env_file().exists(),
+            "the walk it resumed reached the end"
+        );
         let _ = code;
     }
 
@@ -949,6 +960,12 @@ pub(crate) mod tests {
             r#"{"at":"protocols","answers":{},"phase":"in-progress"}"#,
         );
         let code = greeting(working_ctx(), &paths, &Scripted::saying(true, &[])).await;
+        // Picked up rather than greeted: greeting a machine leaves the saved run
+        // untouched, and resuming one consumes it.
+        assert!(
+            !paths.setup_progress().exists(),
+            "the machine was greeted and its unfinished setup left where it was"
+        );
         let _ = code;
     }
 
@@ -982,6 +999,9 @@ pub(crate) mod tests {
             SetupFlags::none(),
         )
         .await;
+        // Afresh: the run it began asked its questions and wrote what it gathered,
+        // rather than stopping for answers that are not there.
+        assert!(paths.env_file().exists(), "a fresh run reached the end");
         let _ = code;
     }
 
@@ -998,14 +1018,30 @@ pub(crate) mod tests {
         )
         .await;
         assert_ne!(shown(code), success());
+        // Told which it needs rather than left part-way: nothing was gathered, so
+        // there is no saved run for the operator to come back to.
+        assert!(
+            !paths.setup_progress().exists(),
+            "it got past the questions nobody was there to answer"
+        );
     }
 
+    /// Flags answer the questions a run with nobody there cannot ask.
+    ///
+    /// The sibling above, with nobody there and none of them, is told which flags it
+    /// needs and gathers nothing. With them the walk is answered and reaches the
+    /// apply — which is as far as a machine with no stack to bring up can go, so what
+    /// it leaves is a run to resume rather than a list of flags to supply.
     #[tokio::test]
-    async fn a_fully_flagged_run_with_nobody_there_answers_from_the_flags() {
+    async fn flags_answer_the_questions_a_run_with_nobody_there_cannot_ask() {
         let paths = scratch("flagged");
         let flags = crate::prompt::SetupFlags::parse(crate::prompt::fixtures::workable())
             .unwrap_or(SetupFlags::none());
         let code = setting_up(working_ctx(), &paths, &Scripted::saying(false, &[]), flags).await;
+        assert!(
+            paths.setup_progress().exists(),
+            "the flags did not carry it past the questions"
+        );
         let _ = code;
     }
 
@@ -1068,7 +1104,7 @@ pub(crate) mod tests {
 
     /// Both audiences, so neither branch is one nothing runs.
     #[test]
-    fn a_conclusion_reaches_whoever_asked_for_it() {
+    fn both_audiences_a_conclusion_is_written_for_are_reachable() {
         let prose = ["it ended".to_owned()];
         concluded(SetupOutcome::Abandoned, &Settings::default(), &prose, false);
         concluded(SetupOutcome::Abandoned, &Settings::default(), &prose, true);

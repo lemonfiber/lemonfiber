@@ -145,12 +145,7 @@ SITES = {
 
 
 def matrix_installs_what_is_pinned() -> list[str]:
-    """`dist plan` is asked what the matrix expression resolves to on each runner.
-
-    The replacement for that step names one URL and one digest. A runner whose
-    entry asks for a different installer — a PowerShell one, or another version —
-    would be given the wrong one silently.
-    """
+    """`dist plan` is asked what the matrix expression resolves to on each runner."""
     done = subprocess.run(
         ["dist", "plan", "--output-format=json"],
         capture_output=True,
@@ -159,10 +154,49 @@ def matrix_installs_what_is_pinned() -> list[str]:
     )
     if done.returncode != 0:
         return [f"`dist plan` failed, so what the matrix installs is unknown:\n{done.stderr.strip()}"]
-    matrix = json.loads(done.stdout)["ci"]["github"]["artifacts_matrix"]
+    try:
+        plan = json.loads(done.stdout)
+    except json.JSONDecodeError as why:
+        return [f"`dist plan` did not answer with JSON, so nothing was read: {why}"]
+    return runners_install_what_is_pinned(plan)
+
+
+def runners_install_what_is_pinned(plan: dict) -> list[str]:
+    """Every runner in the plan's matrix, against the installer this file pins.
+
+    The replacement for that step names one URL and one digest. A runner whose
+    entry asks for a different installer — a PowerShell one, or another version —
+    would be given the wrong one silently.
+
+    Apart from the call that produces the plan, so every way of reading one wrong
+    can be put in front of it without `dist` installed.
+
+    **A matrix with no runner in it is a refusal.** Zero entries is zero
+    comparisons and an empty problem list, and what this file then prints is that
+    every runner installs the pinned installer. A cargo-dist version that renames
+    the key, and a configuration that produces no local artefacts, both arrive
+    that way — and the other half of this file already refuses a site it cannot
+    find, for the same reason.
+    """
+    matrix = plan.get("ci", {}).get("github", {}).get("artifacts_matrix")
+    if not isinstance(matrix, dict):
+        return [
+            (
+                "`dist plan` answered with no ci.github.artifacts_matrix, so what the "
+                "matrix installs was never read"
+            )
+        ]
+    entries = matrix.get("include") or []
+    if not entries:
+        return [
+            (
+                "`dist plan` resolved the artifacts matrix to no runner at all, so what "
+                "the matrix installs was never read; a pass here would be about nothing"
+            )
+        ]
     problems = []
-    for entry in matrix.get("include", []):
-        install = entry.get("install_dist", {})
+    for entry in entries:
+        install = entry.get("install_dist") or {}
         if install.get("run") != DIST_INSTALL_RUN:
             problems.append(
                 f"{entry.get('runner')} installs dist with {install.get('run')!r}, "
@@ -171,7 +205,64 @@ def matrix_installs_what_is_pinned() -> list[str]:
     return problems
 
 
+def planned(*runners: str) -> dict:
+    """A plan shaped as `dist` writes one, with these runners installing the pin."""
+    return {
+        "ci": {
+            "github": {
+                "artifacts_matrix": {
+                    "include": [
+                        {"runner": runner, "install_dist": {"run": DIST_INSTALL_RUN}}
+                        for runner in runners
+                    ]
+                }
+            }
+        }
+    }
+
+
+def self_test() -> int:
+    """Drive the matrix reading with each way it can answer about nothing.
+
+    The property worth proving is not that a wrong installer is named. It is that
+    a plan this cannot read never comes back empty-handed and happy — which is the
+    only state in which an unverified installer reaches a release.
+    """
+    broken: list[str] = []
+
+    if runners_install_what_is_pinned(planned("ubuntu-latest", "macos-14")):
+        broken.append("a plan whose every runner installs the pin was refused")
+
+    for name, plan in (
+        ("an empty plan", {}),
+        ("a plan with no matrix", {"ci": {"github": {}}}),
+        ("a matrix with no include", {"ci": {"github": {"artifacts_matrix": {}}}}),
+        ("a matrix including nobody", planned()),
+    ):
+        if not runners_install_what_is_pinned(plan):
+            broken.append(f"{name} was read as every runner installing the pin")
+
+    off = planned("ubuntu-latest")
+    off["ci"]["github"]["artifacts_matrix"]["include"][0]["install_dist"]["run"] = "curl | sh"
+    said = runners_install_what_is_pinned(off)
+    if not said or "ubuntu-latest" not in said[0]:
+        broken.append("a runner installing something else was not named")
+
+    for line in broken:
+        print(f"::error::{line}", file=sys.stderr)
+    if broken:
+        print(f"::error::self-test: {len(broken)} claim(s) this makes are not true", file=sys.stderr)
+        return 1
+    print(
+        "self-test: a plan with no matrix, no include and no runner are each refused, "
+        "and a runner installing something other than the pin is named."
+    )
+    return 0
+
+
 def main() -> int:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
     if not WORKFLOW.is_file():
         print(f"{WORKFLOW} is not there; run `dist generate` first.", file=sys.stderr)
         return 1

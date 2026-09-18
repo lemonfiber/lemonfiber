@@ -453,13 +453,23 @@ mod tests {
         // client still running something has not stopped, and one running nothing
         // that would start the next thing handed to it has not either.
         let ctx = a_stack("bandwidth-pulling", a_client_that_answers("[{}]", "false"));
-        for client in &opened(&ctx, &[torrent()]).await {
+        let clients = &opened(&ctx, &[torrent()]).await;
+        assert!(
+            !clients.is_empty(),
+            "no client answered, so nothing below was asked"
+        );
+        for client in clients {
             let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
             assert_eq!(asked.pulling, Some(Pulling::Fetching));
         }
 
         let idle = a_stack("bandwidth-idle", a_client_that_answers("[]", "true"));
-        for client in &opened(&idle, &[torrent()]).await {
+        let clients = &opened(&idle, &[torrent()]).await;
+        assert!(
+            !clients.is_empty(),
+            "no client answered, so nothing below was asked"
+        );
+        for client in clients {
             let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
             assert_eq!(asked.pulling, Some(Pulling::Stopped));
             assert!(
@@ -473,7 +483,12 @@ mod tests {
     async fn stopping_and_starting_are_two_named_requests_rather_than_one_flag() {
         let http = a_client_that_answers("[]", "true");
         let ctx = a_stack("bandwidth-stopping", http.clone());
-        for client in &opened(&ctx, &[torrent()]).await {
+        let clients = &opened(&ctx, &[torrent()]).await;
+        assert!(
+            !clients.is_empty(),
+            "no client answered, so nothing below was asked"
+        );
+        for client in clients {
             assert_eq!(
                 holding(client, &wanted(), Some(Fetch::Stop), false)
                     .await
@@ -498,7 +513,12 @@ mod tests {
         // "Stopped" is exactly the wrong thing to say about a client nobody could
         // reach: it is the answer that reads as a cap being kept.
         let ctx = a_stack("bandwidth-unfetchable", Fake::silent());
-        for client in &opened(&ctx, &[torrent()]).await {
+        let clients = &opened(&ctx, &[torrent()]).await;
+        assert!(
+            !clients.is_empty(),
+            "no client answered, so nothing below was asked"
+        );
+        for client in clients {
             assert!(holding(client, &wanted(), Some(Fetch::Ask), false)
                 .await
                 .pulling
@@ -515,7 +535,12 @@ mod tests {
             })
             .build()
             .with_http(Fake::silent());
-        for client in &opened(&ctx, &[torrent()]).await {
+        let clients = &opened(&ctx, &[torrent()]).await;
+        assert!(
+            !clients.is_empty(),
+            "no client answered, so nothing below was asked"
+        );
+        for client in clients {
             assert!(client.moved("2026-09").await.is_none());
         }
     }

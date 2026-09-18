@@ -762,7 +762,15 @@ mod tests {
         acting.came_to(Ok(Outcome::Lifecycle(report)));
 
         let said = showing(&acting);
-        for line in printed.lines().filter(|line| !line.is_empty()) {
+        let lines: Vec<&str> = printed.lines().filter(|line| !line.is_empty()).collect();
+        // The words to compare against are what the command line rendered, and a
+        // render that came back empty would make the comparison below hold over
+        // nothing while the claim is that the two accounts are the same one.
+        assert!(
+            !lines.is_empty(),
+            "the command line rendered nothing to compare"
+        );
+        for line in lines {
             assert!(said.contains(line), "{line:?} is missing from {said}");
         }
     }

@@ -564,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn each_pull_line_reads_as_prose_or_as_an_envelope() {
+    fn both_shapes_a_pull_line_takes_are_reachable() {
         // Both are exercised for their own sake: a person reads one, a script the
         // other, and neither should ever be handed the wrong shape.
         emit_line(kind::PULL, "Pulling sonarr", false);

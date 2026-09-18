@@ -164,8 +164,8 @@ pub struct Occupied {
 ///
 /// The nine the doctor recognises. Written here because the artefact publishes the
 /// closed sets a row draws from, and held to the doctor's own enumeration by a test
-/// beside that enumeration — a second copy nobody compares is a second copy that
-/// drifts.
+/// in the crate that owns both — this one cannot see the register, and a second copy
+/// nobody compares is a second copy that drifts.
 const CATEGORIES: &[&str] = &[
     "environment",
     "storage",

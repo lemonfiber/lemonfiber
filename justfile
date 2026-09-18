@@ -238,6 +238,11 @@ scripts:
     python3 scripts/the_requirements_an_entry_names.py --self-test
     python3 scripts/no_open_codeql_alert.py --self-test
     python3 scripts/the_gate_a_tag_must_pass.py --self-test
+    python3 scripts/verify_dist_installer.py --self-test
+    python3 scripts/the_tag_a_shell_never_sees.py --self-test
+    python3 scripts/pin_release_actions.py --self-test
+    python3 scripts/the_tag_a_shell_never_sees.py --sweep
+    python3 scripts/pin_release_actions.py --sweep
 
 deny:
     cargo deny check

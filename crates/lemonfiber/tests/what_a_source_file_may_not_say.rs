@@ -65,9 +65,9 @@ fn no_requirement_identifier_appears_in_a_comment() {
 /// Feature-area identifiers are caught too.
 ///
 /// Separate from the prefix list above because these have no fixed prefix — the
-/// shape is an uppercase letter, a digit, a dash, an R, then a digit. Written as
-/// a character test rather than as an example, since an example would be a
-/// requirement identifier in a comment and this test would find it.
+/// shape is an uppercase letter, a feature number, a dash, an R, then a digit.
+/// Written as a character test rather than as an example, since an example would
+/// be a requirement identifier in a comment and this test would find it.
 #[test]
 fn no_feature_requirement_identifier_appears_in_a_comment() {
     for (path, text) in sources() {
@@ -76,23 +76,77 @@ fn no_feature_requirement_identifier_appears_in_a_comment() {
             if !(trimmed.starts_with("//") || trimmed.starts_with("/*")) {
                 continue;
             }
-            let characters: Vec<char> = line.chars().collect();
-            for window in characters.windows(5) {
-                let [area, feature, dash, marker, index] = window else {
-                    continue;
-                };
-                let looks_like_an_identifier = area.is_ascii_uppercase()
-                    && feature.is_ascii_digit()
-                    && *dash == '-'
-                    && *marker == 'R'
-                    && index.is_ascii_digit();
-                assert!(
-                    !looks_like_an_identifier,
-                    "{}:{} cites a requirement in a comment — cite it in the commit instead",
-                    path.display(),
-                    number + 1
-                );
+            assert!(
+                !cites_a_feature_requirement(line),
+                "{}:{} cites a requirement in a comment — cite it in the commit instead",
+                path.display(),
+                number + 1
+            );
+        }
+    }
+}
+
+/// Whether a line writes a feature-area requirement identifier.
+///
+/// A scan rather than a window of fixed width. A window of five characters can
+/// only ever see a feature number of one digit, and the specification defines
+/// four areas whose number is two — every identifier in those was invisible to a
+/// rule that names itself after catching them. The feature number is read as one
+/// or more digits for that reason, and nothing else about the shape moves.
+fn cites_a_feature_requirement(line: &str) -> bool {
+    let characters: Vec<char> = line.chars().collect();
+    for (at, letter) in characters.iter().enumerate() {
+        if !letter.is_ascii_uppercase() {
+            continue;
+        }
+        let mut after = at + 1;
+        while characters.get(after).is_some_and(char::is_ascii_digit) {
+            after += 1;
+        }
+        if after == at + 1 {
+            continue;
+        }
+        let reads = [
+            characters.get(after),
+            characters.get(after + 1),
+            characters.get(after + 2),
+        ];
+        if let [Some('-'), Some('R'), Some(index)] = reads {
+            if index.is_ascii_digit() {
+                return true;
             }
         }
+    }
+    false
+}
+
+/// The scan is held to the shapes it exists to catch, and to those it must not.
+///
+/// Every subject is assembled from characters rather than written out, because a
+/// literal one would be an identifier in this file and the sweep above reads this
+/// file. What is worth pinning is the two-digit feature number: a rule that
+/// catches the shorter shape and not the longer one goes green over exactly the
+/// citations nobody notices.
+#[test]
+fn the_scan_reads_a_feature_number_of_any_length() {
+    let identifier =
+        |area: &str, feature: u32, index: u32| format!("// see {area}{feature}-R{index}");
+    for (area, feature) in [("F", 1u32), ("F", 10), ("B", 10), ("D", 10), ("F", 11)] {
+        let line = identifier(area, feature, 4);
+        assert!(
+            cites_a_feature_requirement(&line),
+            "{line} is a citation and was not read as one"
+        );
+    }
+    for ordinary in [
+        "// the HTTP path it answers on",
+        "// a run of four-R values",
+        "// CRLF endings",
+        "// version 2 of the record",
+    ] {
+        assert!(
+            !cites_a_feature_requirement(ordinary),
+            "{ordinary} is prose and was read as a citation"
+        );
     }
 }

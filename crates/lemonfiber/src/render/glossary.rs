@@ -405,6 +405,9 @@ mod tests {
             .collect();
         let said = footnotes(&every.join(" and the "), true, &Acknowledged::default()).text();
 
+        // A block that rendered nothing runs past no terminal, and would pass the
+        // width guard below by having no line to measure.
+        assert!(!said.trim().is_empty(), "the block rendered nothing");
         for line in said.lines() {
             let width = line.chars().count();
             assert!(width <= 80, "{width} columns: {line}");

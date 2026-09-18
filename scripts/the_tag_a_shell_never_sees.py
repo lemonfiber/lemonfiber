@@ -36,7 +36,16 @@ import pathlib
 import re
 import sys
 
+import yaml
+
 WORKFLOW = pathlib.Path(".github/workflows/release.yml")
+
+# Every workflow in the tree. The patch below rewrites the one file `dist
+# generate` overwrites; the sweep at the end of this reads all of them, because
+# the rule is about the tag rather than about that file. Six other workflows here
+# take a tag or a version and reach a shell with it, and each of them does the
+# right thing today by nobody having done otherwise — which is not a rule.
+WORKFLOWS = pathlib.Path(".github/workflows")
 
 # The name the tag arrives under, everywhere it arrives.
 PASSED_AS = "RELEASE_TAG"
@@ -160,7 +169,133 @@ def pasted(script: str) -> str | None:
     return next((one for one in found if TAG_NAME.search(one)), None)
 
 
+def as_script(workflows: dict[str, str]) -> list[str]:
+    """Every `run:` block a tag or a version reaches as an expression.
+
+    GitHub substitutes a `${{ }}` before the shell sees the line, so the value is
+    not an argument at that point: it is source. A tag is the one piece of a
+    release chosen by a person at the moment they push, and git lets that name
+    carry `$`, a backtick, `;`, `&` and `|`.
+
+    Read from the parsed workflow rather than by matching the text, because a
+    `run:` block is a scalar whose extent only the parser knows — and what is being
+    asked is exactly whether a name sits inside one rather than beside it in an
+    `env:` mapping, which is where it belongs.
+
+    A workflow this cannot parse is named rather than skipped. The whole value of a
+    sweep is that it is over everything, and a file quietly left out is the one the
+    next mistake lands in.
+    """
+    found: list[str] = []
+    if not workflows:
+        return [
+            (
+                f"no workflow was read under {WORKFLOWS}, so nothing was swept and a "
+                "pass here would be about nothing"
+            )
+        ]
+    for name, text in sorted(workflows.items()):
+        try:
+            tree = yaml.safe_load(text)
+        except yaml.YAMLError as why:
+            found.append(f"{name} could not be parsed, so it was not swept: {why}")
+            continue
+        for job, step, run in runs(tree):
+            for expression in EXPRESSION.findall(run):
+                if TAG_NAME.search(expression):
+                    found.append(
+                        f"{name} job {job}, step {step} builds a shell line out of "
+                        f"{expression.strip()}; the value is substituted before the "
+                        "shell sees it, so a name a person chose becomes source. "
+                        "Carry it through `env:` and read it as a variable."
+                    )
+    return found
+
+
+def runs(tree: object) -> list[tuple[str, str, str]]:
+    """Every `run:` block a workflow declares, with the job and step it sits in."""
+    found: list[tuple[str, str, str]] = []
+    if not isinstance(tree, dict):
+        return found
+    for job, declared in (tree.get("jobs") or {}).items():
+        if not isinstance(declared, dict):
+            continue
+        for at, step in enumerate(declared.get("steps") or []):
+            if not isinstance(step, dict):
+                continue
+            script = step.get("run")
+            if isinstance(script, str):
+                found.append((job, step.get("name") or f"{at}", script))
+    return found
+
+
+def swept() -> dict[str, str]:
+    """Every workflow this repository declares, by name."""
+    return {
+        path.name: path.read_text(encoding="utf-8")
+        for path in sorted(WORKFLOWS.glob("*.yml"))
+    }
+
+
+def self_test() -> int:
+    """Drive the sweep with a workflow that has the defect and one that has not.
+
+    A sweep is worth exactly what it refuses, and a sweep over nothing refuses
+    nothing — so the empty case is here beside the two real ones.
+    """
+    broken: list[str] = []
+
+    safe = (
+        "jobs:\n  one:\n    steps:\n      - name: tag it\n        env:\n"
+        "          RELEASE_TAG: ${{ github.ref_name }}\n        run: |\n"
+        '          gh release create "$RELEASE_TAG"\n'
+    )
+    if as_script({"safe.yml": safe}):
+        broken.append("a tag carried through env: was reported as reaching a shell")
+
+    unsafe = (
+        "jobs:\n  one:\n    steps:\n      - name: tag it\n        run: |\n"
+        "          gh release create ${{ github.ref_name }}\n"
+    )
+    said = as_script({"unsafe.yml": unsafe})
+    if not said or "unsafe.yml" not in said[0] or "tag it" not in said[0]:
+        broken.append("a tag interpolated into a run block was not named")
+
+    if not as_script({}):
+        broken.append("a sweep over no workflow at all reported clean")
+
+    if not as_script({"broken.yml": "jobs: [\n"}):
+        broken.append("a workflow that could not be parsed was skipped quietly")
+
+    for line in broken:
+        print(f"::error::{line}", file=sys.stderr)
+    if broken:
+        print(
+            f"::error::self-test: {len(broken)} claim(s) this makes are not true",
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        "self-test: a tag interpolated into a run block is named, one carried through "
+        "env: is not, and a sweep over nothing or over a file it cannot parse refuses."
+    )
+    return 0
+
+
 def main() -> int:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
+    if "--sweep" in sys.argv[1:]:
+        found = as_script(swept())
+        for one in found:
+            print(f"::error::{one}", file=sys.stderr)
+        if found:
+            return 1
+        print(
+            f"workflows: the tag reaches every step as an argument in all "
+            f"{len(swept())} of them"
+        )
+        return 0
     if not WORKFLOW.is_file():
         print(f"{WORKFLOW} is not there; run `dist generate` first.", file=sys.stderr)
         return 1
