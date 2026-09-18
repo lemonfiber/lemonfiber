@@ -141,15 +141,24 @@ fn setting(line: &str, marks: &Marks, terms: &Terms) -> String {
     format!("{name}={}", marks.of(value.trim()))
 }
 
-/// A URL with everything after its question mark marked.
+/// A URL with everything after its question mark marked, and any password in front of
+/// its host withheld.
 ///
 /// The shape that catches people out: an indexer's address is worth sharing and the key
 /// riding in its query string is not, and the two arrive as one string. So a value that is
 /// allowed through keeps its address and loses its parameters wholesale — a query nobody
 /// reads is a smaller loss than a key everybody can.
+///
+/// The password is the second place a URL can carry a credential, and this handled only
+/// the first. A value with no `?` in it took the untouched arm, so an address behind a
+/// proxy that asks for a login went into the bundle with the login in it — a file an
+/// operator is told to attach to a public thread. The query half stays local because the
+/// bundle marks rather than drops, so the same key can be recognised where it appears
+/// twice; the password half is the shared rule, asked rather than restated.
 fn url(value: &str, marks: &Marks) -> String {
+    let value = lemonfiber_ports::withheld::without_password(value);
     match value.split_once('?') {
-        None => value.to_owned(),
+        None => value.clone(),
         Some((address, query)) => format!("{address}?{}", marks.of(query)),
     }
 }

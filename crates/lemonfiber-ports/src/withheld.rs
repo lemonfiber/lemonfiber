@@ -123,7 +123,12 @@ pub fn without_credentials(value: &str) -> String {
 
 /// The same value with the password half of any userinfo in it withheld, or the value
 /// itself where there is none to withhold.
-fn without_password(value: &str) -> String {
+///
+/// Public because the rule has a second consumer that must not spell it again. A support
+/// bundle keeps the query rather than dropping it, so it cannot use the pair above and
+/// wrote its own half instead — which handled the query and never learned about this one.
+#[must_use]
+pub fn without_password(value: &str) -> String {
     password_withheld(value).unwrap_or_else(|| value.to_owned())
 }
 

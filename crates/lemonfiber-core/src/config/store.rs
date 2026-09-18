@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-use super::env::EnvFile;
+use super::env::{is_one_line, EnvFile};
 use lemonfiber_ports::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// Withholding a credential from text that has no field names to read.
@@ -95,8 +95,17 @@ pub fn read(path: &Path) -> Result<EnvFile, Failure> {
 ///
 /// # Errors
 ///
-/// Returns [`Failure`] when the file cannot be read or written.
+/// Returns [`Failure`] when the file cannot be read or written, or when the key
+/// or the value spans more than one line.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Failure> {
+    // Before the file is read, so a refused value cannot move the marker or
+    // rewrite the file on its way to being turned down.
+    if !is_one_line(key) || !is_one_line(value) {
+        return Err(Failure::SpansLines {
+            path: path.to_path_buf(),
+            key: key.to_owned(),
+        });
+    }
     let mut file = read(path)?;
     refuse_if_newer(path, &file)?;
     file.set(key, value);
@@ -329,6 +338,15 @@ pub enum Failure {
     /// There is nowhere to keep configuration.
     #[error("no configuration file has been chosen")]
     Nowhere,
+    /// A setting's key or value carries a line break, which would write further
+    /// settings rather than one setting containing it.
+    #[error("the value offered for {key} spans more than one line, so writing it to {path} would write settings nobody asked for")]
+    SpansLines {
+        /// The file, in full.
+        path: PathBuf,
+        /// The setting that was being changed.
+        key: String,
+    },
     /// The configuration was written by a newer lemonfiber than the one running.
     #[error("the configuration at {path} was written by lemonfiber {wrote} and this is {running}")]
     TooNew {
@@ -352,6 +370,9 @@ pub const CONFIG_NOWHERE: Code = Code::new("CONFIG-3");
 
 /// Raised when configuration was written by a newer lemonfiber.
 pub const CONFIG_TOO_NEW: Code = Code::new("CONFIG-5");
+
+/// Raised when a setting's key or value spans more than one line.
+pub const CONFIG_SPANS_LINES: Code = Code::new("CONFIG-6");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {
@@ -382,6 +403,15 @@ impl Diagnose for Failure {
                 Remedy::new("Run setup").with_detail("lemonfiber setup"),
             )
             .in_state(State::Guided),
+            Self::SpansLines { path, key } => Problem::new(
+                CONFIG_SPANS_LINES,
+                Severity::Error,
+                format!("The value for {key} could not be saved"),
+                "Nothing has been changed. A settings file is one setting per line, so a value with a line break in it would not be saved as that value — it would be saved as that setting and then whatever the rest of the text spells, which the stack would run as settings you never chose.",
+                Remedy::new("Check where this value came from, and set it to a single line"),
+            )
+            .in_state(State::Guided)
+            .with_detail(format!("the settings are at {}", path.display())),
             Self::TooNew {
                 path,
                 wrote,
@@ -557,6 +587,48 @@ mod tests {
     }
 
     #[test]
+    fn a_value_carrying_a_line_break_writes_no_setting_at_all() {
+        // The shape a container can put there without anybody typing it: an API
+        // key read back out of a service's own configuration file, carrying a
+        // break and two settings that would run the rest of the stack as root.
+        let path = scratch("spanning");
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&path, "TZ=UTC\n");
+
+        let refusal = set(&path, "INDEXER_APIKEY", "abc\nPUID=0\nPGID=0").err();
+        assert!(
+            matches!(refusal, Some(Failure::SpansLines { ref key, .. }) if key == "INDEXER_APIKEY"),
+            "the refusal names the setting, and is its own kind of failure"
+        );
+        assert_eq!(
+            refusal.map(|failure| failure.problem().remedies.is_empty()),
+            Some(false),
+            "and offers something to do about it"
+        );
+
+        let after = std::fs::read_to_string(&path).ok();
+        assert_eq!(
+            after,
+            Some("TZ=UTC\n".to_owned()),
+            "the file is byte for byte what it was — not the key, not the \
+             injected settings, and not the marker a write would have moved"
+        );
+
+        // A carriage return alone is the same defect on the other line ending,
+        // and a key is as capable of carrying one as a value.
+        assert!(set(&path, "A", "1\rB=2").is_err());
+        assert!(set(&path, "A\nB", "1").is_err());
+        assert_eq!(
+            std::fs::read_to_string(&path).ok(),
+            Some("TZ=UTC\n".to_owned())
+        );
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
+    }
+
+    #[test]
     fn a_configuration_that_cannot_be_read_is_refused_rather_than_assumed_empty() {
         let blocker = scratch("unreadable");
         if let Some(parent) = blocker.parent() {
@@ -709,16 +781,37 @@ mod tests {
                 reason: "full".to_owned(),
             },
             Failure::Nowhere,
+            Failure::SpansLines {
+                path: "/tmp/x/.env".into(),
+                key: "INDEXER_APIKEY".to_owned(),
+            },
             Failure::TooNew {
                 path: "/tmp/x/.env".into(),
                 wrote: "9.0.0".to_owned(),
                 running: "0.1.0".to_owned(),
             },
         ];
+        let mut codes = std::collections::BTreeSet::new();
         for failure in &failures {
+            // Named exhaustively rather than swept past: a variant added without
+            // a sample above stops this compiling, where a bare loop would have
+            // gone on passing about the ones the array happened to hold.
+            match failure {
+                Failure::Unreadable { .. }
+                | Failure::NotWritten { .. }
+                | Failure::Nowhere
+                | Failure::SpansLines { .. }
+                | Failure::TooNew { .. } => {}
+            }
             assert!(!failure.to_string().is_empty());
             assert!(!failure.problem().remedies.is_empty());
+            codes.insert(failure.problem().code.as_str());
         }
+        assert_eq!(
+            codes.len(),
+            failures.len(),
+            "and each of them raises a code of its own, so a log names which"
+        );
     }
 
     /// The file a newer build left behind, written by hand rather than through

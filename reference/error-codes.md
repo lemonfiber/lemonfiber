@@ -34,6 +34,7 @@ what to do about it, is written for operators at
 - `CONFIG-3`
 - `CONFIG-4`
 - `CONFIG-5`
+- `CONFIG-6`
 - `CRED-1`
 - `CRED-2`
 - `CRED-3`

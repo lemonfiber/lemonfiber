@@ -263,8 +263,12 @@ pub fn in_full(name: &str) -> bool {
 /// own site, and some of those sites hand out the address with the key already in it.
 ///
 /// A value that is allowed through therefore keeps its address and loses its parameters
-/// wholesale — the same call [`crate::bundle::allowed`] makes for the same value, for the
-/// same reason. A query nobody reads is a smaller loss than a key everybody can.
+/// wholesale. A query nobody reads is a smaller loss than a key everybody can.
+///
+/// [`crate::bundle::allowed`] does the same to the same value for the same reason, and
+/// differs in one thing: it marks the query rather than dropping it, so a reader can see
+/// where one key turns up twice. That is the whole of the difference, and it is why the
+/// two are not one call.
 ///
 /// A password written in front of the host goes the same way, for a reason the query's
 /// is not: there the parameter's name belongs to whoever wrote the service, and here the

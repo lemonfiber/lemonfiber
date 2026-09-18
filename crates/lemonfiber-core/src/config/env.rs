@@ -35,6 +35,23 @@ pub struct EnvFile {
     trailing_newline: bool,
 }
 
+/// Whether text can be written as part of one line of this file.
+///
+/// A setting is a line, and rendering writes the key and the value into one with
+/// nothing between them and the next. So a value carrying a break does not
+/// produce a setting with a break in it — it produces that setting and then
+/// however many more the rest of the text spells, which the stack reads as
+/// settings the operator wrote.
+///
+/// Several of the values that reach a settings file are read out of a file one of
+/// the containers wrote about itself, so a break here is not a shape only a hand
+/// edit could put there. What refuses it is the writer, because that is the one
+/// place every source passes through.
+#[must_use]
+pub fn is_one_line(text: &str) -> bool {
+    !text.contains(['\n', '\r'])
+}
+
 impl EnvFile {
     /// Read an environment file.
     ///
@@ -181,7 +198,7 @@ impl Line {
 
 #[cfg(test)]
 mod tests {
-    use super::EnvFile;
+    use super::{is_one_line, EnvFile};
 
     /// The file this stack ships as its documented starting point.
     const EXAMPLE: &str = include_str!("../../../../assets/media-stack/.env.example");
@@ -220,6 +237,21 @@ mod tests {
 
         assert_eq!(file.render(), "# what B is for\nB=2\n");
         assert_eq!(file.get("A"), None);
+    }
+
+    #[test]
+    fn a_value_spanning_lines_is_more_settings_rather_than_one_value() {
+        // Why the writer refuses rather than escaping: there is no escape. The
+        // renderer puts the value straight after the `=`, so what a break makes
+        // is a second setting, and this shows it happening.
+        let mut file = EnvFile::parse("TZ=UTC\n");
+        file.set("INDEXER_APIKEY", "abc\nPUID=0");
+
+        assert_eq!(EnvFile::parse(&file.render()).get("PUID"), Some("0"));
+        assert!(!is_one_line("abc\nPUID=0"));
+        assert!(!is_one_line("abc\rPUID=0"));
+        assert!(is_one_line("abc"));
+        assert!(is_one_line(""));
     }
 
     #[test]
