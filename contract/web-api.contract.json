@@ -3353,6 +3353,17 @@
           "description": "A service the household can reach that is not the front door, and why it is not.\n\nCarried rather than left out, because the decision is the useful part: an operator\nwho can see that the index over every service was considered and refused has been\ntold something, where one shown a single name has only been given an answer.",
           "type": "object",
           "properties": {
+            "address": {
+              "description": "The address to hand somebody for this service, read from this machine at the\nmoment of asking rather than remembered.\n\n**Carried because not-the-door is not nowhere.** A household member wanting to\nwatch something, or to ask for something, wants the service that faces them —\nand which of the two happens to be the front door is an operator's\narrangement, not an answer to their question. Without this a surface can hand\nthem only whichever one the door turned out to be, and say nothing at all\nabout the other.\n\nAbsent where the stack declares no port for it, for the reason the door's own\naddress is absent then: an address with no port on it is one a browser answers\nwith a refusal, and the manifest is where a port is declared.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Address"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "because": {
               "description": "Why it is not somewhere to begin.",
               "type": "string"
@@ -5769,6 +5780,17 @@
           "description": "A service the household can reach that is not the front door, and why it is not.\n\nCarried rather than left out, because the decision is the useful part: an operator\nwho can see that the index over every service was considered and refused has been\ntold something, where one shown a single name has only been given an answer.",
           "type": "object",
           "properties": {
+            "address": {
+              "description": "The address to hand somebody for this service, read from this machine at the\nmoment of asking rather than remembered.\n\n**Carried because not-the-door is not nowhere.** A household member wanting to\nwatch something, or to ask for something, wants the service that faces them —\nand which of the two happens to be the front door is an operator's\narrangement, not an answer to their question. Without this a surface can hand\nthem only whichever one the door turned out to be, and say nothing at all\nabout the other.\n\nAbsent where the stack declares no port for it, for the reason the door's own\naddress is absent then: an address with no port on it is one a browser answers\nwith a refusal, and the manifest is where a port is declared.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Address"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "because": {
               "description": "Why it is not somewhere to begin.",
               "type": "string"

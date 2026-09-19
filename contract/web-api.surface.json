@@ -1879,6 +1879,12 @@
     },
     "FrontDoorBeside": {
       "fields": {
+        "address": {
+          "type": [
+            "anyOf(null,ref:Address)"
+          ],
+          "required": false
+        },
         "because": {
           "type": [
             "string"

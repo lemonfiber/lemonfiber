@@ -52,6 +52,20 @@ pub struct Beside {
     pub facing: Facing,
     /// Why it is not somewhere to begin.
     pub because: String,
+    /// The address to hand somebody for this service, read from this machine at the
+    /// moment of asking rather than remembered.
+    ///
+    /// **Carried because not-the-door is not nowhere.** A household member wanting to
+    /// watch something, or to ask for something, wants the service that faces them —
+    /// and which of the two happens to be the front door is an operator's
+    /// arrangement, not an answer to their question. Without this a surface can hand
+    /// them only whichever one the door turned out to be, and say nothing at all
+    /// about the other.
+    ///
+    /// Absent where the stack declares no port for it, for the reason the door's own
+    /// address is absent then: an address with no port on it is one a browser answers
+    /// with a refusal, and the manifest is where a port is declared.
+    pub address: Option<Address>,
 }
 
 /// The household's one front door: which service it is, where it stands, and what

@@ -63,7 +63,7 @@ pub(super) fn assembled(
             facing: None,
             meaning: meaning(Standing::Absent, "", &chosen),
             chosen,
-            beside: beside(declared, None),
+            beside: beside(declared, None, named, recorded, environment),
         };
     };
 
@@ -80,7 +80,13 @@ pub(super) fn assembled(
         meaning: meaning(standing, &service.name, &chosen),
         chosen,
         address: reached,
-        beside: beside(declared, Some(service.id.as_str())),
+        beside: beside(
+            declared,
+            Some(service.id.as_str()),
+            named,
+            recorded,
+            environment,
+        ),
     }
 }
 
@@ -205,7 +211,13 @@ fn said(standing: Standing, name: &str) -> String {
 /// In the order the manifest declares them, so the same stack answers the same way
 /// twice. The door itself is left out: it is named above, and naming it here as well
 /// would be one fact stated in two places that can disagree.
-fn beside(services: &[lemonfiber_manifest::Service], door: Option<&str>) -> Vec<Beside> {
+fn beside(
+    services: &[lemonfiber_manifest::Service],
+    door: Option<&str>,
+    named: Option<&str>,
+    recorded: Option<&str>,
+    environment: Environment,
+) -> Vec<Beside> {
     services
         .iter()
         .filter(|service| Some(service.id.as_str()) != door)
@@ -215,6 +227,10 @@ fn beside(services: &[lemonfiber_manifest::Service], door: Option<&str>) -> Vec<
                 service: service.name.clone(),
                 facing,
                 because: facing.because().to_owned(),
+                // The same reading the door's own address gets, for the same machine
+                // at the same moment. A second way of working out where a service is
+                // would be a second answer able to disagree with the first.
+                address: reached(service, named, recorded, environment),
             })
         })
         .collect()
@@ -273,6 +289,53 @@ mod tests {
             .collect();
         assert!(beside.contains(&"Jellyfin".to_owned()));
         assert!(!beside.contains(&"Seerr".to_owned()));
+    }
+
+    /// The library is reachable even where the request service is the door.
+    ///
+    /// The point of carrying an address beside the door rather than only on it: a
+    /// member who wants to watch something wants the service that faces watching,
+    /// and which of the two the operator made the front door is not an answer to
+    /// that question. Without this a surface can hand them only whichever one it
+    /// turned out to be.
+    #[tokio::test]
+    async fn the_library_beside_the_door_can_still_be_handed_over() {
+        let report = front_door(&ctx(&["seerr", "jellyfin"])).await.ok();
+        let library = report
+            .iter()
+            .flat_map(|report| report.beside.iter())
+            .find(|beside| beside.service == "Jellyfin")
+            .and_then(|beside| beside.address.clone());
+
+        assert!(
+            library.is_some_and(|address| address.url.contains("kitchen-nas")),
+            "the library stood beside the door with nowhere to send anybody"
+        );
+    }
+
+    /// Every service beside the door is handed over with somewhere to arrive.
+    ///
+    /// The shipped stack declares a port for each of them, so each carries an
+    /// address — including the index over everything, which is refused as a *door*
+    /// for what it faces rather than for being unreachable. The two answers are
+    /// separate, and this is what keeps them from being read as one.
+    #[tokio::test]
+    async fn a_service_refused_as_the_door_is_still_somewhere_to_arrive() {
+        let report = front_door(&ctx(&["seerr"])).await.ok();
+        let homepage = report
+            .iter()
+            .flat_map(|report| report.beside.iter())
+            .find(|beside| beside.service == "Homepage");
+
+        assert_eq!(
+            homepage.map(|beside| beside.facing),
+            Some(Facing::Operators),
+            "the index is not somewhere the household begins"
+        );
+        assert!(
+            homepage.is_some_and(|beside| beside.address.is_some()),
+            "a service refused as the door was also left unreachable"
+        );
     }
 
     #[tokio::test]
