@@ -92,6 +92,10 @@ mod tests {
                 service: "Homepage".to_owned(),
                 facing: Facing::Operators,
                 because: Facing::Operators.because().to_owned(),
+                address: Some(Address {
+                    url: "http://kitchen-nas.local:3000".to_owned(),
+                    caution: None,
+                }),
             }],
         }
     }

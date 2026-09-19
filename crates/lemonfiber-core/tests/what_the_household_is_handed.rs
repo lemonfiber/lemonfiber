@@ -147,16 +147,42 @@ async fn what_the_household_can_reach_is_still_named_so_the_guard_above_means_so
 }
 
 #[tokio::test]
-async fn the_only_address_on_the_answer_is_the_doors_own() {
-    // Naming a service and handing over the address of one are different things, and
-    // the second is what a link is. What stands beside the door is a name and a
-    // reason; there is nothing on it to follow.
+async fn only_what_faces_the_household_is_handed_over() {
+    // Naming a service and handing over the address of one are different acts, and
+    // the second is what a link is. A member may be handed the way to somewhere meant
+    // for them — the library, a shelf — because arriving there is the point of
+    // naming it. The rest are named in order to be refused **by name**, and an
+    // address on one of those would be that refusal undone.
     let report = answered(None).await;
-    let addresses = everything(&report).matches("http://").count();
-    assert_eq!(addresses, 1, "{}", everything(&report));
     assert!(report
         .address
         .is_some_and(|address| address.url.contains("kitchen-nas.local:5055")));
+
+    let handed: Vec<&str> = report
+        .beside
+        .iter()
+        .filter(|beside| beside.address.is_some())
+        .map(|beside| beside.service.as_str())
+        .collect();
+    assert!(
+        handed.contains(&"Jellyfin"),
+        "the library is somewhere a member is meant to arrive: {handed:?}"
+    );
+
+    // The index over every service says of itself that it includes the ones nobody
+    // in the house should learn exist. It is the one this rule is really about.
+    let withheld: Vec<&str> = report
+        .beside
+        .iter()
+        .filter(|beside| beside.address.is_none())
+        .map(|beside| beside.service.as_str())
+        .collect();
+    assert!(
+        withheld.contains(&"Homepage") && withheld.contains(&"Caddy"),
+        "a service the household is not sent to was handed over anyway: {withheld:?}"
+    );
+
+    // And the reason a service is not the door is still prose, never a link.
     assert!(report
         .beside
         .iter()

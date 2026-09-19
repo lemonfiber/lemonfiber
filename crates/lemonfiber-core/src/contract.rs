@@ -667,6 +667,10 @@ mod tests {
                 service: "homepage".to_owned(),
                 facing: crate::door::Facing::Operators,
                 because: crate::door::Facing::Operators.because().to_owned(),
+                address: Some(crate::door::Address {
+                    url: "http://a-machine.local:3000".to_owned(),
+                    caution: None,
+                }),
             }],
         }
     }

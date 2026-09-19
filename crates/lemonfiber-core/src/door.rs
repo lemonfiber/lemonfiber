@@ -82,6 +82,25 @@ impl Facing {
     pub const fn begins(self) -> bool {
         matches!(self, Self::Asking | Self::Watching)
     }
+
+    /// Whether somebody in the house may be handed the way there at all.
+    ///
+    /// Wider than [`Self::begins`] and narrower than every service there is. A shelf
+    /// is not somewhere to *start* — it holds one kind of media and is reached from
+    /// the library — but a member sent to it arrives somewhere meant for them, so an
+    /// address is a thing they can be given.
+    ///
+    /// **The other three are named in order to be refused by name.** The index over
+    /// every service exists for the operator and includes the ones nobody in the
+    /// house should learn exist; the carriage is how the others are reached rather
+    /// than one of them; and a service nothing has said anything about is offered to
+    /// nobody, which is the register's own default and the safe direction to be
+    /// wrong in. Naming one of those and handing over the way to it are different
+    /// acts, and only the first is what standing beside the door means.
+    #[must_use]
+    pub const fn handed_over(self) -> bool {
+        matches!(self, Self::Asking | Self::Watching | Self::Shelf)
+    }
 }
 
 /// The services published to the household that speak no API lemonfiber knows.
