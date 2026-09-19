@@ -29,7 +29,9 @@ use thiserror::Error;
 
 use crate::doctor::BUNDLED_CHECKS;
 
-pub use claimed::{claimed, read, Claimed, Claiming, Contributed, Ran, Unreadable, Verdict};
+pub use claimed::{
+    claimed, read, Claimed, Claiming, Contributed, Evidence, Ran, Unreadable, Verdict,
+};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
 

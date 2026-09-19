@@ -49,6 +49,23 @@ pub enum Unreadable {
     Stack(#[from] Ungenerated),
 }
 
+/// What the verdicts in a report were reached against.
+///
+/// One value, because one is all this build can produce: nothing here asks a service
+/// anything. It is a field rather than a sentence for the reason a verdict is one — a
+/// reader handed `demonstrated` has nothing else in the document to tell a recording
+/// that answered from a service that did, and the weaker of those two claims must not
+/// be readable as the stronger. The prose says it on the page; this says it to
+/// whatever consumes the report: an author's own CI, a catalogue, anything counting
+/// passes. Naming the axis now is also what makes a second kind of evidence a change
+/// the compiler walks somebody through rather than one they have to remember.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Evidence {
+    /// The recordings the plugin ships. No service was asked anything.
+    Recordings,
+}
+
 /// What one bound probe came to.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "outcome", rename_all = "lowercase")]
@@ -128,6 +145,8 @@ pub struct Claimed {
     pub vocabulary_version: u32,
     /// The extension points generation it was held to.
     pub extension_points_version: u32,
+    /// What every verdict in this report was reached against.
+    pub against: Evidence,
     /// Everything the two published vocabularies refuse, in one pass.
     pub refusals: Vec<lemonfiber_plugin::Violation>,
     /// What its services declare they can do.
@@ -199,6 +218,7 @@ pub fn claimed(path: &Path) -> Result<Claimed, Unreadable> {
         version: manifest.plugin.version.clone(),
         vocabulary_version: lemonfiber_plugin::vocabulary::VOCABULARY_VERSION,
         extension_points_version: lemonfiber_plugin::extension::EXTENSION_POINTS_VERSION,
+        against: Evidence::Recordings,
         installable: installs(&refusals, &capabilities),
         refusals,
         capabilities,

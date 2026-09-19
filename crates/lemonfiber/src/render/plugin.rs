@@ -13,7 +13,8 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Capabilities, Claimed, Claiming, Credential, Points, Probe, Provenance, Ran, Verdict, Vouched,
+    Capabilities, Claimed, Claiming, Credential, Evidence, Points, Probe, Provenance, Ran, Verdict,
+    Vouched,
 };
 
 use super::Lines;
@@ -237,9 +238,19 @@ fn claims(read: &Claimed) -> Lines {
         }
     }
 
-    lines.spaced(if read.installable {
-        "Nothing here stops it being installed. No service was asked anything: every \
-         verdict above is against the recordings this plugin ships."
+    // A match rather than a sentence written here, so that the day a verdict can come
+    // from a service this stops compiling instead of going on saying the wrong thing.
+    // And said on every run rather than only on the one that passed: the refused
+    // report is the one whose reader is about to go and change their service, and it
+    // was the report that never told them nothing had been asked of it.
+    lines.spaced(match read.against {
+        Evidence::Recordings => {
+            "No service was asked anything: every verdict above is against the \
+             recordings this plugin ships."
+        }
+    });
+    lines.put(if read.installable {
+        "Nothing here stops it being installed."
     } else {
         "As it stands this would not be installed."
     });
@@ -319,7 +330,7 @@ fn counted(number: usize, thing: &str) -> String {
 mod tests {
     use lemonfiber_core::filling::{Filling, Shown};
     use lemonfiber_core::plugin::{
-        Claimed, Claiming, Contributed, Ran, Verdict, Violation, Vouched,
+        Claimed, Claiming, Contributed, Evidence, Ran, Verdict, Violation, Vouched,
     };
 
     use super::{capabilities, claimed, claims, document, points};
@@ -352,6 +363,7 @@ mod tests {
             version: "1.0.0".to_owned(),
             vocabulary_version: 1,
             extension_points_version: 1,
+            against: Evidence::Recordings,
             installable: refusals.is_empty(),
             refusals,
             capabilities,
@@ -420,6 +432,39 @@ mod tests {
             "{text}"
         );
         assert!(text.contains("media.serve"), "{text}");
+    }
+
+    /// What the verdicts were reached against is on the page either way.
+    ///
+    /// Read here as well as through the binary, because this file is compiled twice
+    /// under coverage and a branch taken in only one of the two reads as missed. It
+    /// used to be half of the sentence that said the plugin could be installed, which
+    /// left the report most likely to send somebody off to look at their own service
+    /// as the one that never told them nothing had been asked of it.
+    #[test]
+    fn the_page_says_what_it_was_against_whichever_answer_it_reaches() {
+        let installable = claims(&read(
+            vec![claiming("media.serve", Shown::Demonstrated, None)],
+            Vec::new(),
+        ))
+        .text();
+        let refused = claims(&read(
+            vec![claiming("media.serve", Shown::Demonstrated, None)],
+            vec![Violation {
+                location: "service kavita.digest".to_owned(),
+                message: "a digest is a sha256 content address of sixty-four characters".to_owned(),
+            }],
+        ))
+        .text();
+        for text in [&installable, &refused] {
+            assert!(text.contains("No service was asked anything"), "{text}");
+            assert!(text.contains("recordings this plugin ships"), "{text}");
+        }
+        assert!(
+            installable.contains("Nothing here stops it being installed"),
+            "{installable}"
+        );
+        assert!(refused.contains("would not be installed"), "{refused}");
     }
 
     /// A remedy names the check it is for, and a row saying nothing takes no line for it.
