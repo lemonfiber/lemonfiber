@@ -230,7 +230,16 @@ fn beside(
                 // The same reading the door's own address gets, for the same machine
                 // at the same moment. A second way of working out where a service is
                 // would be a second answer able to disagree with the first.
-                address: reached(service, named, recorded, environment),
+                //
+                // Only where somebody in the house may be handed the way there.
+                // Naming a service and handing over the address of one are different
+                // acts: the index over every service is named here in order to be
+                // refused by name, and an address on it would be the refusal
+                // undone.
+                address: facing
+                    .handed_over()
+                    .then(|| reached(service, named, recorded, environment))
+                    .flatten(),
             })
         })
         .collect()
@@ -313,14 +322,14 @@ mod tests {
         );
     }
 
-    /// Every service beside the door is handed over with somewhere to arrive.
+    /// The index over every service is named and is **not** handed over.
     ///
-    /// The shipped stack declares a port for each of them, so each carries an
-    /// address — including the index over everything, which is refused as a *door*
-    /// for what it faces rather than for being unreachable. The two answers are
-    /// separate, and this is what keeps them from being read as one.
+    /// It says of itself that it includes the services nobody in the house should
+    /// learn exist. Naming it beside the door is how it gets refused by name; an
+    /// address on it would be that refusal undone, so the two halves of the answer
+    /// have to disagree about it on purpose.
     #[tokio::test]
-    async fn a_service_refused_as_the_door_is_still_somewhere_to_arrive() {
+    async fn the_index_over_everything_is_named_without_being_handed_over() {
         let report = front_door(&ctx(&["seerr"])).await.ok();
         let homepage = report
             .iter()
@@ -333,8 +342,8 @@ mod tests {
             "the index is not somewhere the household begins"
         );
         assert!(
-            homepage.is_some_and(|beside| beside.address.is_some()),
-            "a service refused as the door was also left unreachable"
+            homepage.is_some_and(|beside| beside.address.is_none()),
+            "the operator's index was handed to the household"
         );
     }
 
