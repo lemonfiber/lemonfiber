@@ -127,8 +127,29 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
         bound: bound(),
         admitting: Arc::clone(admitting),
         live,
+        clock: Stopped::at(NOW),
     });
     (routes(serving, streaming), token)
+}
+
+/// The stream's route alone, merged without the layer that guards the rest.
+///
+/// **The assembly mistake, staged deliberately.** This route brings its own state
+/// and can therefore be merged outside the guard — which is why it checks admission
+/// a second time, and why that check cannot be reached through the assembled
+/// surface, where the outer guard answers first.
+pub(crate) fn stream_alone(admitting: &Arc<Admitting>) -> axum::Router {
+    let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
+        unreachable!("a cycling source always mints one")
+    };
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    lemonfiber_api::events::routes(Arc::new(Streaming {
+        token,
+        bound: bound(),
+        admitting: Arc::clone(admitting),
+        live,
+        clock: Stopped::at(NOW),
+    }))
 }
 
 /// A surface keeping the password at `path`, sharing one register with the test.

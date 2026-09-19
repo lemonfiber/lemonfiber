@@ -367,3 +367,71 @@ async fn a_request_that_reached_a_handler_unnamed_is_not_served() {
         "a handler reached without a subject served the request anyway"
     );
 }
+
+/// The stream refuses on its own, where nothing above it did.
+///
+/// Driven against the route merged **alone**, because that is the only arrangement
+/// in which this check does anything: assembled correctly the outer guard answers
+/// first, so a request never reaches the stream's own reading. It exists for the
+/// arrangement staged here — a route that brings its own state and was merged
+/// outside the layer covering the rest — and without it that mistake leaves the
+/// stream open while every other route is closed.
+#[tokio::test]
+async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
+    let named = "stream-alone";
+    let household = AHousehold::knowing(MEMBER);
+    let (router, _, admitting) = door_with(
+        Some(keeping(named)),
+        Arc::clone(&household),
+        not_the_token(),
+    );
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, session(&answer.body)));
+
+    household.go_dark();
+    let refused = asked(stream_alone(&admitting), "GET", "/api/events", &carried, "").await;
+
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert!(refused.body.contains("media server"), "{}", refused.body);
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// And it answers a caller it *can* vouch for, so the refusal above is the check
+/// rather than the route being shut.
+#[tokio::test]
+async fn the_stream_answers_a_member_it_could_check() {
+    let named = "stream-alone-open";
+    let (router, _, admitting) = door_with(
+        Some(keeping(named)),
+        AHousehold::knowing(MEMBER),
+        not_the_token(),
+    );
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, session(&answer.body)));
+
+    let heard = asked(stream_alone(&admitting), "GET", "/api/events", &carried, "").await;
+
+    assert_eq!(
+        heard.status,
+        StatusCode::OK,
+        "a member the household vouched for was not let on to the stream"
+    );
+    let _ = fs::remove_dir_all(a_directory(named));
+}

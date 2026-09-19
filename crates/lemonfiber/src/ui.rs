@@ -374,6 +374,7 @@ async fn serving(
             bound,
             admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
+            clock: Arc::clone(&ctx.clock),
         });
         let surface = surface(serving, streaming, app);
         match holding(sockets, surface, &admitting, offered, &mut until, look).await {
@@ -829,6 +830,7 @@ mod tests {
             bound: Binding::here(bound().port()),
             admitting,
             live,
+            clock: Arc::clone(&serving.ctx.clock),
         });
         Some(surface(serving, streaming, None))
     }

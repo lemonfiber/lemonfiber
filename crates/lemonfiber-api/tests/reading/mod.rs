@@ -158,6 +158,7 @@ pub(crate) async fn answered(
             token,
             bound: bound(),
             live,
+            clock: Stopped::at(0),
         }),
     );
 

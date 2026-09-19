@@ -497,6 +497,7 @@ async fn no_setup_endpoint_is_reachable_without_this_run_s_token() {
         token: Arc::clone(&serving.token),
         bound: bound(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        clock: Stopped::at(0),
     });
     let surface = lemonfiber_api::router::routes(serving, streaming);
 
@@ -541,6 +542,7 @@ async fn a_token_from_this_run_is_admitted() {
         token: Arc::clone(&serving.token),
         bound: bound(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        clock: Stopped::at(0),
     });
     let surface = lemonfiber_api::router::routes(serving, streaming);
     let request = Request::builder()
