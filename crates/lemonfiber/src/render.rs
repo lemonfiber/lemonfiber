@@ -500,10 +500,10 @@ mod tests {
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
         AdoptReport, AlertReport, BesideReport, CarryingReport, ConfigReport, ConflictReport,
-        Disposition, DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport,
-        MigrationReport, MovedReport, MusicReport, OccupantReport, QualityReport, ResetReport,
-        SettingReport, Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport,
-        UpgradeReport, VersionReport, WizardReport,
+        Disposition, DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HeldReport,
+        HouseholdReport, MigrationReport, MovedReport, MusicReport, OccupantReport, QualityReport,
+        ResetReport, SettingReport, Standing, StandingReport, StatusReport, StuckReport,
+        UnsupportedReport, UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::reconfigure::{Change, Cost, Findings, Review, Stance};
     use lemonfiber_core::wizard::{Phase, Step};
@@ -984,6 +984,13 @@ mod tests {
                 filtering: None,
                 policy: None,
                 allows: None,
+            }),
+            Outcome::Held(HeldReport {
+                member: "Ada".to_owned(),
+                id: "a7f3".to_owned(),
+                holdings: Vec::new(),
+                available: true,
+                findings: Vec::new(),
             }),
             Outcome::Stuck(StuckReport {
                 items: Vec::new(),

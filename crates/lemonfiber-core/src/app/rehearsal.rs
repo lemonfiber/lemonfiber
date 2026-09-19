@@ -751,6 +751,10 @@ mod tests {
                 format: crate::audio::Format::Lossless,
             },
             Command::Household { member: None },
+            Command::Held {
+                member: "ana".to_owned(),
+                most: 25,
+            },
             Command::Allowing(Chosen::default()),
             Command::Deciding(Decision {
                 request: 1,

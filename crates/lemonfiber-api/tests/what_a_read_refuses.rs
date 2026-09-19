@@ -480,6 +480,26 @@ async fn more_holdings_than_one_read_answers_with_is_refused_not_quietly_cut_dow
     );
 }
 
+/// Naming no count is answered, at the length one screen holds.
+///
+/// The only one of the four counts that is not a refusal, and it is here beside them
+/// because it is the same boundary read from the other side: the arm that answers is
+/// what says the other three are refusing something rather than refusing everything.
+#[test]
+fn a_shelf_asked_for_with_no_count_is_read_to_what_one_screen_holds() {
+    let named = reads::wanted(reads::HELD, Some("member=ada"))
+        .ok()
+        .and_then(|given| reads::named(reads::HELD, given).ok());
+
+    assert_eq!(
+        named,
+        Some(Command::Held {
+            member: "ada".to_owned(),
+            most: reads::A_SHELF,
+        })
+    );
+}
+
 #[tokio::test]
 async fn a_shelf_at_the_ceiling_is_still_asked_for() {
     let seen = asked(world(running(), stack()), "/api/held?member=ada&most=500").await;
