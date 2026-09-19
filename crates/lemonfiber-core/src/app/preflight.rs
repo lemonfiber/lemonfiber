@@ -190,6 +190,7 @@ mod tests {
                 forms: Vec::new(),
                 services: Vec::new(),
                 removed: Vec::new(),
+                wirings: Vec::new(),
             })
     }
 

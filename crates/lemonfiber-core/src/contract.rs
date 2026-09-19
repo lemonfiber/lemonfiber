@@ -66,8 +66,8 @@ use crate::model::{
     Envelope, FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdRemoval,
     HouseholdReport, ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport,
     ProvenanceReport, QualityReport, ReplaceReport, ResetReport, SetupReport, Started,
-    StatusReport, StuckReport, SupervisionReport, TraceReport, UpdateReport, UpgradeReport,
-    VersionReport, WalkthroughReport, WizardReport, API_VERSION,
+    StatusReport, StuckReport, SubstitutionReport, SupervisionReport, TraceReport, UpdateReport,
+    UpgradeReport, VersionReport, WalkthroughReport, WiringReport, WizardReport, API_VERSION,
 };
 use crate::outbound::Leaving;
 use crate::ports::docker::LogLine;
@@ -252,6 +252,12 @@ fn the_rest_of_the_kinds(kinds: &mut BTreeMap<String, Schema>) {
     );
     describing(kinds, kind::WATCH, schema_for!(Envelope<SupervisionReport>));
     describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
+    describing(kinds, kind::WIRING, schema_for!(Envelope<WiringReport>));
+    describing(
+        kinds,
+        kind::SUBSTITUTION,
+        schema_for!(Envelope<SubstitutionReport>),
+    );
     describing(kinds, kind::WORD, schema_for!(Envelope<Term>));
 }
 
@@ -299,10 +305,11 @@ mod tests {
         DoctorReport, FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdReport,
         ImportReport, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport,
         QualityReport, RemovedService, ReplaceReport, ResetReport, ServiceProvenance, StatusReport,
-        StuckReport, SupervisionReport, TraceReport, UpdateReport, UpgradeReport, VersionReport,
-        WalkthroughReport, WizardReport,
+        StuckReport, SubstitutionReport, SupervisionReport, TraceReport, UpdateReport,
+        UpgradeReport, VersionReport, WalkthroughReport, WiringReport, WizardReport,
     };
     use crate::stack::closure::Plan;
+    use crate::wiring::{Reaches, Settled, Substitution, Unfilled, Wired};
 
     /// What is committed, read from the workspace root.
     fn committed() -> Option<String> {
@@ -589,6 +596,8 @@ mod tests {
                     replaced_by: Some("bindery".to_owned()),
                 }],
             }),
+            Outcome::Wiring(what_is_wired()),
+            Outcome::Substituted(a_substitution()),
             Outcome::Stored(crate::stored::stored(
                 &crate::config::paths::Paths::rooted(
                     std::path::Path::new("/home/op/.config"),
@@ -678,6 +687,54 @@ mod tests {
                     caution: None,
                 }),
             }],
+        }
+    }
+
+    /// One of each kind of link, because the two arms of `Reaches` are what the
+    /// shape comparison is about: an ask carries a capability and how it was
+    /// settled, a by-name link carries a service and a reason.
+    fn what_is_wired() -> WiringReport {
+        WiringReport {
+            wired: vec![
+                Wired {
+                    by: "seerr".to_owned(),
+                    reaches: Reaches::Asked {
+                        capability: "identity.source".to_owned(),
+                        services: vec!["jellyfin".to_owned()],
+                        settled: Settled::Outright,
+                    },
+                },
+                Wired {
+                    by: "qbittorrent".to_owned(),
+                    reaches: Reaches::ByName {
+                        service: "gluetun".to_owned(),
+                        why: "It has no network namespace of its own".to_owned(),
+                    },
+                },
+            ],
+            unfilled: vec![Unfilled {
+                by: "bazarr".to_owned(),
+                capability: "library.curate".to_owned(),
+            }],
+        }
+    }
+
+    /// A substitution with every optional half of its shape filled: something it
+    /// replaces, and something it leaves with nothing filling it.
+    fn a_substitution() -> SubstitutionReport {
+        SubstitutionReport {
+            substitution: Substitution {
+                capability: "indexer.search".to_owned(),
+                was: Some("prowlarr".to_owned()),
+                now: "nzbhydra2".to_owned(),
+                asked_by: vec!["bindery".to_owned()],
+                leaves_unfilled: vec![Unfilled {
+                    by: "bindery".to_owned(),
+                    capability: "indexer.proxy".to_owned(),
+                }],
+                setting: "indexer.search=nzbhydra2".to_owned(),
+            },
+            applied: true,
         }
     }
 

@@ -36,6 +36,15 @@ pub struct Manifest {
     /// something to satisfy rather than something to read.
     #[serde(default)]
     pub removed: Vec<Removed>,
+    /// Every link between two of this stack's services.
+    ///
+    /// Optional in the format because an operator's own stack directory stays
+    /// readable without it, and because a stack written before this table existed
+    /// is still a stack. It is not optional of the one this project ships: a link
+    /// that is not declared here is one nothing can report on, substitute at, or
+    /// show as the exception it is.
+    #[serde(default, rename = "wiring")]
+    pub wirings: Vec<Wiring>,
 }
 
 impl Manifest {
@@ -273,6 +282,57 @@ pub struct Removed {
     /// The service that took its place, where one did.
     #[serde(default)]
     pub replaced_by: Option<String>,
+}
+
+/// One link between two of the stack's services, and which of the two it names.
+///
+/// A link asks for a capability or it names a service, and the difference is the
+/// whole subject. An ask is written against what the far end *does*, so anything
+/// that stands in for it is reached by everything that asked and nothing else
+/// changes; a name is written against what the far end *is*, which is sometimes the
+/// honest answer and is always the exception.
+///
+/// Both halves of the pair are optional in the type and exactly one of them is
+/// required by validation. Making it an enum in the parser would report a link that
+/// carried both as a shape failure, and *this has two ends where it should have one*
+/// is a sentence a parse error cannot say.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Wiring {
+    /// The service the link runs from — what asked.
+    ///
+    /// The name a report uses when nothing fills what was asked for. Without it an
+    /// unfilled capability is a fact about the stack with nobody to tell, which is
+    /// the failure at the point of use this exists instead of.
+    pub by: String,
+    /// The capability asked for, where this is an ask.
+    #[serde(default)]
+    pub asks: Option<String>,
+    /// Whether the link reaches every service that fills it rather than the one.
+    ///
+    /// Some asks are for the one service that does a thing and some are for all of
+    /// them, and how many claimants happen to exist today does not say which this
+    /// is. A stack where one capability is declared four times over and another once
+    /// would have both reported as the same answer, and only one of the two would be
+    /// a link that worked.
+    #[serde(default)]
+    pub each: bool,
+    /// Which claimant fills it, where the stack's own services contest it.
+    ///
+    /// A default the operator substitutes, not a rule: install order, precedence and
+    /// recency are each a way of being right most of the time, and a choice written
+    /// down with its reason beside it is what is done instead of them.
+    #[serde(default)]
+    pub filled_by: Option<String>,
+    /// The service named, where this link is by name.
+    #[serde(default)]
+    pub to: Option<String>,
+    /// Why it is by name, or why that claimant was chosen.
+    ///
+    /// Required of both, because an exception with no reason beside it reads as an
+    /// oversight and a choice with no reason beside it reads as a rule.
+    #[serde(default)]
+    pub why: Option<String>,
 }
 
 /// Which interface a service's port is published on.

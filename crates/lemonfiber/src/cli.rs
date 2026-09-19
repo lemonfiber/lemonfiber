@@ -20,6 +20,7 @@ use clap::{CommandFactory, Parser};
 mod carried;
 mod request;
 mod under;
+mod wiring;
 
 pub use under::{
     AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
@@ -43,6 +44,7 @@ pub use setup::RawSetup;
 // written down is this file's business, and moving them would otherwise be a change
 // at every call site that matches on one.
 pub use request::Request;
+pub use wiring::WiringCommand;
 
 /// Set up and run your media stack.
 #[derive(Debug, Parser)]

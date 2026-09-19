@@ -32,7 +32,7 @@
 
 use lemonfiber_ports::error::{Amiss, Code, Problem, Remedy, Severity, State};
 
-use super::command::{Asking, Keeping, MigrateAction};
+use super::command::{Asking, Keeping, Linking, MigrateAction};
 use super::setup::SetupAction;
 use super::{repair, restore, update, Command, Ctx};
 
@@ -116,6 +116,7 @@ pub fn asked(command: &Command) -> Asked {
         Command::Glossary => ("glossary", Rehearsal::Reads),
         Command::Clients => ("clients", Rehearsal::Reads),
         Command::Catalogue => ("catalogue", Rehearsal::Reads),
+        Command::Wiring(Linking::Read) => ("wiring", Rehearsal::Reads),
         Command::Outbound => ("outbound", Rehearsal::Reads),
         Command::Provenance => ("provenance", Rehearsal::Reads),
         Command::Stored => ("stored", Rehearsal::Reads),
@@ -178,6 +179,7 @@ pub fn asked(command: &Command) -> Asked {
         Command::Restart { .. } => ("restart", Rehearsal::Reports),
         Command::Pull { .. } => ("pull", Rehearsal::Reports),
         Command::ConfigSet(_) => ("config set", Rehearsal::Reports),
+        Command::Wiring(Linking::Fill(_)) => ("wiring fill", Rehearsal::Reports),
         Command::Quality(_) => ("quality", Rehearsal::Reports),
         Command::Alerts(_) => ("alerts", Rehearsal::Reports),
         Command::QualityMusic { .. } => ("quality music", Rehearsal::Reports),
@@ -432,8 +434,8 @@ mod tests {
         THE_WALK_IS_THE_OBSERVATION,
     };
     use crate::app::command::{
-        AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Keeping, MigrateAction,
-        QualityAction, Removing, Setting,
+        AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
+        MigrateAction, QualityAction, Removing, Setting,
     };
     use crate::app::engine::Waiting;
     use crate::app::setup::SetupAction;
@@ -953,6 +955,14 @@ mod tests {
             (Command::Hosting(Keeping::Read), Rehearsal::Reads),
             (Command::Setup(SetupAction::Where), Rehearsal::Reads),
             (Command::Setup(SetupAction::Apply), Rehearsal::Reports),
+            (Command::Wiring(Linking::Read), Rehearsal::Reads),
+            (
+                Command::Wiring(Linking::Fill(Filling {
+                    capability: "indexer.search".to_owned(),
+                    service: "nzbhydra2".to_owned(),
+                })),
+                Rehearsal::Reports,
+            ),
         ] {
             assert!(
                 asked(&command).rehearsal == expected,

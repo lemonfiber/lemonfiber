@@ -85,10 +85,11 @@ pub mod update;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
+mod wiring;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
+    Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
 };
 mod outcome;
 pub use ctx::{Ctx, PATIENCE};
@@ -381,6 +382,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
+        Command::Wiring(asked) => wiring::dispatched(ctx, &asked),
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => {
@@ -1455,12 +1457,19 @@ mod tests {
                 std::env::temp_dir().join(format!("lemonfiber-no-server-{}", std::process::id()));
             let _ = std::fs::create_dir_all(&to);
             let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-            // Every block but the media server's, kept in order.
-            let kept: String = read
+            // Every block but the media server's, kept in order — and the links that
+            // named it with it, because a stack that drops a service drops what
+            // reached it, and one that kept them is refused before this asks anything.
+            let services: String = read
                 .split("[[service]]")
                 .filter(|block| !block.contains("id = \"jellyfin\""))
                 .collect::<Vec<_>>()
                 .join("[[service]]");
+            let kept: String = services
+                .split("[[wiring]]")
+                .filter(|block| !block.contains("\"jellyfin\""))
+                .collect::<Vec<_>>()
+                .join("[[wiring]]");
             let _ = std::fs::write(to.join("stack.toml"), kept);
             to
         });
@@ -2580,6 +2589,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -2641,6 +2652,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -3503,6 +3516,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -4502,6 +4517,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)

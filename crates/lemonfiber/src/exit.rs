@@ -199,6 +199,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Adoption(report) => adopting(report),
         Outcome::Beside(report) => standing(report),
         Outcome::Replacement(report) => replacing(report),
+        // An ask nothing fills is a stack that will not wire, and a script asking
+        // what this stack wires to what is asking exactly that. It is the operator's
+        // own configuration to fix, which is the code that says so.
+        Outcome::Wiring(report) if report.unfilled.is_empty() => ExitCode::SUCCESS,
+        Outcome::Wiring(_) => ExitCode::from(VALIDATION),
         Outcome::Import(report) => carrying(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
@@ -331,6 +336,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)
+        // A substitution was recorded, or worked out and not written; one that
+        // could not be made comes back as a problem.
+        | Outcome::Substituted(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
         | Outcome::Undo(_)
@@ -1508,6 +1516,54 @@ mod tests {
 
     /// Having adopted, and having only said what adopting would come to, are both the
     /// command doing what it was asked.
+    /// An ask nothing fills is a stack that will not wire, and a script asking what
+    /// this stack wires to what is asking exactly that. It is the operator's own
+    /// configuration to fix, so it earns the code that says so rather than the one
+    /// that means "try again later".
+    #[test]
+    fn a_listing_with_an_ask_nothing_fills_exits_as_a_configuration_problem() {
+        let whole = lemonfiber_core::model::WiringReport {
+            wired: Vec::new(),
+            unfilled: Vec::new(),
+        };
+        assert_eq!(
+            settled(&Outcome::Wiring(whole)),
+            std::process::ExitCode::SUCCESS
+        );
+
+        let broken = lemonfiber_core::model::WiringReport {
+            wired: Vec::new(),
+            unfilled: vec![lemonfiber_core::wiring::Unfilled {
+                by: "seerr".to_owned(),
+                capability: "identity.source".to_owned(),
+            }],
+        };
+        assert_eq!(
+            settled(&Outcome::Wiring(broken)),
+            std::process::ExitCode::from(VALIDATION)
+        );
+    }
+
+    /// A substitution that was worked out is an answer, whether or not it was written.
+    #[test]
+    fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out() {
+        let made = |applied| {
+            Outcome::Substituted(lemonfiber_core::model::SubstitutionReport {
+                substitution: lemonfiber_core::wiring::Substitution {
+                    capability: "indexer.search".to_owned(),
+                    was: Some("prowlarr".to_owned()),
+                    now: "nzbhydra2".to_owned(),
+                    asked_by: vec!["bindery".to_owned()],
+                    leaves_unfilled: Vec::new(),
+                    setting: "indexer.search=nzbhydra2".to_owned(),
+                },
+                applied,
+            })
+        };
+        assert_eq!(settled(&made(true)), std::process::ExitCode::SUCCESS);
+        assert_eq!(settled(&made(false)), std::process::ExitCode::SUCCESS);
+    }
+
     #[test]
     fn adopting_and_rehearsing_it_both_exit_successfully() {
         let adopted = lemonfiber_core::model::AdoptReport {

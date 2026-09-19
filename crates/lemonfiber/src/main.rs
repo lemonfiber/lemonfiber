@@ -43,7 +43,7 @@ use render::walkthrough::{Narrating as WalkNarrating, Quiet};
 use setup::{greeting, setting_up};
 use translate::{
     bundling, configuration, diagnosing, hosting, household, invitation, letting, quality,
-    removing, restarting, traced,
+    removing, restarting, traced, wiring,
 };
 
 /// Logs as a screen, or logs as a stream.
@@ -312,6 +312,7 @@ async fn main() -> ExitCode {
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::Catalogue => Command::Catalogue,
+        Request::Wiring { fill } => wiring(fill),
         Request::Outbound => Command::Outbound,
         Request::Provenance => Command::Provenance,
         Request::Credentials(asked) => translate::credentials(asked),

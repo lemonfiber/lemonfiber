@@ -78,6 +78,10 @@ pub enum Outcome {
     Removed(crate::model::HouseholdRemoval),
     /// What each service in this stack is for, and what became of the ones that went.
     Catalogue(crate::model::CatalogueReport),
+    /// What this stack wires to what, and what nothing fills.
+    Wiring(crate::model::WiringReport),
+    /// A change of which service fills a capability, and what it costs.
+    Substituted(crate::model::SubstitutionReport),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
     /// Where every service in this stack comes from, and under what licence.
@@ -158,6 +162,8 @@ impl Outcome {
             Self::Invited(_) => kind::INVITATION,
             Self::Removed(_) => kind::REMOVAL,
             Self::Catalogue(_) => crate::model::kind::CATALOGUE,
+            Self::Wiring(_) => crate::model::kind::WIRING,
+            Self::Substituted(_) => crate::model::kind::SUBSTITUTION,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
             Self::Provenance(_) => crate::model::kind::PROVENANCE,
             Self::Credentials(_) => crate::model::kind::CREDENTIALS,
@@ -216,6 +222,8 @@ impl serde::Serialize for Outcome {
             Self::Invited(report) => report.serialize(serializer),
             Self::Removed(report) => report.serialize(serializer),
             Self::Catalogue(report) => report.serialize(serializer),
+            Self::Wiring(report) => report.serialize(serializer),
+            Self::Substituted(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
             Self::Provenance(report) => report.serialize(serializer),
             Self::Credentials(inventory) => inventory.serialize(serializer),

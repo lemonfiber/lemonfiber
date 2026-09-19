@@ -12,6 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{ApiKind, Date, Manifest, Protocol, Removed, Service};
 
+mod wiring;
+
 /// Tags that move under you. A pin meaning "whatever is newest" is not a pin.
 const FLOATING_TAGS: &[&str] = &[
     "latest", "stable", "edge", "nightly", "develop", "dev", "main", "master", "rolling",
@@ -95,6 +97,7 @@ pub fn validate(manifest: &Manifest, today: Date) -> Vec<Violation> {
     check_forms(manifest, &profiles, &mut found);
     check_services(manifest, &profiles, today, &mut found);
     check_removed(manifest, &mut found);
+    wiring::check(manifest, &mut found);
     found
 }
 

@@ -2,22 +2,34 @@
 //!
 //! One account, not two: the request service authenticates against the media server
 //! rather than keeping accounts of its own.
+//!
+//! Which server that is comes from what the stack says the request service asks for.
+//! It asks for an identity source, and whatever fills that is what it signs in
+//! against — so a service standing in for the bundled one is reached without a line
+//! here changing, which is the test of whether the wiring was really converted.
 
 use super::Ctx;
 
-/// Make Jellyfin the identity source for Seerr, so the household signs in once.
+/// What this connection asks the stack for: a service that answers, for the services
+/// that ask, whether a person is who they say they are.
+const IDENTITY: &str = "identity.source";
+
+/// Make whatever fills the identity source the one Seerr signs in against, so the
+/// household signs in once.
 ///
-/// Both must be in the stack; without either there is nothing to wire. Jellyfin's
-/// admin password is the one credential minted rather than read — recorded on the
-/// run that mints it and read back on a later run — so the driver is given what
-/// was recorded and hands back a freshly minted one for the surface to record.
+/// Both must be in the stack; without either there is nothing to wire. The media
+/// server's admin password is the one credential minted rather than read — recorded
+/// on the run that mints it and read back on a later run — so the driver is given
+/// what was recorded and hands back a freshly minted one for the surface to record.
 pub(super) async fn seed_jellyfin_identity(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     expected: &crate::baseline::Baseline,
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let mut records = crate::baseline::Baseline::new();
-    let (Some(seerr_base), Some(jellyfin)) = (seerr_service(services), jellyfin_service(services))
+    let (Some(seerr_base), Some(jellyfin)) =
+        (seerr_service(services), identity_source(services, filled))
     else {
         return (Vec::new(), records);
     };
@@ -120,6 +132,29 @@ fn remember(
 pub(super) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
     crate::app::targets::service_addr(services, lemonfiber_manifest::ApiKind::Seerr)
         .map(|addr| addr.loopback)
+}
+
+/// The addresses of whatever fills the identity source, if anything does.
+///
+/// The service is chosen by what it can do and then opened by what it is: the stack
+/// says which service answers the ask, and the adapter that speaks to it comes from
+/// that service's own declared shape. A filler this build has no adapter for is
+/// nothing to wire rather than something to guess at — which is the same answer the
+/// stack already gives for a service it declares no API for.
+pub(in crate::app) fn identity_source(
+    services: &[lemonfiber_manifest::Service],
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Option<crate::app::targets::ServiceAddr> {
+    let [fills_it] = filled.get(IDENTITY)?.as_slice() else {
+        return None;
+    };
+    let kind = services
+        .iter()
+        .find(|service| &service.id == fills_it)?
+        .api
+        .as_ref()?
+        .kind;
+    crate::app::targets::service_addr(services, kind).filter(|addr| &addr.id == fills_it)
 }
 
 /// Jellyfin's addresses, if the stack has it. Jellyfin's kind carries no key source of

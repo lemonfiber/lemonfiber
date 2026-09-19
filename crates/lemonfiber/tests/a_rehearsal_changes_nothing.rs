@@ -49,7 +49,8 @@ use lemonfiber::cli::{Cli, STACK};
 use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
 use lemonfiber_core::app::{
     dispatch, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Ctx, Decision,
-    Keeping, MigrateAction, QualityAction, Removing, Setting, SetupAction, Waiting,
+    Filling, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, SetupAction,
+    Waiting,
 };
 use lemonfiber_core::archive::{Archive, Archiving, Fault, Reader, Space, Vault};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
@@ -195,6 +196,15 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("outbound", Command::Outbound),
         ("provenance", Command::Provenance),
         ("catalogue", Command::Catalogue),
+        // The verb rather than the read, because the read writes nothing under any
+        // flag and a rehearsal of it would be proving that a listing lists.
+        (
+            "wiring",
+            Command::Wiring(Linking::Fill(Filling {
+                capability: "indexer.search".to_owned(),
+                service: "nzbhydra2".to_owned(),
+            })),
+        ),
         (
             "credentials",
             Command::Credentials(Asking::Rotate {
