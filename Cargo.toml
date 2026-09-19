@@ -102,9 +102,9 @@ ci = "github"
 # deferred (see targets). Both return with Windows and the tap token at 1.0.0.
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-# Windows (x86_64-pc-windows-msvc) is deferred: the native binary does not yet
-# compile — docker.rs needs a bollard named-pipe path and filesystem.rs uses the
-# nightly-only file_index(). Tracked as L1/M10 work before 1.0.0.
+# Windows is deferred because the native binary does not compile yet. What it is
+# waiting on is a register in `what_windows_is_waiting_on.rs`, held to this list
+# by a test: the target may be added here exactly when that register is empty.
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 # No publish jobs yet — the Homebrew tap publish returns at 1.0.0 (L1-R3).
 publish-jobs = []
