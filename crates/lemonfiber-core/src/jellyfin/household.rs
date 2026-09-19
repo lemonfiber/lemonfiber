@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 
-use super::Jellyfin;
+use super::{Jellyfin, AUTHORIZATION};
 use crate::ports::http::Method;
 use crate::ports::service::{
     Access, Allowed, Certificate, Failure, Invited, Member, NamedLibrary, Unrated,
@@ -227,6 +227,14 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(held.into_iter().map(UserResource::member).collect())
     }
 
+    async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure> {
+        whoever(self, name, password).await
+    }
+
+    async fn standing(&self, id: &str) -> Result<bool, Failure> {
+        standing(self, id).await
+    }
+
     async fn invite(&self, name: &str) -> Result<Member, Failure> {
         // No password: that is the invitation. The account exists from this moment,
         // which is why nothing has to be running for somebody to claim it later.
@@ -323,6 +331,86 @@ impl crate::ports::service::Household for Jellyfin {
     }
 }
 
+/// The status the server answers about an account it does not hold.
+///
+/// One status and not the pair [`REFUSED`] carries. Those two say the credential
+/// this build signed in with was turned away, which is a fault on our side of the
+/// call — reading them as *there is no such account* would sign out an entire
+/// household the day the media server's own admin password changed.
+const GONE: u16 = 404;
+
+/// Whether an account still stands.
+///
+/// Beside the impl rather than inside it because it decides, and an `#[async_trait]`
+/// body is one the coverage report attributes nothing inside.
+///
+/// One account read rather than the household listed. Both would answer, and this is
+/// the cheaper of the two on a server whose household is large — which matters
+/// because it is asked on every call a member makes.
+async fn standing(jellyfin: &Jellyfin, id: &str) -> Result<bool, Failure> {
+    let request = jellyfin
+        .as_admin(Method::Get, &format!("/Users/{id}"), None)
+        .await?;
+    let response = jellyfin.endpoint.send(&request).await?;
+
+    // Gone is an answer rather than a fault, and it is the answer this exists for.
+    if response.status == GONE {
+        return Ok(false);
+    }
+
+    let held: UserResource = jellyfin.endpoint.decode(
+        &response,
+        "whether the account still stands could not be read",
+    )?;
+
+    // **An answer carrying no policy is an account that exists**, which is what this
+    // was asked. Reading it as disabled instead would lock out everybody on a server
+    // that stopped sending the field — permanently, since the next call reads the
+    // same answer — where the requirement this serves is about an identity that was
+    // *removed*, and removal is the status above. The flag is honoured where the
+    // server states it and nothing is inferred where it does not.
+    Ok(held.policy.is_none_or(|policy| !policy.disabled))
+}
+
+/// Who a name and a password prove somebody to be.
+///
+/// Beside the impl rather than inside it because it decides. An `#[async_trait]`
+/// body is rewritten into a generated future and the coverage report attributes
+/// nothing inside it to the lines it came from, so the refusal below could stop
+/// being taken and the gate that says this workspace is covered would say nothing.
+async fn whoever(
+    jellyfin: &Jellyfin,
+    name: &str,
+    password: &str,
+) -> Result<Option<String>, Failure> {
+    // The member's own credentials, not the admin's, and not stored anywhere: what
+    // comes back is the account this pair belongs to and nothing is kept of how it
+    // was proved.
+    let body = serde_json::json!({ "Username": name, "Pw": password }).to_string();
+    let mut request = jellyfin.request(Method::Post, "/Users/AuthenticateByName", Some(body));
+    request
+        .headers
+        .push(("X-Emby-Authorization".to_owned(), AUTHORIZATION.to_owned()));
+    let response = jellyfin.endpoint.send(&request).await?;
+
+    // A pair the server does not recognise is an answer rather than a fault, and the
+    // two must not arrive the same way: a surface that read them alike would tell
+    // somebody their password was wrong on the day the server was down, and would go
+    // on telling them so until it came back.
+    if REFUSED.contains(&response.status) {
+        return Ok(None);
+    }
+
+    let signed: SignedIn = jellyfin
+        .endpoint
+        .decode(&response, "the sign-in was not accepted")?;
+
+    // An account with no id is an answer this build cannot use. Read as nobody rather
+    // than as somebody with an empty name, because an empty id would match every
+    // other account that answered the same way.
+    Ok(Some(signed.user.id).filter(|id| !id.is_empty()))
+}
+
 async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), Failure> {
     // The account's own policy, read first, with what was chosen written over it.
     // **A body naming only what changed is refused.** Driven against
@@ -364,4 +452,24 @@ async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), F
         .await?;
     let response = jellyfin.endpoint.send(&request).await?;
     jellyfin.endpoint.expect_success(&response)
+}
+
+/// The statuses a media server refuses a name and password with.
+///
+/// Both, because a server tells an unknown account and a wrong password apart and
+/// this deliberately does not: which half was wrong is the half worth guessing at.
+const REFUSED: [u16; 2] = [401, 403];
+
+/// What a sign-in answers with, of which one field is read.
+#[derive(serde::Deserialize)]
+struct SignedIn {
+    #[serde(rename = "User", default)]
+    user: SignedInUser,
+}
+
+/// The account a sign-in proved, by the id the media server files it under.
+#[derive(serde::Deserialize, Default)]
+struct SignedInUser {
+    #[serde(rename = "Id", default)]
+    id: String,
 }

@@ -14,6 +14,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::PROVENANCE;
 use crate::router::Serving;
 
@@ -25,6 +26,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// Every service this stack declares, with its licence, its project and its pin.
-async fn provenance(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, PROVENANCE, query.as_deref()).await
+async fn provenance(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, PROVENANCE, query.as_deref()).await
 }

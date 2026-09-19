@@ -594,3 +594,143 @@ async fn a_choice_nobody_made_leaves_the_accounts_own_answer_standing() {
         "an offer naming no libraries changed which ones are open: {written}"
     );
 }
+
+/// A member's own password, built rather than written, so a scan of this tree
+/// looking for a committed credential does not find a string that reads as one.
+fn hers() -> String {
+    ('b'..='m').collect()
+}
+
+/// A password that proves nobody.
+fn not_hers() -> String {
+    ('c'..='n').rev().collect()
+}
+
+/// A sign-in that hands back the account it proved, which is what a member's is read for.
+const SIGNED_IN_AS: &str = r#"{"AccessToken":"token","User":{"Id":"a7f3","Name":"ana"}}"#;
+
+#[tokio::test]
+async fn a_pair_the_server_knows_answers_with_the_account_it_proved() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN_AS)]);
+
+    assert_eq!(
+        jellyfin(&fake).whoever("ana", &hers()).await.ok().flatten(),
+        Some("a7f3".to_owned())
+    );
+    // The member's own credentials, and the admin's nowhere near it: this is the one
+    // call where somebody else's password travels, and it travels only to the route
+    // where it is being proved.
+    let asked: Vec<&str> = fake
+        .requests()
+        .iter()
+        .map(|request| request.url.as_str())
+        .filter(|url| url.ends_with("/Users/AuthenticateByName"))
+        .map(|_| "authenticate")
+        .collect();
+    assert_eq!(asked, ["authenticate"], "the member was proved elsewhere");
+}
+
+#[tokio::test]
+async fn a_pair_the_server_refuses_is_nobody_rather_than_a_fault() {
+    // Both statuses, because a server tells an unknown account and a wrong password
+    // apart and this deliberately does not.
+    for refused in [401, 403] {
+        let fake = Fake::in_turn(vec![Answer::reply(refused, r#"{"error":"no"}"#)]);
+
+        let said = jellyfin(&fake).whoever("ana", &not_hers()).await;
+        assert!(
+            matches!(said, Ok(None)),
+            "a refusal at {refused} was read as something other than nobody"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_server_that_could_not_answer_is_not_a_pair_that_was_wrong() {
+    // The distinction the nested shape exists for. Collapsed, this would tell
+    // somebody their password was wrong for as long as the server was down.
+    let fake = Fake::in_turn(vec![Answer::reply(500, "upstream is unwell")]);
+
+    assert!(
+        jellyfin(&fake).whoever("ana", &hers()).await.is_err(),
+        "a server that could not answer was read as a pair that was wrong"
+    );
+}
+
+#[tokio::test]
+async fn an_account_with_no_id_is_nobody() {
+    // An empty id would match every other account that answered the same way, so it
+    // is read as nobody rather than as somebody with no name.
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"AccessToken":"t","User":{}}"#)]);
+
+    assert!(matches!(
+        jellyfin(&fake).whoever("ana", &hers()).await,
+        Ok(None)
+    ));
+}
+
+/// An account the server holds, with the flag that says it is not switched off.
+const STILL_HELD: &str =
+    r#"{"Id":"a7f3","Name":"ana","HasPassword":true,"Policy":{"IsDisabled":false}}"#;
+
+/// The same account, switched off at the server rather than removed from it.
+const SWITCHED_OFF: &str =
+    r#"{"Id":"a7f3","Name":"ana","HasPassword":true,"Policy":{"IsDisabled":true}}"#;
+
+/// One account read, rather than the household listed to look for it.
+fn about(answer: Answer) -> Arc<Fake> {
+    Fake::by_route(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            Answer::reply(200, SIGNED_IN),
+        ),
+        (Method::Get, "/Users/", answer),
+    ])
+}
+
+#[tokio::test]
+async fn an_account_the_server_still_holds_is_standing() {
+    let fake = about(Answer::reply(200, STILL_HELD));
+
+    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(true)));
+}
+
+#[tokio::test]
+async fn an_account_the_server_no_longer_holds_is_not_standing() {
+    // The answer this question exists for, and the reason it is `Ok` rather than an
+    // error: a removed account is a fact the server stated, not a failure to answer.
+    let fake = about(Answer::reply(404, r#"{"error":"no such user"}"#));
+
+    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(false)));
+}
+
+#[tokio::test]
+async fn an_account_switched_off_at_the_server_is_not_standing() {
+    let fake = about(Answer::reply(200, SWITCHED_OFF));
+
+    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(false)));
+}
+
+#[tokio::test]
+async fn a_server_that_would_not_say_is_not_an_account_that_is_gone() {
+    // The distinction the nested shape exists for, one floor up from the sign-in.
+    // Collapsed, a media server restarting would sign out every member and tell each
+    // of them their account had been removed.
+    let fake = about(Answer::reply(500, "upstream is unwell"));
+
+    assert!(
+        reader(&fake).standing("a7f3").await.is_err(),
+        "a server that could not answer was read as an account that is gone"
+    );
+}
+
+#[tokio::test]
+async fn an_account_answered_without_a_policy_is_one_the_server_still_holds() {
+    // Existence is what this was asked, and the server answered it. Reading a missing
+    // flag as *switched off* would lock out everybody the day the field stopped
+    // arriving — permanently, since the next call reads the same answer.
+    let fake = about(Answer::reply(200, r#"{"Id":"a7f3","Name":"ana"}"#));
+
+    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(true)));
+}

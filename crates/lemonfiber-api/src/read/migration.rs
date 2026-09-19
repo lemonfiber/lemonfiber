@@ -12,6 +12,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::MIGRATION;
 use crate::router::Serving;
 
@@ -23,6 +24,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// What is standing on this machine, and what of it lemonfiber could take over.
-async fn migration(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, MIGRATION, query.as_deref()).await
+async fn migration(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, MIGRATION, query.as_deref()).await
 }

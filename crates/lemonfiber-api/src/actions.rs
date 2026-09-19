@@ -37,9 +37,15 @@ use axum::{Json, Router};
 use lemonfiber_core::app::restore::Consent as RestoreConsent;
 use lemonfiber_core::app::{Command, Setting, Waiting};
 
+use crate::admission::Caller;
+use crate::entitled::{may, Permitted};
 use crate::jobs::{accepted, Job};
+// Qualified where it is called, because this door has a module of its own by that
+// name. The sentence is the surface's rather than this door's: nothing about the
+// request was wrong, which is the whole of what `Refused` next door describes.
 use crate::read::carried_out;
 use crate::router::Serving;
+use crate::serve::Refusal;
 use crate::serve::{carrying, SENTENCE};
 
 pub use asked::{
@@ -122,12 +128,20 @@ pub fn routes() -> Router<Serving> {
 /// One action, carried out or refused.
 async fn taken(
     State(serving): State<Serving>,
+    caller: Caller,
     Path(action): Path<String>,
     Json(given): Json<Arguments>,
 ) -> Response {
     let command = match named(&action, given) {
         Ok(command) => command,
-        Err(refused) => return declined(&refused),
+        Err(why) => return declined(&why),
+    };
+    // Ruled on above the fork rather than inside it, so an action handed to a job is
+    // ruled on by the same sentence as one answered on the spot. A check that lived
+    // in the immediate arm would leave the slow half of this door as the way round
+    // the fast half.
+    let Permitted::This(command) = may(&caller, command) else {
+        return crate::serve::refused(Refusal::NotYours);
     };
     match answering(&command) {
         Answering::Now => carried_out(&serving.ctx, command).await,

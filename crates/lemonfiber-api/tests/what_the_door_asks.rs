@@ -3,192 +3,14 @@
 //! Driven from outside the crate, because what a caller can reach is the thing worth
 //! holding still — and because everything here is asynchronous, which is a shape the
 //! coverage gate reads properly only from out here.
+//!
+//! What a caller may ask for *once* the door has named them is next door, in
+//! `what_a_member_may_ask_for`. Who gets in and what they may then have are two
+//! questions, and a file answering both would be found by neither reader.
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+mod door;
 
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
-use lemonfiber_api::admission::{Admitting, RETRY_AFTER, SESSION};
-use lemonfiber_api::events::live::Live;
-use lemonfiber_api::events::Streaming;
-use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
-use lemonfiber_api::jobs::Jobs;
-use lemonfiber_api::router::{routes, Serving};
-use lemonfiber_core::admission::{credential, Credential};
-use lemonfiber_core::app::Ctx;
-use lemonfiber_core::config::Settings;
-use lemonfiber_core::platform::Environment;
-use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::Fake;
-use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
-use lemonfiber_fixtures::support::{a_password, Reporting};
-use tower::ServiceExt as _;
-
-/// The second the stopped clock reads.
-const NOW: u64 = 1_700_000_000;
-
-/// The port this surface says it is listening on.
-const PORT: u16 = 8471;
-
-/// Serving this machine and nowhere else.
-fn bound() -> Binding {
-    Binding::here(PORT)
-}
-
-/// What a request has to say to have come from here.
-fn from_here() -> Vec<(&'static str, String)> {
-    vec![("host", format!("127.0.0.1:{PORT}"))]
-}
-
-/// The moment every one of these runs at.
-fn moment() -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_secs(NOW)
-}
-
-/// A directory of this test's own, emptied first so a rerun starts fresh.
-fn a_directory(named: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-door-{named}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    dir
-}
-
-/// The password the operator chose, built rather than written down.
-fn chosen() -> String {
-    a_password()
-}
-
-/// The credential that password makes.
-fn a_credential(password: &str) -> Credential {
-    let Ok(held) = Credential::set(password, &Chance::cycling()) else {
-        unreachable!("a full-length password and a source that answers make a record")
-    };
-    held
-}
-
-/// A machine keeping that password, and where it keeps it.
-fn keeping(named: &str) -> PathBuf {
-    let path = a_directory(named).join("admission.json");
-    let held = a_credential(&chosen());
-    let Ok(()) = credential::keep(&path, &held) else {
-        unreachable!("a scratch directory can be written")
-    };
-    path
-}
-
-/// The world these requests run against: a stopped clock, and randomness a test chose.
-fn world(admission: Option<PathBuf>, random: Chance) -> Ctx {
-    Ctx::new(
-        Arc::new(Idle),
-        Arc::new(Reporting::absent()),
-        Stopped::at(NOW),
-        lemonfiber_adapters::live(),
-        Source::External(Path::new("/lemonfiber/no/such/stack")),
-        Settings {
-            admission,
-            ..Settings::default()
-        },
-        Environment::MacOs,
-    )
-    .with_http(Fake::silent())
-    .with_random(Arc::new(random))
-}
-
-/// The whole surface over that world, and the register it admits from.
-fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Arc<Token>) {
-    let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
-        unreachable!("a cycling source always mints one")
-    };
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
-    let serving = Serving {
-        ctx: Arc::new(ctx),
-        token: Arc::clone(&token),
-        bound: bound(),
-        jobs: Jobs::default(),
-        admitting: Arc::clone(admitting),
-        live: Arc::clone(&live),
-    };
-    let streaming = Arc::new(Streaming {
-        token: Arc::clone(&token),
-        bound: bound(),
-        admitting: Arc::clone(admitting),
-        live,
-    });
-    (routes(serving, streaming), token)
-}
-
-/// A surface keeping the password at `path`, sharing one register with the test.
-fn door(path: Option<PathBuf>, random: Chance) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        kept: path.clone(),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(world(path, random), &admitting);
-    (router, token, admitting)
-}
-
-/// What one request was answered with: the status, the body, and how long is left.
-struct Answer {
-    /// The status it came back under.
-    status: StatusCode,
-    /// What it said.
-    body: String,
-    /// The wait it named, where it named one.
-    left: Option<String>,
-}
-
-/// One request, and what it was answered with.
-async fn asked(
-    router: axum::Router,
-    method: &str,
-    path: &str,
-    pairs: &[(&str, String)],
-    body: &str,
-) -> Answer {
-    let mut building = Request::builder()
-        .method(method)
-        .uri(path)
-        .header(header::CONTENT_TYPE, "application/json");
-    for (name, value) in pairs {
-        building = building.header(*name, value);
-    }
-    let Ok(request) = building.body(Body::from(body.to_owned())) else {
-        unreachable!("the request a test writes is one that can be built")
-    };
-    let Ok(response) = router.oneshot(request).await;
-    let status = response.status();
-    let left = response
-        .headers()
-        .get(RETRY_AFTER)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned);
-    let Ok(read) = to_bytes(response.into_body(), 64 * 1024).await else {
-        unreachable!("an answer this surface produces is one that can be read")
-    };
-    Answer {
-        status,
-        body: String::from_utf8_lossy(&read).into_owned(),
-        left,
-    }
-}
-
-/// The body a password is offered in.
-fn offering(password: &str) -> String {
-    format!("{{\"password\":{}}}", serde_json::json!(password))
-}
-
-/// The secret an answer handed back, where it handed one back.
-fn session(body: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .as_ref()
-        .and_then(|opened| opened.pointer("/data/token"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned()
-}
+use door::*;
 
 #[tokio::test]
 async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_takes() {
@@ -211,11 +33,13 @@ async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_t
     );
     // And what it handed back is a secret the rest of the surface takes, which is the
     // whole of what being given one is worth.
-    assert!(
+    assert_eq!(
         admitting
             .sessions
-            .holds(Some(&opened), moment(), &a_credential(&chosen()))
-            .await
+            .holds(Some(&opened), moment(), Some(&a_credential(&chosen())))
+            .await,
+        Some(Opened::Operator(a_credential(&chosen()))),
+        "the secret handed back was not a session the rest of the surface takes"
     );
     let _ = fs::remove_dir_all(a_directory("exchanged"));
 }
@@ -367,30 +191,28 @@ async fn a_session_ends_when_it_expires_and_when_the_password_changes() {
     let held = a_credential(&chosen());
     let opened = admitting
         .sessions
-        .opened(&Chance::cycling(), moment(), &held)
+        .opened(&Chance::cycling(), moment(), Opened::Operator(held.clone()))
         .await;
     let Some(opened) = opened else {
         unreachable!("a cycling source mints a session")
     };
 
-    assert!(
-        admitting
-            .sessions
-            .holds(Some(&opened.token), moment(), &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&opened.token), moment(), Some(&held))
+        .await
+        .is_some());
     // A day later it is gone, because a window left open all week is not evidence
     // that whoever opened it is still there.
-    assert!(
-        !admitting
-            .sessions
-            .holds(
-                Some(&opened.token),
-                moment() + Duration::from_secs(24 * 60 * 60),
-                &held
-            )
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(
+            Some(&opened.token),
+            moment() + Duration::from_secs(24 * 60 * 60),
+            Some(&held)
+        )
+        .await
+        .is_none());
     let _ = fs::remove_dir_all(a_directory("ending"));
 }
 
@@ -406,43 +228,48 @@ async fn opening_one_lets_go_of_the_ones_that_have_ended_and_keeps_the_rest() {
 
     let first = admitting
         .sessions
-        .opened(&Chance::cycling(), moment(), &held)
+        .opened(&Chance::cycling(), moment(), Opened::Operator(held.clone()))
         .await;
     let second = admitting
         .sessions
-        .opened(&Chance::exactly(Some(vec![0x7b; 32])), moment(), &held)
+        .opened(
+            &Chance::exactly(Some(vec![0x7b; 32])),
+            moment(),
+            Opened::Operator(held.clone()),
+        )
         .await;
     let Some((first, second)) = first.zip(second) else {
         unreachable!("both sources mint a session")
     };
     assert_ne!(first.token, second.token);
-    assert!(
-        admitting
-            .sessions
-            .holds(Some(&first.token), moment(), &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&first.token), moment(), Some(&held))
+        .await
+        .is_some());
 
     // A day on, both have ended, and opening a third is what lets go of them.
     let third = admitting
         .sessions
-        .opened(&Chance::exactly(Some(vec![0x2c; 32])), later, &held)
+        .opened(
+            &Chance::exactly(Some(vec![0x2c; 32])),
+            later,
+            Opened::Operator(held.clone()),
+        )
         .await;
     let Some(third) = third else {
         unreachable!("a source that answers mints a session")
     };
-    assert!(
-        !admitting
-            .sessions
-            .holds(Some(&first.token), later, &held)
-            .await
-    );
-    assert!(
-        admitting
-            .sessions
-            .holds(Some(&third.token), later, &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&first.token), later, Some(&held))
+        .await
+        .is_none());
+    assert!(admitting
+        .sessions
+        .holds(Some(&third.token), later, Some(&held))
+        .await
+        .is_some());
     let _ = fs::remove_dir_all(a_directory("several"));
 }
 
@@ -453,7 +280,7 @@ async fn a_password_change_ends_a_session_somebody_else_is_holding() {
     let held = a_credential(&chosen());
     let opened = admitting
         .sessions
-        .opened(&Chance::cycling(), moment(), &held)
+        .opened(&Chance::cycling(), moment(), Opened::Operator(held.clone()))
         .await;
     let Some(opened) = opened else {
         unreachable!("a cycling source mints a session")
@@ -464,12 +291,11 @@ async fn a_password_change_ends_a_session_somebody_else_is_holding() {
     let another = a_credential(&chosen().to_uppercase());
     assert!(credential::keep(&path, &another).is_ok());
 
-    assert!(
-        !admitting
-            .sessions
-            .holds(Some(&opened.token), moment(), &another)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(Some(&opened.token), moment(), Some(&another))
+        .await
+        .is_none());
     let _ = fs::remove_dir_all(a_directory("changed"));
 }
 
@@ -479,13 +305,16 @@ async fn a_secret_this_run_never_handed_out_is_no_session_and_nor_is_nothing() {
     let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
     let held = a_credential(&chosen());
 
-    assert!(!admitting.sessions.holds(None, moment(), &held).await);
-    assert!(
-        !admitting
-            .sessions
-            .holds(Some("not a session"), moment(), &held)
-            .await
-    );
+    assert!(admitting
+        .sessions
+        .holds(None, moment(), Some(&held))
+        .await
+        .is_none());
+    assert!(admitting
+        .sessions
+        .holds(Some("not a session"), moment(), Some(&held))
+        .await
+        .is_none());
     let _ = fs::remove_dir_all(a_directory("unknown"));
 }
 
@@ -564,4 +393,246 @@ fn exactly_one_path_is_let_through_without_a_token() {
             .is_some_and(|line| line.contains("crate::admission::SESSION")),
         "the one path let through is not the door: {exempt:?}"
     );
+}
+
+#[tokio::test]
+async fn the_token_printed_at_the_machine_answers_as_the_machine() {
+    let path = keeping("who-machine");
+    let (_, token, admitting) = door(Some(path), Chance::cycling());
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(token.as_str())), &token, moment())
+            .await,
+        Knocking::Known(Caller::Machine),
+        "the token printed at this machine named somebody other than the machine"
+    );
+    let _ = fs::remove_dir_all(a_directory("who-machine"));
+}
+
+#[tokio::test]
+async fn a_session_the_password_bought_answers_as_the_operator() {
+    let path = keeping("who-operator");
+    let (router, _, admitting) = door(Some(path), Chance::cycling());
+
+    let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
+    let opened = session(&answer.body);
+
+    // Checked against a token that is not this session, which is every machine but
+    // the one that minted it. The fixture's randomness is cycled letters, so a
+    // session and a per-run token of the same width are the same string here — and
+    // a check that let the machine arm answer first would be reporting on that
+    // rather than on the session.
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'z'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Known(Caller::Operator),
+        "a session bought with the password named somebody other than the operator"
+    );
+    let _ = fs::remove_dir_all(a_directory("who-operator"));
+}
+
+#[tokio::test]
+async fn nothing_and_a_wrong_secret_are_the_same_silence() {
+    // One answer for both, because a caller told which secret was wrong is a caller
+    // told which one to go on guessing at.
+    let path = keeping("who-nobody");
+    let (_, token, admitting) = door(Some(path), Chance::cycling());
+
+    assert_eq!(
+        admitting.carried(&carrying(None), &token, moment()).await,
+        Knocking::Nobody,
+        "a request carrying no secret was admitted as somebody"
+    );
+    assert_eq!(
+        admitting
+            .carried(
+                &carrying(Some("not a secret this run minted")),
+                &token,
+                moment()
+            )
+            .await,
+        Knocking::Nobody,
+        "a secret this run never minted was admitted as somebody"
+    );
+    let _ = fs::remove_dir_all(a_directory("who-nobody"));
+}
+
+#[tokio::test]
+async fn a_member_the_household_knows_is_let_in_as_that_member() {
+    let path = keeping("member-in");
+    let (router, _token, admitting) =
+        door_with(Some(path), AHousehold::knowing("a7f3"), Chance::cycling());
+
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Known(Caller::Member("a7f3".to_owned())),
+        "a session the household bought named somebody other than that member"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-in"));
+}
+
+#[tokio::test]
+async fn the_machines_own_password_is_tried_before_the_household_is_asked() {
+    // Two doors and nothing chooses between them. The one that needs no network
+    // answers first, so a household that is down cannot keep the operator out.
+    let path = keeping("operator-first");
+    let (router, _, _) = door_with(Some(path), AHousehold::unreachable(), Chance::cycling());
+
+    let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
+
+    assert_eq!(
+        answer.status,
+        StatusCode::OK,
+        "the machine's own password was refused because the household could not be asked"
+    );
+    let _ = fs::remove_dir_all(a_directory("operator-first"));
+}
+
+#[tokio::test]
+async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
+    // The safe direction, and the honest one: nothing proved anything, so nobody
+    // is let in on it.
+    let path = keeping("household-down");
+    let (router, _, _) = door_with(Some(path), AHousehold::unreachable(), Chance::cycling());
+
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+
+    assert_eq!(answer.status, StatusCode::UNAUTHORIZED);
+    let _ = fs::remove_dir_all(a_directory("household-down"));
+}
+
+#[tokio::test]
+async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong() {
+    let path = keeping("member-unknown");
+    let (router, _, _) = door_with(Some(path), AHousehold::knowing_nobody(), Chance::cycling());
+
+    let stranger = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("nobody", &nobodys()),
+    )
+    .await;
+    let wrong = asked(router, "POST", SESSION, &from_here(), &offering(&nobodys())).await;
+
+    assert_eq!(stranger.status, wrong.status);
+    assert_eq!(
+        stranger.body, wrong.body,
+        "the refusals differ, so they say which door was meant"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-unknown"));
+}
+
+/// The sequence a removed identity is described by, staged end to end.
+///
+/// Signing in, working, being taken off the server, and then the *next* call —
+/// which is the word the requirement uses. A check that ran at sign-in and not
+/// afterwards would pass a test that only signed in, and would leave somebody
+/// removed on Monday still reading the household on Tuesday.
+#[tokio::test]
+async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
+    let path = keeping("member-withdrawn");
+    let household = AHousehold::knowing("a7f3");
+    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Known(Caller::Member("a7f3".to_owned())),
+        "the session was not answering as the member who bought it"
+    );
+
+    household.withdraw();
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Nobody,
+        "a session outlived the account it was bought with"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-withdrawn"));
+}
+
+/// Gone and could-not-be-asked are different facts and must not arrive alike.
+///
+/// Collapsing them would sign a household out for the length of a media-server
+/// reboot and tell them their accounts had been removed — the same mistake the
+/// sign-in door one floor down is built to avoid, made where it is harder to see.
+/// Both are staged from the same signed-in session, so the only thing that differs
+/// between the two answers is what the household said.
+#[tokio::test]
+async fn a_household_that_cannot_be_asked_is_not_a_household_that_said_no() {
+    let path = keeping("member-unasked");
+    let household = AHousehold::knowing("a7f3");
+    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    household.go_dark();
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Unconfirmed,
+        "a household that could not be asked was read as one that answered no"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-unasked"));
 }

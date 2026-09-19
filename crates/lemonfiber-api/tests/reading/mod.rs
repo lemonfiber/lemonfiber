@@ -28,6 +28,7 @@ pub(crate) use lemonfiber_core::ports::docker::{Health, Lifecycle};
 pub(crate) use lemonfiber_core::stack::Source;
 pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Renamed, Stopped};
+pub(crate) use lemonfiber_fixtures::pulled::Pulled;
 pub(crate) use lemonfiber_fixtures::support::Reporting;
 pub(crate) use std::path::Path;
 pub(crate) use std::sync::Arc;
@@ -83,6 +84,12 @@ pub(crate) fn holding(engine: Reporting, stack: Source, settings: Settings) -> C
         Environment::MacOs,
     )
     .with_http(Fake::silent())
+    // The image listing is stubbed for the reason the http seam is. `live()` hands
+    // back the reader that reaches this machine's own container engine, so a read
+    // consulting it answers what the developer happens to be running — green on a
+    // machine with an engine and red on one without, which is most contributors and
+    // is a failure they did not cause and cannot read.
+    .with_images(Pulled::holding(Vec::new()))
 }
 
 /// A value built rather than written, so nothing scanning this tree for a
@@ -151,6 +158,7 @@ pub(crate) async fn answered(
             token,
             bound: bound(),
             live,
+            clock: Stopped::at(0),
         }),
     );
 

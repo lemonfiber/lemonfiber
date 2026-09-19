@@ -14,6 +14,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::EXPLAIN;
 use crate::router::Serving;
 
@@ -34,6 +35,10 @@ pub(super) fn routes() -> Router<Serving> {
 /// list, which is the same refusal the command line reports and carries the list in
 /// its detail. Naming an empty word is naming one it does not explain, and is
 /// refused for that rather than read as having named none.
-async fn explain(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, EXPLAIN, query.as_deref()).await
+async fn explain(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, EXPLAIN, query.as_deref()).await
 }

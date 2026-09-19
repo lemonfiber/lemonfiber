@@ -86,6 +86,7 @@ impl Serving {
                 token: Arc::new(token),
                 bound: lemonfiber_api::guard::Binding::here(8471),
                 live: Arc::clone(&live),
+                clock: Stopped::at(0),
             })
         });
         Self { streaming, live }

@@ -17,11 +17,12 @@ use axum::Router;
 use lemonfiber_core::app::Ctx;
 
 use crate::admission::Admitting;
+use crate::admission::Knocking;
 use crate::events::live::Live;
 use crate::events::Streaming;
 use crate::guard::{Binding, Token};
 use crate::jobs::Jobs;
-use crate::serve::{admitted, refused};
+use crate::serve::{admitted, refused, Refusal};
 
 /// What every handler is given.
 ///
@@ -103,13 +104,35 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
     // and nothing else carries none by definition. The other half of the guard still
     // applies to it below, which is what stops a page the operator happens to be
     // visiting from posting guesses at it.
-    let known = request.uri().path() == crate::admission::SESSION
-        || serving
-            .admitting
-            .carried(request.headers(), &serving.token, now)
-            .await;
+    let knocking = serving
+        .admitting
+        .carried(request.headers(), &serving.token, now)
+        .await;
+    // Said as what it is, rather than folded into the silence below. Somebody whose
+    // household could not be asked has not been turned away — they have not been
+    // asked about — and the sign-in door stays open to them so a media server
+    // coming back is all it takes, rather than a sentence telling them their
+    // account is gone.
+    let at_the_door = request.uri().path() == crate::admission::SESSION;
+    if matches!(knocking, Knocking::Unconfirmed) && !at_the_door {
+        return refused(Refusal::Unconfirmed);
+    }
+    let caller = match knocking {
+        Knocking::Known(caller) => Some(caller),
+        Knocking::Nobody | Knocking::Unconfirmed => None,
+    };
+    let known = at_the_door || caller.is_some();
     match admitted(known, request.headers(), serving.bound) {
-        Ok(()) => next.run(request).await,
+        Ok(()) => {
+            // Carried on the request rather than looked up again, so a handler
+            // asking who this is gets the answer the guard actually admitted
+            // rather than a second reading that could disagree with it.
+            let mut request = request;
+            if let Some(caller) = caller {
+                request.extensions_mut().insert(caller);
+            }
+            next.run(request).await
+        }
         Err(refusal) => refused(refusal),
     }
 }

@@ -53,9 +53,11 @@ use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::error::{Amiss, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
+use crate::admission::Caller;
+use crate::entitled::{may, Permitted};
 use crate::reads::{named, wanted};
 use crate::router::Serving;
-use crate::serve::{answered, carrying, SENTENCE};
+use crate::serve::{answered, carrying, refused, Refusal, SENTENCE};
 
 /// The status a read that this machine could not answer is refused with.
 ///
@@ -98,13 +100,24 @@ pub fn routes() -> Router<Serving> {
 /// arrived, so the name a path is served under, what may be said alongside it and
 /// the command it comes to are one decision made in one place rather than
 /// thirteen made per handler.
-pub(crate) async fn reading(ctx: &Ctx, read: &str, query: Option<&str>) -> Response {
+pub(crate) async fn reading(
+    ctx: &Ctx,
+    caller: &Caller,
+    read: &str,
+    query: Option<&str>,
+) -> Response {
     let given = match wanted(read, query) {
         Ok(given) => given,
         Err(problem) => return went_wrong(&problem),
     };
     match named(read, given) {
-        Ok(command) => carried_out(ctx, command).await,
+        // Ruled on between naming the command and carrying it out, so what is
+        // carried out is what this caller may have — narrowed where they may have
+        // part of it, and nothing where it is not theirs at all.
+        Ok(command) => match may(caller, command) {
+            Permitted::This(command) => carried_out(ctx, command).await,
+            Permitted::Nothing => refused(Refusal::NotYours),
+        },
         Err(said) => unreadable(said),
     }
 }

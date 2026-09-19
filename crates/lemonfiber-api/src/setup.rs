@@ -39,9 +39,11 @@ use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::wizard::{Answer, Choice};
 use serde::Deserialize;
 
+use crate::admission::Caller;
+use crate::entitled::{may, Permitted};
 use crate::read::{enveloped, refusing};
 use crate::router::Serving;
-use crate::serve::{carrying, SENTENCE};
+use crate::serve::{carrying, refused, Refusal, SENTENCE};
 
 /// What is said to a request whose body is not one setup takes.
 const NOT_AN_ANSWER: &str =
@@ -60,29 +62,30 @@ pub fn routes() -> Router<Serving> {
 }
 
 /// Where setup stands, and what it is still asking for.
-async fn standing(State(serving): State<Serving>) -> Response {
-    walked(&serving, SetupAction::Where).await
+async fn standing(State(serving): State<Serving>, caller: Caller) -> Response {
+    walked(&serving, &caller, SetupAction::Where).await
 }
 
 /// One question answered.
 async fn answered(
     State(serving): State<Serving>,
+    caller: Caller,
     given: Result<Json<Answer>, JsonRejection>,
 ) -> Response {
     let Ok(Json(answer)) = given else {
         return unreadable();
     };
-    walked(&serving, SetupAction::Answer(answer)).await
+    walked(&serving, &caller, SetupAction::Answer(answer)).await
 }
 
 /// On to the next step, for the steps that only inform.
-async fn onward(State(serving): State<Serving>) -> Response {
-    walked(&serving, SetupAction::Next).await
+async fn onward(State(serving): State<Serving>, caller: Caller) -> Response {
+    walked(&serving, &caller, SetupAction::Next).await
 }
 
 /// Back to the previous question.
-async fn backward(State(serving): State<Serving>) -> Response {
-    walked(&serving, SetupAction::Back).await
+async fn backward(State(serving): State<Serving>, caller: Caller) -> Response {
+    walked(&serving, &caller, SetupAction::Back).await
 }
 
 /// The reviewed answers written.
@@ -90,8 +93,8 @@ async fn backward(State(serving): State<Serving>) -> Response {
 /// Answered with its outcome rather than with a name to follow, because applying
 /// reads and writes lemonfiber's own files and reaches neither the container
 /// engine nor a service — it has finished by the time a reply could be written.
-async fn applied(State(serving): State<Serving>) -> Response {
-    walked(&serving, SetupAction::Apply).await
+async fn applied(State(serving): State<Serving>, caller: Caller) -> Response {
+    walked(&serving, &caller, SetupAction::Apply).await
 }
 
 /// One way out of an apply that stopped part-way.
@@ -105,12 +108,13 @@ async fn applied(State(serving): State<Serving>) -> Response {
 /// answers, all of which are lemonfiber's own files.
 async fn recovered(
     State(serving): State<Serving>,
+    caller: Caller,
     given: Result<Json<Chosen>, JsonRejection>,
 ) -> Response {
     let Ok(Json(chosen)) = given else {
         return unreadable();
     };
-    walked(&serving, SetupAction::Recover(chosen.choice)).await
+    walked(&serving, &caller, SetupAction::Recover(chosen.choice)).await
 }
 
 /// The way out of an interrupted apply a caller picked.
@@ -126,8 +130,11 @@ struct Chosen {
 }
 
 /// One step of the walk, carried out and answered with where it left setup.
-async fn walked(serving: &Serving, action: SetupAction) -> Response {
-    match dispatch(Command::Setup(action), &serving.ctx).await {
+async fn walked(serving: &Serving, caller: &Caller, action: SetupAction) -> Response {
+    let Permitted::This(command) = may(caller, Command::Setup(action)) else {
+        return refused(Refusal::NotYours);
+    };
+    match dispatch(command, &serving.ctx).await {
         Ok(outcome) => enveloped(StatusCode::OK, outcome.envelope().to_json()),
         Err(problem) => enveloped(
             refusing(&problem),

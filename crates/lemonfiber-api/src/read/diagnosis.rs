@@ -11,6 +11,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::{CHECKS, STORAGE};
 use crate::router::Serving;
 
@@ -24,11 +25,19 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// What the diagnostic checks found, or one group of them.
-async fn checks(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, CHECKS, query.as_deref()).await
+async fn checks(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, CHECKS, query.as_deref()).await
 }
 
 /// What the checks about the disk found.
-async fn storage(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, STORAGE, query.as_deref()).await
+async fn storage(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, STORAGE, query.as_deref()).await
 }

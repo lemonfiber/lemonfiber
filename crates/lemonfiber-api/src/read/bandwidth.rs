@@ -14,6 +14,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::BANDWIDTH;
 use crate::router::Serving;
 
@@ -25,6 +26,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// What the line carries, what the stack may take of it, and what the clients say.
-async fn bandwidth(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, BANDWIDTH, query.as_deref()).await
+async fn bandwidth(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, BANDWIDTH, query.as_deref()).await
 }

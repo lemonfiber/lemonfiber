@@ -14,6 +14,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::SPACE;
 use crate::router::Serving;
 
@@ -25,6 +26,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// Where the disk stands, where the room went, and what could be got back.
-async fn space(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, SPACE, query.as_deref()).await
+async fn space(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, SPACE, query.as_deref()).await
 }

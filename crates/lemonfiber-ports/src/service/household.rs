@@ -27,6 +27,53 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn household(&self) -> Result<Vec<Member>, Failure>;
 
+    /// Who a name and a password prove somebody to be, or nothing where they prove
+    /// nobody.
+    ///
+    /// The media server holds the household's accounts, so it is what decides
+    /// whether somebody is one of them. Answering here rather than keeping a second
+    /// list means a member removed there is removed from everything, and a password
+    /// changed there is changed once.
+    ///
+    /// Three answers rather than two, and the third is why this returns a nested
+    /// shape: **wrong** is `Ok(None)` and **could not ask** is `Err`. A surface that
+    /// collapsed them would tell somebody their password was wrong on the day the
+    /// media server was down, and would go on telling them that until it came back.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses to answer —
+    /// never for a name and password it simply does not recognise.
+    async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure>;
+
+    /// Whether an account still stands: the server still holds it, and it is not
+    /// disabled.
+    ///
+    /// Asked on every call a member makes, because a session is a claim about an
+    /// identity and only the media server can say whether that identity is still
+    /// one. No cache satisfies the sentence it exists for — an identity removed
+    /// there must produce a signed-out app at the **next** refused call, and a
+    /// cached yes is a window in which that is untrue.
+    ///
+    /// The cost is a call per member request where the operator's equivalent is a
+    /// disk read, and it is stated rather than hidden. If it proves too expensive
+    /// the answer is to make this call cheap, not to keep the answer and leave the
+    /// requirement untrue for the length of a window.
+    ///
+    /// Narrower than [`Household::household`] on purpose: this asks about one
+    /// account, so it is answered by reading one rather than by listing everybody
+    /// and looking. It is not a second opinion about the same question — it is a
+    /// smaller question.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses to answer —
+    /// never for an account it simply does not hold, which is `Ok(false)`. The two
+    /// must not arrive the same way: **gone** and **could not ask** are different
+    /// facts, and a guard that read them alike would sign a household out for the
+    /// length of a reboot.
+    async fn standing(&self, id: &str) -> Result<bool, Failure>;
+
     /// Make an account somebody can claim by setting a password on it.
     ///
     /// # Errors

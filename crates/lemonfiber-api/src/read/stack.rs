@@ -14,6 +14,7 @@ use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 
+use crate::admission::Caller;
 use crate::reads::{Asked, FOLLOW, FORM, FORMS, LOGS, SERVICE, SERVICES, STATUS, TAIL, VERSION};
 use crate::router::Serving;
 
@@ -50,8 +51,12 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
-async fn version(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, VERSION, query.as_deref()).await
+async fn version(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, VERSION, query.as_deref()).await
 }
 
 /// Every form the stack declares, or what naming some of them would come to.
@@ -59,18 +64,30 @@ async fn version(State(serving): State<Serving>, RawQuery(query): RawQuery) -> R
 /// Forms come from the stack rather than from lemonfiber, so their names are not
 /// something a caller can hold in advance. Naming none lists them and naming some
 /// resolves them, which is the fork `lemonfiber forms` takes on the same word.
-async fn forms(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, FORMS, query.as_deref()).await
+async fn forms(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, FORMS, query.as_deref()).await
 }
 
 /// What the whole stack is doing.
-async fn status(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, STATUS, query.as_deref()).await
+async fn status(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, STATUS, query.as_deref()).await
 }
 
 /// What each service is doing, narrowed to the forms that were named.
-async fn services(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, SERVICES, query.as_deref()).await
+async fn services(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, SERVICES, query.as_deref()).await
 }
 
 /// What the services are saying, and — where it is asked for — what they say next.

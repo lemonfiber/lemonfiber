@@ -15,6 +15,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::CATALOGUE;
 use crate::router::Serving;
 
@@ -26,6 +27,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// Every service this stack declares, and every one it has dropped.
-async fn catalogue(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, CATALOGUE, query.as_deref()).await
+async fn catalogue(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, CATALOGUE, query.as_deref()).await
 }

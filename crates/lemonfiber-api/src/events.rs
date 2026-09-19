@@ -26,8 +26,11 @@ use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
+use lemonfiber_core::ports::time::Clock;
+
+use crate::admission::Knocking;
 use crate::guard::{Binding, Token};
-use crate::serve::{admitted, carrying, refused, STREAM};
+use crate::serve::{admitted, carrying, refused, Refusal, STREAM};
 
 use self::live::{Listening, Live};
 
@@ -55,6 +58,14 @@ pub struct Streaming {
     pub admitting: Arc<crate::admission::Admitting>,
     /// The one gather, and everyone already listening to it.
     pub live: Arc<Live>,
+    /// The clock the rest of the surface reads.
+    ///
+    /// Carried for the reason the token and the register are. This guard decides
+    /// whether a session has ended, and the guard above every other route decides
+    /// the same thing from the context's clock — two readings of *when it is* can
+    /// disagree at the moment a session expires, and the route that disagreed would
+    /// be the one nobody tested. Held rather than asked of the platform here.
+    pub clock: Arc<dyn Clock>,
 }
 
 /// The event stream's route, for the surface to merge with the rest.
@@ -74,12 +85,23 @@ pub fn routes(streaming: Arc<Streaming>) -> Router {
 /// state and can therefore be merged outside the layer that guards the rest,
 /// which is an assembly mistake that would otherwise leave it open.
 pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap) -> Response<Body> {
-    let now = std::time::SystemTime::now();
-    let known = streaming
+    let now = streaming.clock.now();
+    let knocking = streaming
         .admitting
         .carried(&headers, &streaming.token, now)
         .await;
-    if let Err(refusal) = admitted(known, &headers, streaming.bound) {
+    // A stream is held open for hours, so the household is asked once and the answer
+    // stands for the life of it. That is the one place a cached yes is honest: the
+    // events this carries are the ones a caller would have been shown anyway, and a
+    // removed member's next *request* is refused, which is what the sentence asks.
+    if matches!(knocking, Knocking::Unconfirmed) {
+        return refused(Refusal::Unconfirmed);
+    }
+    if let Err(refusal) = admitted(
+        matches!(knocking, Knocking::Known(_)),
+        &headers,
+        streaming.bound,
+    ) {
         return refused(refusal);
     }
     let seen = headers

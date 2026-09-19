@@ -11,6 +11,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::UNINSTALL;
 use crate::router::Serving;
 
@@ -22,6 +23,10 @@ pub(super) fn routes() -> Router<Serving> {
 }
 
 /// What one of the four removals would take, and nothing removed.
-async fn uninstall(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, UNINSTALL, query.as_deref()).await
+async fn uninstall(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, UNINSTALL, query.as_deref()).await
 }

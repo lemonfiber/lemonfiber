@@ -9,6 +9,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 
+use crate::admission::Caller;
 use crate::reads::{CONFIG, QUALITY};
 use crate::router::Serving;
 
@@ -29,11 +30,19 @@ pub(super) fn routes() -> Router<Serving> {
 ///
 /// Naming none shows them all and naming one reads that one, which is the fork
 /// `config show` and `config get` take on the command line.
-async fn config(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, CONFIG, query.as_deref()).await
+async fn config(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, CONFIG, query.as_deref()).await
 }
 
 /// The quality choice in force, what each preset means, and what it costs.
-async fn quality(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
-    reading(&serving.ctx, QUALITY, query.as_deref()).await
+async fn quality(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    reading(&serving.ctx, &caller, QUALITY, query.as_deref()).await
 }
