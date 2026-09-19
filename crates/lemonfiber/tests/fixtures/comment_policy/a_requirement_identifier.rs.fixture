@@ -1,0 +1,6 @@
+/// What this counts.
+pub fn counted(from: &str) -> usize {
+    // Held to ARCH-R1 and to F10-R2, which is where the shape of this answer is
+    // written down and why it is a count rather than a list of what was counted.
+    from.len()
+}

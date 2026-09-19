@@ -1,0 +1,5 @@
+/// What this counts.
+pub fn counted(from: &str) -> usize {
+    let held = from.len(); // the length of the string
+    held
+}

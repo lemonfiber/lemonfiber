@@ -1,0 +1,7 @@
+/// What this counts.
+pub fn counted(from: &str) -> usize {
+    /* A block comment, which the policy has no use an informative run does not
+       already cover. */
+    /**/
+    from.len()
+}

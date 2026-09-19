@@ -1,0 +1,6 @@
+/// What this counts, and where the shape of the answer is written down.
+///
+/// See `.docs/architecture/a-page-nobody-wrote.md`.
+pub fn counted(from: &str) -> usize {
+    from.len()
+}
