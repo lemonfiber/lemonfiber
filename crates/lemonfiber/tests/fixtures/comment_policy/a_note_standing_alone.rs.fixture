@@ -1,0 +1,5 @@
+/// What this counts.
+pub fn counted(from: &str) -> usize {
+    // A note with no second line.
+    from.len()
+}

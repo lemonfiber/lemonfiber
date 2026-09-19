@@ -1,0 +1,19 @@
+/// Everything a scan for two slashes reads as a comment, and none of it is one.
+///
+/// A rule that fires anywhere in this file is reading raw text rather than tokens.
+pub fn quoted() -> Vec<&'static str> {
+    let plain = "// TODO: not a comment";
+    let raw = r#"also // ARCH-R1 not a comment"#;
+    let deeper = r##"and a "# inside it, // still not a comment"##;
+    let bytes = b"// F10-R2 not a comment either";
+    let slash = '/';
+    let quote = '"';
+    let escaped = '\'';
+    let backslash = '\\';
+    let page = "see .docs/architecture/a-page-nobody-wrote.md";
+    let _ = (slash, quote, escaped, backslash, bytes);
+    vec![plain, raw, deeper, page]
+}
+
+/** A doc block holds a nested /* block */ and closes where its own marker is. */
+pub const HELD: usize = 4;

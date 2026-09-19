@@ -1,0 +1,10 @@
+/// What this counts.
+pub fn counted(from: &str) -> usize {
+    // One line of it.
+    // Two lines of it.
+    // Three lines of it.
+    // Four lines of it, which is as far as a comment goes.
+    // Five, which is one line past where prose stops being a note and starts
+    // being a page.
+    from.len()
+}

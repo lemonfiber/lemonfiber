@@ -1,0 +1,6 @@
+/// What this counts.
+pub fn counted(from: &str) -> usize {
+    // The count is the byte length for now, and the measure anybody reading it
+    // wants is a grapheme walk. TODO before something relies on this one.
+    from.len()
+}

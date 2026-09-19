@@ -1,0 +1,27 @@
+//! A file the whole policy passes.
+//!
+//! Every shape a rule looks at stands here in the form the policy allows, so a rule
+//! that fires on this file has learned to refuse correct code — which is the half of
+//! a gate that no sweep over a clean tree can ever show.
+
+/// What this counts, and where the shape of the answer is written down.
+///
+/// See `.docs/architecture/module-layout.md`.
+pub fn counted(from: &str) -> usize {
+    // Two lines is the floor, and this is the reason for it: a note that cannot
+    // reach a second line is a note the code should be making itself.
+    let held = from.len();
+
+    // Four is the ceiling, and a run that reaches it exactly is still a comment
+    // rather than a page. Past it the prose has stopped being the reason for the
+    // line below and started being the shape of the thing around it, which is a
+    // document somebody can revise rather than a note nobody will.
+    held
+}
+
+/** A doc block is rustdoc rather than an informative comment, so it stands. */
+pub const HELD: usize = 4;
+
+//// Four slashes is a plain comment rather than a doc one, which is the reading
+//// rustc makes of it, so it answers to the shape rules like any other run.
+pub const ALSO: usize = 2;
