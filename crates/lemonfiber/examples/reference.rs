@@ -1,8 +1,14 @@
-//! Writes the command reference to stdout.
+//! Writes the command reference, a page per command.
 //!
-//! `just reference` redirects it to the committed artefact. The comparison lives in
-//! a test, so a stale artefact fails the build rather than this binary.
+//! `just reference` runs it from the workspace root. The comparison lives in a test,
+//! so a stale artefact fails the build rather than this program.
 
-fn main() {
-    print!("{}", lemonfiber::reference::render());
+fn main() -> std::process::ExitCode {
+    match lemonfiber::reference::write(std::path::Path::new(".")) {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(why) => {
+            eprintln!("error: the command reference could not be written: {why}");
+            std::process::ExitCode::FAILURE
+        }
+    }
 }
