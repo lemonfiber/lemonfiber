@@ -1,9 +1,9 @@
-//! What one member may watch, read from the media server as that account.
+//! What one member may watch, asked of the media server about that account.
 //!
 //! Its own file because it is a different question from the one beside it. That one is
 //! who holds an account and what each may do; this is what is *on the shelf* for one of
-//! them — and the answer is the server's rather than this product's, which is the whole
-//! of why it is worth a module of its own to say so once.
+//! them — and the answer is the server's rather than this product's, which is worth a
+//! module of its own to say once.
 
 use super::{item_type, Jellyfin, Kind, Medium, Method};
 use crate::ports::service::{Failure, Held};

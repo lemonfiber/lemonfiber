@@ -1462,8 +1462,8 @@ mod tests {
     #[tokio::test]
     async fn a_refresh_tells_the_operator_what_it_found() {
         // The whole point of the driver: the health check, the queue check and the
-        // notifier all ran because a refresh ran, without anybody asking for them.
-        // Before this they were reachable only from their own tests.
+        // notifier all run because a refresh ran, without anybody asking for them —
+        // which is the one thing their own tests cannot say about them.
         let ctx = ctx_remembering("tells", Reporting::absent());
         let snapshot = gather(&ctx, None).await;
 

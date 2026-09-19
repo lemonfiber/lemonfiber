@@ -887,11 +887,10 @@ mod tests {
 
     /// An invitation that has run out is offered again on the account it was for.
     ///
-    /// **Not by taking that account back and building another**, which is what this
-    /// used to do: the identifier is what everything else in the stack knows somebody
-    /// by, so a second account under the same name is the wrong one for anything
-    /// holding the first. The window is restarted by dating the invitation again, and
-    /// the account it names is untouched.
+    /// **Not by taking that account back and building another.** The identifier is what
+    /// everything else in the stack knows somebody by, so a second account under the
+    /// same name is the wrong one for anything holding the first. The window is
+    /// restarted by dating the invitation again, and the account it names is untouched.
     #[tokio::test]
     async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for() {
         let env = recorded_admin("reissue");

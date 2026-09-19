@@ -79,9 +79,9 @@ pub(super) fn narrowed(only: Option<&str>) -> Option<Command> {
 /// refused here rather than at whichever surface supplied it, so a line typed at a
 /// screen and a query string arriving empty are answered in the same sentence.
 ///
-/// Before this, an empty one reached the core as a setting to look for, matched
-/// nothing, and came back as a listing of no settings — which reads as "there is no
-/// such setting" about a setting nobody named.
+/// What the refusal is worth is the reading it keeps out: an empty name carried to the
+/// core matches nothing and comes back as a listing of no settings, which reads as
+/// "there is no such setting" about a setting nobody named.
 pub(super) fn setting(key: Option<String>) -> Result<Command, &'static str> {
     match key {
         None => Ok(Command::ConfigShow),
