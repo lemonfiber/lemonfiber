@@ -281,15 +281,32 @@ mod tests {
 
     /// The blob is the thing that was signed, and a registry that will not serve it
     /// has not said anything about the image either.
+    ///
+    /// Two ways it will not: a refusal it gave, and a connection that never
+    /// answered. The manifest is served in both, so what is being read is the
+    /// second half of the errand failing rather than the first.
     #[tokio::test]
     async fn a_payload_the_registry_would_not_serve_is_a_question_nobody_put() {
-        let asked = reaching(Fake::by_path(vec![
+        let refused = reaching(Fake::by_path(vec![
             ("/manifests/", Answer::reply(200, MANIFEST)),
             ("/blobs/", Answer::reply(500, "")),
         ]));
-        let found = Oci::new(asked).signatures(&komga()).await;
-        let why = found.err().map(|one| one.reason).unwrap_or_default();
+        let why = Oci::new(refused)
+            .signatures(&komga())
+            .await
+            .err()
+            .map(|one| one.reason)
+            .unwrap_or_default();
         assert!(why.contains("answered 500"), "{why}");
+
+        let silent = reaching(Fake::by_path(vec![
+            ("/manifests/", Answer::reply(200, MANIFEST)),
+            ("/blobs/", Answer::Silent),
+        ]));
+        assert!(
+            Oci::new(silent).signatures(&komga()).await.is_err(),
+            "a blob nobody answered for became a signature"
+        );
     }
 
     #[test]
