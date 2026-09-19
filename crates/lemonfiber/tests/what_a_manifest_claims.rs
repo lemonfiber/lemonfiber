@@ -106,6 +106,10 @@ fn a_claim_its_recordings_answer_is_demonstrated_and_exits_zero() {
     assert!(said.contains("media.serve"), "{said}");
     assert!(said.contains("demonstrated"), "{said}");
     assert!(
+        said.contains("No service was asked anything"),
+        "`demonstrated` never stands on its own: {said}"
+    );
+    assert!(
         said.contains("contested between") && said.contains("jellyfin"),
         "the bundled claimants are named: {said}"
     );
@@ -122,6 +126,26 @@ fn a_claim_its_recordings_refuse_exits_non_zero() {
     assert!(
         said.contains("would not be installed"),
         "it says so in words as well as in the status: {said}"
+    );
+}
+
+/// A refused run says what its verdicts were against, the same as a passing one does.
+///
+/// The sentence lived inside the branch that passed, which left the report most likely
+/// to send somebody off to look at their service as the one that never told them
+/// nothing had been asked of it.
+#[test]
+fn a_refused_run_still_says_no_service_was_asked_anything() {
+    let at = source("against", &MANIFEST.replace("status = 401", "status = 403"));
+    let (ok, said, _) = ran(&at, &[]);
+    assert!(!ok, "{said}");
+    assert!(
+        said.contains("No service was asked anything"),
+        "a refused report says what it was against too: {said}"
+    );
+    assert!(
+        said.contains("recordings this plugin ships"),
+        "and says which evidence that was: {said}"
     );
 }
 
@@ -164,6 +188,10 @@ fn the_machine_readable_form_carries_what_the_report_says() {
         here.to_string()
     };
     assert_eq!(at(&["installable"]), "false", "{said}");
+    // The one thing a word like `demonstrated` cannot carry: what it was demonstrated
+    // against. Nothing else in this document distinguishes a recording that answered
+    // from a service that did, and the weaker claim must not read as the stronger.
+    assert_eq!(at(&["against"]), "\"recordings\"", "{said}");
     assert_eq!(at(&["capabilities", "0", "shown"]), "\"refuted\"", "{said}");
     assert_eq!(
         at(&["capabilities", "0", "probes", "0", "verdict", "outcome"]),

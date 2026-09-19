@@ -27,7 +27,12 @@
 pub enum Shown {
     /// A service declares it, and nothing has asked the service yet.
     Claimed,
-    /// The probes ran against the service and passed.
+    /// The probes ran and passed against the evidence the report names.
+    ///
+    /// Which is not the same claim in each case, and the report is where the two are
+    /// told apart: a recording that answers is evidence about a moment somebody wrote
+    /// down, and a service that answers is evidence about the service. This word alone
+    /// does not distinguish them and must not be read as though it did.
     Demonstrated,
     /// The probes could not be run. The claim stands unverified and is not met.
     Unproven,
