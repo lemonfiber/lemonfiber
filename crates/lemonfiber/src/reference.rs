@@ -219,10 +219,10 @@ mod tests {
     #[test]
     fn every_committed_page_still_matches_the_command_line() {
         let pages = pages();
+        let made = pages.len();
         assert!(
-            pages.len() > 40,
-            "the render made {} pages, which is the wrong tree",
-            pages.len()
+            made > 40,
+            "the render made {made} pages, which is the wrong tree"
         );
         for Page { path, text } in pages {
             let stored = std::fs::read_to_string(workspace().join(&path)).unwrap_or_default();
@@ -240,10 +240,10 @@ mod tests {
     #[test]
     fn the_directory_holds_exactly_the_pages_the_reference_writes() {
         let written = written();
+        let named = written.len();
         assert!(
-            written.len() > 40,
-            "the render named {} pages, which is the wrong tree",
-            written.len()
+            named > 40,
+            "the render named {named} pages, which is the wrong tree"
         );
         assert_eq!(
             found(),
@@ -261,10 +261,10 @@ mod tests {
     fn every_command_is_described_on_exactly_one_page() {
         let pages = pages();
         let commands = every_command();
+        let walked = commands.len();
         assert!(
-            commands.len() > 60,
-            "the walk found {} commands, which is the wrong tree",
-            commands.len()
+            walked > 60,
+            "the walk found {walked} commands, which is the wrong tree"
         );
         for trail in commands {
             let heading = format!("## `{trail}`");
@@ -348,7 +348,11 @@ mod tests {
     #[test]
     fn no_page_carries_an_escape_sequence() {
         let pages = pages();
-        assert!(pages.len() > 40, "the render made {} pages", pages.len());
+        let made = pages.len();
+        assert!(
+            made > 40,
+            "the render made {made} pages, which is the wrong tree"
+        );
         for page in pages {
             assert!(!page.text.contains('\u{1b}'), "{}", page.path);
         }
@@ -367,6 +371,10 @@ mod tests {
         let _ = std::fs::create_dir_all(&at);
         let abandoned = at.join("a-command-nobody-declares.md");
         let _ = std::fs::write(&abandoned, "left behind");
+        // Beside it, a page the reference does have, so the loop that decides what
+        // to remove is asked about both kinds rather than only the one it takes.
+        let kept = at.join("setup.md");
+        let _ = std::fs::write(&kept, "out of date");
 
         let wrote = write(&root);
         assert!(wrote.is_ok(), "{wrote:?}");
@@ -374,9 +382,18 @@ mod tests {
             !abandoned.exists(),
             "a page for a command nobody declares was left behind"
         );
+        assert_ne!(
+            std::fs::read_to_string(&kept).unwrap_or_default(),
+            "out of date",
+            "a page the reference does have was not rewritten"
+        );
 
         let pages = pages();
-        assert!(pages.len() > 40, "the render made {} pages", pages.len());
+        let made = pages.len();
+        assert!(
+            made > 40,
+            "the render made {made} pages, which is the wrong tree"
+        );
         for page in pages {
             assert!(
                 root.join(&page.path).is_file(),
