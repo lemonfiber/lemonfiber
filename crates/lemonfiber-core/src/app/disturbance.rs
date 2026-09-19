@@ -194,6 +194,7 @@ const fn situation(command: &Command) -> Option<Situation> {
         | Command::QualityMusic { .. }
         | Command::Trace { .. }
         | Command::Household { .. }
+        | Command::Held { .. }
         | Command::Allowing(..)
         | Command::Deciding(..)
         | Command::Expiring(..)

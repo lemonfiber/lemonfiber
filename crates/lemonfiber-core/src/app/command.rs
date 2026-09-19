@@ -12,6 +12,7 @@ use crate::doctor::Narrowing;
 use super::{bundle, repair, restore, setup::SetupAction, support, update, Waiting};
 
 mod alerts;
+mod allowance;
 mod bandwidth;
 mod credentials;
 mod hosting;
@@ -22,6 +23,7 @@ mod setting;
 mod uninstall;
 
 pub use alerts::AlertAction;
+pub use allowance::Allowance;
 pub use bandwidth::BandwidthAsked;
 pub use credentials::Asking;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
@@ -30,32 +32,6 @@ pub use migrate::MigrateAction;
 pub use quality::QualityAction;
 pub use setting::Setting;
 pub use uninstall::Removing;
-
-/// What an invitation lets the person it is for watch.
-///
-/// One value over two answers because they are one decision taken at one moment: which
-/// libraries somebody may open and how far up the ratings they may go are the two
-/// halves of what an account is *for*, and every surface asks both while it is asking
-/// who the account is for.
-///
-/// Libraries are named the way the media server's own screens name them and are turned
-/// into that server's own identifiers once, in the core, so no surface carries a table
-/// of its own. The age limit needs no turning: the media server keeps it as a number
-/// and the number is an age — see [`crate::age_limit`], which holds the words said for
-/// one.
-///
-/// The default is the ordinary case and the one nobody has to think about: every
-/// library, and no limit at all.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Allowance {
-    /// The libraries they may open, by name. Empty is every one.
-    pub libraries: Vec<String>,
-    /// The age above which the media server holds things back. `None` is no limit.
-    pub age_limit: Option<u32>,
-    /// What is to happen to content the media server has no rating for. `None` leaves
-    /// it to the default a restriction carries — see [`crate::app::invite`].
-    pub unrated: Option<crate::ports::service::Unrated>,
-}
 
 /// What a surface is asking for.
 ///
@@ -240,6 +216,18 @@ pub enum Command {
         /// one. Carried like [`Command::Doctor`]'s widening, and asked for at the
         /// door changes are asked for.
         searching: bool,
+    },
+    /// Report what one member can watch, as the media server answers it for them.
+    ///
+    /// Apart from [`Command::Household`] because they are different questions: that one
+    /// is what the household has *asked for*, and this is what is already here. One
+    /// member rather than all of them, because the shelf is different for every account
+    /// and a single answer would be wrong for whoever it was not read as.
+    Held {
+        /// Whose shelf — an id the media server files somebody under, or their name.
+        member: String,
+        /// How many to answer with, newest first.
+        most: u32,
     },
     /// Report what the household has asked for and where each request stands, in the
     /// words the member who asked would use rather than the services' own.

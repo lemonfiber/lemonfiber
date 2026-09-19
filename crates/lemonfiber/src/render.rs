@@ -24,6 +24,7 @@ mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
+mod held;
 mod history;
 pub(crate) mod host;
 mod hosting;
@@ -239,6 +240,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Music(report) => quality::music(report),
         Outcome::Trace(report) => trace::trace(report),
         Outcome::Household(report) => trace::household(report),
+        Outcome::Held(report) => held::held(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::Stuck(report) => trace::stuck(report),
@@ -498,10 +500,10 @@ mod tests {
     use lemonfiber_core::migration::mode::offered;
     use lemonfiber_core::model::{
         AdoptReport, AlertReport, BesideReport, CarryingReport, ConfigReport, ConflictReport,
-        Disposition, DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HouseholdReport,
-        MigrationReport, MovedReport, MusicReport, OccupantReport, QualityReport, ResetReport,
-        SettingReport, Standing, StandingReport, StatusReport, StuckReport, UnsupportedReport,
-        UpgradeReport, VersionReport, WizardReport,
+        Disposition, DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HeldReport,
+        HouseholdReport, MigrationReport, MovedReport, MusicReport, OccupantReport, QualityReport,
+        ResetReport, SettingReport, Standing, StandingReport, StatusReport, StuckReport,
+        UnsupportedReport, UpgradeReport, VersionReport, WizardReport,
     };
     use lemonfiber_core::reconfigure::{Change, Cost, Findings, Review, Stance};
     use lemonfiber_core::wizard::{Phase, Step};
@@ -982,6 +984,13 @@ mod tests {
                 filtering: None,
                 policy: None,
                 allows: None,
+            }),
+            Outcome::Held(HeldReport {
+                member: "Ada".to_owned(),
+                id: "a7f3".to_owned(),
+                holdings: Vec::new(),
+                available: true,
+                findings: Vec::new(),
             }),
             Outcome::Stuck(StuckReport {
                 items: Vec::new(),

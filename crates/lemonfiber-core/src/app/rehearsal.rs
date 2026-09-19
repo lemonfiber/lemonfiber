@@ -182,6 +182,7 @@ pub fn asked(command: &Command) -> Asked {
         Command::Alerts(_) => ("alerts", Rehearsal::Reports),
         Command::QualityMusic { .. } => ("quality music", Rehearsal::Reports),
         Command::Household { .. } => ("household", Rehearsal::Reports),
+        Command::Held { .. } => ("held", Rehearsal::Reports),
         Command::Allowing(_) => ("allow", Rehearsal::Reports),
         Command::Deciding(_) => ("decide", Rehearsal::Reports),
         Command::Expiring(_) => ("expiring", Rehearsal::Reports),
@@ -750,6 +751,10 @@ mod tests {
                 format: crate::audio::Format::Lossless,
             },
             Command::Household { member: None },
+            Command::Held {
+                member: "ana".to_owned(),
+                most: 25,
+            },
             Command::Allowing(Chosen::default()),
             Command::Deciding(Decision {
                 request: 1,

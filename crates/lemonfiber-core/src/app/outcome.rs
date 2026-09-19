@@ -58,6 +58,8 @@ pub enum Outcome {
     Trace(TraceReport),
     /// What the household asked for, member by member.
     Household(HouseholdReport),
+    /// What one member can watch, as the media server answers it for them.
+    Held(crate::model::HeldReport),
     /// What this machine keeps running for lemonfiber, and what a change to it did.
     Hosting(HostingReport),
     /// The one address to hand somebody who lives here.
@@ -146,6 +148,7 @@ impl Outcome {
             Self::Music(_) => kind::MUSIC,
             Self::Trace(_) => kind::TRACE,
             Self::Household(_) => kind::HOUSEHOLD,
+            Self::Held(_) => kind::HELD,
             Self::Hosting(_) => kind::HOSTING,
             Self::FrontDoor(_) => kind::FRONT_DOOR,
             Self::Stuck(_) => kind::STUCK,
@@ -203,6 +206,7 @@ impl serde::Serialize for Outcome {
             Self::Music(report) => report.serialize(serializer),
             Self::Trace(report) => report.serialize(serializer),
             Self::Household(report) => report.serialize(serializer),
+            Self::Held(report) => report.serialize(serializer),
             Self::Hosting(report) => report.serialize(serializer),
             Self::FrontDoor(report) => report.serialize(serializer),
             Self::Stuck(report) => report.serialize(serializer),

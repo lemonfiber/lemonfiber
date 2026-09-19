@@ -66,6 +66,13 @@ pub fn may(caller: &Caller, command: Command) -> Permitted {
             Command::Household { .. } => Permitted::This(Command::Household {
                 member: Some(id.clone()),
             }),
+            // Theirs, and narrowed the same way. How much of the shelf to answer with
+            // is the caller's to choose and is carried through; whose shelf it is
+            // never was, so what the request named is discarded rather than checked.
+            Command::Held { most, .. } => Permitted::This(Command::Held {
+                member: id.clone(),
+                most,
+            }),
             _ => Permitted::Nothing,
         },
     }
@@ -114,6 +121,46 @@ mod tests {
             Permitted::This(Command::Household {
                 member: Some(ASKING.to_owned())
             })
+        );
+    }
+
+    /// The shelf is narrowed the same way, and the point is the same one: a member's
+    /// shelf is what their account may watch, so a request naming somebody else is
+    /// answered with their own rather than compared and turned down.
+    #[test]
+    fn a_member_naming_somebody_elses_shelf_is_given_their_own() {
+        assert_eq!(
+            may(
+                &member(),
+                Command::Held {
+                    member: SOMEBODY_ELSE.to_owned(),
+                    most: 25,
+                }
+            ),
+            Permitted::This(Command::Held {
+                member: ASKING.to_owned(),
+                most: 25,
+            })
+        );
+    }
+
+    /// How much of the shelf to answer with is the caller's and survives the
+    /// narrowing. Whose shelf it is never was theirs to choose, and does not.
+    #[test]
+    fn how_much_of_the_shelf_a_member_asked_for_is_carried_through() {
+        assert_eq!(
+            may(
+                &member(),
+                Command::Held {
+                    member: ASKING.to_owned(),
+                    most: 7,
+                }
+            ),
+            Permitted::This(Command::Held {
+                member: ASKING.to_owned(),
+                most: 7,
+            }),
+            "the count a member asked for was not carried through"
         );
     }
 

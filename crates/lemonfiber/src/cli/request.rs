@@ -244,6 +244,24 @@ pub enum Request {
         #[command(subcommand)]
         action: Option<HouseholdCommand>,
     },
+    /// Show what one member can actually watch.
+    ///
+    /// The household word says what has been *asked for*. This says what is already
+    /// here — read from the media server as that member, so it is their age limit,
+    /// their blocked kinds and the libraries their account reaches that decide what
+    /// comes back. Nothing in lemonfiber narrows it afterwards, which is why this is
+    /// the only place a restriction can be seen as the list it comes to rather than
+    /// as the setting it was typed in as.
+    ///
+    /// One person at a time, because no two accounts need have the same shelf.
+    Held {
+        /// Whose shelf, named the way you would say it.
+        #[arg(long)]
+        member: String,
+        /// How many to show, newest first.
+        #[arg(long)]
+        most: Option<u32>,
+    },
     /// Add one thing, end to end, and watch every step of it happen.
     ///
     /// The walk a first run is offered: search the indexers, grab a release, download

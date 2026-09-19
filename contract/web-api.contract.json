@@ -6005,6 +6005,134 @@
         }
       }
     },
+    "held": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/HeldReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Held": {
+          "description": "One thing the household holds, as a member is shown it.\n\nWhat a person recognises and nothing else. There is no file path, no container,\nno bitrate and no library id: a member deciding what to watch is not choosing a\ntranscode, and a surface handed those would have to decide not to draw them.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The identifier the server tells it apart by, which is what asking to play one\nof them names.",
+              "type": "string"
+            },
+            "medium": {
+              "description": "Which of the kinds this product deals in it is.",
+              "$ref": "#/$defs/Medium"
+            },
+            "title": {
+              "description": "What it is called, in the words the server holds it under.",
+              "type": "string"
+            },
+            "year": {
+              "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "medium"
+          ]
+        },
+        "HeldReport": {
+          "description": "What one member can watch, and who they are.",
+          "type": "object",
+          "properties": {
+            "available": {
+              "description": "Whether the shelf could be read at all.\n\nAn empty shelf and an unread one are different answers, and collapsing them\nwould tell a household they own nothing on the day the media server rebooted.\nAnything that could not be read is said in `findings` and this goes false.",
+              "type": "boolean"
+            },
+            "findings": {
+              "description": "What is worth saying about this shelf, in the words its reader would use.\n\nAlways written, empty or not. A field the schema requires and the document\nsometimes omits is one a reader has to guess about, and an empty list already\nsays the thing it would say: there is nothing to report about this shelf.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "holdings": {
+              "description": "What they hold, newest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Held"
+              }
+            },
+            "id": {
+              "description": "The identifier the media server files them under.",
+              "type": "string"
+            },
+            "member": {
+              "description": "The member this was asked for, by the name they are known by.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "member",
+            "id",
+            "holdings",
+            "available",
+            "findings"
+          ]
+        },
+        "Medium": {
+          "description": "The kinds of thing a household holds.\n\nNamed rather than passed through as the server's own word, because a surface\ndrawing \"Series\" against one server and \"tvshow\" against another would be\nrendering a detail of which server this household runs.\n\n`Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two\nrequest services a [`crate::media::Kind`], a request's suspension a\n[`crate::service::asking::Holding`], and what one line of a manifest is a\n`uninstall::Sort` — and one word meaning two things in one vocabulary is how a\nreader comes to trust the wrong one. The contract flattens every type name into one\nnamespace, so a clash there is a clash for anything reading it by name.",
+          "oneOf": [
+            {
+              "description": "One film.",
+              "type": "string",
+              "const": "film"
+            },
+            {
+              "description": "A television series, rather than one episode of one.",
+              "type": "string",
+              "const": "series"
+            },
+            {
+              "description": "Something the server holds that is neither, and is not hidden for that.",
+              "type": "string",
+              "const": "other"
+            }
+          ]
+        }
+      }
+    },
     "history": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

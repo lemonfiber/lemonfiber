@@ -174,6 +174,13 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             },
         ),
         ("household", Command::Household { member: None }),
+        (
+            "held",
+            Command::Held {
+                member: "anybody".to_owned(),
+                most: 25,
+            },
+        ),
         ("walkthrough", Command::Walkthrough { item: None }),
         (
             "explain",
