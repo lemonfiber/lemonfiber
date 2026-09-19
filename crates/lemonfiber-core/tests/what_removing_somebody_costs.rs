@@ -340,12 +340,21 @@ fn stack_without(service: &str, tag: &str) -> Source {
     let to = std::env::temp_dir().join(format!("lemonfiber-without-{tag}-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&to);
     let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let needle = format!("id = \"{service}\"");
-    let kept: String = read
+    // The links that named it go with it. A stack that drops a service drops what
+    // reached it, and one that kept them would be refused for naming a service the
+    // manifest no longer declares — which is the rule working rather than the case
+    // these tests are about.
+    let named = format!("\"{service}\"");
+    let services: String = read
         .split("[[service]]")
-        .filter(|block| !block.contains(&needle))
+        .filter(|block| !block.contains(&format!("id = {named}")))
         .collect::<Vec<_>>()
         .join("[[service]]");
+    let kept: String = services
+        .split("[[wiring]]")
+        .filter(|block| !block.contains(&named))
+        .collect::<Vec<_>>()
+        .join("[[wiring]]");
     let _ = std::fs::write(to.join("stack.toml"), kept);
     Source::External(Box::leak(to.into_boxed_path()))
 }
