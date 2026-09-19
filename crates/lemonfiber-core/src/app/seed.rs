@@ -2473,6 +2473,83 @@ mod tests {
         let _ = std::fs::remove_dir_all(bare.parent().unwrap_or(std::path::Path::new("/")));
     }
 
+    /// Which service the book \*arr pulls from is the stack's answer rather than a name
+    /// written in this crate, so an ask the stack has not settled is nothing to
+    /// register — not the service that used to be named here.
+    ///
+    /// Three ways it is unsettled, and all of them are the same answer: nothing said
+    /// what fills it, several do and none was chosen, and the one chosen is not in
+    /// this stack. Registering a guess in any of them would point the book \*arr at
+    /// software the operator did not pick.
+    #[tokio::test]
+    async fn an_indexer_ask_the_stack_has_not_settled_registers_nobody() {
+        const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+        let env = recorded_admin("bindery-unsettled");
+        let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+        let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
+        let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+            .with_http(http)
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+        let services = [prowlarr(), bindery_svc()];
+
+        for unsettled in [
+            std::collections::BTreeMap::new(),
+            std::collections::BTreeMap::from([(
+                "indexer.search".to_owned(),
+                vec!["prowlarr".to_owned(), "nzbhydra2".to_owned()],
+            )]),
+            filling("indexer.search", "nzbhydra2"),
+        ] {
+            assert!(
+                super::aggregators::seed_aggregators(
+                    &ctx,
+                    &services,
+                    Some(stack_root()),
+                    &unsettled
+                )
+                .await
+                .is_empty(),
+                "an ask settled as {unsettled:?} registered an aggregator anyway"
+            );
+        }
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
+
+    /// The same rule on the other converted connection: what the request service signs
+    /// in against is whatever fills the identity ask, and an ask nothing settles is
+    /// nothing to wire.
+    ///
+    /// The last case is the one worth having. A filler this build has no adapter for
+    /// is a service it cannot speak to, and the stack already answers that way for a
+    /// service it declares no API for — so the two agree rather than one of them
+    /// guessing at a protocol from a name.
+    #[test]
+    fn the_identity_source_is_whatever_fills_the_ask_and_nothing_where_that_is_unsettled() {
+        let apiless = manifest_service("lockbox", None, Some(9000));
+        let services = [jellyfin_svc(), seerr_with_settings(), apiless];
+
+        assert_eq!(
+            super::identity::identity_source(&services, &identified()).map(|addr| addr.id),
+            Some("jellyfin".to_owned())
+        );
+
+        for unsettled in [
+            std::collections::BTreeMap::new(),
+            std::collections::BTreeMap::from([(
+                "identity.source".to_owned(),
+                vec!["jellyfin".to_owned(), "lockbox".to_owned()],
+            )]),
+            filling("identity.source", "plex"),
+            filling("identity.source", "lockbox"),
+        ] {
+            assert_eq!(
+                super::identity::identity_source(&services, &unsettled).map(|addr| addr.id),
+                None,
+                "an ask settled as {unsettled:?} was wired to something anyway"
+            );
+        }
+    }
+
     /// A service that will not answer is reported, in its own words.
     #[tokio::test]
     async fn a_book_arr_that_refuses_is_reported() {

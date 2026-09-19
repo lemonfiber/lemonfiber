@@ -204,20 +204,18 @@ fn asked(
     held: &[String],
     chosen: &Chosen,
 ) -> (Vec<String>, Settled) {
-    if held.is_empty() {
-        return (Vec::new(), Settled::Unfilled);
-    }
-    if wiring.each {
+    if wiring.each && !held.is_empty() {
         return (held.to_vec(), Settled::Each);
-    }
-    if let [only] = held {
-        return (vec![only.clone()], Settled::Outright);
     }
 
     // The operator's choice over the stack's, because the stack's is the default they
     // were offered and theirs is the answer they gave. Either is only a choice while
     // the service it names still claims the capability — one that stopped claiming it
     // at a pin bump leaves a contest rather than a filler nothing can demonstrate.
+    //
+    // And only where there is something to choose between. One service claiming it is
+    // answered by the one service, not by crediting whoever wrote the setting with a
+    // decision they were never offered.
     let picked = chosen
         .filler(capability)
         .map(|service| (service, Whose::Operator, None))
@@ -227,7 +225,7 @@ fn asked(
                 .as_deref()
                 .map(|service| (service, Whose::Stack, wiring.why.clone()))
         })
-        .filter(|(service, _, _)| held.iter().any(|one| one == service));
+        .filter(|(service, _, _)| held.len() > 1 && held.iter().any(|one| one == service));
 
     match picked {
         Some((service, whose, why)) => (
@@ -238,14 +236,14 @@ fn asked(
                 over: held.iter().filter(|one| *one != service).cloned().collect(),
             },
         ),
-        None => (
-            Vec::new(),
-            match fills(&candidates(held)) {
-                Filling::Contested { claimants } => Settled::Contested { claimants },
-                Filling::By { service } => return (vec![service], Settled::Outright),
-                Filling::Unfilled => Settled::Unfilled,
-            },
-        ),
+        // Nobody chose, so the claimants answer for themselves — through the one
+        // function that decides what a set of claims comes to, rather than through a
+        // second opinion about it kept here.
+        None => match fills(&candidates(held)) {
+            Filling::By { service } => (vec![service], Settled::Outright),
+            Filling::Contested { claimants } => (Vec::new(), Settled::Contested { claimants }),
+            Filling::Unfilled => (Vec::new(), Settled::Unfilled),
+        },
     }
 }
 
@@ -501,29 +499,30 @@ pub const OPERATION: &str = "substitute";
 #[cfg(test)]
 mod tests {
     use super::{
-        filled, recorded, settle, substitute, unfilled, Chosen, Reaches, Refused, Settled, Whose,
-        FILLS_KEY,
+        filled, recorded, settle, substitute, unfilled, Chosen, Reaches, Refused, Settled,
+        Substitution, Unfilled, Whose, FILLS_KEY,
     };
     use lemonfiber_manifest::Manifest;
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
 
-    fn stack() -> Manifest {
-        match Manifest::from_toml(STACK) {
-            Ok(manifest) => manifest,
-            Err(_) => unreachable!("the stack this crate is compiled with parses"),
-        }
+    /// The stack this crate is compiled with, if it reads.
+    ///
+    /// An `Option` rather than a manifest, because the arm for a stack that does not
+    /// parse is a line no passing run reaches and the coverage gate counts it — see
+    /// `.docs/architecture/error-model.md`. Every case below carries the option to
+    /// its assertion instead, so a stack that stopped parsing fails the assertion
+    /// rather than a panic.
+    fn stack() -> Option<Manifest> {
+        Manifest::from_toml(STACK).ok()
     }
 
     /// A manifest of exactly what a case is about, so nothing else can settle it.
-    fn written(body: &str) -> Manifest {
+    fn written(body: &str) -> Option<Manifest> {
         let text = format!(
             "schema_version = 1\nstack_version = \"0.1.0\"\nmin_cli_version = \"0.1.0\"\n{body}"
         );
-        match Manifest::from_toml(&text) {
-            Ok(manifest) => manifest,
-            Err(_) => unreachable!("the fixture parses"),
-        }
+        Manifest::from_toml(&text).ok()
     }
 
     /// A service declaring what it provides, and nothing else that matters here.
@@ -537,11 +536,44 @@ mod tests {
     }
 
     /// What one named link came to.
-    fn came(manifest: &Manifest, chosen: &Chosen, by: &str) -> Option<Reaches> {
-        settle(manifest, chosen)
-            .into_iter()
-            .find(|one| one.by == by)
-            .map(|one| one.reaches)
+    fn came(manifest: Option<Manifest>, chosen: &Chosen, by: &str) -> Option<Reaches> {
+        manifest.and_then(|manifest| {
+            settle(&manifest, chosen)
+                .into_iter()
+                .find(|one| one.by == by)
+                .map(|one| one.reaches)
+        })
+    }
+
+    /// Every ask the stack leaves unfilled, as an option that carries a stack that
+    /// did not read at all rather than reporting it as nothing missing.
+    fn nothing_fills(manifest: Option<Manifest>, chosen: &Chosen) -> Option<Vec<super::Unfilled>> {
+        manifest.map(|manifest| unfilled(&settle(&manifest, chosen)))
+    }
+
+    /// What a substitution against that manifest comes to.
+    fn substituting(
+        manifest: Option<Manifest>,
+        chosen: &Chosen,
+        capability: &str,
+        service: &str,
+    ) -> Option<Result<Substitution, Refused>> {
+        manifest.map(|manifest| substitute(&manifest, chosen, capability, service))
+    }
+
+    /// One field of a substitution, where it was worked out at all. Three of them,
+    /// because a case about one field reads better against that field than against a
+    /// whole value most of which it is not about.
+    fn cost(made: Option<Result<Substitution, Refused>>) -> Option<Result<Vec<Unfilled>, Refused>> {
+        made.map(|one| one.map(|made| made.leaves_unfilled))
+    }
+
+    fn now(made: Option<Result<Substitution, Refused>>) -> Option<Result<String, Refused>> {
+        made.map(|one| one.map(|made| made.now))
+    }
+
+    fn was(made: Option<Result<Substitution, Refused>>) -> Option<Result<Option<String>, Refused>> {
+        made.map(|one| one.map(|made| made.was))
     }
 
     /// One claimant and nothing to settle.
@@ -553,7 +585,7 @@ mod tests {
             service("server", "\"media.serve\"")
         ));
         assert_eq!(
-            came(&manifest, &Chosen::default(), "asker"),
+            came(manifest, &Chosen::default(), "asker"),
             Some(Reaches::Asked {
                 capability: "media.serve".to_owned(),
                 services: vec!["server".to_owned()],
@@ -567,7 +599,7 @@ mod tests {
     /// in the stack that reaches all of them.
     #[test]
     fn an_ask_for_every_filler_reaches_every_filler() {
-        let reaches = came(&stack(), &Chosen::default(), "bazarr");
+        let reaches = came(stack(), &Chosen::default(), "bazarr");
         assert_eq!(
             reaches,
             Some(Reaches::Asked {
@@ -594,7 +626,7 @@ mod tests {
             service("two", "\"media.serve\"")
         ));
         assert_eq!(
-            came(&manifest, &Chosen::default(), "asker"),
+            came(manifest, &Chosen::default(), "asker"),
             Some(Reaches::Asked {
                 capability: "media.serve".to_owned(),
                 services: Vec::new(),
@@ -608,19 +640,25 @@ mod tests {
     /// The stack's own choice settles a contest, and says it was the stack's and why.
     #[test]
     fn the_stack_s_choice_settles_a_contest_and_says_whose_it_is() {
-        let Some(Reaches::Asked {
-            services, settled, ..
-        }) = came(&stack(), &Chosen::default(), "bindery")
-        else {
-            unreachable!("the stack declares this link")
-        };
-        assert_eq!(services, vec!["prowlarr".to_owned()]);
-        let Settled::Chosen { whose, why, over } = settled else {
-            unreachable!("two services here answer as an indexer")
-        };
-        assert_eq!(whose, Whose::Stack);
-        assert_eq!(over, vec!["nzbhydra2".to_owned()]);
-        assert!(why.is_some_and(|said| said.contains("NZBHydra2")));
+        let reaches = came(stack(), &Chosen::default(), "bindery");
+        assert!(
+            reaches.as_ref().is_some_and(|one| matches!(
+                one,
+                Reaches::Asked {
+                    capability,
+                    services,
+                    settled: Settled::Chosen {
+                        whose: Whose::Stack,
+                        why: Some(said),
+                        over,
+                    },
+                } if capability == "indexer.search"
+                    && services.as_slice() == ["prowlarr".to_owned()]
+                    && said.contains("NZBHydra2")
+                    && over.as_slice() == ["nzbhydra2".to_owned()]
+            )),
+            "{reaches:?}"
+        );
     }
 
     /// The operator's choice is over the stack's, because the stack's is the default
@@ -628,20 +666,21 @@ mod tests {
     #[test]
     fn the_operator_s_choice_is_over_the_stack_s() {
         let chosen = Chosen::read(Some("indexer.search=nzbhydra2"));
-        let Some(Reaches::Asked {
-            services, settled, ..
-        }) = came(&stack(), &chosen, "bindery")
-        else {
-            unreachable!("the stack declares this link")
-        };
-        assert_eq!(services, vec!["nzbhydra2".to_owned()]);
-        assert!(matches!(
-            settled,
-            Settled::Chosen {
-                whose: Whose::Operator,
-                ..
-            }
-        ));
+        let reaches = came(stack(), &chosen, "bindery");
+        assert!(
+            reaches.as_ref().is_some_and(|one| matches!(
+                one,
+                Reaches::Asked {
+                    services,
+                    settled: Settled::Chosen {
+                        whose: Whose::Operator,
+                        ..
+                    },
+                    ..
+                } if services.as_slice() == ["nzbhydra2".to_owned()]
+            )),
+            "{reaches:?}"
+        );
     }
 
     /// A choice naming a service that no longer claims it is not a choice any more.
@@ -650,28 +689,37 @@ mod tests {
     #[test]
     fn a_choice_of_something_that_stopped_claiming_it_leaves_the_contest_standing() {
         let chosen = Chosen::read(Some("indexer.search=sabnzbd"));
-        let Some(Reaches::Asked { settled, .. }) = came(&stack(), &chosen, "bindery") else {
-            unreachable!("the stack declares this link")
-        };
-        assert!(matches!(settled, Settled::Contested { .. }));
+        let reaches = came(stack(), &chosen, "bindery");
+        assert!(
+            reaches.as_ref().is_some_and(|one| matches!(
+                one,
+                Reaches::Asked {
+                    settled: Settled::Contested { .. },
+                    ..
+                }
+            )),
+            "{reaches:?}"
+        );
     }
 
     /// A by-name link is shown as one, carrying the reason it is the exception.
     #[test]
     fn a_by_name_link_is_shown_as_by_name_with_its_reason() {
-        let Some(Reaches::ByName { service, why }) =
-            came(&stack(), &Chosen::default(), "qbittorrent")
-        else {
-            unreachable!("the stack keeps this one by name")
-        };
-        assert_eq!(service, "gluetun");
-        assert!(why.contains("network namespace"));
+        let reaches = came(stack(), &Chosen::default(), "qbittorrent");
+        assert!(
+            reaches.as_ref().is_some_and(|one| matches!(
+                one,
+                Reaches::ByName { service, why }
+                    if service == "gluetun" && why.contains("network namespace")
+            )),
+            "{reaches:?}"
+        );
     }
 
     /// Nothing in the shipped stack asks for something nothing provides.
     #[test]
     fn nothing_the_shipped_stack_asks_for_goes_unfilled() {
-        assert_eq!(unfilled(&settle(&stack(), &Chosen::default())), Vec::new());
+        assert_eq!(nothing_fills(stack(), &Chosen::default()), Some(Vec::new()));
     }
 
     /// An ask nothing fills names what asked, which is what makes it actionable.
@@ -681,15 +729,17 @@ mod tests {
             "{}\n[[wiring]]\nby = \"asker\"\nasks = \"media.serve\"\n",
             service("asker", "")
         ));
-        let found = unfilled(&settle(&manifest, &Chosen::default()));
-        let [only] = found.as_slice() else {
-            unreachable!("one ask, and nothing declares what it asks for")
-        };
-        assert_eq!(only.by, "asker");
-        assert_eq!(only.capability, "media.serve");
+        let found = nothing_fills(manifest, &Chosen::default());
         assert_eq!(
-            only.to_string(),
-            "asker asks for media.serve and nothing fills it"
+            found,
+            Some(vec![Unfilled {
+                by: "asker".to_owned(),
+                capability: "media.serve".to_owned(),
+            }])
+        );
+        assert_eq!(
+            found.unwrap_or_default().first().map(ToString::to_string),
+            Some("asker asks for media.serve and nothing fills it".to_owned())
         );
     }
 
@@ -703,23 +753,42 @@ mod tests {
             service("one", "\"media.serve\""),
             service("two", "\"media.serve\"")
         ));
-        assert_eq!(unfilled(&settle(&manifest, &Chosen::default())), Vec::new());
+        assert_eq!(
+            nothing_fills(manifest, &Chosen::default()),
+            Some(Vec::new())
+        );
     }
 
     /// Substituting is a change of which service fills a capability, and it says what
     /// asked so the reach of the change is visible before it is made.
     #[test]
     fn a_substitution_names_the_capability_both_services_and_everything_that_asked() {
-        let made = substitute(&stack(), &Chosen::default(), "indexer.search", "nzbhydra2");
-        let Ok(made) = made else {
-            unreachable!("nzbhydra2 provides indexer.search and bindery asks for it")
-        };
-        assert_eq!(made.capability, "indexer.search");
-        assert_eq!(made.was.as_deref(), Some("prowlarr"));
-        assert_eq!(made.now, "nzbhydra2");
-        assert_eq!(made.asked_by, vec!["bindery".to_owned()]);
-        assert_eq!(made.setting, "indexer.search=nzbhydra2");
-        assert_eq!(made.leaves_unfilled, Vec::new());
+        assert_eq!(
+            substituting(stack(), &Chosen::default(), "indexer.search", "nzbhydra2"),
+            Some(Ok(Substitution {
+                capability: "indexer.search".to_owned(),
+                was: Some("prowlarr".to_owned()),
+                now: "nzbhydra2".to_owned(),
+                asked_by: vec!["bindery".to_owned()],
+                leaves_unfilled: Vec::new(),
+                setting: "indexer.search=nzbhydra2".to_owned(),
+            }))
+        );
+    }
+
+    /// A capability every filler answers has no one service it *was*, and saying so
+    /// is better than naming whichever of the four came first.
+    #[test]
+    fn a_capability_every_filler_answers_has_no_single_service_it_was() {
+        assert_eq!(
+            was(substituting(
+                stack(),
+                &Chosen::default(),
+                "library.curate",
+                "sonarr"
+            )),
+            Some(Ok(None))
+        );
     }
 
     /// The one thing an operator cannot find out afterwards: a service filling two
@@ -734,28 +803,29 @@ mod tests {
             service("player", "\"media.serve\"")
         ));
         let chosen = Chosen::read(Some("media.serve=both"));
-        let Ok(made) = substitute(&manifest, &chosen, "media.serve", "player") else {
-            unreachable!("player provides media.serve and asker asks for it")
-        };
-        assert_eq!(made.leaves_unfilled, Vec::new());
+        assert_eq!(
+            cost(substituting(manifest, &chosen, "media.serve", "player")),
+            Some(Ok(Vec::new())),
+            "`both` still declares identity.source, so nothing stopped being filled"
+        );
 
-        // Nothing is left unfilled by that one, because `both` still fills identity.
-        // Take the identity source away and the same substitution costs it.
+        // The same change where the service being stood down claims nothing else: it
+        // is still the one that answers what it declares, so the cost is still none.
         let losing = written(&format!(
             "{}{}{}\n[[wiring]]\nby = \"asker\"\nasks = \"media.serve\"\n",
             service("asker", ""),
             service("both", "\"media.serve\""),
             service("player", "\"media.serve\"")
         ));
-        let Ok(second) = substitute(
-            &losing,
-            &Chosen::read(Some("media.serve=both")),
-            "media.serve",
-            "player",
-        ) else {
-            unreachable!("player provides media.serve")
-        };
-        assert_eq!(second.now, "player");
+        assert_eq!(
+            now(substituting(
+                losing,
+                &Chosen::read(Some("media.serve=both")),
+                "media.serve",
+                "player",
+            )),
+            Some(Ok("player".to_owned()))
+        );
     }
 
     /// The report says what *this* change would cost, not what was already wrong. An
@@ -770,29 +840,29 @@ mod tests {
             service("two", "\"media.serve\"")
         ));
         let chosen = Chosen::read(Some("media.serve=one"));
-        let Ok(made) = substitute(&manifest, &chosen, "media.serve", "two") else {
-            unreachable!("two provides media.serve")
-        };
-        assert_eq!(made.leaves_unfilled, Vec::new());
+        assert_eq!(
+            cost(substituting(manifest, &chosen, "media.serve", "two")),
+            Some(Ok(Vec::new()))
+        );
     }
 
     /// A service that cannot do the thing is not a substitute for one that can.
     #[test]
     fn a_service_that_does_not_provide_it_is_refused_naming_both() {
         assert_eq!(
-            substitute(&stack(), &Chosen::default(), "indexer.search", "sabnzbd"),
-            Err(Refused::DoesNotProvide {
+            substituting(stack(), &Chosen::default(), "indexer.search", "sabnzbd"),
+            Some(Err(Refused::DoesNotProvide {
                 service: "sabnzbd".to_owned(),
                 capability: "indexer.search".to_owned(),
-            })
+            }))
         );
     }
 
     #[test]
     fn a_service_this_stack_does_not_have_is_refused_by_name() {
         assert_eq!(
-            substitute(&stack(), &Chosen::default(), "indexer.search", "plex"),
-            Err(Refused::NoSuchService("plex".to_owned()))
+            substituting(stack(), &Chosen::default(), "indexer.search", "plex"),
+            Some(Err(Refused::NoSuchService("plex".to_owned())))
         );
     }
 
@@ -801,19 +871,19 @@ mod tests {
     #[test]
     fn a_capability_nothing_asks_for_is_refused_rather_than_recorded() {
         assert_eq!(
-            substitute(&stack(), &Chosen::default(), "media.serve", "jellyfin"),
-            Err(Refused::NothingAsks("media.serve".to_owned()))
+            substituting(stack(), &Chosen::default(), "media.serve", "jellyfin"),
+            Some(Err(Refused::NothingAsks("media.serve".to_owned())))
         );
     }
 
     #[test]
     fn choosing_what_already_fills_it_is_refused_rather_than_journalled_as_a_change() {
         assert_eq!(
-            substitute(&stack(), &Chosen::default(), "identity.source", "jellyfin"),
-            Err(Refused::AlreadyFills {
+            substituting(stack(), &Chosen::default(), "identity.source", "jellyfin"),
+            Some(Err(Refused::AlreadyFills {
                 service: "jellyfin".to_owned(),
                 capability: "identity.source".to_owned(),
-            })
+            }))
         );
     }
 
@@ -821,28 +891,32 @@ mod tests {
     /// in the history and unwinds through the machinery every other change uses.
     #[test]
     fn a_substitution_is_journalled_as_a_change_that_can_be_put_back() {
-        let Ok(made) = substitute(&stack(), &Chosen::default(), "indexer.search", "nzbhydra2")
-        else {
-            unreachable!("nzbhydra2 provides indexer.search")
-        };
-        let change = recorded(&made, None, "2026-09-19T00:00:00Z");
-        assert_eq!(change.operation, "substitute");
-        assert_eq!(change.target, "indexer.search");
+        let change = substituting(stack(), &Chosen::default(), "indexer.search", "nzbhydra2")
+            .and_then(Result::ok)
+            .map(|made| recorded(&made, None, "2026-09-19T00:00:00Z"));
         assert_eq!(
-            change.kind,
-            crate::journal::Kind::Set {
+            change.as_ref().map(|change| change.operation.clone()),
+            Some("substitute".to_owned())
+        );
+        assert_eq!(
+            change.as_ref().map(|change| change.target.clone()),
+            Some("indexer.search".to_owned())
+        );
+        assert_eq!(
+            change.as_ref().map(|change| change.kind.clone()),
+            Some(crate::journal::Kind::Set {
                 key: FILLS_KEY.to_owned(),
                 previous: None,
                 current: "indexer.search=nzbhydra2".to_owned(),
-            }
+            })
         );
         assert_eq!(
-            change.undo().action,
-            crate::journal::Action::Restore {
+            change.map(|change| change.undo().action),
+            Some(crate::journal::Action::Restore {
                 key: FILLS_KEY.to_owned(),
                 value: None,
                 wrote: "indexer.search=nzbhydra2".to_owned(),
-            }
+            })
         );
     }
 
@@ -850,7 +924,9 @@ mod tests {
     /// is settled is one map rather than one answer per asker.
     #[test]
     fn what_fills_each_capability_is_one_answer_for_every_asker() {
-        let held = filled(&settle(&stack(), &Chosen::default()));
+        let held = stack()
+            .map(|manifest| filled(&settle(&manifest, &Chosen::default())))
+            .unwrap_or_default();
         assert_eq!(
             held.get("download.torrent").map(Vec::as_slice),
             Some(["qbittorrent".to_owned()].as_slice())
@@ -889,12 +965,73 @@ mod tests {
     /// the six the manifest says they are.
     #[test]
     fn every_link_the_shipped_stack_declares_is_answered() {
-        let wired = settle(&stack(), &Chosen::default());
-        assert_eq!(wired.len(), stack().wirings.len());
-        let by_name = wired
-            .iter()
-            .filter(|one| matches!(one.reaches, Reaches::ByName { .. }))
-            .count();
-        assert_eq!(by_name, 6);
+        let counted = stack().map(|manifest| {
+            let wired = settle(&manifest, &Chosen::default());
+            let by_name = wired
+                .iter()
+                .filter(|one| matches!(one.reaches, Reaches::ByName { .. }))
+                .count();
+            (wired.len(), manifest.wirings.len(), by_name)
+        });
+        assert_eq!(
+            counted.map(|(answered, _, _)| answered),
+            counted.map(|(_, declared, _)| declared)
+        );
+        assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(6));
+    }
+
+    /// An ask for every filler with nothing to fill it is unfilled, not "every one of
+    /// nothing". The two read the same in a count and differently to somebody being
+    /// told what is wrong with their stack.
+    #[test]
+    fn an_ask_for_every_filler_that_nothing_fills_is_unfilled() {
+        let manifest = written(&format!(
+            "{}\n[[wiring]]\nby = \"asker\"\nasks = \"library.curate\"\neach = true\n",
+            service("asker", "")
+        ));
+        assert_eq!(
+            came(manifest, &Chosen::default(), "asker"),
+            Some(Reaches::Asked {
+                capability: "library.curate".to_owned(),
+                services: Vec::new(),
+                settled: Settled::Unfilled,
+            })
+        );
+    }
+
+    /// One claimant and a recorded choice naming it is still not a choice: there was
+    /// nothing to choose between, and saying somebody chose would credit a decision
+    /// they were never offered.
+    #[test]
+    fn a_choice_where_only_one_claims_it_is_reported_as_no_choice_at_all() {
+        let manifest = written(&format!(
+            "{}{}\n[[wiring]]\nby = \"asker\"\nasks = \"media.serve\"\n",
+            service("asker", ""),
+            service("server", "\"media.serve\"")
+        ));
+        assert_eq!(
+            came(manifest, &Chosen::read(Some("media.serve=server")), "asker"),
+            Some(Reaches::Asked {
+                capability: "media.serve".to_owned(),
+                services: vec!["server".to_owned()],
+                settled: Settled::Outright,
+            })
+        );
+    }
+
+    /// A link that is neither an ask nor a by-name wiring is nothing this can answer.
+    /// The validator refuses one; a reader handed one anyway leaves it out rather than
+    /// inventing an end for it.
+    #[test]
+    fn a_link_that_says_neither_what_it_asks_for_nor_what_it_names_is_left_out() {
+        let manifest = written(&format!(
+            "{}\n[[wiring]]\nby = \"asker\"\n",
+            service("asker", "")
+        ));
+        assert_eq!(came(manifest.clone(), &Chosen::default(), "asker"), None);
+        assert_eq!(
+            manifest.map(|manifest| settle(&manifest, &Chosen::default())),
+            Some(Vec::new())
+        );
     }
 }

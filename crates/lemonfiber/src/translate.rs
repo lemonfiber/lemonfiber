@@ -514,7 +514,9 @@ pub(crate) fn moving(object: UpdateCommand) -> Command {
 
 #[cfg(test)]
 mod tests {
-    use lemonfiber_core::app::{Allowance, Command, QualityAction, Setting, Waiting};
+    use lemonfiber_core::app::{
+        Allowance, Command, Filling, Linking, QualityAction, Setting, Waiting,
+    };
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
@@ -1453,6 +1455,25 @@ mod tests {
                 mode: lemonfiber_core::migration::mode::Mode::Beside,
                 confirmed: true,
             }
+        );
+    }
+
+    /// The bare word reads what this stack wires to what; the verb under it changes
+    /// one of those links. A command line that asked for a listing cannot become one
+    /// that changes a stack by being mistyped, and that is the whole reason the write
+    /// is a subcommand rather than a pair of flags.
+    #[test]
+    fn asking_what_is_wired_reads_and_the_verb_under_it_writes() {
+        assert_eq!(super::wiring(None), Command::Wiring(Linking::Read));
+        assert_eq!(
+            super::wiring(Some(lemonfiber::cli::WiringCommand::Fill {
+                capability: "indexer.search".to_owned(),
+                service: "nzbhydra2".to_owned(),
+            })),
+            Command::Wiring(Linking::Fill(Filling {
+                capability: "indexer.search".to_owned(),
+                service: "nzbhydra2".to_owned(),
+            }))
         );
     }
 

@@ -434,8 +434,8 @@ mod tests {
         THE_WALK_IS_THE_OBSERVATION,
     };
     use crate::app::command::{
-        AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Keeping, MigrateAction,
-        QualityAction, Removing, Setting,
+        AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
+        MigrateAction, QualityAction, Removing, Setting,
     };
     use crate::app::engine::Waiting;
     use crate::app::setup::SetupAction;
@@ -955,6 +955,14 @@ mod tests {
             (Command::Hosting(Keeping::Read), Rehearsal::Reads),
             (Command::Setup(SetupAction::Where), Rehearsal::Reads),
             (Command::Setup(SetupAction::Apply), Rehearsal::Reports),
+            (Command::Wiring(Linking::Read), Rehearsal::Reads),
+            (
+                Command::Wiring(Linking::Fill(Filling {
+                    capability: "indexer.search".to_owned(),
+                    service: "nzbhydra2".to_owned(),
+                })),
+                Rehearsal::Reports,
+            ),
         ] {
             assert!(
                 asked(&command).rehearsal == expected,

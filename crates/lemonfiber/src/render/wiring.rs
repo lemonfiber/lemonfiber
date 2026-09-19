@@ -231,6 +231,26 @@ mod tests {
         assert!(said.contains("1 link, 1 of them by name."), "{said}");
     }
 
+    /// An ask for every filler says so, because "reaches four services" and "reaches
+    /// the one this settled on" are different facts about a stack.
+    #[test]
+    fn an_ask_for_every_filler_says_it_reaches_all_of_them() {
+        let said = shown(&WiringReport {
+            wired: vec![asking(
+                "bazarr",
+                "library.curate",
+                &["sonarr", "radarr"],
+                Settled::Each,
+            )],
+            unfilled: Vec::new(),
+        });
+        assert!(said.contains("reaches  sonarr, radarr"), "{said}");
+        assert!(
+            said.contains("reaching  every service that fills it"),
+            "{said}"
+        );
+    }
+
     /// A contest names every claimant and says how to settle it, because an operator
     /// told only that there is a conflict has been given a problem and no list.
     #[test]

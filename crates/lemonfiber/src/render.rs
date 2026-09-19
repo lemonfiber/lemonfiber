@@ -663,6 +663,52 @@ mod tests {
         assert!(!said.contains(char::from(27)), "{said}");
     }
 
+    /// Both halves of the wiring request reach a renderer of their own: the listing
+    /// is a report and the substitution is what one change came to, and a dispatcher
+    /// that sent either to the other would answer the wrong question in full.
+    #[test]
+    fn what_this_stack_wires_to_what_and_one_change_to_it_render_apart() {
+        let listing = answer(
+            &Outcome::Wiring(lemonfiber_core::model::WiringReport {
+                wired: vec![lemonfiber_core::wiring::Wired {
+                    by: "seerr".to_owned(),
+                    reaches: lemonfiber_core::wiring::Reaches::Asked {
+                        capability: "identity.source".to_owned(),
+                        services: vec!["jellyfin".to_owned()],
+                        settled: lemonfiber_core::wiring::Settled::Outright,
+                    },
+                }],
+                unfilled: Vec::new(),
+            }),
+            false,
+        )
+        .text();
+        assert!(
+            listing.contains("seerr asks for identity.source"),
+            "{listing}"
+        );
+
+        let changed = answer(
+            &Outcome::Substituted(lemonfiber_core::model::SubstitutionReport {
+                substitution: lemonfiber_core::wiring::Substitution {
+                    capability: "indexer.search".to_owned(),
+                    was: Some("prowlarr".to_owned()),
+                    now: "nzbhydra2".to_owned(),
+                    asked_by: vec!["bindery".to_owned()],
+                    leaves_unfilled: Vec::new(),
+                    setting: "indexer.search=nzbhydra2".to_owned(),
+                },
+                applied: true,
+            }),
+            false,
+        )
+        .text();
+        assert!(
+            changed.contains("nzbhydra2 now fills indexer.search."),
+            "{changed}"
+        );
+    }
+
     #[test]
     fn every_shape_this_module_prints_is_reachable() {
         // The one place this module reaches the terminal, exercised so it cannot rot.
