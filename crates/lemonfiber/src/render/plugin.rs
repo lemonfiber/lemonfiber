@@ -13,7 +13,7 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Capabilities, Claimed, Claiming, Credential, Points, Probe, Ran, Verdict,
+    Capabilities, Claimed, Claiming, Credential, Points, Probe, Provenance, Ran, Verdict, Vouched,
 };
 
 use super::Lines;
@@ -147,6 +147,49 @@ pub(crate) fn claimed(read: &Claimed, json: bool) -> Option<Lines> {
     Some(claims(read))
 }
 
+/// What anybody has said about the images a plugin pins, in whichever form was asked.
+pub(crate) fn vouched(read: &Vouched, json: bool) -> Option<Lines> {
+    if json {
+        return serde_json::to_string_pretty(read)
+            .ok()
+            .as_deref()
+            .map(document);
+    }
+    Some(provenance(read))
+}
+
+/// Three answers, each said as itself.
+///
+/// The words are the whole point. *Unproven* is not a softer *refused* and not a
+/// quieter *signed*: it is the answer that says nobody has claimed this image, and an
+/// operator deciding whether to go on needs it kept apart from a claim that did not
+/// hold. So each line says which of the three it is before it says anything else.
+fn provenance(read: &Vouched) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{} — what its images are vouched for", read.id));
+    lines.put(String::new());
+    for one in &read.images {
+        lines.put(format!("  {}  {}", one.held.as_str(), one.service));
+        lines.put(format!("    {}@{}", one.image, one.digest));
+        let why = match &one.held {
+            Provenance::Signed { by } => format!("signed, and the key that made it is {by}"),
+            Provenance::Unproven { why } | Provenance::Refused { why } => why.clone(),
+        };
+        lines.put(format!("    {why}"));
+        lines.put(String::new());
+    }
+    if read.images.is_empty() {
+        lines.put("  it pins no image, so nothing was asked about anything.".to_owned());
+        lines.put(String::new());
+    }
+    lines.put(if read.installable {
+        "nothing said about these images stops an install.".to_owned()
+    } else {
+        "this would not be installed as it stands.".to_owned()
+    });
+    lines
+}
+
 /// What one plugin's source claims, and what this build makes of it.
 ///
 /// The refusals come first and are the whole answer where there are any: a manifest
@@ -275,7 +318,9 @@ fn counted(number: usize, thing: &str) -> String {
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::filling::{Filling, Shown};
-    use lemonfiber_core::plugin::{Claimed, Claiming, Contributed, Ran, Verdict, Violation};
+    use lemonfiber_core::plugin::{
+        Claimed, Claiming, Contributed, Ran, Verdict, Violation, Vouched,
+    };
 
     use super::{capabilities, claimed, claims, document, points};
 
@@ -620,5 +665,79 @@ mod tests {
     fn a_document_is_carried_through_as_it_was_written() {
         let lines = document("{\n  \"a\": 1\n}\n");
         assert_eq!(lines.text(), "{\n  \"a\": 1\n}");
+    }
+
+    /// One image, in each of the three answers, rendered as itself.
+    ///
+    /// The words are what this is for. An operator reading the report has to be able
+    /// to tell a publisher who signed nothing from a claim that did not hold, and the
+    /// two would look alike the moment either stopped naming itself.
+    #[test]
+    fn each_of_the_three_answers_says_which_one_it_is() {
+        use lemonfiber_core::plugin::{Provenance, Vouch};
+
+        let one = |held: Provenance| Vouched {
+            id: "komga".to_owned(),
+            installable: !held.refuses(),
+            images: vec![Vouch {
+                service: "komga".to_owned(),
+                image: "docker.io/gotson/komga".to_owned(),
+                digest: "sha256:abc".to_owned(),
+                held,
+            }],
+        };
+
+        let signed = super::provenance(&one(Provenance::Signed {
+            by: "the operator's own".to_owned(),
+        }))
+        .text();
+        assert!(signed.contains("signed"), "{signed}");
+        assert!(signed.contains("the operator's own"), "{signed}");
+        assert!(
+            signed.contains("docker.io/gotson/komga@sha256:abc"),
+            "{signed}"
+        );
+        assert!(signed.contains("stops an install"), "{signed}");
+
+        let unproven = super::provenance(&one(Provenance::Unproven {
+            why: "its publisher has made no claim".to_owned(),
+        }))
+        .text();
+        assert!(unproven.contains("unproven"), "{unproven}");
+        assert!(unproven.contains("made no claim"), "{unproven}");
+
+        let refused = super::provenance(&one(Provenance::Refused {
+            why: "no key this build holds made it".to_owned(),
+        }))
+        .text();
+        assert!(refused.contains("refused"), "{refused}");
+        assert!(refused.contains("would not be installed"), "{refused}");
+    }
+
+    /// A plugin pinning nothing says so rather than printing an empty list.
+    #[test]
+    fn a_read_over_no_image_says_it_asked_about_nothing() {
+        let said = super::provenance(&Vouched {
+            id: "komga".to_owned(),
+            images: Vec::new(),
+            installable: false,
+        })
+        .text();
+        assert!(said.contains("pins no image"), "{said}");
+        assert!(said.contains("would not be installed"), "{said}");
+    }
+
+    #[test]
+    fn what_was_vouched_for_is_carried_as_json_where_a_script_asked() {
+        let read = Vouched {
+            id: "komga".to_owned(),
+            images: Vec::new(),
+            installable: false,
+        };
+        let json = super::vouched(&read, true)
+            .map(|lines| lines.text())
+            .unwrap_or_default();
+        assert!(json.contains(r#""id": "komga""#), "{json}");
+        assert!(json.contains(r#""installable": false"#), "{json}");
     }
 }

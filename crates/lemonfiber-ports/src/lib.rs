@@ -36,6 +36,7 @@ pub mod occupancy;
 pub mod plural;
 pub mod process;
 pub mod random;
+pub mod registry;
 pub mod retry;
 pub mod seams;
 pub mod service;

@@ -8,12 +8,13 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, PluginCommand, RawDoctor, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
 
 mod acting;
 mod archive;
+mod authoring;
 mod context;
 mod dashboard;
 mod engine;
@@ -34,7 +35,7 @@ mod ui;
 use crate::say::{complain, say};
 use context::{context, here};
 use engine::{halting, pull, starting, stream};
-use exit::{complain, no_config_home, settled, FAILURE, USAGE};
+use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
 use render::render;
@@ -272,7 +273,7 @@ async fn main() -> ExitCode {
         // The documents a plugin author reads are this build's own, so they are
         // answered here and never dispatched: there is no stack to ask, nothing to
         // decide, and a context to build would be a context nothing reached through.
-        Request::Plugin { read } => return published(&read, cli.json),
+        Request::Plugin { read } => return for_an_author(&read, cli.json).await,
         Request::Trace {
             term,
             season,
@@ -349,92 +350,23 @@ async fn main() -> ExitCode {
     answered(command, &ctx, cli.json).await
 }
 
-/// Answer one of the four things a plugin author asks this binary.
+/// Put a plugin author's answer in front of them, and end with its code.
 ///
-/// No context, no dispatch and no stack. Three are documents generated at build time
-/// from lemonfiber's own types, so the answer is the same on a machine with nothing
-/// installed as on one running everything — which is the whole of what an author needs
-/// them to be. The fourth reads a manifest the author is writing.
-///
-/// The schema is always the document, because it is a thing an editor reads rather than
-/// a listing a person does. The other three have a form for each.
-fn published(read: &PluginCommand, json: bool) -> ExitCode {
-    let lines = match read {
-        PluginCommand::Schema => lemonfiber_core::plugin::schema().as_deref().map(document),
-        PluginCommand::ExtensionPoints if json => {
-            lemonfiber_core::plugin::points().as_deref().map(document)
-        }
-        PluginCommand::ExtensionPoints => Some(render::plugin::points(
-            &lemonfiber_core::plugin::extension_points(),
-        )),
-        PluginCommand::Capabilities => match capabilities(json) {
-            Ok(lines) => lines,
-            Err(code) => return code,
-        },
-        PluginCommand::Claims { path } => return claims(path, json),
-    };
-    let Some(lines) = lines else {
-        complain!("error: the published document could not be written");
-        return ExitCode::from(FAILURE);
-    };
-    lines.print();
-    ExitCode::SUCCESS
-}
-
-/// What one plugin's source claims, held to what this build publishes.
-///
-/// The one request under this word that reads something the operator has rather than
-/// something lemonfiber published, and the one that can come back with an exit status
-/// worth branching on: a manifest the vocabularies refuse, or a claim its own
-/// recordings refute, is a plugin that would not be installed — which is what an
-/// author's CI is asking.
-///
-/// Nothing is written and no service is asked anything. Every verdict is against the
-/// recordings the plugin ships, which is what lets this run in a checkout with no stack
-/// and no instance of the software anywhere.
-fn claims(path: &std::path::Path, json: bool) -> ExitCode {
-    let read = match lemonfiber_core::plugin::claimed(path) {
-        Ok(read) => read,
-        Err(unreadable) => {
-            complain!("error: {unreadable}");
-            return ExitCode::from(FAILURE);
-        }
-    };
-    let Some(lines) = render::plugin::claimed(&read, json) else {
-        complain!("error: what was read could not be written as JSON");
-        return ExitCode::from(FAILURE);
-    };
-    lines.print();
-    if read.installable {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(FAILURE)
+/// The one part of that errand this file keeps: which adapter reaches a registry is
+/// the edge's to choose, and so is writing to a stream. What to say and what to exit
+/// with is decided in [`authoring`], where a test can hold it.
+async fn for_an_author(read: &lemonfiber::cli::PluginCommand, json: bool) -> ExitCode {
+    let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::new(
+        lemonfiber_adapters::http::Web::new(),
+    ));
+    let answered = authoring::published(read, json, &asking).await;
+    if let Some(fault) = answered.fault {
+        complain!("error: {fault}");
     }
-}
-
-/// The capability vocabulary, in whichever form was asked for.
-///
-/// Its own function because it is the one of the three documents that can refuse: it
-/// is read against the stack this build pins, and a stack that disagreed with the
-/// vocabulary would have failed generation long before here. Reported as this build's
-/// own fault rather than the operator's, because it is.
-fn capabilities(json: bool) -> Result<Option<render::Lines>, ExitCode> {
-    match lemonfiber_core::plugin::capabilities() {
-        Ok(_) if json => Ok(lemonfiber_core::plugin::vocabulary()
-            .ok()
-            .as_deref()
-            .map(document)),
-        Ok(published) => Ok(Some(render::plugin::capabilities(&published))),
-        Err(problem) => {
-            complain!("error: {problem}");
-            Err(ExitCode::from(FAILURE))
-        }
+    if let Some(lines) = answered.lines {
+        lines.print();
     }
-}
-
-/// One committed document, going out exactly as it was written.
-fn document(text: &str) -> render::Lines {
-    render::plugin::document(text)
+    ExitCode::from(answered.code)
 }
 
 /// The app this binary serves a browser.

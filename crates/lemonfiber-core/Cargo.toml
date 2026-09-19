@@ -15,6 +15,13 @@ lemonfiber-manifest = { path = "../lemonfiber-manifest" }
 lemonfiber-plugin = { path = "../lemonfiber-plugin" }
 lemonfiber-ports = { path = "../lemonfiber-ports" }
 argon2 = { workspace = true }
+# Verifying the signature a registry offers beside an image. Already in the tree —
+# rustls builds on it — so this adds no crate to the graph, and it is the one
+# library this binary already trusts to decide whether bytes were signed.
+ring = "0.17"
+# Decoding the base64 a PEM key and a registry's signature annotation are carried
+# in. Already in the tree through the HTTP stack.
+base64 = "0.22"
 async-trait = { workspace = true }
 jiff = { workspace = true }
 crc32fast = "1"

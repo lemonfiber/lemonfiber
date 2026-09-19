@@ -27,6 +27,7 @@ pub mod nntp;
 pub mod occupancy;
 pub mod process;
 pub mod random;
+pub mod registry;
 pub mod retrying;
 pub mod time;
 

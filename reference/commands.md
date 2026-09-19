@@ -1193,6 +1193,7 @@ Commands:
   extension-points  List the places a plugin may extend lemonfiber itself
   schema            Print the schema an editor validates `plugin.toml` against
   claims            Read a plugin's source and say what its claims come to
+  provenance        Ask each image's registry whether anybody has said it is theirs
   help              Print this message or the help of the given subcommand(s)
 
 Options:
@@ -1336,6 +1337,49 @@ Arguments:
 Options:
       --json
           Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin provenance`
+
+```text
+Ask each image's registry whether anybody has said it is theirs.
+
+The one read here that reaches the network, and the only one: it asks the registry the manifest pins an image in whether it offers a signature for that exact digest, and says what this build makes of the answer.
+
+Three answers and never two. An image whose signature verifies against a key you hold is **signed**. One nobody signed is **unproven** — a publisher who signed nothing has made no claim, which is a different fact from a claim that did not check out, and it does not stop an install. One carrying a signature that does not hold is **refused**, and it does.
+
+Without `--key` nothing can be verified, so an image a registry does offer a signature for is reported unproven rather than signed. Nothing is ever reported as signed on the strength of an answer that did not arrive.
+
+Usage: lemonfiber plugin provenance [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The plugin's source: its directory, or the `plugin.toml` inside it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --key <PEM>
+          A PEM public key to check signatures against. Repeatable
 
       --dry-run
           Say what would happen, and change nothing

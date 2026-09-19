@@ -11,13 +11,16 @@ use clap::Subcommand;
 
 /// What a plugin author can be told, with nothing running.
 ///
-/// Four reads and no verbs. Nothing here installs, removes or asks anything of a
-/// service: three are the documents lemonfiber publishes about what a plugin may
-/// claim, where it may contribute and what shape its manifest takes, and the fourth
-/// reads a manifest on a path and says what this build makes of it. Each answers with
-/// no network, no catalogue and no stack, and each says which generation it is
-/// reporting — an author comparing two answers needs to know whether the difference is
-/// their build or their manifest.
+/// Five reads and no verbs. Nothing here installs, removes or changes anything: three
+/// are the documents lemonfiber publishes about what a plugin may claim, where it may
+/// contribute and what shape its manifest takes, the fourth reads a manifest on a path
+/// and says what this build makes of it, and the fifth asks each image's registry what
+/// it holds beside that image.
+///
+/// The first four answer with no network, no catalogue and no stack, and each says
+/// which generation it is reporting — an author comparing two answers needs to know
+/// whether the difference is their build or their manifest. The fifth is the one that
+/// reaches out, which is why it is its own request rather than part of another.
 #[derive(Debug, Subcommand)]
 pub enum PluginCommand {
     /// List the capabilities a service can claim, and what claiming one undertakes.
@@ -65,5 +68,27 @@ pub enum PluginCommand {
     Claims {
         /// The plugin's source: its directory, or the `plugin.toml` inside it.
         path: PathBuf,
+    },
+    /// Ask each image's registry whether anybody has said it is theirs.
+    ///
+    /// The one read here that reaches the network, and the only one: it asks the
+    /// registry the manifest pins an image in whether it offers a signature for that
+    /// exact digest, and says what this build makes of the answer.
+    ///
+    /// Three answers and never two. An image whose signature verifies against a key
+    /// you hold is **signed**. One nobody signed is **unproven** — a publisher who
+    /// signed nothing has made no claim, which is a different fact from a claim that
+    /// did not check out, and it does not stop an install. One carrying a signature
+    /// that does not hold is **refused**, and it does.
+    ///
+    /// Without `--key` nothing can be verified, so an image a registry does offer a
+    /// signature for is reported unproven rather than signed. Nothing is ever
+    /// reported as signed on the strength of an answer that did not arrive.
+    Provenance {
+        /// The plugin's source: its directory, or the `plugin.toml` inside it.
+        path: PathBuf,
+        /// A PEM public key to check signatures against. Repeatable.
+        #[arg(long = "key", value_name = "PEM")]
+        keys: Vec<PathBuf>,
     },
 }

@@ -19,6 +19,7 @@
 
 mod claimed;
 mod judging;
+mod provenance;
 mod recorded;
 
 use lemonfiber_manifest::Manifest;
@@ -28,7 +29,8 @@ use thiserror::Error;
 
 use crate::doctor::BUNDLED_CHECKS;
 
-pub use claimed::{claimed, Claimed, Claiming, Contributed, Ran, Unreadable, Verdict};
+pub use claimed::{claimed, read, Claimed, Claiming, Contributed, Ran, Unreadable, Verdict};
+pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
 
 // Re-exported so a surface rendering one of these reads it through the module that
