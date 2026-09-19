@@ -228,11 +228,23 @@ mod tests {
     /// The comma goes with the name. A service declaring two leaves `[, "other"]`
     /// behind otherwise, which is a stack that does not parse — and a test that then
     /// proves the reader refuses bad TOML rather than what it was written for.
+    ///
+    /// Only the declarations, for the same reason. The stack also *asks* for these
+    /// names, and an edit that reached those lines would leave `asks =` with nothing
+    /// after it — the same unparseable stack, arrived at a different way.
     fn without(name: &str) -> String {
         STACK
-            .replace(&format!("\"{name}\", "), "")
-            .replace(&format!(", \"{name}\""), "")
-            .replace(&format!("\"{name}\""), "")
+            .lines()
+            .map(|line| {
+                if !line.trim_start().starts_with("provides = ") {
+                    return line.to_owned();
+                }
+                line.replace(&format!("\"{name}\", "), "")
+                    .replace(&format!(", \"{name}\""), "")
+                    .replace(&format!("\"{name}\""), "")
+            })
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 
     /// A capability no bundled service declares fails generation, naming it.

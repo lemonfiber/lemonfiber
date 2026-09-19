@@ -158,6 +158,10 @@ pub const WATCH: Kind = Kind("watch");
 pub const WIZARD: Kind = Kind("wizard");
 /// One glossary term.
 pub const WORD: Kind = Kind("word");
+/// What this stack wires to what, and how each link was settled.
+pub const WIRING: Kind = Kind("wiring");
+/// A change of which service fills a capability, and what it costs.
+pub const SUBSTITUTION: Kind = Kind("substitution");
 
 /// Every kind, so the contract cannot describe one that is never emitted.
 pub const ALL: &[Kind] = &[
@@ -220,6 +224,8 @@ pub const ALL: &[Kind] = &[
     WATCH,
     WIZARD,
     WORD,
+    WIRING,
+    SUBSTITUTION,
 ];
 
 #[cfg(test)]

@@ -176,6 +176,7 @@ const fn situation(command: &Command) -> Option<Situation> {
         // so a new one stops the build until somebody has decided.
         Command::Version
         | Command::Catalogue
+        | Command::Wiring(_)
         | Command::Forms
         | Command::Preview { .. }
         | Command::Pull { .. }

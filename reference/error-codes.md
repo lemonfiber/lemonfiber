@@ -195,5 +195,9 @@ what to do about it, is written for operators at
 - `VPN-8`
 - `WATCH-1`
 - `WATCH-2`
+- `WIRE-1`
+- `WIRE-2`
+- `WIRE-3`
+- `WIRE-4`
 - `WIRING-1`
 - `WORD-1`

@@ -17,8 +17,9 @@ use crate::ports::service::{Aggregator, Aggregators as _};
 /// What this connection is called where it is reported.
 const CONNECTION: &str = "Indexers into Bindery";
 
-/// The name the aggregator is filed under in the book \*arr's own list.
-const AGGREGATOR: &str = "Prowlarr";
+/// What this connection asks the stack for: a service that runs a search across the
+/// indexers it holds and answers with what they returned.
+const SEARCHES: &str = "indexer.search";
 
 /// Tell the book \*arr about the aggregator, where the stack has both.
 ///
@@ -29,11 +30,12 @@ pub(super) async fn seed_aggregators(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&std::path::Path>,
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
 ) -> Vec<crate::seed::Wiring> {
     let Some(client) = super::super::targets::bindery_reader(ctx, services) else {
         return Vec::new();
     };
-    let Some(aggregator) = aggregator_to_pull_from(ctx, services, project).await else {
+    let Some(aggregator) = aggregator_to_pull_from(ctx, services, project, filled).await else {
         return Vec::new();
     };
 
@@ -48,18 +50,28 @@ pub(super) async fn seed_aggregators(
 ///
 /// A container name rather than a loopback address, because the service reading it is
 /// a container beside it.
+///
+/// Which service that is comes from what the stack says this link asks for, not from a
+/// name written here. Two of the stack's own services answer as an indexer, and which
+/// of them fills the ask is the manifest's default until the operator substitutes —
+/// at which point this reaches the other one with nothing here changed, which is the
+/// whole of what asking rather than naming buys.
 async fn aggregator_to_pull_from(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&std::path::Path>,
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
 ) -> Option<Aggregator> {
-    let service = services.iter().find(|service| service.id == "prowlarr")?;
-    let port = service.port?;
-    let target = super::target_for(service, project?)?;
+    let [chosen] = filled.get(SEARCHES)?.as_slice() else {
+        return None;
+    };
+    let aggregator = services.iter().find(|service| &service.id == chosen)?;
+    let port = aggregator.port?;
+    let target = super::target_for(aggregator, project?)?;
     let key = super::arrs::read_servarr_key(ctx, &target.config).await?;
     Some(Aggregator {
-        name: AGGREGATOR.to_owned(),
-        url: format!("http://{}:{port}", service.id),
+        name: aggregator.name.clone(),
+        url: format!("http://{}:{port}", aggregator.id),
         key,
     })
 }

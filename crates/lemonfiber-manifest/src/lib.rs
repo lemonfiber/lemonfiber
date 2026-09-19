@@ -17,7 +17,7 @@ pub use date::Date;
 pub use error::Error;
 pub use schema::{
     Api, ApiKind, Bind, Criticality, Form, Health, HealthKind, KeySource, Manifest, Profile,
-    Protocol, Removed, Service,
+    Protocol, Removed, Service, Wiring,
 };
 pub use validate::{is_core_name, validate, Violation, ALLOWED_GRANTS};
 

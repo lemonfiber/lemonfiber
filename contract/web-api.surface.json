@@ -50,6 +50,7 @@
     "stop-seeding": "ref:Letting",
     "stored": "ref:Stored",
     "stuck": "ref:StuckReport",
+    "substitution": "ref:SubstitutionReport",
     "trace": "ref:TraceReport",
     "undo": "ref:UndoReversal",
     "uninstall": "ref:Uninstall",
@@ -58,6 +59,7 @@
     "version": "ref:VersionReport",
     "walkthrough": "ref:WalkthroughReport",
     "watch": "ref:SupervisionReport",
+    "wiring": "ref:WiringReport",
     "wizard": "ref:WizardReport",
     "word": "ref:Term"
   },
@@ -4298,6 +4300,51 @@
         "\"within\""
       ]
     },
+    "Reaches": {
+      "fields": {
+        "capability": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "how": {
+          "type": [
+            "const:\"asked\"",
+            "const:\"by-name\""
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "settled": {
+          "type": [
+            "ref:WiringSettled"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"asked\"",
+        "\"by-name\""
+      ]
+    },
     "Reason": {
       "fields": {},
       "variants": [
@@ -6226,6 +6273,64 @@
       },
       "variants": []
     },
+    "Substitution": {
+      "fields": {
+        "asked_by": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "capability": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "leaves_unfilled": {
+          "type": [
+            "array[ref:Unfilled]"
+          ],
+          "required": true
+        },
+        "now": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "setting": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "was": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "SubstitutionReport": {
+      "fields": {
+        "applied": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "substitution": {
+          "type": [
+            "ref:Substitution"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "SupervisionReport": {
       "fields": {
         "forms": {
@@ -6724,6 +6829,23 @@
         "reversed": {
           "type": [
             "array[ref:Undo]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Unfilled": {
+      "fields": {
+        "by": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "capability": {
+          "type": [
+            "string"
           ],
           "required": true
         }
@@ -7464,6 +7586,30 @@
         "\"throttle\""
       ]
     },
+    "Whose": {
+      "fields": {},
+      "variants": [
+        "\"operator\"",
+        "\"stack\""
+      ]
+    },
+    "Wired": {
+      "fields": {
+        "by": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reaches": {
+          "type": [
+            "ref:Reaches"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "Wiring": {
       "fields": {
         "connection": {
@@ -7486,6 +7632,68 @@
         }
       },
       "variants": []
+    },
+    "WiringReport": {
+      "fields": {
+        "unfilled": {
+          "type": [
+            "array[ref:Unfilled]"
+          ],
+          "required": true
+        },
+        "wired": {
+          "type": [
+            "array[ref:Wired]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "WiringSettled": {
+      "fields": {
+        "claimants": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "over": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "settled": {
+          "type": [
+            "const:\"chosen\"",
+            "const:\"contested\"",
+            "const:\"each\"",
+            "const:\"outright\"",
+            "const:\"unfilled\""
+          ],
+          "required": true
+        },
+        "whose": {
+          "type": [
+            "ref:Whose"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": [
+        "\"chosen\"",
+        "\"contested\"",
+        "\"each\"",
+        "\"outright\"",
+        "\"unfilled\""
+      ]
     },
     "WizardReport": {
       "fields": {

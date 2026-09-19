@@ -199,6 +199,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Adoption(report) => adopting(report),
         Outcome::Beside(report) => standing(report),
         Outcome::Replacement(report) => replacing(report),
+        // An ask nothing fills is a stack that will not wire, and a script asking
+        // what this stack wires to what is asking exactly that. It is the operator's
+        // own configuration to fix, which is the code that says so.
+        Outcome::Wiring(report) if report.unfilled.is_empty() => ExitCode::SUCCESS,
+        Outcome::Wiring(_) => ExitCode::from(VALIDATION),
         Outcome::Import(report) => carrying(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
@@ -331,6 +336,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)
+        // A substitution was recorded, or worked out and not written; one that
+        // could not be made comes back as a problem.
+        | Outcome::Substituted(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
         | Outcome::Undo(_)

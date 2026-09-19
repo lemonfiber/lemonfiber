@@ -14,6 +14,7 @@ use super::reaching::{
     OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY, REACH_REGISTRY_KEY,
     REACH_UPDATES_KEY, REACH_USENET_KEY,
 };
+use crate::wiring::FILLS_KEY;
 
 /// The setting recording that a Usenet provider is configured.
 ///
@@ -320,4 +321,5 @@ pub const SETTINGS: &[&str] = &[
     AUDIOBOOKSHELF_PASSWORD_KEY,
     BINDERY_API_KEY,
     FRONT_DOOR_KEY,
+    FILLS_KEY,
 ];

@@ -92,6 +92,17 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     wirings.extend(withheld(&mut manifest.services, &ctx.settings.unmanaged));
 
+    // What each of the stack's asks comes to, settled once for the whole pass. The
+    // connections below reach *whatever fills* what they ask for rather than a
+    // service this crate names, which is what makes something standing in for a
+    // bundled service a change to the manifest and the setting rather than a change
+    // here. Settled after withholding, because a service the operator manages
+    // themselves is not one this pass wires to.
+    let filled = crate::wiring::filled(&crate::wiring::settle(
+        &manifest,
+        &super::targets::chosen_fillers(ctx),
+    ));
+
     // qBittorrent's password, the one credential lemonfiber mints. Collecting the
     // optional target into a list wires it where the stack has it and does nothing
     // where it does not, without a branch a test could not reach. The generated
@@ -180,8 +191,9 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // The book *arr, which the aggregator cannot register itself into: it keeps its own
     // list of aggregators and pulls from them, so it is told where one is instead.
-    wirings
-        .extend(aggregators::seed_aggregators(ctx, &manifest.services, project.as_deref()).await);
+    wirings.extend(
+        aggregators::seed_aggregators(ctx, &manifest.services, project.as_deref(), &filled).await,
+    );
 
     // Jellyfin as Seerr's identity source: one household account, not two.
     // Jellyfin has no key to read, so its admin password is minted and recorded
@@ -192,7 +204,7 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // pass that asked it for anything first would report a fresh stack as broken and
     // then, in the same run, fix what it had just reported.
     let (identity_wirings, identity_records) =
-        seed_jellyfin_identity(ctx, &manifest.services, &baseline).await;
+        seed_jellyfin_identity(ctx, &manifest.services, &baseline, &filled).await;
     wirings.extend(identity_wirings);
     baseline.merge(&identity_records);
 
@@ -1734,6 +1746,26 @@ mod tests {
         )
     }
 
+    /// What one ask resolves to, as a pass hands it to the connection that asked.
+    ///
+    /// These fixtures declare services rather than whole stacks, so the resolution is
+    /// supplied the way the pass supplies it rather than settled again here: what a
+    /// connection does with an answer is what these are about, and settling it twice
+    /// would be testing the reader instead.
+    fn filling(capability: &str, service: &str) -> std::collections::BTreeMap<String, Vec<String>> {
+        std::collections::BTreeMap::from([(capability.to_owned(), vec![service.to_owned()])])
+    }
+
+    /// The stack's indexer ask, as the shipped manifest settles it.
+    fn searched() -> std::collections::BTreeMap<String, Vec<String>> {
+        filling("indexer.search", "prowlarr")
+    }
+
+    /// The stack's identity ask, as the shipped manifest settles it.
+    fn identified() -> std::collections::BTreeMap<String, Vec<String>> {
+        filling("identity.source", "jellyfin")
+    }
+
     /// The wirings whose connection registers an \*arr into Prowlarr's app sync.
     fn application_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
         report
@@ -2296,6 +2328,7 @@ mod tests {
             &ctx,
             &[prowlarr(), bindery_svc()],
             Some(stack_root()),
+            &searched(),
         )
         .await;
 
@@ -2331,6 +2364,7 @@ mod tests {
             &ctx,
             &[prowlarr(), bindery_svc()],
             Some(stack_root()),
+            &searched(),
         )
         .await;
 
@@ -2370,6 +2404,7 @@ mod tests {
             &ctx,
             &[prowlarr(), bindery_svc()],
             Some(stack_root()),
+            &searched(),
         )
         .await;
 
@@ -2397,9 +2432,14 @@ mod tests {
             .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
 
         assert!(
-            super::aggregators::seed_aggregators(&ctx, &[prowlarr()], Some(stack_root()))
-                .await
-                .is_empty(),
+            super::aggregators::seed_aggregators(
+                &ctx,
+                &[prowlarr()],
+                Some(stack_root()),
+                &searched()
+            )
+            .await
+            .is_empty(),
             "a stack with no book *arr wired something"
         );
 
@@ -2410,7 +2450,8 @@ mod tests {
             super::aggregators::seed_aggregators(
                 &unkeyed,
                 &[prowlarr(), bindery_svc()],
-                Some(stack_root())
+                Some(stack_root()),
+                &searched()
             )
             .await
             .is_empty(),
@@ -2418,9 +2459,14 @@ mod tests {
         );
 
         assert!(
-            super::aggregators::seed_aggregators(&ctx, &[bindery_svc()], Some(stack_root()))
-                .await
-                .is_empty(),
+            super::aggregators::seed_aggregators(
+                &ctx,
+                &[bindery_svc()],
+                Some(stack_root()),
+                &searched()
+            )
+            .await
+            .is_empty(),
             "a stack with no aggregator wired something"
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -2442,6 +2488,7 @@ mod tests {
             &ctx,
             &[prowlarr(), bindery_svc()],
             Some(stack_root()),
+            &searched(),
         )
         .await;
 
@@ -2476,6 +2523,7 @@ mod tests {
             &ctx,
             &[prowlarr(), bindery_svc()],
             Some(stack_root()),
+            &searched(),
         )
         .await;
 
@@ -2511,6 +2559,7 @@ mod tests {
             &ctx,
             &[prowlarr(), bindery_svc()],
             Some(stack_root()),
+            &searched(),
         )
         .await;
 
@@ -2931,12 +2980,14 @@ mod tests {
         // Seerr present but no Jellyfin, and the other way round: either alone is
         // nothing to wire.
         let base = crate::baseline::Baseline::new();
-        assert!(super::seed_jellyfin_identity(&ctx, &[seerr_svc()], &base)
-            .await
-            .0
-            .is_empty());
         assert!(
-            super::seed_jellyfin_identity(&ctx, &[jellyfin_svc()], &base)
+            super::seed_jellyfin_identity(&ctx, &[seerr_svc()], &base, &identified())
+                .await
+                .0
+                .is_empty()
+        );
+        assert!(
+            super::seed_jellyfin_identity(&ctx, &[jellyfin_svc()], &base, &identified())
                 .await
                 .0
                 .is_empty()
@@ -2963,6 +3014,7 @@ mod tests {
             &ctx,
             &[jellyfin_svc(), seerr_svc()],
             &crate::baseline::Baseline::new(),
+            &identified(),
         )
         .await;
         assert_eq!(wirings.len(), 2);
@@ -2993,6 +3045,7 @@ mod tests {
             &ctx,
             &[jellyfin_svc(), seerr_svc()],
             &crate::baseline::Baseline::new(),
+            &identified(),
         )
         .await;
         assert_eq!(wirings.len(), 2);
@@ -3058,6 +3111,7 @@ mod tests {
             &ctx,
             &[jellyfin_svc(), seerr_svc()],
             &crate::baseline::Baseline::new(),
+            &identified(),
         )
         .await;
 
@@ -3116,8 +3170,13 @@ mod tests {
             "2026-08-28T00:00:00Z",
         );
 
-        let (wirings, records) =
-            super::seed_jellyfin_identity(&ctx, &[jellyfin_svc(), seerr_svc()], &baseline).await;
+        let (wirings, records) = super::seed_jellyfin_identity(
+            &ctx,
+            &[jellyfin_svc(), seerr_svc()],
+            &baseline,
+            &identified(),
+        )
+        .await;
 
         assert_eq!(
             wirings.get(1).map(|wiring| &wiring.state),

@@ -15,6 +15,7 @@ mod alerts;
 mod allowance;
 mod bandwidth;
 mod credentials;
+mod filling;
 mod hosting;
 mod household;
 mod migrate;
@@ -26,6 +27,7 @@ pub use alerts::AlertAction;
 pub use allowance::Allowance;
 pub use bandwidth::BandwidthAsked;
 pub use credentials::Asking;
+pub use filling::{Filling, Linking};
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision};
 pub use migrate::MigrateAction;
@@ -337,6 +339,18 @@ pub enum Command {
     /// narrow it by — and an operator who cannot tell which of nineteen names matters
     /// is asking about all of them rather than about the one they can already name.
     Catalogue,
+    /// Say what this stack wires to what, and how each link was settled.
+    ///
+    /// The read takes no arguments, over the manifest and the one setting that
+    /// records a choice: what reaches what is a property of the stack rather than of
+    /// the caller, and an operator asking it is asking about the whole of it.
+    ///
+    /// The one verb under it is the whole of substituting. There is no operation for
+    /// swapping two services, because there is nothing to swap: a link asks for a
+    /// capability, and which service answers is a setting. Refused where the named
+    /// service cannot do the thing, where nothing asks for it, or where it already
+    /// fills it — each a change that would record something and mean nothing.
+    Wiring(Linking),
     /// List everything that leaves this machine: what lemonfiber asks of the world
     /// on its own account, and what the stack's own services ask of it.
     ///

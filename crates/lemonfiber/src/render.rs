@@ -47,6 +47,7 @@ mod trace;
 mod uninstall;
 mod update;
 pub(crate) mod walkthrough;
+mod wiring;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::{AlertReport, ConfigReport, FormsReport, VersionReport, WizardReport};
@@ -252,6 +253,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Provenance(report) => provenance::comes_from(report),
         Outcome::Catalogue(report) => catalogue::holds(report),
+        Outcome::Wiring(report) => wiring::wired(report),
+        Outcome::Substituted(report) => wiring::substituted(report),
         Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::SelfUpdate(report) => self_update::standing(report),

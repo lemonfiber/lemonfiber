@@ -12425,6 +12425,124 @@
         }
       }
     },
+    "substitution": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/SubstitutionReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Substitution": {
+          "description": "One service standing in for another, worked out before anything is written.",
+          "type": "object",
+          "properties": {
+            "asked_by": {
+              "description": "Every service that asks for it, so the reach of the change is visible.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "capability": {
+              "description": "The capability whose filler changes.",
+              "type": "string"
+            },
+            "leaves_unfilled": {
+              "description": "What this would leave with nothing filling it, each naming what asked.\n\nThe one thing an operator cannot find out afterwards. A service filling two\ncapabilities is replaced for one of them, and the other stops being filled —\nwhich is a working stack becoming a broken one, on a change that reads as\nswapping like for like.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Unfilled"
+              }
+            },
+            "now": {
+              "description": "What would fill it.",
+              "type": "string"
+            },
+            "setting": {
+              "description": "The setting the change writes.",
+              "type": "string"
+            },
+            "was": {
+              "description": "What fills it now, where anything does.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "capability",
+            "now",
+            "asked_by",
+            "leaves_unfilled",
+            "setting"
+          ]
+        },
+        "SubstitutionReport": {
+          "description": "What substituting one service for another would come to.",
+          "type": "object",
+          "properties": {
+            "applied": {
+              "description": "Whether it was written, or only worked out.\n\nA run that only says what it would do writes nothing and reports the same\nanswer, so the two are told apart here rather than by the caller remembering\nwhich flags it passed.",
+              "type": "boolean"
+            },
+            "substitution": {
+              "description": "The change itself, and what it would leave with nothing filling it.",
+              "$ref": "#/$defs/Substitution"
+            }
+          },
+          "required": [
+            "substitution",
+            "applied"
+          ]
+        },
+        "Unfilled": {
+          "description": "A capability something asks for and nothing fills, and what asked for it.\n\nThe pair rather than the name: a capability nothing fills is a fact about the\nstack, and a capability *`seerr` asks for* and nothing fills is a thing somebody\ncan act on. Reporting the first and leaving the second to be worked out is the\nobscure failure at the point of use this exists instead of.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "description": "The service that asked.",
+              "type": "string"
+            },
+            "capability": {
+              "description": "What it asked for.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "by",
+            "capability"
+          ]
+        }
+      }
+    },
     "trace": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -14990,6 +15108,274 @@
             "root",
             "every",
             "command"
+          ]
+        }
+      }
+    },
+    "wiring": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/WiringReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Reaches": {
+          "description": "What one link reaches, and how that was settled.",
+          "oneOf": [
+            {
+              "description": "An ask for a capability.",
+              "type": "object",
+              "properties": {
+                "capability": {
+                  "description": "The capability asked for.",
+                  "type": "string"
+                },
+                "how": {
+                  "type": "string",
+                  "const": "asked"
+                },
+                "services": {
+                  "description": "What the ask reaches — empty where nothing fills it or a contest stands.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "settled": {
+                  "description": "How it was settled.",
+                  "$ref": "#/$defs/WiringSettled"
+                }
+              },
+              "required": [
+                "how",
+                "capability",
+                "services",
+                "settled"
+              ]
+            },
+            {
+              "description": "A link deliberately kept to a named service, shown as the exception it is.",
+              "type": "object",
+              "properties": {
+                "how": {
+                  "type": "string",
+                  "const": "by-name"
+                },
+                "service": {
+                  "description": "The service named.",
+                  "type": "string"
+                },
+                "why": {
+                  "description": "Why it is by name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "how",
+                "service",
+                "why"
+              ]
+            }
+          ]
+        },
+        "Unfilled": {
+          "description": "A capability something asks for and nothing fills, and what asked for it.\n\nThe pair rather than the name: a capability nothing fills is a fact about the\nstack, and a capability *`seerr` asks for* and nothing fills is a thing somebody\ncan act on. Reporting the first and leaving the second to be worked out is the\nobscure failure at the point of use this exists instead of.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "description": "The service that asked.",
+              "type": "string"
+            },
+            "capability": {
+              "description": "What it asked for.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "by",
+            "capability"
+          ]
+        },
+        "Whose": {
+          "description": "Who settled a contest between claimants.",
+          "oneOf": [
+            {
+              "description": "The stack shipped the choice, in the file the operator can read.",
+              "type": "string",
+              "const": "stack"
+            },
+            {
+              "description": "The operator chose, and the change is in the journal.",
+              "type": "string",
+              "const": "operator"
+            }
+          ]
+        },
+        "Wired": {
+          "description": "One of the stack's links, answered.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "description": "The service the link runs from — what asked.",
+              "type": "string"
+            },
+            "reaches": {
+              "description": "What it reaches.",
+              "$ref": "#/$defs/Reaches"
+            }
+          },
+          "required": [
+            "by",
+            "reaches"
+          ]
+        },
+        "WiringReport": {
+          "description": "What this stack wires to what.",
+          "type": "object",
+          "properties": {
+            "unfilled": {
+              "description": "Every capability something asks for and nothing fills, naming what asked.\n\nRepeated out of the links above rather than left to be found among them: a\nstack with one unfilled ask among twenty working ones is a stack whose one\nproblem is a line in a list, and a consumer that had to notice it would be\nthe reason nobody did.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Unfilled"
+              }
+            },
+            "wired": {
+              "description": "Every link, in the order the stack declares them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Wired"
+              }
+            }
+          },
+          "required": [
+            "wired",
+            "unfilled"
+          ]
+        },
+        "WiringSettled": {
+          "description": "How an ask was settled.",
+          "oneOf": [
+            {
+              "description": "One claimant, and nothing to settle.",
+              "type": "object",
+              "properties": {
+                "settled": {
+                  "type": "string",
+                  "const": "outright"
+                }
+              },
+              "required": [
+                "settled"
+              ]
+            },
+            {
+              "description": "Every claimant, because the link asked for all of them rather than one.",
+              "type": "object",
+              "properties": {
+                "settled": {
+                  "type": "string",
+                  "const": "each"
+                }
+              },
+              "required": [
+                "settled"
+              ]
+            },
+            {
+              "description": "Several claimants and the link asked for one. Refused until somebody chooses:\ninstall order, precedence and recency are each a way of being right most of\nthe time, and the times they are wrong are somebody's stack answering to the\nwrong software.",
+              "type": "object",
+              "properties": {
+                "claimants": {
+                  "description": "Every candidate, named, so a choice is made from a list.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "settled": {
+                  "type": "string",
+                  "const": "contested"
+                }
+              },
+              "required": [
+                "settled",
+                "claimants"
+              ]
+            },
+            {
+              "description": "Several claimants, and a choice is recorded.",
+              "type": "object",
+              "properties": {
+                "over": {
+                  "description": "The ones not chosen, so the choice reads as a choice.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "settled": {
+                  "type": "string",
+                  "const": "chosen"
+                },
+                "whose": {
+                  "description": "Who chose.",
+                  "$ref": "#/$defs/Whose"
+                },
+                "why": {
+                  "description": "Why, where the chooser said.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "settled",
+                "whose",
+                "over"
+              ]
+            },
+            {
+              "description": "Nothing claims it. What asked is named beside this, which is the point.",
+              "type": "object",
+              "properties": {
+                "settled": {
+                  "type": "string",
+                  "const": "unfilled"
+                }
+              },
+              "required": [
+                "settled"
+              ]
+            }
           ]
         }
       }
