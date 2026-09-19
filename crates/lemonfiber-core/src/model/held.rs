@@ -36,6 +36,9 @@ pub struct HeldReport {
     /// Anything that could not be read is said in `findings` and this goes false.
     pub available: bool,
     /// What is worth saying about this shelf, in the words its reader would use.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    ///
+    /// Always written, empty or not. A field the schema requires and the document
+    /// sometimes omits is one a reader has to guess about, and an empty list already
+    /// says the thing it would say: there is nothing to report about this shelf.
     pub findings: Vec<String>,
 }
