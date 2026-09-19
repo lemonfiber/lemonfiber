@@ -32,8 +32,17 @@ use crate::recyclarr::Kind;
 
 /// Read the household's requests, grouped by the member who made each one.
 ///
-/// `member` narrows to one person, matched the forgiving way a name is typed rather than
-/// by an exact string — the same courtesy the trace extends to a title.
+/// `member` narrows to one person, named the way the caller knows them: a person types a
+/// name and gets the forgiving match a typed name deserves, and a session carries the id
+/// the media server files its accounts under and gets an exact one.
+///
+/// **Both, because both callers name a person and only one of them types.** The web
+/// surface narrows a member's own read by rewriting the command with their account id,
+/// which is the only name a session has for them; an account id is not a substring of
+/// anybody's name, so a narrowing that read names alone finds nobody. What that costs is
+/// the whole of why it is worth saying here: a member filtered out of their own
+/// household comes back as a house holding nobody, which is not an error anywhere, and
+/// the app above draws it as *there is nothing to tell you*.
 pub(super) async fn household(
     ctx: &Ctx,
     member: Option<&str>,
@@ -231,6 +240,24 @@ pub(super) async fn reaching(
     Ok(access)
 }
 
+/// Whether this account is the one the caller named.
+///
+/// Two ways of naming one person, because two callers name them differently. A person
+/// types a name and means whoever they were thinking of, so it is looked for inside one
+/// — the same courtesy the trace extends to a title. A session carries the id the media
+/// server assigned and means that account and no other, so it is compared whole.
+///
+/// **The id is tried first, and exactly.** An identifier matched the forgiving way would
+/// be one that could find a different person whose name happened to contain it, and this
+/// narrowing decides whose requests somebody is shown — so the one reading it must never
+/// produce is a member handed another member's row.
+///
+/// `named` arrives lower-cased, because the caller lower-cases it once rather than this
+/// doing it per account.
+fn names(account: &Member, named: &str) -> bool {
+    account.id.to_lowercase() == named || account.name.to_lowercase().contains(named)
+}
+
 /// The household, member by member, with what each asked for joined onto them.
 ///
 /// Members come out in name order, and each member's requests in the order the service
@@ -279,10 +306,11 @@ fn assemble(
         let theirs = by_name
             .remove(&account.name.to_lowercase())
             .unwrap_or_default();
-        if wanted
-            .as_ref()
-            .is_some_and(|name| !account.name.to_lowercase().contains(name))
-        {
+        // An id is compared whole and a name is looked for inside one. The id is tried
+        // first and exactly, so a session naming an account reaches that account and
+        // nothing else: an identifier matched the forgiving way would be one that could
+        // find a *different* person whose name happened to contain it.
+        if wanted.as_ref().is_some_and(|named| !names(&account, named)) {
             continue;
         }
         // An administrator is left out of the agreement: the request service treats
@@ -1325,6 +1353,59 @@ mod tests {
             report.findings.is_empty(),
             "asking about one member reported everybody else's requests as orphans: {report:?}"
         );
+    }
+
+    /// A session names a member by the id the server assigned, and reaches them.
+    ///
+    /// The other caller of the narrowing, and the one that types nothing. A web surface
+    /// rewrites a member's own read with their account id, which is the only name it
+    /// has for them — so a narrowing that looks for it inside names finds nobody and
+    /// answers with a house holding no one, which reads as an ordinary empty answer
+    /// rather than as a member who could not be found.
+    #[test]
+    fn a_member_is_found_by_the_id_a_session_carries() {
+        let report = assembled(
+            vec![account("Alex", true), account("Sam", true)],
+            vec![request("Alex", Some(Kind::Radarr), Some(7), (2, 5))],
+            &unnamed(),
+            &titles(),
+            Some("id-alex"),
+        );
+
+        let named: Vec<&str> = report
+            .members
+            .iter()
+            .map(|member| member.name.as_str())
+            .collect();
+
+        assert_eq!(
+            named,
+            vec!["Alex"],
+            "a session naming its own account id was answered with {named:?}"
+        );
+    }
+
+    /// The typed name still reaches whoever was meant by it.
+    ///
+    /// Kept beside the one above so that widening the narrowing to ids cannot quietly
+    /// cost the forgiveness a person typing a name depends on.
+    #[test]
+    fn a_typed_name_still_finds_the_member_it_partly_spells() {
+        let report = assembled(
+            vec![account("Alex", true), account("Sam", true)],
+            vec![request("Alex", Some(Kind::Radarr), Some(7), (2, 5))],
+            &unnamed(),
+            &titles(),
+            Some("ale"),
+        );
+
+        let named: Vec<&str> = report
+            .members
+            .iter()
+            .map(|member| member.name.as_str())
+            .collect();
+
+        assert_eq!(named, vec!["Alex"], "a typed name found {named:?}");
     }
 
     #[test]
