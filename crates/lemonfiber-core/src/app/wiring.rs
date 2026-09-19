@@ -220,9 +220,8 @@ mod tests {
     /// What the settings file says the operator chose.
     fn recorded(at: &std::path::Path) -> Option<String> {
         crate::config::store::read(&at.join("config").join(".env"))
-            .ok()?
-            .get(FILLS_KEY)
-            .map(str::to_owned)
+            .ok()
+            .and_then(|held| held.get(FILLS_KEY).map(str::to_owned))
     }
 
     /// What one asked-for capability reaches, as the listing answers it.
@@ -344,6 +343,67 @@ mod tests {
         .err()
         .map(|problem| problem.code);
         assert_eq!(refused, Some(CHOICE_UNWRITABLE));
+    }
+
+    /// A stack nothing can read answers neither question. Both halves read the
+    /// manifest first and neither can say anything useful without it — a listing of
+    /// nothing would read as a stack that wires nothing, and a substitution worked
+    /// out against nothing would be a choice recorded for a capability no wiring asks
+    /// for.
+    #[test]
+    fn a_stack_that_cannot_be_read_refuses_both_the_listing_and_the_change() {
+        let ctx = crate::test_support::a_context()
+            .over(crate::test_support::nowhere())
+            .build();
+
+        assert!(
+            listing(&ctx).is_err(),
+            "a stack nothing could read was listed"
+        );
+        assert!(
+            substituting(
+                &ctx,
+                &Filling {
+                    capability: "indexer.search".to_owned(),
+                    service: "nzbhydra2".to_owned(),
+                },
+            )
+            .is_err(),
+            "a choice was worked out against a stack nothing could read"
+        );
+    }
+
+    /// A settings file that cannot be written refuses, rather than reporting a change
+    /// it did not make.
+    ///
+    /// The journal entry goes down first on purpose, so a run stopped between the two
+    /// leaves an entry for a setting that still holds its old value — which unwinds to
+    /// the value it already has. What must not happen is the opposite: the answer
+    /// saying the choice was recorded when the file says otherwise.
+    #[test]
+    fn a_choice_the_settings_file_will_not_take_is_refused_rather_than_reported_made() {
+        let at = dir("unwritable");
+        // A directory where the settings file goes: the path exists, so there is
+        // somewhere to record the choice, and writing to it cannot succeed.
+        let _ = std::fs::create_dir_all(at.join("config").join(".env"));
+        let settings = crate::config::Settings {
+            env_file: Some(at.join("config").join(".env")),
+            stack_dir: Some(at.join("data").join("stack")),
+            ..crate::config::Settings::default()
+        };
+        let ctx = crate::test_support::a_context().settings(settings).build();
+
+        let answered = substituting(
+            &ctx,
+            &Filling {
+                capability: "indexer.search".to_owned(),
+                service: "nzbhydra2".to_owned(),
+            },
+        )
+        .map(|report| report.applied)
+        .map_err(|problem| problem.severity);
+
+        assert_eq!(answered, Err(lemonfiber_ports::error::Severity::Error));
     }
 
     /// The read and the verb arrive as one command and come back as two answers.
