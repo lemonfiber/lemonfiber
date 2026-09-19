@@ -62,6 +62,21 @@ pub enum Opened {
     Member(String),
 }
 
+impl Opened {
+    /// The household member this is a session for, where it is a member's.
+    ///
+    /// None for the operator, which is what the wire says about them too: absent is
+    /// the discriminator, so the envelope and the register answer the same question
+    /// the same way rather than from two fields that could disagree.
+    #[must_use]
+    pub fn member(&self) -> Option<String> {
+        match self {
+            Self::Operator(_) => None,
+            Self::Member(id) => Some(id.clone()),
+        }
+    }
+}
+
 /// Every session this run has opened.
 #[derive(Default)]
 pub struct Sessions {
@@ -86,7 +101,9 @@ impl Sessions {
     ) -> Option<Admitted> {
         let token = crate::guard::minted(random, WIDTH)?;
         let until = now.checked_add(LASTS)?;
-        let opened = Admitted::opened(token.clone(), until)?;
+        // Read from what is being held rather than passed alongside it, so the
+        // envelope cannot name somebody the register does not have a session for.
+        let opened = Admitted::opened(token.clone(), until, who.member())?;
         let mut held = self.held.lock().await;
         held.retain(|_, session| session.until > now);
         held.insert(token.clone(), Session { until, who });

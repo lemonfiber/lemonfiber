@@ -435,3 +435,57 @@ async fn the_stream_answers_a_member_it_could_check() {
     );
     let _ = fs::remove_dir_all(a_directory(named));
 }
+
+/// The envelope names the member it was bought by.
+///
+/// The one thing a client needs in order to draw the right application without
+/// deciding for itself who is looking: the requirement that the application follow
+/// the identity that signed in is unmeetable by an app that cannot read the
+/// identity, because it would have to infer one.
+#[tokio::test]
+async fn the_session_a_member_buys_says_which_member() {
+    let named = "member-named-on-the-wire";
+    let (router, _, _) = door_with(
+        Some(keeping(named)),
+        AHousehold::knowing(MEMBER),
+        not_the_token(),
+    );
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+
+    assert_eq!(answer.status, StatusCode::OK);
+    assert_eq!(
+        whose(&answer.body),
+        Some(MEMBER.to_owned()),
+        "a member signed in and the envelope did not say who they are: {}",
+        answer.body
+    );
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// The operator's envelope names nobody, which is what says they are the operator.
+///
+/// Absent rather than a second field saying which kind of person this is: two fields
+/// can disagree, and the day they did a client would have to choose which to
+/// believe.
+#[tokio::test]
+async fn the_session_the_operator_buys_names_nobody() {
+    let named = "operator-named-on-the-wire";
+    let (router, _, _) = door(Some(keeping(named)), not_the_token());
+    let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
+
+    assert_eq!(answer.status, StatusCode::OK);
+    assert_eq!(
+        whose(&answer.body),
+        None,
+        "the operator's session named somebody: {}",
+        answer.body
+    );
+    let _ = fs::remove_dir_all(a_directory(named));
+}
