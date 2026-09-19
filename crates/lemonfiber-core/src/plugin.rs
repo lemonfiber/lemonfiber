@@ -231,7 +231,7 @@ mod tests {
     ///
     /// Only the declarations, for the same reason. The stack also *asks* for these
     /// names, and an edit that reached those lines would leave `asks =` with nothing
-    /// after it — the same unparseable stack, arrived at a different way.
+    /// after it — the same stack that will not parse, arrived at a different way.
     fn without(name: &str) -> String {
         STACK
             .lines()
