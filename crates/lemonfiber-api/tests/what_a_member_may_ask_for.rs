@@ -171,3 +171,160 @@ async fn the_machine_is_refused_none_of_the_three() {
     }
     let _ = fs::remove_dir_all(a_directory("machine-unchanged"));
 }
+
+/// A member whose household has gone quiet is refused, and told which fact it is.
+///
+/// Not the silence a stranger gets. They proved who they are and the question that
+/// could not be answered is about the media server, so the sentence says that — the
+/// thing to fix is the server, not their account, and a refusal that implied
+/// otherwise would send somebody to change a password that was never wrong.
+#[tokio::test]
+async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked() {
+    let named = "member-unreachable-read";
+    let household = AHousehold::knowing(MEMBER);
+    let (router, _, _) = door_with(
+        Some(keeping(named)),
+        Arc::clone(&household),
+        not_the_token(),
+    );
+    let answer = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, session(&answer.body)));
+
+    household.go_dark();
+    let refused = asked(router, "GET", "/api/requests", &carried, "").await;
+
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert!(
+        refused.body.contains("media server"),
+        "somebody was refused without being told the media server is what could not \
+         be asked: {}",
+        refused.body
+    );
+    assert!(
+        !refused.body.contains("no token or session"),
+        "a member whose household went quiet was answered as somebody carrying \
+         nothing: {}",
+        refused.body
+    );
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// The stream is a request like any other, and refuses the same way.
+///
+/// Its own guard, because it brings its own state and is merged outside the layer
+/// that covers the rest — which is exactly the assembly mistake that would leave it
+/// open while every other route was closed.
+#[tokio::test]
+async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
+    let named = "member-unreachable-stream";
+    let household = AHousehold::knowing(MEMBER);
+    let (router, _, _) = door_with(
+        Some(keeping(named)),
+        Arc::clone(&household),
+        not_the_token(),
+    );
+    let answer = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, session(&answer.body)));
+
+    household.go_dark();
+    let refused = asked(router, "GET", "/api/events", &carried, "").await;
+
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert!(refused.body.contains("media server"), "{}", refused.body);
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// The sign-in door stays open to somebody the household could not be asked about.
+///
+/// The whole reason unconfirmed is not nobody. A member whose media server was
+/// restarting can sign in again the moment it answers, rather than being held out
+/// by the same silence that turns away a stranger.
+#[tokio::test]
+async fn the_door_is_still_open_to_somebody_who_could_not_be_checked() {
+    let named = "member-unreachable-door";
+    let household = AHousehold::knowing(MEMBER);
+    let (router, _, _) = door_with(
+        Some(keeping(named)),
+        Arc::clone(&household),
+        not_the_token(),
+    );
+    let answer = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, session(&answer.body)));
+
+    household.go_dark();
+    // Carrying the unconfirmed session at the one path that opens without one. The
+    // door answers about the pair offered rather than refusing the session, so a
+    // household coming back is all it takes to be let in again.
+    let again = asked(
+        router,
+        "POST",
+        SESSION,
+        &carried,
+        &offering_as(WHO, &hers()),
+    )
+    .await;
+
+    assert_ne!(
+        again.status,
+        StatusCode::FORBIDDEN,
+        "the sign-in door refused somebody it had not been able to ask about: {}",
+        again.body
+    );
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// A member session on a build that has no household is one nothing can vouch for.
+///
+/// It cannot arise from signing in — a member proves themselves *to* a household —
+/// so it is held directly here. The arm exists because a build can lose its
+/// household between minting a session and answering with it, and the safe reading
+/// of a session nothing can check is that nobody has been identified.
+#[tokio::test]
+async fn a_member_session_with_no_household_behind_it_is_unconfirmed() {
+    let named = "member-no-household";
+    let (router, _, admitting) = door(Some(keeping(named)), not_the_token());
+    let Some(opened) = admitting
+        .sessions
+        .opened(
+            &not_the_token(),
+            moment(),
+            Opened::Member(MEMBER.to_owned()),
+        )
+        .await
+    else {
+        unreachable!("a source that answers mints a session")
+    };
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, opened.token));
+
+    let refused = asked(router, "GET", "/api/requests", &carried, "").await;
+
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert!(refused.body.contains("media server"), "{}", refused.body);
+    let _ = fs::remove_dir_all(a_directory(named));
+}
