@@ -11,7 +11,7 @@ use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::update;
 use lemonfiber_core::app::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting,
+    Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
@@ -27,7 +27,7 @@ use crate::say::complain;
 use lemonfiber::cli::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
     QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawRemoval, RawRemoving,
-    RawUnrated, UpdateCommand,
+    RawUnrated, UpdateCommand, WiringCommand,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -73,6 +73,23 @@ pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
             }),
         },
     }
+}
+
+/// Reading what this stack wires to what, or changing one of those links.
+///
+/// The read is the bare word and the write is a verb under it, so a command line
+/// that asks for a listing cannot be one that changes a stack by being mistyped.
+pub(crate) fn wiring(fill: Option<WiringCommand>) -> Command {
+    Command::Wiring(match fill {
+        None => Linking::Read,
+        Some(WiringCommand::Fill {
+            capability,
+            service,
+        }) => Linking::Fill(Filling {
+            capability,
+            service,
+        }),
+    })
 }
 
 /// Whose shelf, and how much of it.

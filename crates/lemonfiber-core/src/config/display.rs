@@ -135,6 +135,13 @@ pub const SHOWN: &[(&str, &str)] = &[
          a request surface still sends them to what this names",
     ),
     (
+        crate::wiring::FILLS_KEY,
+        "which service the operator chose to fill each capability, which is service names \
+         and capability names and no credential — and the one setting whose value has to be \
+         readable from the surface, because a substitution nobody can see is a wiring change \
+         nobody can find",
+    ),
+    (
         super::INDEXER_URL_KEY,
         "where searches are sent, and the first thing to check when none come back",
     ),

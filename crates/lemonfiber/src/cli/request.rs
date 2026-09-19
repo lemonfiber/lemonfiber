@@ -321,6 +321,18 @@ pub enum Request {
     /// It reads the stack description and nothing else, so it answers with the
     /// machine off and the containers down.
     Catalogue,
+    /// Say what this stack wires to what, and how each link was settled.
+    ///
+    /// A link asks for a capability — an identity source, a torrent client — and
+    /// whatever provides it is what the link reaches, so putting something else in
+    /// its place is one setting rather than a hunt for everything that named it. One
+    /// kept to a named service is shown as one, with its reason, and where two claim
+    /// the same thing `fill` is how you choose. Non-zero where nothing provides it.
+    Wiring {
+        /// The one verb: choose which service fills a capability.
+        #[command(subcommand)]
+        fill: Option<super::WiringCommand>,
+    },
     /// List everything that leaves this machine, and what refusing each of it costs.
     ///
     /// lemonfiber's own requests first — where each goes, why, exactly what travels,

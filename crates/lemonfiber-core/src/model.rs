@@ -35,6 +35,7 @@ mod settings;
 mod trace;
 mod upgrade;
 mod walkthrough;
+mod wiring;
 
 pub use admission::*;
 pub use alerts::*;
@@ -59,6 +60,7 @@ pub use settings::*;
 pub use trace::*;
 pub use upgrade::*;
 pub use walkthrough::*;
+pub use wiring::*;
 
 #[cfg(test)]
 mod tests {

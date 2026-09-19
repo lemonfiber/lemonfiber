@@ -128,6 +128,7 @@ pub mod update;
 pub mod validate;
 mod version;
 pub mod walkthrough;
+pub mod wiring;
 pub mod within;
 pub mod wizard;
 

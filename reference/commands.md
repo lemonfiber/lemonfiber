@@ -38,6 +38,7 @@ Commands:
   stuck         List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   front-door    Name the one address to send somebody who lives here
   catalogue     Say what each service in this stack is for, and what became of any it dropped
+  wiring        Say what this stack wires to what, and how each link was settled
   outbound      List everything that leaves this machine, and what refusing each of it costs
   provenance    Say where each service comes from: its licence, its project, and the exact version this stack pins it at
   credentials   Say which credentials this stack holds, or act on one of them
@@ -117,6 +118,7 @@ Options:
 - [`lemonfiber stuck`](commands/stuck.md)
 - [`lemonfiber front-door`](commands/front-door.md)
 - [`lemonfiber catalogue`](commands/catalogue.md)
+- [`lemonfiber wiring`](commands/wiring.md)
 - [`lemonfiber outbound`](commands/outbound.md)
 - [`lemonfiber provenance`](commands/provenance.md)
 - [`lemonfiber credentials`](commands/credentials.md)

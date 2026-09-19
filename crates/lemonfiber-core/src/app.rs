@@ -85,10 +85,11 @@ pub mod update;
 mod upgrade;
 mod walkthrough;
 pub mod watch;
+mod wiring;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Hostable, Keeping, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
+    Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
 };
 mod outcome;
 pub use ctx::{Ctx, PATIENCE};
@@ -381,6 +382,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
         Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
+        Command::Wiring(asked) => wiring::dispatched(ctx, &asked),
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => {
@@ -2580,6 +2582,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -2641,6 +2645,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -3503,6 +3509,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
@@ -4502,6 +4510,8 @@ mod tests {
                 | Outcome::Invited(_)
                 | Outcome::Removed(_)
                 | Outcome::Catalogue(_)
+                | Outcome::Wiring(_)
+                | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)

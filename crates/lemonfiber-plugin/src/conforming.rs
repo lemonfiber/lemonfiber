@@ -815,6 +815,50 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
         }
     }
 
+    /// A plugin cannot say what reaches what.
+    ///
+    /// The stack manifest declares a link between two of its services, and a link
+    /// that names a service rather than asking for a capability is the exception an
+    /// operator makes deliberately. A plugin has no field for either: it declares
+    /// what its own service can do and is reached by whatever already asks, and the
+    /// route and the dashboard entry are written for it from its tier.
+    ///
+    /// Asked of the generated schema rather than of the types, because the document
+    /// an author writes against is the one that has to have no such field — and
+    /// because a field added to a nested block would satisfy a check that only read
+    /// the top level.
+    ///
+    /// A recipe's `to` is not one of these and is deliberately left off the list: it
+    /// names where a captured value goes inside the plugin's own recipe, and what a
+    /// call may address is bounded where recipes are read.
+    #[test]
+    fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
+        const ABSENT: &[&str] = &[
+            "asks",
+            "by",
+            "by_name",
+            "depends_on",
+            "each",
+            "filled_by",
+            "fills",
+            "reaches",
+            "wire",
+            "wires",
+        ];
+        let published = published();
+        let mut named = BTreeSet::new();
+        every_field(published.as_value(), &mut named);
+        for absent in ABSENT {
+            assert!(
+                !named.contains(*absent),
+                "the format declares `{absent}`, which is a way to say what reaches what"
+            );
+        }
+        // The one spelling it does declare, so the sweep above is read against a
+        // format that has a `wiring` block rather than against one that has none.
+        assert!(named.contains("wiring"));
+    }
+
     /// What a plugin is, as the set of blocks it may write.
     ///
     /// Held to the whole set rather than to a floor, so that a block added without the
