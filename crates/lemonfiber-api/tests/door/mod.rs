@@ -226,6 +226,19 @@ pub(crate) fn session(body: &str) -> String {
         .to_owned()
 }
 
+/// Who the envelope says the session is for, or nothing where it names nobody.
+///
+/// Read out of the answer rather than asserted against a whole body, because what
+/// matters is the one field a client reads to know which application it is drawing.
+pub(crate) fn whose(body: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .as_ref()
+        .and_then(|opened| opened.pointer("/data/member"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+}
+
 /// One request's headers, carrying the secret offered as the surface's own header.
 pub(crate) fn carrying(secret: Option<&str>) -> HeaderMap {
     let mut headers = HeaderMap::new();

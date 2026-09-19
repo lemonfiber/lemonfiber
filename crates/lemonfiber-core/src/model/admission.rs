@@ -25,6 +25,18 @@ pub struct Admitted {
     pub token: String,
     /// When it stops being one, written as every other instant this product writes.
     pub until: String,
+    /// The household member this session is for, where it is a member's.
+    ///
+    /// **Absent is the operator**, which is the whole of the discriminator. A second
+    /// field naming which kind of person this is could disagree with this one, and
+    /// the day they disagreed a client would have to choose which to believe.
+    ///
+    /// The id and nothing else. What that member is called, what they may watch and
+    /// what they have left are read from the household report, which already carries
+    /// all of it per member — so there is one fact here and no second copy of
+    /// anything that could go stale against the read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member: Option<String>,
 }
 
 impl Admitted {
@@ -36,10 +48,11 @@ impl Admitted {
     /// calendar to place — a session with no ending written on it would be one a
     /// client could not know the end of.
     #[must_use]
-    pub fn opened(token: String, until: SystemTime) -> Option<Self> {
+    pub fn opened(token: String, until: SystemTime, member: Option<String>) -> Option<Self> {
         Some(Self {
             token,
             until: crate::instant::written(until)?,
+            member,
         })
     }
 }

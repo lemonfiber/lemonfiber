@@ -178,6 +178,12 @@
     },
     "Admitted": {
       "fields": {
+        "member": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "token": {
           "type": [
             "string"
