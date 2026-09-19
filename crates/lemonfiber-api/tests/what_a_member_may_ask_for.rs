@@ -328,3 +328,42 @@ async fn a_member_session_with_no_household_behind_it_is_unconfirmed() {
     assert!(refused.body.contains("media server"), "{}", refused.body);
     let _ = fs::remove_dir_all(a_directory(named));
 }
+
+/// A handler reached without the guard having named anybody says so.
+///
+/// Driven directly, because the assembled surface cannot produce it: the guard
+/// inserts the subject or refuses, so there is no request that arrives at a handler
+/// carrying none. The arm exists for the assembly mistake rather than for a caller
+/// — a route merged outside the layer that guards the rest — and it answers as what
+/// it is, a request carrying nothing this run admits, rather than serving as though
+/// somebody had proved something.
+#[tokio::test]
+async fn a_request_that_reached_a_handler_unnamed_is_not_served() {
+    let Ok(mut carrying) = Request::builder().uri("/api/requests").body(()) else {
+        unreachable!("the request a test writes is one that can be built")
+    };
+    carrying.extensions_mut().insert(Caller::Machine);
+    let (mut named, ()) = carrying.into_parts();
+    let (mut unnamed, ()) = {
+        let Ok(bare) = Request::builder().uri("/api/requests").body(()) else {
+            unreachable!("the request a test writes is one that can be built")
+        };
+        bare.into_parts()
+    };
+
+    // The refusal is a built response rather than a value, so each side is read for
+    // what a caller would actually see.
+    assert_eq!(
+        Caller::from_request_parts(&mut named, &()).await.ok(),
+        Some(Caller::Machine),
+        "a request the guard named was not read as that caller"
+    );
+    assert_eq!(
+        Caller::from_request_parts(&mut unnamed, &())
+            .await
+            .err()
+            .map(|refusal| refusal.status()),
+        Some(StatusCode::FORBIDDEN),
+        "a handler reached without a subject served the request anyway"
+    );
+}

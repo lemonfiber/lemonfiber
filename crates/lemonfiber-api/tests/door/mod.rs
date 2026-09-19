@@ -17,6 +17,7 @@ pub(crate) use std::sync::Arc;
 pub(crate) use std::time::{Duration, SystemTime};
 
 pub(crate) use axum::body::{to_bytes, Body};
+pub(crate) use axum::extract::FromRequestParts as _;
 pub(crate) use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
 pub(crate) use lemonfiber_api::admission::sessions::Opened;
 pub(crate) use lemonfiber_api::admission::{Admitting, Caller, Knocking, RETRY_AFTER, SESSION};
