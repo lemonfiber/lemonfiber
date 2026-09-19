@@ -24,7 +24,8 @@ crates/
 │   │                     of it — a file per flow, each holding the list it
 │   │                     decides over, and every other decision the terminal
 │   │                     file must not hold
-│   ├── examples/         emitters: a `print!` around one generated artefact
+│   ├── examples/         emitters: one generated artefact each, printed or
+│   │                     written where it is a set of files
 │   └── tests/            the architecture tests, from the top of the graph
 │
 ├── lemonfiber-core/      lib — all logic, no UI, no terminal
@@ -56,13 +57,24 @@ crates/
 
 The `lemonfiber` package carries a library alongside its binary. The library holds
 only the clap definitions and the renderers that turn what the workspace declares
-into `reference/commands.md` and `reference/error-codes.md`; `main.rs` and everything
-it reaches stay in the binary. The split exists because an artefact is written by a
-program that is not this binary, and it has to read the same declarations rather than
-a second description of them. `cargo run --example reference`, `--example codes` and
-`--example contract` are those programs; each is a `print!` around one function, and
-`just reference`, `just codes` and `just contract` redirect them to the file the tests
-compare against.
+into `reference/commands.md`, the pages under `reference/commands/`, and
+`reference/error-codes.md`; `main.rs` and everything it reaches stay in the binary.
+The split exists because an artefact is written by a program that is not this binary,
+and it has to read the same declarations rather than a second description of them.
+`cargo run --example reference`, `--example codes` and `--example contract` are those
+programs, and `just reference`, `just codes` and `just contract` run them.
+
+`--example codes` and `--example contract` are a `print!` around one function, which
+the recipe redirects to the file the tests compare against. `--example reference` is
+not, because the command reference is a set of files rather than one: an index at
+`reference/commands.md` and a page per top-level command beside it, each carrying
+everything declared beneath that command. The grouping is clap's own tree rather than
+a table somebody maintains, so a command added gets a page and one removed takes its
+page with it — which a redirect of stdout could not do, so the renderer writes the
+directory itself and removes what it no longer has. The tests compare every page
+against the declarations **and** the directory's contents against the set of pages,
+because a page left behind for a command that is gone would otherwise match itself
+for ever.
 
 `--example surface` is the fourth and the one that is not merely a `print!`: it reads
 the artefact it is about to replace before it writes, and refuses where the new one

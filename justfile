@@ -167,7 +167,7 @@ extension-points:
 
 # Rewrite the command reference from the declarations the binary parses with.
 reference:
-    cargo run --quiet --example reference -p lemonfiber > reference/commands.md
+    cargo run --quiet --example reference -p lemonfiber
 
 # Rewrite the error-code reference from the codes the crates declare.
 codes:
