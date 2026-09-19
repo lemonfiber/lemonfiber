@@ -288,7 +288,8 @@ mod tests {
             ("/blobs/", Answer::reply(500, "")),
         ]));
         let found = Oci::new(asked).signatures(&komga()).await;
-        assert!(found.is_err(), "a blob nobody served became a signature");
+        let why = found.err().map(|one| one.reason).unwrap_or_default();
+        assert!(why.contains("answered 500"), "{why}");
     }
 
     #[test]
@@ -318,6 +319,10 @@ mod tests {
         assert_eq!(
             addressed("localhost:5000/x"),
             ("localhost:5000".to_owned(), "x".to_owned())
+        );
+        assert_eq!(
+            addressed("localhost/x"),
+            ("localhost".to_owned(), "x".to_owned())
         );
     }
 }

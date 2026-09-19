@@ -20,7 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use lemonfiber::cli::PluginCommand;
-use lemonfiber_core::plugin::Key;
+use lemonfiber_core::plugin::{Capabilities, Key, Ungenerated};
 use lemonfiber_core::ports::registry::Registry;
 
 use crate::exit::FAILURE;
@@ -106,9 +106,18 @@ fn document_of(text: Option<&str>) -> Answered {
 /// vocabulary would have failed generation long before here. Reported as this build's
 /// own fault rather than the operator's, because it is.
 fn capabilities(json: bool) -> Answered {
-    match lemonfiber_core::plugin::capabilities() {
+    vocabulary(&lemonfiber_core::plugin::capabilities(), json)
+}
+
+/// The vocabulary in whichever form, from whatever generating it came to.
+///
+/// Takes the outcome rather than asking for it, so the refusal is a case a test can
+/// put in front of this. Generation fails long before an operator asks for the
+/// document, and the sentence it gives them is still the whole of what they get.
+fn vocabulary(published: &Result<Capabilities, Ungenerated>, json: bool) -> Answered {
+    match published {
         Ok(_) if json => document_of(lemonfiber_core::plugin::vocabulary().ok().as_deref()),
-        Ok(published) => Answered::shown(render::plugin::capabilities(&published)),
+        Ok(published) => Answered::shown(render::plugin::capabilities(published)),
         Err(problem) => Answered::faulted(problem.to_string()),
     }
 }
@@ -200,10 +209,11 @@ mod tests {
     use std::sync::Arc;
 
     use lemonfiber::cli::PluginCommand;
+    use lemonfiber_core::plugin::Ungenerated;
     use lemonfiber_core::ports::registry::Registry;
     use lemonfiber_fixtures::http::{Answer, Fake};
 
-    use super::{document_of, held_keys, published, unrenderable, Answered};
+    use super::{document_of, held_keys, published, unrenderable, vocabulary, Answered};
     use crate::exit::FAILURE;
 
     /// A manifest nothing refuses, pinning one image and claiming nothing.
@@ -281,6 +291,18 @@ criticality = "enhancing"
     /// What one read came to, asked of a registry that offers nothing.
     async fn read(asked: PluginCommand, json: bool) -> Answered {
         published(&asked, json, &answering(404, "{}")).await
+    }
+
+    /// A registry that offers one signature over one payload, over no network.
+    fn offering(payload: &'static str) -> impl Registry {
+        const MANIFEST: &str = r#"{"schemaVersion":2,"layers":[
+            {"digest":"sha256:aaa","annotations":{"dev.cosignproject.cosign/signature":"AQID"}}
+        ]}"#;
+        let reaching: Arc<dyn lemonfiber_core::ports::http::Http> = Fake::by_path(vec![
+            ("/manifests/", Answer::reply(200, MANIFEST)),
+            ("/blobs/", Answer::reply(200, payload)),
+        ]);
+        lemonfiber_adapters::registry::Oci::new(reaching)
     }
 
     /// What was shown, or nothing where the read had no lines to show.
@@ -444,6 +466,65 @@ criticality = "enhancing"
                 .and_then(|held| held.first().map(|key| key.named.clone())),
             Some(at.display().to_string())
         );
+    }
+
+    /// A signature that does not hold stops the install and says why.
+    ///
+    /// The payload names another image, which is the refusal that needs no key to
+    /// establish — a signature somebody really made, about something else.
+    #[tokio::test]
+    async fn an_image_whose_signature_does_not_hold_stops_the_install() {
+        let elsewhere = r#"{"critical":{"image":{"docker-manifest-digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}}}"#;
+        let answered = published(
+            &PluginCommand::Provenance {
+                path: source("refused", WHOLE),
+                keys: vec![written("refusing-key", PUBLIC_KEY)],
+            },
+            false,
+            &offering(elsewhere),
+        )
+        .await;
+
+        assert_eq!(answered.code, FAILURE, "{:?}", answered.fault);
+        assert!(answered.fault.is_none());
+        let said = said(&answered);
+        assert!(said.contains("refused"), "{said}");
+        assert!(said.contains("would not be installed"), "{said}");
+    }
+
+    /// A key named on the command line and not readable stops the whole read.
+    #[tokio::test]
+    async fn a_key_the_read_was_given_and_cannot_use_stops_it_before_asking() {
+        let answered = read(
+            PluginCommand::Provenance {
+                path: source("bad-key", WHOLE),
+                keys: vec![written("gibberish", "hello")],
+            },
+            false,
+        )
+        .await;
+
+        assert_eq!(answered.code, FAILURE);
+        assert!(
+            answered.lines.is_none(),
+            "a key it could not use was dropped"
+        );
+        assert!(answered.fault.is_some_and(|why| why.contains("P-256")));
+    }
+
+    /// A vocabulary this build could not generate is reported as this build's fault.
+    ///
+    /// Put in front of the read rather than provoked, because a stack that disagreed
+    /// with the vocabulary fails generation long before an operator asks — and the
+    /// sentence they get if it ever does is the whole of what this is for.
+    #[test]
+    fn a_vocabulary_that_could_not_be_generated_is_this_builds_fault() {
+        let answered = vocabulary(&Err(Ungenerated::Unrenderable), false);
+        assert_eq!(answered.code, FAILURE);
+        assert!(answered.lines.is_none());
+        assert!(answered
+            .fault
+            .is_some_and(|why| why.contains("could not be written as JSON")));
     }
 
     /// A public key on the curve this build verifies against.
