@@ -75,6 +75,27 @@ pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
     }
 }
 
+/// Whose shelf, and how much of it.
+///
+/// Naming nobody cannot happen — the word requires it, because there is no
+/// whole-household form of this to fall back to. Naming a number of nought or more than
+/// one read answers with is refused rather than rounded: somebody who asked for a
+/// thousand and was shown five hundred has been told that is the shelf.
+pub(crate) fn held(member: String, most: Option<u32>) -> Result<Command, u8> {
+    // Taken from the served read rather than restated, so a terminal and a browser
+    // looking at one household cannot come to see two different shelves. A number
+    // written down twice is a number that drifts the first time one of them moves.
+    let most = most.unwrap_or(lemonfiber_api::reads::A_SHELF);
+    if most == 0 || most > lemonfiber_api::reads::MOST_AT_ONCE {
+        complain!(
+            "error: `--most` takes a number from 1 to {}",
+            lemonfiber_api::reads::MOST_AT_ONCE
+        );
+        return Err(USAGE);
+    }
+    Ok(Command::Held { member, most })
+}
+
 /// What is being asked about the household: who is here, or what they may ask for.
 ///
 /// One word with four things under it, because they are one subject. Naming nothing is
@@ -527,6 +548,29 @@ mod tests {
             moving(UpdateCommand::Itself { to: None }),
             Command::SelfUpdate { to: None }
         );
+    }
+
+    /// Naming no count takes the one a browser asking the same question is answered
+    /// with — the served read's own number, read from there rather than restated.
+    #[test]
+    fn a_shelf_with_no_count_takes_the_one_both_surfaces_share() {
+        assert_eq!(
+            super::held("Ada".to_owned(), None),
+            Ok(Command::Held {
+                member: "Ada".to_owned(),
+                most: lemonfiber_api::reads::A_SHELF,
+            })
+        );
+    }
+
+    /// Refused rather than rounded, at both ends. Somebody who asked for a thousand and
+    /// was shown five hundred has been told that is the shelf.
+    #[test]
+    fn a_count_outside_what_one_shelf_shows_is_refused_at_either_end() {
+        let ceiling = lemonfiber_api::reads::MOST_AT_ONCE;
+        assert!(super::held("Ada".to_owned(), Some(0)).is_err());
+        assert!(super::held("Ada".to_owned(), Some(ceiling + 1)).is_err());
+        assert!(super::held("Ada".to_owned(), Some(ceiling)).is_ok());
     }
 
     /// One choice about what the household may ask for, as the command line took it.

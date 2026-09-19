@@ -24,6 +24,7 @@ mod doctor;
 pub(crate) mod door;
 pub(crate) mod downloads;
 pub(crate) mod glossary;
+mod held;
 mod history;
 pub(crate) mod host;
 mod hosting;
@@ -239,6 +240,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Music(report) => quality::music(report),
         Outcome::Trace(report) => trace::trace(report),
         Outcome::Household(report) => trace::household(report),
+        Outcome::Held(report) => held::held(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::Stuck(report) => trace::stuck(report),

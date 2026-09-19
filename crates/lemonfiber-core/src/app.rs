@@ -42,6 +42,7 @@ mod expiring;
 #[cfg(test)]
 mod fixtures;
 pub mod forwarding;
+mod held;
 mod history;
 mod hosting;
 mod household;
@@ -300,6 +301,18 @@ fn worded(word: Option<&str>) -> Result<Outcome, Box<Problem>> {
         .ok_or_else(|| Box::new(crate::glossary::unrecognised(word)))
 }
 
+/// Held open until the location is lost, which is what a guard is.
+///
+/// Beside the table rather than in it because this is the one command whose arm reached
+/// into the context for something the caller never named. The interval and the volume
+/// are this command's own: a surface that could choose either could choose one that
+/// misses the moment the command exists for.
+async fn watching(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
+    watch::supervise(ctx, ctx.volume.as_ref(), forms, WATCH)
+        .await
+        .map(Outcome::Watch)
+}
+
 /// The table itself: every command, and where it goes.
 ///
 /// Split from [`dispatch`] so that the three things asked of every command are asked
@@ -337,6 +350,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             season,
             searching,
         } => traced(ctx, term, season, searching).await,
+        Command::Held { member, most } => held::held(ctx, &member, most).await.map(Outcome::Held),
         Command::Household { member } => household::household(ctx, member.as_deref())
             .await
             .map(Outcome::Household),
@@ -409,12 +423,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Bandwidth(asked) => bandwidth::bandwidth(ctx, &asked)
             .await
             .map(Outcome::Bandwidth),
-        // Held open until the location is lost, which is what a guard is. The
-        // interval is this command's own rather than the caller's: a surface that
-        // could choose it could choose one that misses the moment it exists for.
-        Command::Watch { forms } => watch::supervise(ctx, ctx.volume.as_ref(), &forms, WATCH)
-            .await
-            .map(Outcome::Watch),
+        Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.
         Command::Walkthrough { item } => walked(ctx, item).await,
@@ -1828,6 +1837,37 @@ mod tests {
         );
     }
 
+    /// The shelf reports itself unread rather than empty where there is nothing to sign
+    /// in to the media server with — which is the distinction the whole report is built
+    /// around, and the one that would tell a household they own nothing on the day the
+    /// server rebooted.
+    #[tokio::test]
+    async fn a_shelf_with_no_media_server_behind_it_is_unread_not_empty() {
+        let json = dispatch(
+            Command::Held {
+                member: "ada".to_owned(),
+                most: 25,
+            },
+            &ctx(Ok(spoke(""))),
+        )
+        .await
+        .ok()
+        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+        .unwrap_or_default();
+        assert!(
+            json.contains("\"kind\":\"held\""),
+            "envelope names the kind"
+        );
+        assert!(
+            json.contains("\"available\":false"),
+            "an unread shelf reported itself as read: {json}"
+        );
+        assert!(
+            json.contains("no recorded"),
+            "an unread shelf did not say why: {json}"
+        );
+    }
+
     /// Both writes about what a household may ask for answer with the household.
     ///
     /// Nothing is recorded to sign in with, so each refuses rather than writing — which
@@ -2532,6 +2572,7 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Hosting(_)
                 | Outcome::Household(_)
+                | Outcome::Held(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
@@ -2592,6 +2633,7 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Hosting(_)
                 | Outcome::Household(_)
+                | Outcome::Held(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
@@ -3453,6 +3495,7 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Hosting(_)
                 | Outcome::Household(_)
+                | Outcome::Held(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)
@@ -4451,6 +4494,7 @@ mod tests {
                 | Outcome::Trace(_)
                 | Outcome::Hosting(_)
                 | Outcome::Household(_)
+                | Outcome::Held(_)
                 | Outcome::FrontDoor(_)
                 | Outcome::Stuck(_)
                 | Outcome::Word(_)

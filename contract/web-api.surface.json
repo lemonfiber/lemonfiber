@@ -19,6 +19,7 @@
     "forms": "ref:FormsReport",
     "front-door": "ref:FrontDoorReport",
     "glossary": "ref:Vocabulary",
+    "held": "ref:HeldReport",
     "history": "ref:HistoryReport",
     "hosting": "ref:HostingReport",
     "household": "ref:HouseholdReport",
@@ -2099,6 +2100,70 @@
       },
       "variants": []
     },
+    "Held": {
+      "fields": {
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "medium": {
+          "type": [
+            "ref:Medium"
+          ],
+          "required": true
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "year": {
+          "type": [
+            "integer|null/uint16"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "HeldReport": {
+      "fields": {
+        "available": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "findings": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "holdings": {
+          "type": [
+            "array[ref:Held]"
+          ],
+          "required": true
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "member": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "HistoryReport": {
       "fields": {
         "changes": {
@@ -2973,6 +3038,14 @@
         "\"launchd\"",
         "\"systemd\"",
         "\"unsupported\""
+      ]
+    },
+    "Medium": {
+      "fields": {},
+      "variants": [
+        "\"film\"",
+        "\"other\"",
+        "\"series\""
       ]
     },
     "Member": {

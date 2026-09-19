@@ -31,7 +31,7 @@ pub(crate) use lemonfiber_core::app::Ctx;
 pub(crate) use lemonfiber_core::config::Settings;
 pub(crate) use lemonfiber_core::platform::Environment;
 pub(crate) use lemonfiber_core::ports::service::{
-    Allowed, Certificate, Failure, Household, Invited, Member, NamedLibrary,
+    Allowed, Certificate, Failure, Held, Household, Invited, Member, NamedLibrary,
 };
 pub(crate) use lemonfiber_core::stack::Source;
 pub(crate) use lemonfiber_fixtures::http::Fake;
@@ -351,6 +351,9 @@ impl Household for AHousehold {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn holdings(&self, _: &str, _: u32) -> Result<Vec<Held>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
     async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {

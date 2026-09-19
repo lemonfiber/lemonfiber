@@ -79,6 +79,9 @@ pub const HOSTING: Kind = Kind("hosting");
 pub const HISTORY: Kind = Kind("history");
 /// What the household asked for, member by member.
 pub const HOUSEHOLD: Kind = Kind("household");
+
+/// What one member can watch, as the media server answers it for them.
+pub const HELD: Kind = Kind("held");
 /// What copying an operator's own records across came to.
 pub const IMPORT: Kind = Kind("import");
 /// An account offered to somebody in the house.
@@ -179,6 +182,7 @@ pub const ALL: &[Kind] = &[
     HOSTING,
     HISTORY,
     HOUSEHOLD,
+    HELD,
     IMPORT,
     INVITATION,
     REMOVAL,

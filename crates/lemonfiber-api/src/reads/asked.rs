@@ -23,7 +23,7 @@ use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
 
 use super::{
     Wanted, ALERTS, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS,
-    EXPLAIN, FORMS, FRONT_DOOR, HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE,
+    EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE,
     STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
 };
 
@@ -47,6 +47,9 @@ pub(crate) const FOLLOW: &str = "follow";
 
 /// The parameter naming the household member to narrow to.
 const MEMBER: &str = "member";
+
+/// The parameter saying how many holdings to answer with.
+const MOST: &str = "most";
 
 /// The parameter naming what to follow.
 const TERM: &str = "term";
@@ -95,6 +98,7 @@ const TAKEN: &[(&str, &[&str])] = &[
     (CHECKS, &[ONLY]),
     (STORAGE, &[]),
     (REQUESTS, &[MEMBER]),
+    (HELD, &[MEMBER, MOST]),
     (HOSTING, &[]),
     (FRONT_DOOR, &[]),
     (TRACE, &[TERM, SEASON]),
@@ -197,6 +201,7 @@ impl Asked {
             tier: self.one(TIER).map(str::to_owned),
             to: self.one(TO).map(str::to_owned),
             what: self.one(WHAT).map(str::to_owned),
+            most: self.one(MOST).map(str::to_owned),
         }
     }
 }

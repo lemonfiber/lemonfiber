@@ -29,14 +29,23 @@
 //! ones that take none.
 
 mod asked;
+mod naming;
+
+use naming::{diagnosing, following, household, moving, narrowed, removing, setting, shelf};
+
+/// How much of a shelf a read answers with, and the most it ever will.
+///
+/// Published so the command line takes the same two numbers rather than restating
+/// them: a terminal and a browser looking at one household must not come to show two
+/// different shelves, and a number written down twice drifts the first time one of
+/// them moves.
+pub use naming::{A_SHELF, MOST_AT_ONCE};
 
 use lemonfiber_core::app::{
-    update, AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction,
-    Removing, Waiting,
+    AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::uninstall::Tier;
 
 pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
 
@@ -64,6 +73,15 @@ pub const STORAGE: &str = "/api/storage";
 /// by the contract rather than by the path, and a published path renamed outruns its
 /// own redirect.
 pub const REQUESTS: &str = "/api/requests";
+
+/// What one member can watch, as the media server answers it for them.
+///
+/// Beside the requests read rather than folded into it because they are different
+/// questions — that one is what the household has *asked for*, this is what is already
+/// here. One member at a time, and never all of them: the server applies that account's
+/// age limit, blocked kinds and library access before it answers, so a single shelf for
+/// everybody would be wrong for whoever it was not read as.
+pub const HELD: &str = "/api/held";
 
 /// What this machine keeps running when no terminal is open.
 pub const HOSTING: &str = "/api/hosting";
@@ -217,6 +235,7 @@ pub const OFFERED: &[&str] = &[
     CHECKS,
     STORAGE,
     REQUESTS,
+    HELD,
     HOSTING,
     FRONT_DOOR,
     TRACE,
@@ -251,6 +270,23 @@ pub const NO_SETTING: &str = "Which setting to read must be named.";
 
 /// What is said to a request that named no household member to narrow to.
 pub const NO_MEMBER: &str = "Which member to narrow to must be named.";
+
+/// What is said to a request asking for a shelf and naming nobody whose it is.
+///
+/// Apart from [`NO_MEMBER`] because the two refuse different things: that one is said
+/// where naming nobody would have meant everybody, and this is said where there is no
+/// everybody to fall back to.
+pub const NO_SHELF_WITHOUT_A_MEMBER: &str = "Whose shelf to read must be named.";
+
+/// What is said to a request asking for a number of holdings that is not one.
+pub const NOT_A_COUNT: &str = "How many holdings to answer with must be a whole number.";
+
+/// What is said to a request asking for more holdings than this answers in one go.
+///
+/// Refused rather than quietly cut down to the ceiling. A caller that asked for five
+/// thousand and was handed five hundred has been told it has the whole shelf, and a
+/// narrower answer wearing the shape of the answer is the same failure as a wider one.
+pub const TOO_MANY_AT_ONCE: &str = "That is more holdings than one read answers with.";
 
 /// What is said to a request naming a group of checks that is not one.
 pub const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
@@ -298,6 +334,8 @@ pub struct Wanted {
     pub to: Option<String>,
     /// Which of the two things that can be moved forward is being read.
     pub what: Option<String>,
+    /// How many holdings a shelf answers with.
+    pub most: Option<String>,
 }
 
 /// What a read was given, or why the request cannot be read as it stands.
@@ -331,6 +369,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         tier,
         to,
         what,
+        most,
     } = given;
     match read {
         VERSION => Ok(Command::Version),
@@ -344,6 +383,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
         REQUESTS => household(member),
+        HELD => shelf(member, most),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different
@@ -393,115 +433,4 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         CLIENTS => Ok(Command::Clients),
         _ => Err(NO_SUCH_READ),
     }
-}
-
-/// The removal a name asks for, read and nothing more.
-///
-/// Naming none reads the one that removes nothing, which is the safe reading and the
-/// one a browser opening the page has not chosen anything by.
-fn removing(tier: Option<String>) -> Result<Command, &'static str> {
-    let Some(named) = tier else {
-        return Ok(Command::Uninstall(Removing::surveying(Tier::Stop)));
-    };
-    Tier::named(&named)
-        .map(|tier| Command::Uninstall(Removing::surveying(tier)))
-        .ok_or(NO_SUCH_REMOVAL)
-}
-
-/// Which of the two things that can be moved forward was asked about.
-///
-/// Naming a version asks the binary about that one and naming none asks about whatever
-/// is newest, which is the fork the command line takes on the same word. Neither half
-/// replaces anything, so both are reads.
-fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, &'static str> {
-    match what {
-        Some("self") => Ok(Command::SelfUpdate { to }),
-        Some("stack") => Ok(Command::Update(update::Asked {
-            service: None,
-            confirm: false,
-            wait: Waiting::Never,
-        })),
-        _ => Err(NO_UPDATE_OBJECT),
-    }
-}
-
-/// A diagnosis, narrowed or whole.
-///
-/// A read looks and does not touch, so it neither accepts a warning nor opts into
-/// the checks that disturb a running system; both of those change something.
-const fn diagnosing(narrowing: Narrowing) -> Command {
-    Command::Doctor {
-        narrowing,
-        disruptive: false,
-        accept: None,
-    }
-}
-
-/// The diagnosis a request asked for, or nothing where it named a group of checks
-/// that is not one lemonfiber knows.
-fn narrowed(only: Option<&str>) -> Option<Command> {
-    match only {
-        None => Some(diagnosing(Narrowing::Suite)),
-        Some(name) => Narrowing::parse(name).map(diagnosing),
-    }
-}
-
-/// Every setting, or the one that was named.
-///
-/// Naming none and naming an empty one are different requests here, which is why
-/// this cannot do what a restore does with a name it was given none of and read the
-/// empty one as absent: absent already means every setting, so an empty name read
-/// that way would answer a question nobody asked. It is refused instead — and
-/// refused here rather than at whichever surface supplied it, so a line typed at a
-/// screen and a query string arriving empty are answered in the same sentence.
-///
-/// Before this, an empty one reached the core as a setting to look for, matched
-/// nothing, and came back as a listing of no settings — which reads as "there is no
-/// such setting" about a setting nobody named.
-fn setting(key: Option<String>) -> Result<Command, &'static str> {
-    match key {
-        None => Ok(Command::ConfigShow),
-        Some(key) if key.is_empty() => Err(NO_SETTING),
-        Some(key) => Ok(Command::ConfigGet { key }),
-    }
-}
-
-/// What the household asked for, narrowed to one member or taken whole.
-///
-/// Empty is refused for the reason it is refused of a setting, and the answer it
-/// used to give was worse: a member nobody named matched nobody, and a report of no
-/// requests reads as "nobody has asked for anything" — which is exactly the reading
-/// [`lemonfiber_core::app`]'s own household reader refuses to produce when it cannot
-/// reach the request service.
-fn household(member: Option<String>) -> Result<Command, &'static str> {
-    match member {
-        None => Ok(Command::Household { member: None }),
-        Some(member) if member.is_empty() => Err(NO_MEMBER),
-        Some(member) => Ok(Command::Household {
-            member: Some(member),
-        }),
-    }
-}
-
-/// Following one item, or why the request could not be followed.
-///
-/// The term is one value rather than several. The command line takes it as words so
-/// it can be typed without quoting and joins them back into the title as said; every
-/// other surface carries the title already whole.
-///
-/// Nothing is searched. A read looks and does not touch, and asking the indexers what
-/// they carry spends a live search against the allowance they hold the operator to —
-/// so the widened form of this is an action, at the door changes are asked for.
-fn following(term: Option<String>, season: Option<&str>) -> Result<Command, &'static str> {
-    let Some(term) = term.filter(|term| !term.is_empty()) else {
-        return Err(NO_TERM);
-    };
-    let Ok(season) = season.map(str::parse::<u32>).transpose() else {
-        return Err(NOT_A_SEASON);
-    };
-    Ok(Command::Trace {
-        term,
-        season,
-        searching: false,
-    })
 }

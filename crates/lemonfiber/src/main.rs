@@ -179,6 +179,21 @@ async fn doctoring(ctx: &Ctx, asked: RawDoctor, json: bool) -> Result<Command, E
     diagnosing(asked.only.as_deref(), asked.disruptive, asked.accept).map_err(ExitCode::from)
 }
 
+/// A translation that may refuse, taken or reported.
+///
+/// Four arms of the table below wrote the same three lines around a translation that can
+/// come back a usage error, and the repetition is what put the table past what a
+/// function may be. A macro rather than a function because what it does on a refusal is
+/// leave `main`, which nothing `main` calls can do for it.
+macro_rules! taken {
+    ($translated:expr) => {
+        match $translated {
+            Ok(command) => command,
+            Err(code) => return ExitCode::from(code),
+        }
+    };
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -258,14 +273,8 @@ async fn main() -> ExitCode {
         Request::Ps { forms } => Command::Ps { forms },
         Request::Config { action } => configuration(action),
         Request::Migrate { action } => Command::Migrate(translate::migrating(action.as_ref())),
-        Request::Alerts { action } => match translate::alerts(action) {
-            Ok(command) => command,
-            Err(code) => return ExitCode::from(code),
-        },
-        Request::Quality { action } => match quality(action) {
-            Ok(command) => command,
-            Err(code) => return ExitCode::from(code),
-        },
+        Request::Alerts { action } => taken!(translate::alerts(action)),
+        Request::Quality { action } => taken!(quality(action)),
         Request::Doctor(asked) => match doctoring(&ctx, asked, cli.json).await {
             Ok(command) => command,
             Err(code) => return code,
@@ -296,10 +305,8 @@ async fn main() -> ExitCode {
         // Naming a word says what it means and naming none lists them, and both are
         // answered from a table compiled into the binary rather than from a stack.
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
-        Request::Household { member, action } => match household(member, action) {
-            Ok(command) => command,
-            Err(code) => return ExitCode::from(code),
-        },
+        Request::Household { member, action } => taken!(household(member, action)),
+        Request::Held { member, most } => taken!(translate::held(member, most)),
         Request::History => Command::History,
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,

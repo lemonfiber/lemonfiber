@@ -414,3 +414,78 @@ async fn asking_where_this_copy_stands_about_two_versions_at_once_is_refused() {
         Some("READ-2")
     );
 }
+
+/// Naming nobody is not a whole-household shelf, because there is no such thing: the
+/// media server answers what is watchable per account, applying that account's age
+/// limit and library access first. A read that fell back to everybody would be
+/// answering a question with somebody else's answer.
+#[tokio::test]
+async fn a_shelf_asked_for_with_nobody_whose_it_is_is_refused() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/held").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "Whose shelf to read must be named.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_shelf_asked_for_by_nobody_at_all_is_refused_the_same_way() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/held?member=").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "Whose shelf to read must be named.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_count_of_holdings_that_is_not_a_number_is_refused() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/held?member=ada&most=lots").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "How many holdings to answer with must be a whole number.".to_owned()
+        ))
+    );
+}
+
+/// Nought holdings is a request for an answer that says nothing, and it is refused
+/// rather than served: an empty shelf is a fact about a household, and one produced by
+/// the count asked for would be that fact said about somebody it is not true of.
+#[tokio::test]
+async fn a_shelf_of_no_holdings_at_all_is_refused_rather_than_answered_empty() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/held?member=ada&most=0").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "How many holdings to answer with must be a whole number.".to_owned()
+        ))
+    );
+}
+
+/// **Refused rather than cut down to the ceiling.** A caller handed five hundred after
+/// asking for five thousand has been told that is the shelf, and a narrower answer
+/// wearing the shape of the answer is the same defect as a wider one.
+#[tokio::test]
+async fn more_holdings_than_one_read_answers_with_is_refused_not_quietly_cut_down() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/held?member=ada&most=5000").await,
+        Some((
+            StatusCode::BAD_REQUEST,
+            "That is more holdings than one read answers with.".to_owned()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_shelf_at_the_ceiling_is_still_asked_for() {
+    let seen = asked(world(running(), stack()), "/api/held?member=ada&most=500").await;
+    assert!(
+        seen.as_ref()
+            .is_some_and(|(status, _)| *status != StatusCode::BAD_REQUEST),
+        "the ceiling is the last count this answers, not the first it refuses: {seen:?}"
+    );
+}

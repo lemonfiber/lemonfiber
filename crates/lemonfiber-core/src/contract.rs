@@ -156,6 +156,11 @@ fn the_first_kinds(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<FrontDoorReport>),
     );
     describing(kinds, kind::GLOSSARY, schema_for!(Envelope<Vocabulary>));
+    describing(
+        kinds,
+        kind::HELD,
+        schema_for!(Envelope<crate::model::HeldReport>),
+    );
     describing(kinds, kind::HOSTING, schema_for!(Envelope<HostingReport>));
     describing(kinds, kind::CLIENTS, schema_for!(Envelope<Guidance>));
     describing(kinds, kind::INVITATION, schema_for!(Envelope<Invitation>));
@@ -369,6 +374,7 @@ mod tests {
             Outcome::Trace(TraceReport::default()),
             Outcome::Hosting(HostingReport::default()),
             Outcome::Household(HouseholdReport::default()),
+            Outcome::Held(crate::model::HeldReport::default()),
             Outcome::Stuck(StuckReport::default()),
             Outcome::Status(StatusReport {
                 forms: Vec::new(),

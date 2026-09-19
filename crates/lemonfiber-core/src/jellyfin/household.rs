@@ -11,12 +11,15 @@
 //! invitation survives this program being closed, reinstalled, or run from
 //! somewhere else.
 
+mod shelf;
+
 use async_trait::async_trait;
 
-use super::{Jellyfin, AUTHORIZATION};
+use super::{item_type, Jellyfin, AUTHORIZATION};
 use crate::ports::http::Method;
+use crate::ports::media::Kind;
 use crate::ports::service::{
-    Access, Allowed, Certificate, Failure, Invited, Member, NamedLibrary, Unrated,
+    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Unrated,
 };
 
 /// The account list, as the media server names its fields.
@@ -310,6 +313,10 @@ impl crate::ports::service::Household for Jellyfin {
 
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
         allow(self, id, allowed).await
+    }
+
+    async fn holdings(&self, member: &str, most: u32) -> Result<Vec<Held>, Failure> {
+        shelf::holdings(self, member, most).await
     }
 
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {

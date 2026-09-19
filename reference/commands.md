@@ -30,6 +30,7 @@ Commands:
   hosting       Say what this machine keeps running when no terminal is open
   trace         Follow one show or film across the services — "where is my show?"
   household     Show who is in the household, what each may watch and ask for, and what each asked for
+  held          Show what one member can actually watch
   walkthrough   Add one thing, end to end, and watch every step of it happen
   explain       Say what one of this product's words means
   history       Show everything lemonfiber changed, newest first, and how far each could be put back
@@ -108,6 +109,7 @@ Options:
 - [`lemonfiber hosting`](commands/hosting.md)
 - [`lemonfiber trace`](commands/trace.md)
 - [`lemonfiber household`](commands/household.md)
+- [`lemonfiber held`](commands/held.md)
 - [`lemonfiber walkthrough`](commands/walkthrough.md)
 - [`lemonfiber explain`](commands/explain.md)
 - [`lemonfiber history`](commands/history.md)

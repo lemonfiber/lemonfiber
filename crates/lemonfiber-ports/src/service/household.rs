@@ -125,6 +125,24 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure>;
 
+    /// What this member may watch, as the media server answers it for them.
+    ///
+    /// **Asked for that member, never filtered for them.** The server holds the age
+    /// limit, the library access and the blocked kinds, and answering about one
+    /// account is a thing it already does — so what comes back is what they may see
+    /// because the server said so, whoever's credential carried the question. A read
+    /// taken about the household and narrowed here would be a second copy of every one
+    /// of those rules, able to disagree with the first on the day either moved.
+    ///
+    /// Sorted and bounded by the server rather than here: a household library is
+    /// larger than a screen, and deciding which part of it to ask for is the caller's
+    /// errand rather than this one's.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn holdings(&self, member: &str, most: u32) -> Result<Vec<Held>, Failure>;
+
     /// The certificates this server's own rating table names, and the ages it holds
     /// them against.
     ///
@@ -165,6 +183,49 @@ pub struct NamedLibrary {
     pub id: String,
     /// What the operator called it.
     pub name: String,
+}
+
+/// One thing the household holds, as a member is shown it.
+///
+/// What a person recognises and nothing else. There is no file path, no container,
+/// no bitrate and no library id: a member deciding what to watch is not choosing a
+/// transcode, and a surface handed those would have to decide not to draw them.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Held {
+    /// The identifier the server tells it apart by, which is what asking to play one
+    /// of them names.
+    pub id: String,
+    /// What it is called, in the words the server holds it under.
+    pub title: String,
+    /// The year it came out, where the server knows one. Absent rather than guessed:
+    /// two films share a title far more often than they share a title and a year.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub year: Option<u16>,
+    /// Which of the kinds this product deals in it is.
+    pub medium: Medium,
+}
+
+/// The kinds of thing a household holds.
+///
+/// Named rather than passed through as the server's own word, because a surface
+/// drawing "Series" against one server and "tvshow" against another would be
+/// rendering a detail of which server this household runs.
+///
+/// `Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two
+/// request services a [`crate::media::Kind`], a request's suspension a
+/// [`crate::service::asking::Holding`], and what one line of a manifest is a
+/// `uninstall::Sort` — and one word meaning two things in one vocabulary is how a
+/// reader comes to trust the wrong one. The contract flattens every type name into one
+/// namespace, so a clash there is a clash for anything reading it by name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Medium {
+    /// One film.
+    Film,
+    /// A television series, rather than one episode of one.
+    Series,
+    /// Something the server holds that is neither, and is not hidden for that.
+    Other,
 }
 
 /// One certificate the media server's own rating table names.

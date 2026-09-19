@@ -49,8 +49,8 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::reads::{
     named, ALERTS, BANDWIDTH, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR,
-    HISTORY, HOSTING, MIGRATION, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED, STUCK, TRACE,
-    UNINSTALL, UPDATE, VERSION,
+    HELD, HISTORY, HOSTING, MIGRATION, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED, STUCK,
+    TRACE, UNINSTALL, UPDATE, VERSION,
 };
 use lemonfiber_core::app::Command;
 
@@ -155,6 +155,15 @@ static AFTER: &[Question] = &[
         read: REQUESTS,
         needs: Needed::Typed(&[Wants {
             asks: "Which member, as you would say their name",
+            narrows: Narrows::Member,
+        }]),
+    },
+    Question {
+        name: "what one person can watch",
+        about: "what is already on the shelf for one member, as their own account sees it",
+        read: HELD,
+        needs: Needed::Typed(&[Wants {
+            asks: "Whose shelf, as you would say their name",
             narrows: Narrows::Member,
         }]),
     },

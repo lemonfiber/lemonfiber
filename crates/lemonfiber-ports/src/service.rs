@@ -47,7 +47,7 @@ pub use failure::{
 };
 pub use fetching::{Fetching, Pulling};
 pub use household::{
-    Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Unrated,
+    Access, Allowed, Certificate, Held, Household, Invited, Medium, Member, NamedLibrary, Unrated,
 };
 pub use metering::{Metering, Moved};
 pub use notices::Noticing;
