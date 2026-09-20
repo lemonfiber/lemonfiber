@@ -50,7 +50,10 @@ pub(crate) mod walkthrough;
 mod wiring;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{AlertReport, ConfigReport, FormsReport, VersionReport, WizardReport};
+use lemonfiber_core::model::{
+    AlertReport, ConfigReport, FormsReport, SettingReport, VersionReport, WizardReport,
+};
+use lemonfiber_core::origin::Origin;
 use lemonfiber_core::reconfigure::{Review, Stance};
 use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
@@ -404,7 +407,12 @@ fn alerts(report: &AlertReport) -> Lines {
 fn settings(report: &ConfigReport) -> Lines {
     let mut lines = Lines::default();
     for setting in &report.settings {
-        lines.put(format!("{}={}", setting.key, setting.value));
+        lines.put(format!(
+            "{}={}  — {}",
+            setting.key,
+            setting.value,
+            came_from(&setting.origin)
+        ));
     }
     if let Some(review) = &report.review {
         let change = &review.change;
@@ -426,6 +434,47 @@ fn settings(report: &ConfigReport) -> Lines {
     if let Some(consequence) = &report.consequence {
         lines.put(String::new());
         lines.put(consequence.clone());
+    }
+    // Last, so the values and any change to one read as one block. These are the
+    // footnotes to the listing above rather than part of it, and a sentence sitting
+    // between a setting and the change being made to it would read as being about
+    // the change.
+    lines.extend(unsettled(&report.settings));
+    lines
+}
+
+/// How one setting's origin reads on the line beside it.
+fn came_from(origin: &Origin) -> String {
+    match origin {
+        Origin::Bundled => "lemonfiber's own".to_owned(),
+        Origin::Operator => "yours".to_owned(),
+        Origin::Plugin { named } => format!("set by plugin {named}"),
+        Origin::Unknown { .. } => "origin unknown".to_owned(),
+    }
+}
+
+/// Why any of them could not be attributed, each reason given once.
+///
+/// Under the listing rather than on every line. The reasons are sentences and the
+/// settings are many, and one repeated per row would bury the values somebody came
+/// to read — but leaving the word *unknown* on the page with nothing behind it is
+/// how it comes to read as a fault rather than as an honest answer.
+fn unsettled(settings: &[SettingReport]) -> Lines {
+    let mut lines = Lines::default();
+    let mut said: Vec<&str> = Vec::new();
+    for setting in settings {
+        if let Origin::Unknown { why } = &setting.origin {
+            if !said.contains(&why.as_str()) {
+                said.push(why);
+            }
+        }
+    }
+    if said.is_empty() {
+        return lines;
+    }
+    lines.spaced("Where a setting's origin is unknown:");
+    for why in said {
+        lines.put(format!("  {why}"));
     }
     lines
 }
@@ -508,6 +557,7 @@ mod tests {
         ResetReport, SettingReport, Standing, StandingReport, StatusReport, StuckReport,
         UnsupportedReport, UpgradeReport, VersionReport, WizardReport,
     };
+    use lemonfiber_core::origin::Origin;
     use lemonfiber_core::reconfigure::{Change, Cost, Findings, Review, Stance};
     use lemonfiber_core::wizard::{Phase, Step};
 
@@ -785,12 +835,112 @@ mod tests {
                 key: "DATA_ROOT".to_owned(),
                 value: "/data".to_owned(),
                 secret: false,
+                origin: Origin::Operator,
             }],
             changed: matches!(stance, Stance::Pending | Stance::Applied),
             consequence: None,
             rehearsed: false,
             review: Some(proposal(stance)),
         }
+    }
+
+    /// A listing of settings, each carrying the origin given for it.
+    fn listing(settings: Vec<(&str, Origin)>) -> ConfigReport {
+        ConfigReport {
+            settings: settings
+                .into_iter()
+                .map(|(key, origin)| SettingReport {
+                    key: key.to_owned(),
+                    value: "/data".to_owned(),
+                    secret: false,
+                    origin,
+                })
+                .collect(),
+            changed: false,
+            consequence: None,
+            rehearsed: false,
+            review: None,
+        }
+    }
+
+    /// Every origin reads as words on the line the value is on, because a reader who
+    /// has to go and look somewhere else is a reader who does not.
+    #[test]
+    fn every_setting_says_where_it_came_from_beside_its_value() {
+        let text = settings(&listing(vec![
+            ("A", Origin::Bundled),
+            ("B", Origin::Operator),
+            (
+                "C",
+                Origin::Plugin {
+                    named: "komga".to_owned(),
+                },
+            ),
+            (
+                "D",
+                Origin::Unknown {
+                    why: "no record of writing here".to_owned(),
+                },
+            ),
+        ]))
+        .text();
+        assert!(text.contains("A=/data  — lemonfiber's own"), "{text}");
+        assert!(text.contains("B=/data  — yours"), "{text}");
+        assert!(text.contains("C=/data  — set by plugin komga"), "{text}");
+        assert!(text.contains("D=/data  — origin unknown"), "{text}");
+    }
+
+    /// The reasons sit under the listing rather than on every line, and each is given
+    /// once however many settings share it.
+    #[test]
+    fn why_an_origin_is_unknown_is_said_once_under_the_listing() {
+        let text = settings(&listing(vec![
+            (
+                "A",
+                Origin::Unknown {
+                    why: "no record of writing here".to_owned(),
+                },
+            ),
+            (
+                "B",
+                Origin::Unknown {
+                    why: "no record of writing here".to_owned(),
+                },
+            ),
+            (
+                "C",
+                Origin::Unknown {
+                    why: "a credential is never recorded".to_owned(),
+                },
+            ),
+        ]))
+        .text();
+        assert!(
+            text.contains("Where a setting's origin is unknown:"),
+            "{text}"
+        );
+        assert_eq!(
+            text.matches("no record of writing here").count(),
+            1,
+            "a reason shared by two settings is given once: {text}"
+        );
+        assert!(text.contains("a credential is never recorded"), "{text}");
+    }
+
+    /// The acceptance half. A listing nothing is unknown about carries no block of
+    /// reasons at all — a rule that only ever adds is one nobody can tell is working.
+    #[test]
+    fn a_listing_with_nothing_unknown_says_nothing_about_unknown_origins() {
+        let text = settings(&listing(vec![
+            ("A", Origin::Bundled),
+            ("B", Origin::Operator),
+        ]))
+        .text();
+        assert!(!text.contains("origin unknown"), "{text}");
+        assert!(
+            !text.contains("Where a setting's origin is unknown"),
+            "{text}"
+        );
     }
 
     #[test]
@@ -993,6 +1143,7 @@ mod tests {
                     key: "DATA_ROOT".to_owned(),
                     value: "/data".to_owned(),
                     secret: false,
+                    origin: Origin::Operator,
                 }],
                 changed: false,
                 rehearsed: false,
@@ -1426,6 +1577,7 @@ mod tests {
                 key: "INDEXER_APIKEY".to_owned(),
                 value: "(set, not shown)".to_owned(),
                 secret: true,
+                origin: Origin::Operator,
             }],
             ..part_way()
         })

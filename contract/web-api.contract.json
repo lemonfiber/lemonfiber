@@ -2316,6 +2316,10 @@
               "description": "The setting's name.",
               "type": "string"
             },
+            "origin": {
+              "description": "Where the value came from, beside the value rather than behind a second\nrequest — reading a setting and reading what put it there are one act.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
             "secret": {
               "description": "Whether the value was withheld.",
               "type": "boolean"
@@ -2328,7 +2332,8 @@
           "required": [
             "key",
             "value",
-            "secret"
+            "secret",
+            "origin"
           ]
         },
         "Stance": {
@@ -2429,6 +2434,73 @@
               "required": [
                 "outcome",
                 "detail"
+              ]
+            }
+          ]
+        },
+        "ValueOrigin": {
+          "description": "Where a value in force came from.\n\nPublished under a name of its own because the generated schema keys on the type's\nbare name, and a second `Origin` in the crate would be merged with this one into a\nsingle definition carrying the variants of both — a published contract saying a\ncredential may be *unknown* and a setting may be *service*, neither of which is\ntrue, and neither of which the additive-only surface check would refuse.",
+          "oneOf": [
+            {
+              "description": "This build's own, out of what lemonfiber ships rather than out of a choice.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "bundled"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "The operator settled it, whether by answering for it or by editing it since.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "operator"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "A named plugin set it.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which one, so the thread back to it is a name rather than a search.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "plugin"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
+            },
+            {
+              "description": "It could not be established, and what stopped it.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "unknown"
+                },
+                "why": {
+                  "description": "What stopped it being established, so the gap reads as a reason rather\nthan as a shrug.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "origin",
+                "why"
               ]
             }
           ]
@@ -15447,6 +15519,10 @@
               "description": "The setting's name.",
               "type": "string"
             },
+            "origin": {
+              "description": "Where the value came from, beside the value rather than behind a second\nrequest — reading a setting and reading what put it there are one act.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
             "secret": {
               "description": "Whether the value was withheld.",
               "type": "boolean"
@@ -15459,7 +15535,8 @@
           "required": [
             "key",
             "value",
-            "secret"
+            "secret",
+            "origin"
           ]
         },
         "Validation": {
@@ -15535,6 +15612,73 @@
               "required": [
                 "outcome",
                 "detail"
+              ]
+            }
+          ]
+        },
+        "ValueOrigin": {
+          "description": "Where a value in force came from.\n\nPublished under a name of its own because the generated schema keys on the type's\nbare name, and a second `Origin` in the crate would be merged with this one into a\nsingle definition carrying the variants of both — a published contract saying a\ncredential may be *unknown* and a setting may be *service*, neither of which is\ntrue, and neither of which the additive-only surface check would refuse.",
+          "oneOf": [
+            {
+              "description": "This build's own, out of what lemonfiber ships rather than out of a choice.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "bundled"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "The operator settled it, whether by answering for it or by editing it since.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "operator"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "A named plugin set it.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which one, so the thread back to it is a name rather than a search.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "plugin"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
+            },
+            {
+              "description": "It could not be established, and what stopped it.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "unknown"
+                },
+                "why": {
+                  "description": "What stopped it being established, so the gap reads as a reason rather\nthan as a shrug.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "origin",
+                "why"
               ]
             }
           ]

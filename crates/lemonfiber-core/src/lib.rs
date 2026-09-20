@@ -87,6 +87,7 @@ pub mod materialised;
 pub mod migration;
 pub mod model;
 pub mod notify;
+pub mod origin;
 pub mod outbound;
 pub mod platform;
 pub use lemonfiber_ports::plural;

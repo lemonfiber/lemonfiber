@@ -215,7 +215,12 @@ fn reported(wizard: &Wizard, paths: &Paths, proof: Option<Validation>) -> Wizard
             .plan()
             .settings()
             .iter()
-            .map(|(key, value)| SettingReport::from(store::showing(key, value)))
+            // The operator's, and said so before the write rather than after: a plan
+            // is what their own answers came to, so the origin they will read back
+            // off the listing afterwards is the one they are shown here.
+            .map(|(key, value)| {
+                SettingReport::of(store::showing(key, value), crate::origin::Origin::Operator)
+            })
             .collect(),
     }
 }

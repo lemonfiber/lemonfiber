@@ -5464,6 +5464,12 @@
           ],
           "required": true
         },
+        "origin": {
+          "type": [
+            "ref:ValueOrigin"
+          ],
+          "required": true
+        },
         "secret": {
           "type": [
             "boolean"
@@ -7322,6 +7328,37 @@
         "\"rejected\"",
         "\"unreachable\"",
         "\"valid\""
+      ]
+    },
+    "ValueOrigin": {
+      "fields": {
+        "named": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "origin": {
+          "type": [
+            "const:\"bundled\"",
+            "const:\"operator\"",
+            "const:\"plugin\"",
+            "const:\"unknown\""
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"bundled\"",
+        "\"operator\"",
+        "\"plugin\"",
+        "\"unknown\""
       ]
     },
     "VersionReport": {

@@ -63,14 +63,26 @@ pub struct SettingReport {
     pub value: String,
     /// Whether the value was withheld.
     pub secret: bool,
+    /// Where the value came from, beside the value rather than behind a second
+    /// request — reading a setting and reading what put it there are one act.
+    pub origin: crate::origin::Origin,
 }
 
-impl From<crate::config::store::Shown> for SettingReport {
-    fn from(shown: crate::config::store::Shown) -> Self {
+impl SettingReport {
+    /// One row, from a value already made safe to show and the origin established
+    /// for it.
+    ///
+    /// Taken as an argument rather than worked out here, and there is deliberately no
+    /// conversion that leaves it out: what is known about where a value came from
+    /// differs by who is asking — a listing has the record to consult and a plan has
+    /// not been written yet — and a default would answer for both by guessing.
+    #[must_use]
+    pub fn of(shown: crate::config::store::Shown, origin: crate::origin::Origin) -> Self {
         Self {
             key: shown.key,
             value: shown.value,
             secret: shown.secret,
+            origin,
         }
     }
 }
