@@ -463,8 +463,8 @@ fn unsettled(settings: &[SettingReport]) -> Lines {
     let mut lines = Lines::default();
     let mut said: Vec<&str> = Vec::new();
     for setting in settings {
-        if let Origin::Unknown { why } = &setting.origin {
-            if !said.contains(&why.as_str()) {
+        if let Some(why) = setting.origin.why() {
+            if !said.contains(&why) {
                 said.push(why);
             }
         }

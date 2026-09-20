@@ -652,10 +652,12 @@ mod tests {
             EXPLANATIONS_KEY,
         );
         assert_ne!(held, Some(crate::origin::Origin::Bundled));
-        let Some(crate::origin::Origin::Unknown { why }) = held else {
-            unreachable!("a setting with no record behind it is the unknown one")
-        };
-        assert!(why.contains("no record of writing here"), "{why}");
+        assert!(
+            held.as_ref()
+                .and_then(crate::origin::Origin::why)
+                .is_some_and(|why| why.contains("no record of writing here")),
+            "{held:?}"
+        );
     }
 
     #[tokio::test]
@@ -668,10 +670,12 @@ mod tests {
             &reading(&ctx, Some(INDEXER_APIKEY_KEY)).await,
             INDEXER_APIKEY_KEY,
         );
-        let Some(crate::origin::Origin::Unknown { why }) = held else {
-            unreachable!("a credential's origin is the unknown one")
-        };
-        assert!(why.contains("keeps no record of a credential"), "{why}");
+        assert!(
+            held.as_ref()
+                .and_then(crate::origin::Origin::why)
+                .is_some_and(|why| why.contains("keeps no record of a credential")),
+            "{held:?}"
+        );
     }
 
     #[tokio::test]
@@ -704,22 +708,25 @@ mod tests {
 
     #[tokio::test]
     async fn nothing_but_a_settings_answer_is_read_for_a_consequence() {
-        // The three readers above are total, and this is the arm that proves each of
+        // The four readers above are total, and this is the arm that proves each of
         // them rather than a fallback nothing ever reaches.
-        let other = Outcome::Version(crate::model::VersionReport {
-            binary: "0".to_owned(),
-            supported_schema: Vec::new(),
-            stack: String::new(),
-            compose: None,
-            changelog: crate::changelog::Notes::unread(),
-        });
-        let said = consequence(&Ok(other));
+        let other: Result<Outcome, Box<crate::error::Problem>> =
+            Ok(Outcome::Version(crate::model::VersionReport {
+                binary: "0".to_owned(),
+                supported_schema: Vec::new(),
+                stack: String::new(),
+                compose: None,
+                changelog: crate::changelog::Notes::unread(),
+            }));
+        let said = consequence(&other);
         assert!(said.is_some_and(|said| said.contains("not a configuration answer")));
+        assert_eq!(origin_of(&other, EXPLANATIONS_KEY), None);
 
         let refused = Err(Box::new(store::Failure::Nowhere.problem()));
         assert_eq!(consequence(&refused), None);
         assert_eq!(reviewed(&refused), None);
         assert_eq!(stance(&refused), None);
+        assert_eq!(origin_of(&refused, EXPLANATIONS_KEY), None);
     }
 
     // ── A replacement credential is proven before the one it replaces is dropped ──

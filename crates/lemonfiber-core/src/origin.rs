@@ -88,6 +88,19 @@ impl Origin {
             _ => None,
         }
     }
+
+    /// Why the origin could not be established, where it could not be.
+    ///
+    /// Reached through this rather than by each surface taking the variant apart, so
+    /// that a listing showing the reason and a listing deciding whether there is one
+    /// are asking the same question.
+    #[must_use]
+    pub fn why(&self) -> Option<&str> {
+        match self {
+            Self::Unknown { why } => Some(why),
+            _ => None,
+        }
+    }
 }
 
 /// Where one setting's value came from, given what lemonfiber recorded for it.
@@ -169,6 +182,28 @@ mod tests {
         .is_settled());
     }
 
+    /// Only the unsettled answer carries a reason, and the reason is what it was
+    /// given — a settled origin has nothing to explain and says nothing.
+    #[test]
+    fn only_an_unknown_origin_says_why() {
+        assert_eq!(
+            Origin::Unknown {
+                why: "no record".to_owned()
+            }
+            .why(),
+            Some("no record")
+        );
+        assert_eq!(Origin::Bundled.why(), None);
+        assert_eq!(Origin::Operator.why(), None);
+        assert_eq!(
+            Origin::Plugin {
+                named: "komga".to_owned()
+            }
+            .why(),
+            None
+        );
+    }
+
     #[test]
     fn only_a_plugin_origin_names_a_plugin() {
         assert_eq!(
@@ -224,12 +259,10 @@ mod tests {
         let held = of_setting("DATA_ROOT", None);
         assert!(!held.is_settled());
         assert_ne!(held, Origin::Bundled);
-        let Origin::Unknown { why } = held else {
-            unreachable!("an unsettled origin is the unknown one")
-        };
         assert!(
-            why.contains("no record of writing here"),
-            "the reason names what was missing: {why}"
+            held.why()
+                .is_some_and(|why| why.contains("no record of writing here")),
+            "the reason names what was missing: {held:?}"
         );
     }
 
@@ -240,12 +273,10 @@ mod tests {
     fn a_credential_says_it_is_unknown_because_it_is_never_recorded() {
         let held = of_setting("PROVIDER_PASS", None);
         assert_ne!(held, Origin::Bundled);
-        let Origin::Unknown { why } = held else {
-            unreachable!("a credential's origin is the unknown one")
-        };
         assert!(
-            why.contains("keeps no record of a credential"),
-            "the reason names the rule rather than a loss: {why}"
+            held.why()
+                .is_some_and(|why| why.contains("keeps no record of a credential")),
+            "the reason names the rule rather than a loss: {held:?}"
         );
     }
 }
