@@ -57,6 +57,14 @@ pub struct Proof {
     /// A recorded response to run against where no instance exists.
     #[serde(default)]
     pub fixture: Option<String>,
+    /// Which of this plugin's services is asked.
+    ///
+    /// Optional where the plugin declares one, required where it declares more. A proof
+    /// gates the install of every service the plugin brings, and one that did not say
+    /// which it was about would be checked against whichever the reader reached first —
+    /// including its digest, which is what ties a recording to the image it came out of.
+    #[serde(default)]
+    pub service: Option<String>,
     /// Why this is worth asserting. A proof nobody can justify is one nobody will
     /// maintain.
     pub why: String,
@@ -116,6 +124,20 @@ pub struct Contribution {
 }
 
 /// What is asked, and where.
+///
+/// Three fields and no more, and the third is the one worth explaining. A service that
+/// answers XML unless a caller asks for JSON cannot satisfy a capability whose probe
+/// requires a JSON assertion, and until this field there was nowhere to ask: Plex
+/// answers `text/xml` at every path, including the one its health probe uses, unless
+/// the request carries `Accept: application/json`.
+///
+/// **It is one media type and not a header map, and the difference is the point.** A
+/// probe declares who it is asked as, and `none` on every `guarded` probe has meant what
+/// it says partly because nothing could be presented. A map of headers would make that a
+/// convention a reviewer has to hold — any service may name its credential header
+/// whatever it likes, so no list of refused names could ever be closed — where one named
+/// field keeps it a property of the format. A probe still cannot present anything,
+/// because there is nowhere to write it.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "PluginRequest")]
@@ -124,6 +146,11 @@ pub struct Request {
     pub method: String,
     /// The path on the service being asked.
     pub path: String,
+    /// The one representation the answer is asked for, as a media type.
+    ///
+    /// Absent where the service needs no asking, which is most of them.
+    #[serde(default)]
+    pub accept: Option<String>,
 }
 
 /// What the answer has to be.
@@ -133,22 +160,28 @@ pub struct Request {
 /// connection before knowing whether anything inside is listening. So a status alone
 /// is not evidence — except for a refusal, which is the one answer no port proxy can
 /// produce.
+///
+/// **A key of the four key-wise constraints is a place rather than a name.** A plain
+/// name is a top-level member, and one beginning with `/` is a JSON Pointer, extended
+/// with a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the
+/// only thing it could say about a service that nests its payload was that the envelope
+/// was there — which is a probe that passes by observing that something replied.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Expect {
     /// The status the answer must carry.
     #[serde(default)]
     pub status: Option<u16>,
-    /// Keys the answer must carry, each with the exact value it must hold.
+    /// Places the answer must carry, each with the exact value it must hold.
     #[serde(default)]
     pub json: Option<BTreeMap<String, Expected>>,
-    /// Keys the answer must carry, whatever they hold.
+    /// Places the answer must carry, whatever they hold.
     #[serde(default)]
     pub json_has_keys: Option<Vec<String>>,
-    /// Keys the answer must carry, each with the kind of value it must be.
+    /// Places the answer must carry, each with the kind of value it must be.
     #[serde(default)]
     pub json_types: Option<BTreeMap<String, Kind>>,
-    /// Keys the answer must carry, each with a number it must not be below.
+    /// Places the answer must carry, each with a number it must not be below.
     #[serde(default)]
     pub json_at_least: Option<BTreeMap<String, i64>>,
     /// The answer read as an array, with at least this many entries.
@@ -193,12 +226,12 @@ pub enum Kind {
     Dict,
 }
 
-/// Exactly what a key must hold.
+/// Exactly what a place must hold.
 ///
-/// Three kinds and no nesting, which is the whole of what an expectation has ever
-/// needed to say: a flag that must be set, a number that must match, or a word. A
-/// shape deeper than this is asking about a document rather than about a claim, and
-/// the key-wise constraints beside this one are how that is said.
+/// Three kinds and no nesting: a flag that must be set, a number that must match, or a
+/// word. A value deeper than this is asking about a document rather than about a claim
+/// — and where the thing worth asserting is deeper *in* the answer, the key reaches it
+/// rather than the value growing to match.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum Expected {

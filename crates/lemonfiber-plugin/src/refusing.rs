@@ -17,7 +17,11 @@
 //! so what a caller gets back is every reason this build would not act on the file
 //! rather than the first one.
 
+mod evidence;
+mod naming;
 mod recipes;
+
+use std::collections::BTreeSet;
 
 use crate::offering;
 use crate::schema::{Manifest, Plugin, Service};
@@ -36,6 +40,10 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     let mut found = claiming::violations(manifest, occupied);
     declaring(&manifest.plugin, &mut found);
     running(manifest, &mut found);
+    naming::wired(manifest, &mut found);
+    naming::about(manifest, &mut found);
+    evidence::asking(manifest, &mut found);
+    evidence::looking(manifest, &mut found);
     requiring(manifest, &mut found);
     recipes::declared(manifest, &mut found);
     readable(manifest, &mut found);
@@ -105,20 +113,37 @@ const DATA: &str = "/data";
 
 /// What runs, and whether what runs is fixed.
 ///
-/// One service, because this generation of the format describes one addition to a stack
-/// that already exists. Two would make "which one did I install" a question with no good
-/// answer, and none would make the rest of the manifest describe nothing.
+/// At least one, because a plugin declaring none would leave the rest of the manifest
+/// describing nothing. No ceiling, because a plugin is one thing to an operator and is
+/// often two containers: a media server and the reader of its watch history are one
+/// install and one uninstall, on two tiers, with two criticalities — and a format
+/// permitting one forces the wider tier on both halves or splits the pair into two
+/// plugins an operator keeps in step by hand.
+///
+/// Ids are unique within the manifest as well as across the stack. Two services sharing
+/// one id is not a collision with anything installed, so the rule that catches it
+/// elsewhere never fires; what it is is one name for two containers, and every later
+/// rule that reaches for a service *by* name — a wiring, a proof, a contribution —
+/// would reach the first of them and say nothing about the second.
 fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
-    if manifest.services.len() != 1 {
+    if manifest.services.is_empty() {
         found.push(Violation {
             location: "service".to_owned(),
-            message: format!(
-                "this generation of the format describes exactly one service and {} are declared",
-                manifest.services.len()
-            ),
+            message: "declares no service, so there is nothing for the rest of this manifest to \
+                      be about"
+                .to_owned(),
         });
     }
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
     for service in &manifest.services {
+        if !seen.insert(service.id.as_str()) {
+            found.push(Violation {
+                location: format!("service {}.id", service.id),
+                message: "is declared twice, and everything that names a service by id would \
+                          reach one of the two and say nothing about the other"
+                    .to_owned(),
+            });
+        }
         pinned(service, found);
         placed(service, found);
     }
@@ -381,7 +406,7 @@ request = { method = "GET", path = "/api/v1/series" }
 expect  = { status = 200, json_has_keys = ["content"], json_types = { content = "list" } }
 fixture = "fixtures/media-serve-catalogue.json"
 
-[wiring]
+[[wiring]]
 hostname        = "comics"
 dashboard_group = "Library"
 
@@ -418,7 +443,7 @@ capabilities = ["doctor.contribute"]
 "#;
 
     /// What this build says about a manifest, as one line per refusal.
-    fn said(text: &str) -> Vec<String> {
+    pub(crate) fn said(text: &str) -> Vec<String> {
         Manifest::from_toml(text).map_or_else(
             |refused| vec![refused.to_string()],
             |manifest| {
@@ -431,13 +456,13 @@ capabilities = ["doctor.contribute"]
     }
 
     /// Whether some refusal carries every one of these words.
-    fn names(said: &[String], words: &[&str]) -> bool {
+    pub(crate) fn names(said: &[String], words: &[&str]) -> bool {
         said.iter()
             .any(|one| words.iter().all(|word| one.contains(word)))
     }
 
     /// One edit to a manifest this build would act on, and what it then says about it.
-    fn without(before: &str, after: &str) -> Vec<String> {
+    pub(crate) fn without(before: &str, after: &str) -> Vec<String> {
         assert!(
             INSTALLABLE.contains(before),
             "the fixture still says {before:?}"
@@ -588,16 +613,75 @@ capabilities = ["doctor.contribute"]
         );
     }
 
+    /// The second service beside the first, which the format now permits.
+    ///
+    /// `loopback` and `enhancing` where the first is `lan` and `important`, because
+    /// those two differences are the whole argument for letting a plugin declare two.
+    /// It declares the first service's own namespaced capability as well, which is the
+    /// case a core name is refused for and this one is not.
+    pub(crate) const BESIDE: &str = r#"
+[[service]]
+id          = "komga-stats"
+name        = "Komga statistics"
+image       = "docker.io/gotson/komga-stats"
+digest      = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+tag         = "0.4.0"
+port        = 8181
+bind        = "loopback"
+criticality = "enhancing"
+provides    = ["komga:kobo-sync"]
+config_path = "/stats"
+"#;
+
+    /// A manifest this build would act on, declaring two services.
+    ///
+    /// Built by editing the single-service one rather than written out, so the two
+    /// cannot drift: every rule the first service is held to is the same rule, and what
+    /// this fixture adds is only the three things a second service makes answerable.
+    pub(crate) fn paired() -> String {
+        format!(
+            "{}{BESIDE}",
+            INSTALLABLE
+                .replace("[[wiring]]\n", "[[wiring]]\nservice         = \"komga\"\n")
+                .replace(
+                    "id      = \"komga.serves\"\n",
+                    "id      = \"komga.serves\"\nservice = \"komga\"\n"
+                )
+        )
+    }
+
+    /// Two services in one plugin, which is one install and two containers.
     #[test]
-    fn a_second_service_is_refused_because_the_format_describes_one_addition() {
-        let text = format!(
-            "{INSTALLABLE}\n[[service]]\nid = \"other\"\nname = \"Other\"\n\
-             image = \"docker.io/x/y\"\n\
-             digest = \"sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945\"\n\
-             tag = \"1\"\ncriticality = \"optional\"\n"
-        );
+    fn a_plugin_may_declare_a_second_service_beside_the_first() {
+        let said = said(&paired());
+        assert!(said.is_empty(), "got: {said:?}");
+    }
+
+    /// And none at all is still refused, because the rest of the file is about one.
+    #[test]
+    fn a_plugin_declaring_no_service_is_refused() {
+        let text = INSTALLABLE
+            .split("[[service]]")
+            .next()
+            .unwrap_or_default()
+            .to_owned()
+            + "[requires]\ncapabilities = []\n";
         let said = said(&text);
-        assert!(names(&said, &["service", "one service"]), "got: {said:?}");
+        assert!(
+            names(&said, &["service", "declares no service"]),
+            "got: {said:?}"
+        );
+    }
+
+    /// One id for two containers, which every later rule would resolve to the first.
+    #[test]
+    fn two_services_sharing_an_id_are_refused_by_that_id() {
+        let said =
+            said(&paired().replace("id          = \"komga-stats\"", "id          = \"komga\""));
+        assert!(
+            names(&said, &["service komga.id", "declared twice"]),
+            "got: {said:?}"
+        );
     }
 
     #[test]

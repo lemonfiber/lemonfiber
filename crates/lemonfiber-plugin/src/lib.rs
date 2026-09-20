@@ -17,6 +17,7 @@ mod conforming;
 mod error;
 pub mod extension;
 pub mod offering;
+pub mod pointing;
 pub mod refusing;
 mod schema;
 pub mod vocabulary;

@@ -68,22 +68,18 @@
       }
     },
     "service": {
-      "description": "What runs. Exactly one, in this generation.",
+      "description": "What runs. One or more.\n\nMore than one because a plugin is often a thing and the thing beside it: Plex\nand the reader of its watch history are one install and one uninstall to an\noperator, and are two containers on two tiers with two criticalities. A format\npermitting one forces the author of the pair to choose the wider tier for both\nhalves, or to publish two plugins an operator has to keep in step by hand.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/PluginService"
       }
     },
     "wiring": {
-      "description": "How the stack's own proxy and dashboard reach it.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Wiring"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "description": "How the stack's own proxy and dashboard reach its services. One each, at most.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Wiring"
+      }
     }
   },
   "additionalProperties": false,
@@ -282,7 +278,7 @@
       ]
     },
     "Expect": {
-      "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal, which is the one answer no port proxy can\nproduce.",
+      "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal, which is the one answer no port proxy can\nproduce.\n\n**A key of the four key-wise constraints is a place rather than a name.** A plain\nname is a top-level member, and one beginning with `/` is a JSON Pointer, extended\nwith a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the\nonly thing it could say about a service that nests its payload was that the envelope\nwas there — which is a probe that passes by observing that something replied.",
       "type": "object",
       "properties": {
         "body_starts_with": {
@@ -302,7 +298,7 @@
           "default": null
         },
         "json": {
-          "description": "Keys the answer must carry, each with the exact value it must hold.",
+          "description": "Places the answer must carry, each with the exact value it must hold.",
           "type": [
             "object",
             "null"
@@ -322,7 +318,7 @@
           "minimum": 0
         },
         "json_at_least": {
-          "description": "Keys the answer must carry, each with a number it must not be below.",
+          "description": "Places the answer must carry, each with a number it must not be below.",
           "type": [
             "object",
             "null"
@@ -334,7 +330,7 @@
           "default": null
         },
         "json_has_keys": {
-          "description": "Keys the answer must carry, whatever they hold.",
+          "description": "Places the answer must carry, whatever they hold.",
           "type": [
             "array",
             "null"
@@ -353,7 +349,7 @@
           "default": null
         },
         "json_types": {
-          "description": "Keys the answer must carry, each with the kind of value it must be.",
+          "description": "Places the answer must carry, each with the kind of value it must be.",
           "type": [
             "object",
             "null"
@@ -377,7 +373,7 @@
       "additionalProperties": false
     },
     "Expected": {
-      "description": "Exactly what a key must hold.\n\nThree kinds and no nesting, which is the whole of what an expectation has ever\nneeded to say: a flag that must be set, a number that must match, or a word. A\nshape deeper than this is asking about a document rather than about a claim, and\nthe key-wise constraints beside this one are how that is said.",
+      "description": "Exactly what a place must hold.\n\nThree kinds and no nesting: a flag that must be set, a number that must match, or a\nword. A value deeper than this is asking about a document rather than about a claim\n— and where the thing worth asserting is deeper *in* the answer, the key reaches it\nrather than the value growing to match.",
       "anyOf": [
         {
           "description": "A true or a false.",
@@ -607,9 +603,17 @@
       ]
     },
     "PluginRequest": {
-      "description": "What is asked, and where.",
+      "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
       "type": "object",
       "properties": {
+        "accept": {
+          "description": "The one representation the answer is asked for, as a media type.\n\nAbsent where the service needs no asking, which is most of them.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "method": {
           "description": "The HTTP method.",
           "type": "string"
@@ -749,6 +753,14 @@
         "request": {
           "description": "Method and path.",
           "$ref": "#/$defs/PluginRequest"
+        },
+        "service": {
+          "description": "Which of this plugin's services is asked.\n\nOptional where the plugin declares one, required where it declares more. A proof\ngates the install of every service the plugin brings, and one that did not say\nwhich it was about would be checked against whichever the reader reached first —\nincluding its digest, which is what ties a recording to the image it came out of.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "title": {
           "description": "What it establishes, in one line.",
@@ -938,7 +950,15 @@
           "default": null
         },
         "hostname": {
-          "description": "The label in front of the operator's domain. A single DNS label — not a name,\nan address or a port. Defaults to the plugin's id.",
+          "description": "The label in front of the operator's domain. A single DNS label — not a name,\nan address or a port. Defaults to the service's id.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "service": {
+          "description": "Which of this plugin's services it is about.\n\nOptional where the plugin declares one service, because there is nothing to\nchoose between; required where it declares more, because a hostname is a fact\nabout one service and a manifest that left it to be inferred would be inferring\nwhich of two the household reaches.",
           "type": [
             "string",
             "null"
