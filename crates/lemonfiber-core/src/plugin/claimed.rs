@@ -11,15 +11,16 @@
 //! whose recording cannot be read at all establishes nothing, and unproven is never
 //! counted as shown.
 
+mod asserting;
+
 use std::path::{Path, PathBuf};
 
 use lemonfiber_plugin::{Claim, ClaimProbe, Manifest, Service};
 
-use super::judging::judge;
-use super::recorded::{self, Recording};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::plugin::{capabilities, Ungenerated};
+pub use asserting::{Asserted, Assertion};
 
 /// The one file a plugin is described by.
 const MANIFEST: &str = "plugin.toml";
@@ -151,6 +152,15 @@ pub struct Claimed {
     pub refusals: Vec<lemonfiber_plugin::Violation>,
     /// What its services declare they can do.
     pub capabilities: Vec<Claiming>,
+    /// What must hold before it is installed, against the recordings it ships.
+    pub proofs: Vec<Asserted>,
+    /// The checks it contributes, against the recordings they name.
+    ///
+    /// Reported and never counted against the install. A contributed check reports on a
+    /// running stack rather than gating one, so a check that its own recording refuses
+    /// is a check doing its job on a machine in the state it was recorded in — which is
+    /// a different fact from a claim its recordings refute.
+    pub checks: Vec<Asserted>,
     /// What it adds to lemonfiber's own registers.
     pub contributions: Vec<Contributed>,
     /// Whether this plugin would be installed as it stands.
@@ -211,6 +221,8 @@ pub fn claimed(path: &Path) -> Result<Claimed, Unreadable> {
     for claiming in &mut capabilities {
         claiming.filling = filled(claiming, &published, &manifest.plugin.id);
     }
+    let proofs = asserting::proved(&manifest, &root, &mut refusals);
+    let checks = asserting::checked(&manifest, &root, &mut refusals);
 
     Ok(Claimed {
         id: manifest.plugin.id.clone(),
@@ -219,25 +231,39 @@ pub fn claimed(path: &Path) -> Result<Claimed, Unreadable> {
         vocabulary_version: lemonfiber_plugin::vocabulary::VOCABULARY_VERSION,
         extension_points_version: lemonfiber_plugin::extension::EXTENSION_POINTS_VERSION,
         against: Evidence::Recordings,
-        installable: installs(&refusals, &capabilities),
+        installable: installs(&refusals, &capabilities, &proofs),
         refusals,
         capabilities,
+        proofs,
+        checks,
         contributions: manifest.contributions.iter().map(contributed).collect(),
     })
 }
 
 /// Whether what was read would be installed.
 ///
-/// A refusal is the manifest contradicting what this build publishes, and a refuted
-/// claim is a service that does not do what it says — both stop an install. An unproven
-/// claim does not: nothing has been established about the service, so the capability
-/// goes unfilled and the plugin is installed without filling it, which is a different
-/// fact from the service being broken.
-fn installs(refusals: &[lemonfiber_plugin::Violation], capabilities: &[Claiming]) -> bool {
+/// A refusal is the manifest contradicting what this build publishes, a refuted claim is
+/// a service that does not do what it says, and a proof its own recording refuses is the
+/// plugin failing its own condition for being installed at all — all three stop an
+/// install. An unproven one does not, in any of the three: nothing has been established
+/// about the service, so the capability goes unfilled and the plugin is installed
+/// without filling it, which is a different fact from the service being broken.
+///
+/// A contributed check is not here. It reports on a running stack rather than gating
+/// one, so a check its recording refuses is a check finding the thing it exists to
+/// find.
+fn installs(
+    refusals: &[lemonfiber_plugin::Violation],
+    capabilities: &[Claiming],
+    proofs: &[Asserted],
+) -> bool {
     refusals.is_empty()
         && !capabilities
             .iter()
             .any(|claiming| claiming.shown == Shown::Refuted)
+        && !proofs
+            .iter()
+            .any(|proof| matches!(proof.verdict, Verdict::Failed { .. }))
 }
 
 /// The plugin's own directory and the manifest inside it.
@@ -305,63 +331,14 @@ fn against(
     root: &Path,
     refusals: &mut Vec<lemonfiber_plugin::Violation>,
 ) -> Verdict {
-    let recording = match recorded::read(root, &binding.fixture) {
-        Ok(recording) => recording,
-        Err(unrunnable) => return Verdict::Unproven { why: unrunnable.0 },
-    };
-    if let Some(wrong) = elsewhere(&recording, service, &binding.fixture) {
-        // Refused *rather than run against*. Judging it anyway would report a probe as
-        // answered by an image nobody is installing, which is the passing verdict this
-        // refusal exists to stop somebody reading.
-        // The whole refusal rather than its message, so the verdict names the recording
-        // it is about: a probe reported unproven beside a dozen others is read on its
-        // own line, away from the refusal that explains it.
-        let why = wrong.to_string();
-        refusals.push(wrong);
-        return Verdict::Unproven { why };
-    }
-    if !recorded::records(&recording, &binding.request.method, &binding.request.path) {
-        return Verdict::Unproven {
-            why: format!(
-                "{} records {} {}, and this asks {} {}",
-                binding.fixture,
-                recording.request.method,
-                recording.request.path,
-                binding.request.method,
-                binding.request.path
-            ),
-        };
-    }
-    let faults = judge(&binding.expect, &recording.response);
-    if faults.is_empty() {
-        Verdict::Passed
-    } else {
-        Verdict::Failed { faults }
-    }
-}
-
-/// A recording taken from an image this manifest does not install.
-///
-/// Refused rather than run against. It passes, and the service it describes is not the
-/// one that will run — which is the shape a pin moved without re-recording takes, and
-/// nothing else would notice it.
-fn elsewhere(
-    recording: &Recording,
-    service: &Service,
-    named: &str,
-) -> Option<lemonfiber_plugin::Violation> {
-    let pinned = format!("{}@{}", service.image, service.digest);
-    if recording.recorded_from == pinned {
-        return None;
-    }
-    Some(lemonfiber_plugin::Violation {
-        location: named.to_owned(),
-        message: format!(
-            "was recorded from {}, and this manifest installs {pinned}; a recording of another \
-             build passes while describing software nobody is installing",
-            recording.recorded_from
-        ),
-    })
+    asserting::recorded_answer(
+        Some(binding.fixture.as_str()),
+        &binding.request,
+        &binding.expect,
+        Some(service),
+        root,
+        refusals,
+    )
 }
 
 /// How far a claim has been shown, from what its probes came to.

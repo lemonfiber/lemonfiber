@@ -550,7 +550,7 @@ dashboard_group = "Library"
     /// give two services of one plugin the same address.
     #[test]
     fn a_service_the_manifest_names_no_label_for_answers_on_its_own_id() {
-        let record = installed(|manifest| manifest.wiring = None);
+        let record = installed(|manifest| manifest.wirings.clear());
         assert_eq!(
             placed(record.as_ref(), "komga").map(|one| one.reached),
             Some(Some(Reached::Household {

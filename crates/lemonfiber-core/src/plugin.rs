@@ -35,7 +35,8 @@ use thiserror::Error;
 use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
-    claimed, read, Claimed, Claiming, Contributed, Evidence, Ran, Unreadable, Verdict,
+    claimed, read, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence, Ran, Unreadable,
+    Verdict,
 };
 pub use installed::{
     Already, Install, Installed, Installs, Placed, Reached, Register, Unreadable as Unrecorded,

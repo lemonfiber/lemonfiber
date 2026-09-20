@@ -16,8 +16,8 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Capabilities, Claimed, Claiming, Credential, Evidence, Installed, Installs, Points, Probe,
-    Provenance, Ran, Reached, Verdict, Vouched,
+    Asserted, Capabilities, Claimed, Claiming, Credential, Evidence, Installed, Installs, Points,
+    Probe, Provenance, Ran, Reached, Verdict, Vouched,
 };
 
 use super::Lines;
@@ -227,6 +227,29 @@ fn claims(read: &Claimed) -> Lines {
         }
     }
 
+    if !read.proofs.is_empty() {
+        lines.spaced("What must hold before it is installed");
+        for proof in &read.proofs {
+            asserted(&mut lines, proof);
+        }
+    }
+
+    if !read.checks.is_empty() {
+        lines.spaced("What it would check, every day after");
+        for check in &read.checks {
+            asserted(&mut lines, check);
+        }
+        // Said here rather than left to be inferred from the verdicts, because a check
+        // its own recording refuses reads exactly like a claim its recordings refute and
+        // is the opposite news: the recording is of a machine in the state the check
+        // exists to find, and the check found it.
+        lines.put(
+            "  A check reports on a running stack rather than gating one, so none of these \
+             decides whether this is installed."
+                .to_owned(),
+        );
+    }
+
     if !read.contributions.is_empty() {
         lines.spaced("What it adds to lemonfiber's own registers");
         for row in &read.contributions {
@@ -260,12 +283,23 @@ fn claims(read: &Claimed) -> Lines {
     lines
 }
 
+/// One proof or contributed check, and what its recording came to.
+fn asserted(lines: &mut Lines, one: &Asserted) {
+    lines.put(format!("  {} — {}", one.id, one.says));
+    lines.put(format!("    {} — {}", one.service, came_to(&one.verdict)));
+}
+
 /// One capability, its probes, and what asking for it would come to.
 fn capability(lines: &mut Lines, claiming: &Claiming) {
+    // The service, always, rather than only where a plugin declares two. A reader
+    // holding a report with one line per capability has no way to tell which container
+    // answered, and a plugin may declare two services that both offer its own
+    // namespaced name — which is two identical lines if this says nothing.
     lines.put(format!(
-        "  {}  [{}]",
+        "  {}  [{}]  on {}",
         claiming.name,
-        claiming.shown.as_str()
+        claiming.shown.as_str(),
+        claiming.service
     ));
     for ran in &claiming.probes {
         lines.put(format!("    probe {} — {}", ran.probe, verdict(ran)));
@@ -313,7 +347,18 @@ fn capability(lines: &mut Lines, claiming: &Claiming) {
 
 /// What one probe came to, in one line.
 fn verdict(ran: &Ran) -> String {
-    match &ran.verdict {
+    came_to(&ran.verdict)
+}
+
+/// What one verdict came to, in one line.
+///
+/// Named for what it answers rather than for `reached`, which is the name the
+/// service-side renderer below has and is about being reachable. Two functions
+/// called the same thing in one file, taking different types and meaning
+/// different things, is a rename waiting to be made by whoever next reads only
+/// one of them.
+fn came_to(verdict: &Verdict) -> String {
+    match verdict {
         Verdict::Passed => "the recording answers it".to_owned(),
         Verdict::Failed { faults } => format!("refuted: {}", faults.join("; ")),
         Verdict::Unproven { why } => format!("unproven: {why}"),
@@ -656,6 +701,8 @@ mod tests {
             installable: refusals.is_empty(),
             refusals,
             capabilities,
+            proofs: Vec::new(),
+            checks: Vec::new(),
             contributions: vec![Contributed {
                 at: "doctor.check".to_owned(),
                 id: "kavita:settings-guarded".to_owned(),

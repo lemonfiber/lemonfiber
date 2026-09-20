@@ -45,6 +45,15 @@ pub struct Asked {
     pub method: String,
     /// The path on the service.
     pub path: String,
+    /// The representation it was asked for, where it asked for one.
+    ///
+    /// Recorded because a service that negotiates answers two different things at one
+    /// path, and a recording that did not say which it asked for would be evidence for
+    /// whichever question somebody later pointed at it. Plex answers XML at `/identity`
+    /// and JSON at `/identity` — the same second, the same container — and the only
+    /// thing that tells the two answers apart is this.
+    #[serde(default)]
+    pub accept: Option<String>,
 }
 
 /// What came back, in the terms an expectation can constrain.
@@ -103,16 +112,32 @@ pub fn read(root: &Path, named: &str) -> Result<Recording, Unrunnable> {
 ///
 /// A recording of some other call says nothing about this one. The two have drifted,
 /// which is a thing to report rather than to judge either way.
+///
+/// What was asked for is part of *which call this is*, not a detail beside it. A
+/// recording taken without `Accept: application/json` from a service that answers XML
+/// without it is a recording of the XML, and running a JSON assertion against it would
+/// fail a probe over a header nobody sent.
 #[must_use]
-pub fn records(recording: &Recording, method: &str, path: &str) -> bool {
-    recording.request.method == method && recording.request.path == path
+pub fn records(recording: &Recording, asked: &lemonfiber_plugin::Request) -> bool {
+    recording.request.method == asked.method
+        && recording.request.path == asked.path
+        && recording.request.accept == asked.accept
+}
+
+/// A request as a refusal names it: the verb, the path, and what it asked for.
+#[must_use]
+pub fn said(method: &str, path: &str, accept: Option<&str>) -> String {
+    match accept {
+        Some(accept) => format!("{method} {path} as {accept}"),
+        None => format!("{method} {path}"),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use super::{read, records, Asked, Recording};
+    use super::{read, records, said, Asked, Recording};
 
     /// A recording written to a scratch directory, and read back the way a run reads it.
     fn kept(directory: &Path, named: &str, body: &str) {
@@ -158,7 +183,8 @@ mod tests {
             Ok((
                 Asked {
                     method: "GET".to_owned(),
-                    path: "/api/v1/series".to_owned()
+                    path: "/api/v1/series".to_owned(),
+                    accept: None,
                 },
                 401,
                 true
@@ -213,16 +239,63 @@ mod tests {
         assert!(said.contains("outside the plugin"), "got: {said}");
     }
 
+    /// One request, read the way a manifest's is rather than built here.
+    ///
+    /// `Request` refuses a field it does not know and takes its own defaults, so a
+    /// literal written beside it could name a shape a manifest cannot.
+    fn asking(method: &str, path: &str, accept: Option<&str>) -> lemonfiber_plugin::Request {
+        let quoted = accept.map_or_else(String::new, |accept| format!(r#", "accept": "{accept}""#));
+        let text = format!(r#"{{"method": "{method}", "path": "{path}"{quoted}}}"#);
+        let read = serde_json::from_str(&text);
+        assert!(read.is_ok(), "the request does not read: {read:?}");
+        read.unwrap_or_else(|_| unreachable!("asserted just above"))
+    }
+
     #[test]
     fn a_recording_of_another_call_is_not_of_this_one() {
         let recording: Result<Recording, _> = serde_json::from_str(WHOLE);
         let asked = |method: &str, path: &str| {
             recording
                 .as_ref()
-                .is_ok_and(|one| records(one, method, path))
+                .is_ok_and(|one| records(one, &asking(method, path, None)))
         };
         assert!(asked("GET", "/api/v1/series"), "the call it records");
         assert!(!asked("POST", "/api/v1/series"), "another method");
         assert!(!asked("GET", "/api/v1/libraries"), "another path");
+    }
+
+    /// What was asked for is part of which call a recording is of.
+    ///
+    /// Both directions, because only one of them is the mistake anybody would make: a
+    /// recording taken plainly is not evidence for a request that negotiates, and a
+    /// recording that negotiated is not evidence for one that did not.
+    #[test]
+    fn a_recording_that_asked_for_something_else_is_of_another_call() {
+        let plain: Result<Recording, _> = serde_json::from_str(WHOLE);
+        let negotiated: Result<Recording, _> = serde_json::from_str(&WHOLE.replace(
+            r#""path": "/api/v1/series" }"#,
+            r#""path": "/api/v1/series", "accept": "application/json" }"#,
+        ));
+        assert!(
+            negotiated.is_ok(),
+            "the recording does not read: {negotiated:?}"
+        );
+        let json = asking("GET", "/api/v1/series", Some("application/json"));
+        let bare = asking("GET", "/api/v1/series", None);
+
+        assert!(plain.as_ref().is_ok_and(|one| records(one, &bare)));
+        assert!(!plain.as_ref().is_ok_and(|one| records(one, &json)));
+        assert!(negotiated.as_ref().is_ok_and(|one| records(one, &json)));
+        assert!(!negotiated.as_ref().is_ok_and(|one| records(one, &bare)));
+    }
+
+    /// A refusal says what was asked for where anything was, and nothing where not.
+    #[test]
+    fn a_request_is_named_with_what_it_asked_for() {
+        assert_eq!(said("GET", "/identity", None), "GET /identity");
+        assert_eq!(
+            said("GET", "/identity", Some("application/json")),
+            "GET /identity as application/json"
+        );
     }
 }
