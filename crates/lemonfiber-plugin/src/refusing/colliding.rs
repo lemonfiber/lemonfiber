@@ -66,12 +66,16 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
 /// costs is that the thing behind `watch` is no longer the thing that was behind
 /// `watch` — with both services running, both healthy, and nothing failing.
 fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
+    // Every declared wiring rather than the one a manifest used to be able to
+    // hold. A plugin with two services has a stanza each, and checking the first
+    // would leave the second free to take a name the stack already answers on —
+    // which is the collision this exists to refuse, arrived at by the back door.
     let taken = manifest
-        .wiring
-        .as_ref()
-        .and_then(|wiring| wiring.hostname.as_deref())
+        .wirings
+        .iter()
+        .filter_map(|wiring| wiring.hostname.as_deref())
         .filter(|label| bundled::answering(label));
-    if let Some(hostname) = taken {
+    for hostname in taken {
         found.push(Violation {
             location: "wiring.hostname".to_owned(),
             message: format!(

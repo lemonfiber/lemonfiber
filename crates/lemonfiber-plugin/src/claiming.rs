@@ -17,7 +17,7 @@
 
 mod contributing;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::schema::{Claim, Expect, Manifest, Service};
 use crate::vocabulary::{self, Capability, Constraint, Probe, Removed};
@@ -101,13 +101,28 @@ fn core(name: &str, at: &str, removed: &[Removed], found: &mut Vec<Violation>) {
 /// stands alone: a core name nothing demonstrates asserts, and a claim for a name no
 /// service declares demonstrates something nobody said.
 fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
-    let declared: BTreeSet<&str> = manifest
-        .services
-        .iter()
-        .flat_map(|service| &service.provides)
-        .map(String::as_str)
-        .filter(|name| vocabulary::is_core_name(name))
-        .collect();
+    let mut declared: BTreeMap<&str, &str> = BTreeMap::new();
+    for service in &manifest.services {
+        for name in service
+            .provides
+            .iter()
+            .map(String::as_str)
+            .filter(|name| vocabulary::is_core_name(name))
+        {
+            if let Some(first) = declared.insert(name, service.id.as_str()) {
+                found.push(Violation {
+                    location: format!("service {}.provides", service.id),
+                    message: format!(
+                        "{name} is a core capability and {first} already declares it; something \
+                         asks for one of these by name and exactly one service answers, so two \
+                         services of one plugin is not a choice an operator could make — it is \
+                         two answers to one question, decided here rather than contested on their \
+                         machine"
+                    ),
+                });
+            }
+        }
+    }
 
     let mut claimed: BTreeSet<&str> = BTreeSet::new();
     for claim in &manifest.claims {
@@ -130,7 +145,7 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
                 message: format!("{} is claimed twice", claim.capability),
             });
         }
-        if !declared.contains(claim.capability.as_str()) {
+        if !declared.contains_key(claim.capability.as_str()) {
             found.push(Violation {
                 location: at.clone(),
                 message: format!(
@@ -147,9 +162,9 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
     }
 
-    for name in declared.difference(&claimed) {
+    for (name, service) in declared.iter().filter(|(name, _)| !claimed.contains(*name)) {
         found.push(Violation {
-            location: format!("service provides {name}"),
+            location: format!("service {service}.provides"),
             message: format!(
                 "{name} is declared and demonstrated by no [[claim]]; a capability is \
                  demonstrated, not asserted"

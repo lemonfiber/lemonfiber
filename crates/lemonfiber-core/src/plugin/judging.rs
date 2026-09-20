@@ -9,10 +9,18 @@
 //! whoever is looking at this is holding a recording and a manifest and deciding which
 //! of them is wrong, and one fault at a time makes that a guessing game.
 
+use lemonfiber_plugin::pointing::{self, Step};
 use lemonfiber_plugin::{Expect, Expected, Kind};
 use serde_json::Value;
 
 use super::recorded::Answer;
+
+/// The most of a value a refusal prints before it stops being readable.
+///
+/// A refusal is read by somebody holding a manifest and a recording and deciding which
+/// of the two is wrong. Plex answers a hundred and fifty-one settings at `/:/prefs`, and
+/// a refusal that printed all of them said everything and showed nothing.
+const READABLE: usize = 120;
 
 /// Every way this answer is not the one the expectation declared.
 ///
@@ -35,47 +43,57 @@ pub fn judge(expect: &Expect, answer: &Answer) -> Vec<String> {
     faults
 }
 
-/// The keys an answer must carry with the exact value it must hold.
+/// The places an answer must carry with the exact value it must hold.
 fn exact(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
     let Some(wanted) = &expect.json else { return };
     for (key, value) in wanted {
         match held(answer, key) {
-            None => faults.push(format!("the body carries no {key}")),
-            Some(found) if !same(value, found) => {
-                faults.push(format!("{key} is {found}, and it declares {}", said(value)));
+            Err(missing) => faults.push(missing.about(key)),
+            Ok(found) if !same(value, found) => {
+                faults.push(format!(
+                    "{key} is {}, and it declares {}",
+                    readable(found),
+                    said(value)
+                ));
             }
-            Some(_) => {}
+            Ok(_) => {}
         }
     }
 }
 
-/// The keys an answer must carry, whatever they hold, and the kinds they must be.
+/// The places an answer must carry, whatever they hold, and the kinds they must be.
 fn keys(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
     for key in expect.json_has_keys.iter().flatten() {
-        if held(answer, key).is_none() {
-            faults.push(format!("the body carries no {key}"));
+        if let Err(missing) = held(answer, key) {
+            faults.push(missing.about(key));
         }
     }
     for (key, kind) in expect.json_types.iter().flatten() {
         match held(answer, key) {
-            None => faults.push(format!("the body carries no {key}")),
-            Some(found) if !is_kind(found, *kind) => faults.push(format!(
+            Err(missing) => faults.push(missing.about(key)),
+            Ok(found) if !is_kind(found, *kind) => faults.push(format!(
                 "{key} is {}, and it declares {}",
                 kind_of(found),
                 kind_said(*kind)
             )),
-            Some(_) => {}
+            Ok(_) => {}
         }
     }
     for (key, least) in expect.json_at_least.iter().flatten() {
-        match held(answer, key).and_then(Value::as_i64) {
-            None => faults.push(format!("the body carries no number at {key}")),
-            Some(found) if found < *least => {
-                faults.push(format!(
-                    "{key} is {found}, and it declares at least {least}"
-                ));
-            }
-            Some(_) => {}
+        match held(answer, key) {
+            Err(missing) => faults.push(missing.about(key)),
+            Ok(found) => match found.as_i64() {
+                None => faults.push(format!(
+                    "{key} is {}, and it declares at least {least}",
+                    readable(found)
+                )),
+                Some(found) if found < *least => {
+                    faults.push(format!(
+                        "{key} is {found}, and it declares at least {least}"
+                    ));
+                }
+                Some(_) => {}
+            },
         }
     }
 }
@@ -122,9 +140,129 @@ fn served(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
     }
 }
 
-/// What the body holds at a key, where the body is an object that has one.
-fn held<'a>(answer: &'a Answer, key: &str) -> Option<&'a Value> {
-    answer.json.as_ref()?.as_object()?.get(key)
+/// Why an answer holds nothing at the place a key names.
+///
+/// Two, and the difference is whose fault it is. A key that names no place is a
+/// manifest this build would refuse to read — reported here as well, because an
+/// assertion nothing can evaluate must not come back as one that held. Everything else
+/// is the answer, and what is worth saying about it is how far the way there got: *no
+/// `MediaContainer`* and *`/MediaContainer/Setting` holds no entry whose `id` is that*
+/// are the same verdict and different mornings.
+enum Missing {
+    /// The key names no place at all.
+    Unreadable(String),
+    /// The way there ran out, with what was reached before it did. Empty where it ran
+    /// out at once, which is the flat case and wants no clause at all.
+    Ran(String),
+}
+
+impl Missing {
+    /// What to say about the key this happened to.
+    fn about(&self, key: &str) -> String {
+        match self {
+            Self::Unreadable(why) => format!("{key} names no place in an answer: {why}"),
+            Self::Ran(clause) if clause.is_empty() => format!("the body carries no {key}"),
+            Self::Ran(clause) => format!("the body carries no {key}: {clause}"),
+        }
+    }
+}
+
+/// What the body holds at the place a key names.
+///
+/// A key is read by [`pointing`]: a plain name is a top-level member, which is what
+/// every key written before this generation is, and one beginning with `/` is a JSON
+/// Pointer that may pick an entry of a list by a field it holds.
+fn held<'a>(answer: &'a Answer, key: &str) -> Result<&'a Value, Missing> {
+    let steps = pointing::steps(key).map_err(|why| Missing::Unreadable(why.0))?;
+    let Some(body) = answer.json.as_ref() else {
+        return Err(Missing::Ran(
+            "the body did not parse as a document".to_owned(),
+        ));
+    };
+
+    let mut at = body;
+    for (taken, step) in steps.iter().enumerate() {
+        // Named only where the walk stops, because naming it is what a refusal wants
+        // and every other step throws the string away. `get` rather than a slice: the
+        // range comes from this loop's own index and cannot be out of bounds, and a
+        // line that cannot panic beats a sentence saying why it could not.
+        let reached = || place(steps.get(..taken).unwrap_or_default());
+        at = match step {
+            Step::Named(name) => match at.as_object() {
+                None => return Err(Missing::Ran(format!("{} is {}", reached(), kind_of(at)))),
+                Some(object) => object.get(name).ok_or_else(|| {
+                    // Nothing was walked, so there is nowhere to name and the plain
+                    // sentence says the whole of it.
+                    Missing::Ran(if taken == 0 {
+                        String::new()
+                    } else {
+                        format!("{} holds no {name}", reached())
+                    })
+                })?,
+            },
+            Step::Selected { field, value } => {
+                let Some(entries) = at.as_array() else {
+                    return Err(Missing::Ran(format!(
+                        "{} is {}, and a selector picks an entry of a list",
+                        reached(),
+                        kind_of(at)
+                    )));
+                };
+                let mut matched = entries
+                    .iter()
+                    .filter(|entry| entry.get(field).is_some_and(|held| is(held, value)));
+                let first = matched.next().ok_or_else(|| {
+                    Missing::Ran(format!(
+                        "{} holds no entry whose {field} is {value:?}",
+                        reached()
+                    ))
+                })?;
+                let rest = matched.count();
+                if rest > 0 {
+                    return Err(Missing::Ran(format!(
+                        "{} holds {} entries whose {field} is {value:?}, and a selector picks one",
+                        reached(),
+                        rest + 1
+                    )));
+                }
+                first
+            }
+        };
+    }
+    Ok(at)
+}
+
+/// What to call the place a walk reached, where it reached one.
+fn place(walked: &[Step]) -> String {
+    if walked.is_empty() {
+        return "the body".to_owned();
+    }
+    pointing::said(walked)
+}
+
+/// Whether an entry's field holds the value a selector names.
+///
+/// A selector's value is written as text, because a key is text. What it is compared
+/// against is whatever the answer holds, so the three scalars each have their own
+/// reading and nothing else matches: an object or a list is not a thing a key can spell,
+/// and `null` is the absence a selector is looking past.
+fn is(held: &Value, wanted: &str) -> bool {
+    match held {
+        Value::String(word) => word == wanted,
+        Value::Number(number) => number.to_string() == wanted,
+        Value::Bool(flag) => flag.to_string() == wanted,
+        _ => false,
+    }
+}
+
+/// A value as a refusal prints it, cut where it stops being readable.
+fn readable(found: &Value) -> String {
+    let whole = found.to_string();
+    if whole.chars().count() <= READABLE {
+        return whole;
+    }
+    let kept: String = whole.chars().take(READABLE).collect();
+    format!("{kept}… ({} characters in all)", whole.chars().count())
 }
 
 /// Whether a value is the one an expectation names.
@@ -465,6 +603,248 @@ mod tests {
         );
         let faults = judge(&expect, &answered(r#"{"status": 200, "json": {}}"#));
         assert_eq!(faults.len(), 4, "got: {faults:?}");
+    }
+
+    /// A place one level down, which is what most of the web answers with.
+    ///
+    /// The whole of what the flat vocabulary could say about this body was that
+    /// `MediaContainer` was there, which is a probe passing because something replied.
+    #[test]
+    fn a_pointer_reaches_a_place_inside_the_answer() {
+        let plex = answered(
+            r#"{"status": 200, "json": {"MediaContainer": {"size": 0,
+                "machineIdentifier": "1b9acc58", "claimed": false}}}"#,
+        );
+        let faults = judge(
+            &expects(
+                r#"{"status": 200,
+                    "json": {"/MediaContainer/claimed": false},
+                    "json_has_keys": ["/MediaContainer/machineIdentifier"],
+                    "json_types": {"/MediaContainer/machineIdentifier": "str"},
+                    "json_at_least": {"/MediaContainer/size": 0}}"#,
+            ),
+            &plex,
+        );
+        assert_eq!(faults, Vec::<String>::new());
+    }
+
+    /// The same place, holding something else, named as the place rather than as a key.
+    #[test]
+    fn a_place_holding_something_else_is_named_by_the_key_that_reached_it() {
+        let faults = judge(
+            &expects(r#"{"json": {"/MediaContainer/claimed": true}}"#),
+            &answered(r#"{"status": 200, "json": {"MediaContainer": {"claimed": false}}}"#),
+        );
+        assert_eq!(
+            faults,
+            vec!["/MediaContainer/claimed is false, and it declares true"]
+        );
+    }
+
+    /// A key that is not a pointer still means the top-level member of that name.
+    ///
+    /// The property every manifest written before pointers existed depends on, asked
+    /// of a key with a dot in it because that is the one that would change meaning
+    /// under a dotted-path reading.
+    #[test]
+    fn a_key_that_is_not_a_pointer_is_still_a_top_level_name() {
+        let answer = answered(r#"{"status": 200, "json": {"MediaContainer.size": 3}}"#);
+        assert_eq!(
+            judge(&expects(r#"{"json": {"MediaContainer.size": 3}}"#), &answer),
+            Vec::<String>::new()
+        );
+        // And reaches nothing where the body nests instead, rather than quietly
+        // resolving a path somebody did not write.
+        let nested = answered(r#"{"status": 200, "json": {"MediaContainer": {"size": 3}}}"#);
+        assert_eq!(
+            judge(
+                &expects(r#"{"json_has_keys": ["MediaContainer.size"]}"#),
+                &nested
+            ),
+            vec!["the body carries no MediaContainer.size"]
+        );
+    }
+
+    /// The selector, against the answer it was written for.
+    ///
+    /// A hundred and fifty-one settings, found by the `id` one of them carries. The
+    /// value is compared as text against whatever the entry holds, so a flag, a number
+    /// and a word each have their own reading and each is asked for here.
+    #[test]
+    fn a_selector_picks_the_one_entry_a_field_names() {
+        let prefs = answered(
+            r#"{"status": 200, "json": {"MediaContainer": {"size": 3, "Setting": [
+                {"id": "FriendlyName", "value": ""},
+                {"id": "PublishServerOnPlexOnlineKey", "value": false},
+                {"id": "TranscoderQuality", "value": 3}]}}}"#,
+        );
+        let faults = judge(
+            &expects(
+                r#"{"json": {
+                    "/MediaContainer/Setting/[id=PublishServerOnPlexOnlineKey]/value": false,
+                    "/MediaContainer/Setting/[id=TranscoderQuality]/value": 3,
+                    "/MediaContainer/Setting/[id=FriendlyName]/value": ""}}"#,
+            ),
+            &prefs,
+        );
+        assert_eq!(faults, Vec::<String>::new());
+
+        // Picking by a number and by a flag, which is the other half of the comparison.
+        let byvalue = judge(
+            &expects(r#"{"json": {"/MediaContainer/Setting/[value=3]/id": "TranscoderQuality"}}"#),
+            &prefs,
+        );
+        assert_eq!(byvalue, Vec::<String>::new());
+        let byflag = judge(
+            &expects(
+                r#"{"json": {"/MediaContainer/Setting/[value=false]/id":
+                    "PublishServerOnPlexOnlineKey"}}"#,
+            ),
+            &prefs,
+        );
+        assert_eq!(byflag, Vec::<String>::new());
+
+        // And the setting turned on, which is the whole reason the check exists.
+        let published = answered(
+            r#"{"status": 200, "json": {"MediaContainer": {"Setting": [
+                {"id": "PublishServerOnPlexOnlineKey", "value": true}]}}}"#,
+        );
+        assert_eq!(
+            judge(
+                &expects(
+                    r#"{"json": {
+                        "/MediaContainer/Setting/[id=PublishServerOnPlexOnlineKey]/value": false}}"#
+                ),
+                &published
+            ),
+            vec![
+                "/MediaContainer/Setting/[id=PublishServerOnPlexOnlineKey]/value is true, \
+                 and it declares false"
+            ]
+        );
+    }
+
+    /// Every way the way there can run out, each saying where it stopped.
+    ///
+    /// A verdict of *the body carries no …* and nothing else is what a reader gets from
+    /// a flat lookup, and against a nested answer it is the least useful true sentence
+    /// available: it does not say whether the envelope was there.
+    #[test]
+    fn a_place_that_cannot_be_reached_says_how_far_it_got() {
+        let body = answered(
+            r#"{"status": 200, "json": {"MediaContainer": {"size": 0, "title": "Plex",
+                "Setting": [{"id": "a", "value": 1}, {"id": "b", "value": 1}]}}}"#,
+        );
+        let asked = |key: &str| {
+            judge(
+                &expects(&format!(r#"{{"json_has_keys": ["{key}"]}}"#)),
+                &body,
+            )
+        };
+        assert_eq!(
+            asked("/MediaContainer/nowhere"),
+            vec!["the body carries no /MediaContainer/nowhere: /MediaContainer holds no nowhere"]
+        );
+        assert_eq!(
+            asked("/MediaContainer/title/deeper"),
+            vec![
+                "the body carries no /MediaContainer/title/deeper: /MediaContainer/title is a \
+                 string"
+            ]
+        );
+        assert_eq!(
+            asked("/MediaContainer/[id=a]"),
+            vec![
+                "the body carries no /MediaContainer/[id=a]: /MediaContainer is an object, and a \
+                 selector picks an entry of a list"
+            ]
+        );
+        assert_eq!(
+            asked("/MediaContainer/Setting/[id=nobody]/value"),
+            vec![
+                "the body carries no /MediaContainer/Setting/[id=nobody]/value: \
+                 /MediaContainer/Setting holds no entry whose id is \"nobody\""
+            ]
+        );
+        assert_eq!(
+            asked("/MediaContainer/Setting/[value=1]/id"),
+            vec![
+                "the body carries no /MediaContainer/Setting/[value=1]/id: \
+                 /MediaContainer/Setting holds 2 entries whose value is \"1\", and a selector \
+                 picks one"
+            ]
+        );
+        // The first step, where there is nowhere to name and the plain sentence is the
+        // whole of it — the wording every manifest written before pointers relies on.
+        assert_eq!(asked("nowhere"), vec!["the body carries no nowhere"]);
+        // The body itself being the wrong shape, which is a different sentence again.
+        let list = answered(r#"{"status": 200, "json": [1, 2]}"#);
+        assert_eq!(
+            judge(&expects(r#"{"json_has_keys": ["content"]}"#), &list),
+            vec!["the body carries no content: the body is a list"]
+        );
+        let nothing = answered(r#"{"status": 204}"#);
+        assert_eq!(
+            judge(&expects(r#"{"json_has_keys": ["content"]}"#), &nothing),
+            vec!["the body carries no content: the body did not parse as a document"]
+        );
+    }
+
+    /// A key that names no place is a fault rather than a place that is absent.
+    ///
+    /// The manifest reader refuses one before anything is run. This is the second
+    /// answer to the same question, for the callers that did not come through it: an
+    /// assertion nothing can evaluate must not read as one that held.
+    #[test]
+    fn a_key_naming_no_place_is_a_fault_that_says_so() {
+        let faults = judge(
+            &expects(r#"{"json_has_keys": ["/Setting[id=x]"]}"#),
+            &answered(r#"{"status": 200, "json": {}}"#),
+        );
+        assert_eq!(faults.len(), 1, "got: {faults:?}");
+        assert!(
+            faults.first().is_some_and(
+                |said| said.contains("names no place in an answer") && said.contains("bracket")
+            ),
+            "got: {faults:?}"
+        );
+    }
+
+    /// A number asked of something that is not one says what is there.
+    #[test]
+    fn a_place_holding_no_number_cannot_answer_a_minimum() {
+        let faults = judge(
+            &expects(r#"{"json_at_least": {"/MediaContainer/title": 1}}"#),
+            &answered(r#"{"status": 200, "json": {"MediaContainer": {"title": "Plex"}}}"#),
+        );
+        assert_eq!(
+            faults,
+            vec![r#"/MediaContainer/title is "Plex", and it declares at least 1"#]
+        );
+    }
+
+    /// A refusal is read by somebody deciding which of two documents is wrong.
+    ///
+    /// Plex answers a hundred and fifty-one settings at one path, and the refusal that
+    /// printed all of them said everything and showed nothing. Both sides of the cut
+    /// are asked for, because a cap that always fired would be as useless as none.
+    #[test]
+    fn a_refusal_prints_no_more_of_a_value_than_can_be_read() {
+        let short = judge(
+            &expects(r#"{"json": {"a": "x"}}"#),
+            &answered(r#"{"status": 200, "json": {"a": "short"}}"#),
+        );
+        assert_eq!(short, vec![r#"a is "short", and it declares "x""#]);
+
+        let long: String = std::iter::repeat_n("settings", 60).collect();
+        let faults = judge(
+            &expects(r#"{"json": {"a": "x"}}"#),
+            &answered(&format!(r#"{{"status": 200, "json": {{"a": "{long}"}}}}"#)),
+        );
+        let said = faults.first().cloned().unwrap_or_default();
+        assert!(said.contains('…'), "it was cut: {said}");
+        assert!(said.contains("characters in all"), "and says so: {said}");
+        assert!(said.chars().count() < 200, "and is readable: {said}");
     }
 
     /// An expectation that says nothing judges nothing, which is why the vocabulary
