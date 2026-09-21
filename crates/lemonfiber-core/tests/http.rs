@@ -25,6 +25,9 @@ enum Reply {
     /// An empty response that sets this cookie, so what a later request carries
     /// back can be looked at.
     Setting(&'static str),
+    /// An empty response carrying one header whose value is text and one whose value
+    /// is not, so what the reading does with each can be looked at.
+    Unreadable,
 }
 
 /// A running fake server on localhost, and the request it captured.
@@ -103,20 +106,30 @@ async fn served(listener: &TcpListener, reply: Reply, captured: &Arc<Mutex<Strin
         text.clone_into(&mut guard);
     }
 
-    let bytes = match reply {
-        Reply::Whole(status, body) => {
-            format!(
-                "HTTP/1.1 {status} X\r\nContent-Length: {}\r\n\r\n{body}",
-                body.len()
-            )
-        }
+    let bytes: Vec<u8> = match reply {
+        Reply::Whole(status, body) => format!(
+            "HTTP/1.1 {status} X\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        )
+        .into_bytes(),
         // Promise a hundred bytes, send five, then close.
-        Reply::Truncated => "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nshort".to_owned(),
+        Reply::Truncated => b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nshort".to_vec(),
         Reply::Setting(cookie) => {
             format!("HTTP/1.1 200 X\r\nSet-Cookie: {cookie}\r\nContent-Length: 0\r\n\r\n")
+                .into_bytes()
+        }
+        // Bytes no UTF-8 sequence may hold, written straight into a header value.
+        // Permitted on the wire and sent in practice by anything that puts a name
+        // from a non-UTF-8 locale into a header, which is why the reading has to
+        // decide something about them rather than assume they cannot arrive.
+        Reply::Unreadable => {
+            let mut said =
+                b"HTTP/1.1 200 X\r\nContent-Type: text/plain\r\nX-Served-By: \xff\xfe".to_vec();
+            said.extend_from_slice(b"\r\nContent-Length: 0\r\n\r\n");
+            said
         }
     };
-    let _ = socket.write_all(bytes.as_bytes()).await;
+    let _ = socket.write_all(&bytes).await;
     let _ = socket.flush().await;
     let _ = socket.shutdown().await;
 }
@@ -168,6 +181,37 @@ async fn a_get_returns_the_status_and_the_body() {
     assert!(
         sent.starts_with("GET "),
         "a GET was actually sent: {sent:?}"
+    );
+}
+
+/// A header whose value is not text is dropped, and the one beside it is kept.
+///
+/// What a caller does with a header is hold it against something a manifest spelled
+/// out, and a replacement character compared against a declared value is a mismatch
+/// neither side can explain from what it can see. So it is left out — and the
+/// readable header is asserted from the same answer, because "left out" has to be
+/// the reading working rather than the reading having stopped at the first header it
+/// could not make sense of.
+#[tokio::test]
+async fn a_header_whose_value_is_not_text_is_dropped_and_its_neighbour_is_kept() {
+    let server = serve(Reply::Unreadable).await;
+    let response = Web::new().send(&asking(&server.base)).await.ok();
+    server.stop().await;
+
+    assert_eq!(response.as_ref().map(|answer| answer.status), Some(200));
+    assert_eq!(
+        response
+            .as_ref()
+            .and_then(|answer| answer.header("content-type")),
+        Some("text/plain"),
+        "the readable header came back"
+    );
+    assert_eq!(
+        response
+            .as_ref()
+            .and_then(|answer| answer.header("x-served-by")),
+        None,
+        "and the one that is not text was left out rather than mangled"
     );
 }
 

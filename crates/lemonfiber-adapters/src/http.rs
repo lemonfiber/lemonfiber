@@ -137,8 +137,27 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
     // answer.
     let response = builder.send().await.map_err(|error| unreachable(&error))?;
     let status = response.status().as_u16();
+    // Read before the body, because reading the body consumes the response. A header
+    // whose value is not text is dropped rather than lossily rendered: what a caller
+    // does with one of these is compare it to something a manifest spelled out, and a
+    // replacement character compared against a declared media type would be a
+    // mismatch nobody could explain from either side.
+    let headers = response
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|value| (name.as_str().to_owned(), value.to_owned()))
+        })
+        .collect();
     let body = response.text().await.map_err(|error| unreachable(&error))?;
-    Ok(Response { status, body })
+    Ok(Response {
+        status,
+        headers,
+        body,
+    })
 }
 
 /// The whole of a URL's query, where it carries one.

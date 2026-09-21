@@ -545,6 +545,7 @@ mod tests {
             if next.is_empty() {
                 return Ok(crate::ports::http::Response {
                     status: 200,
+                    headers: Vec::new(),
                     body: "<?xml version=\"1.0\"?><rss><channel><item>a</item></channel></rss>"
                         .to_owned(),
                 });

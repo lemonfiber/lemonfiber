@@ -44,6 +44,19 @@ pub struct Request {
 pub struct Response {
     /// The status code, whatever it was — a refusal is still an answer.
     pub status: u16,
+    /// The headers it answered with.
+    ///
+    /// The mirror of the request's, and it exists for the same reason that one does.
+    /// A request may ask for a representation; without this, nothing could see which
+    /// one came back — so a caller that asked for a document and was handed an
+    /// application shell had no way to tell, and would read the shell as the document.
+    /// A service that answers two different things at one path is ordinary rather than
+    /// exotic, and the only thing that tells the two answers apart is here.
+    ///
+    /// A list rather than a map, and in the order they arrived, because a header may
+    /// be sent more than once and folding them would make what came back depend on
+    /// which copy was read last.
+    pub headers: Vec<(String, String)>,
     /// The body it returned.
     pub body: String,
 }
@@ -53,6 +66,23 @@ impl Response {
     #[must_use]
     pub const fn is_success(&self) -> bool {
         self.status >= 200 && self.status < 300
+    }
+
+    /// What one header holds, whatever case the service spelled its name in.
+    ///
+    /// Header names are case-insensitive on the wire and every service spells them
+    /// differently, so the matching is done here rather than at each caller — a rule
+    /// each of them has to remember is a rule that holds until one of them forgets.
+    ///
+    /// The first, where a header arrived more than once. Which is the right answer for
+    /// the one this is used for: a content type is singular, and a second one is a
+    /// service contradicting itself rather than adding to what it said.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(held, _)| held.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
     }
 }
 
@@ -116,25 +146,55 @@ impl Http for std::sync::Arc<dyn Http> {
 mod tests {
     use super::{Method, Request, Response, Unreachable};
 
+    /// An answer with nothing said about how it was served.
+    fn answered(status: u16) -> Response {
+        Response {
+            status,
+            headers: Vec::new(),
+            body: String::new(),
+        }
+    }
+
     #[test]
     fn a_two_hundred_is_a_success_and_a_refusal_is_not() {
-        assert!(Response {
-            status: 200,
-            body: String::new()
-        }
-        .is_success());
-        assert!(Response {
-            status: 204,
-            body: String::new()
-        }
-        .is_success());
+        assert!(answered(200).is_success());
+        assert!(answered(204).is_success());
         for status in [199, 300, 401, 500] {
-            assert!(!Response {
-                status,
-                body: String::new()
-            }
-            .is_success());
+            assert!(!answered(status).is_success());
         }
+    }
+
+    /// Whatever case the service spelled the name in, and the first where it repeated.
+    #[test]
+    fn a_header_is_found_however_the_service_spelled_its_name() {
+        let response = Response {
+            status: 200,
+            headers: vec![
+                ("Content-Type".to_owned(), "application/json".to_owned()),
+                ("content-type".to_owned(), "text/xml".to_owned()),
+                ("X-Served-By".to_owned(), "plex".to_owned()),
+            ],
+            body: String::new(),
+        };
+        assert_eq!(response.header("content-type"), Some("application/json"));
+        assert_eq!(response.header("CONTENT-TYPE"), Some("application/json"));
+        assert_eq!(response.header("x-served-by"), Some("plex"));
+    }
+
+    /// And a header nothing sent is absent rather than empty.
+    ///
+    /// The half that decides whether the reading means anything: a lookup answering
+    /// `Some("")` for a header that never arrived would let a caller conclude the
+    /// service said something it did not.
+    #[test]
+    fn a_header_the_service_did_not_send_is_absent() {
+        assert_eq!(answered(200).header("content-type"), None);
+        let response = Response {
+            status: 200,
+            headers: vec![("Content-Length".to_owned(), "0".to_owned())],
+            body: String::new(),
+        };
+        assert_eq!(response.header("content-type"), None);
     }
 
     #[test]

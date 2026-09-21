@@ -23,6 +23,21 @@ use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
 pub enum Answer {
     /// A response with this status and body.
     Reply(u16, String),
+    /// The same, said to have been served as this media type.
+    ///
+    /// For the code that reads what came back rather than only what it says. A
+    /// service answering XML unless a caller asks for JSON is the ordinary case, and
+    /// a fake that could not say what it served could not exercise the reading of it
+    /// — which would leave the reading tested only against the answer it was already
+    /// expecting.
+    Served {
+        /// The status.
+        status: u16,
+        /// What the `content-type` header carried.
+        content_type: String,
+        /// The body.
+        body: String,
+    },
     /// Nothing at all — the service is not there.
     Silent,
 }
@@ -35,6 +50,16 @@ impl Answer {
     #[must_use]
     pub fn reply(status: u16, body: impl Into<String>) -> Self {
         Self::Reply(status, body.into())
+    }
+
+    /// A response, said to have been served as this media type.
+    #[must_use]
+    pub fn served(status: u16, content_type: impl Into<String>, body: impl Into<String>) -> Self {
+        Self::Served {
+            status,
+            content_type: content_type.into(),
+            body: body.into(),
+        }
     }
 }
 
@@ -253,7 +278,20 @@ impl Http for Fake {
 /// The answer this fixture was built to give, as the port carries it.
 fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> {
     match answer {
-        Answer::Reply(status, body) => Ok(Response { status, body }),
+        Answer::Reply(status, body) => Ok(Response {
+            status,
+            headers: Vec::new(),
+            body,
+        }),
+        Answer::Served {
+            status,
+            content_type,
+            body,
+        } => Ok(Response {
+            status,
+            headers: vec![("content-type".to_owned(), content_type)],
+            body,
+        }),
         Answer::Silent => Err(Unreachable {
             url: request.url.clone(),
             reason: "connection refused".to_owned(),
