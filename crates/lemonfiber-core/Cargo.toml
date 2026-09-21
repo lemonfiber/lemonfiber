@@ -21,7 +21,7 @@ argon2 = { workspace = true }
 ring = "0.17"
 # Decoding the base64 a PEM key and a registry's signature annotation are carried
 # in. Already in the tree through the HTTP stack.
-base64 = "0.22"
+base64 = "0.23"
 async-trait = { workspace = true }
 jiff = { workspace = true }
 crc32fast = "1"
