@@ -80,6 +80,7 @@ what to do about it, is written for operators at
 - `LIFE-4`
 - `LIFE-5`
 - `LIFE-6`
+- `PLUGIN-1`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

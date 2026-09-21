@@ -178,6 +178,18 @@ const CATEGORIES: &[&str] = &[
     "config",
 ];
 
+/// What a contributed check's timeout is bounded to.
+///
+/// Published as the value rather than as something to go and find, so the register
+/// that runs a row is held to these bounds without a lookup — and a lookup that came
+/// back with nothing cannot become a reason to fall back to some other number. The
+/// point below is built from this, so there is one of it.
+pub const CHECK_TIMEOUT: Limits = Limits {
+    min: 1,
+    max: 30,
+    default: 10,
+};
+
 /// The capability a manifest asks for in order to contribute at either point.
 ///
 /// One name for both, because what it stands for is the doctor reading rows it did not
@@ -198,11 +210,7 @@ const DOCTOR_CHECK: Point = Point {
         optional: &["timeout_s", "service"],
         bounds: &[Bounded {
             field: "timeout_s",
-            limits: Limits {
-                min: 1,
-                max: 30,
-                default: 10,
-            },
+            limits: CHECK_TIMEOUT,
         }],
         enums: &[Closed {
             field: "category",
@@ -327,6 +335,21 @@ mod tests {
                 )
             });
         assert_eq!(bounds, Some(("timeout_s", 1, 30, 10)));
+    }
+
+    /// The bound the register is held to is the bound the artefact publishes.
+    ///
+    /// One value under two names would be two numbers to keep in step, and the one
+    /// that fell behind would be the one actually bounding a run — leaving the
+    /// published document describing a limit nothing applies.
+    #[test]
+    fn the_published_bound_and_the_one_a_runner_reads_are_the_same_value() {
+        let published = POINTS
+            .iter()
+            .find(|point| point.name == super::check())
+            .and_then(|point| point.row.bounds.first())
+            .map(|bound| bound.limits);
+        assert_eq!(published, Some(super::CHECK_TIMEOUT));
     }
 
     #[test]

@@ -262,9 +262,6 @@ mod tests {
         // And the two shapes are told apart, which is what the kept dot is for.
         assert!(emitted.contains("services.releases"));
         assert!(emitted.contains("services.releases."));
-        // And the two shapes are told apart, which is what the kept dot is for.
-        assert!(emitted.contains("services.releases"));
-        assert!(emitted.contains("services.releases."));
     }
 
     /// A bundled identity never carries a colon, which is what makes a namespaced

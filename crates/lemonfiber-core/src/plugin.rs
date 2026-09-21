@@ -18,9 +18,13 @@
 //! one, because a plugin author will trust it.
 
 mod claimed;
-mod judging;
+// Reachable from the diagnostics register as well as from here. A plugin's row is
+// judged by the one evaluator its recordings are judged by, and the answer a live
+// service gives is read into the one shape a recorded answer is read into — which is
+// the whole of what keeps a contributed check from needing an interpreter of its own.
+pub(crate) mod judging;
 mod provenance;
-mod recorded;
+pub(crate) mod recorded;
 
 use lemonfiber_manifest::Manifest;
 use schemars::schema_for;
