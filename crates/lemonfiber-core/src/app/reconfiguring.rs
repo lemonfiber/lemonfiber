@@ -140,7 +140,7 @@ fn edited(ctx: &Ctx, key: &str, found: Option<&str>, writing: &str) -> Option<Ed
 /// A record that is there but unreadable is left alone rather than judged against:
 /// it is the same loss seeding refuses to overwrite, and a change that treated it as
 /// absent would silently re-form it around whatever the file happens to hold.
-fn recorded(ctx: &Ctx) -> Option<crate::baseline::Baseline> {
+pub(super) fn recorded(ctx: &Ctx) -> Option<crate::baseline::Baseline> {
     match super::seed::load_baseline(ctx) {
         super::seed::Loaded::Formed(baseline) => Some(baseline),
         super::seed::Loaded::Fresh | super::seed::Loaded::Lost => None,

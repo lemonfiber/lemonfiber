@@ -946,6 +946,7 @@ mod tests {
                 key: "DATA_ROOT".to_owned(),
                 value: "/srv/media".to_owned(),
                 secret: false,
+                origin: crate::origin::Origin::Operator,
             }],
             written: Vec::new(),
             proof: Some(crate::validate::Validation::Valid {

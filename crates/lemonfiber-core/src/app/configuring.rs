@@ -17,6 +17,7 @@ mod proving;
 use crate::config::{env::EnvFile, port_forward_from_env, store};
 use crate::error::{Diagnose, Problem};
 use crate::model::{ConfigReport, SettingReport};
+use crate::origin;
 use crate::reconfigure::{Consent, Review, Stance};
 use crate::validate::{Credential, Validation};
 
@@ -117,10 +118,22 @@ async fn settings(
         }
         None => (held, false, None, None),
     };
+    // Read once for the whole listing rather than per row: it is one file, and a
+    // machine that cannot produce it answers *unknown* for every setting instead of
+    // failing a read that is otherwise perfectly good.
+    let recorded = super::reconfiguring::recorded(ctx);
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
-        .map(SettingReport::from)
+        .map(|shown| {
+            let origin = origin::of_setting(
+                &shown.key,
+                recorded
+                    .as_ref()
+                    .and_then(|held| held.entry(super::reconfiguring::SETTINGS, &shown.key)),
+            );
+            SettingReport::of(shown, origin)
+        })
         .collect();
 
     Ok(Outcome::Config(ConfigReport {
@@ -325,8 +338,8 @@ mod tests {
     use super::{configuration, reading, Setting};
     use crate::app::{Ctx, Outcome, Waiting};
     use crate::config::{
-        store, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, PROVIDER_PORT_KEY,
-        PROVIDER_TLS_KEY, VPN_PORT_FORWARDING_KEY,
+        store, EXPLANATIONS_KEY, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY,
+        PROVIDER_PORT_KEY, PROVIDER_TLS_KEY, VPN_PORT_FORWARDING_KEY,
     };
     use crate::error::Diagnose;
     use crate::reconfigure::{Review, Stance};
@@ -597,6 +610,74 @@ mod tests {
         assert_eq!(said.as_deref(), Some(crate::door::KEPT));
     }
 
+    /// Where a read said one setting came from, or nothing where it answered
+    /// something else entirely.
+    fn origin_of(
+        outcome: &Result<Outcome, Box<crate::error::Problem>>,
+        key: &str,
+    ) -> Option<crate::origin::Origin> {
+        match outcome {
+            Ok(Outcome::Config(report)) => report
+                .settings
+                .iter()
+                .find(|setting| setting.key == key)
+                .map(|setting| setting.origin.clone()),
+            Ok(_) | Err(_) => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_setting_written_through_lemonfiber_is_read_back_as_the_operators() {
+        let env = env_at("origin-written", "");
+        let ctx = ctx(env.clone());
+        let written = configuration(&ctx, Setting::to(EXPLANATIONS_KEY, "on")).await;
+        assert!(written.is_ok());
+        assert_eq!(on_disk(&env, EXPLANATIONS_KEY).as_deref(), Some("on"));
+
+        let read = reading(&ctx, Some(EXPLANATIONS_KEY)).await;
+        assert_eq!(
+            origin_of(&read, EXPLANATIONS_KEY),
+            Some(crate::origin::Origin::Operator)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_setting_lemonfiber_never_wrote_says_unknown_rather_than_bundled() {
+        // The state a machine is in before its first change through lemonfiber, and
+        // the one where a guess would be wrong most usefully: what the file holds
+        // cannot be told from what setup left, so the read says so.
+        let ctx = ctx(env_at("origin-unrecorded", "LEMONFIBER_EXPLANATIONS=on\n"));
+        let held = origin_of(
+            &reading(&ctx, Some(EXPLANATIONS_KEY)).await,
+            EXPLANATIONS_KEY,
+        );
+        assert_ne!(held, Some(crate::origin::Origin::Bundled));
+        assert!(
+            held.as_ref()
+                .and_then(crate::origin::Origin::why)
+                .is_some_and(|why| why.contains("no record of writing here")),
+            "{held:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_credential_says_it_is_unknown_because_it_is_never_recorded() {
+        // Not the same silence as the setting above. Keeping a record of a credential
+        // would mean holding the value twice, so this one is unknown because a rule
+        // is working rather than because something was lost — and it says which.
+        let ctx = ctx(env_at("origin-credential", "INDEXER_APIKEY=abc123\n"));
+        let held = origin_of(
+            &reading(&ctx, Some(INDEXER_APIKEY_KEY)).await,
+            INDEXER_APIKEY_KEY,
+        );
+        assert!(
+            held.as_ref()
+                .and_then(crate::origin::Origin::why)
+                .is_some_and(|why| why.contains("keeps no record of a credential")),
+            "{held:?}"
+        );
+    }
+
     #[tokio::test]
     async fn reading_a_setting_is_never_a_decision() {
         let ctx = ctx(env_at("reading", "VPN_PORT_FORWARDING=off\n"));
@@ -627,22 +708,25 @@ mod tests {
 
     #[tokio::test]
     async fn nothing_but_a_settings_answer_is_read_for_a_consequence() {
-        // The three readers above are total, and this is the arm that proves each of
+        // The four readers above are total, and this is the arm that proves each of
         // them rather than a fallback nothing ever reaches.
-        let other = Outcome::Version(crate::model::VersionReport {
-            binary: "0".to_owned(),
-            supported_schema: Vec::new(),
-            stack: String::new(),
-            compose: None,
-            changelog: crate::changelog::Notes::unread(),
-        });
-        let said = consequence(&Ok(other));
+        let other: Result<Outcome, Box<crate::error::Problem>> =
+            Ok(Outcome::Version(crate::model::VersionReport {
+                binary: "0".to_owned(),
+                supported_schema: Vec::new(),
+                stack: String::new(),
+                compose: None,
+                changelog: crate::changelog::Notes::unread(),
+            }));
+        let said = consequence(&other);
         assert!(said.is_some_and(|said| said.contains("not a configuration answer")));
+        assert_eq!(origin_of(&other, EXPLANATIONS_KEY), None);
 
         let refused = Err(Box::new(store::Failure::Nowhere.problem()));
         assert_eq!(consequence(&refused), None);
         assert_eq!(reviewed(&refused), None);
         assert_eq!(stance(&refused), None);
+        assert_eq!(origin_of(&refused, EXPLANATIONS_KEY), None);
     }
 
     // ── A replacement credential is proven before the one it replaces is dropped ──
