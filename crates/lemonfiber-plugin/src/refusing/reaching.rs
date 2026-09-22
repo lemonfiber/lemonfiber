@@ -439,6 +439,51 @@ to    = "homepage"
         assert!(walked(&planted, "Nothing").is_empty());
     }
 
+    /// A schema that refers to itself comes back, and one that refers to nothing
+    /// finds no path through it.
+    ///
+    /// The two ways this walk could fail to answer, and neither is reachable from
+    /// the schema this build publishes — which is the whole reason they are planted.
+    /// The bound below says in words that it exists so a definition which one day
+    /// refers to itself is not a hang; a bound nothing has ever reached is a claim
+    /// rather than a measurement. And a reference naming a definition that is not
+    /// there is what a schema mid-rename looks like: it must be no path rather than
+    /// a panic or a walk that stops early with the sites before it.
+    #[test]
+    fn a_schema_that_refers_to_itself_is_bounded_and_one_that_refers_to_nothing_finds_no_path() {
+        let circular: Value = serde_json::from_str(
+            r##"{
+                "properties": { "step": { "$ref": "#/$defs/Step" } },
+                "$defs": {
+                    "Step": {
+                        "properties": {
+                            "capture": { "$ref": "#/$defs/Capture" },
+                            "then": { "$ref": "#/$defs/Step" }
+                        }
+                    },
+                    "Capture": { "properties": {} }
+                }
+            }"##,
+        )
+        .unwrap_or(Value::Null);
+        let found = walked(&circular, "Capture");
+        assert_eq!(
+            found.len(),
+            DEEP,
+            "one path for each depth the bound allows, and then it stops: {found:?}"
+        );
+        assert_eq!(found.first().map(String::as_str), Some("step.capture"));
+
+        let dangling: Value = serde_json::from_str(
+            r##"{
+                "properties": { "step": { "$ref": "#/$defs/Gone" } },
+                "$defs": { "Capture": { "properties": {} } }
+            }"##,
+        )
+        .unwrap_or(Value::Null);
+        assert!(walked(&dangling, "Capture").is_empty());
+    }
+
     /// Every path in the published schema at which one declaration can appear.
     fn sites(of: &str) -> Vec<String> {
         walked(&published(), of)

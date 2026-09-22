@@ -14,7 +14,7 @@
 //! it found and hold that to what the shipped files declare, so a read that silently
 //! stopped working is a failure rather than a silence.
 
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use lemonfiber_manifest::{Manifest, Service};
 
@@ -33,14 +33,24 @@ const DOMAIN: &str = ".{$DOMAIN";
 
 /// Every service the shipped stack declares.
 ///
-/// An unreadable stack description yields none, which would leave every rule over
-/// this register walking nothing. Nothing here can tell that apart from a stack with
-/// no services in it, which is why the tests below do it instead.
+/// Read once, from a file this binary is compiled with. Deliberately not a latch:
+/// a latch is settled by one caller and read by the rest, and a read that settled
+/// it would make a later settle silently do nothing. There is no caller to hand
+/// this a value — the answer is a function of the shipped description alone — so
+/// the construct that says so is the one with no settle to be ignored.
 pub(super) fn services() -> &'static [Service] {
-    static SHIPPED: OnceLock<Vec<Service>> = OnceLock::new();
-    SHIPPED.get_or_init(|| {
-        Manifest::from_toml(STACK).map_or_else(|_| Vec::new(), |stack| stack.services)
-    })
+    static SHIPPED: LazyLock<Vec<Service>> = LazyLock::new(|| declared(STACK));
+    &SHIPPED
+}
+
+/// The services one stack description declares, or none where it cannot be read.
+///
+/// Apart from the register above so that both of its answers can be asked for. An
+/// unreadable description yields no services, and every rule over the register then
+/// walks nothing — which is invisible from inside those rules and has to be a test's
+/// job, so the reading is a function a test can hand a description to.
+fn declared(text: &str) -> Vec<Service> {
+    Manifest::from_toml(text).map_or_else(|_| Vec::new(), |stack| stack.services)
 }
 
 /// Every name the shipped proxy is written to answer on.
@@ -51,8 +61,8 @@ pub(super) fn services() -> &'static [Service] {
 /// offer into a collision on the day it was taken up, in a file the operator is
 /// editing by hand and would have no reason to suspect.
 pub(super) fn hostnames() -> &'static [String] {
-    static ANSWERED: OnceLock<Vec<String>> = OnceLock::new();
-    ANSWERED.get_or_init(|| proxied(PROXY))
+    static ANSWERED: LazyLock<Vec<String>> = LazyLock::new(|| proxied(PROXY));
+    &ANSWERED
 }
 
 /// The shipped service with this id, where the stack ships one.
@@ -101,7 +111,7 @@ fn is_label(letter: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{answering, hostnames, named, proxied, publishing, services};
+    use super::{answering, declared, hostnames, named, proxied, publishing, services, STACK};
 
     /// The register found the stack, rather than finding nothing and passing.
     ///
@@ -113,11 +123,15 @@ mod tests {
     /// and each of them would go on reporting that a manifest collides with nothing.
     #[test]
     fn the_register_holds_the_stack_this_build_ships() {
+        // Counted before the assertion rather than inside its message. A value a
+        // message reaches for is read only where the message is built, which is only
+        // where the assertion fails — so the reading is a line no passing run enters,
+        // and the coverage gate is right to call it one.
+        let shipped = services().len();
         assert!(
-            services().len() > 10,
+            shipped > 10,
             "the shipped stack description was not read, so every rule over this register is \
-             walking nothing: {} services",
-            services().len()
+             walking nothing: {shipped} services"
         );
         assert!(
             named("jellyfin").is_some(),
@@ -126,14 +140,25 @@ mod tests {
         assert_eq!(named("jellyfin").and_then(|held| held.port), Some(8096));
     }
 
+    /// A description this build cannot read holds nothing, and holds it visibly.
+    ///
+    /// The reading is asked both ways here because the register above cannot ask
+    /// it either way: it reads one file, once, and an answer of *no services* from
+    /// it is the same silence whether the file was unreadable or empty.
+    #[test]
+    fn a_stack_description_that_cannot_be_read_holds_nothing() {
+        assert!(declared("= not a stack description").is_empty());
+        assert!(!declared(STACK).is_empty());
+    }
+
     /// And the names it answers on, for the same reason.
     #[test]
     fn the_register_holds_the_names_the_proxy_answers_on() {
+        let answered = hostnames();
         assert!(
-            hostnames().len() > 5,
+            answered.len() > 5,
             "the shipped proxy configuration was not read, so a plugin could take any name it \
-             already answers on: {:?}",
-            hostnames()
+             already answers on: {answered:?}"
         );
         assert!(answering("watch"), "the stanza in force is read");
         assert!(answering("sonarr"), "and the one written out disabled");
