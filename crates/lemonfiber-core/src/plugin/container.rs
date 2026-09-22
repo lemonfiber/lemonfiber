@@ -246,7 +246,7 @@ criticality = "enhancing"
 takes_data  = true
 config_path = "/config"
 
-[wiring]
+[[wiring]]
 hostname        = "comics"
 dashboard_group = "Library"
 "#;

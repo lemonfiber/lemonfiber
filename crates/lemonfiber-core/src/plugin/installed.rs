@@ -411,7 +411,7 @@ port        = 9000
 bind        = "loopback"
 criticality = "enhancing"
 
-[wiring]
+[[wiring]]
 hostname        = "comics"
 dashboard_group = "Library"
 "#;
