@@ -17,7 +17,7 @@
 
 mod contributing;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::schema::{Claim, Expect, Manifest, Service};
 use crate::vocabulary::{self, Capability, Constraint, Probe, Removed};
@@ -101,13 +101,28 @@ fn core(name: &str, at: &str, removed: &[Removed], found: &mut Vec<Violation>) {
 /// stands alone: a core name nothing demonstrates asserts, and a claim for a name no
 /// service declares demonstrates something nobody said.
 fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
-    let declared: BTreeSet<&str> = manifest
-        .services
-        .iter()
-        .flat_map(|service| &service.provides)
-        .map(String::as_str)
-        .filter(|name| vocabulary::is_core_name(name))
-        .collect();
+    let mut declared: BTreeMap<&str, &str> = BTreeMap::new();
+    for service in &manifest.services {
+        for name in service
+            .provides
+            .iter()
+            .map(String::as_str)
+            .filter(|name| vocabulary::is_core_name(name))
+        {
+            if let Some(first) = declared.insert(name, service.id.as_str()) {
+                found.push(Violation {
+                    location: format!("service {}.provides", service.id),
+                    message: format!(
+                        "{name} is a core capability and {first} already declares it; something \
+                         asks for one of these by name and exactly one service answers, so two \
+                         services of one plugin is not a choice an operator could make — it is \
+                         two answers to one question, decided here rather than contested on their \
+                         machine"
+                    ),
+                });
+            }
+        }
+    }
 
     let mut claimed: BTreeSet<&str> = BTreeSet::new();
     for claim in &manifest.claims {
@@ -130,7 +145,7 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
                 message: format!("{} is claimed twice", claim.capability),
             });
         }
-        if !declared.contains(claim.capability.as_str()) {
+        if !declared.contains_key(claim.capability.as_str()) {
             found.push(Violation {
                 location: at.clone(),
                 message: format!(
@@ -147,9 +162,9 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
     }
 
-    for name in declared.difference(&claimed) {
+    for (name, service) in declared.iter().filter(|(name, _)| !claimed.contains(*name)) {
         found.push(Violation {
-            location: format!("service provides {name}"),
+            location: format!("service {service}.provides"),
             message: format!(
                 "{name} is declared and demonstrated by no [[claim]]; a capability is \
                  demonstrated, not asserted"
@@ -510,6 +525,40 @@ why    = "Until somebody does, the first caller on the household network becomes
         assert!(
             never.contains("names no capability") && !never.contains("generation"),
             "a name that never existed is a different fact: {never}"
+        );
+    }
+
+    /// A second service of the same plugin, declaring what the first one does.
+    const ALONGSIDE: &str = r#"
+[[service]]
+id          = "komga-sync"
+name        = "Komga's reading history"
+image       = "example.invalid/komga-sync"
+digest      = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+tag         = "1.0.0"
+criticality = "enhancing"
+provides    = ["media.serve"]
+
+"#;
+
+    /// Something asks for a core capability by name and exactly one service answers it,
+    /// so two services of one plugin declaring it is not a choice an operator could make.
+    ///
+    /// Decided here rather than contested on their machine. A plugin is one install and
+    /// both halves arrive together, so there is no moment at which anybody is asked
+    /// which of the two to wire — and nothing downstream would say which one was.
+    #[test]
+    fn a_core_capability_two_of_one_plugins_services_declare_is_refused_naming_the_first() {
+        let said = against(&CLAIMANT.replace("[[claim]]", &format!("{ALONGSIDE}[[claim]]")));
+        assert!(
+            says(
+                &said,
+                &[
+                    "media.serve is a core capability and komga already declares it",
+                    "two answers to one question",
+                ]
+            ),
+            "got: {said:?}"
         );
     }
 

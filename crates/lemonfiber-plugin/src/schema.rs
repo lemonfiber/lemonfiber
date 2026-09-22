@@ -30,15 +30,21 @@ pub struct Manifest {
     pub schema_version: u32,
     /// Who the plugin is, and where it came from.
     pub plugin: Plugin,
-    /// What runs. Exactly one, in this generation.
+    /// What runs. One or more.
+    ///
+    /// More than one because a plugin is often a thing and the thing beside it: Plex
+    /// and the reader of its watch history are one install and one uninstall to an
+    /// operator, and are two containers on two tiers with two criticalities. A format
+    /// permitting one forces the author of the pair to choose the wider tier for both
+    /// halves, or to publish two plugins an operator has to keep in step by hand.
     #[serde(default, rename = "service")]
     pub services: Vec<Service>,
     /// The core capabilities this plugin claims, and the probes each is shown by.
     #[serde(default, rename = "claim")]
     pub claims: Vec<Claim>,
-    /// How the stack's own proxy and dashboard reach it.
-    #[serde(default)]
-    pub wiring: Option<Wiring>,
+    /// How the stack's own proxy and dashboard reach its services. One each, at most.
+    #[serde(default, rename = "wiring")]
+    pub wirings: Vec<Wiring>,
     /// What must hold before it is installed.
     #[serde(default, rename = "proof")]
     pub proofs: Vec<Proof>,
@@ -230,6 +236,14 @@ impl Service {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Wiring {
+    /// Which of this plugin's services it is about.
+    ///
+    /// Optional where the plugin declares one service, because there is nothing to
+    /// choose between; required where it declares more, because a hostname is a fact
+    /// about one service and a manifest that left it to be inferred would be inferring
+    /// which of two the household reaches.
+    #[serde(default)]
+    pub service: Option<String>,
     /// The label in front of the operator's domain. A single DNS label — not a name,
     /// an address or a port. Defaults to the service's id.
     #[serde(default)]
@@ -263,7 +277,16 @@ impl Manifest {
     /// — so nothing declared is answered as nothing declared rather than guessed at.
     #[must_use]
     pub fn entry<'a>(&'a self, service: &'a Service) -> Entry<'a> {
-        let declared = self.wiring.as_ref();
+        // The stanza about this service: one naming it, or one naming nothing,
+        // which a plugin declaring a single service is allowed to write. A
+        // plugin with two must name them, so an unnamed stanza there cannot be
+        // about the wrong one — `naming::wired` refuses that before this runs.
+        let declared = self.wirings.iter().find(|wiring| {
+            wiring
+                .service
+                .as_deref()
+                .is_none_or(|named| named == service.id)
+        });
         Entry {
             hostname: declared
                 .and_then(|wiring| wiring.hostname.as_deref())
@@ -431,7 +454,7 @@ request = { method = "GET", path = "/api/v1/series" }
 expect  = { status = 200, json_has_keys = ["content"], json_types = { content = "list" }, json_at_least = { totalElements = 1 }, json_array_min = 1, json_is_absent = false, content_type = "application/json", body_starts_with = "{" }
 fixture = "fixtures/media-serve-catalogue.json"
 
-[wiring]
+[[wiring]]
 hostname        = "comics"
 dashboard_group = "Library"
 
@@ -896,12 +919,23 @@ capabilities = ["doctor.contribute", "recipe.run"]
     #[test]
     fn reads_how_the_stack_is_told_to_reach_it() {
         let read = parse(WHOLE)
-            .and_then(|manifest| manifest.wiring)
-            .map(|wiring| (wiring.hostname, wiring.dashboard_group));
+            .map(|manifest| manifest.wirings)
+            .and_then(|wirings| wirings.into_iter().next())
+            .map(|wiring| (wiring.service, wiring.hostname, wiring.dashboard_group));
         assert_eq!(
             read,
-            Some((Some("comics".to_owned()), Some("Library".to_owned())))
+            Some((None, Some("comics".to_owned()), Some("Library".to_owned())))
         );
+    }
+
+    /// A wiring naming its service, which is how a plugin with two says which is which.
+    #[test]
+    fn a_wiring_says_which_service_it_is_about() {
+        let read = parse(&WHOLE.replace("[[wiring]]", "[[wiring]]\nservice = \"komga\""))
+            .map(|manifest| manifest.wirings)
+            .and_then(|wirings| wirings.into_iter().next())
+            .map(|wiring| wiring.service);
+        assert_eq!(read, Some(Some("komga".to_owned())));
     }
 
     /// The optional half is optional, and reads as absent rather than as a fault.
@@ -923,7 +957,7 @@ forms       = ["library"]
         let read = parse(bare).map(|manifest| {
             (
                 manifest.services.len(),
-                manifest.wiring.is_some(),
+                !manifest.wirings.is_empty(),
                 manifest.requires.is_some(),
                 manifest.recipes.len(),
             )
@@ -1071,6 +1105,57 @@ forms       = ["library"]
         assert_eq!(entry.and_then(|entry| entry.group), Some("Library"));
     }
 
+    /// A second service of the same plugin, which is what makes the stanzas ambiguous.
+    const ALONGSIDE: &str = r#"[[service]]
+id          = "komga-sync"
+name        = "Komga's reading history"
+image       = "docker.io/gotson/komga-sync"
+digest      = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+tag         = "1.0.0"
+criticality = "enhancing"
+"#;
+
+    /// One stanza for each of them, each saying which it is about.
+    const WIRED: &str = r#"[[wiring]]
+service         = "komga"
+hostname        = "comics"
+dashboard_group = "Library"
+
+[[wiring]]
+service         = "komga-sync"
+hostname        = "history"
+"#;
+
+    /// A stanza that names a service is the one read for that service.
+    ///
+    /// The field exists precisely so a plugin declaring two services cannot leave which
+    /// one the household reaches to be inferred — and every fixture here wrote the
+    /// unnamed stanza, which is the form a plugin with a single service may use. So the
+    /// half of the reading that tells one service's stanza from another's had never
+    /// decided anything, and a manifest with two would have taken whichever came first.
+    #[test]
+    fn a_wiring_naming_a_service_is_read_for_that_one_and_not_for_the_other() {
+        let two = WHOLE.replace(
+            "[[wiring]]\nhostname        = \"comics\"\ndashboard_group = \"Library\"\n",
+            &format!("{ALONGSIDE}\n{WIRED}"),
+        );
+        let read = parse(&two).map(|manifest| {
+            manifest
+                .services
+                .iter()
+                .map(|service| manifest.entry(service))
+                .map(|entry| (entry.hostname.to_owned(), entry.group.map(str::to_owned)))
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            read,
+            Some(vec![
+                ("comics".to_owned(), Some("Library".to_owned())),
+                ("history".to_owned(), None),
+            ])
+        );
+    }
+
     /// A label is a fact about one container, so the fallback is the service's own
     /// id: taking the plugin's would give two of its services one address. The
     /// group has no fallback this crate can state, so nothing declared stays
@@ -1079,7 +1164,7 @@ forms       = ["library"]
     fn a_manifest_declaring_no_wiring_leaves_the_service_its_own_id_and_no_group() {
         let mut manifest = whole();
         if let Some(manifest) = manifest.as_mut() {
-            manifest.wiring = None;
+            manifest.wirings.clear();
         }
         let entry = manifest
             .as_ref()

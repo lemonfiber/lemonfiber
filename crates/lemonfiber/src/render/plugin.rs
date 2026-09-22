@@ -16,8 +16,8 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Capabilities, Claimed, Claiming, Credential, Evidence, Installed, Installs, Points, Probe,
-    Provenance, Ran, Reached, Verdict, Vouched,
+    Asserted, Capabilities, Claimed, Claiming, Credential, Evidence, Installed, Installs, Points,
+    Probe, Provenance, Ran, Reached, Verdict, Vouched,
 };
 
 use super::Lines;
@@ -227,6 +227,29 @@ fn claims(read: &Claimed) -> Lines {
         }
     }
 
+    if !read.proofs.is_empty() {
+        lines.spaced("What must hold before it is installed");
+        for proof in &read.proofs {
+            asserted(&mut lines, proof);
+        }
+    }
+
+    if !read.checks.is_empty() {
+        lines.spaced("What it would check, every day after");
+        for check in &read.checks {
+            asserted(&mut lines, check);
+        }
+        // Said here rather than left to be inferred from the verdicts, because a check
+        // its own recording refuses reads exactly like a claim its recordings refute and
+        // is the opposite news: the recording is of a machine in the state the check
+        // exists to find, and the check found it.
+        lines.put(
+            "  A check reports on a running stack rather than gating one, so none of these \
+             decides whether this is installed."
+                .to_owned(),
+        );
+    }
+
     if !read.contributions.is_empty() {
         lines.spaced("What it adds to lemonfiber's own registers");
         for row in &read.contributions {
@@ -260,12 +283,23 @@ fn claims(read: &Claimed) -> Lines {
     lines
 }
 
+/// One proof or contributed check, and what its recording came to.
+fn asserted(lines: &mut Lines, one: &Asserted) {
+    lines.put(format!("  {} — {}", one.id, one.says));
+    lines.put(format!("    {} — {}", one.service, came_to(&one.verdict)));
+}
+
 /// One capability, its probes, and what asking for it would come to.
 fn capability(lines: &mut Lines, claiming: &Claiming) {
+    // The service, always, rather than only where a plugin declares two. A reader
+    // holding a report with one line per capability has no way to tell which container
+    // answered, and a plugin may declare two services that both offer its own
+    // namespaced name — which is two identical lines if this says nothing.
     lines.put(format!(
-        "  {}  [{}]",
+        "  {}  [{}]  on {}",
         claiming.name,
-        claiming.shown.as_str()
+        claiming.shown.as_str(),
+        claiming.service
     ));
     for ran in &claiming.probes {
         lines.put(format!("    probe {} — {}", ran.probe, verdict(ran)));
@@ -313,7 +347,18 @@ fn capability(lines: &mut Lines, claiming: &Claiming) {
 
 /// What one probe came to, in one line.
 fn verdict(ran: &Ran) -> String {
-    match &ran.verdict {
+    came_to(&ran.verdict)
+}
+
+/// What one verdict came to, in one line.
+///
+/// Named for what it answers rather than for `reached`, which is the name the
+/// service-side renderer below has and is about being reachable. Two functions
+/// called the same thing in one file, taking different types and meaning
+/// different things, is a rename waiting to be made by whoever next reads only
+/// one of them.
+fn came_to(verdict: &Verdict) -> String {
+    match verdict {
         Verdict::Passed => "the recording answers it".to_owned(),
         Verdict::Failed { faults } => format!("refuted: {}", faults.join("; ")),
         Verdict::Unproven { why } => format!("unproven: {why}"),
@@ -461,7 +506,8 @@ fn panel(group: Option<&str>) -> String {
 mod tests {
     use lemonfiber_core::filling::{Filling, Shown};
     use lemonfiber_core::plugin::{
-        Claimed, Claiming, Contributed, Evidence, Ran, Verdict, Violation, Vouched,
+        Asserted, Assertion, Claimed, Claiming, Contributed, Evidence, Ran, Verdict, Violation,
+        Vouched,
     };
 
     use lemonfiber_core::plugin::{Install, Installed, Installs, Placed, Reached};
@@ -735,6 +781,8 @@ mod tests {
             installable: refusals.is_empty(),
             refusals,
             capabilities,
+            proofs: Vec::new(),
+            checks: Vec::new(),
             contributions: vec![Contributed {
                 at: "doctor.check".to_owned(),
                 id: "kavita:settings-guarded".to_owned(),
@@ -868,6 +916,96 @@ mod tests {
             "{text}"
         );
         assert!(!text.contains("kavita:holds-nothing\n    \n"), "{text}");
+    }
+
+    /// One assertion that is not a probe, as the reader hands it over.
+    fn asserting(kind: Assertion, id: &str, says: &str, verdict: Verdict) -> Asserted {
+        Asserted {
+            kind,
+            id: id.to_owned(),
+            says: says.to_owned(),
+            service: "kavita".to_owned(),
+            verdict,
+        }
+    }
+
+    /// The two assertions that are not about a capability each get a heading saying what
+    /// a verdict under it costs, because the two cost opposite things.
+    ///
+    /// A refused proof is the plugin failing its own condition for being installed and a
+    /// refused check is a check finding the thing it exists to find, on a machine in the
+    /// state it was recorded in. They are one shape on the page, so the page has to say
+    /// which of the two a reader is looking at rather than leave it to be inferred from
+    /// a verdict that reads identically either way.
+    #[test]
+    fn a_proof_and_a_contributed_check_are_shown_under_headings_that_say_what_each_costs() {
+        let mut read = read(Vec::new(), Vec::new());
+        read.proofs = vec![asserting(
+            Assertion::Proof,
+            "guarded",
+            "It refuses a read nobody signed in for",
+            Verdict::Passed,
+        )];
+        read.checks = vec![asserting(
+            Assertion::Check,
+            "kavita:claimed",
+            "Kavita has an administrator",
+            Verdict::Failed {
+                faults: vec!["answered 200 where it declares 401".to_owned()],
+            },
+        )];
+        let text = claims(&read).text();
+        assert!(
+            text.contains("What must hold before it is installed"),
+            "{text}"
+        );
+        assert!(
+            text.contains("  guarded — It refuses a read nobody signed in for"),
+            "{text}"
+        );
+        assert!(
+            text.contains("    kavita — the recording answers it"),
+            "{text}"
+        );
+        assert!(
+            text.contains("What it would check, every day after"),
+            "{text}"
+        );
+        assert!(
+            text.contains("    kavita — refuted: answered 200 where it declares 401"),
+            "{text}"
+        );
+        assert!(
+            text.contains("none of these decides whether this is installed"),
+            "a refuted check is the opposite news from a refuted claim: {text}"
+        );
+    }
+
+    /// A plugin asserting nothing of its own gets neither heading, and never the
+    /// sentence about what a check does not decide.
+    ///
+    /// The pair above is only worth a heading where there is something under it: a
+    /// report headed *what must hold before it is installed* with nothing beneath it
+    /// reads as a condition that was not reached rather than as one nobody wrote.
+    #[test]
+    fn a_plugin_that_asserts_nothing_of_its_own_gets_no_heading_for_either() {
+        let text = claims(&read(
+            vec![claiming("media.serve", Shown::Demonstrated, None)],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            !text.contains("What must hold before it is installed"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("What it would check, every day after"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("none of these decides whether this is installed"),
+            "{text}"
+        );
     }
 
     /// A capability of the plugin's own is inert; a core name nothing publishes is not
