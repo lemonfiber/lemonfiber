@@ -108,6 +108,7 @@ mod tests {
             }
             Ok(Response {
                 status: 200,
+                headers: Vec::new(),
                 body: "answered".to_owned(),
             })
         }
@@ -196,6 +197,7 @@ mod tests {
                 self.0.fetch_add(1, Ordering::SeqCst);
                 Ok(Response {
                     status: 401,
+                    headers: Vec::new(),
                     body: "no".to_owned(),
                 })
             }
