@@ -57,16 +57,16 @@ pub enum Asked {
 }
 
 /// The source names no plugin this build can read.
-const UNREADABLE: Code = Code::new("PLUGIN-1");
+const UNREADABLE: Code = Code::new("PLUGIN-2");
 
 /// The manifest is read and this build refuses what it declares.
-const REFUSED: Code = Code::new("PLUGIN-2");
+const REFUSED: Code = Code::new("PLUGIN-3");
 
 /// The record of what is installed cannot be read.
-const UNRECORDED: Code = Code::new("PLUGIN-3");
+const UNRECORDED: Code = Code::new("PLUGIN-4");
 
 /// The plugin is installed already.
-const ALREADY: Code = Code::new("PLUGIN-4");
+const ALREADY: Code = Code::new("PLUGIN-5");
 
 /// What is installed, and what installing one came to.
 ///
@@ -405,7 +405,7 @@ config_path = "/app/data"
         let ctx = ctx("nothing-there");
         assert_eq!(
             refusal(installing(&ctx, Path::new("/nowhere/at/all"))),
-            "PLUGIN-1"
+            "PLUGIN-2"
         );
         assert!(!record_of(&ctx).exists());
     }
@@ -422,7 +422,7 @@ config_path = "/app/data"
                 r#"config_path = "/data/media""#,
             ),
         );
-        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-2");
+        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-3");
         assert!(!record_of(&ctx).exists(), "the record was written");
     }
 
@@ -431,7 +431,7 @@ config_path = "/app/data"
         let ctx = ctx("twice");
         let at = source("twice", MANIFEST);
         assert_eq!(counted(installing(&ctx, &at)), Some(1));
-        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-4");
+        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-5");
         assert_eq!(counted(reading(&ctx)), Some(1));
     }
 
@@ -445,8 +445,8 @@ config_path = "/app/data"
         assert_eq!(counted(installing(&ctx, &at)), Some(1));
         assert!(crate::config::store::write(&record_of(&ctx), "{ half a record").is_ok());
 
-        assert_eq!(refusal(reading(&ctx)), "PLUGIN-3");
-        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-3");
+        assert_eq!(refusal(reading(&ctx)), "PLUGIN-4");
+        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-4");
         // And a refusal is not an answer with a shorter listing in it: there is no
         // report at all, which is what stops a surface rendering one.
         assert_eq!(report(reading(&ctx)), None);
@@ -459,7 +459,7 @@ config_path = "/app/data"
     fn a_record_that_cannot_be_opened_is_refused_rather_than_read_as_empty() {
         let ctx = ctx("unopenable");
         assert!(std::fs::create_dir_all(record_of(&ctx)).is_ok());
-        assert_eq!(refusal(reading(&ctx)), "PLUGIN-3");
+        assert_eq!(refusal(reading(&ctx)), "PLUGIN-4");
     }
 
     /// Nowhere configured is a machine that has not been set up, which has no
