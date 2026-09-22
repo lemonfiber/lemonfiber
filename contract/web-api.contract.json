@@ -8795,6 +8795,234 @@
         }
       }
     },
+    "plugins": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/PluginInstalls"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "PluginInstall": {
+          "description": "What an install came to.",
+          "type": "object",
+          "properties": {
+            "recorded": {
+              "description": "Whether it was written down. A rehearsal leaves this false.",
+              "type": "boolean"
+            },
+            "would": {
+              "description": "What the install settled, said whether or not it was written down.",
+              "$ref": "#/$defs/PluginInstalled"
+            }
+          },
+          "required": [
+            "would",
+            "recorded"
+          ]
+        },
+        "PluginInstalled": {
+          "description": "One plugin's install, as it was decided.",
+          "type": "object",
+          "properties": {
+            "plugin": {
+              "description": "The plugin's id: the name it is installed and journalled under.",
+              "type": "string"
+            },
+            "services": {
+              "description": "What was placed, one entry per service the plugin declares.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginPlaced"
+              }
+            },
+            "version": {
+              "description": "The plugin's own content version, as it stood when it was installed.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "plugin",
+            "version",
+            "services"
+          ]
+        },
+        "PluginInstalls": {
+          "description": "What is installed, and what installing one came to.\n\nOne answer for the reading and for the verb, because they are one question: an\noperator who has just installed something wants to see it among what they had, and\na rehearsal that showed only the new entry would not say what it is joining.",
+          "type": "object",
+          "properties": {
+            "install": {
+              "description": "What this run's install came to, or nothing where it only read.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginInstall"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "installed": {
+              "description": "Every plugin the record holds.\n\nWhat it holds, rather than what it would hold: a rehearsal wrote nothing, so\nwhat it settled is in `install` and not here. A listing that counted it\nwould report an install that did not happen.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginInstalled"
+              }
+            }
+          },
+          "required": [
+            "installed"
+          ]
+        },
+        "PluginPlaced": {
+          "description": "One service of an installed plugin, as it was placed.",
+          "type": "object",
+          "properties": {
+            "config_path": {
+              "description": "Where inside the container its one configuration directory is mounted.\n\nResolved rather than optional. The record answers where the directory is, and\na run that re-derived the fallback would answer for a container it did not\nwrite the day that fallback moved.",
+              "type": "string"
+            },
+            "digest": {
+              "description": "The digest that fixes what runs.",
+              "type": "string"
+            },
+            "image": {
+              "description": "The registry path, carrying no pin of its own.",
+              "type": "string"
+            },
+            "reached": {
+              "description": "How it is reached, or nothing where it has no listener.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginReached"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "service": {
+              "description": "The service's id, which is the name its container is written under.",
+              "type": "string"
+            },
+            "tag": {
+              "description": "The readable name that digest went by when it was installed.",
+              "type": "string"
+            },
+            "takes_data": {
+              "description": "Whether the library is mounted for it.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "service",
+            "image",
+            "digest",
+            "tag",
+            "config_path",
+            "takes_data"
+          ]
+        },
+        "PluginReached": {
+          "description": "How an installed service is reached, where it is reached at all.\n\nThe tier is the arm, so the label a tier earns lives only in the arm entitled to\none. Only a household service is proxied — the bundled policy is that an admin\nsurface does not get a name on the household network — and a record able to carry\na loopback service with a hostname would be a record able to describe the thing\nthat policy exists to prevent.\n\n**The group is on both arms, and that is not an oversight.** Only the proxy is\nthe household tier's alone; the bundled dashboard carries an entry for an\noperator surface too, with the address it links to rendered from the tier — nine\nof the shipped stack's own entries point at this machine. A record that kept the\ngroup for the wider tier alone would leave a loopback service off the panel its\nbundled neighbours are on.\n\nA tier and never an address, either way: lemonfiber renders one from the other\nexactly as it does for a bundled service, so the two-tier policy stays a property\nof the system rather than a request a plugin made.",
+          "oneOf": [
+            {
+              "description": "From this machine and nowhere else. No route, and no label to route to.",
+              "type": "object",
+              "properties": {
+                "group": {
+                  "description": "The group on the bundled dashboard, where the manifest named one.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "default": null
+                },
+                "port": {
+                  "description": "The port the service listens on.",
+                  "type": "integer",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0
+                },
+                "tier": {
+                  "type": "string",
+                  "const": "loopback"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "tier",
+                "port"
+              ]
+            },
+            {
+              "description": "From the household, through the stack's own proxy, at this label.",
+              "type": "object",
+              "properties": {
+                "group": {
+                  "description": "The group on the bundled dashboard, where the manifest named one.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "default": null
+                },
+                "hostname": {
+                  "description": "The single label in front of the operator's domain.",
+                  "type": "string"
+                },
+                "port": {
+                  "description": "The port the service listens on.",
+                  "type": "integer",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0
+                },
+                "tier": {
+                  "type": "string",
+                  "const": "household"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "tier",
+                "port",
+                "hostname"
+              ]
+            }
+          ]
+        }
+      }
+    },
     "preview": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

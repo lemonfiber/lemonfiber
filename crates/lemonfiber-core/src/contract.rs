@@ -70,6 +70,7 @@ use crate::model::{
     UpgradeReport, VersionReport, WalkthroughReport, WiringReport, WizardReport, API_VERSION,
 };
 use crate::outbound::Leaving;
+use crate::plugin::Installs;
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
 use crate::stack::closure::Plan;
@@ -188,6 +189,7 @@ fn the_first_kinds(kinds: &mut BTreeMap<String, Schema>) {
     );
     describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
     describing(kinds, kind::OUTBOUND, schema_for!(Envelope<Leaving>));
+    describing(kinds, kind::PLUGINS, schema_for!(Envelope<Installs>));
     describing(kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
 }
 
@@ -565,6 +567,7 @@ mod tests {
                 },
             ))),
             Outcome::Outbound(what_leaves()),
+            Outcome::Plugins(what_is_installed()),
             // One service rather than a whole stack: every field of the entry is on
             // it, which is all the shape comparison reads, and a listing of nineteen
             // would be nineteen copies of the same schema.
@@ -740,6 +743,39 @@ mod tests {
 
     /// One request of this product's own and one of a service's, which is both
     /// halves of what leaves this machine.
+    /// One plugin, installed, with its one service on the wider tier.
+    ///
+    /// Carrying the install beside the listing rather than only the listing: the
+    /// two halves of the report are what a surface branches on, and a sample with
+    /// one of them absent would compare the shape of the other to nothing.
+    fn what_is_installed() -> crate::plugin::Installs {
+        let one = crate::plugin::Installed {
+            plugin: "komga".to_owned(),
+            version: "1.2.0".to_owned(),
+            services: vec![crate::plugin::Placed {
+                service: "komga".to_owned(),
+                image: "docker.io/gotson/komga".to_owned(),
+                digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                    .to_owned(),
+                tag: "1.11.0".to_owned(),
+                config_path: "/config".to_owned(),
+                takes_data: true,
+                reached: Some(crate::plugin::Reached::Household {
+                    port: 25600,
+                    hostname: "comics".to_owned(),
+                    group: Some("Library".to_owned()),
+                }),
+            }],
+        };
+        crate::plugin::Installs {
+            installed: vec![one.clone()],
+            install: Some(crate::plugin::Install {
+                would: one,
+                recorded: true,
+            }),
+        }
+    }
+
     fn what_leaves() -> crate::outbound::Leaving {
         crate::outbound::Leaving {
             ours: vec![crate::outbound::Outbound {

@@ -81,6 +81,9 @@ what to do about it, is written for operators at
 - `LIFE-5`
 - `LIFE-6`
 - `PLUGIN-1`
+- `PLUGIN-2`
+- `PLUGIN-3`
+- `PLUGIN-4`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

@@ -19,7 +19,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber::cli::PluginCommand;
+use lemonfiber::cli::Authoring;
 use lemonfiber_core::plugin::{Capabilities, Key, Ungenerated};
 use lemonfiber_core::ports::registry::Registry;
 
@@ -78,18 +78,18 @@ impl Answered {
 ///
 /// The schema is always the document, because it is a thing an editor reads rather
 /// than a listing a person does. The other four have a form for each.
-pub(crate) async fn published(read: &PluginCommand, json: bool, asking: &dyn Registry) -> Answered {
+pub(crate) async fn published(read: &Authoring, json: bool, asking: &dyn Registry) -> Answered {
     match read {
-        PluginCommand::Schema => document_of(lemonfiber_core::plugin::schema().as_deref()),
-        PluginCommand::ExtensionPoints if json => {
+        Authoring::Schema => document_of(lemonfiber_core::plugin::schema().as_deref()),
+        Authoring::ExtensionPoints if json => {
             document_of(lemonfiber_core::plugin::points().as_deref())
         }
-        PluginCommand::ExtensionPoints => Answered::shown(render::plugin::points(
+        Authoring::ExtensionPoints => Answered::shown(render::plugin::points(
             &lemonfiber_core::plugin::extension_points(),
         )),
-        PluginCommand::Capabilities => capabilities(json),
-        PluginCommand::Claims { path } => claims(path, json),
-        PluginCommand::Provenance { path, keys } => vouched_for(path, keys, json, asking).await,
+        Authoring::Capabilities => capabilities(json),
+        Authoring::Claims { path } => claims(path, json),
+        Authoring::Provenance { path, keys } => vouched_for(path, keys, json, asking).await,
     }
 }
 
@@ -208,7 +208,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    use lemonfiber::cli::PluginCommand;
+    use lemonfiber::cli::Authoring;
     use lemonfiber_core::plugin::Ungenerated;
     use lemonfiber_core::ports::registry::Registry;
     use lemonfiber_fixtures::http::{Answer, Fake};
@@ -289,7 +289,7 @@ criticality = "enhancing"
     }
 
     /// What one read came to, asked of a registry that offers nothing.
-    async fn read(asked: PluginCommand, json: bool) -> Answered {
+    async fn read(asked: Authoring, json: bool) -> Answered {
         published(&asked, json, &answering(404, "{}")).await
     }
 
@@ -318,12 +318,12 @@ criticality = "enhancing"
     #[tokio::test]
     async fn every_document_this_build_publishes_has_a_form_for_each_reader() {
         /// Naming a read without making one, since a request is not `Clone`.
-        type Asking = fn() -> PluginCommand;
+        type Asking = fn() -> Authoring;
 
         let asked: [(&str, Asking); 3] = [
-            ("schema", || PluginCommand::Schema),
-            ("extension-points", || PluginCommand::ExtensionPoints),
-            ("capabilities", || PluginCommand::Capabilities),
+            ("schema", || Authoring::Schema),
+            ("extension-points", || Authoring::ExtensionPoints),
+            ("capabilities", || Authoring::Capabilities),
         ];
         let mut seen = 0_usize;
         for (named, one) in asked {
@@ -344,8 +344,8 @@ criticality = "enhancing"
     /// the other two it has no second form to fall back to.
     #[tokio::test]
     async fn the_schema_is_the_same_document_either_way() {
-        let plain = said(&read(PluginCommand::Schema, false).await);
-        let machine = said(&read(PluginCommand::Schema, true).await);
+        let plain = said(&read(Authoring::Schema, false).await);
+        let machine = said(&read(Authoring::Schema, true).await);
         assert_eq!(plain, machine);
         assert!(plain.contains("schema_version"), "{plain}");
     }
@@ -353,8 +353,8 @@ criticality = "enhancing"
     /// The two listings are listings for a person and documents for a parser.
     #[tokio::test]
     async fn a_listing_reads_as_prose_and_a_document_reads_as_json() {
-        let listed = said(&read(PluginCommand::ExtensionPoints, false).await);
-        let document = said(&read(PluginCommand::ExtensionPoints, true).await);
+        let listed = said(&read(Authoring::ExtensionPoints, false).await);
+        let document = said(&read(Authoring::ExtensionPoints, true).await);
         assert_ne!(listed, document);
         assert!(document.starts_with('{'), "{document}");
     }
@@ -362,7 +362,7 @@ criticality = "enhancing"
     #[tokio::test]
     async fn a_plugin_nothing_refuses_is_read_and_the_run_ends_well() {
         let at = source("whole", WHOLE);
-        let answered = read(PluginCommand::Claims { path: at }, false).await;
+        let answered = read(Authoring::Claims { path: at }, false).await;
         assert_eq!(answered.code, 0, "{:?}", answered.fault);
         assert!(answered.fault.is_none());
         assert!(said(&answered).contains("kavita"), "{}", said(&answered));
@@ -376,7 +376,7 @@ criticality = "enhancing"
     #[tokio::test]
     async fn a_plugin_that_would_not_install_says_why_and_still_fails() {
         let at = source("unpinned", &unpinned());
-        let answered = read(PluginCommand::Claims { path: at }, false).await;
+        let answered = read(Authoring::Claims { path: at }, false).await;
         assert_eq!(answered.code, FAILURE);
         assert!(answered.fault.is_none(), "{:?}", answered.fault);
         assert!(!said(&answered).is_empty(), "the reason was withheld");
@@ -386,8 +386,8 @@ criticality = "enhancing"
     #[tokio::test]
     async fn a_path_holding_no_manifest_is_a_fault_rather_than_a_verdict() {
         for asked in [
-            PluginCommand::Claims { path: nowhere() },
-            PluginCommand::Provenance {
+            Authoring::Claims { path: nowhere() },
+            Authoring::Provenance {
                 path: nowhere(),
                 keys: Vec::new(),
             },
@@ -405,7 +405,7 @@ criticality = "enhancing"
     async fn an_image_no_registry_offers_a_signature_for_is_unproven_and_allowed() {
         let at = source("unproven", WHOLE);
         let answered = read(
-            PluginCommand::Provenance {
+            Authoring::Provenance {
                 path: at,
                 keys: Vec::new(),
             },
@@ -424,7 +424,7 @@ criticality = "enhancing"
         let at = source("vouched-json", WHOLE);
         let said = said(
             &read(
-                PluginCommand::Provenance {
+                Authoring::Provenance {
                     path: at,
                     keys: Vec::new(),
                 },
@@ -476,7 +476,7 @@ criticality = "enhancing"
     async fn an_image_whose_signature_does_not_hold_stops_the_install() {
         let elsewhere = r#"{"critical":{"image":{"docker-manifest-digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}}}"#;
         let answered = published(
-            &PluginCommand::Provenance {
+            &Authoring::Provenance {
                 path: source("refused", WHOLE),
                 keys: vec![written("refusing-key", PUBLIC_KEY)],
             },
@@ -496,7 +496,7 @@ criticality = "enhancing"
     #[tokio::test]
     async fn a_key_the_read_was_given_and_cannot_use_stops_it_before_asking() {
         let answered = read(
-            PluginCommand::Provenance {
+            Authoring::Provenance {
                 path: source("bad-key", WHOLE),
                 keys: vec![written("gibberish", "hello")],
             },
@@ -584,9 +584,9 @@ criticality = "enhancing"
     #[tokio::test]
     async fn a_directory_and_the_manifest_inside_it_are_the_same_plugin() {
         let at = source("either-way", WHOLE);
-        let directory = read(PluginCommand::Claims { path: at.clone() }, true).await;
+        let directory = read(Authoring::Claims { path: at.clone() }, true).await;
         let file = read(
-            PluginCommand::Claims {
+            Authoring::Claims {
                 path: at.join("plugin.toml"),
             },
             true,

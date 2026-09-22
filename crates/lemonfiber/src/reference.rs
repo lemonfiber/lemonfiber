@@ -296,7 +296,12 @@ mod tests {
             ),
             (
                 "plugin",
-                &["lemonfiber plugin", "lemonfiber plugin provenance"][..],
+                &[
+                    "lemonfiber plugin",
+                    "lemonfiber plugin provenance",
+                    "lemonfiber plugin install",
+                    "lemonfiber plugin installed",
+                ][..],
             ),
         ] {
             let at = format!("{REFERENCE_DIR}/{name}.md");

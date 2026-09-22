@@ -8,7 +8,7 @@
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::bundle::Wanted;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::update;
+use lemonfiber_core::app::{plugins, update};
 use lemonfiber_core::app::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting,
@@ -25,9 +25,9 @@ use lemonfiber_core::uninstall::Tier;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
-    QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawRemoval, RawRemoving,
-    RawUnrated, UpdateCommand, WiringCommand,
+    AlertCommand, Asked, Authoring, ConfigAction, HostingCommand, HouseholdCommand, Kept,
+    MigrateCommand, PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCredentials,
+    RawRemoval, RawRemoving, RawUnrated, UpdateCommand, WiringCommand,
 };
 
 /// What a support bundle was asked to hold, and where it goes.
@@ -512,15 +512,43 @@ pub(crate) fn moving(object: UpdateCommand) -> Command {
     }
 }
 
+/// Which of the two doors a word under `plugin` goes through.
+///
+/// A value rather than a routing decision taken here, for the reason the rest of
+/// this file is a mapping: which door a word takes is what the vocabulary says, and
+/// walking through it is the caller's errand.
+pub(crate) enum Under {
+    /// A value that arrives once, dispatched like any other verb.
+    Dispatched(Command),
+    /// A document this build generated at compile time, answered with no stack.
+    Published(Authoring),
+}
+
+/// Which door this word goes through, and the value it goes through it as.
+///
+/// The five documents answer the same on a machine with nothing installed as on one
+/// running everything, so there is no stack to ask and nothing to decide; the two
+/// verbs are about this machine and go where every other verb goes.
+pub(crate) fn plugin(read: PluginCommand) -> Under {
+    match read {
+        PluginCommand::Install { path } => {
+            Under::Dispatched(Command::Plugins(plugins::Asked::Install { path }))
+        }
+        PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
+        PluginCommand::Authoring(read) => Under::Published(read),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use lemonfiber_core::app::plugins;
     use lemonfiber_core::app::{
         Allowance, Command, Filling, Linking, QualityAction, Setting, Waiting,
     };
     use lemonfiber_core::audio::Format;
     use lemonfiber_core::quality::Preset;
 
-    use super::{alerts, diagnosing, moving, named, narrowed};
+    use super::{alerts, diagnosing, moving, named, narrowed, Authoring};
     use super::{
         bundling, configuration, credentials, hosting, household, invitation, letting, quality,
         restarting, sharing, traced, Answer, Arranged, Asking, Chosen, Decision, Destination,
@@ -1497,5 +1525,51 @@ mod tests {
                 confirmed: false,
             }
         );
+    }
+
+    /// Which door a word under `plugin` goes through, and the command it becomes.
+    fn door(read: lemonfiber::cli::PluginCommand) -> Option<Command> {
+        match super::plugin(read) {
+            super::Under::Dispatched(command) => Some(command),
+            super::Under::Published(_) => None,
+        }
+    }
+
+    /// The two words about this machine become commands, and the path the operator
+    /// typed is carried through untouched.
+    #[test]
+    fn the_words_about_this_machine_become_commands() {
+        assert_eq!(
+            door(lemonfiber::cli::PluginCommand::Install {
+                path: std::path::PathBuf::from("/srv/komga")
+            }),
+            Some(Command::Plugins(plugins::Asked::Install {
+                path: std::path::PathBuf::from("/srv/komga")
+            }))
+        );
+        assert_eq!(
+            door(lemonfiber::cli::PluginCommand::Installed),
+            Some(Command::Plugins(plugins::Asked::Installed))
+        );
+    }
+
+    /// And the five that are documents this build generated go the other way,
+    /// because there is no stack to ask and nothing to decide.
+    #[test]
+    fn the_documents_an_author_reads_are_not_dispatched() {
+        for read in [
+            Authoring::Capabilities,
+            Authoring::ExtensionPoints,
+            Authoring::Schema,
+            Authoring::Claims {
+                path: std::path::PathBuf::from("/srv/komga"),
+            },
+            Authoring::Provenance {
+                path: std::path::PathBuf::from("/srv/komga"),
+                keys: Vec::new(),
+            },
+        ] {
+            assert_eq!(door(lemonfiber::cli::PluginCommand::Authoring(read)), None);
+        }
     }
 }

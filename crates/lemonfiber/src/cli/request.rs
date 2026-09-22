@@ -160,18 +160,16 @@ pub enum Request {
     },
     /// Run the checks that prove the stack is doing what it should.
     Doctor(RawDoctor),
-    /// Read what a plugin may claim, where it may contribute, and how it is written.
+    /// Install a plugin, say what is installed, and read what one may declare.
     ///
-    /// For somebody writing a plugin rather than running a stack. Everything under this
-    /// word is a read of a document this build publishes and attaches to every release:
-    /// the capabilities a service can claim, the places a plugin may extend lemonfiber
-    /// itself, and the schema an editor validates `plugin.toml` against.
-    ///
-    /// Every one of them answers with no network, no catalogue and no stack running,
-    /// and says which generation it is reporting — so an author who has to know whether
-    /// a difference is their build or their manifest can tell.
+    /// Five of the words under this one are documents for somebody writing a plugin,
+    /// answered with no network, no catalogue and no stack running, each saying which
+    /// generation it reports — so an author who has to know whether a difference is
+    /// their build or their manifest can tell. The other two are about this machine:
+    /// `install` settles what installing somebody else's plugin decides and writes it
+    /// down, and `installed` reads that record back. Only the first writes anything.
     Plugin {
-        /// Which of the three documents to read.
+        /// Which of them to ask for.
         #[command(subcommand)]
         read: PluginCommand,
     },

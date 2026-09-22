@@ -101,6 +101,8 @@ pub const MIGRATION: Kind = Kind("migration");
 pub const MUSIC: Kind = Kind("music");
 /// Everything that leaves this machine, and what the stack's own services reach.
 pub const OUTBOUND: Kind = Kind("outbound");
+/// Every plugin installed on this machine, and what installing one came to.
+pub const PLUGINS: Kind = Kind("plugins");
 /// What starting or stopping would do, before it is done.
 pub const PREVIEW: Kind = Kind("preview");
 /// Where each service in the stack comes from, and under what licence.
@@ -196,6 +198,7 @@ pub const ALL: &[Kind] = &[
     MIGRATION,
     MUSIC,
     OUTBOUND,
+    PLUGINS,
     PREVIEW,
     PROVENANCE,
     PULL,

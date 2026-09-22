@@ -24,6 +24,11 @@ pub struct Paths {
 /// somewhere the reversal will not look.
 pub const JOURNAL: &str = "journal.jsonl";
 
+/// The install record's file name, named once for the reason the journal's is: the
+/// command that writes it reaches it beside the environment file rather than through
+/// this layout, so the two spellings have to be one.
+pub const PLUGINS: &str = "plugins.json";
+
 impl Paths {
     /// The layout beneath a configuration base and a data base.
     ///
@@ -216,6 +221,19 @@ impl Paths {
         self.config.join("admission.json")
     }
 
+    /// What is installed of somebody else's, and what installing each decided.
+    ///
+    /// Kept with configuration rather than beside the stack, and it is the record
+    /// here with the least tolerance for being lost: every other one holds an answer
+    /// that can be given again, and this one is the only memory that a stranger's
+    /// service is on this machine at all. A restore that dropped it would leave every
+    /// value a plugin set orphaned with nothing to name the owner, and a reading of
+    /// what is installed confidently answering *nothing*.
+    #[must_use]
+    pub fn plugins(&self) -> PathBuf {
+        self.config.join(PLUGINS)
+    }
+
     /// The materialised stack — compose files written where Compose can read
     /// them.
     #[must_use]
@@ -318,6 +336,7 @@ mod tests {
             paths.refusals(),
             paths.admission(),
             paths.updates(),
+            paths.plugins(),
         ];
         let data: Vec<PathBuf> = vec![
             paths.stack(),

@@ -6,10 +6,9 @@
 //! without the routing in the way. The dispatcher lives beside it and matches on
 //! every variant here, so nothing can be added without somewhere to send it.
 
-use crate::audio::Format;
-use crate::doctor::Narrowing;
+use crate::{audio::Format, doctor::Narrowing};
 
-use super::{bundle, repair, restore, setup::SetupAction, support, update, Waiting};
+use super::{bundle, plugins, repair, restore, setup::SetupAction, support, update, Waiting};
 
 mod alerts;
 mod allowance;
@@ -383,6 +382,8 @@ pub enum Command {
     /// it by — a disclosure a surface could ask for half of is one an operator could
     /// be shown half of.
     Stored,
+    /// Install a plugin, or say what is installed already.
+    Plugins(plugins::Asked),
     /// Remove everything lemonfiber keeps on this machine.
     ///
     /// The whole of it: every location the layout names sits under one of two

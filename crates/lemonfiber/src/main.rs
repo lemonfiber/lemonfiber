@@ -279,10 +279,15 @@ async fn main() -> ExitCode {
             Ok(command) => command,
             Err(code) => return code,
         },
-        // The documents a plugin author reads are this build's own, so they are
-        // answered here and never dispatched: there is no stack to ask, nothing to
-        // decide, and a context to build would be a context nothing reached through.
-        Request::Plugin { read } => return for_an_author(&read, cli.json).await,
+        // Two of the words under this one are about this machine and go through
+        // dispatch like any other verb. The five that are not are documents this
+        // build generated at compile time, so they are answered here and never
+        // dispatched: there is no stack to ask, nothing to decide, and a context to
+        // build would be a context nothing reached through.
+        Request::Plugin { read } => match translate::plugin(read) {
+            translate::Under::Dispatched(command) => command,
+            translate::Under::Published(read) => return for_an_author(&read, cli.json).await,
+        },
         Request::Trace {
             term,
             season,
@@ -363,7 +368,7 @@ async fn main() -> ExitCode {
 /// The one part of that errand this file keeps: which adapter reaches a registry is
 /// the edge's to choose, and so is writing to a stream. What to say and what to exit
 /// with is decided in [`authoring`], where a test can hold it.
-async fn for_an_author(read: &lemonfiber::cli::PluginCommand, json: bool) -> ExitCode {
+async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCode {
     let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::new(
         lemonfiber_adapters::http::Web::new(),
     ));

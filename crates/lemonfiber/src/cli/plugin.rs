@@ -1,28 +1,79 @@
-//! The three things a plugin author can ask this binary about.
+//! What can be asked under the word `plugin`.
 //!
-//! Its own file rather than a line in the request list, because all three are reads of
-//! published artefacts rather than anything done to a stack — and because what tells
-//! them apart is worth a sentence each, which is more than an index of requests should
-//! carry.
+//! Its own file rather than a line in the request list, because what tells these apart
+//! is worth a sentence each, which is more than an index of requests should carry.
+//!
+//! Five of them are reads of documents this build publishes, answered from the binary
+//! with no network, no catalogue and no stack. Two are about one operator's machine —
+//! what is installed on it, and what putting something on it decides — so those two
+//! are dispatched like every other verb and the five are not.
 
 use std::path::PathBuf;
 
 use clap::Subcommand;
 
+/// What can be asked about a plugin, and what can be done with one.
+///
+/// Two words and a flattened five. The split is the point of the type rather than a
+/// tidying of it: [`Authoring`] holds the documents, which are generated at build
+/// time and answer the same on every machine, and the two here are about the machine
+/// this is running on. Keeping them apart is what lets the reader that answers a
+/// document be handed a value that cannot be a verb — so a word added to one half
+/// cannot be quietly answered by the other.
+#[derive(Debug, Subcommand)]
+pub enum PluginCommand {
+    /// The five documents, each a word of its own on the command line.
+    #[command(flatten)]
+    Authoring(Authoring),
+    /// Install a plugin, recording what installing it decided.
+    ///
+    /// The manifest is held to everything `claims` holds it to before anything is
+    /// written, and a plugin this build refuses is not installed — a refusal is
+    /// total, so none of the manifest is acted on and the machine is left as it was.
+    ///
+    /// What is written is the record of what the install settled: the plugin, and
+    /// for each of its services the image, the digest that pins what runs, the tier
+    /// it is published on and where inside its container its own configuration
+    /// directory is mounted. That record is the answer every later step reads —
+    /// the author's file may be edited or deleted the moment this is done, and a run
+    /// that went back to it would be answering a question about a document rather
+    /// than about this machine.
+    ///
+    /// Installing over an installation is refused naming it: that is an update,
+    /// which puts one set of changes back before it applies another.
+    ///
+    /// `--dry-run` settles everything the real run settles, says the same account of
+    /// it, and writes nothing.
+    Install {
+        /// The plugin's source: its directory, or the `plugin.toml` inside it.
+        path: PathBuf,
+    },
+    /// Say what is installed, and what each install decided.
+    ///
+    /// Read from the record rather than from the manifests, so it answers for a
+    /// machine whose plugin sources are long gone. A machine with none answers with
+    /// an empty list and says so.
+    ///
+    /// A record that is there and cannot be read is refused rather than answered as
+    /// nothing installed: a stranger's service may be running, and *no plugins* is
+    /// the one wrong answer that would be believed.
+    Installed,
+}
+
 /// What a plugin author can be told, with nothing running.
 ///
-/// Five reads and no verbs. Nothing here installs, removes or changes anything: three
-/// are the documents lemonfiber publishes about what a plugin may claim, where it may
-/// contribute and what shape its manifest takes, the fourth reads a manifest on a path
-/// and says what this build makes of it, and the fifth asks each image's registry what
-/// it holds beside that image.
+/// Five reads and no verbs. Nothing here installs, removes or changes anything:
+/// three are the documents lemonfiber publishes about what a plugin may claim, where
+/// it may contribute and what shape its manifest takes, the fourth reads a manifest
+/// on a path and says what this build makes of it, and the fifth asks each image's
+/// registry what it holds beside that image.
 ///
 /// The first four answer with no network, no catalogue and no stack, and each says
 /// which generation it is reporting — an author comparing two answers needs to know
 /// whether the difference is their build or their manifest. The fifth is the one that
 /// reaches out, which is why it is its own request rather than part of another.
 #[derive(Debug, Subcommand)]
-pub enum PluginCommand {
+pub enum Authoring {
     /// List the capabilities a service can claim, and what claiming one undertakes.
     ///
     /// A capability is a named, contracted thing a service can do, so that wiring can

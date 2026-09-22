@@ -334,6 +334,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // problem, so there is nothing for a code to tell apart here.
         | Outcome::Invited(_)
         | Outcome::Outbound(_)
+        // An install happened or it did not; a manifest this build refuses, a record
+        // it cannot read and a plugin already installed each come back as a problem,
+        // so a report here is one that arrived and whatever it says stands.
+        | Outcome::Plugins(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)
         // A substitution was recorded, or worked out and not written; one that

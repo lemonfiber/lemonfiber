@@ -31,6 +31,7 @@
     "migration": "ref:MigrationReport",
     "music": "ref:MusicReport",
     "outbound": "ref:Leaving",
+    "plugins": "ref:PluginInstalls",
     "preview": "ref:Plan",
     "provenance": "ref:ProvenanceReport",
     "pull": "string",
@@ -3979,6 +3980,143 @@
         }
       },
       "variants": []
+    },
+    "PluginInstall": {
+      "fields": {
+        "recorded": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "would": {
+          "type": [
+            "ref:PluginInstalled"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginInstalled": {
+      "fields": {
+        "plugin": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "services": {
+          "type": [
+            "array[ref:PluginPlaced]"
+          ],
+          "required": true
+        },
+        "version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginInstalls": {
+      "fields": {
+        "install": {
+          "type": [
+            "anyOf(null,ref:PluginInstall)"
+          ],
+          "required": false
+        },
+        "installed": {
+          "type": [
+            "array[ref:PluginInstalled]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginPlaced": {
+      "fields": {
+        "config_path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "digest": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "image": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "reached": {
+          "type": [
+            "anyOf(null,ref:PluginReached)"
+          ],
+          "required": false
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "tag": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "takes_data": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginReached": {
+      "fields": {
+        "group": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "hostname": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "port": {
+          "type": [
+            "integer/uint16"
+          ],
+          "required": true
+        },
+        "tier": {
+          "type": [
+            "const:\"household\"",
+            "const:\"loopback\""
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"household\"",
+        "\"loopback\""
+      ]
     },
     "Policy": {
       "fields": {},

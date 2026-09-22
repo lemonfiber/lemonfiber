@@ -25,9 +25,9 @@ pub use conforming::Violation;
 pub use error::Error;
 pub use refusing::refusals;
 pub use schema::{
-    Bind, Capture, Claim, ClaimProbe, Contribution, Criticality, Expect, Expected, Health,
+    Bind, Capture, Claim, ClaimProbe, Contribution, Criticality, Entry, Expect, Expected, Health,
     HealthKind, Kind, Manifest, Override, Pair, Plugin, Proof, Recipe, Request, Requires, Secret,
-    Service, Step, StepCall, Wiring, RUN,
+    Service, Step, StepCall, Wiring, CONFIGURATION, RUN,
 };
 
 /// The manifest schema version this crate prefers.

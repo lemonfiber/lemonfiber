@@ -48,9 +48,9 @@ use clap::CommandFactory as _;
 use lemonfiber::cli::{Cli, STACK};
 use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
 use lemonfiber_core::app::{
-    dispatch, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Ctx, Decision,
-    Filling, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, SetupAction,
-    Waiting,
+    dispatch, plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Ctx,
+    Decision, Filling, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting,
+    SetupAction, Waiting,
 };
 use lemonfiber_core::archive::{Archive, Archiving, Fault, Reader, Space, Vault};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
@@ -71,12 +71,17 @@ use lemonfiber_fixtures::walking::Walking;
 /// The subcommands that never become a [`Command`], and why.
 ///
 /// Named rather than filtered by shape, so that adding a fourth means saying what it
-/// is. Following a log is a stream rather than an answer; the terminal is a program
-/// that then issues commands of its own, each of which arrives here under its own
-/// name; and the documents a plugin author reads are generated at build time and
-/// carried in the binary, so reading one asks nothing of this machine and there is
-/// nothing for a rehearsal to spare.
-const NOT_DISPATCHED: [&str; 4] = ["logs", "ui", "plugin", "help"];
+/// is. Following a log is a stream rather than an answer; and the terminal is a
+/// program that then issues commands of its own, each of which arrives here under
+/// its own name. `help` is clap's, not lemonfiber's, and answers nothing.
+///
+/// `plugin` was on this list while every word under it was a generated document
+/// answering the same on every machine. Two of them are not: one settles what
+/// installing somebody else's plugin decides and writes it down, and the other reads
+/// that back. So the word is dispatched now and is driven below, which is what makes
+/// the sentence this list is for — *reading one asks nothing of this machine* — stop
+/// covering a word that writes.
+const NOT_DISPATCHED: [&str; 3] = ["logs", "ui", "help"];
 
 /// What a rehearsal of each subcommand is driven with.
 ///
@@ -276,6 +281,16 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
             }),
         ),
         ("backup", Command::Backup { service: None }),
+        // The one write under `plugin`, and the shape a rehearsal most easily gets
+        // wrong: everything before the write settles what the install decides, so a
+        // handler reading the flag late would have the record on disk before it
+        // decided not to write one.
+        (
+            "plugin",
+            Command::Plugins(plugins::Asked::Install {
+                path: a_plugin_source(),
+            }),
+        ),
         (
             "support",
             Command::Support {
@@ -398,6 +413,54 @@ fn subcommands() -> BTreeSet<String> {
         .map(|command| command.get_name().to_owned())
         .filter(|name| !NOT_DISPATCHED.contains(&name.as_str()))
         .collect()
+}
+
+/// A plugin's source, written where a rehearsal can read one.
+///
+/// Outside every scratch home on purpose: what this file compares is what a run left
+/// in lemonfiber's own directories, and somebody else's working copy is neither. A
+/// source that sat inside one would show up in the comparison as a change the run
+/// did not make.
+///
+/// Whole rather than minimal, because a manifest the reader refuses is turned back
+/// before it reaches the write — which would be a pass saying nothing about the
+/// thing this drives it for.
+fn a_plugin_source() -> PathBuf {
+    let at = std::env::temp_dir().join(format!(
+        "lemonfiber-rehearsed-plugin-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&at);
+    let _ = std::fs::create_dir_all(&at);
+    let _ = std::fs::write(
+        at.join("plugin.toml"),
+        r#"
+schema_version = 1
+
+[plugin]
+id          = "komga"
+name        = "Komga"
+version     = "1.2.0"
+description = "Reads your comics on any browser"
+without_it  = "Files on disk, no way to read them"
+upstream    = "https://example.invalid"
+license     = "MIT"
+forms       = ["library"]
+
+[[service]]
+id          = "komga"
+name        = "Komga"
+image       = "example.invalid/komga"
+digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+tag         = "1.11.0"
+port        = 25600
+bind        = "lan"
+criticality = "important"
+takes_data  = true
+config_path = "/config"
+"#,
+    );
+    at
 }
 
 /// Every file under `root`, with its bytes, so two readings can be compared.

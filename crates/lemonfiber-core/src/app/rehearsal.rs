@@ -33,6 +33,7 @@
 use lemonfiber_ports::error::{Amiss, Code, Problem, Remedy, Severity, State};
 
 use super::command::{Asking, Keeping, Linking, MigrateAction};
+use super::plugins;
 use super::setup::SetupAction;
 use super::{repair, restore, update, Command, Ctx};
 
@@ -120,6 +121,7 @@ pub fn asked(command: &Command) -> Asked {
         Command::Outbound => ("outbound", Rehearsal::Reads),
         Command::Provenance => ("provenance", Rehearsal::Reads),
         Command::Stored => ("stored", Rehearsal::Reads),
+        Command::Plugins(plugins::Asked::Installed) => ("plugin installed", Rehearsal::Reads),
         Command::Archives => ("archives", Rehearsal::Reads),
         Command::Migrate(MigrateAction::Survey) => ("migrate", Rehearsal::Reads),
         Command::Credentials(Asking::Read | Asking::Reveal { .. }) => {
@@ -179,6 +181,10 @@ pub fn asked(command: &Command) -> Asked {
         Command::Restart { .. } => ("restart", Rehearsal::Reports),
         Command::Pull { .. } => ("pull", Rehearsal::Reports),
         Command::ConfigSet(_) => ("config set", Rehearsal::Reports),
+        // The whole of what it changes is one small record, and it is written last:
+        // everything before it is reading the manifest and settling what the install
+        // decides, which a rehearsal does in full and then stops one line short of.
+        Command::Plugins(plugins::Asked::Install { .. }) => ("plugin install", Rehearsal::Reports),
         Command::Wiring(Linking::Fill(_)) => ("wiring fill", Rehearsal::Reports),
         Command::Quality(_) => ("quality", Rehearsal::Reports),
         Command::Alerts(_) => ("alerts", Rehearsal::Reports),
@@ -438,6 +444,7 @@ mod tests {
         MigrateAction, QualityAction, Removing, Setting,
     };
     use crate::app::engine::Waiting;
+    use crate::app::plugins;
     use crate::app::setup::SetupAction;
     use crate::app::Command;
 
@@ -666,6 +673,7 @@ mod tests {
             Command::Outbound,
             Command::Provenance,
             Command::Stored,
+            Command::Plugins(plugins::Asked::Installed),
             Command::Archives,
             Command::Migrate(MigrateAction::Survey),
             Command::Credentials(Asking::Read),
@@ -805,6 +813,9 @@ mod tests {
             }),
             Command::Setup(SetupAction::Apply),
             Command::Backup { service: None },
+            Command::Plugins(plugins::Asked::Install {
+                path: std::path::PathBuf::from("/srv/komga"),
+            }),
         ]
     }
 

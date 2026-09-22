@@ -84,6 +84,8 @@ pub enum Outcome {
     Substituted(crate::model::SubstitutionReport),
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving),
+    /// Every plugin installed on this machine, and what installing one came to.
+    Plugins(crate::plugin::Installs),
     /// Where every service in this stack comes from, and under what licence.
     Provenance(crate::model::ProvenanceReport),
     /// Every credential this stack holds, and what became of acting on one.
@@ -165,6 +167,7 @@ impl Outcome {
             Self::Wiring(_) => crate::model::kind::WIRING,
             Self::Substituted(_) => crate::model::kind::SUBSTITUTION,
             Self::Outbound(_) => crate::model::kind::OUTBOUND,
+            Self::Plugins(_) => crate::model::kind::PLUGINS,
             Self::Provenance(_) => crate::model::kind::PROVENANCE,
             Self::Credentials(_) => crate::model::kind::CREDENTIALS,
             Self::Stored(_) => crate::model::kind::STORED,
@@ -225,6 +228,7 @@ impl serde::Serialize for Outcome {
             Self::Wiring(report) => report.serialize(serializer),
             Self::Substituted(report) => report.serialize(serializer),
             Self::Outbound(report) => report.serialize(serializer),
+            Self::Plugins(report) => report.serialize(serializer),
             Self::Provenance(report) => report.serialize(serializer),
             Self::Credentials(inventory) => inventory.serialize(serializer),
             Self::Stored(report) => report.serialize(serializer),

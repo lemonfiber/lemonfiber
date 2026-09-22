@@ -25,7 +25,7 @@ Commands:
   alerts        Choose how much lemonfiber tells you about, in plain language
   quality       Choose how good your media should look, in plain language
   doctor        Run the checks that prove the stack is doing what it should
-  plugin        Read what a plugin may claim, where it may contribute, and how it is written
+  plugin        Install a plugin, say what is installed, and read what one may declare
   watch         Guard the data location while forms run, stopping them if it disappears
   hosting       Say what this machine keeps running when no terminal is open
   trace         Follow one show or film across the services — "where is my show?"
