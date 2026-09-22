@@ -782,12 +782,24 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
             "env",
             "grants",
             "cap_add",
+            "cap_drop",
             "devices",
+            "device_cgroup_rules",
             "privileged",
             "network_mode",
+            "networks",
             "user",
+            "userns_mode",
+            "group_add",
             "volumes",
+            "volumes_from",
             "mounts",
+            "tmpfs",
+            "security_opt",
+            "sysctls",
+            "ipc",
+            "pid",
+            "env_file",
             "depends_on",
             "extends",
             "profile",
@@ -813,6 +825,47 @@ call = { method = \"POST\", to = \"k\", path = \"/x\", headers = { Authorization
                 "the format declares `{absent}`, which is a way to reach past what it says"
             );
         }
+    }
+
+    /// What a plugin's service may declare, and the whole of what it may declare.
+    ///
+    /// The complement of the rule above, and it is here because a deny-list cannot
+    /// close a format on its own: a field added under a name nobody thought to ban
+    /// passes that one and is read by the reader all the same. The set of fields a
+    /// service declares *is* the set of things a plugin may ask for, so it is held as
+    /// a set — a field added to this table fails here naming itself, whatever it is
+    /// called, and whoever added it has to say why it belongs rather than why it was
+    /// not banned.
+    ///
+    /// The service table alone, because it is the only block from which a container
+    /// is written. What the other blocks may not carry is the list above, which is
+    /// asked of every table there is.
+    #[test]
+    fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
+        const PERMITTED: &[&str] = &[
+            "bind",
+            "config_path",
+            "criticality",
+            "digest",
+            "health",
+            "id",
+            "image",
+            "media_types",
+            "name",
+            "port",
+            "provides",
+            "tag",
+            "takes_data",
+        ];
+        let published = published();
+        let declared: BTreeSet<String> = published
+            .as_value()
+            .pointer("/$defs/PluginService/properties")
+            .and_then(Json::as_object)
+            .map(|held| held.keys().cloned().collect())
+            .unwrap_or_default();
+        let permitted: BTreeSet<String> = PERMITTED.iter().map(|&one| one.to_owned()).collect();
+        assert_eq!(declared, permitted);
     }
 
     /// A plugin cannot say what reaches what.

@@ -235,6 +235,8 @@ The manifest is held to everything `claims` holds it to before anything is writt
 
 What is written is the record of what the install settled: the plugin, and for each of its services the image, the digest that pins what runs, the tier it is published on and where inside its container its own configuration directory is mounted. That record is the answer every later step reads — the author's file may be edited or deleted the moment this is done, and a run that went back to it would be answering a question about a document rather than about this machine.
 
+It then says what container lemonfiber writes from that record, which is the question worth asking before a stranger's service is on the machine: the image pinned to its digest, the profile it sits in, the interface its tier publishes it on, and every mount it can ever have. A plugin supplies none of that and there is no field in which it could ask for more of it.
+
 Installing over an installation is refused naming it: that is an update, which puts one set of changes back before it applies another.
 
 `--dry-run` settles everything the real run settles, says the same account of it, and writes nothing.

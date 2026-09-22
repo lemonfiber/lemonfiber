@@ -348,6 +348,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             named(&install.would)
         ));
         lines.extend(services(&install.would));
+        lines.extend(container(&install.would));
         if !install.recorded {
             lines.spaced("Nothing was written. Run it again without --dry-run to install it.");
         }
@@ -358,6 +359,29 @@ pub(crate) fn installs(report: &Installs) -> Lines {
     for one in &report.installed {
         lines.spaced(format!("  {}", named(one)));
         lines.extend(services(one));
+    }
+    lines
+}
+
+/// The container lemonfiber writes for what was installed.
+///
+/// Shown with the install rather than kept for whoever goes looking, because the
+/// question it answers is the one an operator has before they trust a stranger's
+/// plugin: *what is this thing allowed to touch.* A container definition is not
+/// pleasant reading, and it is the only reading that answers that honestly — every
+/// mount it can ever have is in it, and there is no second file adding to it.
+///
+/// Derived here rather than carried on the report. The record holds what installing
+/// decided and this is what follows from it, so a field on the report would be a copy
+/// of a derivation, free to disagree with the derivation the moment either moved.
+///
+/// Indented under the install like everything else it is shown beside, so the entry
+/// reads as part of the answer rather than as a file somebody pasted into it.
+fn container(one: &Installed) -> Lines {
+    let mut lines = Lines::default();
+    lines.spaced("    The container lemonfiber writes for it, from that and from nothing else:");
+    for line in lemonfiber_core::plugin::written(one).lines() {
+        lines.put(format!("      {line}"));
     }
     lines
 }
@@ -576,6 +600,61 @@ mod tests {
         assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
         assert!(said.contains("One plugin is installed:"), "{said}");
         assert!(!said.contains("Nothing was written"), "{said}");
+    }
+
+    /// The container is shown with the install, and it is the one the core writes.
+    ///
+    /// Asserted against the core's own answer rather than against a copy of the text,
+    /// so this holds the renderer to showing what is generated rather than to a
+    /// second rendering of it that could drift. What is checked here is the framing —
+    /// that each line arrives indented under the install, under a heading saying what
+    /// it is — because that is this renderer's share of the answer and the rest is
+    /// the generator's.
+    #[test]
+    fn the_install_shows_the_container_that_is_written_for_it() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: vec![one.clone()],
+            install: Some(Install {
+                would: one.clone(),
+                recorded: true,
+            }),
+        })
+        .text();
+        assert!(
+            said.contains("The container lemonfiber writes for it"),
+            "{said}"
+        );
+        for line in lemonfiber_core::plugin::written(&one).lines() {
+            assert!(said.contains(&format!("      {line}")), "{line} in {said}");
+        }
+        assert!(said.contains("      services:"), "{said}");
+    }
+
+    /// A rehearsal is shown the same container the real run is.
+    ///
+    /// What installing decides is what a rehearsal settles, so a rehearsal that
+    /// showed less of it would be a rehearsal of something else — and the one an
+    /// operator most wants the container for is the one before anything is written.
+    #[test]
+    fn a_rehearsal_is_shown_the_same_container_the_install_is() {
+        let one = recorded("komga", Some(household()));
+        let shown = |recorded: bool| {
+            installs(&Installs {
+                installed: Vec::new(),
+                install: Some(Install {
+                    would: one.clone(),
+                    recorded,
+                }),
+            })
+            .text()
+        };
+        let written = lemonfiber_core::plugin::written(&one);
+        for line in written.lines() {
+            let indented = format!("      {line}");
+            assert!(shown(false).contains(&indented), "{line}");
+            assert!(shown(true).contains(&indented), "{line}");
+        }
     }
 
     /// A rehearsal says it was not written in the same breath as what it settled.

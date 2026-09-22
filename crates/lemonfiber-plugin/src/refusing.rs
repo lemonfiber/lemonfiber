@@ -758,6 +758,96 @@ capture = [{ name = "token", from = "json.token", origin = "stack-service" }]
         }
     }
 
+    /// Every way a plugin could ask for more of the machine, and what it is called.
+    ///
+    /// Each is spelled the way a container engine spells it, because that is what an
+    /// author copying an entry out of somewhere else would write. `grants` earns a row
+    /// beside `cap_add` rather than being folded into it: it is what the *stack's* own
+    /// manifest calls a kernel capability, so it is the spelling somebody reading
+    /// `stack.toml` for an example would reach for.
+    const MORE_OF_THE_MACHINE: [(&str, &str, &str); 11] = [
+        (
+            "a mount of its own",
+            r#"volumes = ["/etc:/etc"]"#,
+            "volumes",
+        ),
+        ("a device", r#"devices = ["/dev/net/tun"]"#, "devices"),
+        (
+            "a kernel capability",
+            r#"cap_add = ["NET_ADMIN"]"#,
+            "cap_add",
+        ),
+        (
+            "a kernel capability, as the stack spells it",
+            r#"grants = ["NET_ADMIN"]"#,
+            "grants",
+        ),
+        (
+            "a network of its own",
+            r#"network_mode = "host""#,
+            "network_mode",
+        ),
+        ("a privileged container", "privileged = true", "privileged"),
+        ("a user override", r#"user = "0:0""#, "user"),
+        ("an entrypoint", r#"entrypoint = "/bin/sh""#, "entrypoint"),
+        ("a command", r#"command = "cat /etc/shadow""#, "command"),
+        (
+            "an environment variable",
+            r#"environment = { TZ = "UTC" }"#,
+            "environment",
+        ),
+        (
+            "the container runtime's own socket, as a mount by another name",
+            r#"volumes_from = ["docker"]"#,
+            "volumes_from",
+        ),
+    ];
+
+    /// The installable manifest with one of those declared on its service.
+    fn asking(declared: &str) -> String {
+        INSTALLABLE.replace(
+            "takes_data  = true",
+            &format!("takes_data  = true\n{declared}"),
+        )
+    }
+
+    /// Every one of them is refused, and the refusal names the field.
+    ///
+    /// The register above is about reaching past what a manifest *declared*. This is
+    /// about reaching past what any manifest may declare at all, which fails
+    /// differently: there is no field to ask in, so what comes back is a malformed
+    /// manifest rather than a permission withheld. The difference is worth keeping
+    /// visible — a rule somebody has to remember and apply can be forgotten for one
+    /// plugin, and an absent field cannot.
+    #[test]
+    fn every_way_a_plugin_could_ask_for_more_of_the_machine_is_refused_by_name() {
+        for (reach, declared, named) in MORE_OF_THE_MACHINE {
+            let said = said(&asking(declared));
+            assert!(
+                names(&said, &[named]),
+                "{reach} is refused, and named: {said:?}"
+            );
+        }
+    }
+
+    /// And none of them is a manifest with the ask quietly taken out.
+    ///
+    /// The shape faults yield no manifest at all, so there is nothing for a caller to
+    /// install on narrowed terms. Asked of the same list rather than of a few of it,
+    /// because *refused* and *narrowed* look identical from a test that only reads
+    /// the words in a refusal — and a field that parsed and was dropped would pass
+    /// the one above while leaving the plugin running under a declaration nobody
+    /// could read.
+    #[test]
+    fn a_manifest_asking_for_more_of_the_machine_yields_nothing_to_act_on() {
+        for (reach, declared, _) in MORE_OF_THE_MACHINE {
+            assert!(
+                Manifest::from_toml(&asking(declared)).ok().is_none(),
+                "{reach} yields no manifest"
+            );
+        }
+    }
+
     /// An over-reaching manifest is answered with a refusal, not with a smaller
     /// manifest.
     ///
