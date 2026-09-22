@@ -3,10 +3,12 @@
 //! [`crate::conforming`] answers whether a file is a manifest at all — the fields, the
 //! kinds, the closed sets. What is left is everything the shape cannot say: that a
 //! digest is a digest, that a path is one directory and not the library, that a
-//! capability asked for is one this build has. Those are rules over values, and a
-//! generated schema is the wrong place for them: a schema an author's editor enforces
-//! has to describe the reader exactly, and a reader that refused a well-shaped digest
-//! for being the wrong length would be describing a rule rather than a shape.
+//! capability asked for is one this build has, that a name is not one the stack
+//! already holds, that nothing is reached which was not declared. Those are rules over
+//! values, and a generated schema is the wrong place for them: a schema an author's
+//! editor enforces has to describe the reader exactly, and a reader that refused a
+//! well-shaped digest for being the wrong length would be describing a rule rather
+//! than a shape.
 //!
 //! Every one of them is reported in one pass with the others, because an author fixing
 //! a third-party manifest one fault per run is guessing. Nothing here stops at the first
@@ -16,7 +18,17 @@
 //! answered for before a value is looked at, and the values are answered for together,
 //! so what a caller gets back is every reason this build would not act on the file
 //! rather than the first one.
+//!
+//! **And refused rather than narrowed.** There is no route through here that drops
+//! the part of a manifest it will not accept and applies the rest, and nowhere for
+//! one to go: this reads a manifest and answers about it. A plugin installed with
+//! the excess quietly removed would be running under a declaration that no longer
+//! describes it, and the declaration is the entire basis on which a stranger's
+//! contribution was judged.
 
+mod bundled;
+mod colliding;
+mod reaching;
 mod recipes;
 
 use crate::offering;
@@ -30,12 +42,19 @@ use crate::{claiming, Violation};
 /// contribution may collide with, and a copy kept here would go on reserving a name
 /// nothing holds.
 ///
+/// What the *stack* holds is read rather than passed, and the difference between the
+/// two is which of them has a file. The doctor's register is assembled in code and
+/// exists nowhere else; the stack description is the artefact this binary is built
+/// from, so [`bundled`] reads that rather than keeping a second answer beside it.
+///
 /// An empty answer is a manifest this build would act on.
 #[must_use]
 pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     let mut found = claiming::violations(manifest, occupied);
     declaring(&manifest.plugin, &mut found);
     running(manifest, &mut found);
+    colliding::with_the_stack(manifest, &mut found);
+    reaching::beyond(manifest, &mut found);
     requiring(manifest, &mut found);
     recipes::declared(manifest, &mut found);
     readable(manifest, &mut found);
@@ -325,7 +344,7 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{declared, refusals};
+    use super::{declared, refusals, Violation};
     use crate::schema::Manifest;
 
     /// The identities lemonfiber's own registers hold, which these fixtures avoid.
@@ -418,7 +437,7 @@ capabilities = ["doctor.contribute"]
 "#;
 
     /// What this build says about a manifest, as one line per refusal.
-    fn said(text: &str) -> Vec<String> {
+    pub(crate) fn said(text: &str) -> Vec<String> {
         Manifest::from_toml(text).map_or_else(
             |refused| vec![refused.to_string()],
             |manifest| {
@@ -431,13 +450,13 @@ capabilities = ["doctor.contribute"]
     }
 
     /// Whether some refusal carries every one of these words.
-    fn names(said: &[String], words: &[&str]) -> bool {
+    pub(crate) fn names(said: &[String], words: &[&str]) -> bool {
         said.iter()
             .any(|one| words.iter().all(|word| one.contains(word)))
     }
 
     /// One edit to a manifest this build would act on, and what it then says about it.
-    fn without(before: &str, after: &str) -> Vec<String> {
+    pub(crate) fn without(before: &str, after: &str) -> Vec<String> {
         assert!(
             INSTALLABLE.contains(before),
             "the fixture still says {before:?}"
@@ -642,5 +661,169 @@ capabilities = ["doctor.contribute"]
         let read = Manifest::from_toml(crate::schema::tests::WHOLE).ok();
         let swept = read.as_ref().map(|manifest| declared(manifest).len());
         assert_eq!(swept, Some(22));
+    }
+
+    /// A recipe that takes a value out of an answer and says nothing about holding
+    /// it, for the two tests that need a reach the reader parses rather than one it
+    /// refuses as a shape.
+    const UNDECLARED: &str = r#"
+[[recipe]]
+id    = "adopt-existing-library"
+title = "Point it at the comics the stack already files"
+why   = "The stack already files comics, and a fresh Komga knows nothing about it."
+
+[[recipe.step]]
+id      = "sign-in"
+call    = { method = "POST", to = "komga", path = "/api/v1/login" }
+expect  = { status = 200 }
+capture = [{ name = "token", from = "json.token", origin = "stack-service" }]
+"#;
+
+    /// Every way this format lets a manifest reach past what it declares.
+    ///
+    /// The register itself, as behaviour. Each of these is somewhere a manifest can
+    /// name something that is not its own, and each is refused — which is the whole
+    /// of what makes reading one worth doing. Kept together rather than left to the
+    /// module that implements each, because the thing worth knowing is that the
+    /// *list* is answered for: a way in that nobody refused is not visible from
+    /// inside the rule that does not cover it.
+    #[test]
+    fn every_way_a_manifest_can_reach_past_what_it_declares_is_refused() {
+        let reaches: [(&str, String, &str); 8] = [
+            (
+                "a field the format has no declaration for",
+                INSTALLABLE.replace(
+                    "takes_data  = true",
+                    "takes_data  = true\nprivileged = true",
+                ),
+                "privileged",
+            ),
+            (
+                "an id the stack already holds",
+                INSTALLABLE.replace(
+                    "[[service]]\nid          = \"komga\"",
+                    "[[service]]\nid          = \"jellyfin\"",
+                ),
+                "service jellyfin.id",
+            ),
+            (
+                "a port the stack already publishes on",
+                INSTALLABLE.replace("port        = 25600", "port        = 8096"),
+                "service komga.port",
+            ),
+            (
+                "a name the stack's proxy already answers on",
+                INSTALLABLE.replace(
+                    r#"hostname        = "comics""#,
+                    r#"hostname        = "watch""#,
+                ),
+                "wiring.hostname",
+            ),
+            (
+                "a directory outside the one it is given",
+                INSTALLABLE.replace(
+                    r#"config_path = "/config""#,
+                    r#"config_path = "/data/komga""#,
+                ),
+                "service komga.config_path",
+            ),
+            (
+                "a capability of lemonfiber's this build does not offer",
+                INSTALLABLE.replace(
+                    r#"capabilities = ["doctor.contribute"]"#,
+                    r#"capabilities = ["doctor.contribute", "service.add"]"#,
+                ),
+                "service.add",
+            ),
+            (
+                "an identity a register lemonfiber runs already holds",
+                INSTALLABLE.replace(
+                    r#"id        = "komga:claimed""#,
+                    r#"id        = "storage.hardlinks""#,
+                ),
+                "storage.hardlinks",
+            ),
+            (
+                "a value taken out of an answer and never declared",
+                format!("{INSTALLABLE}{UNDECLARED}"),
+                "[[secret]]",
+            ),
+        ];
+        for (reach, text, named) in reaches {
+            let said = said(&text);
+            assert!(
+                names(&said, &[named]),
+                "{reach} is refused, and named: {said:?}"
+            );
+        }
+    }
+
+    /// An over-reaching manifest is answered with a refusal, not with a smaller
+    /// manifest.
+    ///
+    /// The distinction the whole extension design turns on. Confining one — taking
+    /// the reach out and installing the rest — would leave a plugin running under a
+    /// declaration that no longer describes it, and the declaration is the only
+    /// thing anybody read. So the shape faults yield no manifest at all, and the
+    /// value faults leave the manifest exactly as it was written and say why it is
+    /// refused.
+    #[test]
+    fn a_manifest_that_over_reaches_is_refused_rather_than_narrowed() {
+        let asking = INSTALLABLE.replace(
+            "takes_data  = true",
+            "takes_data  = true\nprivileged = true",
+        );
+        assert!(Manifest::from_toml(&asking).ok().is_none());
+
+        let reaching = format!("{INSTALLABLE}{UNDECLARED}");
+        let read = Manifest::from_toml(&reaching).ok();
+        let found: Vec<String> = read
+            .as_ref()
+            .map(|manifest| refusals(manifest, OCCUPIED))
+            .unwrap_or_default()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert!(
+            names(&found, &["[[secret]]"]),
+            "the reach is one the reader parses and the rules refuse by name: {found:?}"
+        );
+        assert_eq!(
+            read.as_ref()
+                .and_then(|manifest| manifest.recipes.first())
+                .and_then(|recipe| recipe.steps.first())
+                .and_then(|step| step.capture.first())
+                .map(|capture| capture.name.as_str()),
+            Some("token"),
+            "and the reach is still there to read, rather than taken out and the rest kept"
+        );
+    }
+
+    /// There is no field by which a refusal could be downgraded to a warning.
+    ///
+    /// The other way confinement arrives: not by editing the manifest but by
+    /// grading the answer, so that some refusals stop the install and others are
+    /// printed. A refusal here is where it is and what is wrong with it, and
+    /// nothing else — every one of them is a reason this build will not act on the
+    /// file.
+    #[test]
+    fn a_refusal_carries_nowhere_to_say_it_is_only_advisory() {
+        let one = Violation {
+            location: "service komga.port".to_owned(),
+            message: "is the port the stack already publishes jellyfin on".to_owned(),
+        };
+        let carried: Vec<String> = serde_json::to_value(&one)
+            .ok()
+            .and_then(|held| {
+                held.as_object()
+                    .map(|fields| fields.keys().cloned().collect())
+            })
+            .unwrap_or_default();
+        assert_eq!(
+            carried,
+            vec!["location".to_owned(), "message".to_owned()],
+            "a refusal says where and what, and carries no grade by which one could be \
+             reported and proceeded past"
+        );
     }
 }

@@ -6,6 +6,12 @@
 //! asking for more than the format can express is refused by a reader rather than
 //! confined by a sandbox.
 //!
+//! Two things are guarded, because that sentence has two halves and they fail
+//! separately. Nothing here can run a part of a plugin. And nothing here confines
+//! one that over-reached instead of refusing it: there is no sandbox to install it
+//! into and no route that takes the reach out and applies the rest, and the moment
+//! somebody starts building either is the moment it is still a choice.
+//!
 //! Today that property holds for the strongest reason available — nothing in this
 //! workspace has any way to load a unit of code or evaluate a program handed to
 //! it. That is also the weakest kind of guarantee to keep, because it is true by
@@ -27,7 +33,7 @@
 //! both are narrower than they sound: `unsafe` is forbidden across this workspace,
 //! which is what a library would need to enter machine code it just mapped.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 mod refused;
 mod source_tree;
@@ -48,6 +54,30 @@ const OFFERED: &[&str] = &[
     "load_plugin",
     "plugin_runtime",
     "run_contributed",
+];
+
+/// Words a surface would use if an over-reaching plugin were confined rather than
+/// refused.
+///
+/// The other half of the same property, and the one that would arrive by good
+/// intentions rather than by carelessness. A manifest asking for more than it
+/// declared is refused whole: there is no sandbox it is installed into instead, and
+/// no route that takes the reach out and applies the rest. Both of those are
+/// reasonable-sounding things for somebody to build, which is exactly why the point
+/// at which one is being built is worth noticing — a plugin running under a
+/// declaration that no longer describes it has lost the only property that made
+/// reading its manifest worth doing.
+const CONFINED: &[&str] = &[
+    "sandbox_plugin",
+    "plugin_sandbox",
+    "confine_plugin",
+    "quarantine_plugin",
+    "restrict_plugin",
+    "drop_undeclared",
+    "ignore_undeclared",
+    "skip_undeclared",
+    "strip_undeclared",
+    "install_anyway",
 ];
 
 /// Nothing in the dependency graph can load code or evaluate a program.
@@ -110,20 +140,93 @@ fn every_stem_this_sweeps_for_is_shaped_like_a_package_name() {
 /// deleted rather than obeyed.
 #[test]
 fn nothing_offers_to_run_a_part_of_a_plugin() {
-    let offering: Vec<String> = shipped()
-        .into_iter()
+    let offering = saying(&shipped(), OFFERED);
+    assert!(
+        offering.is_empty(),
+        "these name a way to run part of a plugin, and the feature proposing one is not \
+         agreed — nothing may offer it before that is settled: {offering:?}"
+    );
+}
+
+/// Nothing here offers to confine an over-reaching plugin rather than refuse it.
+///
+/// The shipped half only, for the reason above: the words are in this file because
+/// this file refuses them.
+#[test]
+fn nothing_offers_to_confine_a_plugin_instead_of_refusing_it() {
+    let confining = saying(&shipped(), CONFINED);
+    assert!(
+        confining.is_empty(),
+        "these name a way to install a plugin that reached past its own declaration with the \
+         reach taken out or fenced off, and a plugin running under a declaration that no \
+         longer describes it is what refusing one exists to prevent: {confining:?}"
+    );
+}
+
+/// The sweep is shown finding a word, on a corpus planted to hold one.
+///
+/// Two guards above are satisfied by an empty answer, and an empty answer is what a
+/// sweep reading the wrong corpus, or filtering on nothing, also gives. This is the
+/// half that tells those apart.
+#[test]
+fn the_sweep_finds_a_word_it_is_written_to_find() {
+    let planted = BTreeMap::from([
+        (
+            "crates/planted/src/lib.rs".to_owned(),
+            "fn sandbox_plugin() {}".to_owned(),
+        ),
+        (
+            "crates/planted/src/clean.rs".to_owned(),
+            "fn refuse() {}".to_owned(),
+        ),
+    ]);
+    assert_eq!(
+        saying(&planted, CONFINED),
+        vec!["crates/planted/src/lib.rs (sandbox_plugin)".to_owned()]
+    );
+    assert!(saying(&planted, OFFERED).is_empty());
+}
+
+/// Every word in a sweep is one a name could actually be, and is written once.
+///
+/// A sweep is only a guard while its words are ones somebody would type. A typo
+/// matches nothing, and a sweep of words that match nothing passes exactly as
+/// loudly as one that found nothing.
+#[test]
+fn every_word_these_sweep_for_could_be_a_name() {
+    let malformed: Vec<&&str> = OFFERED
+        .iter()
+        .chain(CONFINED)
+        .filter(|word| {
+            word.len() < 2
+                || !word
+                    .chars()
+                    .all(|letter| letter.is_ascii_lowercase() || letter == '_')
+        })
+        .collect();
+    assert!(
+        malformed.is_empty(),
+        "these could not be part of a name, so they refuse nothing: {malformed:?}"
+    );
+    let every: Vec<&&str> = OFFERED.iter().chain(CONFINED).collect();
+    assert_eq!(
+        every.len(),
+        every.iter().collect::<BTreeSet<_>>().len(),
+        "a word is written twice, which means one of them was added without reading the list"
+    );
+}
+
+/// Which files in a corpus name one of these words, and which of them they name.
+fn saying(corpus: &BTreeMap<String, String>, words: &[&str]) -> Vec<String> {
+    corpus
+        .iter()
         .filter_map(|(file, ships)| {
-            let said: Vec<&str> = OFFERED
+            let said: Vec<&str> = words
                 .iter()
                 .filter(|word| ships.contains(**word))
                 .copied()
                 .collect();
             (!said.is_empty()).then(|| format!("{file} ({})", said.join(", ")))
         })
-        .collect();
-    assert!(
-        offering.is_empty(),
-        "these name a way to run part of a plugin, and the feature proposing one is not \
-         agreed — nothing may offer it before that is settled: {offering:?}"
-    );
+        .collect()
 }

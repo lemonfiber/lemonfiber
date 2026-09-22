@@ -32,7 +32,11 @@ const CLOSES: &str = "}}";
 ///
 /// Closed, because a recipe's calls are the riskiest thing in the format and the set of
 /// verbs it needs is small and known. A word outside it is one no runner could make.
-const METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE"];
+///
+/// Reachable from beside this, where a verb is asked whether it changes what it is
+/// sent to. Two lists of verbs would be two answers to what a call may say, and the
+/// one that fell behind would be classifying a word the other had just admitted.
+pub(super) const METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 /// Everything this build refuses about the recipes a manifest declares.
 pub(super) fn declared(manifest: &Manifest, found: &mut Vec<Violation>) {
