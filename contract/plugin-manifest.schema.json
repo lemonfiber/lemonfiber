@@ -938,7 +938,7 @@
           "default": null
         },
         "hostname": {
-          "description": "The label in front of the operator's domain. A single DNS label — not a name,\nan address or a port. Defaults to the plugin's id.",
+          "description": "The label in front of the operator's domain. A single DNS label — not a name,\nan address or a port. Defaults to the service's id.",
           "type": [
             "string",
             "null"

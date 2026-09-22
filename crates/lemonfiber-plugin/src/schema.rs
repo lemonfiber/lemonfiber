@@ -200,6 +200,27 @@ pub struct Service {
     pub config_path: Option<String>,
 }
 
+/// Where a service's own configuration directory lands when it names nowhere.
+///
+/// A LinuxServer.io convention rather than a standard, which is why it is the
+/// fallback rather than the rule. Published as a constant because it is part of the
+/// contract an author writes against: a manifest that leaves the field out has still
+/// said where its directory goes, and the answer is this.
+pub const CONFIGURATION: &str = "/config";
+
+impl Service {
+    /// Where inside the container this service's one configuration directory is
+    /// mounted, whether or not the manifest said.
+    ///
+    /// Stated once, beside the field, so that the reader deciding what to write and
+    /// the record saying what was written cannot default differently. Two callers
+    /// each reaching for the constant is two places the convention can move.
+    #[must_use]
+    pub fn configuration(&self) -> &str {
+        self.config_path.as_deref().unwrap_or(CONFIGURATION)
+    }
+}
+
 /// How the stack's own services reach a plugin's service.
 ///
 /// The tier governs, not the plugin. Only a `lan` service is proxied, because the
@@ -210,13 +231,46 @@ pub struct Service {
 #[serde(deny_unknown_fields)]
 pub struct Wiring {
     /// The label in front of the operator's domain. A single DNS label — not a name,
-    /// an address or a port. Defaults to the plugin's id.
+    /// an address or a port. Defaults to the service's id.
     #[serde(default)]
     pub hostname: Option<String>,
     /// Which group on the bundled dashboard it appears under. Defaults to the group
     /// the stack uses for its tier.
     #[serde(default)]
     pub dashboard_group: Option<String>,
+}
+
+/// Where one service's own entry goes, once the manifest's defaults are taken.
+///
+/// A borrow of the manifest rather than a copy out of it, because nothing here is a
+/// decision this crate makes: it is what the author wrote, with the two defaults the
+/// contract states applied where they wrote nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Entry<'a> {
+    /// The single DNS label the service answers on.
+    pub hostname: &'a str,
+    /// The group on the bundled dashboard it appears under, where one was named.
+    pub group: Option<&'a str>,
+}
+
+impl Manifest {
+    /// Where this service's own entry goes, from what the manifest declared.
+    ///
+    /// The hostname falls back to the service's id rather than the plugin's: a label
+    /// is a fact about one container, and a default taken from the plugin would give
+    /// two of its services one address. The group has no fallback this crate can
+    /// state — which group a tier belongs to is the stack's answer, not the format's
+    /// — so nothing declared is answered as nothing declared rather than guessed at.
+    #[must_use]
+    pub fn entry<'a>(&'a self, service: &'a Service) -> Entry<'a> {
+        let declared = self.wiring.as_ref();
+        Entry {
+            hostname: declared
+                .and_then(|wiring| wiring.hostname.as_deref())
+                .unwrap_or(&service.id),
+            group: declared.and_then(|wiring| wiring.dashboard_group.as_deref()),
+        }
+    }
 }
 
 /// A value the plugin will hold.
@@ -326,7 +380,7 @@ pub enum HealthKind {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{Bind, Contribution, Criticality, Expected, HealthKind, Kind, Manifest};
+    use super::{Bind, Contribution, Criticality, Expected, HealthKind, Kind, Manifest, Service};
     use crate::Error;
 
     /// A manifest declaring every block the contract carries.
@@ -982,5 +1036,55 @@ forms       = ["library"]
             Manifest::from_toml("= not toml"),
             Err(Error::Syntax(_))
         ));
+    }
+
+    /// The whole fixture, for the two defaults below.
+    fn whole() -> Option<Manifest> {
+        Manifest::from_toml(WHOLE).ok()
+    }
+
+    #[test]
+    fn a_service_says_where_its_configuration_directory_goes_whether_or_not_it_declared_one() {
+        let manifest = whole();
+        let service = manifest.as_ref().and_then(|one| one.services.first());
+        assert_eq!(service.map(Service::configuration), Some("/config"));
+
+        let mut bare = service.cloned();
+        if let Some(bare) = bare.as_mut() {
+            bare.config_path = None;
+        }
+        assert_eq!(
+            bare.as_ref().map(Service::configuration),
+            Some(super::CONFIGURATION)
+        );
+    }
+
+    /// The label and the group the manifest declared, read as one answer so no
+    /// caller has to take the two defaults for itself.
+    #[test]
+    fn where_a_services_own_entry_goes_is_what_the_manifest_declared() {
+        let manifest = whole();
+        let entry = manifest
+            .as_ref()
+            .and_then(|one| one.services.first().map(|service| one.entry(service)));
+        assert_eq!(entry.map(|entry| entry.hostname), Some("comics"));
+        assert_eq!(entry.and_then(|entry| entry.group), Some("Library"));
+    }
+
+    /// A label is a fact about one container, so the fallback is the service's own
+    /// id: taking the plugin's would give two of its services one address. The
+    /// group has no fallback this crate can state, so nothing declared stays
+    /// nothing declared rather than being guessed at.
+    #[test]
+    fn a_manifest_declaring_no_wiring_leaves_the_service_its_own_id_and_no_group() {
+        let mut manifest = whole();
+        if let Some(manifest) = manifest.as_mut() {
+            manifest.wiring = None;
+        }
+        let entry = manifest
+            .as_ref()
+            .and_then(|one| one.services.first().map(|service| one.entry(service)));
+        assert_eq!(entry.map(|entry| entry.hostname), Some("komga"));
+        assert_eq!(entry.map(|entry| entry.group), Some(None));
     }
 }

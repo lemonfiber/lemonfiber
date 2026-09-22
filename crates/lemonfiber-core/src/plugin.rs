@@ -18,6 +18,7 @@
 //! one, because a plugin author will trust it.
 
 mod claimed;
+mod installed;
 // Reachable from the diagnostics register as well as from here. A plugin's row is
 // judged by the one evaluator its recordings are judged by, and the answer a live
 // service gives is read into the one shape a recorded answer is read into — which is
@@ -35,6 +36,9 @@ use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
     claimed, read, Claimed, Claiming, Contributed, Evidence, Ran, Unreadable, Verdict,
+};
+pub use installed::{
+    Already, Install, Installed, Installs, Placed, Reached, Register, Unreadable as Unrecorded,
 };
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};

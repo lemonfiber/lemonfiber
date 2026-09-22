@@ -54,6 +54,7 @@ mod migration;
 mod music;
 mod notify;
 mod outbox;
+pub mod plugins;
 mod preflight;
 pub mod putting_back;
 mod quality;
@@ -314,6 +315,21 @@ async fn watching(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> 
         .map(Outcome::Watch)
 }
 
+/// Held on until the arrangement changes under it, sweeping as it goes.
+///
+/// Beside the table for the reason [`watching`] is: this arm reached for something
+/// the caller never named. How often it wakes is this command's own, because a
+/// period in whole days has no moment to miss — and a surface that could choose it
+/// could choose one that misses the day.
+///
+/// It is also the one command here that acts while nobody is watching, which is why
+/// its period is named rather than defaulted: naming one records it and stops.
+async fn sweeping(ctx: &Ctx, arranged: Arranged) -> Result<Outcome, Box<Problem>> {
+    expiring::expiring(ctx, arranged, expiring::SWEEPING)
+        .await
+        .map(Outcome::Household)
+}
+
 /// The table itself: every command, and where it goes.
 ///
 /// Split from [`dispatch`] so that the three things asked of every command are asked
@@ -327,8 +343,6 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
         Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
-        // The same start with four questions in front of it and two behind it, none
-        // of which a start somebody typed should ask.
         Command::AtBoot => boot::at_boot(ctx).await,
         Command::Start { forms, services } => acting(ctx, &forms, Action::Start(services)).await,
         Command::Down { forms, wait } => engine::teardown(ctx, &forms, wait).await,
@@ -360,13 +374,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // to see after changing a limit is the limit, on the people it applies to.
         Command::Allowing(chosen) => asking::allowing(ctx, &chosen).await.map(Outcome::Household),
         Command::Deciding(decision) => decided(ctx, decision).await,
-        // The one command here that acts while nobody is watching, and so the one whose
-        // period is named rather than defaulted. Naming one records it and stops; running
-        // on it holds until the arrangement changes under it, and how often it wakes is
-        // this command's own because a period in whole days has no moment to miss.
-        Command::Expiring(arranged) => expiring::expiring(ctx, arranged, expiring::SWEEPING)
-            .await
-            .map(Outcome::Household),
+        Command::Expiring(arranged) => sweeping(ctx, arranged).await,
         // The short command that decides what becomes of the long ones. It reads
         // after it writes rather than reporting what a write claimed, because a written
         // definition is not a running command and this exists to tell the two apart.
@@ -401,6 +409,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Undo { run } => putting_back::undo(ctx, run).await,
         Command::Credentials(asked) => credentials::answer(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
+        Command::Plugins(action) => plugins::asked(ctx, &action),
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.
@@ -2592,6 +2601,7 @@ mod tests {
                 | Outcome::Wiring(_)
                 | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
+                | Outcome::Plugins(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
@@ -2655,6 +2665,7 @@ mod tests {
                 | Outcome::Wiring(_)
                 | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
+                | Outcome::Plugins(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
@@ -3519,6 +3530,7 @@ mod tests {
                 | Outcome::Wiring(_)
                 | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
+                | Outcome::Plugins(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)
@@ -4520,6 +4532,7 @@ mod tests {
                 | Outcome::Wiring(_)
                 | Outcome::Substituted(_)
                 | Outcome::Outbound(_)
+                | Outcome::Plugins(_)
                 | Outcome::Provenance(_)
                 | Outcome::Credentials(_)
                 | Outcome::Stored(_)

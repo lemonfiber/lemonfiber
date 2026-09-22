@@ -186,6 +186,17 @@ pub const EVERY: &[Entry] = &[
         at: Paths::refusals,
     },
     Entry {
+        accessor: "plugins",
+        what: "what is installed of somebody else's",
+        why: "Each plugin you installed, and what installing it settled: the images it runs, \
+              the digest that fixes each one, the tier each is published on and where inside \
+              its container it keeps its own state. It is the only record that a stranger's \
+              service is on this machine, so losing it does not leave you with no plugins — it \
+              leaves you with plugins nothing can account for.",
+        secret: false,
+        at: Paths::plugins,
+    },
+    Entry {
         accessor: "acknowledged",
         what: "the words you have gone and looked up",
         why: "So a report names a word you already know instead of explaining it again. What \

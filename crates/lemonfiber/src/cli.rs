@@ -34,7 +34,7 @@ pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
 pub use carried::{APP, STACK};
 pub use credentials::RawCredentials;
-pub use plugin::PluginCommand;
+pub use plugin::{Authoring, PluginCommand};
 pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};

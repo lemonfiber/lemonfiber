@@ -211,6 +211,7 @@ const fn situation(command: &Command) -> Option<Situation> {
         | Command::Provenance
         | Command::Credentials(..)
         | Command::Stored
+        | Command::Plugins(..)
         | Command::Forget { .. }
         | Command::SelfUpdate { .. }
         | Command::Uninstall(..)

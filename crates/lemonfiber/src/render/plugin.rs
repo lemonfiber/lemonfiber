@@ -1,20 +1,23 @@
-//! The published artefacts, on a terminal.
+//! Everything under the word `plugin`, on a terminal.
 //!
-//! The reader here is a plugin author rather than an operator, and what they are after
-//! is different: not *is my stack well* but *what may I write down*. So a capability
-//! leads with the prose a claimant is held to and the probes a claim has to bind, and a
-//! point leads with what a row carries — the parts somebody is about to copy into a
-//! manifest.
+//! Two readers, and the pages read differently for each. **For a plugin author** what
+//! is wanted is not *is my stack well* but *what may I write down*, so a capability
+//! leads with the prose a claimant is held to and the probes a claim has to bind, and
+//! a point leads with what a row carries — the parts somebody is about to copy into a
+//! manifest. Every one of those pages opens by saying which generation it is
+//! reporting: an author comparing what they were told with what their manifest was
+//! refused for needs to know whether the difference is their build or their file, and
+//! the generation is the only thing that answers that.
 //!
-//! Every one of them opens by saying which generation it is reporting. An author
-//! comparing what they were told with what their manifest was refused for needs to know
-//! whether the difference is their build or their file, and the generation is the only
-//! thing that answers that.
+//! **For an operator** the question is what a stranger's plugin is doing on their
+//! machine, so the install leads with the image and the digest that pins it, and says
+//! where each service keeps its state and how it is reached. No generation there: the
+//! answer is about this machine rather than about what a manifest may declare.
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Capabilities, Claimed, Claiming, Credential, Evidence, Points, Probe, Provenance, Ran, Verdict,
-    Vouched,
+    Capabilities, Claimed, Claiming, Credential, Evidence, Installed, Installs, Points, Probe,
+    Provenance, Ran, Reached, Verdict, Vouched,
 };
 
 use super::Lines;
@@ -326,6 +329,110 @@ fn counted(number: usize, thing: &str) -> String {
     }
 }
 
+/// What is installed on this machine, and what installing one came to.
+///
+/// The install leads where there was one, because that is what the operator just
+/// asked for and the listing beneath it is the context. A rehearsal says so in the
+/// same breath as what it settled, rather than in a line somebody may not reach:
+/// *this is what it would record* has to arrive with the record, not after it.
+pub(crate) fn installs(report: &Installs) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(install) = &report.install {
+        lines.put(format!(
+            "{} {}:",
+            if install.recorded {
+                "Installed"
+            } else {
+                "Would install"
+            },
+            named(&install.would)
+        ));
+        lines.extend(services(&install.would));
+        if !install.recorded {
+            lines.spaced("Nothing was written. Run it again without --dry-run to install it.");
+        }
+        lines.spaced(shelf(report.installed.len()));
+    } else {
+        lines.put(shelf(report.installed.len()));
+    }
+    for one in &report.installed {
+        lines.spaced(format!("  {}", named(one)));
+        lines.extend(services(one));
+    }
+    lines
+}
+
+/// How many are installed, said as a sentence rather than as a number.
+///
+/// None is its own sentence rather than a nought with a list after it: a heading
+/// promising entries and then having none reads as a listing that failed.
+fn shelf(installed: usize) -> String {
+    match installed {
+        0 => "No plugins are installed.".to_owned(),
+        1 => "One plugin is installed:".to_owned(),
+        many => format!("{many} plugins are installed:"),
+    }
+}
+
+/// A plugin as it is named in a listing: its id and the version that was installed.
+fn named(one: &Installed) -> String {
+    format!("{} {}", one.plugin, one.version)
+}
+
+/// What each of a plugin's services was placed as.
+///
+/// The digest rather than the tag as the leading fact about what runs, because the
+/// tag is a label its publisher can repoint and the digest is what is actually on
+/// this machine. Both are shown: one is what an operator recognises and the other is
+/// what they can check.
+fn services(one: &Installed) -> Lines {
+    let mut lines = Lines::default();
+    for service in &one.services {
+        lines.put(format!("    {}", service.service));
+        lines.put(format!("      image   {} {}", service.image, service.tag));
+        lines.put(format!("      digest  {}", service.digest));
+        lines.put(format!("      config  {}", service.config_path));
+        lines.put(format!(
+            "      reached {}",
+            reached(service.reached.as_ref())
+        ));
+        if service.takes_data {
+            lines.put("      library mounted".to_owned());
+        }
+    }
+    lines
+}
+
+/// How a service is reached, in the terms the tier decides.
+///
+/// A loopback service says so and names no address: lemonfiber renders one from the
+/// tier, and a line here that spelled one out would be a second answer free to
+/// disagree with the one the stack is written from.
+fn reached(reached: Option<&Reached>) -> String {
+    match reached {
+        None => "nothing — it publishes no port".to_owned(),
+        Some(Reached::Loopback { port, group }) => {
+            format!(
+                "this machine only, on port {port}{}",
+                panel(group.as_deref())
+            )
+        }
+        Some(Reached::Household {
+            port,
+            hostname,
+            group,
+        }) => format!(
+            "the household, as {hostname}, on port {port}{}",
+            panel(group.as_deref())
+        ),
+    }
+}
+
+/// The dashboard group, where the manifest named one.
+fn panel(group: Option<&str>) -> String {
+    group.map_or_else(String::new, |group| format!(", under {group}"))
+}
+
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::filling::{Filling, Shown};
@@ -333,7 +440,189 @@ mod tests {
         Claimed, Claiming, Contributed, Evidence, Ran, Verdict, Violation, Vouched,
     };
 
-    use super::{capabilities, claimed, claims, document, points};
+    use lemonfiber_core::plugin::{Install, Installed, Installs, Placed, Reached};
+
+    use super::{capabilities, claimed, claims, document, installs, points};
+
+    /// One plugin's record, as an install settles it.
+    ///
+    /// The library is mounted for a service that is reached and not for one that is
+    /// not, which is not a rule — it is the pair of shapes this renderer draws
+    /// differently, arranged so one listing exercises both.
+    fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
+        Installed {
+            plugin: plugin.to_owned(),
+            version: "1.2.0".to_owned(),
+            services: vec![Placed {
+                service: plugin.to_owned(),
+                image: format!("example.invalid/{plugin}"),
+                digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                    .to_owned(),
+                tag: "1.11.0".to_owned(),
+                config_path: "/app/data".to_owned(),
+                takes_data: reached.is_some(),
+                reached,
+            }],
+        }
+    }
+
+    /// A household service, as the record carries one.
+    fn household() -> Reached {
+        Reached::Household {
+            port: 25600,
+            hostname: "comics".to_owned(),
+            group: Some("Library".to_owned()),
+        }
+    }
+
+    #[test]
+    fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: None,
+        })
+        .text();
+        assert_eq!(said, "No plugins are installed.");
+    }
+
+    /// Where the configuration directory landed is the fact this record exists to
+    /// keep, so it is on the page rather than only in the document.
+    #[test]
+    fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
+        let said = installs(&Installs {
+            installed: vec![recorded("komga", Some(household()))],
+            install: None,
+        })
+        .text();
+        assert!(said.contains("One plugin is installed:"), "{said}");
+        assert!(said.contains("komga 1.2.0"), "{said}");
+        assert!(said.contains("config  /app/data"), "{said}");
+        assert!(said.contains("sha256:4f53cda1"), "{said}");
+        assert!(
+            said.contains("the household, as comics, on port 25600"),
+            "{said}"
+        );
+        assert!(said.contains("under Library"), "{said}");
+        assert!(said.contains("library mounted"), "{said}");
+    }
+
+    #[test]
+    fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
+        let said = installs(&Installs {
+            installed: vec![recorded("komga", Some(household())), recorded("plex", None)],
+            install: None,
+        })
+        .text();
+        assert!(said.contains("2 plugins are installed:"), "{said}");
+        assert!(said.contains("nothing — it publishes no port"), "{said}");
+        assert_eq!(
+            said.matches("library mounted").count(),
+            1,
+            "the service that does not mount the library said it did: {said}"
+        );
+    }
+
+    /// A loopback service says so and names no address: lemonfiber renders one from
+    /// the tier, and a line here spelling one out would be a second answer.
+    #[test]
+    fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
+        let said = installs(&Installs {
+            installed: vec![recorded(
+                "komga",
+                Some(Reached::Loopback {
+                    port: 9000,
+                    group: Some("Operators".to_owned()),
+                }),
+            )],
+            install: None,
+        })
+        .text();
+        assert!(said.contains("this machine only, on port 9000"), "{said}");
+        assert!(said.contains("under Operators"), "{said}");
+        assert!(
+            !said.contains("as komga"),
+            "a loopback service was given a name: {said}"
+        );
+    }
+
+    #[test]
+    fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
+        let said = installs(&Installs {
+            installed: vec![recorded(
+                "komga",
+                Some(Reached::Loopback {
+                    port: 9000,
+                    group: None,
+                }),
+            )],
+            install: None,
+        })
+        .text();
+        assert!(said.contains("this machine only, on port 9000"), "{said}");
+        assert!(!said.contains("under"), "{said}");
+    }
+
+    #[test]
+    fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: vec![one.clone()],
+            install: Some(Install {
+                would: one,
+                recorded: true,
+            }),
+        })
+        .text();
+        assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
+        assert!(said.contains("One plugin is installed:"), "{said}");
+        assert!(!said.contains("Nothing was written"), "{said}");
+    }
+
+    /// A rehearsal says it was not written in the same breath as what it settled.
+    /// An operator who reads only the first half must not read it as done.
+    #[test]
+    fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: vec![one.clone()],
+            install: Some(Install {
+                would: one,
+                recorded: false,
+            }),
+        })
+        .text();
+        assert!(said.starts_with("Would install komga 1.2.0:"), "{said}");
+        assert!(said.contains("Nothing was written."), "{said}");
+    }
+
+    /// A rehearsal on a machine with nothing on it says so, rather than heading a
+    /// list of none — and never counts the plugin it did not install.
+    #[test]
+    fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                would: recorded("komga", Some(household())),
+                recorded: false,
+            }),
+        })
+        .text();
+        assert!(said.contains("Nothing was written."), "{said}");
+        assert!(said.contains("No plugins are installed."), "{said}");
+        assert!(!said.contains("is installed:"), "{said}");
+    }
+
+    /// Through the dispatcher rather than by calling this module, because what the
+    /// terminal draws is what the printer chose for the outcome.
+    #[test]
+    fn the_printer_reaches_this_renderer_for_this_outcome() {
+        let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Plugins(Installs {
+            installed: vec![recorded("komga", Some(household()))],
+            install: None,
+        }))
+        .text();
+        assert!(drawn.contains("komga 1.2.0"), "{drawn}");
+    }
 
     /// One capability as the reader hands it over, with one probe that passed.
     fn claiming(name: &str, shown: Shown, filling: Option<Filling>) -> Claiming {

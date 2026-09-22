@@ -6,11 +6,9 @@ Part of the [command reference](../commands.md).
 ## `lemonfiber plugin`
 
 ```text
-Read what a plugin may claim, where it may contribute, and how it is written.
+Install a plugin, say what is installed, and read what one may declare.
 
-For somebody writing a plugin rather than running a stack. Everything under this word is a read of a document this build publishes and attaches to every release: the capabilities a service can claim, the places a plugin may extend lemonfiber itself, and the schema an editor validates `plugin.toml` against.
-
-Every one of them answers with no network, no catalogue and no stack running, and says which generation it is reporting — so an author who has to know whether a difference is their build or their manifest can tell.
+Five of the words under this one are documents for somebody writing a plugin, answered with no network, no catalogue and no stack running, each saying which generation it reports — so an author who has to know whether a difference is their build or their manifest can tell. The other two are about this machine: `install` settles what installing somebody else's plugin decides and writes it down, and `installed` reads that record back. Only the first writes anything.
 
 Usage: lemonfiber plugin [OPTIONS] <COMMAND>
 
@@ -20,6 +18,8 @@ Commands:
   schema            Print the schema an editor validates `plugin.toml` against
   claims            Read a plugin's source and say what its claims come to
   provenance        Ask each image's registry whether anybody has said it is theirs
+  install           Install a plugin, recording what installing it decided
+  installed         Say what is installed, and what each install decided
   help              Print this message or the help of the given subcommand(s)
 
 Options:
@@ -206,6 +206,82 @@ Options:
 
       --key <PEM>
           A PEM public key to check signatures against. Repeatable
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin install`
+
+```text
+Install a plugin, recording what installing it decided.
+
+The manifest is held to everything `claims` holds it to before anything is written, and a plugin this build refuses is not installed — a refusal is total, so none of the manifest is acted on and the machine is left as it was.
+
+What is written is the record of what the install settled: the plugin, and for each of its services the image, the digest that pins what runs, the tier it is published on and where inside its container its own configuration directory is mounted. That record is the answer every later step reads — the author's file may be edited or deleted the moment this is done, and a run that went back to it would be answering a question about a document rather than about this machine.
+
+Installing over an installation is refused naming it: that is an update, which puts one set of changes back before it applies another.
+
+`--dry-run` settles everything the real run settles, says the same account of it, and writes nothing.
+
+Usage: lemonfiber plugin install [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The plugin's source: its directory, or the `plugin.toml` inside it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin installed`
+
+```text
+Say what is installed, and what each install decided.
+
+Read from the record rather than from the manifests, so it answers for a machine whose plugin sources are long gone. A machine with none answers with an empty list and says so.
+
+A record that is there and cannot be read is refused rather than answered as nothing installed: a stranger's service may be running, and *no plugins* is the one wrong answer that would be believed.
+
+Usage: lemonfiber plugin installed [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
 
       --dry-run
           Say what would happen, and change nothing

@@ -254,6 +254,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Invited(report) => invitation::invitation(report),
         Outcome::Removed(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
+        Outcome::Plugins(report) => plugin::installs(report),
         Outcome::Provenance(report) => provenance::comes_from(report),
         Outcome::Catalogue(report) => catalogue::holds(report),
         Outcome::Wiring(report) => wiring::wired(report),
