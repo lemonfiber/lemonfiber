@@ -239,16 +239,20 @@ mod tests {
         assert!(said.contains("outside the plugin"), "got: {said}");
     }
 
-    /// One request, read the way a manifest's is rather than built here.
+    /// Whether a recording is of the call these terms name, with the request read the
+    /// way a manifest's is rather than built here.
     ///
     /// `Request` refuses a field it does not know and takes its own defaults, so a
-    /// literal written beside it could name a shape a manifest cannot.
-    fn asking(method: &str, path: &str, accept: Option<&str>) -> lemonfiber_plugin::Request {
+    /// literal written beside it could name a shape a manifest cannot. It answers the
+    /// question rather than handing back the request because a helper that returned one
+    /// has to say what it does where the text is not a request — and the only answer
+    /// available there is a line the assertion above has already made unreachable.
+    fn is_of(recording: &Recording, method: &str, path: &str, accept: Option<&str>) -> bool {
         let quoted = accept.map_or_else(String::new, |accept| format!(r#", "accept": "{accept}""#));
         let text = format!(r#"{{"method": "{method}", "path": "{path}"{quoted}}}"#);
         let read = serde_json::from_str(&text);
         assert!(read.is_ok(), "the request does not read: {read:?}");
-        read.unwrap_or_else(|_| unreachable!("asserted just above"))
+        read.is_ok_and(|asked| records(recording, &asked))
     }
 
     #[test]
@@ -257,7 +261,7 @@ mod tests {
         let asked = |method: &str, path: &str| {
             recording
                 .as_ref()
-                .is_ok_and(|one| records(one, &asking(method, path, None)))
+                .is_ok_and(|one| is_of(one, method, path, None))
         };
         assert!(asked("GET", "/api/v1/series"), "the call it records");
         assert!(!asked("POST", "/api/v1/series"), "another method");
@@ -280,13 +284,17 @@ mod tests {
             negotiated.is_ok(),
             "the recording does not read: {negotiated:?}"
         );
-        let json = asking("GET", "/api/v1/series", Some("application/json"));
-        let bare = asking("GET", "/api/v1/series", None);
+        let asked = |recording: &Result<Recording, serde_json::Error>, accept: Option<&str>| {
+            recording
+                .as_ref()
+                .is_ok_and(|one| is_of(one, "GET", "/api/v1/series", accept))
+        };
+        let json = Some("application/json");
 
-        assert!(plain.as_ref().is_ok_and(|one| records(one, &bare)));
-        assert!(!plain.as_ref().is_ok_and(|one| records(one, &json)));
-        assert!(negotiated.as_ref().is_ok_and(|one| records(one, &json)));
-        assert!(!negotiated.as_ref().is_ok_and(|one| records(one, &bare)));
+        assert!(asked(&plain, None));
+        assert!(!asked(&plain, json));
+        assert!(asked(&negotiated, json));
+        assert!(!asked(&negotiated, None));
     }
 
     /// A refusal says what was asked for where anything was, and nothing where not.

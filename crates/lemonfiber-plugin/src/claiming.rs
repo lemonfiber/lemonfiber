@@ -528,6 +528,40 @@ why    = "Until somebody does, the first caller on the household network becomes
         );
     }
 
+    /// A second service of the same plugin, declaring what the first one does.
+    const ALONGSIDE: &str = r#"
+[[service]]
+id          = "komga-sync"
+name        = "Komga's reading history"
+image       = "example.invalid/komga-sync"
+digest      = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+tag         = "1.0.0"
+criticality = "enhancing"
+provides    = ["media.serve"]
+
+"#;
+
+    /// Something asks for a core capability by name and exactly one service answers it,
+    /// so two services of one plugin declaring it is not a choice an operator could make.
+    ///
+    /// Decided here rather than contested on their machine. A plugin is one install and
+    /// both halves arrive together, so there is no moment at which anybody is asked
+    /// which of the two to wire — and nothing downstream would say which one was.
+    #[test]
+    fn a_core_capability_two_of_one_plugins_services_declare_is_refused_naming_the_first() {
+        let said = against(&CLAIMANT.replace("[[claim]]", &format!("{ALONGSIDE}[[claim]]")));
+        assert!(
+            says(
+                &said,
+                &[
+                    "media.serve is a core capability and komga already declares it",
+                    "two answers to one question",
+                ]
+            ),
+            "got: {said:?}"
+        );
+    }
+
     /// Two claims for one capability are two answers to one question, and nothing here
     /// would say which of them was read.
     #[test]

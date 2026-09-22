@@ -373,6 +373,27 @@ mod tests {
         Some(at)
     }
 
+    /// The resolver that comparison is taken with stops at this project's own step, so
+    /// what is being agreed about is RFC 6901 and nothing beyond it.
+    ///
+    /// The selector is the one part of a key no other implementation has, so there is
+    /// nothing to hold it to — and a helper that walked one anyway would quietly widen
+    /// the agreement above into a comparison of our own rule against itself.
+    #[test]
+    fn the_resolver_that_agreement_is_taken_with_reaches_no_selector() {
+        let document = json!({"Setting": [{"id": "x", "value": false}]});
+        let list = vec![Step::Named("Setting".to_owned())];
+        assert_eq!(walked(&document, &list), document.pointer("/Setting"));
+        let picked = vec![
+            Step::Named("Setting".to_owned()),
+            Step::Selected {
+                field: "id".to_owned(),
+                value: "x".to_owned(),
+            },
+        ];
+        assert_eq!(walked(&document, &picked), None);
+    }
+
     /// A key is written back as the author wrote it, so a refusal and a manifest agree.
     #[test]
     fn steps_are_written_back_as_the_key_that_named_them() {

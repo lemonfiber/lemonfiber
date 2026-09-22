@@ -657,6 +657,72 @@ fixture = "fixtures/catalogue.json"
         );
     }
 
+    /// The condition the plugin sets on its own install, as an author writes one.
+    const PROVING: &str = r#"
+[[proof]]
+id      = "reachable"
+title   = "It answers on the path it says it is reached at"
+request = { method = "GET", path = "/api/health" }
+expect  = { status = 200 }
+fixture = "fixtures/health.json"
+why     = "A reader nothing can reach is one nobody can open."
+"#;
+
+    /// A plugin carrying that condition, with whatever its recording answered.
+    fn proving(named: &str, status: u16) -> PathBuf {
+        source(
+            named,
+            &format!("{MANIFEST}{PROVING}"),
+            &[
+                ("fixtures/guarded.json", guarded()),
+                ("fixtures/catalogue.json", catalogue()),
+                (
+                    "fixtures/health.json",
+                    recording(
+                        PINNED,
+                        "GET",
+                        "/api/health",
+                        &format!("{{\"status\": {status}}}"),
+                    ),
+                ),
+            ],
+        )
+    }
+
+    /// A proof is the plugin's own condition for being installed, and a recording that
+    /// refuses one stops the install the way a refuted claim does.
+    ///
+    /// Read through the whole report rather than through the runner, because what a
+    /// proof decides is the install — one rule over the proofs and the claims together,
+    /// which nothing asking about a single verdict can see. The claim here answers
+    /// either way, so the only thing moving is the proof.
+    #[test]
+    fn a_proof_its_recording_refuses_stops_the_install_and_one_it_answers_does_not() {
+        let held = claimed(&proving("proved", 200)).ok();
+        assert_eq!(
+            held.as_ref().map(|read| (
+                read.proofs.iter().map(|one| one.id.clone()).collect(),
+                read.proofs.iter().map(|one| one.verdict.clone()).collect(),
+                read.installable
+            )),
+            Some((vec!["reachable".to_owned()], vec![Verdict::Passed], true))
+        );
+
+        let refused = claimed(&proving("unproved", 503)).ok();
+        assert_eq!(
+            refused.as_ref().map(|read| read.installable),
+            Some(false),
+            "a proof its own recording refuses is a condition the plugin set and failed"
+        );
+        assert!(
+            refused.is_some_and(|read| read.proofs.iter().any(|one| matches!(
+                &one.verdict,
+                Verdict::Failed { faults } if !faults.is_empty()
+            ))),
+            "and the verdict says what the answer was"
+        );
+    }
+
     /// The claim a bundled service also makes is contested, and every claimant is
     /// named — which is what an operator resolves it by choosing from.
     #[test]

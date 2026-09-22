@@ -1105,6 +1105,57 @@ forms       = ["library"]
         assert_eq!(entry.and_then(|entry| entry.group), Some("Library"));
     }
 
+    /// A second service of the same plugin, which is what makes the stanzas ambiguous.
+    const ALONGSIDE: &str = r#"[[service]]
+id          = "komga-sync"
+name        = "Komga's reading history"
+image       = "docker.io/gotson/komga-sync"
+digest      = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+tag         = "1.0.0"
+criticality = "enhancing"
+"#;
+
+    /// One stanza for each of them, each saying which it is about.
+    const WIRED: &str = r#"[[wiring]]
+service         = "komga"
+hostname        = "comics"
+dashboard_group = "Library"
+
+[[wiring]]
+service         = "komga-sync"
+hostname        = "history"
+"#;
+
+    /// A stanza that names a service is the one read for that service.
+    ///
+    /// The field exists precisely so a plugin declaring two services cannot leave which
+    /// one the household reaches to be inferred — and every fixture here wrote the
+    /// unnamed stanza, which is the form a plugin with a single service may use. So the
+    /// half of the reading that tells one service's stanza from another's had never
+    /// decided anything, and a manifest with two would have taken whichever came first.
+    #[test]
+    fn a_wiring_naming_a_service_is_read_for_that_one_and_not_for_the_other() {
+        let two = WHOLE.replace(
+            "[[wiring]]\nhostname        = \"comics\"\ndashboard_group = \"Library\"\n",
+            &format!("{ALONGSIDE}\n{WIRED}"),
+        );
+        let read = parse(&two).map(|manifest| {
+            manifest
+                .services
+                .iter()
+                .map(|service| manifest.entry(service))
+                .map(|entry| (entry.hostname.to_owned(), entry.group.map(str::to_owned)))
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            read,
+            Some(vec![
+                ("comics".to_owned(), Some("Library".to_owned())),
+                ("history".to_owned(), None),
+            ])
+        );
+    }
+
     /// A label is a fact about one container, so the fallback is the service's own
     /// id: taking the plugin's would give two of its services one address. The
     /// group has no fallback this crate can state, so nothing declared stays

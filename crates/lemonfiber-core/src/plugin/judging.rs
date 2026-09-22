@@ -724,6 +724,45 @@ mod tests {
         );
     }
 
+    /// A selector's value is text, and the three scalars are the whole of what text can
+    /// spell — so an entry whose field holds an object, a list or nothing is passed over
+    /// rather than matched.
+    ///
+    /// Passed over rather than refused, because it is the answer's shape and not the
+    /// key's: a service that starts nesting one field of its settings would otherwise
+    /// turn every selector written against that list into a refusal about the wrong
+    /// entry. `null` is the one worth saying out loud — it is the absence a selector is
+    /// looking past, and matching it against the word would make *the entry whose group
+    /// is nothing* mean two different entries depending on how the service spells it.
+    #[test]
+    fn a_selector_passes_over_an_entry_whose_field_holds_no_scalar() {
+        let prefs = answered(
+            r#"{"status": 200, "json": {"Setting": [
+                {"id": {"named": "group"}, "value": 1},
+                {"id": ["group"], "value": 2},
+                {"id": null, "value": 3},
+                {"id": "group", "value": 4}]}}"#,
+        );
+        assert_eq!(
+            judge(
+                &expects(r#"{"json": {"/Setting/[id=group]/value": 4}}"#),
+                &prefs
+            ),
+            Vec::<String>::new(),
+            "the one entry a key could have named is the one that is picked"
+        );
+        assert_eq!(
+            judge(
+                &expects(r#"{"json_has_keys": ["/Setting/[id=null]/value"]}"#),
+                &prefs
+            ),
+            vec![
+                "the body carries no /Setting/[id=null]/value: /Setting holds no entry whose id \
+                 is \"null\""
+            ]
+        );
+    }
+
     /// Every way the way there can run out, each saying where it stopped.
     ///
     /// A verdict of *the body carries no …* and nothing else is what a reader gets from

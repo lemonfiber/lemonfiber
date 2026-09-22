@@ -506,7 +506,8 @@ fn panel(group: Option<&str>) -> String {
 mod tests {
     use lemonfiber_core::filling::{Filling, Shown};
     use lemonfiber_core::plugin::{
-        Claimed, Claiming, Contributed, Evidence, Ran, Verdict, Violation, Vouched,
+        Asserted, Assertion, Claimed, Claiming, Contributed, Evidence, Ran, Verdict, Violation,
+        Vouched,
     };
 
     use lemonfiber_core::plugin::{Install, Installed, Installs, Placed, Reached};
@@ -915,6 +916,96 @@ mod tests {
             "{text}"
         );
         assert!(!text.contains("kavita:holds-nothing\n    \n"), "{text}");
+    }
+
+    /// One assertion that is not a probe, as the reader hands it over.
+    fn asserting(kind: Assertion, id: &str, says: &str, verdict: Verdict) -> Asserted {
+        Asserted {
+            kind,
+            id: id.to_owned(),
+            says: says.to_owned(),
+            service: "kavita".to_owned(),
+            verdict,
+        }
+    }
+
+    /// The two assertions that are not about a capability each get a heading saying what
+    /// a verdict under it costs, because the two cost opposite things.
+    ///
+    /// A refused proof is the plugin failing its own condition for being installed and a
+    /// refused check is a check finding the thing it exists to find, on a machine in the
+    /// state it was recorded in. They are one shape on the page, so the page has to say
+    /// which of the two a reader is looking at rather than leave it to be inferred from
+    /// a verdict that reads identically either way.
+    #[test]
+    fn a_proof_and_a_contributed_check_are_shown_under_headings_that_say_what_each_costs() {
+        let mut read = read(Vec::new(), Vec::new());
+        read.proofs = vec![asserting(
+            Assertion::Proof,
+            "guarded",
+            "It refuses a read nobody signed in for",
+            Verdict::Passed,
+        )];
+        read.checks = vec![asserting(
+            Assertion::Check,
+            "kavita:claimed",
+            "Kavita has an administrator",
+            Verdict::Failed {
+                faults: vec!["answered 200 where it declares 401".to_owned()],
+            },
+        )];
+        let text = claims(&read).text();
+        assert!(
+            text.contains("What must hold before it is installed"),
+            "{text}"
+        );
+        assert!(
+            text.contains("  guarded — It refuses a read nobody signed in for"),
+            "{text}"
+        );
+        assert!(
+            text.contains("    kavita — the recording answers it"),
+            "{text}"
+        );
+        assert!(
+            text.contains("What it would check, every day after"),
+            "{text}"
+        );
+        assert!(
+            text.contains("    kavita — refuted: answered 200 where it declares 401"),
+            "{text}"
+        );
+        assert!(
+            text.contains("none of these decides whether this is installed"),
+            "a refuted check is the opposite news from a refuted claim: {text}"
+        );
+    }
+
+    /// A plugin asserting nothing of its own gets neither heading, and never the
+    /// sentence about what a check does not decide.
+    ///
+    /// The pair above is only worth a heading where there is something under it: a
+    /// report headed *what must hold before it is installed* with nothing beneath it
+    /// reads as a condition that was not reached rather than as one nobody wrote.
+    #[test]
+    fn a_plugin_that_asserts_nothing_of_its_own_gets_no_heading_for_either() {
+        let text = claims(&read(
+            vec![claiming("media.serve", Shown::Demonstrated, None)],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            !text.contains("What must hold before it is installed"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("What it would check, every day after"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("none of these decides whether this is installed"),
+            "{text}"
+        );
     }
 
     /// A capability of the plugin's own is inert; a core name nothing publishes is not

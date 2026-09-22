@@ -559,6 +559,18 @@ capabilities = ["doctor.contribute"]
         assert!(names(&said, &["service komga.bind"]), "got: {said:?}");
     }
 
+    /// A service that names no configuration directory is refused nothing about one.
+    ///
+    /// The field is optional and leaving it out is what an image reading the convention
+    /// writes, so there is nothing to hold the rules about where a directory may land
+    /// to — and a refusal here would be this build refusing the default it publishes.
+    /// Every fixture these rules have ever been read against declared it.
+    #[test]
+    fn a_service_that_names_no_configuration_directory_is_refused_nothing_about_one() {
+        let said = without("config_path = \"/config\"\n", "");
+        assert_eq!(said, Vec::<String>::new());
+    }
+
     #[test]
     fn a_configuration_directory_inside_the_library_is_refused() {
         let said = without(
