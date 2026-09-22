@@ -174,6 +174,7 @@ pub(crate) fn read_settings() -> Settings {
         project: lemonfiber_core::config::project_from_env(&recorded),
         quiet: lemonfiber_core::config::quiet_from_env(&recorded),
         overlays: lemonfiber_core::config::overlay_from_env(&recorded),
+        plugins: installed(),
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
@@ -320,6 +321,33 @@ pub(crate) fn here() -> Option<Paths> {
 /// impossible.
 pub(crate) fn configuration_file() -> Option<PathBuf> {
     here().map(|paths| paths.env_file())
+}
+
+/// The plugins this machine has installed, by id, in the register's own order.
+///
+/// Ids rather than paths: where a plugin's document lives depends on which directory
+/// the invocation calls the project root, and that is settled per run rather than
+/// here. Read off the register rather than by listing the directory the documents sit
+/// in — a listing would run whatever it found there, and the register is the only
+/// thing that says what this machine agreed to install.
+///
+/// Silent on a damaged record, and that is deliberate here where it is refused
+/// elsewhere: the verbs that read the register refuse rather than report a stack with
+/// a plugin in it as one with none, and they are where an operator is told. Refusing
+/// to build settings at all would take the whole binary down — `lemonfiber doctor`
+/// included — over a file the operator needs the binary in order to fix.
+fn installed() -> Vec<String> {
+    let Some(paths) = here() else {
+        return Vec::new();
+    };
+    std::fs::read_to_string(paths.plugins())
+        .ok()
+        .and_then(|text| lemonfiber_core::plugin::Register::parse(&text).ok())
+        .unwrap_or_default()
+        .installed()
+        .iter()
+        .map(|one| one.plugin.clone())
+        .collect()
 }
 
 /// Where an embedded stack is written so Compose can read it.

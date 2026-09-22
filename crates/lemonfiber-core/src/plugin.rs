@@ -24,6 +24,10 @@ mod claimed;
 // is the one that derives.
 mod container;
 mod installed;
+// Where an install puts what it writes. Beside the record and the container rather
+// than inside either: the record says what was decided and the container says what
+// follows from it, and this says where both of those land on the machine.
+mod placing;
 // Reachable from the diagnostics register as well as from here. A plugin's row is
 // judged by the one evaluator its recordings are judged by, and the answer a live
 // service gives is read into the one shape a recorded answer is read into — which is
@@ -47,6 +51,7 @@ pub use container::written;
 pub use installed::{
     Already, Install, Installed, Installs, Placed, Reached, Register, Unreadable as Unrecorded,
 };
+pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
 
