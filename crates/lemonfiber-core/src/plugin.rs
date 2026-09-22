@@ -18,6 +18,11 @@
 //! one, because a plugin author will trust it.
 
 mod claimed;
+// The container written from a record, rather than anything read out of a manifest.
+// Beside the record because it is the derivation the record deliberately does not
+// hold: a copy of one is free to disagree with it, so there is one of each and this
+// is the one that derives.
+mod container;
 mod installed;
 // Reachable from the diagnostics register as well as from here. A plugin's row is
 // judged by the one evaluator its recordings are judged by, and the answer a live
@@ -37,6 +42,7 @@ use crate::doctor::BUNDLED_CHECKS;
 pub use claimed::{
     claimed, read, Claimed, Claiming, Contributed, Evidence, Ran, Unreadable, Verdict,
 };
+pub use container::written;
 pub use installed::{
     Already, Install, Installed, Installs, Placed, Reached, Register, Unreadable as Unrecorded,
 };
