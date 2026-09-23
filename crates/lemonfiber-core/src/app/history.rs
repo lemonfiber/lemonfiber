@@ -10,7 +10,7 @@
 use crate::config::store::is_secret;
 use crate::journal::{horizon, Change, Kind};
 use crate::model::{ChangeReport, HistoryReport};
-use crate::rollback::{standing, together, Reversal};
+use crate::rollback::{standing, together};
 
 use super::Ctx;
 
@@ -73,19 +73,29 @@ fn told(change: &Change, standing: crate::rollback::Standing, alongside: usize) 
         .map_or((None, None), |why| (Some(why.because), why.instead));
 
     ChangeReport {
-        at: change.at.clone(),
+        at: stamped(&change.at),
         operation: change.operation.clone(),
         target: change.target.clone(),
         did: did(&change.kind),
-        reversal: match standing.reversal {
-            Reversal::Whole => "whole",
-            Reversal::Partial => "partial",
-            Reversal::None => "none",
-        }
-        .to_owned(),
+        reversal: standing.reversal,
         because,
         instead,
         alongside,
+    }
+}
+
+/// A change's stamp as the report promises it: whole seconds since the epoch.
+///
+/// Every stamp this build writes is already that. A journal outlives the build that
+/// wrote it, though, and an earlier one wrote an empty stamp where its clock would not
+/// answer — so anything that is not digits is read as the epoch, which is how this
+/// build writes a clock that would not answer, rather than passed on as a promise the
+/// report does not keep.
+fn stamped(at: &str) -> String {
+    if !at.is_empty() && at.bytes().all(|byte| byte.is_ascii_digit()) {
+        at.to_owned()
+    } else {
+        "0".to_owned()
     }
 }
 
@@ -110,5 +120,28 @@ fn did(kind: &Kind) -> String {
             previous, current, ..
         } => format!("moved from {previous} to {current}"),
         Kind::Configured { field, .. } => format!("set {field} on the service"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stamped;
+
+    /// Every stamp this build writes goes out as it was written.
+    #[test]
+    fn a_stamp_of_seconds_goes_out_as_written() {
+        assert_eq!(stamped("1709287200"), "1709287200");
+        assert_eq!(stamped("0"), "0");
+    }
+
+    /// An earlier build wrote an empty stamp where its clock would not answer, and a
+    /// journal outlives the build that wrote it. The report promises digits, so what is
+    /// not digits is read as the epoch — this build's own spelling of that clock —
+    /// rather than passed on as a promise it does not keep.
+    #[test]
+    fn a_stamp_that_is_not_seconds_is_read_as_the_epoch() {
+        for unreadable in ["", "t", "2024-03-01T10:00:00Z", "-1", "12a"] {
+            assert_eq!(stamped(unreadable), "0", "{unreadable:?}");
+        }
     }
 }

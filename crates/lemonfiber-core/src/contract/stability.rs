@@ -40,6 +40,16 @@
 //! present becoming optional are refused. A field's type is compared as a token
 //! rather than as the schema node it came from, so re-wording the sentence above a
 //! field leaves this artefact alone.
+//!
+//! One narrowing is recognised as the narrowing it is. A field described as a bare
+//! `string` that comes to point at a named closed set of strings still delivers a
+//! string, and every value it can now carry is one it could carry before — so a
+//! consumer parsing it the old way parses every value it will ever receive. What is
+//! recognised is only that: a bare string becoming a reference to a definition that
+//! is nothing *but* string constants. A reference is otherwise compared by its name,
+//! because resolving references in general would let a field swap one object type
+//! for another and pass. And the set it narrows to is a described type in its own
+//! right, so a value later taken out of it is refused like any other.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -118,6 +128,14 @@ pub struct Surface {
     /// Every type the shapes are made of.
     #[serde(default)]
     pub types: BTreeMap<String, Shape>,
+    /// The definitions that are nothing but string constants, read off their schemas.
+    ///
+    /// Held in memory and never committed. It is only ever asked of the surface a build
+    /// describes now, which is always read from the schemas themselves; and it cannot be
+    /// worked out from [`Shape`] alone, because a shape records the constants a type may
+    /// be and not the alternatives beside them that are not constants at all.
+    #[serde(skip)]
+    pub strings: BTreeSet<String>,
 }
 
 /// A promise the contract made and no longer keeps.
@@ -223,12 +241,18 @@ fn types_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
                  that can never be taken",
             ));
         }
-        fields_kept(name, was, now, found);
+        fields_kept(name, was, now, &after.strings, found);
     }
 }
 
 /// Every field one type described, still described and still the same shape.
-fn fields_kept(name: &str, was: &Shape, now: &Shape, found: &mut Vec<Break>) {
+fn fields_kept(
+    name: &str,
+    was: &Shape,
+    now: &Shape,
+    strings: &BTreeSet<String>,
+    found: &mut Vec<Break>,
+) {
     for (field, before) in &was.fields {
         let Some(after) = now.fields.get(field) else {
             found.push(Break::new(
@@ -238,6 +262,9 @@ fn fields_kept(name: &str, was: &Shape, now: &Shape, found: &mut Vec<Break>) {
             continue;
         };
         for lost in before.types.difference(&after.types) {
+            if narrowed(lost, &after.types, strings) {
+                continue;
+            }
             found.push(Break::new(
                 format!("{name}.{field}"),
                 &format!(
@@ -254,6 +281,19 @@ fn fields_kept(name: &str, was: &Shape, now: &Shape, found: &mut Vec<Break>) {
             ));
         }
     }
+}
+
+/// Whether a field that stopped being described as `lost` is still read that way.
+///
+/// True in the one case this recognises: `lost` is a bare string, and the field now
+/// points at a definition whose schema admits string constants and nothing else. Every
+/// value the field can carry is still a string, so nothing a consumer parses fails.
+fn narrowed(lost: &str, now: &BTreeSet<String>, strings: &BTreeSet<String>) -> bool {
+    lost == "string"
+        && now
+            .iter()
+            .filter_map(|spelled| spelled.strip_prefix("ref:"))
+            .any(|name| strings.contains(name))
 }
 
 /// Every break, as one block of prose to fail a build with.
@@ -279,6 +319,7 @@ pub fn rendered(breaks: &[Break]) -> String {
 fn read(described: &Value, api_version: u32) -> Surface {
     let mut kinds = BTreeMap::new();
     let mut types: BTreeMap<String, Shape> = BTreeMap::new();
+    let mut strings = BTreeSet::new();
     let schemas = described.get("kinds").and_then(Value::as_object);
     for (kind, schema) in schemas.into_iter().flatten() {
         let carried = schema
@@ -289,13 +330,46 @@ fn read(described: &Value, api_version: u32) -> Surface {
         let named = schema.get("$defs").and_then(Value::as_object);
         for (name, shape) in named.into_iter().flatten() {
             gather(shape, types.entry(name.clone()).or_default());
+            if only_string_constants(shape) {
+                strings.insert(name.clone());
+            }
         }
     }
     Surface {
         api_version,
         kinds,
         types,
+        strings,
     }
+}
+
+/// Whether a definition's schema admits string constants and nothing else.
+///
+/// Read from the schema rather than from the shape gathered out of it, because the
+/// shape keeps the constants and drops an alternative that is not one: a set of words
+/// with a bare integer beside it gathers to the same shape as the words alone.
+///
+/// Two spellings are recognised, the two a generator writes a closed set of words in: a
+/// string type with an `enum` of strings, and a choice every one of whose options is a
+/// single string constant. Anything else is not a closed set of strings.
+fn only_string_constants(schema: &Value) -> bool {
+    let a_string = |node: &Value| node.get("type").is_none_or(|kind| kind == "string");
+    if let Some(Value::Array(words)) = schema.get("enum") {
+        return a_string(schema) && !words.is_empty() && words.iter().all(Value::is_string);
+    }
+    ["oneOf", "anyOf"].iter().any(|keyword| {
+        schema
+            .get(*keyword)
+            .and_then(Value::as_array)
+            .is_some_and(|options| {
+                !options.is_empty()
+                    && options.iter().all(|option| {
+                        a_string(option)
+                            && option.get("const").is_some_and(Value::is_string)
+                            && option.get("properties").is_none()
+                    })
+            })
+    })
 }
 
 /// One schema node as the token a consumer would code against.
@@ -433,6 +507,7 @@ mod tests {
             api_version: 1,
             kinds: BTreeMap::new(),
             types,
+            strings: BTreeSet::new(),
         }
     }
 
@@ -444,6 +519,7 @@ mod tests {
             api_version: 1,
             kinds,
             types: BTreeMap::new(),
+            strings: BTreeSet::new(),
         }
     }
 
@@ -707,6 +783,116 @@ mod tests {
         );
     }
 
+    /// A surface whose one field is spelled `spelled`, beside a described type named
+    /// `Set` holding these constants, and read as admitting nothing but string
+    /// constants where `strings_only` says its schema did.
+    fn beside_a_set(spelled: &str, constants: &[&str], strings_only: bool) -> Surface {
+        let mut surface = one_field("reversal", spelled, true);
+        surface.types.insert(
+            "Set".to_owned(),
+            Shape {
+                fields: BTreeMap::new(),
+                variants: constants.iter().map(|one| (*one).to_owned()).collect(),
+            },
+        );
+        if strings_only {
+            surface.strings.insert("Set".to_owned());
+        }
+        surface
+    }
+
+    /// A bare string that comes to name a closed set of strings is a narrowing: every
+    /// value it can now carry is a string it could carry before, so nothing a consumer
+    /// parses fails.
+    #[test]
+    fn a_string_that_becomes_a_closed_set_of_strings_is_not_a_break() {
+        let before = one_field("reversal", "string", true);
+        let after = beside_a_set("ref:Set", &["\"whole\"", "\"partial\"", "\"none\""], true);
+        assert_eq!(Surface::broken(&before, &after), Vec::new());
+    }
+
+    /// A reference is otherwise still compared by name. A string that comes to point at
+    /// a definition whose schema admits anything but string constants — or at a name
+    /// that is not such a definition at all — has changed what arrives.
+    #[test]
+    fn a_string_that_becomes_anything_else_by_reference_is_still_a_break() {
+        let before = one_field("reversal", "string", true);
+        for after in [
+            beside_a_set("ref:Set", &["\"whole\""], false),
+            beside_a_set("ref:Elsewhere", &["\"whole\""], true),
+        ] {
+            assert_eq!(Surface::broken(&before, &after).len(), 1, "{after:?}");
+        }
+    }
+
+    /// Only a bare string narrows. A field that was a number does not become one by
+    /// pointing at a set of strings.
+    #[test]
+    fn only_a_bare_string_is_narrowed() {
+        let before = one_field("reversal", "integer", true);
+        let after = beside_a_set("ref:Set", &["\"whole\""], true);
+        assert_eq!(Surface::broken(&before, &after).len(), 1);
+    }
+
+    /// The set it narrowed to is a described type like any other, so a value taken out
+    /// of it later is refused.
+    #[test]
+    fn a_value_taken_out_of_the_set_it_narrowed_to_is_still_a_break() {
+        let before = beside_a_set("ref:Set", &["\"whole\"", "\"none\""], true);
+        let after = beside_a_set("ref:Set", &["\"whole\""], true);
+        let broken = Surface::broken(&before, &after);
+        assert!(
+            broken.iter().any(|one| one.what == "Set = \"none\""),
+            "{broken:?}"
+        );
+    }
+
+    /// Which definitions admit nothing but string constants is read off the schema, in
+    /// both spellings a generator writes a set of words in — and a set with anything
+    /// else beside it is not one, which is the case a shape alone could not see.
+    #[test]
+    fn a_set_of_words_is_told_from_a_set_with_something_else_beside_it() {
+        let words = [
+            json!({"oneOf": [{"type": "string", "const": "whole"}, {"const": "none"}]}),
+            json!({"type": "string", "enum": ["whole", "none"]}),
+            json!({"anyOf": [{"type": "string", "const": "whole", "description": "all of it"}]}),
+        ];
+        for schema in &words {
+            assert!(super::only_string_constants(schema), "{schema}");
+        }
+        let not_only_words = [
+            json!({"oneOf": [{"type": "string", "const": "whole"}, {"type": "integer"}]}),
+            json!({"oneOf": [{"type": "string", "const": "whole"}, {"const": 1}]}),
+            json!({"oneOf": [{"type": "object", "const": "x", "properties": {}}]}),
+            json!({"oneOf": [{"type": "string", "const": "x", "properties": {"a": {}}}]}),
+            json!({"oneOf": []}),
+            json!({"type": "string", "enum": ["whole", 1]}),
+            json!({"type": "integer", "enum": ["whole"]}),
+            json!({"type": "string", "enum": []}),
+            json!({"type": "string"}),
+            json!({"type": "object", "properties": {"whole": {"type": "string"}}}),
+        ];
+        for schema in &not_only_words {
+            assert!(!super::only_string_constants(schema), "{schema}");
+        }
+    }
+
+    /// And the reading of a real contract records the one this change introduced, so
+    /// the rule above is exercised against what the generator actually wrote.
+    #[test]
+    fn the_contract_s_own_set_of_reversals_is_read_as_a_set_of_words() {
+        let fresh = Surface::of(&Contract::describe());
+        assert!(
+            fresh.strings.contains("ChangeReversal"),
+            "{:?}",
+            fresh.strings
+        );
+        assert!(
+            !fresh.strings.contains("ChangeReport"),
+            "and a report with fields is not"
+        );
+    }
+
     #[test]
     fn a_field_that_was_always_there_and_may_now_be_absent_is_named() {
         let before = one_field("binary", "string", true);
@@ -859,8 +1045,12 @@ mod tests {
         let fresh = Surface::of(&Contract::describe());
         let stored = committed().unwrap_or_default();
 
+        // Compared as what is committed. The reading of which definitions are sets of
+        // words is held in memory beside a fresh surface and is never written, so a
+        // stored surface has none and comparing the values would compare that too.
         assert_eq!(
-            stored, fresh,
+            stored.to_json(),
+            fresh.to_json(),
             "the surface is out of date — rewrite it with `just surface`"
         );
     }

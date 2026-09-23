@@ -8,6 +8,7 @@
 //! this file's. What is here is the wording of it.
 
 use lemonfiber_core::model::{ChangeReport, HistoryReport};
+use lemonfiber_core::rollback::Reversal;
 
 use super::Lines;
 
@@ -38,7 +39,7 @@ fn one(change: &ChangeReport) -> Lines {
         change.at, change.did, change.operation
     ));
     lines.put(format!("  on {}", change.target));
-    lines.put(format!("  putting it back: {}", putting(&change.reversal)));
+    lines.put(format!("  putting it back: {}", putting(change.reversal)));
     if change.alongside > 1 {
         // The operation is the unit that goes back, so what else would go with it is
         // said on the line rather than counted off the list.
@@ -58,28 +59,32 @@ fn one(change: &ChangeReport) -> Lines {
 }
 
 /// How far a change could be put back, in the operator's terms rather than the name.
-fn putting(reversal: &str) -> &'static str {
+///
+/// Every case named rather than a catch-all, so a fourth answer the record learns to
+/// give fails to compile here instead of being read as *not by lemonfiber*.
+fn putting(reversal: Reversal) -> &'static str {
     match reversal {
-        "whole" => "in full",
-        "partial" => "in part",
-        _ => "not by lemonfiber",
+        Reversal::Whole => "in full",
+        Reversal::Partial => "in part",
+        Reversal::None => "not by lemonfiber",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::model::{ChangeReport, HistoryReport};
+    use lemonfiber_core::rollback::Reversal;
 
     use super::history;
 
     /// One change on the record, with the fields a test is not varying already filled.
-    fn change(did: &str, reversal: &str) -> ChangeReport {
+    fn change(did: &str, reversal: Reversal) -> ChangeReport {
         ChangeReport {
-            at: "2024-03-01T10:00:00Z".to_owned(),
+            at: "1709287200".to_owned(),
             operation: "reconfigure".to_owned(),
             target: ".env".to_owned(),
             did: did.to_owned(),
-            reversal: reversal.to_owned(),
+            reversal,
             because: None,
             instead: None,
             alongside: 1,
@@ -113,14 +118,14 @@ mod tests {
     #[test]
     fn the_record_counts_its_changes_and_says_when_each_was_made_and_to_what() {
         let said = history(&record(vec![
-            change("set TZ to UTC", "whole"),
-            change("made /srv/media", "whole"),
+            change("set TZ to UTC", Reversal::Whole),
+            change("made /srv/media", Reversal::Whole),
         ]))
         .text();
 
         assert!(said.starts_with("2 changes, newest first"), "{said}");
         assert!(
-            said.contains("2024-03-01T10:00:00Z — set TZ to UTC (reconfigure)"),
+            said.contains("1709287200 — set TZ to UTC (reconfigure)"),
             "{said}"
         );
         assert!(said.contains("  on .env"), "{said}");
@@ -134,9 +139,12 @@ mod tests {
     #[test]
     fn how_far_a_change_could_be_put_back_is_said_in_what_it_would_mean() {
         let said = history(&record(vec![
-            change("set TZ to UTC", "whole"),
-            change("changed DATA_ROOT from /srv/old to /srv/new", "partial"),
-            change("added a downloadclient", "none"),
+            change("set TZ to UTC", Reversal::Whole),
+            change(
+                "changed DATA_ROOT from /srv/old to /srv/new",
+                Reversal::Partial,
+            ),
+            change("added a downloadclient", Reversal::None),
         ]))
         .text();
 
@@ -155,7 +163,7 @@ mod tests {
     fn a_change_made_with_others_says_so_and_one_made_alone_says_nothing_about_it() {
         let together = history(&record(vec![ChangeReport {
             alongside: 4,
-            ..change("set PUID to 1000", "whole")
+            ..change("set PUID to 1000", Reversal::Whole)
         }]))
         .text();
         assert!(
@@ -163,7 +171,7 @@ mod tests {
             "{together}"
         );
 
-        let alone = history(&record(vec![change("set PUID to 1000", "whole")])).text();
+        let alone = history(&record(vec![change("set PUID to 1000", Reversal::Whole)])).text();
         assert!(!alone.contains("made together"), "{alone}");
     }
 
@@ -174,7 +182,7 @@ mod tests {
         let said = history(&record(vec![ChangeReport {
             because: Some("TZ now holds America/New_York".to_owned()),
             instead: Some("set it yourself if the older value is the one you want".to_owned()),
-            ..change("set TZ to UTC", "none")
+            ..change("set TZ to UTC", Reversal::None)
         }]))
         .text();
 
@@ -193,7 +201,7 @@ mod tests {
     /// reaches renders nowhere however good the renderer under it is.
     #[test]
     fn the_printer_reaches_this_renderer_for_this_outcome() {
-        let report = record(vec![change("added a downloadclient", "whole")]);
+        let report = record(vec![change("added a downloadclient", Reversal::Whole)]);
         let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::History(report)).text();
         assert!(drawn.contains("1 changes, newest first"), "{drawn}");
         assert!(drawn.contains("added a downloadclient"), "{drawn}");

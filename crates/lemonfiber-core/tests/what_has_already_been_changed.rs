@@ -23,6 +23,7 @@ use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::model::HistoryReport;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::seams::Seams;
+use lemonfiber_core::rollback::Reversal;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 
@@ -141,8 +142,8 @@ async fn a_setting_edited_since_is_refused_and_says_what_it_holds() {
     let first = changes.first();
 
     assert_eq!(
-        first.map(|change| change.reversal.clone()),
-        Some("none".to_owned()),
+        first.map(|change| change.reversal),
+        Some(Reversal::None),
         "an edit somebody made is not overwritten"
     );
     let because = first.and_then(|change| change.because.clone());
@@ -168,8 +169,8 @@ async fn a_setting_still_holding_what_it_was_left_can_go_back() {
     let changes = report.map(|report| report.changes).unwrap_or_default();
 
     assert_eq!(
-        changes.first().map(|change| change.reversal.clone()),
-        Some("whole".to_owned())
+        changes.first().map(|change| change.reversal),
+        Some(Reversal::Whole)
     );
 }
 
@@ -338,13 +339,10 @@ async fn what_was_made_goes_back_and_what_a_service_created_does_not() {
 
     let report = recorded(&ctx(&root)).await;
     let changes = report.map(|report| report.changes).unwrap_or_default();
-    let verdicts: Vec<String> = changes
-        .iter()
-        .map(|change| change.reversal.clone())
-        .collect();
+    let verdicts: Vec<Reversal> = changes.iter().map(|change| change.reversal).collect();
 
     // Newest first: the path was made after the record was created.
-    assert_eq!(verdicts, ["whole", "none"]);
+    assert_eq!(verdicts, [Reversal::Whole, Reversal::None]);
     assert!(
         changes
             .first()
@@ -381,8 +379,8 @@ async fn putting_the_data_location_back_is_only_partly_possible_and_says_what_st
     let first = changes.first();
 
     assert_eq!(
-        first.map(|change| change.reversal.clone()),
-        Some("partial".to_owned()),
+        first.map(|change| change.reversal),
+        Some(Reversal::Partial),
         "neither reversible nor refused"
     );
     let because = first.and_then(|change| change.because.clone());
