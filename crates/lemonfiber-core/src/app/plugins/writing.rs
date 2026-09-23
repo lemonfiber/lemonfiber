@@ -1,0 +1,166 @@
+//! Putting an install's writes on the machine, and on the record.
+//!
+//! Apart from the verb that decides them for the reason the length rule exists: what
+//! installing a plugin *settles* and what carrying that out *touches* are two
+//! concerns, and the second is the one with a disk under it. The decision of what an
+//! install writes is further out still, in [`crate::plugin::placing`], which answers
+//! with a list and reaches nothing.
+//!
+//! Nothing here reverses anything, and that is the point. Every write goes into the
+//! journal as a path lemonfiber made, which the rollback layer already knows how to
+//! classify and the reversal already knows how to undo — so removal, when it arrives,
+//! is that machinery pointed at these entries rather than a second implementation of
+//! undoing.
+
+use std::path::{Path, PathBuf};
+
+use lemonfiber_ports::error::{Problem, Remedy, Severity, State};
+
+use crate::error::Diagnose as _;
+use crate::journal::{Change, Kind};
+
+use super::super::Ctx;
+use super::{NOWHERE, UNWRITABLE};
+
+/// Make what the install decided, journalling each write before it is made.
+///
+/// **The order within each write is the whole of what makes an interrupted install
+/// recoverable.** The journal entry goes down first, then the path is made. A run
+/// that dies between the two leaves a record of something that may not exist, and
+/// undoing that removes a path that is already gone — harmless. The other order
+/// leaves a real file with nothing to unwind it, which is the half-installed plugin
+/// on a working stack this whole arrangement exists to prevent.
+///
+/// **A path that is already there is left alone and left unrecorded.** The same rule
+/// an apply uses for the data root, and for the same reason: a directory the operator
+/// already had is theirs, and a reversal that removed it would take something this
+/// install never put there. It follows that installing over the wreckage of a
+/// half-removed plugin records only what it actually had to make.
+///
+/// The operation every entry is written under is the plugin's own id, so its changes
+/// read in the history as that plugin's rather than as lemonfiber's, and so a
+/// reversal can ask for exactly them. One stamp for the whole run, because the run is
+/// the unit a reversal takes.
+///
+/// # Errors
+///
+/// Where a directory or a document cannot be written. The journal is already carrying
+/// whatever was made before the failure, so what did land is reversible.
+pub(super) fn carry_out(
+    ctx: &Ctx,
+    plugin: &str,
+    planned: &[crate::plugin::Write],
+) -> Result<(), Box<Problem>> {
+    // Where the record of these writes goes. A machine that cannot say where its own
+    // files live is the machine setup has not run on, which is the very refusal every
+    // other record raises — reused rather than restated, so an operator meets one
+    // sentence about it rather than two.
+    let Some(paths) = crate::app::targets::layout(ctx) else {
+        return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
+    };
+    let (journal, stamp) = (paths.journal(), ctx.stamp());
+
+    for write in planned {
+        // Both writers below bring the whole missing chain into being, so all of it
+        // is what a reversal has to remove. Recorded parent-first and so unwound
+        // child-first, exactly as an apply records the data root it makes.
+        let making = missing_from(&write.path, write.is_directory());
+        let changes: Vec<Change> = making
+            .iter()
+            .map(|path| made(plugin, path, &stamp))
+            .collect();
+        crate::app::recover::journalled(&journal, &changes, ctx.random.as_ref());
+
+        match &write.content {
+            None => std::fs::create_dir_all(&write.path)
+                .map_err(|why| Box::new(unwritable(&write.path, &why.to_string())))?,
+            // The writer brings the directory into being on its way to the file, so
+            // there is no second answer here to where a document's directory comes
+            // from. Its failure is reported as this install's own: the writer is
+            // shared with the settings file and says *your settings could not be
+            // saved*, which about a plugin's Compose document names the wrong file
+            // and offers the wrong remedy.
+            Some(content) => crate::config::store::write(&write.path, content)
+                .map_err(|failure| Box::new(unwritable(&write.path, &failure.to_string())))?,
+        }
+    }
+    Ok(())
+}
+
+/// Every path this write has to bring into being, parent before child.
+///
+/// A directory that is already there yields nothing, which is what keeps a reversal
+/// from removing something the install found rather than made. A file's missing
+/// parent directories are always included — a document written into a directory
+/// lemonfiber had to make is two things to put back, not one.
+///
+/// **A document that is already there is overwritten and not recorded, and that is
+/// deliberate.** Its path is the plugin's own id and an install over a registered
+/// plugin is refused before reaching here, so the only way to meet one is the
+/// leftover of an install or a removal that did not finish. It holds nothing but what
+/// this build derives from the record, so there is no earlier content a reversal
+/// could owe anybody — and recording it as *made* would be the one entry that removes
+/// a file this run did not create.
+fn missing_from(path: &Path, directory: bool) -> Vec<PathBuf> {
+    let mut making = Vec::new();
+    let mut here = if directory {
+        Some(path)
+    } else {
+        // A file is not a directory to be made; what may have to be made is the
+        // chain above it. The file itself is still recorded, because removing it is
+        // what puts the write back.
+        if !path.exists() {
+            making.push(path.to_path_buf());
+        }
+        path.parent()
+    };
+    let mut directories = Vec::new();
+    while let Some(at) = here.filter(|at| !at.exists()) {
+        directories.push(at.to_path_buf());
+        here = at.parent();
+    }
+    directories.reverse();
+    directories.extend(making);
+    directories
+}
+
+/// The journal entry for a path an install created, so it can be removed again.
+///
+/// The plugin's id is the operation, so a plugin's changes sit in the same record as
+/// every other change and read there as that plugin's own.
+fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
+    let path = path.display().to_string();
+    Change {
+        at: stamp.to_owned(),
+        operation: plugin.to_owned(),
+        target: path.clone(),
+        kind: Kind::Made { path },
+    }
+}
+
+/// There is nowhere on this machine to write what the install decided.
+pub(super) fn nowhere_to_write(plugin: &str) -> Problem {
+    Problem::new(
+        NOWHERE,
+        Severity::Error,
+        format!("there is nowhere to install {plugin} to"),
+        "Nothing was installed and nothing was written. A plugin's service is a container in \
+         the stack, and this machine has no stack directory configured to put one in.",
+        Remedy::new("Run `lemonfiber setup` first, then install the plugin"),
+    )
+    .in_state(State::Guided)
+}
+
+/// A directory or a document the install could not put where it decided it goes.
+fn unwritable(at: &Path, why: &str) -> Problem {
+    Problem::new(
+        UNWRITABLE,
+        Severity::Error,
+        format!("{} could not be written", at.display()),
+        "The install stopped where it was. What it had already written is in the change \
+         record, so `lemonfiber history` says what is there and it can be put back.",
+        Remedy::new("Check the permissions on the stack directory, then install it again"),
+    )
+    .in_state(State::Guided)
+    .with_detail(why.to_owned())
+}

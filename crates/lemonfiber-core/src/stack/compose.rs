@@ -154,6 +154,20 @@ pub fn build(
         argv.push(overlay.display().to_string());
     }
 
+    // Then the installed plugins' own documents, joined here against the very
+    // directory this invocation names as the project root. Resolved per invocation
+    // rather than carried resolved, because an operator's own stack and the embedded
+    // one are different roots and a path settled anywhere else would be right for one
+    // of them and silently wrong for the other.
+    //
+    // After the operator's overlay, because Compose takes the later file as the one
+    // that wins and a stranger's plugin is not entitled to override a choice the
+    // operator made.
+    for document in crate::plugin::documents(&settings.plugins, stack) {
+        argv.push("--file".to_owned());
+        argv.push(document.display().to_string());
+    }
+
     // Sorted, because the plan holds an ordered set: the same request must
     // produce the same command, or golden files test nothing and a cached
     // Compose project churns for no reason.
@@ -335,6 +349,62 @@ mod tests {
                     "--file /opt/lemonfiber/stack/stacks/compose.storage.nas.yml"
                 ))),
             Some(true)
+        );
+    }
+
+    /// An installed plugin's document is layered, and after the operator's own
+    /// overlay: Compose takes the later file as the one that wins, and a stranger's
+    /// plugin is not entitled to override a choice the operator made.
+    #[test]
+    fn an_installed_plugin_s_document_is_layered_after_the_operator_s_own() {
+        let settings = Settings {
+            overlays: vec![PathBuf::from(
+                "/opt/lemonfiber/stack/stacks/compose.storage.nas.yml",
+            )],
+            plugins: vec!["komga".to_owned()],
+            ..Settings::default()
+        };
+        assert_eq!(
+            line(&["library"], &Action::Up, &settings)
+                .as_deref()
+                .map(|command| command.contains(concat!(
+                    "--file /opt/lemonfiber/stack/stacks/compose.storage.nas.yml ",
+                    "--file /opt/lemonfiber/stack/compose/plugins/komga.yml"
+                ))),
+            Some(true)
+        );
+    }
+
+    /// The document is joined against the directory this invocation calls the project
+    /// root, so an operator's own stack gets the document inside it rather than inside
+    /// the one lemonfiber would have materialised.
+    #[test]
+    fn a_plugin_s_document_is_joined_against_the_root_the_invocation_names() {
+        let settings = Settings {
+            plugins: vec!["komga".to_owned()],
+            ..Settings::default()
+        };
+        let theirs = Path::new("/srv/their-own-stack");
+        let command = plan(&["library"])
+            .map(|plan| build(&plan, &settings, theirs, &Action::Up, Environment::MacOs).join(" "));
+        assert_eq!(
+            command
+                .as_deref()
+                .map(|line| line.contains("--file /srv/their-own-stack/compose/plugins/komga.yml")),
+            Some(true)
+        );
+    }
+
+    /// A machine with nothing installed layers nothing, so the invocation a stack
+    /// without plugins produces is the one it always produced.
+    #[test]
+    fn a_machine_with_no_plugins_layers_no_extra_documents() {
+        let settings = Settings::default();
+        assert_eq!(
+            line(&["library"], &Action::Up, &settings)
+                .as_deref()
+                .map(|command| command.contains("compose/plugins/")),
+            Some(false)
         );
     }
 

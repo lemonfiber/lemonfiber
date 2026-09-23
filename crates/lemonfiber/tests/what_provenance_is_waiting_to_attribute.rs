@@ -95,16 +95,6 @@ const WAITING: &[Waiting] = &[
                   day one is installed — unattributed, which is the half this asks for",
     },
     Waiting {
-        requirement: "F7-R2",
-        asks: "a change a plugin made reads as a plugin's in the history, classified like any \
-               other",
-        at: "crates/lemonfiber-core/src/model/history.rs",
-        arrives_as: VOCABULARY,
-        because: "the journal names the operation that made a change as free text and the \
-                  rollback layer classifies any change whatever made it, so what is missing is \
-                  not the classification but a reader being able to tell whose change it was",
-    },
-    Waiting {
         requirement: "F7-R4",
         asks: "a value a plugin overrode exposes both what is in force and the value it \
                replaced",
