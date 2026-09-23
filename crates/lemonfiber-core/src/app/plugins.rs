@@ -117,10 +117,18 @@ pub(super) fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> 
 /// Settle what installing this source decides, write the plugin's wiring, and record
 /// it.
 ///
-/// Everything a rehearsal holds back is behind one branch, so what a rehearsal
-/// reports is what the real run reports — settled by the same code, refused for the
-/// same reasons, and stopping short of the writes rather than describing them
-/// separately.
+/// Everything a rehearsal holds back is one branch wide, so what a rehearsal reports
+/// is what the real run reports — settled by the same code, refused for the same
+/// reasons, and stating the same three lists before stopping short of carrying them
+/// out.
+///
+/// **A rehearsal is refused wherever the install would be, including for want of a
+/// stack.** The account it gives is the one the install then follows, so a rehearsal
+/// that answered on a machine the install could not run on would be describing an
+/// operation that cannot happen there — and the operator would find that out on the
+/// run they thought they had already checked. What answers with no machine at all is
+/// `plugin claims`, which is the author's read and needs neither a stack nor a
+/// record.
 ///
 /// **The wiring goes down before the register, and the order is the safe one.** The
 /// register is what says a plugin is installed and what layers its document into the
@@ -141,18 +149,20 @@ fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Proble
         .record(would.clone())
         .map_err(|there| Box::new(already(&there)))?;
 
+    // Where the writes land, asked for before the branch rather than inside it. What
+    // a rehearsal has to state is where every change goes, and a path is a fact about
+    // this machine — so a machine with nowhere to put them has nothing for a
+    // rehearsal to state and nothing for an install to do.
+    let stack = ctx
+        .settings
+        .stack_dir
+        .as_deref()
+        .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
+    let planned = crate::plugin::writes(&would, stack);
+
     let recorded = !ctx.dry_run;
     if recorded {
-        // Where the writes land. Asked for only on the run that makes them: a
-        // rehearsal on a machine that has never been set up can still say what
-        // installing this would decide, and refusing it for want of somewhere to put
-        // files it is not going to write would be refusing the wrong question.
-        let stack = ctx
-            .settings
-            .stack_dir
-            .as_deref()
-            .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
-        carry_out(ctx, &would.plugin, &crate::plugin::writes(&would, stack))?;
+        carry_out(ctx, &would.plugin, &planned)?;
         // Answered for here rather than passed on. The record writer is shared and
         // says *your settings could not be saved, your existing settings are
         // untouched* — which after the line above is false twice over: the file is
@@ -169,7 +179,13 @@ fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Proble
 
     Ok(Outcome::Plugins(Installs {
         installed: standing.installed().to_vec(),
-        install: Some(Install { would, recorded }),
+        install: Some(Install {
+            would,
+            recorded,
+            changes: crate::plugin::changes(&planned),
+            proofs: crate::plugin::proofs(&manifest),
+            overrides: crate::plugin::overrides(&manifest),
+        }),
     }))
 }
 
@@ -928,10 +944,14 @@ config_path = "/app/data"
         );
     }
 
-    /// And a rehearsal on that same machine still answers, because what it is being
-    /// asked is what installing would decide rather than where the files would go.
+    /// And a rehearsal on that same machine is refused in the same words, because a
+    /// rehearsal is the account the install then follows. One that answered here
+    /// would be describing an operation this machine cannot carry out, and the
+    /// operator would find that out on the run they thought they had checked. What
+    /// answers with no machine at all is `plugin claims`, which is a different
+    /// question.
     #[test]
-    fn a_rehearsal_still_answers_on_a_machine_with_no_stack_directory() {
+    fn a_rehearsal_is_refused_wherever_the_install_would_be() {
         let env_file = env_at("no-stack-rehearsed", &a_password());
         let mut ctx = a_context()
             .settings(crate::config::Settings {
@@ -941,10 +961,9 @@ config_path = "/app/data"
             })
             .build();
         ctx.dry_run = true;
-        let shown = report(installing(&ctx, &source("no-stack-rehearsed", MANIFEST)));
         assert_eq!(
-            shown.and_then(|one| one.install).map(|one| one.recorded),
-            Some(false)
+            refusal(installing(&ctx, &source("no-stack-rehearsed", MANIFEST))),
+            "PLUGIN-6"
         );
     }
 }

@@ -28,6 +28,10 @@ mod installed;
 // than inside either: the record says what was decided and the container says what
 // follows from it, and this says where both of those land on the machine.
 mod placing;
+// What an install says it will do, before any of it is done. Beside the placing for
+// the same reason the placing is beside the record: one module turns a decision into
+// paths, and this turns it into the account an operator agrees to.
+mod stating;
 // Reachable from the diagnostics register as well as from here. A plugin's row is
 // judged by the one evaluator its recordings are judged by, and the answer a live
 // service gives is read into the one shape a recorded answer is read into — which is
@@ -54,6 +58,7 @@ pub use installed::{
 pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
+pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
 
 // Re-exported so a surface rendering one of these reads it through the module that
 // publishes it, rather than reaching past this crate for a type it was handed. The

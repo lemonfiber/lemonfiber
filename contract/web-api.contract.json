@@ -8829,10 +8829,49 @@
         "data"
       ],
       "$defs": {
-        "PluginInstall": {
-          "description": "What an install came to.",
+        "PluginChange": {
+          "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches: a\nplugin's wiring goes in files of its own, so there is no change here that is an\nedit to something somebody else owns.",
           "type": "object",
           "properties": {
+            "path": {
+              "description": "Where it lands, in full.\n\nIn full rather than relative to the stack, because *what is this about to do\nto my machine* is answered by a path somebody can go and look at — and a\nrelative one is right about a directory the reader has to work out for\nthemselves.",
+              "type": "string"
+            },
+            "puts": {
+              "description": "What lands there.",
+              "$ref": "#/$defs/PluginPuts"
+            }
+          },
+          "required": [
+            "path",
+            "puts"
+          ]
+        },
+        "PluginInstall": {
+          "description": "What an install came to, and what it took to get there.\n\n**The three lists below are stated whether the run wrote anything or not, and that\nis the whole of what makes a rehearsal worth running.** A rehearsal that reported\nless than the real run would be a preview of a different operation; one that\nreported it from code of its own would be a second derivation free to disagree\nwith the one that acts. So they are filled in one place, from the manifest and from\nthe very list of writes the install is carried out from, and the surface says them\nin whichever tense `recorded` calls for.",
+          "type": "object",
+          "properties": {
+            "changes": {
+              "description": "Every change it makes to the machine, in the order it makes them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginChange"
+              }
+            },
+            "overrides": {
+              "description": "Every bundled thing the plugin declares it will change.\n\nThe full extent rather than a sample of it: a manifest may change a bundled\nsetting only through a recipe, and a recipe reaching one no `[[override]]`\nnames is refused before anything is written.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginOverriding"
+              }
+            },
+            "proofs": {
+              "description": "Every proof that has to hold before the plugin is installed.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginProving"
+              }
+            },
             "recorded": {
               "description": "Whether it was written down. A rehearsal leaves this false.",
               "type": "boolean"
@@ -8844,7 +8883,10 @@
           },
           "required": [
             "would",
-            "recorded"
+            "recorded",
+            "changes",
+            "proofs",
+            "overrides"
           ]
         },
         "PluginInstalled": {
@@ -8901,6 +8943,24 @@
             "installed"
           ]
         },
+        "PluginOverriding": {
+          "description": "One bundled thing a plugin declares it will change.",
+          "type": "object",
+          "properties": {
+            "setting": {
+              "description": "Which bundled setting it changes.",
+              "type": "string"
+            },
+            "why": {
+              "description": "What changing it is for.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "setting",
+            "why"
+          ]
+        },
         "PluginPlaced": {
           "description": "One service of an installed plugin, as it was placed.",
           "type": "object",
@@ -8949,6 +9009,56 @@
             "tag",
             "config_path",
             "takes_data"
+          ]
+        },
+        "PluginProving": {
+          "description": "One proof that has to hold before a plugin is reported installed.",
+          "type": "object",
+          "properties": {
+            "asks": {
+              "description": "What it asks, as the method and the path it is asked at.",
+              "type": "string"
+            },
+            "establishes": {
+              "description": "What it establishes, in one line.",
+              "type": "string"
+            },
+            "of": {
+              "description": "Which of the plugin's services it asks, where the manifest settles that.\n\nNothing where it does not, which is a manifest the reader has already refused\n— carried as an absence rather than as a guess, so that a report built from a\nmanifest nobody held to the reader says *this was not settled* instead of\nnaming whichever service came first.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "proof": {
+              "description": "The proof's id, which its verdict is reported against.",
+              "type": "string"
+            },
+            "why": {
+              "description": "Why it is worth asserting.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "proof",
+            "establishes",
+            "asks",
+            "why"
+          ]
+        },
+        "PluginPuts": {
+          "description": "What an install puts at one path.",
+          "oneOf": [
+            {
+              "description": "A directory brought into being, which is where one service keeps its own\nconfiguration.",
+              "type": "string",
+              "const": "directory"
+            },
+            {
+              "description": "A document written, which is the container lemonfiber derives for the plugin.",
+              "type": "string",
+              "const": "document"
+            }
           ]
         },
         "PluginReached": {

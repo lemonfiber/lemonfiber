@@ -770,6 +770,28 @@ mod tests {
         crate::plugin::Installs {
             installed: vec![one.clone()],
             install: Some(crate::plugin::Install {
+                changes: vec![
+                    crate::plugin::Changing {
+                        path: "/opt/lemonfiber/stack/config/komga".to_owned(),
+                        puts: crate::plugin::Puts::Directory,
+                    },
+                    crate::plugin::Changing {
+                        path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
+                        puts: crate::plugin::Puts::Document,
+                    },
+                ],
+                proofs: vec![crate::plugin::Proving {
+                    proof: "answers".to_owned(),
+                    establishes: "the library API answers".to_owned(),
+                    of: Some("komga".to_owned()),
+                    asks: "GET /api/v1/libraries".to_owned(),
+                    why: "a plugin whose service does not answer is not installed".to_owned(),
+                }],
+                overrides: vec![crate::plugin::Overriding {
+                    setting: "seerr.settings".to_owned(),
+                    why: "a request for a comic has to reach the library that holds comics"
+                        .to_owned(),
+                }],
                 would: one,
                 recorded: true,
             }),
