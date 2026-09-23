@@ -1236,6 +1236,7 @@ mod tests {
             plugin: "komga".to_owned(),
             version: "1.2.0".to_owned(),
             services: Vec::new(),
+            contributions: Vec::new(),
         }
     }
 

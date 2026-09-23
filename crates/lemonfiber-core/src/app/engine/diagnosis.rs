@@ -56,8 +56,8 @@ pub async fn diagnose(
     narrowing: &Narrowing,
     disruptive: bool,
 ) -> Result<DoctorReport, Box<Problem>> {
-    let (manifest, checks) = assembled(ctx, disruptive).await?;
-    let report = examined(ctx, &manifest.services, &checks, narrowing).await;
+    let (stack, checks) = assembled(ctx, disruptive).await?;
+    let report = examined(ctx, &stack.manifest.services, &checks, narrowing).await;
     answered(narrowing, report)
 }
 
@@ -252,13 +252,33 @@ async fn tunnelled(
 pub(crate) async fn assembled(
     ctx: &Ctx,
     disruptive: bool,
-) -> Result<(lemonfiber_manifest::Manifest, Vec<Box<dyn Check>>), Box<Problem>> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(err.problem()))?;
-    let checks = assembling(ctx, &manifest, disruptive).await;
-    Ok((manifest, checks))
+) -> Result<(Stack, Vec<Box<dyn Check>>), Box<Problem>> {
+    let stack = Stack {
+        manifest: ctx
+            .stack
+            .checked_manifest(ctx.today())
+            .map_err(|err| Box::new(err.problem()))?,
+        // Refused rather than read past. A register that is there and will not parse is
+        // a machine that cannot say what is installed on it, and a diagnosis that
+        // carried on would report a clean bill of health with a stranger's rows silently
+        // missing from it — which is the one answer a reader would act on and should not.
+        installed: crate::app::plugins::read(ctx)?.installed().to_vec(),
+    };
+    let checks = assembling(ctx, &stack, disruptive).await;
+    Ok((stack, checks))
+}
+
+/// Everything the checks are built out of, read once.
+///
+/// Two documents rather than one because they answer two questions and come from two
+/// places: what this build ships is the stack's own manifest, and what an operator has
+/// added to it is the register an install writes. A check list built from only the first
+/// is a diagnosis that stops at the edge of what lemonfiber shipped.
+pub(crate) struct Stack {
+    /// What this build ships, and the services every bundled check is built against.
+    pub manifest: lemonfiber_manifest::Manifest,
+    /// What is installed on this machine, and the rows each of those added.
+    pub installed: Vec<crate::plugin::Installed>,
 }
 
 /// The same list, built from a manifest somebody has already read.
@@ -273,11 +293,8 @@ pub(crate) async fn assembled(
 /// Fresh instances every time, and that is the point of asking again at all: a check
 /// holds what it read when it was built, so re-running the same instances would compare
 /// a machine against the very reading the work was meant to change.
-pub(crate) async fn assembling(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    disruptive: bool,
-) -> Vec<Box<dyn Check>> {
+pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<dyn Check>> {
+    let manifest = &stack.manifest;
     let environment = EnvironmentCheck::reaching(ctx.runner.clone(), ctx.settings.docker.clone());
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     // What the download clients still have to write, so the free-space finding
@@ -383,7 +400,7 @@ pub(crate) async fn assembling(
         crate::app::autostart::load(ctx).wanted().on_boot(),
         ctx.settings.home.clone(),
     );
-    vec![
+    let mut checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(autostart),
         Box::new(bindings),
@@ -398,7 +415,22 @@ pub(crate) async fn assembling(
         Box::new(wiring),
         Box::new(telling),
         Box::new(permissions),
-    ]
+    ];
+    // Appended to the same list rather than kept in one of their own, which is the
+    // whole of what *run where the bundled ones are run* means: one register, one
+    // budget, one narrowing, one overall. A second list beside this one would be a
+    // second set of rules for a row an operator reads in the same report.
+    //
+    // Where each plugin's service answers is composed once, from the record of what was
+    // installed, so a row asks the port the install published rather than a port
+    // something guessed.
+    let answering = crate::plugin::answering(&stack.installed);
+    for installed in &stack.installed {
+        checks.extend(crate::doctor::contributed::declared(
+            installed, &answering, &ctx.http,
+        ));
+    }
+    checks
 }
 
 /// What the accounts underneath the stack have left, read from the services that use

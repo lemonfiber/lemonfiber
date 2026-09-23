@@ -1151,6 +1151,89 @@
       },
       "variants": []
     },
+    "Contribution": {
+      "fields": {
+        "action": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "at": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "category": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "detail": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "expect": {
+          "type": [
+            "anyOf(null,ref:Expect)"
+          ],
+          "required": false
+        },
+        "fixture": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "for": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "request": {
+          "type": [
+            "anyOf(null,ref:PluginRequest)"
+          ],
+          "required": false
+        },
+        "service": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "timeout_s": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        },
+        "title": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "why": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
     "Cost": {
       "fields": {},
       "variants": [
@@ -1692,6 +1775,69 @@
           "required": true
         }
       },
+      "variants": []
+    },
+    "Expect": {
+      "fields": {
+        "body_starts_with": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "content_type": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "json": {
+          "type": [
+            "null|object{ref:Expected}"
+          ],
+          "required": false
+        },
+        "json_array_min": {
+          "type": [
+            "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "json_at_least": {
+          "type": [
+            "null|object{integer/int64}"
+          ],
+          "required": false
+        },
+        "json_has_keys": {
+          "type": [
+            "array|null[string]"
+          ],
+          "required": false
+        },
+        "json_is_absent": {
+          "type": [
+            "boolean|null"
+          ],
+          "required": false
+        },
+        "json_types": {
+          "type": [
+            "null|object{ref:Kind}"
+          ],
+          "required": false
+        },
+        "status": {
+          "type": [
+            "integer|null/uint16"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Expected": {
+      "fields": {},
       "variants": []
     },
     "Facing": {
@@ -2722,6 +2868,16 @@
         }
       },
       "variants": []
+    },
+    "Kind": {
+      "fields": {},
+      "variants": [
+        "\"bool\"",
+        "\"dict\"",
+        "\"int\"",
+        "\"list\"",
+        "\"str\""
+      ]
     },
     "Leaving": {
       "fields": {
@@ -4077,6 +4233,12 @@
     },
     "PluginInstalled": {
       "fields": {
+        "contributions": {
+          "type": [
+            "array[ref:Contribution]"
+          ],
+          "required": false
+        },
         "plugin": {
           "type": [
             "string"
@@ -4259,6 +4421,29 @@
         "\"household\"",
         "\"loopback\""
       ]
+    },
+    "PluginRequest": {
+      "fields": {
+        "accept": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "method": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
     },
     "PluginVerdict": {
       "fields": {

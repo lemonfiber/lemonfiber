@@ -402,6 +402,7 @@ mod tests {
                 takes_data: reached.is_some(),
                 reached,
             }],
+            contributions: Vec::new(),
         }
     }
 

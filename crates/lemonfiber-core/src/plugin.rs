@@ -57,7 +57,8 @@ pub use claimed::{
 };
 pub use container::{profile, written};
 pub use installed::{
-    Already, Install, Installed, Installs, Placed, Reached, Register, Unreadable as Unrecorded,
+    answering, Already, Install, Installed, Installs, Placed, Reached, Register,
+    Unreadable as Unrecorded,
 };
 pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};

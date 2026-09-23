@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The core capability a plugin claims, and the probes it is demonstrated by.
 ///
@@ -77,7 +77,7 @@ pub struct Proof {
 /// are read from `extension-points.json` rather than restated here. What this type
 /// fixes is that a contribution is declared in this block and nowhere else, and that
 /// it carries nothing outside the union of the rows the published points take.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Contribution {
     /// A point the build publishes. One it does not is refused by name.
@@ -138,7 +138,7 @@ pub struct Contribution {
 /// whatever it likes, so no list of refused names could ever be closed — where one named
 /// field keeps it a property of the format. A probe still cannot present anything,
 /// because there is nowhere to write it.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "PluginRequest")]
 pub struct Request {
@@ -166,7 +166,7 @@ pub struct Request {
 /// with a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the
 /// only thing it could say about a service that nests its payload was that the envelope
 /// was there — which is a probe that passes by observing that something replied.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Expect {
     /// The status the answer must carry.
@@ -211,7 +211,7 @@ pub struct Expect {
 /// Five, and closed. A name outside them is one no runner could evaluate, and an
 /// assertion nothing evaluates is a proof that silently checks less than it says —
 /// which is worse than one that fails.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     /// A true or a false.
@@ -232,7 +232,7 @@ pub enum Kind {
 /// word. A value deeper than this is asking about a document rather than about a claim
 /// — and where the thing worth asserting is deeper *in* the answer, the key reaches it
 /// rather than the value growing to match.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum Expected {
     /// A true or a false.

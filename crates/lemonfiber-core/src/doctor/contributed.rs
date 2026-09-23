@@ -26,12 +26,13 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_plugin::extension;
-use lemonfiber_plugin::{Contribution, Expect, Manifest};
+use lemonfiber_plugin::{Contribution, Expect};
 
 use super::{Category, Check, Finding, Reported, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::recorded::Answer;
+use crate::plugin::Installed;
 use crate::ports::http::{self, Http, Method};
 
 /// A check a plugin contributed did not hold.
@@ -43,8 +44,14 @@ pub const CONTRIBUTED_FAILED: Code = Code::new("PLUGIN-1");
 
 /// Every check an installed plugin adds to the register, ready to be run with the rest.
 ///
+/// **Read off the record of what was installed rather than off the plugin's own
+/// files.** The author's directory may be gone the moment an install is done, and a
+/// diagnosis a month later is a question about this machine rather than about a
+/// document. The record is what the install settled and is the one thing that survives,
+/// which is also what stops a row changing under an operator between two runs.
+///
 /// `answering` says where each of the plugin's services can be reached, by the id the
-/// manifest gives it. A service missing from it is one lemonfiber cannot ask, which is
+/// manifest gave it. A service missing from it is one lemonfiber cannot ask, which is
 /// a reason to report a check unrun rather than a reason to leave it out.
 ///
 /// Nothing is returned for a plugin that contributes nothing, and nothing at all for no
@@ -52,24 +59,24 @@ pub const CONTRIBUTED_FAILED: Code = Code::new("PLUGIN-1");
 /// a build that never saw it, rather than one with a gap where it used to be.
 #[must_use]
 pub fn declared(
-    manifest: &Manifest,
+    installed: &Installed,
     answering: &BTreeMap<String, String>,
     http: &Arc<dyn Http>,
 ) -> Vec<Box<dyn Check>> {
-    manifest
+    installed
         .contributions
         .iter()
         .filter(|entry| entry.at == extension::check())
         .map(|entry| {
             Box::new(Contributed {
-                plugin: manifest.plugin.id.clone(),
+                plugin: installed.plugin.clone(),
                 check: entry.id.clone(),
                 title: entry.title.clone().unwrap_or(entry.id.clone()),
                 category: family(entry).unwrap_or(UNPLACEABLE),
-                service: asked_of(manifest, entry),
+                service: entry.service.clone(),
                 budget: bounded(entry.timeout_s),
-                asks: asked(manifest, entry, answering),
-                remedies: remedies(manifest, &entry.id),
+                asks: asked(entry, answering),
+                remedies: remedies(installed, &entry.id),
                 http: Arc::clone(http),
             }) as Box<dyn Check>
         })
@@ -109,17 +116,6 @@ fn bounded(asked: Option<u32>) -> Duration {
     Duration::from_secs(u64::from(seconds))
 }
 
-/// Which of the plugin's services a row is about.
-///
-/// The manifest's own answer rather than a second one here: the rule that a
-/// declaration may leave the service out where a plugin declares a single one is the
-/// format's, and a copy of it beside each reader is a copy free to fall behind.
-fn asked_of(manifest: &Manifest, entry: &Contribution) -> Option<String> {
-    manifest
-        .asks(entry.service.as_deref())
-        .map(|service| service.id.clone())
-}
-
 /// What this check asks, or why nothing can be asked.
 #[derive(Debug)]
 enum Asks {
@@ -139,14 +135,14 @@ enum Asks {
 }
 
 /// The question this row puts, where every part of it is there.
-fn asked(manifest: &Manifest, entry: &Contribution, answering: &BTreeMap<String, String>) -> Asks {
+fn asked(entry: &Contribution, answering: &BTreeMap<String, String>) -> Asks {
     if family(entry).is_none() {
         return Asks::Nothing(format!(
             "{} is not a family the doctor has, so there is nowhere to report it",
             entry.category.as_deref().unwrap_or("nothing")
         ));
     }
-    let Some(service) = asked_of(manifest, entry) else {
+    let Some(service) = entry.service.clone() else {
         return Asks::Nothing(
             "it does not settle which of this plugin's services it asks".to_owned(),
         );
@@ -181,8 +177,8 @@ fn asked(manifest: &Manifest, entry: &Contribution, answering: &BTreeMap<String,
 /// Text, in the shape the error model already has, and that is the whole of what a
 /// contributed remedy is. A repair that acts is a recipe and is declared as one; there
 /// is nothing here that could run.
-fn remedies(manifest: &Manifest, check: &str) -> Vec<Guided> {
-    manifest
+fn remedies(installed: &Installed, check: &str) -> Vec<Guided> {
+    installed
         .contributions
         .iter()
         .filter(|entry| entry.at == extension::remedy())
@@ -388,6 +384,7 @@ mod tests {
     use super::{declared, CONTRIBUTED_FAILED};
     use crate::doctor::{examine, Category, Check, Finding, Narrowing, Overall, Verdict};
     use crate::error::{Problem, Remedy, State};
+    use crate::plugin::Installed;
     use crate::ports::http::{Http, Method};
 
     /// A plugin that declares one check on its own service and one remedy for it.
@@ -454,7 +451,7 @@ why    = "Until somebody does, the first caller on the household network becomes
         let read = Manifest::from_toml(text);
         assert!(read.is_ok(), "the fixture does not read: {read:?}");
         read.as_ref()
-            .map(|manifest| declared(manifest, &answering(), http))
+            .map(|manifest| declared(&Installed::of(manifest), &answering(), http))
             .unwrap_or_default()
     }
 
@@ -720,7 +717,13 @@ why    = "Until somebody does, the first caller on the household network becomes
         assert!(read.is_ok(), "the fixture does not read: {read:?}");
         let checks = read
             .as_ref()
-            .map(|manifest| declared(manifest, &BTreeMap::new(), &saying(holding())))
+            .map(|manifest| {
+                declared(
+                    &Installed::of(manifest),
+                    &BTreeMap::new(),
+                    &saying(holding()),
+                )
+            })
             .unwrap_or_default();
         let report = examine(&checks, &Narrowing::Suite).await;
         assert_eq!(report.findings.len(), 1, "{report:?}");

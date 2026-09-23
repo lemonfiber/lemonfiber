@@ -188,6 +188,7 @@ mod tests {
             plugin: plugin.to_owned(),
             version: "1.2.0".to_owned(),
             services: services.iter().map(|one| placed(one)).collect(),
+            contributions: Vec::new(),
         }
     }
 

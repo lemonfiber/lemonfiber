@@ -19,11 +19,10 @@
 //! default route or spend a live indexer search, twice — which is the same care a
 //! repair takes when it proves its own work, for the same reason.
 
-use lemonfiber_manifest::Manifest;
-
 use crate::doctor::{Finding, Narrowing};
 use crate::error::Problem;
 
+use super::super::engine::Stack;
 use super::super::Ctx;
 
 /// The first reading, and the one thing in this that can refuse.
@@ -38,10 +37,10 @@ use super::super::Ctx;
 /// Where the stack's own manifest cannot be read, which is the one thing every check
 /// needs before any of them can run. Its one caller asks it before a byte of the
 /// install is written, so a refusal here leaves nothing to put back.
-pub(super) async fn looked(ctx: &Ctx) -> Result<(Manifest, Vec<Finding>), Box<Problem>> {
-    let (manifest, checks) = super::super::engine::assembled(ctx, false).await?;
-    let findings = examined(ctx, &manifest, &checks).await;
-    Ok((manifest, findings))
+pub(super) async fn looked(ctx: &Ctx) -> Result<(Stack, Vec<Finding>), Box<Problem>> {
+    let (stack, checks) = super::super::engine::assembled(ctx, false).await?;
+    let findings = examined(ctx, &stack, &checks).await;
+    Ok((stack, findings))
 }
 
 /// The second reading, over checks built afresh from the manifest the first read.
@@ -50,9 +49,9 @@ pub(super) async fn looked(ctx: &Ctx) -> Result<(Manifest, Vec<Finding>), Box<Pr
 /// again: a check holds what it read when it was built, so putting the same instances
 /// a second question would compare the install against the very reading it was meant
 /// to change — and would report every install as having broken nothing.
-pub(super) async fn again(ctx: &Ctx, manifest: &Manifest) -> Vec<Finding> {
-    let checks = super::super::engine::assembling(ctx, manifest, false).await;
-    examined(ctx, manifest, &checks).await
+pub(super) async fn again(ctx: &Ctx, stack: &Stack) -> Vec<Finding> {
+    let checks = super::super::engine::assembling(ctx, stack, false).await;
+    examined(ctx, stack, &checks).await
 }
 
 /// One reading, through the pairing every other caller's goes through.
@@ -64,10 +63,10 @@ pub(super) async fn again(ctx: &Ctx, manifest: &Manifest) -> Vec<Finding> {
 /// would be blamed for.
 async fn examined(
     ctx: &Ctx,
-    manifest: &Manifest,
+    stack: &Stack,
     checks: &[Box<dyn crate::doctor::Check>],
 ) -> Vec<Finding> {
-    super::super::engine::examined(ctx, &manifest.services, checks, &Narrowing::Suite)
+    super::super::engine::examined(ctx, &stack.manifest.services, checks, &Narrowing::Suite)
         .await
         .findings
 }
