@@ -165,7 +165,12 @@ const fn situation(command: &Command) -> Option<Situation> {
         // when it did.
         Command::Up { .. } | Command::Start { .. } | Command::AtBoot => Some(Situation::Starting),
         Command::Restart { .. } => Some(Situation::Restarting),
-        Command::Switch { .. } => Some(Situation::Switching),
+        // An update is the running set changing to a different one: the version
+        // installed comes off and another comes on in its place, held to the same
+        // settle wait a switch is.
+        Command::Switch { .. } | Command::Plugins(Asked::Update { .. }) => {
+            Some(Situation::Switching)
+        }
         Command::Down {
             wait: Waiting::ForTheDownloads,
             ..
@@ -361,14 +366,23 @@ mod tests {
     }
 
     /// Removing a plugin stops its containers through the engine's own stop, so it is
-    /// held to the same grace and said the same way. Installing one takes nothing
-    /// away from anybody, and reading what is installed takes nothing at all.
+    /// held to the same grace and said the same way; updating one changes what is
+    /// running, like a switch. Installing one takes nothing away from anybody, and
+    /// reading what is installed takes nothing at all.
     #[test]
-    fn removing_a_plugin_is_a_stop_and_installing_one_is_not() {
+    fn removing_or_updating_a_plugin_takes_something_away_and_installing_one_does_not() {
         let removing = Command::Plugins(Asked::Remove {
             plugin: "komga".to_owned(),
         });
         assert_eq!(of(&removing, WAITED), Some(Disturbance::Bounded(GRACE)));
+        let updating = Command::Plugins(Asked::Update {
+            path: std::path::PathBuf::from("komga"),
+        });
+        assert_eq!(
+            of(&updating, WAITED),
+            Some(Disturbance::Bounded(WAITED)),
+            "an update changes what is running, and is held to the settle wait a switch is"
+        );
 
         for quiet in [
             Command::Plugins(Asked::Install {

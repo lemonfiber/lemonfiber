@@ -37,7 +37,8 @@ pub(super) const NOT_INSTALLED: Code = Code::new("PLUGIN-10");
 /// # Errors
 ///
 /// Where nothing by that name is installed, where there is nowhere to look for the
-/// record of what was written, where the rollback layer refuses a change, or where the
+/// record of what was written, where the rollback layer refuses a change — asked before
+/// anything is taken, so a refusal leaves the plugin exactly as it was — or where the
 /// record of what is installed cannot be written afterwards.
 pub(super) async fn remove(
     ctx: &Ctx,
@@ -66,6 +67,16 @@ pub(super) async fn remove(
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
     let leaves = unfilled(&going, held.installed(), &stack.services);
+
+    // Judged before anything is taken, on a run that takes anything. The rollback layer
+    // refuses a drifted setting or a change a later one depends on, and a removal that
+    // had already stopped the container when it heard that would leave a plugin the
+    // register still calls installed with nothing of it running — the one state this
+    // verb must not leave. A rehearsal needs no separate question: it touches nothing,
+    // and the reversal below makes the same judgement before answering it.
+    if !ctx.dry_run {
+        super::super::putting_back::admitted(ctx, &going.plugin)?;
+    }
 
     // What stops, named before anything does. A rehearsal carries it in its report,
     // which is read before the real run is asked for; a real run says it aloud as well,
@@ -156,6 +167,7 @@ fn answering(installed: Vec<Installed>, removal: Removal) -> Outcome {
         installed,
         install: None,
         removal: Some(removal),
+        update: None,
     })
 }
 
@@ -165,9 +177,11 @@ fn answering(installed: Vec<Installed>, removal: Removal) -> Outcome {
 /// reversal does: a removal that stopped at its first difficulty would leave more
 /// behind than one that carried on and said what it could not do.
 async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
-    let Some(stack) = ctx.settings.stack_dir.as_deref() else {
-        return false;
-    };
+    // There is always a stack by here: the judgement asked first needs the layout, and a
+    // machine without a stack has none, so it has already refused. An empty path on the
+    // impossible branch keeps this free of a line no test can reach — and were it ever
+    // reached, it would ask the engine about nothing and report the container standing.
+    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
     let mut settings = ctx.settings.clone();
     settings.plugins.push(plugin.to_owned());
     let plan = Plan {
@@ -179,7 +193,7 @@ async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
     let command = build(
         &plan,
         &settings,
-        stack,
+        &stack,
         &Action::Remove(services.to_vec()),
         ctx.environment,
     );

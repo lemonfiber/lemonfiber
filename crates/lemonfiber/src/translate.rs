@@ -527,7 +527,7 @@ pub(crate) enum Under {
 /// Which door this word goes through, and the value it goes through it as.
 ///
 /// The five documents answer the same on a machine with nothing installed as on one
-/// running everything, so there is no stack to ask and nothing to decide; the three
+/// running everything, so there is no stack to ask and nothing to decide; the four
 /// verbs are about this machine and go where every other verb goes.
 pub(crate) fn plugin(read: PluginCommand) -> Under {
     match read {
@@ -537,6 +537,9 @@ pub(crate) fn plugin(read: PluginCommand) -> Under {
         PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
         PluginCommand::Remove { plugin } => {
             Under::Dispatched(Command::Plugins(plugins::Asked::Remove { plugin }))
+        }
+        PluginCommand::Update { path } => {
+            Under::Dispatched(Command::Plugins(plugins::Asked::Update { path }))
         }
         PluginCommand::Authoring(read) => Under::Published(read),
     }
@@ -1562,6 +1565,15 @@ mod tests {
                 plugin: "komga".to_owned()
             })),
             "a removal names the plugin rather than a path, because the source may be gone"
+        );
+        assert_eq!(
+            door(lemonfiber::cli::PluginCommand::Update {
+                path: std::path::PathBuf::from("/srv/komga")
+            }),
+            Some(Command::Plugins(plugins::Asked::Update {
+                path: std::path::PathBuf::from("/srv/komga")
+            })),
+            "an update names the new version's source, because that is what is coming on"
         );
     }
 

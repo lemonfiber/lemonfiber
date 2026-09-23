@@ -166,6 +166,30 @@ pub(super) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, B
     carried_out(ctx, &paths, changes, &run, operation).await
 }
 
+/// Whether [`everything`] would go ahead, asked without touching anything.
+///
+/// For a caller with something of its own to do before the reversal — a plugin's
+/// containers come off before its files go back — and which must not do it if the
+/// reversal is then going to refuse. Asked of the same judgement [`everything`] makes,
+/// so the answer here and the refusal there cannot disagree.
+///
+/// # Errors
+///
+/// The ones [`everything`] would give before touching anything: nowhere to look for
+/// the record, or a change the judgement will not put back.
+pub(super) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
+    let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
+    let journal = super::recover::journal_at(&paths.journal());
+    let changes = journal.changes();
+    judged(
+        ctx,
+        changes,
+        &crate::rollback::everything(changes, operation),
+        operation,
+    )
+    .map(drop)
+}
+
 /// Judge a set of changes whole, then put them back newest first.
 ///
 /// `at` is what a refusal calls the thing being put back: the stamp where an operator
@@ -178,59 +202,7 @@ async fn carried_out(
     run: &[&Change],
     at: &str,
 ) -> Result<Reversal, Box<Problem>> {
-    // Read once rather than per change: the drift question asks the same file as many
-    // times as there are entries otherwise.
-    let holds = |key: &str| -> Option<String> {
-        let file = ctx.settings.env_file.as_ref()?;
-        crate::config::store::read(file)
-            .ok()?
-            .get(key)
-            .map(str::to_owned)
-    };
-
-    // Judged whole before anything is touched. The refusal carries the reason the
-    // judgement gave and what to do instead, which for a change nothing here can put
-    // back is the only useful half of the answer.
-    let mut noted: Vec<Noted> = Vec::new();
-    for change in run {
-        let position = changes
-            .iter()
-            .position(|held| held == *change)
-            .unwrap_or(changes.len());
-        let later = changes.get(position + 1..).unwrap_or_default();
-        let verdict = standing(change, later, &holds);
-        if verdict.reversal == Judgement::None {
-            // The reason and what to do instead, joined rather than branched on: a
-            // refusal carrying no remedy is a shape this judgement does not produce, and
-            // a branch for it would be a line no test could ever reach.
-            let why = verdict
-                .refusal
-                .map(|refusal| {
-                    [Some(refusal.because), refusal.instead]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<String>>()
-                        .join(" — ")
-                })
-                .unwrap_or_default();
-            return Err(Box::new(cannot_succeed(at, &change.target, &why)));
-        }
-        // It goes back, and going back is not the whole of what happens. A judgement
-        // that says so on a change it can still carry out is saying the one thing an
-        // operator would otherwise find out by going to look.
-        if verdict.reversal == Judgement::Partial {
-            if let Some(refusal) = verdict.refusal {
-                noted.push(Noted {
-                    target: change.target.clone(),
-                    because: [Some(refusal.because), refusal.instead]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<String>>()
-                        .join(" — "),
-                });
-            }
-        }
-    }
+    let noted = judged(ctx, changes, run, at)?;
 
     // Newest first, which is the order a reversal has to take and the order the
     // repair's own reversal already takes. A run that made a directory and then made
@@ -339,6 +311,78 @@ fn operation_at(changes: &[Change], at: &str) -> Result<String, Box<Problem>> {
         [one] => Ok((*one).to_owned()),
         several => Err(Box::new(more_than_one(at, several))),
     }
+}
+
+/// The judgement, made whole before anything is touched.
+///
+/// Answers with what going back *also* means for the changes it will put back, and
+/// refuses at the first change it will not: drift, or a later change that depends on
+/// it. One function for [`carried_out`] and [`admitted`], so the question asked before
+/// a caller's own first step and the one asked before the reversal's are the same one.
+///
+/// # Errors
+///
+/// Where a change of the run cannot be put back.
+fn judged(
+    ctx: &Ctx,
+    changes: &[Change],
+    run: &[&Change],
+    at: &str,
+) -> Result<Vec<Noted>, Box<Problem>> {
+    // Read once rather than per change: the drift question asks the same file as many
+    // times as there are entries otherwise.
+    let holds = |key: &str| -> Option<String> {
+        let file = ctx.settings.env_file.as_ref()?;
+        crate::config::store::read(file)
+            .ok()?
+            .get(key)
+            .map(str::to_owned)
+    };
+
+    // Judged whole before anything is touched. The refusal carries the reason the
+    // judgement gave and what to do instead, which for a change nothing here can put
+    // back is the only useful half of the answer.
+    let mut noted: Vec<Noted> = Vec::new();
+    for change in run {
+        let position = changes
+            .iter()
+            .position(|held| held == *change)
+            .unwrap_or(changes.len());
+        let later = changes.get(position + 1..).unwrap_or_default();
+        let verdict = standing(change, later, &holds);
+        if verdict.reversal == Judgement::None {
+            // The reason and what to do instead, joined rather than branched on: a
+            // refusal carrying no remedy is a shape this judgement does not produce, and
+            // a branch for it would be a line no test could ever reach.
+            let why = verdict
+                .refusal
+                .map(|refusal| {
+                    [Some(refusal.because), refusal.instead]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<String>>()
+                        .join(" — ")
+                })
+                .unwrap_or_default();
+            return Err(Box::new(cannot_succeed(at, &change.target, &why)));
+        }
+        // It goes back, and going back is not the whole of what happens. A judgement
+        // that says so on a change it can still carry out is saying the one thing an
+        // operator would otherwise find out by going to look.
+        if verdict.reversal == Judgement::Partial {
+            if let Some(refusal) = verdict.refusal {
+                noted.push(Noted {
+                    target: change.target.clone(),
+                    because: [Some(refusal.because), refusal.instead]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<String>>()
+                        .join(" — "),
+                });
+            }
+        }
+    }
+    Ok(noted)
 }
 
 /// What a reversal left standing, as the report says it.

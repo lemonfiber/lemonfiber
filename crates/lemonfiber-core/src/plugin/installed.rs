@@ -862,6 +862,7 @@ dashboard_group = "Library"
             installed: whole().into_iter().collect(),
             install: None,
             removal: None,
+            update: None,
         };
         let done = Installs {
             removal: None,
@@ -876,6 +877,7 @@ dashboard_group = "Library"
                 overrides: Vec::new(),
                 reversed: None,
             }),
+            update: None,
         };
         assert!(read.install.is_none());
         assert_eq!(done.install.map(|one| one.recorded), Some(true));

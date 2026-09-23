@@ -22,6 +22,8 @@ use lemonfiber_core::plugin::{
 
 use super::super::Lines;
 
+mod updated;
+
 /// What is installed on this machine, and what installing one came to.
 ///
 /// The install leads where there was one, because that is what the operator just
@@ -63,6 +65,9 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.spaced(shelf(report.installed.len()));
     } else if let Some(one) = &report.removal {
         lines.extend(removal(one));
+        lines.spaced(shelf(report.installed.len()));
+    } else if let Some(one) = &report.update {
+        lines.extend(updated::updated(one));
         lines.spaced(shelf(report.installed.len()));
     } else {
         lines.put(shelf(report.installed.len()));
@@ -469,7 +474,7 @@ mod tests {
     use lemonfiber_core::journal::{Action, Undo};
     use lemonfiber_core::plugin::{
         Changing, Evidence, Install, Installed, Installs, Overriding, Placed, Proving, Puts,
-        Reached, Removal, Unfilled, Verdict, Verification,
+        Reached, Removal, Restored, Unfilled, Update, Verdict, Verification,
     };
 
     use super::{installs, stood};
@@ -565,6 +570,7 @@ mod tests {
             removal: None,
             installed: Vec::new(),
             install: None,
+            update: None,
         })
         .text();
         assert_eq!(said, "No plugins are installed.");
@@ -578,6 +584,7 @@ mod tests {
             removal: None,
             installed: vec![recorded("komga", Some(household()))],
             install: None,
+            update: None,
         })
         .text();
         assert!(said.contains("One plugin is installed:"), "{said}");
@@ -598,6 +605,7 @@ mod tests {
             removal: None,
             installed: vec![recorded("komga", Some(household())), recorded("plex", None)],
             install: None,
+            update: None,
         })
         .text();
         assert!(said.contains("2 plugins are installed:"), "{said}");
@@ -623,6 +631,7 @@ mod tests {
                 }),
             )],
             install: None,
+            update: None,
         })
         .text();
         assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -645,6 +654,7 @@ mod tests {
                 }),
             )],
             install: None,
+            update: None,
         })
         .text();
         assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -658,6 +668,7 @@ mod tests {
             removal: None,
             installed: vec![one.clone()],
             install: Some(install(one, true)),
+            update: None,
         })
         .text();
         assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
@@ -680,6 +691,7 @@ mod tests {
             removal: None,
             installed: vec![one.clone()],
             install: Some(install(one.clone(), true)),
+            update: None,
         })
         .text();
         assert!(
@@ -705,6 +717,7 @@ mod tests {
                 removal: None,
                 installed: Vec::new(),
                 install: Some(install(one.clone(), recorded)),
+                update: None,
             })
             .text()
         };
@@ -731,6 +744,7 @@ mod tests {
                 overrides: vec![override_of()],
                 ..install(one, false)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -772,6 +786,7 @@ mod tests {
                 overrides: vec![override_of()],
                 ..install(one, true)
             }),
+            update: None,
         })
         .text();
         assert!(said.contains("What it put on this machine:"), "{said}");
@@ -794,6 +809,7 @@ mod tests {
                 changes: writes(),
                 ..install(recorded("komga", Some(household())), false)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -826,6 +842,7 @@ mod tests {
                 }],
                 ..install(recorded("komga", Some(household())), false)
             }),
+            update: None,
         })
         .text();
         assert!(said.contains("asks GET /api/v1/libraries"), "{said}");
@@ -850,6 +867,7 @@ mod tests {
                 against: Some(Evidence::Service),
                 ..install(one, true)
             }),
+            update: None,
         })
         .text();
         assert!(said.contains("held"), "{said}");
@@ -889,6 +907,7 @@ mod tests {
                 against: Some(Evidence::Service),
                 ..install(one, false)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -941,6 +960,7 @@ mod tests {
                 }),
                 ..install(one, true)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -983,6 +1003,7 @@ mod tests {
                 }),
                 ..install(one, false)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -1045,9 +1066,132 @@ mod tests {
                 verified: None,
                 ..install(one, false)
             }),
+            update: None,
         })
         .text();
         assert!(!said.contains("the stack's own checks"), "{said}");
+    }
+
+    /// An update built for the page: from one version to the next, with whatever it
+    /// came to.
+    fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> Installs {
+        let mut next = self::recorded("komga", None);
+        next.version = "1.3.0".to_owned();
+        Installs {
+            installed: vec![self::recorded("komga", None)],
+            install: None,
+            removal: None,
+            update: Some(Box::new(Update {
+                plugin: "komga".to_owned(),
+                from: "1.2.0".to_owned(),
+                to: "1.3.0".to_owned(),
+                interrupts: vec!["komga".to_owned()],
+                went_back: Reversal {
+                    rehearsed: !recorded && restored.is_none(),
+                    ..Reversal::default()
+                },
+                install: Install {
+                    reversed: restored.as_ref().map(|_| Reversal::default()),
+                    ..install(next, recorded)
+                },
+                stopped: stopped.map(str::to_owned),
+                restored,
+            })),
+        }
+    }
+
+    /// Each of the three ways an update can read leads with which version the machine is
+    /// on, because that is the one thing an operator reading it must not have to work out.
+    #[test]
+    fn an_update_says_first_which_version_the_machine_is_on() {
+        let held = installs(&moving(true, None, None)).text();
+        assert!(
+            held.contains("Updated komga from 1.2.0 to 1.3.0:"),
+            "{held}"
+        );
+        assert!(held.contains("Stopped: komga"), "{held}");
+
+        let rehearsed = installs(&moving(false, None, None)).text();
+        assert!(
+            rehearsed.contains("Would update komga from 1.2.0 to 1.3.0:"),
+            "{rehearsed}"
+        );
+        assert!(rehearsed.contains("Would stop: komga"), "{rehearsed}");
+        assert!(
+            rehearsed.contains("The version it replaces, 1.2.0:"),
+            "{rehearsed}"
+        );
+        assert!(rehearsed.contains("What would go back:"), "{rehearsed}");
+        assert!(
+            rehearsed.contains("The version it puts on, 1.3.0:"),
+            "{rehearsed}"
+        );
+        assert!(rehearsed.contains("Nothing was changed."), "{rehearsed}");
+
+        let back = Restored {
+            version: "1.2.0".to_owned(),
+            placed: true,
+            running: true,
+        };
+        let failed = installs(&moving(false, Some(back), None)).text();
+        assert!(
+            failed.contains("Did not update komga, so 1.2.0 is what this machine is on:"),
+            "{failed}"
+        );
+        assert!(
+            failed.contains("komga 1.2.0 is back on the machine and running"),
+            "{failed}"
+        );
+    }
+
+    /// A version that came back only in part is not called back. A container that would
+    /// not start, and files that would not land, each say what is missing and what the
+    /// record still names.
+    #[test]
+    fn an_old_version_that_came_back_in_part_is_not_said_to_be_back() {
+        let unstarted = installs(&moving(
+            false,
+            Some(Restored {
+                version: "1.2.0".to_owned(),
+                placed: true,
+                running: false,
+            }),
+            Some("the container engine refused to start it: no"),
+        ))
+        .text();
+        assert!(
+            unstarted.contains("its container would not start"),
+            "{unstarted}"
+        );
+        assert!(
+            unstarted.contains(
+                "It stopped before its proofs could be asked: the container engine refused"
+            ),
+            "{unstarted}"
+        );
+        assert!(
+            !unstarted.contains("is back on the machine and running"),
+            "{unstarted}"
+        );
+
+        let unplaced = installs(&moving(
+            false,
+            Some(Restored {
+                version: "1.2.0".to_owned(),
+                placed: false,
+                running: false,
+            }),
+            None,
+        ))
+        .text();
+        assert!(
+            unplaced.contains("komga 1.2.0 could not be put back"),
+            "{unplaced}"
+        );
+        assert!(
+            unplaced.contains("lemonfiber plugin remove komga"),
+            "{unplaced}"
+        );
     }
 
     /// A removal built for the page: one plugin, one thing put back, and whatever it
@@ -1077,6 +1221,7 @@ mod tests {
                     rehearsed: !removed,
                 },
             }),
+            update: None,
         }
     }
 
@@ -1236,6 +1381,7 @@ mod tests {
                 }),
                 ..install(one, false)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -1282,6 +1428,7 @@ mod tests {
                 }),
                 ..install(one, false)
             }),
+            update: None,
         })
         .text();
         assert!(
@@ -1378,6 +1525,7 @@ mod tests {
             removal: None,
             installed: vec![one.clone()],
             install: Some(install(one, false)),
+            update: None,
         })
         .text();
         assert!(said.starts_with("Would install komga 1.2.0:"), "{said}");
@@ -1392,6 +1540,7 @@ mod tests {
             removal: None,
             installed: Vec::new(),
             install: Some(install(recorded("komga", Some(household())), false)),
+            update: None,
         })
         .text();
         assert!(said.contains("Nothing was written."), "{said}");
@@ -1407,6 +1556,7 @@ mod tests {
             removal: None,
             installed: vec![recorded("komga", Some(household()))],
             install: None,
+            update: None,
         }))
         .text();
         assert!(drawn.contains("komga 1.2.0"), "{drawn}");

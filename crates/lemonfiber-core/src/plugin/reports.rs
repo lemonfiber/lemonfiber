@@ -113,6 +113,63 @@ pub struct Removal {
     pub went_back: crate::app::putting_back::Reversal,
 }
 
+/// Where an update did not hold: what putting the version it replaced back came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginRestored")]
+pub struct Restored {
+    /// The version put back, which is the one the record still names.
+    pub version: String,
+    /// Whether everything its record says it placed is on the machine again.
+    pub placed: bool,
+    /// Whether its containers are running again.
+    ///
+    /// Apart from `placed`, because the two fail differently: a document that would not
+    /// land is a disk, and a container that would not start is the engine — and an
+    /// operator fixes them in different places.
+    pub running: bool,
+}
+
+/// What updating a plugin came to, or would come to, as one account.
+///
+/// **One account, because it is one operation.** An update is the version installed
+/// going back and another coming on, and a report that gave those as a removal and an
+/// install side by side would invite reading them as two things that might each have
+/// happened. What an operator has to be able to read off this is which version the
+/// machine is on, and there are exactly two answers: the new one, where
+/// `install.recorded` is true, or the one it replaced, which `restored` says the state
+/// of.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginUpdate")]
+pub struct Update {
+    /// The plugin this is about.
+    pub plugin: String,
+    /// The version the record named before this run.
+    pub from: String,
+    /// The version this run installs, or would.
+    pub to: String,
+    /// Every service of the installed version that stops, named before any of them
+    /// does.
+    pub interrupts: Vec<String>,
+    /// What putting the installed version's changes back came to, or would come to.
+    ///
+    /// Where the plugin's own configuration directory holds what its service wrote, it
+    /// is named here as still standing, which on an update is the point: the new
+    /// version is started against the same directory, and an update that took it would
+    /// be a reinstall that lost everything the old one knew.
+    pub went_back: crate::app::putting_back::Reversal,
+    /// The new version's own account: what it writes, what it has to prove, what it
+    /// proved and what the stack's checks made of it — the same one an install gives,
+    /// because it is the same work. `recorded` is whether the update holds.
+    pub install: Install,
+    /// What stopped the new version before its proofs could be asked, where something
+    /// did: a write that would not land, a container that would not start, or a record
+    /// that could not be written. A proof or a check that did not hold is in `install`.
+    pub stopped: Option<String>,
+    /// Where the update did not hold, what putting the version it replaced back came
+    /// to. Absent on a rehearsal and on an update that held.
+    pub restored: Option<Restored>,
+}
+
 /// What is installed, and what installing one came to.
 ///
 /// One answer for the reading and for the verb, because they are one question: an
@@ -137,4 +194,13 @@ pub struct Installs {
     /// read it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub removal: Option<Removal>,
+    /// What this run's update came to, or nothing where it updated nothing.
+    ///
+    /// A third field rather than an install and a removal filled in together, for the
+    /// reason those two are apart: an update is one operation with one account.
+    ///
+    /// Boxed because it carries a whole install's account beside the reversal, and
+    /// every other run's report would otherwise be as large as the one run that updates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub update: Option<Box<Update>>,
 }
