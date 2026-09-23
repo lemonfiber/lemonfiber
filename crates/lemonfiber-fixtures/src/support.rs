@@ -158,6 +158,66 @@ impl Runner for Sequenced {
     }
 }
 
+/// A runner answering by a word the call contains, and recording every call.
+///
+/// [`Sequenced`] answers by position, which is right where a test is about one adapter
+/// running several programs in a known order. It is exactly wrong where the calls a
+/// test cares about are interleaved with calls it does not: an install asks the engine
+/// to bring a container up, and the diagnosis either side of it asks the engine its
+/// version — so a script by position has to be rewritten every time something
+/// unrelated runs a program, and a test that breaks for that reason was never about
+/// what it said it was about.
+///
+/// The first word that matches wins, so a test names the calls it is about and says
+/// once what everything else answers.
+pub struct Keyed {
+    answers: Vec<(String, Result<Output, Failure>)>,
+    otherwise: Result<Output, Failure>,
+    seen: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+impl Keyed {
+    /// A runner answering each named word its own way, and everything else alike.
+    #[must_use]
+    pub fn answering(
+        answers: Vec<(&str, Result<Output, Failure>)>,
+        otherwise: Result<Output, Failure>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            answers: answers
+                .into_iter()
+                .map(|(word, answer)| (word.to_owned(), answer))
+                .collect(),
+            otherwise,
+            seen: std::sync::Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Whether any call it was handed contained this word.
+    ///
+    /// A poisoned lock reads as nothing having run, which fails a test asserting
+    /// something did rather than passing one asserting nothing did.
+    #[must_use]
+    pub fn ran(&self, word: &str) -> bool {
+        self.seen
+            .lock()
+            .is_ok_and(|seen| seen.iter().any(|argv| argv.iter().any(|said| said == word)))
+    }
+}
+
+#[async_trait]
+impl Runner for Keyed {
+    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        crate::noted(&self.seen, argv.to_vec());
+        let answer = self
+            .answers
+            .iter()
+            .find(|(word, _)| argv.iter().any(|said| said == word))
+            .map_or(&self.otherwise, |(_, answer)| answer);
+        echoed(answer)
+    }
+}
+
 /// A randomness source answering with exactly the bytes a test scripts.
 pub struct FixedRandom(pub Option<Vec<u8>>);
 

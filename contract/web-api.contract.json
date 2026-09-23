@@ -8963,6 +8963,303 @@
             }
           ]
         },
+        "Code": {
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
+          "type": "string"
+        },
+        "DoctorCategory": {
+          "description": "The family a check belongs to, so a run can be narrowed to one of them.\n\nThese are the diagnostic categories the product recognises; the checks that\nfill each one arrive over time, so a category may name more than lemonfiber\ncan yet establish.",
+          "oneOf": [
+            {
+              "description": "Docker present, the daemon reachable, the platform understood.",
+              "type": "string",
+              "const": "environment"
+            },
+            {
+              "description": "The data root: reachable, writable, one filesystem, room to grow.",
+              "type": "string",
+              "const": "storage"
+            },
+            {
+              "description": "Ports free, bindings matching policy, services reachable.",
+              "type": "string",
+              "const": "network"
+            },
+            {
+              "description": "Torrent traffic genuinely leaves through the tunnel.",
+              "type": "string",
+              "const": "vpn"
+            },
+            {
+              "description": "Each credential still valid.",
+              "type": "string",
+              "const": "credentials"
+            },
+            {
+              "description": "Health, crash loops, version skew, the wiring between services.",
+              "type": "string",
+              "const": "services"
+            },
+            {
+              "description": "Provider quota, subscription validity, indexer responsiveness.",
+              "type": "string",
+              "const": "providers"
+            },
+            {
+              "description": "Stuck items, repeated import failures, orphaned downloads.",
+              "type": "string",
+              "const": "queue"
+            },
+            {
+              "description": "Drift from lemonfiber-managed state, permissions, manifest validity.",
+              "type": "string",
+              "const": "config"
+            }
+          ]
+        },
+        "DoctorVerdict": {
+          "description": "How a single check turned out.\n\n\"Could not check\" (`Unverified`) is its own variant rather than a level of\nseverity, so a check that could not run can never be mistaken for one that\npassed — the dishonesty this whole subsystem exists to prevent.",
+          "oneOf": [
+            {
+              "description": "Verified working, with the evidence worth showing.",
+              "type": "object",
+              "properties": {
+                "note": {
+                  "description": "What was observed, where stating it helps — an address, a port.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "pass"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "Working, but degraded or risky.",
+              "type": "object",
+              "properties": {
+                "cause": {
+                  "description": "The problem that produced this one, where several share a root.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Problem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "code": {
+                  "description": "The stable identifier for this kind of problem.",
+                  "$ref": "#/$defs/Code"
+                },
+                "detail": {
+                  "description": "The underlying technical detail, available but never leading.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "meaning": {
+                  "description": "What it means for the operator.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "warn"
+                },
+                "remedies": {
+                  "description": "What to do, most likely first.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Remedy"
+                  }
+                },
+                "severity": {
+                  "description": "How much it matters.",
+                  "$ref": "#/$defs/ProblemSeverity"
+                },
+                "state": {
+                  "description": "Where it stands with respect to being fixed.",
+                  "$ref": "#/$defs/ProblemState"
+                },
+                "summary": {
+                  "description": "What happened, in one plain sentence.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "outcome",
+                "code",
+                "severity",
+                "state",
+                "summary",
+                "meaning",
+                "remedies"
+              ]
+            },
+            {
+              "description": "Not working.",
+              "type": "object",
+              "properties": {
+                "cause": {
+                  "description": "The problem that produced this one, where several share a root.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Problem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "code": {
+                  "description": "The stable identifier for this kind of problem.",
+                  "$ref": "#/$defs/Code"
+                },
+                "detail": {
+                  "description": "The underlying technical detail, available but never leading.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "meaning": {
+                  "description": "What it means for the operator.",
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "fail"
+                },
+                "remedies": {
+                  "description": "What to do, most likely first.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Remedy"
+                  }
+                },
+                "severity": {
+                  "description": "How much it matters.",
+                  "$ref": "#/$defs/ProblemSeverity"
+                },
+                "state": {
+                  "description": "Where it stands with respect to being fixed.",
+                  "$ref": "#/$defs/ProblemState"
+                },
+                "summary": {
+                  "description": "What happened, in one plain sentence.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "outcome",
+                "code",
+                "severity",
+                "state",
+                "summary",
+                "meaning",
+                "remedies"
+              ]
+            },
+            {
+              "description": "Could not be established. Never a pass.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "unverified"
+                },
+                "reason": {
+                  "description": "Why it could not be determined.",
+                  "type": "string"
+                },
+                "remedy": {
+                  "description": "What the operator can do to get an answer.",
+                  "$ref": "#/$defs/Remedy"
+                }
+              },
+              "required": [
+                "outcome",
+                "reason",
+                "remedy"
+              ]
+            },
+            {
+              "description": "A prerequisite was absent, so the check did not apply.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "skipped"
+                },
+                "reason": {
+                  "description": "Why the check did not apply.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "outcome",
+                "reason"
+              ]
+            }
+          ]
+        },
+        "Finding": {
+          "description": "One thing a check established, and how it turned out.",
+          "type": "object",
+          "properties": {
+            "category": {
+              "description": "The family this belongs to.",
+              "$ref": "#/$defs/DoctorCategory"
+            },
+            "caused_by": {
+              "description": "The check whose finding explains this one, where another does.\n\nSet after the run rather than by the check itself: a check is independent\nby construction and cannot see what any other found, which is a property\nworth keeping.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "check": {
+              "description": "A stable identifier for the thing checked, such as `vpn.egress-match`.",
+              "type": "string"
+            },
+            "said": {
+              "description": "What the service said for itself, lately.\n\nCarried on the finding rather than left for the operator to go and fetch,\nbecause the explanation is almost always in it: a check can say a service is\nnot answering, and only the service can say why. Absent where the finding is\nnot about a service, where the service is fine, or where the engine would not\nsay — an empty section would be a promise of evidence that is not there.\n\nSet after the run, like [`Self::caused_by`], since reading a service's output\nis not the check's own business and a check that did it would be doing two\nthings.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "service": {
+              "description": "The service this is about, where it is about one.\n\nAbsent for the checks that are about the machine rather than about\nsomething running on it — the environment, the filesystem, the operator's\nown choices. Carried so that one service's trouble can be attributed to\nthe service underneath it rather than counted as one more independent\nthing wrong.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "description": "The one-line summary of what was checked.",
+              "type": "string"
+            },
+            "verdict": {
+              "description": "How it turned out.",
+              "$ref": "#/$defs/DoctorVerdict"
+            }
+          },
+          "required": [
+            "check",
+            "category",
+            "title",
+            "verdict"
+          ]
+        },
         "PluginChange": {
           "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches: a\nplugin's wiring goes in files of its own, so there is no change here that is an\nedit to something somebody else owns.",
           "type": "object",
@@ -8979,6 +9276,30 @@
           "required": [
             "path",
             "puts"
+          ]
+        },
+        "PluginChangedCheck": {
+          "description": "One check that stands differently after an install than it did before.",
+          "type": "object",
+          "properties": {
+            "before": {
+              "description": "How the same check read before the install, or nothing where it was not\nraised at all.\n\nAbsent means the check produced no finding beforehand, which is read as it\nholding: a finding no longer raised is a fault no longer there, and the same\nrule read backwards is that one not yet raised was not yet a fault.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DoctorVerdict"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "now": {
+              "description": "The check as it reads now, with everything the diagnosis says about it.\n\nThe finding itself rather than a summary of it, because what an operator does\nnext is read the remedy, the service's own output and what else is causing it\n— and a second, thinner shape of the same fact is where those stop arriving.",
+              "$ref": "#/$defs/Finding"
+            }
+          },
+          "required": [
+            "now"
           ]
         },
         "PluginEvidence": {
@@ -9041,6 +9362,17 @@
               "anyOf": [
                 {
                   "$ref": "#/$defs/UndoReversal"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "verified": {
+              "description": "What the stack's own checks made of the install, or nothing on a run that\nasked them nothing.\n\nThe other half of what an install has to establish, and the half a plugin\ncannot establish for itself: its proofs say the plugin works, and this says the\nstack still does. Absent on a rehearsal, which writes nothing and so has\nnothing to hold a reading against.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginVerification"
                 },
                 {
                   "type": "null"
@@ -9368,6 +9700,164 @@
                 "why"
               ]
             }
+          ]
+        },
+        "PluginVerification": {
+          "description": "What the stack's own checks made of an install.",
+          "type": "object",
+          "properties": {
+            "broke": {
+              "description": "Every check this install made worse.\n\nEmpty is the answer an install needs, and it is the common one. What is here\nis what takes the install back.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginChangedCheck"
+              }
+            },
+            "unsettled": {
+              "description": "Every check nothing could be concluded about across the two readings.\n\nReported and never acted on. *I could not tell* is not *it is still broken*,\nand an install reversed because a check could not reach a provider it also\ncould not reach an hour ago would be punishing a plugin for the weather. It is\nsaid out loud rather than dropped, because the assurance an operator thought\nthey had is the thing that went.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginChangedCheck"
+              }
+            }
+          },
+          "required": [
+            "broke",
+            "unsettled"
+          ]
+        },
+        "Problem": {
+          "description": "Something that went wrong, in the form an operator can act on.",
+          "type": "object",
+          "properties": {
+            "cause": {
+              "description": "The problem that produced this one, where several share a root.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Problem"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "code": {
+              "description": "The stable identifier for this kind of problem.",
+              "$ref": "#/$defs/Code"
+            },
+            "detail": {
+              "description": "The underlying technical detail, available but never leading.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "meaning": {
+              "description": "What it means for the operator.",
+              "type": "string"
+            },
+            "remedies": {
+              "description": "What to do, most likely first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Remedy"
+              }
+            },
+            "severity": {
+              "description": "How much it matters.",
+              "$ref": "#/$defs/ProblemSeverity"
+            },
+            "state": {
+              "description": "Where it stands with respect to being fixed.",
+              "$ref": "#/$defs/ProblemState"
+            },
+            "summary": {
+              "description": "What happened, in one plain sentence.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "state",
+            "summary",
+            "meaning",
+            "remedies"
+          ]
+        },
+        "ProblemSeverity": {
+          "description": "How much a problem matters.\n\nFour levels, deliberately. More would not be applied consistently, and\ninconsistent severity is worse than coarse severity.",
+          "oneOf": [
+            {
+              "description": "Informational; nothing is required.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Degraded or risky, still working.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "error"
+            },
+            {
+              "description": "Consequences outside the machine, or data at risk.",
+              "type": "string",
+              "const": "critical"
+            }
+          ]
+        },
+        "ProblemState": {
+          "description": "Where a problem stands with respect to being fixed.",
+          "oneOf": [
+            {
+              "description": "A remedy is available here.",
+              "type": "string",
+              "const": "actionable"
+            },
+            {
+              "description": "The operator must act, somewhere else.",
+              "type": "string",
+              "const": "guided"
+            },
+            {
+              "description": "lemonfiber can fix this itself.",
+              "type": "string",
+              "const": "remediable"
+            },
+            {
+              "description": "No known remedy; escalation is offered instead.",
+              "type": "string",
+              "const": "unknown"
+            },
+            {
+              "description": "Acknowledged, and not re-shown until it recurs.",
+              "type": "string",
+              "const": "suppressed"
+            }
+          ]
+        },
+        "Remedy": {
+          "description": "One thing the operator can do about a problem.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "The action, phrased as something to do rather than something to know.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where to look, when that helps.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
           ]
         },
         "Undo": {

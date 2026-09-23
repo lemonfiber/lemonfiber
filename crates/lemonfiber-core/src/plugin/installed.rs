@@ -374,6 +374,14 @@ pub struct Install {
     /// readable as the stronger, and a reader handed a verdict has nothing else in
     /// the document to tell them apart.
     pub against: Option<super::Evidence>,
+    /// What the stack's own checks made of the install, or nothing on a run that
+    /// asked them nothing.
+    ///
+    /// The other half of what an install has to establish, and the half a plugin
+    /// cannot establish for itself: its proofs say the plugin works, and this says the
+    /// stack still does. Absent on a rehearsal, which writes nothing and so has
+    /// nothing to hold a reading against.
+    pub verified: Option<super::Verification>,
     /// Every bundled thing the plugin declares it will change.
     ///
     /// The full extent rather than a sample of it: a manifest may change a bundled
@@ -791,6 +799,7 @@ dashboard_group = "Library"
                 changes: Vec::new(),
                 proofs: Vec::new(),
                 against: None,
+                verified: None,
                 overrides: Vec::new(),
                 reversed: None,
             }),

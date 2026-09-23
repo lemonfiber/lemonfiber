@@ -13,9 +13,11 @@
 //! renderer and the tense is a field on the report.
 
 use lemonfiber_core::app::putting_back::Reversal;
+use lemonfiber_core::doctor::Verdict as Checked;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
     Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Verdict,
+    Verification,
 };
 
 use super::super::Lines;
@@ -46,6 +48,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(services(&install.would));
         lines.extend(changes(&install.changes, acted));
         lines.extend(proving(&install.proofs, install.against, acted));
+        lines.extend(verified(install.verified.as_ref()));
         // Read off `recorded` rather than off acting, and this is the one place the
         // two part. What is listed is what the plugin may change of the stack's, and
         // an install that went back changed none of it — the same as a rehearsal.
@@ -156,6 +159,59 @@ fn came_to(verdict: &Verdict) -> String {
         Verdict::Passed => "held".to_owned(),
         Verdict::Failed { faults } => format!("did not hold: {}", faults.join("; ")),
         Verdict::Unproven { why } => format!("established nothing: {why}"),
+    }
+}
+
+/// What the stack's own checks made of the install.
+///
+/// **The empty answer is the one worth wording, and it is the common one.** A run that
+/// broke nothing has an empty list, and an empty list under a heading reads as the
+/// checking having failed rather than as the checking having found nothing.
+///
+/// Both readings are shown for a check that moved, because *failing* on its own is the
+/// half that gets a plugin blamed for a machine that was already like that — what makes
+/// this the install's doing is that it was not failing an hour ago.
+///
+/// Nothing at all on a run that asked nothing, which is a rehearsal: a heading saying
+/// the checks found nothing would be a claim about a reading that never happened.
+fn verified(checked: Option<&Verification>) -> Lines {
+    let mut lines = Lines::default();
+    let Some(verification) = checked else {
+        return lines;
+    };
+    lines.spaced("    What the stack's own checks made of it:");
+    if verification.broke.is_empty() {
+        lines.put("      Nothing it broke: every check that held before it holds after it.");
+    }
+    for one in &verification.broke {
+        lines.put(format!("      {} — {}", one.now.check, one.now.title));
+        lines.put(format!("        was  {}", stood(one.before.as_ref())));
+        lines.put(format!("        now  {}", stood(Some(&one.now.verdict))));
+    }
+    for one in &verification.unsettled {
+        lines.put(format!(
+            "      {}: nothing could be told either way, so it is not counted against the \
+             install — {}",
+            one.now.check,
+            stood(Some(&one.now.verdict))
+        ));
+    }
+    lines
+}
+
+/// Where one check stood, in the words its verdict carries.
+///
+/// A check that produced no finding at all is said as *nothing was raised* rather than
+/// as *passing*: the two are the same for the purpose of deciding, and they are not the
+/// same thing to have read, because one of them is a check that did not run.
+fn stood(verdict: Option<&Checked>) -> String {
+    match verdict {
+        None => "nothing was raised".to_owned(),
+        Some(Checked::Pass { .. }) => "passing".to_owned(),
+        Some(Checked::Skipped { reason }) => format!("not asked: {reason}"),
+        Some(Checked::Warn(problem)) => format!("a warning: {}", problem.summary),
+        Some(Checked::Fail(problem)) => format!("failing: {}", problem.summary),
+        Some(Checked::Unverified { reason, .. }) => format!("could not be told: {reason}"),
     }
 }
 
@@ -321,10 +377,11 @@ mod tests {
     use lemonfiber_core::journal::{Action, Undo};
     use lemonfiber_core::plugin::{
         Changing, Evidence, Install, Installed, Installs, Overriding, Placed, Proving, Puts,
-        Reached, Verdict,
+        Reached, Verdict, Verification,
     };
 
-    use super::installs;
+    use super::{installs, stood};
+    use lemonfiber_core::doctor::{Category, Finding, Verdict as Checked};
 
     /// One plugin's record, as an install settles it.
     ///
@@ -359,6 +416,7 @@ mod tests {
             changes: Vec::new(),
             proofs: Vec::new(),
             against: None,
+            verified: None,
             overrides: Vec::new(),
             reversed: None,
         }
@@ -733,6 +791,152 @@ mod tests {
             said.contains("established nothing: nothing answered on port 25600"),
             "{said}"
         );
+    }
+
+    /// A finding under a named check, in the doctor's own shape.
+    fn found(check: &str, verdict: Checked) -> Finding {
+        Finding {
+            check: check.to_owned(),
+            category: Category::Network,
+            title: format!("what {check} establishes"),
+            service: None,
+            caused_by: None,
+            said: None,
+            verdict,
+        }
+    }
+
+    /// A diagnosis with words on it, at either height.
+    fn wrong(summary: &str) -> lemonfiber_core::error::Problem {
+        lemonfiber_core::error::Problem::new(
+            lemonfiber_core::error::Code::new("TEST-1"),
+            lemonfiber_core::error::Severity::Error,
+            summary,
+            "The thing did not happen",
+            lemonfiber_core::error::Remedy::new("Try again"),
+        )
+    }
+
+    /// An install the checks were content with says so, because an empty list under a
+    /// heading reads as the checking having failed rather than as it having found
+    /// nothing.
+    #[test]
+    fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: vec![one.clone()],
+            install: Some(Install {
+                verified: Some(Verification {
+                    broke: Vec::new(),
+                    unsettled: Vec::new(),
+                }),
+                ..install(one, true)
+            }),
+        })
+        .text();
+        assert!(
+            said.contains("What the stack's own checks made of it:"),
+            "{said}"
+        );
+        assert!(
+            said.contains("Nothing it broke: every check that held before it holds after it."),
+            "{said}"
+        );
+    }
+
+    /// A check the install made worse is shown at both readings, because *failing* on
+    /// its own is what gets a plugin blamed for a machine that was already like that.
+    #[test]
+    fn a_check_the_install_made_worse_is_shown_at_both_readings() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                verified: Some(Verification {
+                    broke: vec![lemonfiber_core::plugin::Changed {
+                        now: found(
+                            "network.bindings",
+                            Checked::Fail(wrong("two services answer on 8096")),
+                        ),
+                        before: Some(Checked::Pass { note: None }),
+                    }],
+                    unsettled: vec![lemonfiber_core::plugin::Changed {
+                        now: found(
+                            "providers.usenet",
+                            Checked::Unverified {
+                                reason: "nothing answered".to_owned(),
+                                remedy: lemonfiber_core::error::Remedy::new("Try again"),
+                            },
+                        ),
+                        before: Some(Checked::Pass { note: None }),
+                    }],
+                }),
+                ..install(one, false)
+            }),
+        })
+        .text();
+        assert!(
+            said.contains("network.bindings — what network.bindings establishes"),
+            "{said}"
+        );
+        assert!(said.contains("was  passing"), "{said}");
+        assert!(
+            said.contains("now  failing: two services answer on 8096"),
+            "{said}"
+        );
+        assert!(
+            said.contains("providers.usenet: nothing could be told either way"),
+            "{said}"
+        );
+        assert!(
+            said.contains("could not be told: nothing answered"),
+            "{said}"
+        );
+    }
+
+    /// Every way a check can read has a sentence, and the one that produced no finding
+    /// at all is not called *passing* — the two decide alike and are not the same thing
+    /// to have read.
+    #[test]
+    fn every_way_a_check_can_read_has_a_sentence_of_its_own() {
+        assert_eq!(stood(None), "nothing was raised");
+        assert_eq!(stood(Some(&Checked::Pass { note: None })), "passing");
+        assert_eq!(
+            stood(Some(&Checked::Skipped {
+                reason: "not asked for".to_owned()
+            })),
+            "not asked: not asked for"
+        );
+        assert_eq!(
+            stood(Some(&Checked::Warn(wrong("it is close")))),
+            "a warning: it is close"
+        );
+        assert_eq!(
+            stood(Some(&Checked::Fail(wrong("it broke")))),
+            "failing: it broke"
+        );
+        assert_eq!(
+            stood(Some(&Checked::Unverified {
+                reason: "nothing answered".to_owned(),
+                remedy: lemonfiber_core::error::Remedy::new("Try again"),
+            })),
+            "could not be told: nothing answered"
+        );
+    }
+
+    /// A rehearsal says nothing about the checks at all, because it took no reading.
+    #[test]
+    fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                verified: None,
+                ..install(one, false)
+            }),
+        })
+        .text();
+        assert!(!said.contains("the stack's own checks"), "{said}");
     }
 
     /// An install that went back says so in the rollback layer's own two lists: what

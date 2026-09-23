@@ -1252,6 +1252,7 @@ mod tests {
                 changes: Vec::new(),
                 proofs: Vec::new(),
                 against: None,
+                verified: None,
                 overrides: Vec::new(),
                 reversed,
             }),
