@@ -3998,8 +3998,21 @@
       },
       "variants": []
     },
+    "PluginEvidence": {
+      "fields": {},
+      "variants": [
+        "\"recordings\"",
+        "\"service\""
+      ]
+    },
     "PluginInstall": {
       "fields": {
+        "against": {
+          "type": [
+            "anyOf(null,ref:PluginEvidence)"
+          ],
+          "required": false
+        },
         "changes": {
           "type": [
             "array[ref:PluginChange]"
@@ -4023,6 +4036,12 @@
             "boolean"
           ],
           "required": true
+        },
+        "reversed": {
+          "type": [
+            "anyOf(null,ref:UndoReversal)"
+          ],
+          "required": false
         },
         "would": {
           "type": [
@@ -4145,6 +4164,12 @@
           ],
           "required": true
         },
+        "came_to": {
+          "type": [
+            "anyOf(null,ref:PluginVerdict)"
+          ],
+          "required": false
+        },
         "establishes": {
           "type": [
             "string"
@@ -4210,6 +4235,35 @@
       "variants": [
         "\"household\"",
         "\"loopback\""
+      ]
+    },
+    "PluginVerdict": {
+      "fields": {
+        "faults": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "outcome": {
+          "type": [
+            "const:\"failed\"",
+            "const:\"passed\"",
+            "const:\"unproven\""
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"failed\"",
+        "\"passed\"",
+        "\"unproven\""
       ]
     },
     "Policy": {

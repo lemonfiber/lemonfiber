@@ -35,6 +35,11 @@ use crate::plugin::{Install, Installed, Installs, Register};
 
 use super::{Ctx, Outcome};
 
+// Starting what the writing placed, asking it what the manifest said it would
+// answer, and taking it back where it did not. Its own file because the one thing
+// here that reaches a service and a container engine should be the one thing a
+// reader has to hold a seam in mind for.
+mod proving;
 // Carrying the writes out, and journalling each before it is made. Its own file
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
@@ -91,6 +96,9 @@ pub(super) const UNWRITABLE: Code = Code::new("PLUGIN-7");
 /// The wiring went down and the record of what is installed did not.
 const UNRECORDABLE: Code = Code::new("PLUGIN-8");
 
+/// The plugin's own service would not start, so nothing about it could be proved.
+pub(super) const UNPROVED: Code = Code::new("PLUGIN-9");
+
 /// What is installed, and what installing one came to.
 ///
 /// One entry point for the reading and for the verb, because they answer one
@@ -102,15 +110,17 @@ const UNRECORDABLE: Code = Code::new("PLUGIN-8");
 /// Where the record cannot be read, where the source names no manifest this build
 /// can read, where the manifest is refused, where the plugin is installed already,
 /// where there is no stack to put its container in, where one of the writes would
-/// not land, or where the record of what is installed cannot be written.
-pub(super) fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> {
+/// not land, where the plugin's own service would not start, or where the record of
+/// what is installed cannot be written. Every one of those after the first write puts
+/// the install back before it answers.
+pub(super) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> {
     let held = read(ctx)?;
     match action {
         Asked::Installed => Ok(Outcome::Plugins(Installs {
             installed: held.installed().to_vec(),
             install: None,
         })),
-        Asked::Install { path } => install(ctx, held, path),
+        Asked::Install { path } => install(ctx, held, path).await,
     }
 }
 
@@ -130,12 +140,23 @@ pub(super) fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> 
 /// `plugin claims`, which is the author's read and needs neither a stack nor a
 /// record.
 ///
-/// **The wiring goes down before the register, and the order is the safe one.** The
-/// register is what says a plugin is installed and what layers its document into the
-/// stack, so a run that wrote the wiring and then failed to record it leaves files
-/// nothing reads — inert, on the change record, and removable. The other order would
-/// leave a plugin the machine reports as installed with nothing behind it.
-fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Problem>> {
+/// **The register is the last thing written, and it is written only once the proofs
+/// have held.** That is what makes *registered* and *proved* the same fact rather than
+/// two that agree on a good day: the wiring goes down, the plugin's own services come
+/// up, every proof it declared is asked of them, and only then is the plugin recorded
+/// as installed. Every failure after the first write puts the install back, so what
+/// an operator is left with is the machine they had. And a run that dies outright
+/// still leaves only files nothing reads — inert, on the change record, and
+/// removable — because the register is what layers a plugin's document into the
+/// stack. The other order would leave a plugin the machine reports as installed and
+/// never proved.
+///
+/// **A proof that does not hold puts the whole install back.** The container comes off
+/// first, because nothing on disk records that it is running and a document removed
+/// out from under one leaves something Compose will never be asked about again; then
+/// the files go back through the rollback layer, over the journal entries the writing
+/// already made. Nothing here undoes anything itself.
+async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Problem>> {
     let manifest =
         crate::plugin::read(path).map_err(|unreadable| Box::new(unreadable_source(&unreadable)))?;
     let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
@@ -160,21 +181,46 @@ fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Proble
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let planned = crate::plugin::writes(&would, stack);
 
-    let recorded = !ctx.dry_run;
-    if recorded {
-        carry_out(ctx, &would.plugin, &planned)?;
-        // Answered for here rather than passed on. The record writer is shared and
-        // says *your settings could not be saved, your existing settings are
-        // untouched* — which after the line above is false twice over: the file is
-        // not the settings, and the machine has been written to.
-        super::record::keep(kept_at(ctx).as_deref(), &after)
-            .map_err(|why| Box::new(unrecordable(&would.plugin, *why)))?;
+    let mut stated = crate::plugin::proofs(&manifest);
+    let mut against = None;
+    let mut put_back = None;
+    let mut recorded = false;
+
+    if !ctx.dry_run {
+        let stamp = ctx.stamp();
+        carry_out(ctx, &would.plugin, &stamp, &planned)?;
+
+        // Started before it is registered, which is why the invocation carries this
+        // plugin rather than reading it back: the register is what layers a plugin's
+        // document into the stack, and it is deliberately not written yet.
+        proving::started(ctx, &would, stack, &stamp).await?;
+        proving::asked(ctx, &manifest, &would, &mut stated).await;
+        against = Some(proving::AGAINST);
+
+        if proving::held(&stated) {
+            // Answered for here rather than passed on. The record writer is shared and
+            // says *your settings could not be saved, your existing settings are
+            // untouched* — which after the lines above is false twice over: the file
+            // is not the settings, and the machine has been written to.
+            //
+            // And it goes back, rather than being left for somebody to find. The
+            // proofs held, so the only thing between here and an install is the one
+            // file that could not be written — and a plugin whose container is up
+            // with nothing recording it is the state this verb exists to not leave.
+            if let Err(why) = super::record::keep(kept_at(ctx).as_deref(), &after) {
+                let back = reversing(ctx, &would, stack, &stamp).await;
+                return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
+            }
+            recorded = true;
+        } else {
+            put_back = Some(reversing(ctx, &would, stack, &stamp).await);
+        }
     }
 
-    // What the record holds, which after a rehearsal is what it held before. A
-    // listing that counted the entry nobody wrote would report an install that did
-    // not happen, in the same breath as saying nothing was written — and a reader
-    // who believes the count over the sentence is the one this is written for.
+    // What the record holds, which after a rehearsal or a reversal is what it held
+    // before. A listing that counted the entry nobody wrote would report an install
+    // that did not happen, in the same breath as saying nothing was written — and a
+    // reader who believes the count over the sentence is the one this is written for.
     let standing = if recorded { after } else { held };
 
     Ok(Outcome::Plugins(Installs {
@@ -183,10 +229,75 @@ fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Proble
             would,
             recorded,
             changes: crate::plugin::changes(&planned),
-            proofs: crate::plugin::proofs(&manifest),
+            proofs: stated,
+            against,
             overrides: crate::plugin::overrides(&manifest),
+            reversed: put_back,
         }),
     }))
+}
+
+/// Put the install back, container first and then the files.
+///
+/// The container is not a journal entry — nothing on disk records that it is running —
+/// so it comes off here, and everything after it is the rollback layer reversing the
+/// entries the writing already made. A removal that the engine would not carry out is
+/// reported rather than raised: this runs inside an install that is already failing,
+/// and stopping at the first difficulty would leave more behind than carrying on does.
+///
+/// **A run that wrote nothing has nothing to put back, and that is not a second
+/// failure.** An install records only what it actually had to make, so one that found
+/// every directory and every document already there — the leftovers of an earlier run
+/// that got as far as writing them — journals nothing under its own stamp, and the
+/// rollback layer has no run of that stamp to find. What went back is then nothing,
+/// which is the true answer: those files belong to the run that wrote them and are on
+/// the record under it.
+async fn reversing(
+    ctx: &Ctx,
+    would: &Installed,
+    stack: &Path,
+    stamp: &str,
+) -> super::putting_back::Reversal {
+    let off = proving::removed(ctx, would, stack).await;
+    let mut back = super::putting_back::reversing(ctx, Some(stamp))
+        .await
+        .unwrap_or_default();
+    if !off {
+        back.left.push(super::putting_back::Left {
+            target: would.plugin.clone(),
+            because: "its container could not be taken off the machine, so it may still be \
+                      running with nothing in the stack describing it"
+                .to_owned(),
+        });
+    }
+    back
+}
+
+/// What the machine holds now, read off what the putting back actually did.
+///
+/// Written after the reversal rather than beside the failure, because a sentence
+/// written where the failure is raised is a promise about work that has not happened
+/// yet — and on the run where the reversal cannot finish it is false in exactly the
+/// place an operator would act on it.
+///
+/// One sentence for every refusal that puts the install back, so two refusals cannot
+/// describe the same machine differently.
+pub(super) fn left_behind(back: &super::putting_back::Reversal) -> String {
+    if back.left.is_empty() {
+        return "The install was put back, and nothing is recorded as installed. \
+                `lemonfiber history` says what went back."
+            .to_owned();
+    }
+    let standing = back
+        .left
+        .iter()
+        .map(|one| format!("{} — {}", one.target, one.because))
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!(
+        "The install was put back as far as it could go, and nothing is recorded as installed. \
+         Still standing: {standing}."
+    )
 }
 
 /// What the record holds, or why nothing can be said about it.
@@ -270,23 +381,25 @@ fn unrecorded(at: &Path, why: &str) -> Problem {
     .with_detail(why.to_owned())
 }
 
-/// The wiring is on the machine and the record that says so could not be written.
+/// Everything held and the record that says so could not be written.
 ///
 /// Its own refusal rather than the record writer's, because the writer is shared with
 /// the settings file and says *your settings could not be saved, your existing
 /// settings are untouched*. Both halves are wrong here: the file is not the settings,
-/// and the wiring is already on disk. What an operator needs is the second sentence —
-/// that something was written, that it is inert until the record catches up, and that
-/// the change record already holds it.
-fn unrecordable(plugin: &str, why: Problem) -> Problem {
+/// and the machine has been written to and started.
+///
+/// What an operator needs is what the run left them with, which is why the sentence
+/// is read off the reversal rather than written here. The install goes back for the
+/// same reason every other failure does: the proofs held, so the one thing between
+/// this and an installed plugin is a file that would not be written — and a container
+/// running with nothing recording it is precisely the state this verb exists to not
+/// leave behind.
+fn unrecordable(plugin: &str, why: Problem, back: &super::putting_back::Reversal) -> Problem {
     Problem::new(
         UNRECORDABLE,
         Severity::Error,
-        format!("{plugin} was written and could not be recorded as installed"),
-        "Its wiring is on the machine and nothing reads it: the record of what is installed \
-         is what layers a plugin into the stack, so what was written is inert rather than \
-         half-running. Every one of those writes is in the change record, so `lemonfiber \
-         history` says what is there and it can be put back.",
+        format!("{plugin} held every proof and could not be recorded as installed"),
+        left_behind(back),
         Remedy::new("Check the permissions on the configuration directory, then install it again"),
     )
     .in_state(State::Guided)
@@ -316,11 +429,18 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
 
+    use std::sync::Arc;
+
+    use lemonfiber_fixtures::http::Fake;
+    use lemonfiber_fixtures::support::{spoke, Recording};
+
     use super::{asked, Asked};
     use crate::app::{Ctx, Outcome};
     use crate::config::paths::PLUGINS;
     use crate::journal::Change;
     use crate::plugin::Installs;
+    use crate::plugin::Verdict;
+    use crate::ports::http::Http;
     use crate::test_support::{a_context, a_password, env_at};
 
     /// A plugin's source, as one lands on an operator's disk.
@@ -350,6 +470,44 @@ takes_data  = true
 config_path = "/app/data"
 "#;
 
+    /// The same manifest, declaring one proof of its one service.
+    ///
+    /// A proof rather than a claim's probe, because a proof is the thing that gates an
+    /// install: a claim says what the service can do and a proof says what has to hold
+    /// for installing it to be worth doing at all.
+    const PROVING: &str = r#"
+schema_version = 1
+
+[plugin]
+id          = "komga"
+name        = "Komga"
+version     = "1.2.0"
+description = "Reads your comics on any browser"
+without_it  = "Files on disk, no way to read them"
+upstream    = "https://example.invalid"
+license     = "MIT"
+forms       = ["library"]
+
+[[service]]
+id          = "komga"
+name        = "Komga"
+image       = "example.invalid/komga"
+digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+tag         = "1.11.0"
+port        = 25600
+bind        = "lan"
+criticality = "important"
+takes_data  = true
+config_path = "/app/data"
+
+[[proof]]
+id      = "answers"
+title   = "the library API answers"
+why     = "a plugin whose service does not answer is not installed"
+request = { method = "GET", path = "/api/v1/libraries" }
+expect  = { status = 200 }
+"#;
+
     /// A context whose settings point at a scratch configuration directory, with a
     /// stack directory beside it for the install to write its wiring into.
     ///
@@ -366,6 +524,67 @@ config_path = "/app/data"
                 ..crate::config::Settings::default()
             })
             .build()
+    }
+
+    /// The same, with the runner and the transport a run that proves needs.
+    ///
+    /// The runner answers for the container engine and the transport answers for the
+    /// service: an install that proves reaches both, and a context that faked neither
+    /// would be a test about a real machine's Docker and a real machine's ports.
+    fn proving(name: &str, runner: Arc<dyn crate::ports::Runner>, http: Arc<dyn Http>) -> Ctx {
+        let env_file = env_at(name, &a_password());
+        let stack = env_file.with_file_name("data").join("stack");
+        a_context()
+            .runner(runner)
+            .settings(crate::config::Settings {
+                env_file: Some(env_file),
+                stack_dir: Some(stack),
+                ..crate::config::Settings::default()
+            })
+            .build()
+            .with_http(http)
+            .waiting(std::time::Duration::ZERO)
+    }
+
+    /// A transport that answers the one path the proof above asks at.
+    fn answering(status: u16) -> Arc<dyn Http> {
+        Fake::by_path(vec![(
+            "/api/v1/libraries",
+            lemonfiber_fixtures::http::Answer::reply(status, "[]"),
+        )])
+    }
+
+    /// What one verdict is, in one word.
+    ///
+    /// A word rather than a pattern at each case, because a pattern's other half is a
+    /// branch nothing ever takes — and a case that cannot say which of the three it
+    /// got is a case that would pass on any of them.
+    fn came_to(verdict: Option<&Verdict>) -> &'static str {
+        match verdict {
+            None => "unasked",
+            Some(Verdict::Passed) => "held",
+            Some(Verdict::Failed { .. }) => "failed",
+            Some(Verdict::Unproven { .. }) => "unproven",
+        }
+    }
+
+    /// What the proofs on a report came to, in the order they were declared.
+    fn verdicts(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Vec<Option<Verdict>> {
+        report(outcome)
+            .and_then(|one| one.install)
+            .map(|one| one.proofs.into_iter().map(|proof| proof.came_to).collect())
+            .unwrap_or_default()
+    }
+
+    /// What a verdict that established nothing says stopped it.
+    ///
+    /// Empty for every other verdict, so a case asserting on it is asserting on the
+    /// one that carries a reason rather than on whichever it happened to get.
+    fn why(verdict: Option<&Verdict>) -> String {
+        match verdict {
+            Some(Verdict::Unproven { why }) => why.clone(),
+            None | Some(Verdict::Passed | Verdict::Failed { .. }) => String::new(),
+        }
     }
 
     /// Where a context writes the stack, which is what the install puts wiring under.
@@ -399,18 +618,19 @@ config_path = "/app/data"
     }
 
     /// What installing that source came to.
-    fn installing(ctx: &Ctx, at: &Path) -> Result<Outcome, Box<crate::error::Problem>> {
+    async fn installing(ctx: &Ctx, at: &Path) -> Result<Outcome, Box<crate::error::Problem>> {
         asked(
             ctx,
             &Asked::Install {
                 path: at.to_path_buf(),
             },
         )
+        .await
     }
 
     /// What the reading came to.
-    fn reading(ctx: &Ctx) -> Result<Outcome, Box<crate::error::Problem>> {
-        asked(ctx, &Asked::Installed)
+    async fn reading(ctx: &Ctx) -> Result<Outcome, Box<crate::error::Problem>> {
+        asked(ctx, &Asked::Installed).await
     }
 
     /// The report an answer carries, or nothing where it was not one.
@@ -434,35 +654,60 @@ config_path = "/app/data"
             .unwrap_or_default()
     }
 
+    /// A refusal's code and what it told the operator it left them with, read off the
+    /// one problem rather than by asking twice.
+    fn refused(outcome: Result<Outcome, Box<crate::error::Problem>>) -> (String, String) {
+        outcome
+            .err()
+            .map(|problem| (problem.code.to_string(), problem.meaning))
+            .unwrap_or_default()
+    }
+
+    /// A refusal's own code and the code of whatever it carries underneath it.
+    fn beneath(outcome: Result<Outcome, Box<crate::error::Problem>>) -> (String, String) {
+        outcome
+            .err()
+            .map(|problem| {
+                (
+                    problem.code.to_string(),
+                    problem
+                        .cause
+                        .map(|cause| cause.code.to_string())
+                        .unwrap_or_default(),
+                )
+            })
+            .unwrap_or_default()
+    }
+
     /// The whole of the slice: what the manifest declared survives, and a later run
     /// reads it back without the manifest being anywhere near.
-    #[test]
-    fn where_a_service_keeps_its_configuration_survives_the_install_and_is_read_back() {
+    #[tokio::test]
+    async fn where_a_service_keeps_its_configuration_survives_the_install_and_is_read_back() {
         let ctx = ctx("survives");
         let at = source("survives", MANIFEST);
-        assert_eq!(counted(installing(&ctx, &at)), Some(1));
+        assert_eq!(counted(installing(&ctx, &at).await), Some(1));
 
         // The author's file goes, as it may the moment an install is done.
         let _ = std::fs::remove_dir_all(&at);
 
-        let path = report(reading(&ctx))
+        let path = report(reading(&ctx).await)
             .and_then(|report| report.installed.first().cloned())
             .and_then(|one| one.services.first().cloned())
             .map(|one| one.config_path);
         assert_eq!(path.as_deref(), Some("/app/data"));
     }
 
-    #[test]
-    fn a_machine_with_nothing_installed_answers_with_an_empty_list() {
-        let read = report(reading(&ctx("empty")));
+    #[tokio::test]
+    async fn a_machine_with_nothing_installed_answers_with_an_empty_list() {
+        let read = report(reading(&ctx("empty")).await);
         assert_eq!(read.as_ref().map(|one| one.installed.len()), Some(0));
         assert_eq!(read.map(|one| one.install.is_none()), Some(true));
     }
 
-    #[test]
-    fn the_install_says_what_it_recorded_and_what_it_joined() {
+    #[tokio::test]
+    async fn the_install_says_what_it_recorded_and_what_it_joined() {
         let ctx = ctx("recorded");
-        let shown = report(installing(&ctx, &source("recorded", MANIFEST)));
+        let shown = report(installing(&ctx, &source("recorded", MANIFEST)).await);
         let install = shown.as_ref().and_then(|one| one.install.clone());
         assert_eq!(install.as_ref().map(|one| one.recorded), Some(true));
         assert_eq!(
@@ -474,10 +719,10 @@ config_path = "/app/data"
 
     /// The gate a rehearsal exists to pass: the account is the same and the file is
     /// not there afterwards.
-    #[test]
-    fn a_rehearsed_install_says_everything_the_real_one_would_and_writes_nothing() {
+    #[tokio::test]
+    async fn a_rehearsed_install_says_everything_the_real_one_would_and_writes_nothing() {
         let ctx = rehearsing("rehearsed");
-        let install = report(installing(&ctx, &source("rehearsed", MANIFEST)))
+        let install = report(installing(&ctx, &source("rehearsed", MANIFEST)).await)
             .and_then(|one| one.install.clone());
         assert_eq!(
             install.as_ref().map(|one| one.would.plugin.clone()),
@@ -485,27 +730,27 @@ config_path = "/app/data"
         );
         assert_eq!(install.map(|one| one.recorded), Some(false));
         assert!(!record_of(&ctx).exists(), "the record was written");
-        assert_eq!(counted(reading(&ctx)), Some(0));
+        assert_eq!(counted(reading(&ctx).await), Some(0));
     }
 
     /// And the listing beside it counts what is installed rather than what would
     /// be. A rehearsal that said *one plugin is installed* in the same breath as
     /// *nothing was written* is a rehearsal an operator has to choose between two
     /// halves of.
-    #[test]
-    fn a_rehearsed_install_is_not_counted_among_what_is_installed() {
+    #[tokio::test]
+    async fn a_rehearsed_install_is_not_counted_among_what_is_installed() {
         let ctx = rehearsing("uncounted");
         assert_eq!(
-            counted(installing(&ctx, &source("uncounted", MANIFEST))),
+            counted(installing(&ctx, &source("uncounted", MANIFEST)).await),
             Some(0)
         );
     }
 
-    #[test]
-    fn a_path_holding_no_manifest_is_refused_rather_than_installed() {
+    #[tokio::test]
+    async fn a_path_holding_no_manifest_is_refused_rather_than_installed() {
         let ctx = ctx("nothing-there");
         assert_eq!(
-            refusal(installing(&ctx, Path::new("/nowhere/at/all"))),
+            refusal(installing(&ctx, Path::new("/nowhere/at/all")).await),
             "PLUGIN-2"
         );
         assert!(!record_of(&ctx).exists());
@@ -513,8 +758,8 @@ config_path = "/app/data"
 
     /// The reader's verdict is total, and the install honours it: a manifest that
     /// over-reaches on where it keeps its state is not installed at all.
-    #[test]
-    fn a_manifest_this_build_refuses_is_not_installed() {
+    #[tokio::test]
+    async fn a_manifest_this_build_refuses_is_not_installed() {
         let ctx = ctx("refused");
         let at = source(
             "refused",
@@ -523,59 +768,59 @@ config_path = "/app/data"
                 r#"config_path = "/data/media""#,
             ),
         );
-        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-3");
+        assert_eq!(refusal(installing(&ctx, &at).await), "PLUGIN-3");
         assert!(!record_of(&ctx).exists(), "the record was written");
     }
 
-    #[test]
-    fn installing_what_is_installed_is_refused_naming_it() {
+    #[tokio::test]
+    async fn installing_what_is_installed_is_refused_naming_it() {
         let ctx = ctx("twice");
         let at = source("twice", MANIFEST);
-        assert_eq!(counted(installing(&ctx, &at)), Some(1));
-        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-5");
-        assert_eq!(counted(reading(&ctx)), Some(1));
+        assert_eq!(counted(installing(&ctx, &at).await), Some(1));
+        assert_eq!(refusal(installing(&ctx, &at).await), "PLUGIN-5");
+        assert_eq!(counted(reading(&ctx).await), Some(1));
     }
 
     /// The gate this record exists to pass, in the place it runs. A damaged record
     /// read as empty would answer *nothing is installed* about a machine running
     /// somebody else's service — and then install a second copy over it.
-    #[test]
-    fn a_damaged_record_refuses_the_read_and_the_install_rather_than_reading_as_empty() {
+    #[tokio::test]
+    async fn a_damaged_record_refuses_the_read_and_the_install_rather_than_reading_as_empty() {
         let ctx = ctx("damaged");
         let at = source("damaged", MANIFEST);
-        assert_eq!(counted(installing(&ctx, &at)), Some(1));
+        assert_eq!(counted(installing(&ctx, &at).await), Some(1));
         assert!(crate::config::store::write(&record_of(&ctx), "{ half a record").is_ok());
 
-        assert_eq!(refusal(reading(&ctx)), "PLUGIN-4");
-        assert_eq!(refusal(installing(&ctx, &at)), "PLUGIN-4");
+        assert_eq!(refusal(reading(&ctx).await), "PLUGIN-4");
+        assert_eq!(refusal(installing(&ctx, &at).await), "PLUGIN-4");
         // And a refusal is not an answer with a shorter listing in it: there is no
         // report at all, which is what stops a surface rendering one.
-        assert_eq!(report(reading(&ctx)), None);
+        assert_eq!(report(reading(&ctx).await), None);
     }
 
     /// A record that is there and cannot be opened at all is the same answer as one
     /// that will not parse, and for the same reason: the one thing that must not
     /// happen is answering *nothing is installed*.
-    #[test]
-    fn a_record_that_cannot_be_opened_is_refused_rather_than_read_as_empty() {
+    #[tokio::test]
+    async fn a_record_that_cannot_be_opened_is_refused_rather_than_read_as_empty() {
         let ctx = ctx("unopenable");
         assert!(std::fs::create_dir_all(record_of(&ctx)).is_ok());
-        assert_eq!(refusal(reading(&ctx)), "PLUGIN-4");
+        assert_eq!(refusal(reading(&ctx).await), "PLUGIN-4");
     }
 
     /// Nowhere configured is a machine that has not been set up, which has no
     /// plugins rather than an unreadable record.
-    #[test]
-    fn a_machine_with_nowhere_to_keep_a_record_reads_as_nothing_installed() {
-        assert_eq!(counted(reading(&a_context().build())), Some(0));
+    #[tokio::test]
+    async fn a_machine_with_nowhere_to_keep_a_record_reads_as_nothing_installed() {
+        assert_eq!(counted(reading(&a_context().build()).await), Some(0));
     }
 
     /// And refuses to write one, because the alternative is telling an operator
     /// something was remembered that was not.
-    #[test]
-    fn a_machine_with_nowhere_to_keep_a_record_refuses_to_install() {
+    #[tokio::test]
+    async fn a_machine_with_nowhere_to_keep_a_record_refuses_to_install() {
         let ctx = a_context().build();
-        assert!(!refusal(installing(&ctx, &source("nowhere", MANIFEST))).is_empty());
+        assert!(!refusal(installing(&ctx, &source("nowhere", MANIFEST)).await).is_empty());
     }
 
     /// Every change the record holds, oldest first, as a later run reads them back.
@@ -605,11 +850,11 @@ config_path = "/app/data"
     /// The install puts the plugin's own wiring where the stack reads it: a
     /// configuration directory for the service, and one Compose document naming the
     /// container lemonfiber writes.
-    #[test]
-    fn installing_writes_the_service_s_directory_and_the_document_that_mounts_it() {
+    #[tokio::test]
+    async fn installing_writes_the_service_s_directory_and_the_document_that_mounts_it() {
         let ctx = ctx("writes");
         assert_eq!(
-            counted(installing(&ctx, &source("writes", MANIFEST))),
+            counted(installing(&ctx, &source("writes", MANIFEST)).await),
             Some(1)
         );
 
@@ -621,10 +866,10 @@ config_path = "/app/data"
     /// What lands on disk is the container the record derives, not a second rendering
     /// of it. Two renderings are free to disagree, and the one Compose reads is the
     /// one on disk — so a plugin could be shown one entry and run another.
-    #[test]
-    fn the_document_on_disk_is_the_container_the_record_derives() {
+    #[tokio::test]
+    async fn the_document_on_disk_is_the_container_the_record_derives() {
         let ctx = ctx("derives");
-        let shown = report(installing(&ctx, &source("derives", MANIFEST)));
+        let shown = report(installing(&ctx, &source("derives", MANIFEST)).await);
         let recorded = shown
             .and_then(|one| one.install)
             .map(|one| crate::plugin::written(&one.would))
@@ -639,11 +884,11 @@ config_path = "/app/data"
     /// The whole of what makes a plugin's changes ordinary: they are in the record
     /// every other change is in, named as the plugin rather than as lemonfiber, and
     /// stamped as one run so a reversal can ask for exactly them.
-    #[test]
-    fn every_write_is_journalled_under_the_plugin_s_own_name_as_one_run() {
+    #[tokio::test]
+    async fn every_write_is_journalled_under_the_plugin_s_own_name_as_one_run() {
         let ctx = ctx("journalled");
         assert_eq!(
-            counted(installing(&ctx, &source("journalled", MANIFEST))),
+            counted(installing(&ctx, &source("journalled", MANIFEST)).await),
             Some(1)
         );
 
@@ -658,11 +903,11 @@ config_path = "/app/data"
     /// Both writes are on the record, and the directory is recorded before the
     /// document that mounts it — so a reversal walking backwards removes the document
     /// first and never a directory something still names.
-    #[test]
-    fn the_directory_is_journalled_before_the_document_that_mounts_it() {
+    #[tokio::test]
+    async fn the_directory_is_journalled_before_the_document_that_mounts_it() {
         let ctx = ctx("ordered");
         assert_eq!(
-            counted(installing(&ctx, &source("ordered", MANIFEST))),
+            counted(installing(&ctx, &source("ordered", MANIFEST)).await),
             Some(1)
         );
 
@@ -682,11 +927,11 @@ config_path = "/app/data"
     /// with every other change, named as the plugin, and each carries the rollback
     /// layer's own verdict — which is what makes a plugin's change an ordinary change
     /// rather than a thing with an account of its own.
-    #[test]
-    fn a_plugin_s_changes_are_in_the_history_named_as_the_plugin() {
+    #[tokio::test]
+    async fn a_plugin_s_changes_are_in_the_history_named_as_the_plugin() {
         let ctx = ctx("in-history");
         assert_eq!(
-            counted(installing(&ctx, &source("in-history", MANIFEST))),
+            counted(installing(&ctx, &source("in-history", MANIFEST)).await),
             Some(1)
         );
 
@@ -704,11 +949,11 @@ config_path = "/app/data"
     /// which for a path lemonfiber made is reversible in full. Asked of the layer
     /// itself rather than asserted here, so this stays true the day that judgement
     /// changes.
-    #[test]
-    fn what_an_install_journalled_is_judged_by_the_rollback_layer_like_anything_else() {
+    #[tokio::test]
+    async fn what_an_install_journalled_is_judged_by_the_rollback_layer_like_anything_else() {
         let ctx = ctx("judged");
         assert_eq!(
-            counted(installing(&ctx, &source("judged", MANIFEST))),
+            counted(installing(&ctx, &source("judged", MANIFEST)).await),
             Some(1)
         );
 
@@ -721,11 +966,11 @@ config_path = "/app/data"
 
     /// A rehearsal settles everything and leaves the machine exactly as it was — no
     /// directory, no document, and nothing on the record to put back.
-    #[test]
-    fn a_rehearsed_install_writes_no_wiring_and_journals_nothing() {
+    #[tokio::test]
+    async fn a_rehearsed_install_writes_no_wiring_and_journals_nothing() {
         let ctx = rehearsing("rehearsed-wiring");
         let at = source("rehearsed-wiring", MANIFEST);
-        assert_eq!(counted(installing(&ctx, &at)), Some(0));
+        assert_eq!(counted(installing(&ctx, &at).await), Some(0));
 
         let stack = stack_of(&ctx);
         assert!(!stack.join("config/komga").exists());
@@ -736,14 +981,14 @@ config_path = "/app/data"
     /// A directory the operator already had is theirs. The install uses it and does
     /// not record it, so putting the install back never removes something it found
     /// rather than made.
-    #[test]
-    fn a_directory_that_was_already_there_is_used_and_not_recorded() {
+    #[tokio::test]
+    async fn a_directory_that_was_already_there_is_used_and_not_recorded() {
         let ctx = ctx("already-there");
         let existing = stack_of(&ctx).join("config/komga");
         assert!(std::fs::create_dir_all(&existing).is_ok());
 
         assert_eq!(
-            counted(installing(&ctx, &source("already-there", MANIFEST))),
+            counted(installing(&ctx, &source("already-there", MANIFEST)).await),
             Some(1)
         );
 
@@ -760,8 +1005,8 @@ config_path = "/app/data"
     /// Shown refusing before it is relied on. With the recording taken out, the run
     /// still writes — so the assertions above are about the record being kept rather
     /// than about the writes happening to succeed.
-    #[test]
-    fn the_record_is_what_the_assertions_above_turn_on() {
+    #[tokio::test]
+    async fn the_record_is_what_the_assertions_above_turn_on() {
         let untouched = ctx("turns-on-second");
         assert!(
             journalled(&untouched).is_empty(),
@@ -770,7 +1015,7 @@ config_path = "/app/data"
 
         let installed = ctx("turns-on");
         assert_eq!(
-            counted(installing(&installed, &source("turns-on", MANIFEST))),
+            counted(installing(&installed, &source("turns-on", MANIFEST)).await),
             Some(1)
         );
         assert!(!journalled(&installed).is_empty());
@@ -780,8 +1025,8 @@ config_path = "/app/data"
     /// lives beside the settings, and a machine that cannot say where those are has
     /// nowhere to journal to. Refused rather than written unrecorded, because an
     /// unrecorded write is the one that cannot be put back.
-    #[test]
-    fn a_machine_that_cannot_say_where_its_own_files_are_refuses_the_install() {
+    #[tokio::test]
+    async fn a_machine_that_cannot_say_where_its_own_files_are_refuses_the_install() {
         let ctx = a_context()
             .settings(crate::config::Settings {
                 env_file: None,
@@ -789,9 +1034,9 @@ config_path = "/app/data"
                 ..crate::config::Settings::default()
             })
             .build();
-        assert!(!refusal(installing(&ctx, &source("unrooted", MANIFEST))).is_empty());
+        assert!(!refusal(installing(&ctx, &source("unrooted", MANIFEST)).await).is_empty());
         assert_ne!(
-            refusal(installing(&ctx, &source("unrooted", MANIFEST))),
+            refusal(installing(&ctx, &source("unrooted", MANIFEST)).await),
             "PLUGIN-6",
             "a machine with a stack but no home for its records is not a machine \
              with nowhere to put a container"
@@ -801,8 +1046,8 @@ config_path = "/app/data"
     /// A write that cannot land stops the install where it is rather than carrying
     /// on. What it had already written is on the record, which is what makes the
     /// half-done state recoverable rather than a mystery.
-    #[test]
-    fn a_write_that_cannot_land_stops_the_install_and_leaves_what_it_wrote_on_the_record() {
+    #[tokio::test]
+    async fn a_write_that_cannot_land_stops_the_install_and_leaves_what_it_wrote_on_the_record() {
         let ctx = ctx("blocked");
         let occupied = stack_of(&ctx).join("config/komga");
         let _ = occupied.parent().map(std::fs::create_dir_all);
@@ -811,7 +1056,7 @@ config_path = "/app/data"
         assert!(std::fs::write(&occupied, "not a directory").is_ok());
 
         assert_eq!(
-            refusal(installing(&ctx, &source("blocked", MANIFEST))),
+            refusal(installing(&ctx, &source("blocked", MANIFEST)).await),
             "PLUGIN-7"
         );
         assert!(
@@ -825,15 +1070,15 @@ config_path = "/app/data"
     /// service's own directory does. Driven through a file standing where the
     /// document's directory has to go, which is the one arrangement that fails the
     /// making without failing anything before it.
-    #[test]
-    fn a_document_whose_directory_cannot_be_made_stops_the_install() {
+    #[tokio::test]
+    async fn a_document_whose_directory_cannot_be_made_stops_the_install() {
         let ctx = ctx("no-room");
         let overlays = stack_of(&ctx).join("compose");
         let _ = overlays.parent().map(std::fs::create_dir_all);
         assert!(std::fs::write(&overlays, "not a directory").is_ok());
 
         assert_eq!(
-            refusal(installing(&ctx, &source("no-room", MANIFEST))),
+            refusal(installing(&ctx, &source("no-room", MANIFEST)).await),
             "PLUGIN-7"
         );
     }
@@ -843,8 +1088,8 @@ config_path = "/app/data"
     /// settings file, and its own failure says *your settings could not be saved* —
     /// which about a plugin's Compose document names the wrong file and offers the
     /// wrong remedy.
-    #[test]
-    fn a_document_that_will_not_take_the_write_is_refused_as_the_install_s_own() {
+    #[tokio::test]
+    async fn a_document_that_will_not_take_the_write_is_refused_as_the_install_s_own() {
         let ctx = ctx("unwritable-document");
         let document = stack_of(&ctx).join("compose/plugins/komga.yml");
         // A directory where the document has to go: its own directory is made, and
@@ -852,7 +1097,7 @@ config_path = "/app/data"
         assert!(std::fs::create_dir_all(&document).is_ok());
 
         assert_eq!(
-            refusal(installing(&ctx, &source("unwritable-document", MANIFEST))),
+            refusal(installing(&ctx, &source("unwritable-document", MANIFEST)).await),
             "PLUGIN-7"
         );
     }
@@ -860,15 +1105,15 @@ config_path = "/app/data"
     /// A leftover document is overwritten rather than recorded. It is derived from
     /// the record and holds nothing an earlier run is owed, so recording it as made
     /// would be the one journal entry that removes a file this run did not create.
-    #[test]
-    fn a_leftover_document_is_overwritten_and_not_recorded_as_made() {
+    #[tokio::test]
+    async fn a_leftover_document_is_overwritten_and_not_recorded_as_made() {
         let ctx = ctx("leftover");
         let document = stack_of(&ctx).join("compose/plugins/komga.yml");
         let _ = document.parent().map(std::fs::create_dir_all);
         assert!(std::fs::write(&document, "services: {}\n").is_ok());
 
         assert_eq!(
-            counted(installing(&ctx, &source("leftover", MANIFEST))),
+            counted(installing(&ctx, &source("leftover", MANIFEST)).await),
             Some(1)
         );
         assert!(std::fs::read_to_string(&document)
@@ -882,18 +1127,18 @@ config_path = "/app/data"
         );
     }
 
-    /// The register is written last, and a run that cannot write it refuses — which
-    /// leaves the wiring on disk with nothing layering it. That is what the order
-    /// buys: files nothing reads are inert and are on the change record, where the
-    /// other order would leave a plugin the machine reports as installed with
-    /// nothing behind it.
+    /// The register is written last, and a run that cannot write it puts the whole
+    /// install back. Everything ahead of that write held, so the only thing between
+    /// this run and an installed plugin is one file that would not be written — and
+    /// a container running with nothing recording it is the state the order exists to
+    /// avoid, not one to leave somebody to find.
     ///
     /// Driven through a register this user may read and may not rewrite, because
     /// that is the one arrangement in which everything ahead of the last write
     /// succeeds.
     #[cfg(unix)]
-    #[test]
-    fn a_register_that_cannot_be_written_refuses_and_leaves_the_wiring_on_the_record() {
+    #[tokio::test]
+    async fn a_register_that_cannot_be_written_puts_the_whole_install_back() {
         use std::os::unix::fs::PermissionsExt as _;
 
         let ctx = ctx("unrecordable");
@@ -908,28 +1153,349 @@ config_path = "/app/data"
             std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o400)).is_ok()
         );
 
-        assert_eq!(
-            refusal(installing(&ctx, &source("unrecordable", MANIFEST))),
-            "PLUGIN-8"
+        let (code, said) = refused(installing(&ctx, &source("unrecordable", MANIFEST)).await);
+        assert_eq!(code, "PLUGIN-8");
+        assert!(
+            said.contains("was put back"),
+            "what it left is read off the reversal: {said}"
         );
         assert!(
-            stack_of(&ctx).join("compose/plugins/komga.yml").is_file(),
-            "what was written before the refusal is still there"
+            !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
+            "the document it wrote is gone again"
         );
         assert!(
             made_paths(&ctx)
                 .iter()
                 .any(|path| path.ends_with("compose/plugins/komga.yml")),
-            "and is on the record, so it can be put back"
+            "and the change record still says it was there, so the run can be read"
         );
 
         let _ = std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o600));
     }
 
+    /// The whole of what a proof buys: the plugin's own service is started, asked what
+    /// the manifest said it would answer, and recorded as installed only once it has
+    /// answered it.
+    #[tokio::test]
+    async fn a_plugin_whose_proof_holds_is_started_asked_and_then_recorded() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving("proved", runner.clone(), answering(200));
+
+        assert_eq!(
+            counted(installing(&ctx, &source("proved", PROVING)).await),
+            Some(1)
+        );
+        assert!(runner.ran("up"), "its own service was started");
+        assert!(
+            !runner.ran("rm"),
+            "and nothing was taken back off the machine"
+        );
+    }
+
+    /// The verdict is on the report, and so is what it was reached against — because a
+    /// verdict against a recording the author shipped and one against the service on
+    /// this machine are not the same claim, and a reader handed one has nothing else in
+    /// the document to tell them apart.
+    #[tokio::test]
+    async fn the_report_carries_the_verdict_and_says_it_was_the_service_that_answered() {
+        let ctx = proving(
+            "against",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        let shown =
+            report(installing(&ctx, &source("against", PROVING)).await).and_then(|one| one.install);
+
+        assert_eq!(
+            shown.as_ref().and_then(|one| one.against),
+            Some(crate::plugin::Evidence::Service)
+        );
+        let stated: Vec<Option<Verdict>> = shown
+            .map(|one| one.proofs.into_iter().map(|proof| proof.came_to).collect())
+            .unwrap_or_default();
+        assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "held");
+        assert!(
+            why(stated.first().and_then(Option::as_ref)).is_empty(),
+            "a proof that held carries no reason, because nothing stopped it"
+        );
+    }
+
+    /// A proof the service refuses stops the install, and the install goes back: the
+    /// container comes off the machine and every file it wrote is removed.
+    #[tokio::test]
+    async fn a_proof_the_service_refuses_puts_the_whole_install_back() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving("refuted", runner.clone(), answering(503));
+
+        let outcome = installing(&ctx, &source("refuted", PROVING)).await;
+        assert_eq!(
+            came_to(verdicts(outcome).first().and_then(Option::as_ref)),
+            "failed"
+        );
+
+        assert!(runner.ran("rm"), "its container came off the machine");
+        assert!(
+            !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
+            "and the document it wrote is gone"
+        );
+        assert_eq!(
+            counted(reading(&ctx).await),
+            Some(0),
+            "and nothing is installed"
+        );
+    }
+
+    /// The reversal is the rollback layer's, reported in the rollback layer's own
+    /// shape: what went back, and what did not with the reason each is standing.
+    #[tokio::test]
+    async fn what_a_failed_install_put_back_is_reported_as_the_reversal_it_was() {
+        let ctx = proving(
+            "reversed",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(503),
+        );
+        let put_back = report(installing(&ctx, &source("reversed", PROVING)).await)
+            .and_then(|one| one.install)
+            .and_then(|one| one.reversed);
+
+        let put_back = put_back.unwrap_or_default();
+        assert!(!put_back.reversed.is_empty(), "what went back is named");
+        assert!(put_back.left.is_empty(), "and nothing was left standing");
+        assert!(put_back
+            .reversed
+            .iter()
+            .any(|undo| undo.target.ends_with("komga.yml")));
+    }
+
+    /// A service that never answers is unproven rather than refuted, and the install
+    /// goes back all the same. What it is called and what it costs are two decisions:
+    /// nothing answered, so nothing was established, and installing over that would
+    /// report an install as complete on the strength of a question nobody answered.
+    #[tokio::test]
+    async fn a_service_that_never_answers_is_unproven_and_the_install_still_goes_back() {
+        let ctx = proving(
+            "silent",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            Fake::silent(),
+        );
+
+        let outcome = installing(&ctx, &source("silent", PROVING)).await;
+        assert_eq!(
+            came_to(verdicts(outcome).first().and_then(Option::as_ref)),
+            "unproven"
+        );
+        assert_eq!(counted(reading(&ctx).await), Some(0));
+    }
+
+    /// A service that has not answered *yet* is asked again. A container Compose has
+    /// just created is not a service that is listening, and an install that took the
+    /// first refusal would fail on every image that takes a moment to open its socket.
+    #[tokio::test(start_paused = true)]
+    async fn a_service_that_has_not_answered_yet_is_asked_again() {
+        let http = Fake::by_path_in_turn(vec![(
+            "/api/v1/libraries",
+            vec![
+                lemonfiber_fixtures::http::Answer::Silent,
+                lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+            ],
+        )]);
+        let mut ctx = proving(
+            "patient",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            http.clone(),
+        );
+        ctx.patience = std::time::Duration::from_secs(30);
+
+        assert_eq!(
+            counted(installing(&ctx, &source("patient", PROVING)).await),
+            Some(1)
+        );
+        assert_eq!(http.requests().len(), 2, "it was asked twice");
+    }
+
+    /// A proof of a service that publishes no port is unproven naming it, because
+    /// there is nowhere to ask rather than somewhere to guess.
+    #[tokio::test]
+    async fn a_proof_of_a_service_with_no_port_has_nowhere_to_ask() {
+        let unpublished = PROVING.replace("port        = 25600\n", "");
+        let unpublished = unpublished.replace("bind        = \"lan\"\n", "");
+        let ctx = proving(
+            "unpublished",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            Fake::silent(),
+        );
+
+        let stated = verdicts(installing(&ctx, &source("unpublished", &unpublished)).await);
+        assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "unproven");
+        assert!(why(stated.first().and_then(Option::as_ref)).contains("publishes no port"));
+    }
+
+    /// A container that will not start stops the install by name, and the files it had
+    /// already written go back.
+    #[tokio::test]
+    async fn a_service_that_will_not_start_stops_the_install_and_the_files_go_back() {
+        let runner = lemonfiber_fixtures::support::Sequenced::answering(vec![
+            Ok(lemonfiber_ports::process::Output {
+                status: Some(1),
+                stdout: String::new(),
+                stderr: "no such image".to_owned(),
+            }),
+            Ok(spoke("")),
+        ]);
+        let ctx = proving("unstartable", runner, Fake::silent());
+        let at = source("unstartable", PROVING);
+
+        let (code, said) = refused(installing(&ctx, &at).await);
+        assert_eq!(code, "PLUGIN-9");
+        assert!(
+            said.contains("was put back") && !said.contains("Still standing"),
+            "a reversal that finished says so and names nothing as standing: {said}"
+        );
+        assert!(
+            made_paths(&ctx)
+                .iter()
+                .all(|path| !std::path::Path::new(path).exists()),
+            "every path this run made is gone"
+        );
+    }
+
+    /// A reversal that could not take the container off says what is still standing,
+    /// rather than repeating the sentence a reversal that finished would have got.
+    #[tokio::test]
+    async fn a_service_that_will_not_start_and_will_not_come_off_names_what_stands() {
+        let runner = Arc::new(Recording::answering(Ok(
+            lemonfiber_ports::process::Output {
+                status: Some(1),
+                stdout: String::new(),
+                stderr: "no such image".to_owned(),
+            },
+        )));
+        let ctx = proving("standing", runner, Fake::silent());
+
+        let (code, said) = refused(installing(&ctx, &source("standing", PROVING)).await);
+        assert_eq!(code, "PLUGIN-9");
+        assert!(
+            said.contains("Still standing: komga"),
+            "the container nothing could take off is named: {said}"
+        );
+    }
+
+    /// A container engine that is not there at all is a different answer from one that
+    /// ran and refused, and both stop the install — the engine's own words underneath
+    /// the install's account rather than in place of it.
+    #[tokio::test]
+    async fn an_engine_that_cannot_be_run_at_all_stops_the_install() {
+        let runner = Arc::new(Recording::answering(Err(
+            lemonfiber_ports::process::Failure::NotFound {
+                program: "docker".to_owned(),
+            },
+        )));
+        let ctx = proving("no-engine", runner, Fake::silent());
+
+        assert_eq!(
+            beneath(installing(&ctx, &source("no-engine", PROVING)).await),
+            ("PLUGIN-9".to_owned(), "PROC-1".to_owned()),
+            "the install's own account leads, and what the engine said is carried \
+             underneath it rather than dropped"
+        );
+    }
+
+    /// A proof naming a method the transport cannot send is never put, and says so.
+    /// Sending a different verb than the one written down would be proving something
+    /// nobody declared.
+    #[tokio::test]
+    async fn a_proof_naming_a_method_lemonfiber_cannot_send_is_never_put() {
+        let patched = PROVING.replace("method = \"GET\"", "method = \"PATCH\"");
+        let ctx = proving(
+            "patched",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+
+        let stated = verdicts(installing(&ctx, &source("patched", &patched)).await);
+        assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "unproven");
+        assert!(why(stated.first().and_then(Option::as_ref)).contains("PATCH"));
+    }
+
+    /// A container the engine would not take off the machine is named as still
+    /// standing, because *some of it worked* is the sentence that sends somebody
+    /// looking by hand.
+    #[tokio::test]
+    async fn a_container_that_would_not_come_off_is_named_as_still_standing() {
+        let runner = lemonfiber_fixtures::support::Sequenced::answering(vec![
+            Ok(spoke("")),
+            Ok(lemonfiber_ports::process::Output {
+                status: Some(1),
+                stdout: String::new(),
+                stderr: "no such container".to_owned(),
+            }),
+        ]);
+        let ctx = proving("stuck", runner, answering(503));
+
+        let left = report(installing(&ctx, &source("stuck", PROVING)).await)
+            .and_then(|one| one.install)
+            .and_then(|one| one.reversed)
+            .map(|back| back.left)
+            .unwrap_or_default();
+        assert_eq!(left.len(), 1);
+        assert!(left
+            .first()
+            .is_some_and(|one| one.because.contains("could not be taken off")));
+    }
+
+    /// An install that found everything it would write already there journals nothing
+    /// of its own, so a reversal has no run of its stamp to put back. That is the true
+    /// answer rather than a second failure: those files belong to the run that wrote
+    /// them and are on the record under it.
+    #[tokio::test]
+    async fn an_install_that_wrote_nothing_has_nothing_of_its_own_to_put_back() {
+        let ctx = proving(
+            "leftovers",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(503),
+        );
+        let stack = stack_of(&ctx);
+        assert!(std::fs::create_dir_all(stack.join("config/komga")).is_ok());
+        assert!(std::fs::create_dir_all(stack.join("compose/plugins")).is_ok());
+        assert!(std::fs::write(stack.join("compose/plugins/komga.yml"), "services: {}\n").is_ok());
+
+        let put_back = report(installing(&ctx, &source("leftovers", PROVING)).await)
+            .and_then(|one| one.install)
+            .and_then(|one| one.reversed)
+            .unwrap_or_default();
+        assert!(put_back.reversed.is_empty());
+        assert!(put_back.left.is_empty());
+    }
+
+    /// A rehearsal asks nothing, so it states the proofs with no verdict against them
+    /// and says nothing about what answered — which is a different fact from a proof
+    /// that was asked and established nothing.
+    #[tokio::test]
+    async fn a_rehearsed_install_states_its_proofs_and_asks_none_of_them() {
+        let ctx = {
+            let mut ctx = proving(
+                "unasked",
+                Arc::new(Recording::answering(Ok(spoke("")))),
+                Fake::silent(),
+            );
+            ctx.dry_run = true;
+            ctx
+        };
+        let shown =
+            report(installing(&ctx, &source("unasked", PROVING)).await).and_then(|one| one.install);
+
+        assert_eq!(shown.as_ref().and_then(|one| one.against), None);
+        let stated: Vec<Option<Verdict>> = shown
+            .map(|one| one.proofs.into_iter().map(|proof| proof.came_to).collect())
+            .unwrap_or_default();
+        assert_eq!(stated.len(), 1, "the proof it would run is stated");
+        assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "unasked");
+    }
+
     /// A stack directory is where a plugin's container has to go, so a machine
     /// without one is refused by name rather than installed half-way.
-    #[test]
-    fn a_machine_with_no_stack_directory_refuses_the_install_naming_it() {
+    #[tokio::test]
+    async fn a_machine_with_no_stack_directory_refuses_the_install_naming_it() {
         let env_file = env_at("no-stack", &a_password());
         let ctx = a_context()
             .settings(crate::config::Settings {
@@ -939,7 +1505,7 @@ config_path = "/app/data"
             })
             .build();
         assert_eq!(
-            refusal(installing(&ctx, &source("no-stack", MANIFEST))),
+            refusal(installing(&ctx, &source("no-stack", MANIFEST)).await),
             "PLUGIN-6"
         );
     }
@@ -950,8 +1516,8 @@ config_path = "/app/data"
     /// operator would find that out on the run they thought they had checked. What
     /// answers with no machine at all is `plugin claims`, which is a different
     /// question.
-    #[test]
-    fn a_rehearsal_is_refused_wherever_the_install_would_be() {
+    #[tokio::test]
+    async fn a_rehearsal_is_refused_wherever_the_install_would_be() {
         let env_file = env_at("no-stack-rehearsed", &a_password());
         let mut ctx = a_context()
             .settings(crate::config::Settings {
@@ -962,7 +1528,7 @@ config_path = "/app/data"
             .build();
         ctx.dry_run = true;
         assert_eq!(
-            refusal(installing(&ctx, &source("no-stack-rehearsed", MANIFEST))),
+            refusal(installing(&ctx, &source("no-stack-rehearsed", MANIFEST)).await),
             "PLUGIN-6"
         );
     }

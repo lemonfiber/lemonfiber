@@ -21,6 +21,7 @@
 use lemonfiber_plugin::Manifest;
 use serde::Serialize;
 
+use super::claimed::Verdict;
 use super::placing::Write;
 
 /// What an install puts at one path.
@@ -73,6 +74,13 @@ pub struct Proving {
     pub asks: String,
     /// Why it is worth asserting.
     pub why: String,
+    /// What asking it came to, or nothing where it was not asked.
+    ///
+    /// Absent on a rehearsal, which asks nothing. That is a different fact from a
+    /// proof that was asked and established nothing, and the two must not read alike:
+    /// one is an account of what would happen, the other is a service that did not
+    /// answer.
+    pub came_to: Option<Verdict>,
 }
 
 /// One bundled thing a plugin declares it will change.
@@ -123,6 +131,7 @@ pub fn proofs(manifest: &Manifest) -> Vec<Proving> {
                 .map(|service| service.id.clone()),
             asks: format!("{} {}", proof.request.method, proof.request.path),
             why: proof.why.clone(),
+            came_to: None,
         })
         .collect()
 }
@@ -272,6 +281,7 @@ why = "a request for a comic has to reach the library that holds comics"
                 of: Some("komga".to_owned()),
                 asks: "GET /api/v1/libraries".to_owned(),
                 why: "a plugin whose service does not answer is not installed".to_owned(),
+                came_to: None,
             }]
         );
     }

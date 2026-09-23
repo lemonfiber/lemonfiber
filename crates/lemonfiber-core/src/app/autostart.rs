@@ -47,9 +47,10 @@ pub(crate) fn save(ctx: &Ctx, returning: &Returning) {
 
 /// What one lifecycle action says about what this machine is for.
 ///
-/// Two of the seven say anything at all. The rest change what is running without
-/// saying anything about what should be: stopping one container to look at it, or
-/// fetching an image, is not the operator putting their stack down for the night.
+/// Two of the eight say anything at all. The rest change what is running without
+/// saying anything about what should be: stopping one container to look at it,
+/// fetching an image, or taking back a container an install put there and could not
+/// prove, is not the operator putting their stack down for the night.
 enum Said {
     /// These forms are what the operator wants running.
     Running,
@@ -62,9 +63,12 @@ const fn said(action: &Action) -> Option<Said> {
     match action {
         Action::Up => Some(Said::Running),
         Action::Down => Some(Said::Stopped),
-        Action::Start(_) | Action::Stop(_) | Action::Restart(_) | Action::Pull | Action::Config => {
-            None
-        }
+        Action::Start(_)
+        | Action::Stop(_)
+        | Action::Remove(_)
+        | Action::Restart(_)
+        | Action::Pull
+        | Action::Config => None,
     }
 }
 

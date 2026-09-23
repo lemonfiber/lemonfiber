@@ -786,7 +786,9 @@ mod tests {
                     of: Some("komga".to_owned()),
                     asks: "GET /api/v1/libraries".to_owned(),
                     why: "a plugin whose service does not answer is not installed".to_owned(),
+                    came_to: Some(crate::plugin::Verdict::Passed),
                 }],
+                against: Some(crate::plugin::Evidence::Service),
                 overrides: vec![crate::plugin::Overriding {
                     setting: "seerr.settings".to_owned(),
                     why: "a request for a comic has to reach the library that holds comics"
@@ -794,6 +796,7 @@ mod tests {
                 }],
                 would: one,
                 recorded: true,
+                reversed: None,
             }),
         }
     }

@@ -9,17 +9,23 @@ use std::process::ExitCode;
 
 mod reporting;
 
+// What each report's own answer comes to. Its own file because that is a different
+// question from the one this file asks: here is which code a problem or an outcome
+// deserves, there is what one report says about itself.
+mod reports;
+
 pub(crate) use reporting::{complain, no_config_home, reported};
 
-use lemonfiber_core::app::repair::Report as RepairReport;
+use reports::{
+    accounting, adopting, carrying, forgetting, installing, letting_go, lifecycle, moving,
+    removing, removing_it, replacing, rotating, setting_up, sharing, standing,
+};
+pub(crate) use reports::{repairing, reset_exit, seed_exit, upgrade_exit};
+
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::Revoked;
-use lemonfiber_core::model::{
-    AdoptReport, Disposition, LifecycleReport, ResetReport, Triggered, UpgradeReport, WizardReport,
-};
-use lemonfiber_core::wizard::Phase;
+use lemonfiber_core::model::{Disposition, Triggered};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
@@ -60,125 +66,6 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
     }
 }
 
-/// The exit code an outcome deserves.
-///
-/// What a run that carried an operator's records across exits on.
-///
-/// Anything left behind is the operator's to look at: a record that could not be
-/// carried is one they still have on the old stack and do not have on the new, and a
-/// script that read success would go on as though the library were whole.
-fn carrying(report: &lemonfiber_core::model::ImportReport) -> ExitCode {
-    if report.refusal.is_some() || !report.not_carried.is_empty() {
-        return ExitCode::from(VALIDATION);
-    }
-    ExitCode::SUCCESS
-}
-
-/// What a run that moved the stack onto this build's pinned versions exits on.
-///
-/// A run that halted part-way left the stack on two versions at once, and a script
-/// reading success from it would go on as though everything had moved. What was only
-/// shown exits as the reading it is: nothing was touched, so there is nothing for a
-/// code to report and no reason to make an operator who is deciding read one.
-///
-/// A run where every step succeeded and the stack then would not come back is the
-/// third case, and it is `Updated` — the update did work. The code still reports the
-/// failure, because what a script does next is run against the stack.
-fn moving(report: &lemonfiber_core::app::update::Report) -> ExitCode {
-    use lemonfiber_core::update::State;
-
-    match report.state {
-        State::Partial | State::Failed => ExitCode::from(FAILURE),
-        // `Updated` is the update having succeeded, which is not the same fact as the
-        // stack being up. A run brings back everything it took down for the capture,
-        // and a start that would not run leaves that undone and says so here — so a
-        // script reading this would otherwise go on against services that are down.
-        State::Updated if report.halted.is_some() => ExitCode::from(FAILURE),
-        State::Current | State::UpdatesAvailable | State::Updated => ExitCode::SUCCESS,
-    }
-}
-
-/// What a run that stood in place of a setup already here exits on.
-///
-/// A refusal is the operator's to resolve. So is a stack left half up: a script that
-/// read success from a run which stopped four of six services would go on to start
-/// lemonfiber against ports still answered by the other two.
-fn replacing(report: &lemonfiber_core::model::ReplaceReport) -> ExitCode {
-    if report.refusal.is_some() || !report.still_running.is_empty() {
-        return ExitCode::from(VALIDATION);
-    }
-    ExitCode::SUCCESS
-}
-
-/// What a run that stood beside a setup already here exits on.
-///
-/// A refusal is something the operator has to resolve — nowhere left for a service to
-/// listen, or a machine that could not be read — so it earns VALIDATION rather than a
-/// plain failure.
-fn standing(report: &lemonfiber_core::model::BesideReport) -> ExitCode {
-    if report.refusal.is_some() {
-        return ExitCode::from(VALIDATION);
-    }
-    ExitCode::SUCCESS
-}
-
-/// What a run that took over a setup already here exits on.
-///
-/// A refusal is something the operator has to resolve before lemonfiber will act — a
-/// database a later version wrote, or two setups where only they can say which they
-/// meant — so it earns VALIDATION rather than a plain failure. Having adopted, and
-/// having only said what adopting would come to, are both the command doing what it
-/// was asked.
-fn adopting(report: &AdoptReport) -> ExitCode {
-    if report.refusal.is_some() {
-        return ExitCode::from(VALIDATION);
-    }
-    ExitCode::SUCCESS
-}
-
-/// What a run that started, stopped or restarted the stack exits on.
-///
-/// The exit status is the only thing a script reads, and for years this was the one
-/// command where it said nothing: every lifecycle outcome sat in the always-success
-/// arm below, on the reasoning that whether the stack settled is raised as a problem
-/// by the core. It is not. Waiting for services to become usable happens only where
-/// Compose exited zero, so a start whose Compose invocation failed raises nothing,
-/// returns a report, and used to exit zero — a `lemonfiber up` that started nothing
-/// telling its caller it had worked.
-///
-/// So the Compose status is the verdict. A rehearsal ran nothing and therefore failed
-/// at nothing. A status that is absent on a run that was not a rehearsal is a process
-/// that was signalled rather than one that exited, which is no more a success than a
-/// non-zero code is.
-///
-/// This is what `pull` has always done — it returns a failure code on a non-zero exit
-/// — and the two are the same command in every way that matters to a script.
-fn lifecycle(report: &LifecycleReport) -> ExitCode {
-    if report.rehearsed || report.status == Some(0) {
-        return ExitCode::SUCCESS;
-    }
-    ExitCode::from(FAILURE)
-}
-
-/// What a step of setup exits on.
-///
-/// Recording an answer, moving on and being told where setup stands are all the
-/// command doing what it was asked, and an apply that failed already comes back as a
-/// problem. One phase is neither: `Applying`, read back out of the progress file,
-/// can only mean a previous apply stopped part-way, because one that is still running
-/// is the run this answer is waiting on. What is written is written and what is not is
-/// not, and until the operator chooses a way out the machine is in neither state.
-///
-/// So it earns the code a held quality choice earns — something to act on rather than
-/// something that went wrong — and a script asking whether this machine is set up can
-/// tell "not yet" from "half-way, and somebody has to decide".
-fn setting_up(report: &WizardReport) -> ExitCode {
-    if report.phase == Phase::Applying {
-        return ExitCode::from(VALIDATION);
-    }
-    ExitCode::SUCCESS
-}
-
 /// Most answers are simply produced, so their success is that they arrived. A
 /// diagnosis is different: a script runs it precisely to learn whether the stack
 /// is healthy, so a broken or undetermined result must exit non-zero — reporting
@@ -202,6 +89,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // An ask nothing fills is a stack that will not wire, and a script asking
         // what this stack wires to what is asking exactly that. It is the operator's
         // own configuration to fix, which is the code that says so.
+        Outcome::Plugins(report) => installing(report),
         Outcome::Wiring(report) if report.unfilled.is_empty() => ExitCode::SUCCESS,
         Outcome::Wiring(_) => ExitCode::from(VALIDATION),
         Outcome::Import(report) => carrying(report),
@@ -334,10 +222,6 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // problem, so there is nothing for a code to tell apart here.
         | Outcome::Invited(_)
         | Outcome::Outbound(_)
-        // An install happened or it did not; a manifest this build refuses, a record
-        // it cannot read and a plugin already installed each come back as a problem,
-        // so a report here is one that arrived and whatever it says stands.
-        | Outcome::Plugins(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)
         // A substitution was recorded, or worked out and not written; one that
@@ -353,182 +237,6 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Watch(_)
         | Outcome::Archives(_)
         | Outcome::Support(_) => ExitCode::SUCCESS,
-    }
-}
-
-/// The exit code an accounting of the line earns.
-///
-/// A reading is always a success, however constrained the line is: being at a cap
-/// is a fact about a household's plan and not a fault of the run that said so. A
-/// *run that applied limits* is a failure where any client did not take one or is
-/// not keeping to it, because that is the case where the operator has a setting
-/// they believe in and a household that cannot feel it.
-fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode {
-    if report.applied
-        && report
-            .clients
-            .iter()
-            .any(lemonfiber_core::bandwidth::Holding::worth_saying)
-    {
-        return ExitCode::from(FAILURE);
-    }
-    ExitCode::SUCCESS
-}
-
-/// The exit code a question about the credentials earns.
-///
-/// Only a rotation that was asked for and did not land is a failure. A reading is a
-/// question; a reveal either printed or said why it did not; a rehearsal was never
-/// asked to replace anything; and a rotation that landed but left a consumer waiting
-/// on a restart is reported in words rather than as a failure, because nothing went
-/// wrong — the operator has one more command to run and the report names it.
-fn rotating(inventory: &lemonfiber_core::credential::Inventory) -> ExitCode {
-    match &inventory.rotated {
-        // A rehearsal keeps the existing credential and is not a rotation that failed:
-        // nothing was attempted, and what came back is the answer that was asked for.
-        // Read before the failure below, because it satisfies that test too.
-        Some(rotated) if rotated.rehearsed() => ExitCode::SUCCESS,
-        Some(rotated) if rotated.kept_the_existing() => ExitCode::from(FAILURE),
-        // No rotation was asked for, or one was and it landed. Neither is a fault, so
-        // they answer alike rather than through two arms saying the same thing.
-        None | Some(_) => ExitCode::SUCCESS,
-    }
-}
-
-/// The exit code an accounting of the disk earns.
-fn accounting(report: &lemonfiber_core::space::Reckoning) -> ExitCode {
-    match &report.reclaimed {
-        None => ExitCode::SUCCESS,
-        Some(taken) if taken.left.is_empty() => ExitCode::SUCCESS,
-        Some(_) => ExitCode::from(FAILURE),
-    }
-}
-
-/// The exit code an offer to let one download go earns.
-///
-/// Named apart from the table for the reason the others here are: an arm that reads
-/// an answer is a reading, and a table of readings is one nobody can hold in their
-/// head. Unconfirmed is `VALIDATION` rather than success, because the command was
-/// asked to stop something seeding and stopped nothing, and a script that read that
-/// as done would go on believing a ratio had been given up.
-fn letting_go(offer: &lemonfiber_core::space::Letting) -> ExitCode {
-    if offer.gone.is_some() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(VALIDATION)
-    }
-}
-
-/// The exit code an uninstall earns.
-///
-/// A reading and a rehearsal both succeed: neither was asked to remove anything, so
-/// neither has failed to. What earns a failure is the one answer a script must not
-/// read as done — a removal that ran and left something behind.
-fn removing_it(removal: &lemonfiber_core::uninstall::Removal) -> ExitCode {
-    match removal {
-        lemonfiber_core::uninstall::Removal::Surveyed
-        | lemonfiber_core::uninstall::Removal::Confirmed
-        | lemonfiber_core::uninstall::Removal::Complete { .. } => ExitCode::SUCCESS,
-        lemonfiber_core::uninstall::Removal::Partial { .. } => ExitCode::from(FAILURE),
-    }
-}
-
-/// The exit code a run over what this machine keeps earns.
-fn forgetting(removal: &lemonfiber_core::stored::Removal) -> ExitCode {
-    match removal {
-        lemonfiber_core::stored::Removal::NotAsked => ExitCode::SUCCESS,
-        lemonfiber_core::stored::Removal::Unconfirmed => ExitCode::from(VALIDATION),
-        lemonfiber_core::stored::Removal::Done { left, .. } if left.is_empty() => ExitCode::SUCCESS,
-        lemonfiber_core::stored::Removal::Done { .. } => ExitCode::from(FAILURE),
-    }
-}
-
-/// The exit code taking somebody out of the household earns.
-///
-/// Unconfirmed earns `VALIDATION` rather than success: the command was asked to remove
-/// somebody and removed nobody, and a script that read that as done would carry on as
-/// though they were gone. Reaching only the media server earns `FAILURE`, because
-/// something is left that the next run has to take — they cannot use it, but it is there.
-fn removing(report: &lemonfiber_core::model::HouseholdRemoval) -> ExitCode {
-    match report.revoked {
-        Revoked::Everywhere => ExitCode::SUCCESS,
-        Revoked::Nothing => ExitCode::from(VALIDATION),
-        Revoked::MediaServerOnly => ExitCode::from(FAILURE),
-    }
-}
-
-/// The exit code a repairing run earns.
-///
-/// Anything left unmended is a non-zero result: an operator who asked for things to be put
-/// right and had one fail needs their script to know, and a run that offered nothing had
-/// nothing wrong it could mend.
-pub(crate) fn repairing(report: &RepairReport) -> ExitCode {
-    if report.mended.iter().all(|mended| mended.outcome.settled()) {
-        return ExitCode::SUCCESS;
-    }
-    ExitCode::FAILURE
-}
-
-/// The exit code a seed earns. Seeding is run to make the wiring true, so leaving any
-/// of it unmade is a non-zero result — but the two reasons differ. A refused conflict
-/// (two \*arrs on one root folder) is something the operator wrote that lemonfiber will
-/// not act on until they resolve it, so it earns VALIDATION; work merely left skipped
-/// or failed may complete on a re-run, so it stays FAILURE. A script can then tell "fix
-/// your config" from "wait and retry".
-pub(crate) fn seed_exit(report: &lemonfiber_core::seed::Report) -> ExitCode {
-    // A pass that only said what it would do answered the question it was asked, and
-    // every connection it names as outstanding is one nobody has agreed to make yet.
-    // Read before completeness, because a rehearsal against a stack with anything left
-    // to wire is incomplete by construction — that is the report rather than a fault in
-    // it, and a script told otherwise would stop on the answer it asked for.
-    if report.rehearsed {
-        return ExitCode::SUCCESS;
-    }
-    if report.is_complete() {
-        ExitCode::SUCCESS
-    } else if report.blocked().is_empty() {
-        ExitCode::from(FAILURE)
-    } else {
-        ExitCode::from(VALIDATION)
-    }
-}
-
-/// The exit code a reset earns. A reset without --confirm that found edits to revert
-/// only previewed them — like a held quality choice, it needs the operator's say-so, so
-/// a script sees a non-zero result to act on. Both an edited stack file and a drifted
-/// connection are pending reverts, so either one left unconfirmed is a non-zero result.
-/// Confirmed, or with nothing to revert, it succeeded.
-pub(crate) fn reset_exit(report: &ResetReport) -> ExitCode {
-    let pending = !report.reverted.is_empty() || !report.reverted_connections.is_empty();
-    if !report.confirmed && pending {
-        ExitCode::from(VALIDATION)
-    } else {
-        ExitCode::SUCCESS
-    }
-}
-
-/// The exit code an upgrade earns.
-///
-/// An unconfirmed upgrade stated its cost and did nothing, so a script sees a non-zero
-/// result telling it to confirm. A service that refused is a failure; a run where
-/// nothing was actually started — every service still coming up, or none present — is a
-/// failure too, so success means at least one re-search began and none was refused.
-pub(crate) fn upgrade_exit(report: &UpgradeReport) -> ExitCode {
-    let outcome = |want: fn(&Triggered) -> bool| {
-        report
-            .media
-            .iter()
-            .filter_map(|media| media.outcome.as_ref())
-            .any(want)
-    };
-    if !report.confirmed {
-        ExitCode::from(VALIDATION)
-    } else if outcome(|state| matches!(state, Triggered::Failed { .. })) {
-        ExitCode::from(FAILURE)
-    } else if outcome(|state| matches!(state, Triggered::Started)) {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(FAILURE)
     }
 }
 
@@ -556,7 +264,7 @@ mod tests {
     use lemonfiber_core::model::WalkthroughReport;
     use lemonfiber_core::model::{
         Disposition, DoctorReport, LifecycleReport, MusicChoice, MusicReport, QualityReport,
-        ResetReport, StackEdit, StatusReport, Triggered, UpgradeMedia, UpgradeReport,
+        ResetReport, Revoked, StackEdit, StatusReport, Triggered, UpgradeMedia, UpgradeReport,
         VersionReport, WizardReport,
     };
     use lemonfiber_core::reconfigure::Stance;
@@ -975,7 +683,6 @@ mod tests {
     fn removal(
         revoked: lemonfiber_core::model::Revoked,
     ) -> lemonfiber_core::model::HouseholdRemoval {
-        use lemonfiber_core::model::Revoked;
         lemonfiber_core::model::HouseholdRemoval {
             name: "ana".to_owned(),
             confirmed: !matches!(revoked, Revoked::Nothing),
@@ -1523,6 +1230,73 @@ mod tests {
     /// An ask nothing fills is a stack that will not wire, and a script asking what
     /// this stack wires to what is asking exactly that. It is the operator's own
     /// configuration to fix, so it earns the code that says so rather than the one
+    /// One plugin's record, as an install settles it.
+    fn komga() -> lemonfiber_core::plugin::Installed {
+        lemonfiber_core::plugin::Installed {
+            plugin: "komga".to_owned(),
+            version: "1.2.0".to_owned(),
+            services: Vec::new(),
+        }
+    }
+
+    /// What an install came to, with whatever the case under test needs of it.
+    fn installed(
+        recorded: bool,
+        reversed: Option<lemonfiber_core::app::putting_back::Reversal>,
+    ) -> Outcome {
+        Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            installed: Vec::new(),
+            install: Some(lemonfiber_core::plugin::Install {
+                would: komga(),
+                recorded,
+                changes: Vec::new(),
+                proofs: Vec::new(),
+                against: None,
+                overrides: Vec::new(),
+                reversed,
+            }),
+        })
+    }
+
+    /// An install that was put back arrives as a report rather than as a refusal, and
+    /// a script reading its status would otherwise be told an install succeeded by the
+    /// very run whose whole subject is that it did not.
+    #[test]
+    fn an_install_that_was_put_back_exits_as_a_refusal_rather_than_a_report() {
+        assert_eq!(
+            shown(settled(&installed(true, None))),
+            success(),
+            "an install that held"
+        );
+        assert_eq!(
+            shown(settled(&installed(false, None))),
+            success(),
+            "a rehearsal, which was asked to report and did"
+        );
+        assert_eq!(
+            shown(settled(&installed(
+                false,
+                Some(lemonfiber_core::app::putting_back::Reversal::default())
+            ))),
+            shown(std::process::ExitCode::from(VALIDATION)),
+            "and one whose proofs did not hold"
+        );
+    }
+
+    /// A reading is a reading, whatever is installed.
+    #[test]
+    fn reading_what_is_installed_always_succeeds() {
+        assert_eq!(
+            shown(settled(&Outcome::Plugins(
+                lemonfiber_core::plugin::Installs {
+                    installed: vec![komga()],
+                    install: None,
+                }
+            ))),
+            success()
+        );
+    }
+
     /// that means "try again later".
     #[test]
     fn a_listing_with_an_ask_nothing_fills_exits_as_a_configuration_problem() {

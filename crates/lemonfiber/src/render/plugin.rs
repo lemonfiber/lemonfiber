@@ -282,6 +282,13 @@ fn claims(read: &Claimed) -> Lines {
             "No service was asked anything: every verdict above is against the \
              recordings this plugin ships."
         }
+        // Not reachable from this page and written anyway, because the alternative is
+        // a wildcard — and a wildcard here is what would let a verdict reached against
+        // a service be shown under a sentence saying none was asked.
+        Evidence::Service => {
+            "Every verdict above is against the service itself, running on this \
+             machine and asked."
+        }
     });
     lines.put(if read.installable {
         "Nothing here stops it being installed."
@@ -470,6 +477,23 @@ mod tests {
             text.contains("this claim is refuted and does not fill it"),
             "{text}"
         );
+    }
+
+    /// The sentence this page cannot reach is written rather than wildcarded, and is
+    /// put to the renderer directly. A wildcard is what would let a verdict reached
+    /// against a recording be shown under the sentence saying the service answered,
+    /// and a case that never runs is a sentence nobody has read.
+    #[test]
+    fn each_kind_of_evidence_has_a_sentence_of_its_own_here_too() {
+        let said = |against: Evidence| {
+            claims(&Claimed {
+                against,
+                ..read(Vec::new(), Vec::new())
+            })
+            .text()
+        };
+        assert!(said(Evidence::Recordings).contains("No service was asked anything"));
+        assert!(said(Evidence::Service).contains("against the service itself"));
     }
 
     /// A plugin adding nothing to lemonfiber's own registers gets no heading for one.
