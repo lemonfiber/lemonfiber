@@ -6250,8 +6250,9 @@
               "minimum": 0
             },
             "at": {
-              "description": "When it was made.",
-              "type": "string"
+              "description": "When it was made, as whole seconds since the Unix epoch, written in decimal.\n\nA string of digits rather than a number, because it is the stamp the record keeps\nand a stamp is compared and stored as text; what it counts is stated here so a\nreader can turn it into a time without guessing at a format.\n\n**`0` means the clock was unreadable when the change was written**, not that it\nwas made at the epoch: it is how a machine whose clock would not answer stamps a\nchange. It is not an instant, so two changes both stamped `0` were not made at\nthe same moment, and a reader showing it as a date in 1970 would be inventing\none.",
+              "type": "string",
+              "pattern": "^[0-9]+$"
             },
             "because": {
               "description": "Why it could not go further, where it could not.",
@@ -6276,8 +6277,8 @@
               "type": "string"
             },
             "reversal": {
-              "description": "How far it could be put back: `whole`, `partial`, or `none`.",
-              "type": "string"
+              "description": "How far it could be put back.",
+              "$ref": "#/$defs/ChangeReversal"
             },
             "target": {
               "description": "What it was made to.",
@@ -6291,6 +6292,26 @@
             "did",
             "reversal",
             "alongside"
+          ]
+        },
+        "ChangeReversal": {
+          "description": "How far a change can be put back.\n\nPublished as the closed set it is, rather than as a word a reader has to trust will\nbe one of three: a surface that lays out a history branches on it, and a set the\ncontract names is one a generated reader can match exhaustively.",
+          "oneOf": [
+            {
+              "description": "It can be put back exactly.",
+              "type": "string",
+              "const": "whole"
+            },
+            {
+              "description": "Some of it can, and the rest is stated rather than attempted.",
+              "type": "string",
+              "const": "partial"
+            },
+            {
+              "description": "None of it can.",
+              "type": "string",
+              "const": "none"
+            }
           ]
         },
         "HistoryReport": {

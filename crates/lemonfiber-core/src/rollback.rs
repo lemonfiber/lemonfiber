@@ -14,7 +14,13 @@ use crate::config::store::is_secret;
 use crate::journal::{is_sealed, Change, Kind};
 
 /// How far a change can be put back.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Published as the closed set it is, rather than as a word a reader has to trust will
+/// be one of three: a surface that lays out a history branches on it, and a set the
+/// contract names is one a generated reader can match exhaustively.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+#[schemars(rename = "ChangeReversal")]
 pub enum Reversal {
     /// It can be put back exactly.
     Whole,

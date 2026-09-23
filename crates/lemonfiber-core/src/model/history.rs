@@ -9,7 +9,18 @@ use serde::Serialize;
 /// One change lemonfiber made, and whether it could be put back.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ChangeReport {
-    /// When it was made.
+    /// When it was made, as whole seconds since the Unix epoch, written in decimal.
+    ///
+    /// A string of digits rather than a number, because it is the stamp the record keeps
+    /// and a stamp is compared and stored as text; what it counts is stated here so a
+    /// reader can turn it into a time without guessing at a format.
+    ///
+    /// **`0` means the clock was unreadable when the change was written**, not that it
+    /// was made at the epoch: it is how a machine whose clock would not answer stamps a
+    /// change. It is not an instant, so two changes both stamped `0` were not made at
+    /// the same moment, and a reader showing it as a date in 1970 would be inventing
+    /// one.
+    #[schemars(regex(pattern = r"^[0-9]+$"))]
     pub at: String,
     /// The operation that made it — a seed, a reconfigure, an applied fix — so a
     /// history reads as what happened rather than as bare diffs.
@@ -18,8 +29,8 @@ pub struct ChangeReport {
     pub target: String,
     /// What it did, in the operator's terms.
     pub did: String,
-    /// How far it could be put back: `whole`, `partial`, or `none`.
-    pub reversal: String,
+    /// How far it could be put back.
+    pub reversal: crate::rollback::Reversal,
     /// Why it could not go further, where it could not.
     pub because: Option<String>,
     /// What to do instead, where there is something.

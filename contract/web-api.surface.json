@@ -902,7 +902,7 @@
         },
         "reversal": {
           "type": [
-            "string"
+            "ref:ChangeReversal"
           ],
           "required": true
         },
@@ -914,6 +914,14 @@
         }
       },
       "variants": []
+    },
+    "ChangeReversal": {
+      "fields": {},
+      "variants": [
+        "\"none\"",
+        "\"partial\"",
+        "\"whole\""
+      ]
     },
     "Changed": {
       "fields": {

@@ -1129,7 +1129,10 @@ why    = "Until somebody does, the first caller on the household network becomes
         let shown = super::super::history::history(&ctx);
         assert!(!shown.changes.is_empty());
         assert!(shown.changes.iter().all(|one| one.operation == "komga"));
-        assert!(shown.changes.iter().all(|one| one.reversal == "whole"));
+        assert!(shown
+            .changes
+            .iter()
+            .all(|one| one.reversal == crate::rollback::Reversal::Whole));
         assert!(shown
             .changes
             .iter()
