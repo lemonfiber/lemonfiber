@@ -8829,6 +8829,140 @@
         "data"
       ],
       "$defs": {
+        "Action": {
+          "description": "What an undo does.\n\nTagged by what it does rather than by the field it sits in, so a reader parsing\none branches on a word rather than on which keys are present.",
+          "oneOf": [
+            {
+              "description": "Remove the resource that was created.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "remove"
+                },
+                "id": {
+                  "description": "The identifier to remove.",
+                  "type": "string"
+                },
+                "resource": {
+                  "description": "The kind of resource.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "resource",
+                "id"
+              ]
+            },
+            {
+              "description": "Restore a value, or remove it where there was none before (`None`).",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "restore"
+                },
+                "key": {
+                  "description": "The setting to restore.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "What to restore it to, or `None` to remove it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "wrote": {
+                  "description": "What lemonfiber put there, which has to still be there for putting the\nold value back to be putting anything back.\n\nCarried so that a reversal can ask whether it is undoing its own work.\nWithout it a reversal knows only what it would like the setting to say,\nand a setting the operator has since chosen for themselves reads exactly\nlike one nobody has touched.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "key",
+                "wrote"
+              ]
+            },
+            {
+              "description": "Remove a path that was created.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "delete"
+                },
+                "path": {
+                  "description": "The path to remove.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "path"
+              ]
+            },
+            {
+              "description": "Pin a service back to the version it was standing on.\n\nThe one reversal nothing in this product carries out. Which version runs is\ndecided by the materialised stack and by what Compose was told to start, and\na reversal of settings and files reaches neither — so this is worked out,\nreported, and left for the operator rather than attempted.",
+              "type": "object",
+              "properties": {
+                "current": {
+                  "description": "The version this run moved it to, which has to still be the one running\nfor putting the old one back to be putting anything back.",
+                  "type": "string"
+                },
+                "does": {
+                  "type": "string",
+                  "const": "repin"
+                },
+                "previous": {
+                  "description": "The version to put back.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "previous",
+                "current"
+              ]
+            },
+            {
+              "description": "Put one field of a service's own resource back to what it held.\n\nThe only reversal that needs the service itself: the value lives inside it,\nand nothing on the host can write it. A reversal that cannot reach the\nservice says so rather than reporting the field restored.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "reconfigure"
+                },
+                "field": {
+                  "description": "The field to put back.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The identifier to change.",
+                  "type": "string"
+                },
+                "resource": {
+                  "description": "The kind of resource.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "What to put back, or `None` where it held nothing.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "does",
+                "resource",
+                "id",
+                "field"
+              ]
+            }
+          ]
+        },
         "PluginChange": {
           "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches: a\nplugin's wiring goes in files of its own, so there is no change here that is an\nedit to something somebody else owns.",
           "type": "object",
@@ -8847,10 +8981,36 @@
             "puts"
           ]
         },
+        "PluginEvidence": {
+          "description": "What the verdicts in a report were reached against.\n\nOne value, because one is all this build can produce: nothing here asks a service\nanything. It is a field rather than a sentence for the reason a verdict is one — a\nreader handed `demonstrated` has nothing else in the document to tell a recording\nthat answered from a service that did, and the weaker of those two claims must not\nbe readable as the stronger. The prose says it on the page; this says it to\nwhatever consumes the report: an author's own CI, a catalogue, anything counting\npasses. Naming the axis now is what made the second kind of evidence a change the\ncompiler walked somebody through rather than one they had to remember.",
+          "oneOf": [
+            {
+              "description": "The recordings the plugin ships. No service was asked anything.",
+              "type": "string",
+              "const": "recordings"
+            },
+            {
+              "description": "The service itself, running on this machine and asked.\n\nThe stronger of the two and the one only an install can reach: an author has\nno instance to ask and the catalogue has none either, which is the whole\nreason recordings exist. A verdict reached here says the service did the\nthing on the machine it is installed on, and it must not be readable as the\nweaker claim any more than the weaker may be read as this.",
+              "type": "string",
+              "const": "service"
+            }
+          ]
+        },
         "PluginInstall": {
           "description": "What an install came to, and what it took to get there.\n\n**The three lists below are stated whether the run wrote anything or not, and that\nis the whole of what makes a rehearsal worth running.** A rehearsal that reported\nless than the real run would be a preview of a different operation; one that\nreported it from code of its own would be a second derivation free to disagree\nwith the one that acts. So they are filled in one place, from the manifest and from\nthe very list of writes the install is carried out from, and the surface says them\nin whichever tense `recorded` calls for.",
           "type": "object",
           "properties": {
+            "against": {
+              "description": "What those verdicts were reached against, or nothing where none were reached.\n\nCarried rather than assumed, because the two kinds of evidence are not the\nsame claim: an author's read asks the recordings a plugin ships, and an\ninstall asks the service running on this machine. The weaker must not be\nreadable as the stronger, and a reader handed a verdict has nothing else in\nthe document to tell them apart.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginEvidence"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "changes": {
               "description": "Every change it makes to the machine, in the order it makes them.",
               "type": "array",
@@ -8866,7 +9026,7 @@
               }
             },
             "proofs": {
-              "description": "Every proof that has to hold before the plugin is installed.",
+              "description": "Every proof that has to hold before the plugin is installed, and on a run\nthat asked them, what each came to.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/PluginProving"
@@ -8875,6 +9035,17 @@
             "recorded": {
               "description": "Whether it was written down. A rehearsal leaves this false.",
               "type": "boolean"
+            },
+            "reversed": {
+              "description": "What putting the install back came to, where something failed and it was.\n\nThe rollback layer's own report rather than a shape of this verb's: what went\nback, and what did not with the reason each is still standing. Absent on a run\nthat had nothing to put back, which is both a rehearsal and an install that\nheld.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UndoReversal"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "would": {
               "description": "What the install settled, said whether or not it was written down.",
@@ -9019,6 +9190,17 @@
               "description": "What it asks, as the method and the path it is asked at.",
               "type": "string"
             },
+            "came_to": {
+              "description": "What asking it came to, or nothing where it was not asked.\n\nAbsent on a rehearsal, which asks nothing. That is a different fact from a\nproof that was asked and established nothing, and the two must not read alike:\none is an account of what would happen, the other is a service that did not\nanswer.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginVerdict"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "establishes": {
               "description": "What it establishes, in one line.",
               "type": "string"
@@ -9129,6 +9311,128 @@
                 "hostname"
               ]
             }
+          ]
+        },
+        "PluginVerdict": {
+          "description": "What one assertion came to, whatever answered it.",
+          "oneOf": [
+            {
+              "description": "The recording answers what the binding declares.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "passed"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            {
+              "description": "It does not, in every way it does not.",
+              "type": "object",
+              "properties": {
+                "faults": {
+                  "description": "Every way the recorded answer is not the declared one.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "outcome": {
+                  "type": "string",
+                  "const": "failed"
+                }
+              },
+              "required": [
+                "outcome",
+                "faults"
+              ]
+            },
+            {
+              "description": "It could not be run, and so established nothing either way.",
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "const": "unproven"
+                },
+                "why": {
+                  "description": "What stopped it being run.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "outcome",
+                "why"
+              ]
+            }
+          ]
+        },
+        "Undo": {
+          "description": "A single reversal, for the surface to carry out.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "What reversing it does.",
+              "$ref": "#/$defs/Action"
+            },
+            "target": {
+              "description": "The service or file to reverse it against.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "action"
+          ]
+        },
+        "UndoLeft": {
+          "description": "One change a reversal did not put back, and why it did not.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "Why it is still standing, in the operator's terms.",
+              "type": "string"
+            },
+            "target": {
+              "description": "What the change was against — a service, or lemonfiber's own environment file.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "because"
+          ]
+        },
+        "UndoReversal": {
+          "description": "What putting a run back came to.\n\nA report rather than a bare list, because it is what an envelope carries and an\nenvelope carries a document. Two lists, and the second is the one that matters when\nit is not empty: what went back, and what did not with the reason it did not.",
+          "type": "object",
+          "properties": {
+            "left": {
+              "description": "What was not put back, each with the reason it was not.\n\nA reversal an operator asked for by name has to say what it did *not* do. Five\nchanges asked back and three carried out is a machine in a state nobody has been\ntold about, and \"some of it worked\" is the sentence that makes somebody go\nlooking by hand. Empty where everything went back, which is the common case.\n\nOn a run that only said what it would do, this is what it cannot promise: a\nchange that goes back through the service that made it goes back only where that\nservice is answering, and a rehearsal has not asked one.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/UndoLeft"
+              }
+            },
+            "rehearsed": {
+              "description": "Whether this run only said what it would put back.\n\nA flag rather than a second shape, because the two lists mean the same thing\neither way and a caller reading them should read one document. What changes is\nthe tense a surface says them in.",
+              "type": "boolean"
+            },
+            "reversed": {
+              "description": "What was put back, in the order it was — or, on a run that only said what it\nwould do, what would go back.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Undo"
+              }
+            }
+          },
+          "required": [
+            "reversed",
+            "left",
+            "rehearsed"
           ]
         }
       }

@@ -39,8 +39,9 @@ use super::{NOWHERE, UNWRITABLE};
 ///
 /// The operation every entry is written under is the plugin's own id, so its changes
 /// read in the history as that plugin's rather than as lemonfiber's, and so a
-/// reversal can ask for exactly them. One stamp for the whole run, because the run is
-/// the unit a reversal takes.
+/// reversal can ask for exactly them. The stamp is handed in rather than read here:
+/// it is what names the run, and an install that proves before it records spans more
+/// than one second — so a second reading would name a run with nothing in it.
 ///
 /// # Errors
 ///
@@ -49,6 +50,7 @@ use super::{NOWHERE, UNWRITABLE};
 pub(super) fn carry_out(
     ctx: &Ctx,
     plugin: &str,
+    stamp: &str,
     planned: &[crate::plugin::Write],
 ) -> Result<(), Box<Problem>> {
     // Where the record of these writes goes. A machine that cannot say where its own
@@ -58,7 +60,7 @@ pub(super) fn carry_out(
     let Some(paths) = crate::app::targets::layout(ctx) else {
         return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
     };
-    let (journal, stamp) = (paths.journal(), ctx.stamp());
+    let journal = paths.journal();
 
     for write in planned {
         // Both writers below bring the whole missing chain into being, so all of it
@@ -67,7 +69,7 @@ pub(super) fn carry_out(
         let making = missing_from(&write.path, write.is_directory());
         let changes: Vec<Change> = making
             .iter()
-            .map(|path| made(plugin, path, &stamp))
+            .map(|path| made(plugin, path, stamp))
             .collect();
         crate::app::recover::journalled(&journal, &changes, ctx.random.as_ref());
 

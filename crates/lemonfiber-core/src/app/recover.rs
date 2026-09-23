@@ -334,7 +334,16 @@ fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Res
 /// operator's own location is never emptied by a reversal. A directory a stop left
 /// unmade is not there, and needs nothing done.
 fn remove(path: &Path) -> Result<(), Fault> {
-    match std::fs::remove_dir(path) {
+    // A directory or a file, because both are things lemonfiber makes: an apply makes
+    // the data root, and an install writes a plugin's Compose document. `remove_dir`
+    // on a file refuses with *not a directory*, which would read to an operator as a
+    // reversal that could not carry on rather than as a file that is still there.
+    let taken = if path.is_dir() {
+        std::fs::remove_dir(path)
+    } else {
+        std::fs::remove_file(path)
+    };
+    match taken {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(Fault::NotRemoved {

@@ -32,6 +32,14 @@ pub enum Action {
     Down,
     /// Stop named services without removing them, leaving the rest alone.
     Stop(Vec<String>),
+    /// Stop named services and remove their containers, leaving the rest alone.
+    ///
+    /// Apart from [`Self::Down`], which takes the whole project with it, and apart
+    /// from [`Self::Stop`], which leaves a stopped container where it was. This is
+    /// what an install has to reach for when it puts itself back: the document that
+    /// declared the service is about to be removed, and a container Compose no longer
+    /// knows about is one nothing will ever take down.
+    Remove(Vec<String>),
     /// Restart named services, leaving the rest alone.
     Restart(Vec<String>),
     /// Fetch newer images without applying them.
@@ -48,6 +56,7 @@ impl Action {
             Self::Up | Self::Start(_) => "up",
             Self::Down => "down",
             Self::Stop(_) => "stop",
+            Self::Remove(_) => "rm",
             Self::Restart(_) => "restart",
             Self::Pull => "pull",
             Self::Config => "config",
@@ -75,6 +84,13 @@ impl Action {
             Self::Start(services) => fenced(starting(), services),
             Self::Down => vec!["down".to_owned()],
             Self::Stop(services) => fenced(vec!["stop".to_owned()], services),
+            // `--stop` because a running container cannot be removed, and `--force`
+            // because the question it would otherwise ask is put to a terminal nobody
+            // is watching — this runs inside an install that is already failing.
+            Self::Remove(services) => fenced(
+                vec!["rm".to_owned(), "--force".to_owned(), "--stop".to_owned()],
+                services,
+            ),
             Self::Restart(services) => fenced(vec!["restart".to_owned()], services),
             Self::Pull => vec!["pull".to_owned()],
             Self::Config => vec!["config".to_owned()],
@@ -408,6 +424,20 @@ mod tests {
         );
     }
 
+    /// What an action is called is what a report says it did, and every one of them
+    /// has to have an answer — a word missing here is a run an operator cannot name.
+    #[test]
+    fn every_action_says_what_it_is_called() {
+        assert_eq!(Action::Up.name(), "up");
+        assert_eq!(Action::Start(Vec::new()).name(), "up");
+        assert_eq!(Action::Down.name(), "down");
+        assert_eq!(Action::Stop(Vec::new()).name(), "stop");
+        assert_eq!(Action::Remove(Vec::new()).name(), "rm");
+        assert_eq!(Action::Restart(Vec::new()).name(), "restart");
+        assert_eq!(Action::Pull.name(), "pull");
+        assert_eq!(Action::Config.name(), "config");
+    }
+
     #[test]
     fn each_action_becomes_its_own_subcommand() {
         let settings = Settings::default();
@@ -423,6 +453,12 @@ mod tests {
         assert_eq!(ending(&Action::Up).as_deref(), Some("up --detach"));
         assert_eq!(ending(&Action::Down).as_deref(), Some("down"));
         assert_eq!(ending(&Action::Stop(Vec::new())).as_deref(), Some("stop"));
+        assert_eq!(
+            ending(&Action::Remove(vec!["komga".to_owned()])).as_deref(),
+            Some("rm --force --stop -- komga"),
+            "a container has to be stopped before it can be removed, and the question \
+             it would otherwise ask is put to a terminal nobody is watching"
+        );
         assert_eq!(ending(&Action::Pull).as_deref(), Some("pull"));
         assert_eq!(ending(&Action::Config).as_deref(), Some("config"));
         assert_eq!(

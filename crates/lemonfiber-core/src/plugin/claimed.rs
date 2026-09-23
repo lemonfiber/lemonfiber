@@ -58,18 +58,28 @@ pub enum Unreadable {
 /// that answered from a service that did, and the weaker of those two claims must not
 /// be readable as the stronger. The prose says it on the page; this says it to
 /// whatever consumes the report: an author's own CI, a catalogue, anything counting
-/// passes. Naming the axis now is also what makes a second kind of evidence a change
-/// the compiler walks somebody through rather than one they have to remember.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+/// passes. Naming the axis now is what made the second kind of evidence a change the
+/// compiler walked somebody through rather than one they had to remember.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
+#[schemars(rename = "PluginEvidence")]
 pub enum Evidence {
     /// The recordings the plugin ships. No service was asked anything.
     Recordings,
+    /// The service itself, running on this machine and asked.
+    ///
+    /// The stronger of the two and the one only an install can reach: an author has
+    /// no instance to ask and the catalogue has none either, which is the whole
+    /// reason recordings exist. A verdict reached here says the service did the
+    /// thing on the machine it is installed on, and it must not be readable as the
+    /// weaker claim any more than the weaker may be read as this.
+    Service,
 }
 
-/// What one bound probe came to.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+/// What one assertion came to, whatever answered it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "outcome", rename_all = "lowercase")]
+#[schemars(rename = "PluginVerdict")]
 pub enum Verdict {
     /// The recording answers what the binding declares.
     Passed,

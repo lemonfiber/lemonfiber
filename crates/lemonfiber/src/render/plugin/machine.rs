@@ -12,7 +12,11 @@
 //! showed only the new entry would not say what it is joining. So there is one
 //! renderer and the tense is a field on the report.
 
-use lemonfiber_core::plugin::{Changing, Installed, Installs, Overriding, Proving, Puts, Reached};
+use lemonfiber_core::app::putting_back::Reversal;
+use lemonfiber_core::journal::{Action, Undo};
+use lemonfiber_core::plugin::{
+    Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Verdict,
+};
 
 use super::super::Lines;
 
@@ -25,21 +29,32 @@ use super::super::Lines;
 pub(crate) fn installs(report: &Installs) -> Lines {
     let mut lines = Lines::default();
     if let Some(install) = &report.install {
+        // Whether the run acted, which is what the tense turns on rather than whether
+        // it ended up recorded. An install that wrote its wiring, started the service
+        // and asked its proofs did every one of those things, and reporting them as
+        // what it *would* do describes a rehearsal that did not happen.
+        let acted = install.recorded || install.reversed.is_some();
         lines.put(format!(
             "{} {}:",
-            if install.recorded {
-                "Installed"
-            } else {
-                "Would install"
+            match (install.recorded, install.reversed.is_some()) {
+                (true, _) => "Installed",
+                (false, true) => "Did not install",
+                (false, false) => "Would install",
             },
             named(&install.would)
         ));
         lines.extend(services(&install.would));
-        lines.extend(changes(&install.changes, install.recorded));
-        lines.extend(proving(&install.proofs, install.recorded));
+        lines.extend(changes(&install.changes, acted));
+        lines.extend(proving(&install.proofs, install.against, acted));
+        // Read off `recorded` rather than off acting, and this is the one place the
+        // two part. What is listed is what the plugin may change of the stack's, and
+        // an install that went back changed none of it — the same as a rehearsal.
         lines.extend(overriding(&install.overrides, install.recorded));
         lines.extend(container(&install.would));
-        if !install.recorded {
+        if let Some(put_back) = &install.reversed {
+            lines.extend(reversal(put_back));
+        }
+        if !install.recorded && install.reversed.is_none() {
             lines.spaced("Nothing was written. Run it again without --dry-run to install it.");
         }
         lines.spaced(shelf(report.installed.len()));
@@ -81,12 +96,17 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
     lines
 }
 
-/// Every proof that has to hold, said before there is anything to ask it of.
+/// Every proof that has to hold, and on a run that asked them, what each came to.
 ///
 /// A plugin that declares none says so rather than showing a heading with nothing
 /// under it. The two are different facts and the empty heading reads as the listing
 /// having failed.
-fn proving(proofs: &[Proving], recorded: bool) -> Lines {
+///
+/// **What answered is said once, under the whole list rather than beside each
+/// verdict.** It is one fact about the run and repeating it per proof would be four
+/// sentences where one is true — and leaving it out would let a verdict reached
+/// against a recording read as one the service gave.
+fn proving(proofs: &[Proving], against: Option<Evidence>, recorded: bool) -> Lines {
     let mut lines = Lines::default();
     if proofs.is_empty() {
         lines.spaced("    It declares no proof, so nothing about it was established.");
@@ -106,8 +126,74 @@ fn proving(proofs: &[Proving], recorded: bool) -> Lines {
                 .map_or_else(String::new, |service| format!(", of {service}"))
         ));
         lines.put(format!("        why  {}", one.why));
+        if let Some(verdict) = &one.came_to {
+            lines.put(format!("        {}", came_to(verdict)));
+        }
+    }
+    match against {
+        None => lines.put("      Nothing was asked: this is what a run would ask."),
+        Some(Evidence::Service) => {
+            lines.put("      Asked of the service itself, running on this machine.");
+        }
+        // Not reachable from an install, which asks the service and nothing else.
+        // Written rather than left to a wildcard, because a wildcard is what would let
+        // the weaker evidence be shown under the stronger sentence.
+        Some(Evidence::Recordings) => {
+            lines.put("      Asked of the recordings this plugin ships, and of no service.");
+        }
     }
     lines
+}
+
+/// What one proof came to, in the words the verdict carries.
+///
+/// Unproven says what stopped it rather than that something did. An operator reading
+/// *could not be run* has to go and find out which of a dozen things happened; the
+/// verdict already knows, and the whole reason it is a case rather than a boolean is
+/// so the reason travels with it.
+fn came_to(verdict: &Verdict) -> String {
+    match verdict {
+        Verdict::Passed => "held".to_owned(),
+        Verdict::Failed { faults } => format!("did not hold: {}", faults.join("; ")),
+        Verdict::Unproven { why } => format!("established nothing: {why}"),
+    }
+}
+
+/// What putting a failed install back came to.
+///
+/// Said in the rollback layer's own two lists rather than summarised: what went back,
+/// and what did not with the reason each is still standing. A summary is where an
+/// operator with something left on their machine stops being told which thing.
+fn reversal(put_back: &Reversal) -> Lines {
+    let mut lines = Lines::default();
+    lines.spaced("    It was put back:");
+    for undo in &put_back.reversed {
+        lines.put(format!("      {}", undone(undo)));
+    }
+    for left in &put_back.left {
+        lines.put(format!(
+            "      {} is still there — {}",
+            left.target, left.because
+        ));
+    }
+    if put_back.left.is_empty() {
+        lines.put("      Nothing it wrote is left on the machine.");
+    }
+    lines
+}
+
+/// One thing a reversal put back, said as what it did rather than as what it undid.
+fn undone(undo: &Undo) -> String {
+    match &undo.action {
+        Action::Delete { path } => format!("removed {path}"),
+        // Every other shape is a change a plugin install never makes: it writes files
+        // and nothing else. Named rather than left to a wildcard so the day one of
+        // them can appear here, somebody has to say what it reads as.
+        Action::Remove { resource, .. } => format!("{resource} on {}", undo.target),
+        Action::Restore { key, .. } => format!("put {key} back"),
+        Action::Repin { previous, .. } => format!("{} back to {previous}", undo.target),
+        Action::Reconfigure { field, .. } => format!("put {field} back on {}", undo.target),
+    }
 }
 
 /// Every bundled thing the plugin declares it will change.
@@ -231,8 +317,11 @@ fn panel(group: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use lemonfiber_core::app::putting_back::Reversal;
+    use lemonfiber_core::journal::{Action, Undo};
     use lemonfiber_core::plugin::{
-        Changing, Install, Installed, Installs, Overriding, Placed, Proving, Puts, Reached,
+        Changing, Evidence, Install, Installed, Installs, Overriding, Placed, Proving, Puts,
+        Reached, Verdict,
     };
 
     use super::installs;
@@ -269,7 +358,9 @@ mod tests {
             recorded,
             changes: Vec::new(),
             proofs: Vec::new(),
+            against: None,
             overrides: Vec::new(),
+            reversed: None,
         }
     }
 
@@ -295,6 +386,7 @@ mod tests {
             of: Some("komga".to_owned()),
             asks: "GET /api/v1/libraries".to_owned(),
             why: "a plugin whose service does not answer is not installed".to_owned(),
+            came_to: None,
         }
     }
 
@@ -574,6 +666,225 @@ mod tests {
         .text();
         assert!(said.contains("asks GET /api/v1/libraries"), "{said}");
         assert!(!said.contains(", of "), "{said}");
+    }
+
+    /// A run that asked says what each proof came to and what answered it, so a reader
+    /// cannot take a verdict reached against a service for one reached against a
+    /// recording or the other way round.
+    #[test]
+    fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: vec![one.clone()],
+            install: Some(Install {
+                changes: writes(),
+                proofs: vec![Proving {
+                    came_to: Some(Verdict::Passed),
+                    ..proof()
+                }],
+                against: Some(Evidence::Service),
+                ..install(one, true)
+            }),
+        })
+        .text();
+        assert!(said.contains("held"), "{said}");
+        assert!(
+            said.contains("Asked of the service itself, running on this machine."),
+            "{said}"
+        );
+    }
+
+    /// A proof that did not hold says every way it did not, and one that established
+    /// nothing says what stopped it. *Could not be run* on its own sends an operator
+    /// looking for which of a dozen things happened.
+    #[test]
+    fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                changes: writes(),
+                proofs: vec![
+                    Proving {
+                        proof: "answers".to_owned(),
+                        came_to: Some(Verdict::Failed {
+                            faults: vec!["status was 503, not 200".to_owned()],
+                        }),
+                        ..proof()
+                    },
+                    Proving {
+                        proof: "listens".to_owned(),
+                        came_to: Some(Verdict::Unproven {
+                            why: "nothing answered on port 25600".to_owned(),
+                        }),
+                        ..proof()
+                    },
+                ],
+                against: Some(Evidence::Service),
+                ..install(one, false)
+            }),
+        })
+        .text();
+        assert!(
+            said.contains("did not hold: status was 503, not 200"),
+            "{said}"
+        );
+        assert!(
+            said.contains("established nothing: nothing answered on port 25600"),
+            "{said}"
+        );
+    }
+
+    /// An install that went back says so in the rollback layer's own two lists: what
+    /// went back, and what did not with the reason it is still standing.
+    #[test]
+    fn an_install_that_went_back_names_what_went_and_what_stayed() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                changes: writes(),
+                reversed: Some(Reversal {
+                    reversed: vec![Undo {
+                        target: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
+                        action: Action::Delete {
+                            path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
+                        },
+                    }],
+                    left: Vec::new(),
+                    rehearsed: false,
+                }),
+                ..install(one, false)
+            }),
+        })
+        .text();
+        assert!(
+            said.contains("Did not install komga"),
+            "a run that wrote, started and asked is not one that *would*: {said}"
+        );
+        assert!(
+            said.contains("What it put on this machine:"),
+            "and what it put there is said in the tense it put it: {said}"
+        );
+        assert!(said.contains("It was put back:"), "{said}");
+        assert!(
+            said.contains("removed /opt/lemonfiber/stack/compose/plugins/komga.yml"),
+            "{said}"
+        );
+        assert!(
+            said.contains("Nothing it wrote is left on the machine."),
+            "{said}"
+        );
+        assert!(
+            !said.contains("Run it again without --dry-run"),
+            "a reversal is not a rehearsal, and must not be read as one: {said}"
+        );
+    }
+
+    /// And one whose reversal could not finish names what is still there and why,
+    /// because *some of it worked* is the sentence that sends somebody looking by hand.
+    #[test]
+    fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
+        let one = recorded("komga", Some(household()));
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                changes: writes(),
+                reversed: Some(Reversal {
+                    reversed: Vec::new(),
+                    left: vec![lemonfiber_core::app::putting_back::Left {
+                        target: "komga".to_owned(),
+                        because: "its container could not be taken off the machine".to_owned(),
+                    }],
+                    rehearsed: false,
+                }),
+                ..install(one, false)
+            }),
+        })
+        .text();
+        assert!(
+            said.contains(
+                "komga is still there — its container could not be taken off the machine"
+            ),
+            "{said}"
+        );
+        assert!(
+            !said.contains("Nothing it wrote is left"),
+            "the two sentences are opposites: {said}"
+        );
+    }
+
+    /// The two sentences an install cannot reach are written rather than wildcarded,
+    /// and are put to the renderer directly — because a wildcard is what would let a
+    /// verdict reached against a recording be shown under the sentence saying the
+    /// service answered, and a case that never runs is a sentence nobody has read.
+    #[test]
+    fn each_kind_of_evidence_has_a_sentence_of_its_own() {
+        let said = |against: Option<Evidence>| {
+            super::proving(
+                &[Proving {
+                    came_to: Some(Verdict::Passed),
+                    ..proof()
+                }],
+                against,
+                true,
+            )
+            .text()
+        };
+        assert!(said(Some(Evidence::Service)).contains("Asked of the service itself"));
+        assert!(said(Some(Evidence::Recordings))
+            .contains("Asked of the recordings this plugin ships, and of no service."));
+        assert!(said(None).contains("Nothing was asked"));
+    }
+
+    /// And every shape a reversal can put back has a sentence, though an install only
+    /// ever writes files. A change of another kind appearing here would otherwise be
+    /// rendered by whichever arm a wildcard sent it to.
+    #[test]
+    fn every_shape_a_reversal_puts_back_says_what_it_did() {
+        let undone = |action: Action| {
+            super::undone(&Undo {
+                target: "komga".to_owned(),
+                action,
+            })
+        };
+        assert_eq!(
+            undone(Action::Delete {
+                path: "/x/komga.yml".to_owned()
+            }),
+            "removed /x/komga.yml"
+        );
+        assert_eq!(
+            undone(Action::Remove {
+                resource: "downloadclient".to_owned(),
+                id: "3".to_owned()
+            }),
+            "downloadclient on komga"
+        );
+        assert_eq!(
+            undone(Action::Restore {
+                key: "DOMAIN".to_owned(),
+                value: None,
+                wrote: "home.local".to_owned()
+            }),
+            "put DOMAIN back"
+        );
+        assert_eq!(
+            undone(Action::Repin {
+                previous: "1.0.0".to_owned(),
+                current: "1.1.0".to_owned()
+            }),
+            "komga back to 1.0.0"
+        );
+        assert_eq!(
+            undone(Action::Reconfigure {
+                resource: "downloadclient".to_owned(),
+                id: "3".to_owned(),
+                field: "category".to_owned(),
+                value: None
+            }),
+            "put category back on komga"
+        );
     }
 
     /// A rehearsal says it was not written in the same breath as what it settled.

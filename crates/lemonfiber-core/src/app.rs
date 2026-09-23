@@ -409,7 +409,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Undo { run } => putting_back::undo(ctx, run).await,
         Command::Credentials(asked) => credentials::answer(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
-        Command::Plugins(action) => plugins::asked(ctx, &action),
+        Command::Plugins(action) => plugins::asked(ctx, &action).await,
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.

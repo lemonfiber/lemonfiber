@@ -157,7 +157,12 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
         }
     }
 
-    let undos: Vec<Undo> = run.iter().map(|change| change.undo()).collect();
+    // Newest first, which is the order a reversal has to take and the order the
+    // repair's own reversal already takes. A run that made a directory and then made
+    // one inside it is put back by removing the inner one first; walking the record
+    // forwards would meet the outer directory while its child is still in it, and a
+    // directory that will not empty stops the whole reversal.
+    let undos: Vec<Undo> = run.iter().rev().map(|change| change.undo()).collect();
 
     // A rehearsal stops here, and here is where a real run stops being reversible: the
     // judgement above is the whole of what can be known without touching anything, and

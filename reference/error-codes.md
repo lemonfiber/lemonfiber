@@ -88,6 +88,7 @@ what to do about it, is written for operators at
 - `PLUGIN-6`
 - `PLUGIN-7`
 - `PLUGIN-8`
+- `PLUGIN-9`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

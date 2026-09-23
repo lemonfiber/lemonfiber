@@ -9,6 +9,8 @@
 //! whoever is looking at this is holding a recording and a manifest and deciding which
 //! of them is wrong, and one fault at a time makes that a guessing game.
 
+use std::collections::BTreeMap;
+
 use lemonfiber_plugin::pointing::{self, Step};
 use lemonfiber_plugin::{Expect, Expected, Kind};
 use serde_json::Value;
@@ -21,6 +23,53 @@ use super::recorded::Answer;
 /// of the two is wrong. Plex answers a hundred and fifty-one settings at `/:/prefs`, and
 /// a refusal that printed all of them said everything and showed nothing.
 const READABLE: usize = 120;
+
+/// The method a declaration names, as the transport carries it.
+///
+/// Four, because four is what the port has. A declaration naming anything else cannot
+/// be sent, and saying so is a better answer than sending a different method than the
+/// one that was written down — a proof asked with the wrong verb is a proof about a
+/// question nobody declared.
+///
+/// Beside the evaluator with the answer reader, because they are the two halves of one
+/// seam: this is how a declared question reaches the transport, and that is how what
+/// comes back reaches the rule. Two copies of either would be two ways of asking.
+#[must_use]
+pub(crate) fn method(declared: &str) -> Option<crate::ports::http::Method> {
+    use crate::ports::http::Method;
+    match declared.to_ascii_uppercase().as_str() {
+        "GET" => Some(Method::Get),
+        "POST" => Some(Method::Post),
+        "PUT" => Some(Method::Put),
+        "DELETE" => Some(Method::Delete),
+        _ => None,
+    }
+}
+
+/// A live answer, read into the shape a recorded one is read into.
+///
+/// Beside the evaluator rather than beside either caller, which is what lets one
+/// evaluator serve both: a live answer and a recorded one are the same four facts, and
+/// two evaluators for one vocabulary would be two things to keep in step.
+///
+/// Headers are folded to lower case and the first of a repeated one wins, matching how
+/// the transport answers a question about one. A body is offered as a document where it
+/// reads as one and as text either way, because an expectation may ask about either and
+/// which it asks about is not this function's business.
+pub(crate) fn live(response: &crate::ports::http::Response) -> Answer {
+    let mut headers: BTreeMap<String, String> = BTreeMap::new();
+    for (name, value) in &response.headers {
+        headers
+            .entry(name.to_lowercase())
+            .or_insert_with(|| value.clone());
+    }
+    Answer {
+        status: response.status,
+        headers,
+        json: serde_json::from_str(&response.body).ok(),
+        body_starts_with: Some(response.body.clone()),
+    }
+}
 
 /// Every way this answer is not the one the expectation declared.
 ///

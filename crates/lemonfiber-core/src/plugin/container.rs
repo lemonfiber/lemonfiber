@@ -57,6 +57,16 @@ const TEMPLATE: (&str, &str) = ("compose/_common.yml", "defaults");
 /// `lemonfiber up tv` could no longer be described without naming what is installed.
 const PROFILE: &str = "plugin-";
 
+/// The Compose profile this plugin's services sit in.
+///
+/// Published because an install has to start exactly them and a removal has to take
+/// exactly them back, and a caller that spelled the name itself would be a second
+/// answer to which profile the entry above was written into.
+#[must_use]
+pub fn profile(plugin: &str) -> String {
+    format!("{PROFILE}{plugin}")
+}
+
 /// Where lemonfiber keeps a service's own configuration directory.
 ///
 /// The source is lemonfiber's and the target is the plugin's: an image that reads
@@ -112,7 +122,7 @@ fn entry(plugin: &str, placed: &Placed) -> String {
         placed.service
     );
     let _ = writeln!(written, "    image: {}@{}", placed.image, placed.digest);
-    let _ = writeln!(written, "    profiles: [{PROFILE}{plugin}]");
+    let _ = writeln!(written, "    profiles: [{}]", profile(plugin));
     if let Some(reached) = &placed.reached {
         let port = reached.port();
         let _ = writeln!(

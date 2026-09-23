@@ -162,6 +162,16 @@ impl Placed {
             reached: Reached::of(service, manifest.entry(service)),
         }
     }
+
+    /// The port this machine reaches the service on, where it publishes one.
+    ///
+    /// Nothing where it publishes none, which is a service with no listener rather
+    /// than one on an address nobody wrote down — so a proof against it has nowhere
+    /// to ask rather than somewhere to guess.
+    #[must_use]
+    pub fn published(&self) -> Option<u16> {
+        self.reached.as_ref().map(Reached::port)
+    }
 }
 
 /// One plugin's install, as it was decided.
@@ -353,14 +363,30 @@ pub struct Install {
     pub recorded: bool,
     /// Every change it makes to the machine, in the order it makes them.
     pub changes: Vec<super::Changing>,
-    /// Every proof that has to hold before the plugin is installed.
+    /// Every proof that has to hold before the plugin is installed, and on a run
+    /// that asked them, what each came to.
     pub proofs: Vec<super::Proving>,
+    /// What those verdicts were reached against, or nothing where none were reached.
+    ///
+    /// Carried rather than assumed, because the two kinds of evidence are not the
+    /// same claim: an author's read asks the recordings a plugin ships, and an
+    /// install asks the service running on this machine. The weaker must not be
+    /// readable as the stronger, and a reader handed a verdict has nothing else in
+    /// the document to tell them apart.
+    pub against: Option<super::Evidence>,
     /// Every bundled thing the plugin declares it will change.
     ///
     /// The full extent rather than a sample of it: a manifest may change a bundled
     /// setting only through a recipe, and a recipe reaching one no `[[override]]`
     /// names is refused before anything is written.
     pub overrides: Vec<super::Overriding>,
+    /// What putting the install back came to, where something failed and it was.
+    ///
+    /// The rollback layer's own report rather than a shape of this verb's: what went
+    /// back, and what did not with the reason each is still standing. Absent on a run
+    /// that had nothing to put back, which is both a rehearsal and an install that
+    /// held.
+    pub reversed: Option<crate::app::putting_back::Reversal>,
 }
 
 /// What is installed, and what installing one came to.
@@ -764,7 +790,9 @@ dashboard_group = "Library"
                 recorded: true,
                 changes: Vec::new(),
                 proofs: Vec::new(),
+                against: None,
                 overrides: Vec::new(),
+                reversed: None,
             }),
         };
         assert!(read.install.is_none());

@@ -26,11 +26,11 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_plugin::extension;
-use lemonfiber_plugin::{Contribution, Expect, Manifest, Request};
+use lemonfiber_plugin::{Contribution, Expect, Manifest};
 
 use super::{Category, Check, Finding, Reported, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity, State};
-use crate::plugin::judging::judge;
+use crate::plugin::judging::{judge, live, method};
 use crate::plugin::recorded::Answer;
 use crate::ports::http::{self, Http, Method};
 
@@ -162,7 +162,7 @@ fn asked(manifest: &Manifest, entry: &Contribution, answering: &BTreeMap<String,
                 .to_owned(),
         );
     };
-    let Some(method) = method(request) else {
+    let Some(method) = method(&request.method) else {
         return Asks::Nothing(format!(
             "{} is not a method lemonfiber can send",
             request.method
@@ -173,21 +173,6 @@ fn asked(manifest: &Manifest, entry: &Contribution, answering: &BTreeMap<String,
         method,
         path: request.path.clone(),
         expect: Box::new(expect.clone()),
-    }
-}
-
-/// The method a row names, as the transport carries it.
-///
-/// Four, because four is what the port has. A row naming anything else cannot be sent,
-/// and saying so is a better answer than sending a different method than the one that
-/// was declared.
-fn method(request: &Request) -> Option<Method> {
-    match request.method.to_ascii_uppercase().as_str() {
-        "GET" => Some(Method::Get),
-        "POST" => Some(Method::Post),
-        "PUT" => Some(Method::Put),
-        "DELETE" => Some(Method::Delete),
-        _ => None,
     }
 }
 
@@ -316,7 +301,7 @@ impl Contributed {
                 "{} did not answer: {}",
                 unreachable.url, unreachable.reason
             )),
-            Ok(response) => self.judged(expect, &answer(&response)),
+            Ok(response) => self.judged(expect, &live(&response)),
         }
     }
 
@@ -387,31 +372,6 @@ impl Contributed {
     /// The check and the plugin it belongs to, which every line about it carries.
     fn of(&self) -> String {
         format!("{}, contributed by {}", self.check, self.plugin)
-    }
-}
-
-/// What came back, in the terms the shared evaluator constrains.
-///
-/// The same shape a recording is read into, which is what lets one evaluator serve both
-/// — a live answer and a recorded one are the same four facts, and two evaluators for
-/// one vocabulary would be two things to keep in step.
-///
-/// Headers are folded to lower case and the first of a repeated one wins, matching how
-/// the transport answers a question about one. A body is offered as a document where it
-/// reads as one and as text either way, because an expectation may ask about either and
-/// which it asks about is not this function's business.
-fn answer(response: &http::Response) -> Answer {
-    let mut headers: BTreeMap<String, String> = BTreeMap::new();
-    for (name, value) in &response.headers {
-        headers
-            .entry(name.to_lowercase())
-            .or_insert_with(|| value.clone());
-    }
-    Answer {
-        status: response.status,
-        headers,
-        json: serde_json::from_str(&response.body).ok(),
-        body_starts_with: Some(response.body.clone()),
     }
 }
 
