@@ -32,6 +32,10 @@ mod placing;
 // the same reason the placing is beside the record: one module turns a decision into
 // paths, and this turns it into the account an operator agrees to.
 mod stating;
+// What the stack's own checks made of an install, held against what they said before
+// it. Beside the stating rather than in it: that one is a function of the manifest and
+// of nothing else, and this is a function of two readings of a machine.
+mod verified;
 // Reachable from the diagnostics register as well as from here. A plugin's row is
 // judged by the one evaluator its recordings are judged by, and the answer a live
 // service gives is read into the one shape a recorded answer is read into — which is
@@ -59,6 +63,7 @@ pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
 pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
+pub use verified::{against, Changed, Verification};
 
 // Re-exported so a surface rendering one of these reads it through the module that
 // publishes it, rather than reaching past this crate for a type it was handed. The

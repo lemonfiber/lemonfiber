@@ -789,6 +789,10 @@ mod tests {
                     came_to: Some(crate::plugin::Verdict::Passed),
                 }],
                 against: Some(crate::plugin::Evidence::Service),
+                verified: Some(crate::plugin::Verification {
+                    broke: Vec::new(),
+                    unsettled: Vec::new(),
+                }),
                 overrides: vec![crate::plugin::Overriding {
                     setting: "seerr.settings".to_owned(),
                     why: "a request for a comic has to reach the library that holds comics"

@@ -257,7 +257,27 @@ pub(crate) async fn assembled(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
+    let checks = assembling(ctx, &manifest, disruptive).await;
+    Ok((manifest, checks))
+}
 
+/// The same list, built from a manifest somebody has already read.
+///
+/// Apart from the read above because reading the stack is the one thing here that can
+/// refuse, and building the checks from what was read cannot. That matters to a caller
+/// that has to look twice — an install holding the stack's verdict before its writes
+/// against the same verdict after them — because the second look must be a fresh set of
+/// checks, and a second look that could fail where the first did not would be a refusal
+/// arriving after the machine had already been written to.
+///
+/// Fresh instances every time, and that is the point of asking again at all: a check
+/// holds what it read when it was built, so re-running the same instances would compare
+/// a machine against the very reading the work was meant to change.
+pub(crate) async fn assembling(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    disruptive: bool,
+) -> Vec<Box<dyn Check>> {
     let environment = EnvironmentCheck::reaching(ctx.runner.clone(), ctx.settings.docker.clone());
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     // What the download clients still have to write, so the free-space finding
@@ -281,7 +301,7 @@ pub(crate) async fn assembled(
         Some(committed),
         ctx.stack.crowded_mounts(),
     );
-    let vpn = tunnelled(ctx, &manifest, project.as_deref(), disruptive).await;
+    let vpn = tunnelled(ctx, manifest, project.as_deref(), disruptive).await;
     let credentials = CredentialsCheck::new(
         ctx.http.clone(),
         ctx.filesystem.clone(),
@@ -363,7 +383,7 @@ pub(crate) async fn assembled(
         crate::app::autostart::load(ctx).wanted().on_boot(),
         ctx.settings.home.clone(),
     );
-    let checks: Vec<Box<dyn Check>> = vec![
+    vec![
         Box::new(environment),
         Box::new(autostart),
         Box::new(bindings),
@@ -378,8 +398,7 @@ pub(crate) async fn assembled(
         Box::new(wiring),
         Box::new(telling),
         Box::new(permissions),
-    ];
-    Ok((manifest, checks))
+    ]
 }
 
 /// What the accounts underneath the stack have left, read from the services that use

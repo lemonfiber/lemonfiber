@@ -30,7 +30,7 @@ mod switch;
 mod waiting;
 
 pub use diagnosis::diagnose;
-pub(super) use diagnosis::{assembled, examined};
+pub(super) use diagnosis::{assembled, assembling, examined};
 pub(in crate::app) use inflight::drained;
 pub(super) use inflight::teardown;
 pub use inflight::{in_flight, Interrupted, Waiting};

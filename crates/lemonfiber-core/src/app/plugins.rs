@@ -40,6 +40,11 @@ use super::{Ctx, Outcome};
 // here that reaches a service and a container engine should be the one thing a
 // reader has to hold a seam in mind for.
 mod proving;
+// Asking the stack's own checks what they make of the machine, before the writes and
+// again after them. Apart from the proving because the two answer different
+// questions: one asks the plugin whether it works, the other asks the stack whether
+// it still does.
+mod verifying;
 // Carrying the writes out, and journalling each before it is made. Its own file
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
@@ -183,11 +188,18 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
 
     let mut stated = crate::plugin::proofs(&manifest);
     let mut against = None;
+    let mut checked = None;
     let mut put_back = None;
     let mut recorded = false;
 
     if !ctx.dry_run {
         let stamp = ctx.stamp();
+        // Read before a byte of it is written, and that order is the whole of what
+        // makes the second reading mean anything. What this has to tell apart is a
+        // check the install broke from one that was already failing, and after the
+        // fact there is nothing left to ask.
+        let (stack_manifest, before) = verifying::looked(ctx).await?;
+
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
 
         // Started before it is registered, which is why the invocation carries this
@@ -197,7 +209,23 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
         proving::asked(ctx, &manifest, &would, &mut stated).await;
         against = Some(proving::AGAINST);
 
+        // The stack is asked only where the plugin's own proofs held. A run that has
+        // already failed is a run being put back, and asking a machine mid-reversal
+        // what it makes of itself would produce an account of neither state.
         if proving::held(&stated) {
+            checked = Some(crate::plugin::against(
+                &before,
+                &verifying::again(ctx, &stack_manifest).await,
+            ));
+        }
+
+        // Recorded where both halves held, and put back where either did not. One
+        // question answers for both: a verification nobody took is a run whose proofs
+        // did not hold, because that is the only way this gets here without one.
+        if checked
+            .as_ref()
+            .is_some_and(crate::plugin::Verification::held)
+        {
             // Answered for here rather than passed on. The record writer is shared and
             // says *your settings could not be saved, your existing settings are
             // untouched* — which after the lines above is false twice over: the file
@@ -231,6 +259,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
             changes: crate::plugin::changes(&planned),
             proofs: stated,
             against,
+            verified: checked,
             overrides: crate::plugin::overrides(&manifest),
             reversed: put_back,
         }),
@@ -432,7 +461,7 @@ mod tests {
     use std::sync::Arc;
 
     use lemonfiber_fixtures::http::Fake;
-    use lemonfiber_fixtures::support::{spoke, Recording};
+    use lemonfiber_fixtures::support::{refused as engine_refused, spoke, Keyed, Recording};
 
     use super::{asked, Asked};
     use crate::app::{Ctx, Outcome};
@@ -1192,6 +1221,181 @@ expect  = { status = 200 }
         );
     }
 
+    /// A runner that stops answering one reading the moment the plugin's container
+    /// is up.
+    ///
+    /// The one lever a test has on the stack's own checks. Everything the diagnosis
+    /// reaches here is a fake, and no fake answers differently because a file was
+    /// written — so the change is tied to the install's own call, which is what the
+    /// rule exists for said as plainly as a fake can say it.
+    struct LostToTheInstall {
+        /// The word the failing call carries besides `version`: `compose` singles out
+        /// the Compose reading, and `version` itself takes the engine's own with it.
+        once_up: &'static str,
+        started: std::sync::atomic::AtomicBool,
+    }
+
+    impl LostToTheInstall {
+        /// One of them, before anything has started.
+        fn losing(once_up: &'static str) -> Arc<Self> {
+            Arc::new(Self {
+                once_up,
+                started: std::sync::atomic::AtomicBool::new(false),
+            })
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::ports::Runner for LostToTheInstall {
+        async fn run(
+            &self,
+            argv: &[String],
+        ) -> Result<lemonfiber_ports::process::Output, lemonfiber_ports::process::Failure> {
+            let said = |named: &str| argv.iter().any(|word| word == named);
+            if said("up") {
+                self.started
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            if said("version")
+                && said(self.once_up)
+                && self.started.load(std::sync::atomic::Ordering::SeqCst)
+            {
+                return Err(lemonfiber_ports::process::Failure::NotFound {
+                    program: "docker".to_owned(),
+                });
+            }
+            Ok(spoke("25.0.5|1.44|1.44"))
+        }
+    }
+
+    /// The whole of what the second half of an install buys. The plugin's own proofs
+    /// held — its service answered exactly what the manifest said it would — and the
+    /// stack was still taken back, because a check that was passing before the install
+    /// is failing after it.
+    ///
+    /// **A differential attributes by time rather than by cause, and that is
+    /// deliberate.** Nothing here can prove the install is what broke the engine check,
+    /// and neither can an operator's machine. What it can say is that the check held
+    /// before and does not now, which is the honest claim and the one worth acting on.
+    #[tokio::test]
+    async fn a_plugin_that_holds_its_own_proofs_and_breaks_the_stack_is_still_put_back() {
+        let ctx = proving(
+            "collateral",
+            LostToTheInstall::losing("version"),
+            answering(200),
+        );
+
+        let install = report(installing(&ctx, &source("collateral", PROVING)).await)
+            .and_then(|one| one.install);
+        assert_eq!(
+            install
+                .as_ref()
+                .map(|one| came_to(one.proofs.first().and_then(|proof| proof.came_to.as_ref()))),
+            Some("held"),
+            "the plugin answered its own proof"
+        );
+        assert_eq!(
+            install.as_ref().map(|one| one.recorded),
+            Some(false),
+            "and is not recorded as installed"
+        );
+        let broke: Vec<String> = install
+            .as_ref()
+            .and_then(|one| one.verified.as_ref())
+            .map(|checked| {
+                checked
+                    .broke
+                    .iter()
+                    .map(|one| one.now.check.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(
+            broke.iter().any(|check| check == "environment.engine"),
+            "the check that changed is named: {broke:?}"
+        );
+        assert!(
+            install
+                .as_ref()
+                .and_then(|one| one.reversed.as_ref())
+                .is_some(),
+            "and the install went back"
+        );
+        assert!(
+            !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
+            "so what it wrote is gone again"
+        );
+    }
+
+    /// A check that could no longer be told either way is reported and the install
+    /// still stands. *I could not tell* is not *it is still broken*, and an install
+    /// reversed on it would be punishing a plugin for something nobody established.
+    #[tokio::test]
+    async fn a_check_nothing_could_establish_is_reported_rather_than_held_against_it() {
+        let ctx = proving(
+            "unsettled",
+            LostToTheInstall::losing("compose"),
+            answering(200),
+        );
+
+        let install = report(installing(&ctx, &source("unsettled", PROVING)).await)
+            .and_then(|one| one.install);
+        let checked = install.as_ref().and_then(|one| one.verified.as_ref());
+        assert!(
+            checked.is_some_and(|one| one
+                .unsettled
+                .iter()
+                .any(|changed| changed.now.check == "environment.compose")),
+            "what could not be told is said out loud"
+        );
+        assert!(
+            checked.is_some_and(crate::plugin::Verification::held),
+            "and it does not stop the install"
+        );
+        assert_eq!(
+            install.as_ref().map(|one| one.recorded),
+            Some(true),
+            "which is to say the plugin is installed"
+        );
+    }
+
+    /// An install the stack was fine with says so, rather than saying nothing. A run
+    /// that reported no verification at all would leave a reader unable to tell a
+    /// clean reading from a reading nobody took.
+    #[tokio::test]
+    async fn an_install_the_stack_was_fine_with_says_the_checks_found_nothing() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving("unbroken", runner, answering(200));
+
+        let checked = report(installing(&ctx, &source("unbroken", PROVING)).await)
+            .and_then(|one| one.install)
+            .and_then(|one| one.verified);
+        assert!(
+            checked
+                .as_ref()
+                .is_some_and(crate::plugin::Verification::held),
+            "the checks were taken and nothing was worse for it"
+        );
+        assert!(
+            checked.is_some_and(|one| one.broke.is_empty() && one.unsettled.is_empty()),
+            "on a machine every fake answers the same way twice"
+        );
+    }
+
+    /// A rehearsal takes no reading at all, and says nothing about one. A heading
+    /// saying the checks found nothing would be a claim about a reading that never
+    /// happened.
+    #[tokio::test]
+    async fn a_rehearsal_reports_no_verification_because_it_took_none() {
+        let ctx = rehearsing("unchecked");
+
+        assert!(
+            report(installing(&ctx, &source("unchecked", PROVING)).await)
+                .and_then(|one| one.install)
+                .is_some_and(|one| one.verified.is_none())
+        );
+    }
+
     /// The verdict is on the report, and so is what it was reached against — because a
     /// verdict against a recording the author shipped and one against the service on
     /// this machine are not the same claim, and a reader handed one has nothing else in
@@ -1310,7 +1514,12 @@ expect  = { status = 200 }
             counted(installing(&ctx, &source("patient", PROVING)).await),
             Some(1)
         );
-        assert_eq!(http.requests().len(), 2, "it was asked twice");
+        let asked = http
+            .requests()
+            .into_iter()
+            .filter(|request| request.url.contains("/api/v1/libraries"))
+            .count();
+        assert_eq!(asked, 2, "the proof was asked twice");
     }
 
     /// A proof of a service that publishes no port is unproven naming it, because
@@ -1334,14 +1543,10 @@ expect  = { status = 200 }
     /// already written go back.
     #[tokio::test]
     async fn a_service_that_will_not_start_stops_the_install_and_the_files_go_back() {
-        let runner = lemonfiber_fixtures::support::Sequenced::answering(vec![
-            Ok(lemonfiber_ports::process::Output {
-                status: Some(1),
-                stdout: String::new(),
-                stderr: "no such image".to_owned(),
-            }),
+        let runner = Keyed::answering(
+            vec![("up", Ok(engine_refused("no such image")))],
             Ok(spoke("")),
-        ]);
+        );
         let ctx = proving("unstartable", runner, Fake::silent());
         let at = source("unstartable", PROVING);
 
@@ -1363,13 +1568,13 @@ expect  = { status = 200 }
     /// rather than repeating the sentence a reversal that finished would have got.
     #[tokio::test]
     async fn a_service_that_will_not_start_and_will_not_come_off_names_what_stands() {
-        let runner = Arc::new(Recording::answering(Ok(
-            lemonfiber_ports::process::Output {
-                status: Some(1),
-                stdout: String::new(),
-                stderr: "no such image".to_owned(),
-            },
-        )));
+        let runner = Keyed::answering(
+            vec![
+                ("up", Ok(engine_refused("no such image"))),
+                ("rm", Ok(engine_refused("no such container"))),
+            ],
+            Ok(spoke("")),
+        );
         let ctx = proving("standing", runner, Fake::silent());
 
         let (code, said) = refused(installing(&ctx, &source("standing", PROVING)).await);
@@ -1422,15 +1627,11 @@ expect  = { status = 200 }
     /// looking by hand.
     #[tokio::test]
     async fn a_container_that_would_not_come_off_is_named_as_still_standing() {
-        let runner = lemonfiber_fixtures::support::Sequenced::answering(vec![
+        let runner = Keyed::answering(
+            vec![("rm", Ok(engine_refused("no such container")))],
             Ok(spoke("")),
-            Ok(lemonfiber_ports::process::Output {
-                status: Some(1),
-                stdout: String::new(),
-                stderr: "no such container".to_owned(),
-            }),
-        ]);
-        let ctx = proving("stuck", runner, answering(503));
+        );
+        let ctx = proving("stuck", runner.clone(), answering(503));
 
         let left = report(installing(&ctx, &source("stuck", PROVING)).await)
             .and_then(|one| one.install)
@@ -1441,6 +1642,11 @@ expect  = { status = 200 }
         assert!(left
             .first()
             .is_some_and(|one| one.because.contains("could not be taken off")));
+        assert!(
+            runner.ran("rm"),
+            "and it was asked, which is what makes the refusal the engine's rather than \
+             an account of a call nobody made"
+        );
     }
 
     /// An install that found everything it would write already there journals nothing

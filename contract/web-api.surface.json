@@ -3998,6 +3998,23 @@
       },
       "variants": []
     },
+    "PluginChangedCheck": {
+      "fields": {
+        "before": {
+          "type": [
+            "anyOf(null,ref:DoctorVerdict)"
+          ],
+          "required": false
+        },
+        "now": {
+          "type": [
+            "ref:Finding"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginEvidence": {
       "fields": {},
       "variants": [
@@ -4040,6 +4057,12 @@
         "reversed": {
           "type": [
             "anyOf(null,ref:UndoReversal)"
+          ],
+          "required": false
+        },
+        "verified": {
+          "type": [
+            "anyOf(null,ref:PluginVerification)"
           ],
           "required": false
         },
@@ -4265,6 +4288,23 @@
         "\"passed\"",
         "\"unproven\""
       ]
+    },
+    "PluginVerification": {
+      "fields": {
+        "broke": {
+          "type": [
+            "array[ref:PluginChangedCheck]"
+          ],
+          "required": true
+        },
+        "unsettled": {
+          "type": [
+            "array[ref:PluginChangedCheck]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
     },
     "Policy": {
       "fields": {},
