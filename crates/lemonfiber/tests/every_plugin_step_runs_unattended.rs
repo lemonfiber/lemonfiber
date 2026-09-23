@@ -211,3 +211,117 @@ fn a_rehearsed_install_leaves_the_machine_as_it_found_it() {
     );
     assert_eq!(written(&root), Vec::<PathBuf>::new(), "nothing was written");
 }
+
+/// A plugin with nothing to prove and nothing to claim, which is what an install can
+/// finish against with no instance of the software anywhere: its proofs hold because it
+/// declares none, and the stack's own checks are held against themselves.
+fn plain() -> String {
+    MANIFEST
+        .split("[[claim]]")
+        .next()
+        .unwrap_or_default()
+        .replace("provides    = [\"media.serve\"]\n", "")
+}
+
+/// A machine with the stack this binary carries and a container engine that agrees to
+/// everything, so the verbs that act can be seen acting from start to finish.
+///
+/// The engine is a script rather than a real one, and that is enough for the question
+/// here — whether each verb reaches its end with nobody present and says how it went —
+/// because what it would have started is proved elsewhere, by the verbs' own tests.
+fn engine_agreeing(named: &str) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let root = std::env::temp_dir().join(format!(
+        "lemonfiber-unattended-verbs-{}-{named}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&root);
+    for dir in ["bin", "source", "next", "config", "data"] {
+        let _ = std::fs::create_dir_all(root.join(dir));
+    }
+    let _ = std::fs::write(root.join("bin/docker"), "#!/bin/sh\nexit 0\n");
+    let _ = std::fs::set_permissions(
+        root.join("bin/docker"),
+        std::fs::Permissions::from_mode(0o755),
+    );
+    let _ = std::fs::write(root.join("source/plugin.toml"), plain());
+    let _ = std::fs::write(
+        root.join("next/plugin.toml"),
+        plain().replace("version     = \"1.0.0\"", "version     = \"1.1.0\""),
+    );
+    root
+}
+
+/// One verb on that machine, with nobody there, and how it ended.
+fn acting(root: &Path, argv: &[&str]) -> Option<i32> {
+    std::process::Command::new(BINARY)
+        .arg("--config-dir")
+        .arg(root.join("config"))
+        .arg("--data-dir")
+        .arg(root.join("data"))
+        .args(argv)
+        .env_clear()
+        .env("PATH", root.join("bin"))
+        .env("HOME", root)
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .output()
+        .ok()
+        .and_then(|ran| ran.status.code())
+}
+
+/// Installing, rehearsing, updating and removing each run to their end with nobody at
+/// the terminal, and each ends with a status a script can branch on — shown both ways,
+/// in the order an operator would meet them.
+#[test]
+fn each_verb_runs_to_its_end_with_nobody_at_the_terminal() {
+    let root = engine_agreeing("lifecycle");
+    let steps: [(&str, &[&str], bool); 9] = [
+        (
+            "removing what is not installed",
+            &["plugin", "remove", "kavita"],
+            false,
+        ),
+        (
+            "updating what is not installed",
+            &["plugin", "update", "next"],
+            false,
+        ),
+        (
+            "rehearsing the install",
+            &["plugin", "install", "--dry-run", "source"],
+            true,
+        ),
+        ("installing", &["plugin", "install", "source"], true),
+        (
+            "installing it again",
+            &["plugin", "install", "source"],
+            false,
+        ),
+        (
+            "rehearsing the update",
+            &["plugin", "update", "--dry-run", "next"],
+            true,
+        ),
+        ("updating", &["plugin", "update", "next"], true),
+        (
+            "rehearsing the removal",
+            &["plugin", "remove", "--dry-run", "kavita"],
+            true,
+        ),
+        ("removing", &["plugin", "remove", "kavita"], true),
+    ];
+    for (step, argv, holds) in steps {
+        let ended = acting(&root, argv);
+        assert!(
+            ended.is_some(),
+            "{step} did not end with a status: {ended:?}"
+        );
+        assert_eq!(
+            ended == Some(0),
+            holds,
+            "{step} ended with {ended:?}, where a script would branch the other way"
+        );
+    }
+}

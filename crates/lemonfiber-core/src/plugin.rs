@@ -66,7 +66,7 @@ pub use installed::{
 pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
-pub use reports::{Install, Installs, Removal, Unfilled};
+pub use reports::{Install, Installs, Removal, Restored, Unfilled, Update};
 pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
 pub use verified::{against, Changed, Verification};
 

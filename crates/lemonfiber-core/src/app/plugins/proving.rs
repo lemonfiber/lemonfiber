@@ -87,6 +87,31 @@ pub(super) async fn started(
     }))
 }
 
+/// Bring the plugin's containers up, answering with why not where they did not come.
+///
+/// For an update rather than an install. [`started`] puts the install back when the
+/// engine refuses, which is right for an install and wrong for an update: what an
+/// update starts is either the new version — whose reversal the update carries out
+/// itself, beside putting the old one back — or the old version being put back, where
+/// the only thing worse than it not starting is a reversal that took its files away
+/// again for not starting.
+pub(super) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option<String> {
+    let services: Vec<String> = installed
+        .services
+        .iter()
+        .map(|placed| placed.service.clone())
+        .collect();
+    let command = invocation(ctx, installed, stack, &Action::Start(services));
+    match ctx.runner.run(&command).await {
+        Ok(output) if output.succeeded() => None,
+        Ok(refused) => Some(format!(
+            "the container engine refused to start it: {}",
+            refused.stderr.trim()
+        )),
+        Err(why) => Some(why.to_string()),
+    }
+}
+
 /// Take the plugin's containers back off the machine.
 ///
 /// Answers whether it could, rather than failing: this runs inside an install that is

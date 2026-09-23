@@ -9750,6 +9750,17 @@
                   "type": "null"
                 }
               ]
+            },
+            "update": {
+              "description": "What this run's update came to, or nothing where it updated nothing.\n\nA third field rather than an install and a removal filled in together, for the\nreason those two are apart: an update is one operation with one account.\n\nBoxed because it carries a whole install's account beside the reversal, and\nevery other run's report would otherwise be as large as the one run that updates.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginUpdate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -10021,6 +10032,29 @@
             "path"
           ]
         },
+        "PluginRestored": {
+          "description": "Where an update did not hold: what putting the version it replaced back came to.",
+          "type": "object",
+          "properties": {
+            "placed": {
+              "description": "Whether everything its record says it placed is on the machine again.",
+              "type": "boolean"
+            },
+            "running": {
+              "description": "Whether its containers are running again.\n\nApart from `placed`, because the two fail differently: a document that would not\nland is a disk, and a container that would not start is the engine — and an\noperator fixes them in different places.",
+              "type": "boolean"
+            },
+            "version": {
+              "description": "The version put back, which is the one the record still names.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "placed",
+            "running"
+          ]
+        },
         "PluginUnfilled": {
           "description": "A capability that would have nothing filling it.",
           "type": "object",
@@ -10037,6 +10071,65 @@
           "required": [
             "capability",
             "filled_by"
+          ]
+        },
+        "PluginUpdate": {
+          "description": "What updating a plugin came to, or would come to, as one account.\n\n**One account, because it is one operation.** An update is the version installed\ngoing back and another coming on, and a report that gave those as a removal and an\ninstall side by side would invite reading them as two things that might each have\nhappened. What an operator has to be able to read off this is which version the\nmachine is on, and there are exactly two answers: the new one, where\n`install.recorded` is true, or the one it replaced, which `restored` says the state\nof.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "The version the record named before this run.",
+              "type": "string"
+            },
+            "install": {
+              "description": "The new version's own account: what it writes, what it has to prove, what it\nproved and what the stack's checks made of it — the same one an install gives,\nbecause it is the same work. `recorded` is whether the update holds.",
+              "$ref": "#/$defs/PluginInstall"
+            },
+            "interrupts": {
+              "description": "Every service of the installed version that stops, named before any of them\ndoes.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "plugin": {
+              "description": "The plugin this is about.",
+              "type": "string"
+            },
+            "restored": {
+              "description": "Where the update did not hold, what putting the version it replaced back came\nto. Absent on a rehearsal and on an update that held.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginRestored"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "stopped": {
+              "description": "What stopped the new version before its proofs could be asked, where something\ndid: a write that would not land, a container that would not start, or a record\nthat could not be written. A proof or a check that did not hold is in `install`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "description": "The version this run installs, or would.",
+              "type": "string"
+            },
+            "went_back": {
+              "description": "What putting the installed version's changes back came to, or would come to.\n\nWhere the plugin's own configuration directory holds what its service wrote, it\nis named here as still standing, which on an update is the point: the new\nversion is started against the same directory, and an update that took it would\nbe a reinstall that lost everything the old one knew.",
+              "$ref": "#/$defs/UndoReversal"
+            }
+          },
+          "required": [
+            "plugin",
+            "from",
+            "to",
+            "interrupts",
+            "went_back",
+            "install"
           ]
         },
         "PluginVerdict": {

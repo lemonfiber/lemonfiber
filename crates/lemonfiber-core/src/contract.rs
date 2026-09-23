@@ -806,6 +806,7 @@ mod tests {
                 recorded: true,
                 reversed: None,
             }),
+            update: None,
         }
     }
 

@@ -4293,6 +4293,12 @@
             "anyOf(null,ref:PluginRemoval)"
           ],
           "required": false
+        },
+        "update": {
+          "type": [
+            "anyOf(null,ref:PluginUpdate)"
+          ],
+          "required": false
         }
       },
       "variants": []
@@ -4500,6 +4506,29 @@
       },
       "variants": []
     },
+    "PluginRestored": {
+      "fields": {
+        "placed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "running": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginUnfilled": {
       "fields": {
         "capability": {
@@ -4511,6 +4540,59 @@
         "filled_by": {
           "type": [
             "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginUpdate": {
+      "fields": {
+        "from": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "install": {
+          "type": [
+            "ref:PluginInstall"
+          ],
+          "required": true
+        },
+        "interrupts": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "plugin": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "restored": {
+          "type": [
+            "anyOf(null,ref:PluginRestored)"
+          ],
+          "required": false
+        },
+        "stopped": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "went_back": {
+          "type": [
+            "ref:UndoReversal"
           ],
           "required": true
         }

@@ -57,6 +57,16 @@ pub(super) fn installing(report: &lemonfiber_core::plugin::Installs) -> ExitCode
     {
         return ExitCode::from(VALIDATION);
     }
+    // An update that did not hold is a failure whichever version it left the machine
+    // on: a script that asked for the new one and reads success would go on as though
+    // it had it.
+    if report
+        .update
+        .as_ref()
+        .is_some_and(|one| one.restored.is_some())
+    {
+        return ExitCode::from(VALIDATION);
+    }
     match &report.install {
         None => ExitCode::SUCCESS,
         Some(install) if install.recorded || install.reversed.is_none() => ExitCode::SUCCESS,

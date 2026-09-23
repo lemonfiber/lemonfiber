@@ -6,9 +6,9 @@ Part of the [command reference](../commands.md).
 ## `lemonfiber plugin`
 
 ```text
-Install a plugin, say what is installed, and read what one may declare.
+Install, update and remove plugins, and read what one may declare.
 
-Five of the words under this one are documents for somebody writing a plugin, answered with no network, no catalogue and no stack running, each saying which generation it reports — so an author who has to know whether a difference is their build or their manifest can tell. The other two are about this machine: `install` settles what installing somebody else's plugin decides and writes it down, and `installed` reads that record back. Only the first writes anything.
+Five of the words under this one are documents for somebody writing a plugin, answered with no network, no catalogue and no stack running, each saying which generation it reports — so an author who has to know whether a difference is their build or their manifest can tell. The other four are about this machine: `install` writes down what installing a plugin decides, `installed` reads that back, `update` replaces one version with another as one operation, and `remove` takes one off. Each of the three that acts can be rehearsed with `--dry-run`.
 
 Usage: lemonfiber plugin [OPTIONS] <COMMAND>
 
@@ -21,6 +21,7 @@ Commands:
   install           Install a plugin, recording what installing it decided
   installed         Say what is installed, and what each install decided
   remove            Take a plugin off this machine, putting back everything installing it wrote
+  update            Replace an installed plugin with another version of it, as one operation
   help              Print this message or the help of the given subcommand(s)
 
 Options:
@@ -323,6 +324,46 @@ Usage: lemonfiber plugin remove [OPTIONS] <PLUGIN>
 Arguments:
   <PLUGIN>
           The plugin's id, as `lemonfiber plugin installed` lists it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin update`
+
+```text
+Replace an installed plugin with another version of it, as one operation.
+
+The source of the new version, held to everything an install is held to. The version installed comes off the way a removal takes it — every refusal the rollback layer makes, judged before anything moves — and the new one goes on the way an install puts it on: written, started, proved, and held against the stack's own checks as they read before the update began.
+
+The machine is on one version or the other at every moment, never between them. The record of what is installed is written last, once the new version has held; where it does not hold, it goes back and the version it replaced is put back on from its record, and the report says which version the machine is on.
+
+`--dry-run` says what would go back, what the new version would write and prove, and what would stop meanwhile, and touches nothing.
+
+Usage: lemonfiber plugin update [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The new version's source: its directory, or the `plugin.toml` inside it
 
 Options:
       --json

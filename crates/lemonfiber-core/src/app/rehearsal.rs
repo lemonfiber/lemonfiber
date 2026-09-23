@@ -192,6 +192,10 @@ pub fn asked(command: &Command) -> Asked {
         // what can be known without acting — and what it would leave with nothing
         // filling it is a fact about the record rather than about a machine mid-run.
         Command::Plugins(plugins::Asked::Remove { .. }) => ("plugin remove", Rehearsal::Reports),
+        // Both of those at once, as the one account the update is. What goes back is the
+        // rollback layer's judgement and what comes on is the install's settled writes
+        // and declared proofs, and neither needs anything touched to be known.
+        Command::Plugins(plugins::Asked::Update { .. }) => ("plugin update", Rehearsal::Reports),
         Command::Wiring(Linking::Fill(_)) => ("wiring fill", Rehearsal::Reports),
         Command::Quality(_) => ("quality", Rehearsal::Reports),
         Command::Alerts(_) => ("alerts", Rehearsal::Reports),
@@ -822,6 +826,9 @@ mod tests {
             Command::Backup { service: None },
             Command::Plugins(plugins::Asked::Install {
                 path: std::path::PathBuf::from("/srv/komga"),
+            }),
+            Command::Plugins(plugins::Asked::Update {
+                path: std::path::PathBuf::from("komga"),
             }),
             Command::Plugins(plugins::Asked::Remove {
                 plugin: "komga".to_owned(),

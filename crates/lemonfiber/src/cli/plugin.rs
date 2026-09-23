@@ -86,6 +86,25 @@ pub enum PluginCommand {
         /// The plugin's id, as `lemonfiber plugin installed` lists it.
         plugin: String,
     },
+    /// Replace an installed plugin with another version of it, as one operation.
+    ///
+    /// The source of the new version, held to everything an install is held to. The
+    /// version installed comes off the way a removal takes it — every refusal the
+    /// rollback layer makes, judged before anything moves — and the new one goes on the
+    /// way an install puts it on: written, started, proved, and held against the stack's
+    /// own checks as they read before the update began.
+    ///
+    /// The machine is on one version or the other at every moment, never between them.
+    /// The record of what is installed is written last, once the new version has held;
+    /// where it does not hold, it goes back and the version it replaced is put back on
+    /// from its record, and the report says which version the machine is on.
+    ///
+    /// `--dry-run` says what would go back, what the new version would write and prove,
+    /// and what would stop meanwhile, and touches nothing.
+    Update {
+        /// The new version's source: its directory, or the `plugin.toml` inside it.
+        path: PathBuf,
+    },
 }
 
 /// What a plugin author can be told, with nothing running.

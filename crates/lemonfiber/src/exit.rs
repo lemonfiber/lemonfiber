@@ -1259,6 +1259,7 @@ mod tests {
                 overrides: Vec::new(),
                 reversed,
             }),
+            update: None,
         })
     }
 
@@ -1306,6 +1307,7 @@ mod tests {
                         ..lemonfiber_core::app::putting_back::Reversal::default()
                     },
                 }),
+                update: None,
             })
         };
 
@@ -1338,6 +1340,58 @@ mod tests {
         );
     }
 
+    /// An update that did not hold exits as a refusal whichever version it left the
+    /// machine on: a script that asked for the new version and read success would go on
+    /// as though it had it. One that held, and a rehearsal, succeed.
+    #[test]
+    fn an_update_that_did_not_hold_exits_as_a_refusal() {
+        let moving = |recorded: bool, restored: bool| {
+            Outcome::Plugins(lemonfiber_core::plugin::Installs {
+                installed: Vec::new(),
+                install: None,
+                removal: None,
+                update: Some(Box::new(lemonfiber_core::plugin::Update {
+                    plugin: "komga".to_owned(),
+                    from: "1.2.0".to_owned(),
+                    to: "1.3.0".to_owned(),
+                    interrupts: vec!["komga".to_owned()],
+                    went_back: lemonfiber_core::app::putting_back::Reversal::default(),
+                    install: lemonfiber_core::plugin::Install {
+                        would: komga(),
+                        recorded,
+                        changes: Vec::new(),
+                        proofs: Vec::new(),
+                        against: None,
+                        verified: None,
+                        overrides: Vec::new(),
+                        reversed: None,
+                    },
+                    stopped: None,
+                    restored: restored.then(|| lemonfiber_core::plugin::Restored {
+                        version: "1.2.0".to_owned(),
+                        placed: true,
+                        running: true,
+                    }),
+                })),
+            })
+        };
+        assert_eq!(
+            shown(settled(&moving(true, false))),
+            success(),
+            "one that held"
+        );
+        assert_eq!(
+            shown(settled(&moving(false, false))),
+            success(),
+            "a rehearsal"
+        );
+        assert_eq!(
+            shown(settled(&moving(false, true))),
+            shown(std::process::ExitCode::from(VALIDATION)),
+            "and one that did not hold, even with the old version cleanly back"
+        );
+    }
+
     /// A reading is a reading, whatever is installed.
     #[test]
     fn reading_what_is_installed_always_succeeds() {
@@ -1347,6 +1401,7 @@ mod tests {
                     removal: None,
                     installed: vec![komga()],
                     install: None,
+                    update: None,
                 }
             ))),
             success()
