@@ -1823,7 +1823,7 @@
         },
         "json_types": {
           "type": [
-            "null|object{ref:Kind}"
+            "null|object{ref:ExpectedKind}"
           ],
           "required": false
         },
@@ -1839,6 +1839,16 @@
     "Expected": {
       "fields": {},
       "variants": []
+    },
+    "ExpectedKind": {
+      "fields": {},
+      "variants": [
+        "\"bool\"",
+        "\"dict\"",
+        "\"int\"",
+        "\"list\"",
+        "\"str\""
+      ]
     },
     "Facing": {
       "fields": {},
@@ -2868,16 +2878,6 @@
         }
       },
       "variants": []
-    },
-    "Kind": {
-      "fields": {},
-      "variants": [
-        "\"bool\"",
-        "\"dict\"",
-        "\"int\"",
-        "\"list\"",
-        "\"str\""
-      ]
     },
     "Leaving": {
       "fields": {

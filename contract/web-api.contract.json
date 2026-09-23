@@ -9407,7 +9407,7 @@
                 "null"
               ],
               "additionalProperties": {
-                "$ref": "#/$defs/Kind"
+                "$ref": "#/$defs/ExpectedKind"
               },
               "default": null
             },
@@ -9440,6 +9440,36 @@
             {
               "description": "A word.",
               "type": "string"
+            }
+          ]
+        },
+        "ExpectedKind": {
+          "description": "The kind of value a key must hold.\n\nFive, and closed. A name outside them is one no runner could evaluate, and an\nassertion nothing evaluates is a proof that silently checks less than it says —\nwhich is worse than one that fails.\n\nNamed for what it is the kind *of*, rather than `Kind`, because this is published\nand whoever generates from it flattens every definition into one scope. `Kind` is\nthe one name there a generator is certain to want for itself: every envelope this\ncontract describes is keyed by its `kind`, so the union of them is a `Kind` too, and\ntwo of them in one module is a definition nothing can be compiled against.",
+          "oneOf": [
+            {
+              "description": "A true or a false.",
+              "type": "string",
+              "const": "bool"
+            },
+            {
+              "description": "A whole number.",
+              "type": "string",
+              "const": "int"
+            },
+            {
+              "description": "A string.",
+              "type": "string",
+              "const": "str"
+            },
+            {
+              "description": "An array.",
+              "type": "string",
+              "const": "list"
+            },
+            {
+              "description": "An object.",
+              "type": "string",
+              "const": "dict"
             }
           ]
         },
@@ -9490,36 +9520,6 @@
             "category",
             "title",
             "verdict"
-          ]
-        },
-        "Kind": {
-          "description": "The kind of value a key must hold.\n\nFive, and closed. A name outside them is one no runner could evaluate, and an\nassertion nothing evaluates is a proof that silently checks less than it says —\nwhich is worse than one that fails.",
-          "oneOf": [
-            {
-              "description": "A true or a false.",
-              "type": "string",
-              "const": "bool"
-            },
-            {
-              "description": "A whole number.",
-              "type": "string",
-              "const": "int"
-            },
-            {
-              "description": "A string.",
-              "type": "string",
-              "const": "str"
-            },
-            {
-              "description": "An array.",
-              "type": "string",
-              "const": "list"
-            },
-            {
-              "description": "An object.",
-              "type": "string",
-              "const": "dict"
-            }
           ]
         },
         "PluginChange": {

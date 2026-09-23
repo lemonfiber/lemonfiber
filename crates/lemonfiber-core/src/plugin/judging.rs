@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 
 use lemonfiber_plugin::pointing::{self, Step};
-use lemonfiber_plugin::{Expect, Expected, Kind};
+use lemonfiber_plugin::{Expect, Expected, ExpectedKind};
 use serde_json::Value;
 
 use super::recorded::Answer;
@@ -333,13 +333,13 @@ fn said(wanted: &Expected) -> String {
 }
 
 /// Whether a value is of the kind an expectation names.
-fn is_kind(found: &Value, kind: Kind) -> bool {
+fn is_kind(found: &Value, kind: ExpectedKind) -> bool {
     match kind {
-        Kind::Bool => found.is_boolean(),
-        Kind::Int => found.is_i64() || found.is_u64(),
-        Kind::Str => found.is_string(),
-        Kind::List => found.is_array(),
-        Kind::Dict => found.is_object(),
+        ExpectedKind::Bool => found.is_boolean(),
+        ExpectedKind::Int => found.is_i64() || found.is_u64(),
+        ExpectedKind::Str => found.is_string(),
+        ExpectedKind::List => found.is_array(),
+        ExpectedKind::Dict => found.is_object(),
     }
 }
 
@@ -356,13 +356,13 @@ fn kind_of(found: &Value) -> &'static str {
 }
 
 /// The kind an expectation named, in the same words.
-fn kind_said(kind: Kind) -> &'static str {
+fn kind_said(kind: ExpectedKind) -> &'static str {
     match kind {
-        Kind::Bool => "a true or a false",
-        Kind::Int => "a number",
-        Kind::Str => "a string",
-        Kind::List => "a list",
-        Kind::Dict => "an object",
+        ExpectedKind::Bool => "a true or a false",
+        ExpectedKind::Int => "a number",
+        ExpectedKind::Str => "a string",
+        ExpectedKind::List => "a list",
+        ExpectedKind::Dict => "an object",
     }
 }
 
