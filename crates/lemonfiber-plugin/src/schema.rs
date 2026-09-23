@@ -18,7 +18,9 @@ use serde::Deserialize;
 use crate::conforming::nonconforming;
 use crate::{is_compatible, Error, SUPPORTED_SCHEMA_VERSIONS};
 
-pub use evidence::{Claim, ClaimProbe, Contribution, Expect, Expected, Kind, Proof, Request};
+pub use evidence::{
+    Claim, ClaimProbe, Contribution, Expect, Expected, ExpectedKind, Proof, Request,
+};
 pub use recipe::{Capture, Pair, Recipe, Step, StepCall, RUN};
 
 /// A whole plugin manifest.
@@ -424,7 +426,9 @@ pub enum HealthKind {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{Bind, Contribution, Criticality, Expected, HealthKind, Kind, Manifest, Service};
+    use super::{
+        Bind, Contribution, Criticality, Expected, ExpectedKind, HealthKind, Manifest, Service,
+    };
     use crate::Error;
 
     /// A manifest declaring every block the contract carries.
@@ -726,7 +730,7 @@ capabilities = ["doctor.contribute", "recipe.run"]
             expected,
             Some((
                 Some(vec!["content".to_owned()]),
-                Some(Kind::List),
+                Some(ExpectedKind::List),
                 Some(1),
                 Some(1),
                 Some(false),

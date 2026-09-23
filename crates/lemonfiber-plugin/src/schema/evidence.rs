@@ -180,7 +180,7 @@ pub struct Expect {
     pub json_has_keys: Option<Vec<String>>,
     /// Places the answer must carry, each with the kind of value it must be.
     #[serde(default)]
-    pub json_types: Option<BTreeMap<String, Kind>>,
+    pub json_types: Option<BTreeMap<String, ExpectedKind>>,
     /// Places the answer must carry, each with a number it must not be below.
     #[serde(default)]
     pub json_at_least: Option<BTreeMap<String, i64>>,
@@ -211,9 +211,15 @@ pub struct Expect {
 /// Five, and closed. A name outside them is one no runner could evaluate, and an
 /// assertion nothing evaluates is a proof that silently checks less than it says —
 /// which is worse than one that fails.
+///
+/// Named for what it is the kind *of*, rather than `Kind`, because this is published
+/// and whoever generates from it flattens every definition into one scope. `Kind` is
+/// the one name there a generator is certain to want for itself: every envelope this
+/// contract describes is keyed by its `kind`, so the union of them is a `Kind` too, and
+/// two of them in one module is a definition nothing can be compiled against.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub enum Kind {
+pub enum ExpectedKind {
     /// A true or a false.
     Bool,
     /// A whole number.
