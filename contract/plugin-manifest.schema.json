@@ -14,6 +14,7 @@
     "contribution": {
       "description": "The rows it adds at the points lemonfiber publishes.",
       "type": "array",
+      "default": [],
       "items": {
         "$ref": "#/$defs/Contribution"
       }
@@ -203,7 +204,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "fixture": {
           "description": "The recorded response the check is proved against.",
@@ -234,7 +236,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "service": {
           "description": "Which service the finding is about. Defaults to the plugin's own.",
@@ -305,7 +308,8 @@
           ],
           "additionalProperties": {
             "$ref": "#/$defs/Expected"
-          }
+          },
+          "default": null
         },
         "json_array_min": {
           "description": "The answer read as an array, with at least this many entries.\n\nA catalogue is very often a list rather than an object, and none of the\nobject-shaped constraints can say anything about one.",
@@ -356,7 +360,8 @@
           ],
           "additionalProperties": {
             "$ref": "#/$defs/Kind"
-          }
+          },
+          "default": null
         },
         "status": {
           "description": "The status the answer must carry.",
@@ -881,7 +886,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null
         },
         "id": {
           "description": "Unique within the recipe.",

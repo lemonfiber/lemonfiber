@@ -8967,6 +8967,123 @@
           "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
           "type": "string"
         },
+        "Contribution": {
+          "description": "A row in a register lemonfiber already runs.\n\nThe fields beyond `at` and `id` are the row its point declares, and the point is\npublished — so the required set, the optional set, the closed sets and the bounds\nare read from `extension-points.json` rather than restated here. What this type\nfixes is that a contribution is declared in this block and nowhere else, and that\nit carries nothing outside the union of the rows the published points take.",
+          "type": "object",
+          "properties": {
+            "action": {
+              "description": "What to do, in the imperative.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "at": {
+              "description": "A point the build publishes. One it does not is refused by name.",
+              "type": "string"
+            },
+            "category": {
+              "description": "Which family a check is narrowed to.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "detail": {
+              "description": "The technical half of a remedy, which must not lead.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "expect": {
+              "description": "What the answer must be.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Expect"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "fixture": {
+              "description": "The recorded response the check is proved against.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "for": {
+              "description": "The check a remedy is for, which must be one this same plugin declared.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "id": {
+              "description": "Namespaced with the declaring plugin's id, always.",
+              "type": "string"
+            },
+            "request": {
+              "description": "Method and path on the plugin's own service.\n\nThere is no field for a host, so a check cannot be pointed at another service,\nat the machine, or off it. A plugin wanting to say something about a service it\ndid not install is asking to speak for somebody else's software.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginRequest"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "service": {
+              "description": "Which service the finding is about. Defaults to the plugin's own.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "timeout_s": {
+              "description": "How long a check may run, within the bounds the point declares.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
+            },
+            "title": {
+              "description": "The one-line summary of what was checked.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "why": {
+              "description": "Why this is worth checking.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "at",
+            "id"
+          ]
+        },
         "DoctorCategory": {
           "description": "The family a check belongs to, so a run can be narrowed to one of them.\n\nThese are the diagnostic categories the product recognises; the checks that\nfill each one arrive over time, so a category may name more than lemonfiber\ncan yet establish.",
           "oneOf": [
@@ -9211,6 +9328,121 @@
             }
           ]
         },
+        "Expect": {
+          "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal, which is the one answer no port proxy can\nproduce.\n\n**A key of the four key-wise constraints is a place rather than a name.** A plain\nname is a top-level member, and one beginning with `/` is a JSON Pointer, extended\nwith a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the\nonly thing it could say about a service that nests its payload was that the envelope\nwas there — which is a probe that passes by observing that something replied.",
+          "type": "object",
+          "properties": {
+            "body_starts_with": {
+              "description": "What the body must begin with, where it is not JSON.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "content_type": {
+              "description": "A substring of the content type the answer was served as.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "json": {
+              "description": "Places the answer must carry, each with the exact value it must hold.",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "$ref": "#/$defs/Expected"
+              },
+              "default": null
+            },
+            "json_array_min": {
+              "description": "The answer read as an array, with at least this many entries.\n\nA catalogue is very often a list rather than an object, and none of the\nobject-shaped constraints can say anything about one.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "default": null,
+              "minimum": 0
+            },
+            "json_at_least": {
+              "description": "Places the answer must carry, each with a number it must not be below.",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "default": null
+            },
+            "json_has_keys": {
+              "description": "Places the answer must carry, whatever they hold.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "default": null,
+              "items": {
+                "type": "string"
+              }
+            },
+            "json_is_absent": {
+              "description": "The answer did not parse as JSON at all.\n\nWhich is what a service that serves its application shell for every path it does\nnot implement answers — and the reason a status alone proves nothing against\none: the shell comes back `200` whether the API behind it exists or not, so what\nhas to be said is that the body was *not* a document.",
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "default": null
+            },
+            "json_types": {
+              "description": "Places the answer must carry, each with the kind of value it must be.",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "$ref": "#/$defs/Kind"
+              },
+              "default": null
+            },
+            "status": {
+              "description": "The status the answer must carry.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "default": null,
+              "maximum": 65535,
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "Expected": {
+          "description": "Exactly what a place must hold.\n\nThree kinds and no nesting: a flag that must be set, a number that must match, or a\nword. A value deeper than this is asking about a document rather than about a claim\n— and where the thing worth asserting is deeper *in* the answer, the key reaches it\nrather than the value growing to match.",
+          "anyOf": [
+            {
+              "description": "A true or a false.",
+              "type": "boolean"
+            },
+            {
+              "description": "A whole number.",
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "description": "A word.",
+              "type": "string"
+            }
+          ]
+        },
         "Finding": {
           "description": "One thing a check established, and how it turned out.",
           "type": "object",
@@ -9258,6 +9490,36 @@
             "category",
             "title",
             "verdict"
+          ]
+        },
+        "Kind": {
+          "description": "The kind of value a key must hold.\n\nFive, and closed. A name outside them is one no runner could evaluate, and an\nassertion nothing evaluates is a proof that silently checks less than it says —\nwhich is worse than one that fails.",
+          "oneOf": [
+            {
+              "description": "A true or a false.",
+              "type": "string",
+              "const": "bool"
+            },
+            {
+              "description": "A whole number.",
+              "type": "string",
+              "const": "int"
+            },
+            {
+              "description": "A string.",
+              "type": "string",
+              "const": "str"
+            },
+            {
+              "description": "An array.",
+              "type": "string",
+              "const": "list"
+            },
+            {
+              "description": "An object.",
+              "type": "string",
+              "const": "dict"
+            }
           ]
         },
         "PluginChange": {
@@ -9396,6 +9658,14 @@
           "description": "One plugin's install, as it was decided.",
           "type": "object",
           "properties": {
+            "contributions": {
+              "description": "Every row it adds to a register lemonfiber already runs, as the install\nsettled them.\n\nKept here rather than read back off the plugin's own files, for the reason\neverything else on this record is: the author's directory may be gone the\nmoment an install is done, and a doctor run a month later is a question about\nthis machine rather than about a document. This record is the one answer, so a\nrow that runs is a row that was declared at install and has not changed under\nanybody since.\n\nDefaulted for a register written before this field existed, which reads as a\nplugin that contributes nothing — the same answer a plugin that contributes\nnothing gets, and the only one that can be given about a record that does not\nsay.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/Contribution"
+              }
+            },
             "plugin": {
               "description": "The plugin's id: the name it is installed and journalled under.",
               "type": "string"
@@ -9643,6 +9913,33 @@
                 "hostname"
               ]
             }
+          ]
+        },
+        "PluginRequest": {
+          "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
+          "type": "object",
+          "properties": {
+            "accept": {
+              "description": "The one representation the answer is asked for, as a media type.\n\nAbsent where the service needs no asking, which is most of them.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "method": {
+              "description": "The HTTP method.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The path on the service being asked.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "path"
           ]
         },
         "PluginVerdict": {

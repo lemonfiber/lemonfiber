@@ -185,6 +185,22 @@ pub struct Installed {
     pub version: String,
     /// What was placed, one entry per service the plugin declares.
     pub services: Vec<Placed>,
+    /// Every row it adds to a register lemonfiber already runs, as the install
+    /// settled them.
+    ///
+    /// Kept here rather than read back off the plugin's own files, for the reason
+    /// everything else on this record is: the author's directory may be gone the
+    /// moment an install is done, and a doctor run a month later is a question about
+    /// this machine rather than about a document. This record is the one answer, so a
+    /// row that runs is a row that was declared at install and has not changed under
+    /// anybody since.
+    ///
+    /// Defaulted for a register written before this field existed, which reads as a
+    /// plugin that contributes nothing — the same answer a plugin that contributes
+    /// nothing gets, and the only one that can be given about a record that does not
+    /// say.
+    #[serde(default)]
+    pub contributions: Vec<lemonfiber_plugin::Contribution>,
 }
 
 impl Installed {
@@ -192,6 +208,13 @@ impl Installed {
     ///
     /// A function of the manifest alone, so every decision it takes can be put in
     /// front of a test without a directory, a container engine or a stack.
+    ///
+    /// **Which service each contributed row asks is settled here and written down.**
+    /// The rule for it is the manifest's — a row that names none asks the plugin's
+    /// one service, and a plugin with several leaves it unsettled — and the manifest
+    /// is the only place that rule can be applied, because it is the only place both
+    /// the row and the service list exist. Applying it again later against this
+    /// record would be a second answer to a question already answered.
     #[must_use]
     pub fn of(manifest: &Manifest) -> Self {
         Self {
@@ -202,8 +225,49 @@ impl Installed {
                 .iter()
                 .map(|service| Placed::of(manifest, service))
                 .collect(),
+            contributions: manifest
+                .contributions
+                .iter()
+                .map(|entry| lemonfiber_plugin::Contribution {
+                    service: manifest
+                        .asks(entry.service.as_deref())
+                        .map(|service| service.id.clone()),
+                    ..entry.clone()
+                })
+                .collect(),
         }
     }
+}
+
+/// Where a service published on this machine is reached.
+///
+/// The loopback address rather than the label a household service also answers on: a
+/// plugin's service is asked by lemonfiber, from the machine its container runs on, and
+/// the published port is what is there whichever tier the service is on. The same
+/// address the bundled services are proved at.
+const HERE: &str = "http://127.0.0.1";
+
+/// Where each installed service answers, by the id its manifest gave it.
+///
+/// One answer to *where is this reached*, for the two callers that ask. An install asks
+/// it to put the plugin's own proofs; the diagnostics register asks it to put the rows
+/// the plugin contributed. Two answers would be two ways of reaching the same service,
+/// and the one that fell behind would be asking a port nothing is listening on.
+///
+/// A service that publishes no port is absent rather than present with a guessed
+/// address, which is what lets a caller say *there is nowhere to ask it* instead of
+/// asking somewhere and reporting what that answered.
+#[must_use]
+pub fn answering(installed: &[Installed]) -> std::collections::BTreeMap<String, String> {
+    installed
+        .iter()
+        .flat_map(|one| one.services.iter())
+        .filter_map(|placed| {
+            placed
+                .published()
+                .map(|port| (placed.service.clone(), format!("{HERE}:{port}")))
+        })
+        .collect()
 }
 
 /// Why a register could not be read.

@@ -27,7 +27,7 @@ use lemonfiber_plugin::{Manifest, Proof};
 
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::judging::{judge, live, method};
-use crate::plugin::{Evidence, Installed, Placed, Proving, Verdict};
+use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
@@ -42,14 +42,6 @@ use super::UNPROVED;
 /// question wearing a different coat: a container Compose has created is not yet a
 /// service that answers, and what an operator is waiting for is the second one.
 const POLL: Duration = Duration::from_millis(500);
-
-/// Where a service published on this machine is reached.
-///
-/// The loopback address rather than the label a household service also answers on: a
-/// proof is asked by lemonfiber, from the machine the container runs on, and the
-/// published port is what is there whichever tier the service is on. The same address
-/// the bundled services are proved at.
-const HERE: &str = "http://127.0.0.1";
 
 /// Start the plugin's own services, and nothing else of the stack.
 ///
@@ -148,20 +140,20 @@ pub(super) async fn asked(
     stated: &mut [Proving],
 ) {
     let deadline = ctx.clock.now() + ctx.patience;
+    // Where each of this plugin's services answers, read through the one answer every
+    // caller that asks a plugin's service reads: a second way of composing an address
+    // is a second port to be wrong about.
+    let reached = crate::plugin::answering(std::slice::from_ref(installed));
     for (proof, stated) in manifest.proofs.iter().zip(stated.iter_mut()) {
-        let reached = stated
-            .of
-            .as_deref()
-            .and_then(|named| installed.services.iter().find(|one| one.service == named))
-            .and_then(Placed::published);
-        stated.came_to = Some(match reached {
+        let at = stated.of.as_deref().and_then(|named| reached.get(named));
+        stated.came_to = Some(match at {
             None => Verdict::Unproven {
                 why: format!(
                     "{} publishes no port this machine can reach, so there is nowhere to ask it",
                     stated.of.as_deref().unwrap_or("the service it names")
                 ),
             },
-            Some(port) => answering(ctx, proof, port, deadline).await,
+            Some(address) => answering(ctx, proof, address, deadline).await,
         });
     }
 }
@@ -177,7 +169,7 @@ pub(super) async fn asked(
 async fn answering(
     ctx: &Ctx,
     proof: &Proof,
-    port: u16,
+    address: &str,
     deadline: std::time::SystemTime,
 ) -> Verdict {
     // The method the transport can carry, or nothing where the manifest named one it
@@ -196,7 +188,7 @@ async fn answering(
     // format rather than a convention somebody has to hold.
     let request = Request {
         method,
-        url: format!("{HERE}:{port}{}", proof.request.path),
+        url: format!("{address}{}", proof.request.path),
         headers: Vec::new(),
         body: None,
     };

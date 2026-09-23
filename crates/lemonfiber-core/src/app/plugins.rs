@@ -198,7 +198,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
         // makes the second reading mean anything. What this has to tell apart is a
         // check the install broke from one that was already failing, and after the
         // fact there is nothing left to ask.
-        let (stack_manifest, before) = verifying::looked(ctx).await?;
+        let (standing, before) = verifying::looked(ctx).await?;
 
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
 
@@ -215,7 +215,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
         if proving::held(&stated) {
             checked = Some(crate::plugin::against(
                 &before,
-                &verifying::again(ctx, &stack_manifest).await,
+                &verifying::again(ctx, &standing).await,
             ));
         }
 
@@ -336,7 +336,16 @@ pub(super) fn left_behind(back: &super::putting_back::Reversal) -> String {
 /// be read — damaged, half-written, unreadable to this user — is refused, because
 /// the alternative is telling an operator that nothing is installed while somebody
 /// else's service is running.
-fn read(ctx: &Ctx) -> Result<Register, Box<Problem>> {
+///
+/// Reachable from the diagnostics register too, which asks the same question for the
+/// same reason: the rows a plugin contributed are run from this record, and a
+/// diagnosis that read past a register it could not parse would report a clean bill of
+/// health with a stranger's rows silently missing from it.
+///
+/// # Errors
+///
+/// Where the record is there and this build cannot read it, or names one plugin twice.
+pub(crate) fn read(ctx: &Ctx) -> Result<Register, Box<Problem>> {
     let Some(at) = kept_at(ctx) else {
         return Ok(Register::empty());
     };
@@ -535,6 +544,61 @@ title   = "the library API answers"
 why     = "a plugin whose service does not answer is not installed"
 request = { method = "GET", path = "/api/v1/libraries" }
 expect  = { status = 200 }
+"#;
+
+    /// The same manifest again, this time also contributing a row to the doctor's own
+    /// register — one whose service will not answer it.
+    const CONTRIBUTING: &str = r#"
+schema_version = 1
+
+[plugin]
+id          = "komga"
+name        = "Komga"
+version     = "1.2.0"
+description = "Reads your comics on any browser"
+without_it  = "Files on disk, no way to read them"
+upstream    = "https://example.invalid"
+license     = "MIT"
+forms       = ["library"]
+
+[[service]]
+id          = "komga"
+name        = "Komga"
+image       = "example.invalid/komga"
+digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+tag         = "1.11.0"
+port        = 25600
+bind        = "lan"
+criticality = "important"
+takes_data  = true
+config_path = "/app/data"
+
+[requires]
+capabilities = ["doctor.contribute"]
+
+[[proof]]
+id      = "answers"
+title   = "the library API answers"
+why     = "a plugin whose service does not answer is not installed"
+request = { method = "GET", path = "/api/v1/libraries" }
+expect  = { status = 200 }
+
+[[contribution]]
+at        = "doctor.check"
+id        = "komga:claimed"
+title     = "Komga has an administrator"
+category  = "credentials"
+request   = { method = "GET", path = "/api/v1/claim" }
+expect    = { status = 200 }
+fixture   = "fixtures/claim.json"
+why       = "An unclaimed Komga hands administrator to whoever asks first."
+
+[[contribution]]
+at     = "doctor.remedy"
+id     = "komga:claim-it"
+for    = "komga:claimed"
+action = "Open Komga and create the administrator account"
+why    = "Until somebody does, the first caller on the household network becomes it."
 "#;
 
     /// A context whose settings point at a scratch configuration directory, with a
@@ -1393,6 +1457,56 @@ expect  = { status = 200 }
             report(installing(&ctx, &source("unchecked", PROVING)).await)
                 .and_then(|one| one.install)
                 .is_some_and(|one| one.verified.is_none())
+        );
+    }
+
+    /// **A plugin's own contributed rows do not gate its own install, deliberately.**
+    /// The register is written last, so the second reading of the stack's checks does
+    /// not hold this plugin's rows — and it must not. What a contributed row says is
+    /// an ongoing fact about a service an operator is running; a freshly installed one
+    /// very often has nothing in it yet, and an install reversed for that would refuse
+    /// every plugin whose first row is *is there anything in here*. What gates the
+    /// install is what the plugin declared as a proof, which is the field that exists
+    /// for saying so.
+    #[tokio::test]
+    async fn a_plugins_own_contributed_row_does_not_gate_its_own_install() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving(
+            "contributing",
+            runner,
+            Fake::by_path(vec![
+                (
+                    "/api/v1/libraries",
+                    lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+                ),
+                (
+                    "/api/v1/claim",
+                    lemonfiber_fixtures::http::Answer::reply(500, "no"),
+                ),
+            ]),
+        );
+
+        let install = report(installing(&ctx, &source("contributing", CONTRIBUTING)).await)
+            .and_then(|one| one.install);
+        assert_eq!(
+            install.as_ref().map(|one| one.recorded),
+            Some(true),
+            "the plugin holds its own proof and is installed"
+        );
+        assert!(
+            install
+                .as_ref()
+                .and_then(|one| one.verified.as_ref())
+                .is_some_and(crate::plugin::Verification::held),
+            "and the row it contributes is not among what the stack was asked"
+        );
+        assert!(
+            install.is_some_and(|one| one
+                .would
+                .contributions
+                .iter()
+                .any(|row| row.id == "komga:claimed" && row.service.as_deref() == Some("komga"))),
+            "though the record keeps it, with the service it asks already settled"
         );
     }
 

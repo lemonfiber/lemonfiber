@@ -766,6 +766,7 @@ mod tests {
                     group: Some("Library".to_owned()),
                 }),
             }],
+            contributions: Vec::new(),
         };
         crate::plugin::Installs {
             installed: vec![one.clone()],

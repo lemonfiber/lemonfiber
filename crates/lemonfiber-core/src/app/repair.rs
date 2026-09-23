@@ -125,12 +125,20 @@ pub async fn mend(
     if disruptive && !stance.may_act() {
         return Err(Box::new(offer_cannot_disturb()));
     }
-    let (manifest, checks) = super::engine::assembled(ctx, disruptive).await?;
+    let (stack, checks) = super::engine::assembled(ctx, disruptive).await?;
     // A second set, assembled without the disruptive ones, for proving the work. Built
     // here rather than per repair: nine checks constructed once are nine constructed once,
     // however many faults this run puts right.
     let (_, again) = super::engine::assembled(ctx, false).await?;
-    Ok(mending(ctx, &manifest.services, &checks, &again, stance, confirm).await)
+    Ok(mending(
+        ctx,
+        &stack.manifest.services,
+        &checks,
+        &again,
+        stance,
+        confirm,
+    )
+    .await)
 }
 
 /// The same errand, over checks somebody else assembled.
