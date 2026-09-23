@@ -85,6 +85,14 @@ pub struct Unfilled {
 pub struct Removal {
     /// The plugin this is about.
     pub plugin: String,
+    /// Every service that stops when it goes, named before any of them does.
+    ///
+    /// By service rather than by plugin, because a service is what an operator notices
+    /// stopping: a plugin that brought two containers takes two things away, and the
+    /// plugin's name alone would not say which of the addresses they use goes quiet.
+    /// None of them comes back — a removal is not a restart — which is why this is
+    /// stated before the run rather than discovered after it.
+    pub interrupts: Vec<String>,
     /// Every capability that would have nothing filling it afterwards.
     ///
     /// Stated before it happens rather than reported after, which is the requirement

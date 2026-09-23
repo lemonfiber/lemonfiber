@@ -1298,6 +1298,7 @@ mod tests {
                 install: None,
                 removal: Some(lemonfiber_core::plugin::Removal {
                     plugin: "komga".to_owned(),
+                    interrupts: vec!["komga".to_owned()],
                     leaves: Vec::new(),
                     removed,
                     went_back: lemonfiber_core::app::putting_back::Reversal {

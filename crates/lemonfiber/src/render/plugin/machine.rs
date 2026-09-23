@@ -282,6 +282,23 @@ fn removal(one: &Removal) -> Lines {
         },
         one.plugin
     ));
+    // Past tense only where it is true. A container the engine would not take off is
+    // named below as still standing, and a line above it saying it stopped would be
+    // the page contradicting itself about the one thing an operator came to check.
+    let stayed = one
+        .went_back
+        .left
+        .iter()
+        .any(|left| left.target == one.plugin);
+    lines.spaced(format!(
+        "    {} {}",
+        match (one.removed, stayed) {
+            (false, _) => "Would stop:",
+            (true, false) => "Stopped:",
+            (true, true) => "Asked to stop:",
+        },
+        one.interrupts.join(", ")
+    ));
     lines.extend(leaves(&one.leaves, one.removed));
     lines.extend(reversal(&one.went_back));
     lines
@@ -1045,6 +1062,7 @@ mod tests {
             install: None,
             removal: Some(Removal {
                 plugin: "komga".to_owned(),
+                interrupts: vec!["komga".to_owned(), "komga-stats".to_owned()],
                 leaves,
                 removed,
                 went_back: Reversal {
@@ -1067,6 +1085,10 @@ mod tests {
     fn a_removal_says_what_went_back_and_that_nothing_is_left() {
         let said = installs(&taking(true, Vec::new(), Vec::new())).text();
         assert!(said.contains("Removed komga:"), "{said}");
+        assert!(
+            said.contains("Stopped: komga, komga-stats"),
+            "every service it took away is named, not only the plugin: {said}"
+        );
         assert!(said.contains("It was put back:"), "{said}");
         assert!(
             said.contains("removed /opt/lemonfiber/stack/compose/plugins/komga.yml"),
@@ -1084,12 +1106,33 @@ mod tests {
         );
     }
 
+    /// A container the engine would not take off is not reported as stopped: the page
+    /// says it was asked to, and names it below as still standing.
+    #[test]
+    fn a_container_that_stayed_is_not_said_to_have_stopped() {
+        let said = installs(&taking(
+            true,
+            Vec::new(),
+            vec![lemonfiber_core::app::putting_back::Left {
+                target: "komga".to_owned(),
+                because: "its container could not be taken off the machine".to_owned(),
+            }],
+        ))
+        .text();
+        assert!(said.contains("Asked to stop: komga, komga-stats"), "{said}");
+        assert!(!said.contains("Stopped:"), "{said}");
+    }
+
     /// And a rehearsal says the same things in the conditional, because a removal
     /// nobody has agreed to yet has not happened.
     #[test]
     fn rehearsing_a_removal_reads_in_the_tense_it_is_in() {
         let said = installs(&taking(false, Vec::new(), Vec::new())).text();
         assert!(said.contains("Would remove komga:"), "{said}");
+        assert!(
+            said.contains("Would stop: komga, komga-stats"),
+            "what it would take away is said before anybody agrees to it: {said}"
+        );
         assert!(said.contains("What would go back:"), "{said}");
         assert!(
             said.contains("Nothing of its would be left on the machine."),
