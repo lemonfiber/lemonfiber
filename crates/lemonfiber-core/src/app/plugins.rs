@@ -922,6 +922,47 @@ why    = "Until somebody does, the first caller on the household network becomes
         assert!(!record_of(&ctx).exists(), "the record was written");
     }
 
+    /// A plugin needing something of lemonfiber that this build does not offer is
+    /// refused by naming the thing, never a version. *Too old* is the wrong sentence for
+    /// a mechanism that went, and an operator cannot upgrade their way to one that was
+    /// never there — so the refusal says which one, and says what this build does
+    /// offer, and nothing is written.
+    #[tokio::test]
+    async fn a_plugin_needing_what_this_build_does_not_offer_is_refused_by_name() {
+        let ctx = ctx("unoffered");
+        let at = source(
+            "unoffered",
+            &format!("{MANIFEST}\n[requires]\ncapabilities = [\"service.add\"]\n"),
+        );
+
+        let detail = installing(&ctx, &at)
+            .await
+            .err()
+            .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
+            .unwrap_or_default();
+
+        assert_eq!(detail.0, "PLUGIN-3");
+        assert!(
+            detail
+                .1
+                .contains("service.add is not something this build offers a plugin"),
+            "the capability is named: {}",
+            detail.1
+        );
+        assert!(
+            detail.1.contains("doctor.contribute"),
+            "and so is what this build does offer: {}",
+            detail.1
+        );
+        assert!(
+            !detail.1.contains("version"),
+            "and no version is named, because none is the reason: {}",
+            detail.1
+        );
+        assert!(!record_of(&ctx).exists(), "nothing was installed");
+        assert!(made_paths(&ctx).is_empty(), "and nothing was written");
+    }
+
     #[tokio::test]
     async fn installing_what_is_installed_is_refused_naming_it() {
         let ctx = ctx("twice");
@@ -1601,6 +1642,95 @@ why    = "Until somebody does, the first caller on the household network becomes
             !record_of(&ctx).exists(),
             "and the record is taken away rather than kept empty, because an empty \
              register is still a file a reading can find"
+        );
+    }
+
+    /// A narrator that notes, as it hears each line, whether the container had already
+    /// been taken off by then — which is the whole of what *before* means here.
+    struct Heard {
+        runner: Arc<Recording>,
+        said: std::sync::Mutex<Vec<(String, bool)>>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::ports::Narrator for Heard {
+        async fn say(&self, said: &str) {
+            let already = self.runner.ran("rm");
+            let _ = self
+                .said
+                .lock()
+                .map(|mut heard| heard.push((said.to_owned(), already)));
+        }
+    }
+
+    /// What stops is named before anything does, and named by service. The report of a
+    /// real removal arrives after the containers are gone, so a removal that only put it
+    /// there would be telling an operator about something already past.
+    #[tokio::test]
+    async fn what_a_removal_stops_is_said_before_it_stops_it() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let mut ctx = proving("interrupting", runner.clone(), answering(200));
+        assert_eq!(
+            counted(installing(&ctx, &source("interrupting", PROVING)).await),
+            Some(1)
+        );
+        let heard = Arc::new(Heard {
+            runner: runner.clone(),
+            said: std::sync::Mutex::new(Vec::new()),
+        });
+        ctx.narrator = heard.clone();
+
+        let gone = removal(removing(&ctx, "komga").await);
+
+        assert_eq!(
+            gone.map(|one| one.interrupts),
+            Some(vec!["komga".to_owned()]),
+            "the report names the service it took away"
+        );
+        let said = heard
+            .said
+            .lock()
+            .map(|heard| heard.clone())
+            .unwrap_or_default();
+        assert_eq!(
+            said,
+            vec![(
+                "removing komga stops komga — for good, since nothing is left to start again"
+                    .to_owned(),
+                false
+            )],
+            "said once, and while the container was still there"
+        );
+        assert!(runner.ran("rm"), "and then it was taken off");
+    }
+
+    /// A rehearsal names the same services in its report and says nothing aloud: it
+    /// stops nothing, and the report is read before anybody agrees to the real run.
+    #[tokio::test]
+    async fn a_rehearsed_removal_names_what_it_would_stop_and_says_nothing_aloud() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let mut ctx = proving("interrupting-rehearsed", runner.clone(), answering(200));
+        assert_eq!(
+            counted(installing(&ctx, &source("interrupting-rehearsed", PROVING)).await),
+            Some(1)
+        );
+        let heard = Arc::new(Heard {
+            runner,
+            said: std::sync::Mutex::new(Vec::new()),
+        });
+        ctx.narrator = heard.clone();
+        ctx.dry_run = true;
+
+        let would = removal(removing(&ctx, "komga").await);
+
+        assert_eq!(
+            would.map(|one| one.interrupts),
+            Some(vec!["komga".to_owned()])
+        );
+        assert_eq!(
+            heard.said.lock().map_or(1, |heard| heard.len()),
+            0,
+            "nothing is said aloud about a stop that is not happening"
         );
     }
 

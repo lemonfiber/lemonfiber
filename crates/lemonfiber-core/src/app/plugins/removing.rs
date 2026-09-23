@@ -67,10 +67,25 @@ pub(super) async fn remove(
         .map_err(|err| Box::new(err.problem()))?;
     let leaves = unfilled(&going, held.installed(), &stack.services);
 
+    // What stops, named before anything does. A rehearsal carries it in its report,
+    // which is read before the real run is asked for; a real run says it aloud as well,
+    // because its report arrives after the containers are already gone, and a sentence
+    // about what is about to stop is no use once it has.
+    let interrupts: Vec<String> = going
+        .services
+        .iter()
+        .map(|placed| placed.service.clone())
+        .collect();
+    if !ctx.dry_run {
+        ctx.narrator
+            .say(&interrupting(&going.plugin, &interrupts))
+            .await;
+    }
+
     // Off the machine before the files that describe it go back, and only on a run
     // that acts: a rehearsal that stopped a container would be a rehearsal that changed
     // the machine, which is the one thing it promises not to do.
-    let stayed = !ctx.dry_run && !taken_off(ctx, &going).await;
+    let stayed = !ctx.dry_run && !taken_off(ctx, &going.plugin, &interrupts).await;
 
     // Rehearsed or carried out through the one call. The rollback layer answers a run
     // that is only asking with what it would put back and touches nothing, so a
@@ -91,6 +106,7 @@ pub(super) async fn remove(
             held.installed().to_vec(),
             Removal {
                 plugin: going.plugin.clone(),
+                interrupts,
                 leaves,
                 removed: false,
                 went_back,
@@ -126,6 +142,7 @@ pub(super) async fn remove(
         after.installed().to_vec(),
         Removal {
             plugin: going.plugin,
+            interrupts,
             leaves,
             removed: true,
             went_back,
@@ -147,31 +164,38 @@ fn answering(installed: Vec<Installed>, removal: Removal) -> Outcome {
 /// Answers whether it could rather than failing, for the reason the install's own
 /// reversal does: a removal that stopped at its first difficulty would leave more
 /// behind than one that carried on and said what it could not do.
-async fn taken_off(ctx: &Ctx, going: &Installed) -> bool {
+async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
     let Some(stack) = ctx.settings.stack_dir.as_deref() else {
         return false;
     };
-    let services: Vec<String> = going
-        .services
-        .iter()
-        .map(|placed| placed.service.clone())
-        .collect();
     let mut settings = ctx.settings.clone();
-    settings.plugins.push(going.plugin.clone());
+    settings.plugins.push(plugin.to_owned());
     let plan = Plan {
         forms: Vec::new(),
-        profiles: std::iter::once(crate::plugin::profile(&going.plugin)).collect(),
-        services: services.clone(),
+        profiles: std::iter::once(crate::plugin::profile(plugin)).collect(),
+        services: services.to_vec(),
         dropped: Vec::new(),
     };
     let command = build(
         &plan,
         &settings,
         stack,
-        &Action::Remove(services),
+        &Action::Remove(services.to_vec()),
         ctx.environment,
     );
     matches!(ctx.runner.run(&command).await, Ok(output) if output.succeeded())
+}
+
+/// The sentence said before a removal stops anything.
+///
+/// Says *for good* because that is the part an operator would otherwise assume the
+/// other way: every other verb here that stops a service is one somebody starts again,
+/// and this one leaves nothing behind to start.
+fn interrupting(plugin: &str, services: &[String]) -> String {
+    format!(
+        "removing {plugin} stops {} — for good, since nothing is left to start again",
+        services.join(", ")
+    )
 }
 
 /// What this machine would have nothing filling once the plugin is off it.

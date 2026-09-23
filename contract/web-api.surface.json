@@ -4436,6 +4436,12 @@
     },
     "PluginRemoval": {
       "fields": {
+        "interrupts": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
         "leaves": {
           "type": [
             "array[ref:PluginUnfilled]"

@@ -9938,6 +9938,13 @@
           "description": "What taking a plugin off the machine came to, or would come to.",
           "type": "object",
           "properties": {
+            "interrupts": {
+              "description": "Every service that stops when it goes, named before any of them does.\n\nBy service rather than by plugin, because a service is what an operator notices\nstopping: a plugin that brought two containers takes two things away, and the\nplugin's name alone would not say which of the addresses they use goes quiet.\nNone of them comes back — a removal is not a restart — which is why this is\nstated before the run rather than discovered after it.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "leaves": {
               "description": "Every capability that would have nothing filling it afterwards.\n\nStated before it happens rather than reported after, which is the requirement\nand also the only useful order: an operator told afterwards that their requests\nno longer reach anything has been informed rather than asked.",
               "type": "array",
@@ -9960,6 +9967,7 @@
           },
           "required": [
             "plugin",
+            "interrupts",
             "leaves",
             "removed",
             "went_back"

@@ -15,6 +15,7 @@
 use std::time::Duration;
 
 use super::engine::Waiting;
+use super::plugins::Asked;
 use super::{Command, Ctx};
 
 /// What the container engine gives a service to stop in.
@@ -169,7 +170,15 @@ const fn situation(command: &Command) -> Option<Situation> {
             wait: Waiting::ForTheDownloads,
             ..
         } => Some(Situation::StoppingAfterDownloads),
-        Command::Down { .. } | Command::Halt { .. } => Some(Situation::Stopping),
+        // Taking a plugin off stops its containers through the same engine stop, held
+        // to the same grace. Which ones is the removal's to say, since only it has read
+        // the record of what the plugin placed; the length is this file's.
+        //
+        // An install is not here: it starts a container that was not running, and
+        // takes nothing away from anybody while it does.
+        Command::Down { .. } | Command::Halt { .. } | Command::Plugins(Asked::Remove { .. }) => {
+            Some(Situation::Stopping)
+        }
         // Everything else, listed rather than left to a wildcard. A command
         // added here would otherwise answer *disturbs nothing* by default, and
         // a machine taken away in silence is the failure this exists to prevent —
@@ -211,7 +220,7 @@ const fn situation(command: &Command) -> Option<Situation> {
         | Command::Provenance
         | Command::Credentials(..)
         | Command::Stored
-        | Command::Plugins(..)
+        | Command::Plugins(Asked::Install { .. } | Asked::Installed)
         | Command::Forget { .. }
         | Command::SelfUpdate { .. }
         | Command::Uninstall(..)
@@ -349,6 +358,26 @@ mod tests {
         };
 
         assert_eq!(of(&command, WAITED), Some(Disturbance::Bounded(GRACE)));
+    }
+
+    /// Removing a plugin stops its containers through the engine's own stop, so it is
+    /// held to the same grace and said the same way. Installing one takes nothing
+    /// away from anybody, and reading what is installed takes nothing at all.
+    #[test]
+    fn removing_a_plugin_is_a_stop_and_installing_one_is_not() {
+        let removing = Command::Plugins(Asked::Remove {
+            plugin: "komga".to_owned(),
+        });
+        assert_eq!(of(&removing, WAITED), Some(Disturbance::Bounded(GRACE)));
+
+        for quiet in [
+            Command::Plugins(Asked::Install {
+                path: std::path::PathBuf::from("komga"),
+            }),
+            Command::Plugins(Asked::Installed),
+        ] {
+            assert_eq!(of(&quiet, WAITED), None, "{quiet:?} stops nothing");
+        }
     }
 
     #[test]
