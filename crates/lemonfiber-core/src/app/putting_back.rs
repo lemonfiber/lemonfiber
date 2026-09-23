@@ -46,6 +46,18 @@ pub struct Reversal {
     /// change that goes back through the service that made it goes back only where that
     /// service is answering, and a rehearsal has not asked one.
     pub left: Vec<Left>,
+    /// What putting these changes back means beyond the changes themselves.
+    ///
+    /// Empty on almost every run. What lands here is a change the judgement can put
+    /// back in full and that still leaves something behind — the one in force today
+    /// being a setting that re-points where data lives, which goes back while the
+    /// library stays exactly where it was moved to.
+    ///
+    /// Neither list above can carry it. It did not fail to go back, so it is not what
+    /// was left; and reporting only that it went back would send an operator looking
+    /// for their files at an address that no longer names them.
+    #[serde(default)]
+    pub noted: Vec<Noted>,
     /// Whether this run only said what it would put back.
     ///
     /// A flag rather than a second shape, because the two lists mean the same thing
@@ -61,6 +73,16 @@ pub struct Left {
     /// What the change was against — a service, or lemonfiber's own environment file.
     pub target: String,
     /// Why it is still standing, in the operator's terms.
+    pub because: String,
+}
+
+/// What putting one change back means beyond the change itself.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "UndoNoted")]
+pub struct Noted {
+    /// What the change was against.
+    pub target: String,
+    /// What goes back, what does not go with it, and what to do instead.
     pub because: String,
 }
 
@@ -118,7 +140,44 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 
     let operation = operation_at(changes, at)?;
     let run: Vec<&Change> = together(changes, &operation, at);
+    carried_out(ctx, &paths, changes, &run, at).await
+}
 
+/// Put back every change one operation ever made.
+///
+/// The same machinery as an undo of a stamp and deliberately not a second one: what
+/// differs between taking a plugin off a machine and putting back a run somebody named
+/// is which changes are gathered, and nothing else. The judgement, the order, the
+/// execution, the record of having done it and the account given are one path — so a
+/// removal inherits the rollback layer's refusals rather than being written to agree
+/// with them.
+///
+/// # Errors
+///
+/// Where there is nowhere to look for the record, where the judgement says a change
+/// cannot be put back — drift, or a later change that depends on it — or for any reason
+/// the executor underneath gives.
+pub(super) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
+    let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
+    let journal = super::recover::journal_at(&paths.journal());
+    let changes = journal.changes();
+
+    let run = crate::rollback::everything(changes, operation);
+    carried_out(ctx, &paths, changes, &run, operation).await
+}
+
+/// Judge a set of changes whole, then put them back newest first.
+///
+/// `at` is what a refusal calls the thing being put back: the stamp where an operator
+/// asked for a run, and the plugin where one is being removed. It is read into the
+/// sentence and never looked up by, which is what lets one path serve both.
+async fn carried_out(
+    ctx: &Ctx,
+    paths: &crate::config::paths::Paths,
+    changes: &[Change],
+    run: &[&Change],
+    at: &str,
+) -> Result<Reversal, Box<Problem>> {
     // Read once rather than per change: the drift question asks the same file as many
     // times as there are entries otherwise.
     let holds = |key: &str| -> Option<String> {
@@ -132,7 +191,8 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     // Judged whole before anything is touched. The refusal carries the reason the
     // judgement gave and what to do instead, which for a change nothing here can put
     // back is the only useful half of the answer.
-    for change in &run {
+    let mut noted: Vec<Noted> = Vec::new();
+    for change in run {
         let position = changes
             .iter()
             .position(|held| held == *change)
@@ -155,6 +215,21 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
                 .unwrap_or_default();
             return Err(Box::new(cannot_succeed(at, &change.target, &why)));
         }
+        // It goes back, and going back is not the whole of what happens. A judgement
+        // that says so on a change it can still carry out is saying the one thing an
+        // operator would otherwise find out by going to look.
+        if verdict.reversal == Judgement::Partial {
+            if let Some(refusal) = verdict.refusal {
+                noted.push(Noted {
+                    target: change.target.clone(),
+                    because: [Some(refusal.because), refusal.instead]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<String>>()
+                        .join(" — "),
+                });
+            }
+        }
     }
 
     // Newest first, which is the order a reversal has to take and the order the
@@ -170,7 +245,10 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     // what it did. What it reports is that judgement — every change of the run, split by
     // whether putting it back needs something to be answering.
     if ctx.dry_run {
-        return Ok(would_reverse(undos));
+        return Ok(Reversal {
+            noted,
+            ..would_reverse(undos)
+        });
     }
 
     let manifest = ctx
@@ -201,13 +279,14 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     // back, which is what makes this run answerable to the same command.
     super::recover::journalled(
         &paths.journal(),
-        &recording(&run, &reversed, &ctx.stamp()),
+        &recording(run, &reversed, &ctx.stamp()),
         ctx.random.as_ref(),
     );
 
     Ok(Reversal {
         reversed,
         left: standing_after(&reached.unreached, &carried),
+        noted,
         rehearsed: false,
     })
 }
@@ -238,6 +317,10 @@ pub(super) fn would_reverse(undos: Vec<Undo>) -> Reversal {
                 because: NEEDS_THE_SERVICE.to_owned(),
             })
             .collect(),
+        // Filled in by whoever judged the changes, where anything was judged at all.
+        // This function is handed undos rather than changes, and a note is a fact about
+        // the change it came from.
+        noted: Vec::new(),
         rehearsed: true,
     }
 }
@@ -260,12 +343,17 @@ fn operation_at(changes: &[Change], at: &str) -> Result<String, Box<Problem>> {
 
 /// What a reversal left standing, as the report says it.
 ///
-/// Four lists and three reasons, walked as one: a change only a service can undo where
-/// that service did not answer, a setting somebody has chosen since, and a sealed record
-/// that would not open. The last two cannot arise on this path — the judgement above
-/// refuses a run holding either before anything is touched — but they are carried rather
-/// than dropped, because the executor can still meet one and a report that silently lost
-/// it would be the thing this field exists to prevent.
+/// Five lists and four reasons, walked as one: a change only a service can undo where
+/// that service did not answer, a setting somebody has chosen since, a sealed record that
+/// would not open, and a directory still holding something this run did not put there.
+/// The middle two cannot arise on this path — the judgement above refuses a run holding
+/// either before anything is touched — but they are carried rather than dropped, because
+/// the executor can still meet one and a report that silently lost it would be the thing
+/// this field exists to prevent.
+///
+/// The last is the one a plugin removal meets in the ordinary course of things: two
+/// plugins keep their documents in one directory, the first of them made it, and the
+/// first to leave finds the second's still inside.
 fn standing_after(unreached: &[String], carried: &super::recover::Carried) -> Vec<Left> {
     [
         (unreached, "the service that made it did not answer"),
@@ -280,6 +368,10 @@ fn standing_after(unreached: &[String], carried: &super::recover::Carried) -> Ve
         (
             carried.unread.as_slice(),
             "the record of what it held is sealed under a key this machine no longer has",
+        ),
+        (
+            carried.still_holding.as_slice(),
+            "it still holds something this run did not put there",
         ),
     ]
     .into_iter()

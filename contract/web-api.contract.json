@@ -9670,6 +9670,14 @@
               "description": "The plugin's id: the name it is installed and journalled under.",
               "type": "string"
             },
+            "provides": {
+              "description": "Every core capability its services fill, as the install settled them.\n\nCore names only. A capability of the plugin's own is namespaced, nothing asks\nfor it, and it is inert by design — so a removal that named one as about to go\nunfilled would be warning about something nothing was reaching for.\n\nKept for the question a removal has to answer before it happens: what this\nmachine would have nothing filling once the plugin is off it. Asking the\nmanifest would be asking a file that may be gone.\n\nDefaulted for a register written before the field existed, which reads as a\nplugin that fills nothing — the answer that names no capability rather than the\none that invents one.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
             "services": {
               "description": "What was placed, one entry per service the plugin declares.",
               "type": "array",
@@ -9710,6 +9718,17 @@
               "items": {
                 "$ref": "#/$defs/PluginInstalled"
               }
+            },
+            "removal": {
+              "description": "What this run's removal came to, or nothing where it removed nothing.\n\nBeside the install rather than in place of it, and never both at once: an\ninstall and a removal are two verbs with two accounts, and a field that held\nwhichever happened would make a reader ask which one this was before they could\nread it.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginRemoval"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -9915,6 +9934,37 @@
             }
           ]
         },
+        "PluginRemoval": {
+          "description": "What taking a plugin off the machine came to, or would come to.",
+          "type": "object",
+          "properties": {
+            "leaves": {
+              "description": "Every capability that would have nothing filling it afterwards.\n\nStated before it happens rather than reported after, which is the requirement\nand also the only useful order: an operator told afterwards that their requests\nno longer reach anything has been informed rather than asked.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginUnfilled"
+              }
+            },
+            "plugin": {
+              "description": "The plugin this is about.",
+              "type": "string"
+            },
+            "removed": {
+              "description": "Whether the record of what is installed was written without it.\n\nFalse on a rehearsal and on a run that got as far as putting the files back and\nno further, which are two different machines and are told apart by what the\nreversal says rather than by a second flag here.",
+              "type": "boolean"
+            },
+            "went_back": {
+              "description": "What putting its changes back came to, or would come to.\n\nThe rollback layer's own report rather than a shape of this verb's: a removal is\na reversal with a name on it, and an account of its own would be a second\ndescription of the same work.",
+              "$ref": "#/$defs/UndoReversal"
+            }
+          },
+          "required": [
+            "plugin",
+            "leaves",
+            "removed",
+            "went_back"
+          ]
+        },
         "PluginRequest": {
           "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
           "type": "object",
@@ -9940,6 +9990,24 @@
           "required": [
             "method",
             "path"
+          ]
+        },
+        "PluginUnfilled": {
+          "description": "A capability that would have nothing filling it.",
+          "type": "object",
+          "properties": {
+            "capability": {
+              "description": "The core name nothing would fill.",
+              "type": "string"
+            },
+            "filled_by": {
+              "description": "The plugin that is filling it now, which is the one going.\n\nNamed rather than left to the reader, because the sentence an operator has to\nact on is *this is the only thing filling it* and a capability on its own does\nnot say that.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "capability",
+            "filled_by"
           ]
         },
         "PluginVerdict": {
@@ -10193,6 +10261,24 @@
             "because"
           ]
         },
+        "UndoNoted": {
+          "description": "What putting one change back means beyond the change itself.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "What goes back, what does not go with it, and what to do instead.",
+              "type": "string"
+            },
+            "target": {
+              "description": "What the change was against.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "because"
+          ]
+        },
         "UndoReversal": {
           "description": "What putting a run back came to.\n\nA report rather than a bare list, because it is what an envelope carries and an\nenvelope carries a document. Two lists, and the second is the one that matters when\nit is not empty: what went back, and what did not with the reason it did not.",
           "type": "object",
@@ -10202,6 +10288,14 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/UndoLeft"
+              }
+            },
+            "noted": {
+              "description": "What putting these changes back means beyond the changes themselves.\n\nEmpty on almost every run. What lands here is a change the judgement can put\nback in full and that still leaves something behind — the one in force today\nbeing a setting that re-points where data lives, which goes back while the\nlibrary stays exactly where it was moved to.\n\nNeither list above can carry it. It did not fail to go back, so it is not what\nwas left; and reporting only that it went back would send an operator looking\nfor their files at an address that no longer names them.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/UndoNoted"
               }
             },
             "rehearsed": {
@@ -14605,6 +14699,24 @@
             "because"
           ]
         },
+        "UndoNoted": {
+          "description": "What putting one change back means beyond the change itself.",
+          "type": "object",
+          "properties": {
+            "because": {
+              "description": "What goes back, what does not go with it, and what to do instead.",
+              "type": "string"
+            },
+            "target": {
+              "description": "What the change was against.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "because"
+          ]
+        },
         "UndoReversal": {
           "description": "What putting a run back came to.\n\nA report rather than a bare list, because it is what an envelope carries and an\nenvelope carries a document. Two lists, and the second is the one that matters when\nit is not empty: what went back, and what did not with the reason it did not.",
           "type": "object",
@@ -14614,6 +14726,14 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/UndoLeft"
+              }
+            },
+            "noted": {
+              "description": "What putting these changes back means beyond the changes themselves.\n\nEmpty on almost every run. What lands here is a change the judgement can put\nback in full and that still leaves something behind — the one in force today\nbeing a setting that re-points where data lives, which goes back while the\nlibrary stays exactly where it was moved to.\n\nNeither list above can carry it. It did not fail to go back, so it is not what\nwas left; and reporting only that it went back would send an operator looking\nfor their files at an address that no longer names them.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/UndoNoted"
               }
             },
             "rehearsed": {

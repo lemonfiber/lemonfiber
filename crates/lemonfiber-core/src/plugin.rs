@@ -36,6 +36,10 @@ mod stating;
 // it. Beside the stating rather than in it: that one is a function of the manifest and
 // of nothing else, and this is a function of two readings of a machine.
 mod verified;
+// What one run came to, apart from the record it read and wrote. Two documents with two
+// lifetimes: the record is what the machine keeps, and a report is gone the moment it
+// has been read.
+mod reports;
 // Reachable from the diagnostics register as well as from here. A plugin's row is
 // judged by the one evaluator its recordings are judged by, and the answer a live
 // service gives is read into the one shape a recorded answer is read into — which is
@@ -57,12 +61,12 @@ pub use claimed::{
 };
 pub use container::{profile, written};
 pub use installed::{
-    answering, Already, Install, Installed, Installs, Placed, Reached, Register,
-    Unreadable as Unrecorded,
+    answering, Already, Installed, Placed, Reached, Register, Unreadable as Unrecorded,
 };
 pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
+pub use reports::{Install, Installs, Removal, Unfilled};
 pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
 pub use verified::{against, Changed, Verification};
 

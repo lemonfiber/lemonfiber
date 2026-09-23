@@ -430,6 +430,7 @@ mod tests {
                     },
                 }],
                 left: Vec::new(),
+                noted: Vec::new(),
                 rehearsed: false,
             }),
             Outcome::Seed(crate::seed::Report::default()),
@@ -766,9 +767,11 @@ mod tests {
                     group: Some("Library".to_owned()),
                 }),
             }],
+            provides: Vec::new(),
             contributions: Vec::new(),
         };
         crate::plugin::Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(crate::plugin::Install {
                 changes: vec![

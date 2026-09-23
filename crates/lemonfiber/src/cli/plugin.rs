@@ -64,6 +64,28 @@ pub enum PluginCommand {
     /// nothing installed: a stranger's service may be running, and *no plugins* is
     /// the one wrong answer that would be believed.
     Installed,
+    /// Take a plugin off this machine, putting back everything installing it wrote.
+    ///
+    /// The id rather than a path: the plugin's own source may be long gone, and what
+    /// is being removed is a record this machine holds rather than a document
+    /// somebody still has a copy of.
+    ///
+    /// A removal is the rollback layer's work with a name on it, so it inherits every
+    /// refusal that layer already makes. A setting edited by hand since the install is
+    /// drift and is refused rather than overwritten; a change a later change depends on
+    /// is refused until that one goes back; a change that re-points where data lives
+    /// says plainly that the data does not move with it.
+    ///
+    /// There is no *disable*. A plugin is installed or it is not — a third state in
+    /// which one is present but inert is a state nothing else in this product has and
+    /// one an operator would have to keep in their head.
+    ///
+    /// `--dry-run` says what it would put back and what the machine would be left
+    /// without, and touches nothing.
+    Remove {
+        /// The plugin's id, as `lemonfiber plugin installed` lists it.
+        plugin: String,
+    },
 }
 
 /// What a plugin author can be told, with nothing running.

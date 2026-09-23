@@ -89,6 +89,7 @@ what to do about it, is written for operators at
 - `PLUGIN-7`
 - `PLUGIN-8`
 - `PLUGIN-9`
+- `PLUGIN-10`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`
@@ -162,6 +163,7 @@ what to do about it, is written for operators at
 - `SETUP-8`
 - `SETUP-9`
 - `SETUP-10`
+- `SETUP-11`
 - `SPACE-1`
 - `SPACE-2`
 - `SPACE-3`

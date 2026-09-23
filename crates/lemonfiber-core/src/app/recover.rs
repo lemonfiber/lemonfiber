@@ -182,10 +182,14 @@ pub struct Reached {
 /// of both: it is the one of the three an operator cannot fix by looking, since nothing
 /// on this machine still knows what the setting held.
 ///
-/// The settings the operator owns are reported ahead of the services that would not
-/// answer, where a reversal meets both. An unreachable service announces itself in every
-/// other reading of the stack; a reversal that deliberately did not write is something an
-/// operator can find out no other way.
+/// A directory still holding something this run did not put there is left too, and named
+/// with the rest. It is not a failure to remove it — it is a directory two things share,
+/// where lemonfiber made it and somebody else has since filled it.
+///
+/// The settings and directories the operator owns are reported ahead of the services that
+/// would not answer, where a reversal meets both. An unreachable service announces itself
+/// in every other reading of the stack; a reversal that deliberately did not write is
+/// something an operator can find out no other way.
 pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(), Box<Problem>> {
     let carried = carrying_out(undos, env_file, already)?;
     if !carried.unread.is_empty() {
@@ -193,6 +197,9 @@ pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(),
     }
     if !carried.theirs.is_empty() {
         return Err(Box::new(not_put_back(&carried.theirs)));
+    }
+    if !carried.still_holding.is_empty() {
+        return Err(Box::new(left_holding(&carried.still_holding)));
     }
     if carried.beyond_reach.is_empty() {
         Ok(())
@@ -219,13 +226,24 @@ pub struct Carried {
     pub theirs: Vec<String>,
     /// Settings whose sealed record would not open, so there is nothing to put back.
     pub unread: Vec<String>,
+    /// Directories still holding something this run did not put there.
+    ///
+    /// A directory lemonfiber made and something else has since filled is not one this
+    /// reversal may take. Two plugins share the directory their documents sit in, and
+    /// the first of them made it — so removing the first would take the second's
+    /// document with it, or, once the operating system refuses, would stop the whole
+    /// reversal over a directory whose only fault is that somebody else is using it.
+    pub still_holding: Vec<String>,
 }
 
 /// Carry out every undo that can be, answering with what was left standing.
 ///
 /// A real I/O failure still stops it — a setting or a directory that will not budge is
 /// not a change deliberately left, and reporting it as one would tell an operator their
-/// machine is in a state it is not.
+/// machine is in a state it is not. A directory that will not empty is the one
+/// exception and is not an I/O failure at all: it is a directory holding something this
+/// run did not put there, which is a fact about the machine rather than a fault in the
+/// reversal.
 ///
 /// # Errors
 ///
@@ -245,6 +263,7 @@ pub fn carrying_out(
             Step::BeyondReach(resource) => carried.beyond_reach.push(resource),
             Step::TheirsNow(key) => carried.theirs.push(key),
             Step::StillSealed(key) => carried.unread.push(key),
+            Step::StillHolding(path) => carried.still_holding.push(path),
         }
     }
     Ok(carried)
@@ -265,13 +284,16 @@ enum Step {
     /// The setting held a credential and the record of it did not open, so what this
     /// reversal would write is not a value — it is the sealed text itself.
     StillSealed(String),
+    /// The path is a directory holding something this run did not put there, so it is
+    /// left exactly as it is and named.
+    StillHolding(String),
 }
 
 /// Carry out one undo against the filesystem or the environment file.
 fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
     match action {
         Action::Restore { key, value, wrote } => put_back(env_file, key, value.as_deref(), wrote),
-        Action::Delete { path } => remove(Path::new(path)).map(|()| Step::Done),
+        Action::Delete { path } => remove(Path::new(path)),
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
         // reversal that took the second for an ordinary setting would write the field's
@@ -333,7 +355,7 @@ fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Res
 /// it removes the empty directory and refuses to walk into a populated one, so an
 /// operator's own location is never emptied by a reversal. A directory a stop left
 /// unmade is not there, and needs nothing done.
-fn remove(path: &Path) -> Result<(), Fault> {
+fn remove(path: &Path) -> Result<Step, Fault> {
     // A directory or a file, because both are things lemonfiber makes: an apply makes
     // the data root, and an install writes a plugin's Compose document. `remove_dir`
     // on a file refuses with *not a directory*, which would read to an operator as a
@@ -344,8 +366,14 @@ fn remove(path: &Path) -> Result<(), Fault> {
         std::fs::remove_file(path)
     };
     match taken {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Ok(()) => Ok(Step::Done),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Step::Done),
+        // Not a failure and not something to force. A directory lemonfiber made and
+        // something else has since filled is shared — two plugins keep their documents
+        // in one — and taking it would take the other's with it. Named and left.
+        Err(err) if err.kind() == std::io::ErrorKind::DirectoryNotEmpty => {
+            Ok(Step::StillHolding(path.display().to_string()))
+        }
         Err(err) => Err(Fault::NotRemoved {
             path: path.to_path_buf(),
             reason: err.to_string(),
@@ -456,6 +484,33 @@ pub const NOT_PUT_BACK: Code = Code::new("SETUP-9");
 
 /// Raised when a reversal meets a credential whose sealed record will not open.
 pub const NOT_OPENED: Code = Code::new("SETUP-10");
+
+/// The problem naming the directories a reversal left because something this run did not
+/// put there is inside them.
+///
+/// Named one at a time, for the reason [`not_put_back`] names its settings: which
+/// directory it is decides whether an operator does anything next, and *something was
+/// left* on its own is a sentence nobody can act on.
+///
+/// A warning rather than an error, and the same reading as a setting somebody has chosen
+/// since. Everything else went back, and what did not is a fact about the machine — a
+/// directory two things share — rather than a fault in this run.
+fn left_holding(paths: &[String]) -> Problem {
+    Problem::new(
+        STILL_HOLDING,
+        Severity::Warning,
+        "Some directories hold something this run did not put there",
+        "A directory lemonfiber made comes off on the way back only while it is empty. \
+         These still hold files — something else keeps its own documents in one of them, \
+         or you put something there yourself — and taking them would take that with them. \
+         Everything else was put back.",
+        Remedy::new("Remove them by hand once you have seen what is inside"),
+    )
+    .with_detail(paths.join(", "))
+}
+
+/// Raised when a directory a reversal would remove still holds something else's files.
+pub const STILL_HOLDING: Code = Code::new("SETUP-11");
 
 #[cfg(test)]
 mod tests {
@@ -750,19 +805,55 @@ mod tests {
         );
     }
 
+    /// A directory that will not empty is neither an I/O failure nor something to
+    /// force. Two plugins keep their documents in one directory and the first of them
+    /// made it, so taking it would take the second's with it — it is named and left
+    /// where it is, and the rest of the reversal carries on.
     #[test]
-    fn a_directory_that_is_not_empty_stops_the_reversal() {
+    fn a_directory_holding_something_else_is_named_and_left_where_it_is() {
         let dir = scratch("notempty");
         let made = dir.join("populated");
-        // A non-empty directory is not one apply left for reversal — removing it
-        // would need to walk into contents this reversal must never touch — so it
-        // is reported rather than force-removed.
         assert!(std::fs::create_dir_all(made.join("inside")).is_ok());
+        let env = dir.join(".env");
+
+        let carried = super::carrying_out(&[delete(&made)], &env, Vec::new()).ok();
+
+        assert_eq!(
+            carried.map(|carried| (carried.done.len(), carried.still_holding)),
+            Some((0, vec![made.display().to_string()])),
+            "named, rather than counted among what went back"
+        );
+        assert!(made.exists(), "and it is left where it is");
+        assert!(
+            matches!(
+                undo(&[delete(&made)], &env, Vec::new()),
+                Err(problem) if problem.code == super::STILL_HOLDING
+            ),
+            "and a reversal that has to refuse over what it left says which directory"
+        );
+    }
+
+    /// A directory the machine itself refuses to remove still stops the reversal, which
+    /// is the whole difference from the one above: an empty directory that will not go
+    /// is a machine not doing as it is told, and carrying on would only compound it.
+    #[test]
+    fn a_directory_the_machine_refuses_to_remove_stops_the_reversal() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let dir = scratch("refused");
+        let holding = dir.join("holding");
+        let made = holding.join("made");
+        assert!(std::fs::create_dir_all(&made).is_ok());
+        // An empty directory, refused by the one thing that can refuse an empty one:
+        // the parent it sits in is not writable, so removing the entry is not allowed.
+        let locked = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o500));
 
         let stopped = undo(&[delete(&made)], &dir.join(".env"), Vec::new());
 
+        let _ = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o700));
+        assert!(locked.is_ok(), "the parent was made unwritable");
         assert!(matches!(stopped, Err(problem) if problem.code == super::NOT_REMOVED));
-        assert!(made.exists(), "and it is left where it is");
+        assert!(made.exists(), "and the directory is left where it is");
     }
 
     #[test]
