@@ -3981,8 +3981,43 @@
       },
       "variants": []
     },
+    "PluginChange": {
+      "fields": {
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "puts": {
+          "type": [
+            "ref:PluginPuts"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginInstall": {
       "fields": {
+        "changes": {
+          "type": [
+            "array[ref:PluginChange]"
+          ],
+          "required": true
+        },
+        "overrides": {
+          "type": [
+            "array[ref:PluginOverriding]"
+          ],
+          "required": true
+        },
+        "proofs": {
+          "type": [
+            "array[ref:PluginProving]"
+          ],
+          "required": true
+        },
         "recorded": {
           "type": [
             "boolean"
@@ -4038,6 +4073,23 @@
       },
       "variants": []
     },
+    "PluginOverriding": {
+      "fields": {
+        "setting": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginPlaced": {
       "fields": {
         "config_path": {
@@ -4084,6 +4136,48 @@
         }
       },
       "variants": []
+    },
+    "PluginProving": {
+      "fields": {
+        "asks": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "establishes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "of": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "proof": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginPuts": {
+      "fields": {},
+      "variants": [
+        "\"directory\"",
+        "\"document\""
+      ]
     },
     "PluginReached": {
       "fields": {

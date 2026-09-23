@@ -111,21 +111,13 @@ fn bounded(asked: Option<u32>) -> Duration {
 
 /// Which of the plugin's services a row is about.
 ///
-/// The one it names, or the only one where it names none. Nothing where it names one
-/// the plugin does not declare, or names none and the plugin declares several: both are
-/// refused when the manifest is read, and neither has a sensible guess behind it.
+/// The manifest's own answer rather than a second one here: the rule that a
+/// declaration may leave the service out where a plugin declares a single one is the
+/// format's, and a copy of it beside each reader is a copy free to fall behind.
 fn asked_of(manifest: &Manifest, entry: &Contribution) -> Option<String> {
-    match entry.service.as_deref() {
-        Some(named) => manifest
-            .services
-            .iter()
-            .find(|service| service.id == named)
-            .map(|service| service.id.clone()),
-        None if manifest.services.len() == 1 => {
-            manifest.services.first().map(|service| service.id.clone())
-        }
-        None => None,
-    }
+    manifest
+        .asks(entry.service.as_deref())
+        .map(|service| service.id.clone())
 }
 
 /// What this check asks, or why nothing can be asked.

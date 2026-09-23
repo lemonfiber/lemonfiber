@@ -58,7 +58,7 @@ pub(super) fn proved(
         .proofs
         .iter()
         .map(|proof| {
-            let service = asked_of(manifest, proof.service.as_deref());
+            let service = manifest.asks(proof.service.as_deref());
             Asserted {
                 kind: Assertion::Proof,
                 id: proof.id.clone(),
@@ -92,7 +92,7 @@ pub(super) fn checked(
         .iter()
         .filter(|entry| entry.at == lemonfiber_plugin::extension::check())
         .map(|entry| {
-            let service = asked_of(manifest, entry.service.as_deref());
+            let service = manifest.asks(entry.service.as_deref());
             let (Some(request), Some(expect)) = (&entry.request, &entry.expect) else {
                 return Asserted {
                     kind: Assertion::Check,
@@ -122,20 +122,6 @@ pub(super) fn checked(
             }
         })
         .collect()
-}
-
-/// Which service a declaration asks, where it can be settled.
-///
-/// Nothing where a manifest names none and declares more than one, or names one it does
-/// not declare. Both are refused when the manifest is read; here they are the reason a
-/// verdict cannot be reached, because the service is what a recording's digest is held
-/// to and there is no sensible guess at which one was meant.
-fn asked_of<'a>(manifest: &'a Manifest, named: Option<&str>) -> Option<&'a Service> {
-    match named {
-        None if manifest.services.len() == 1 => manifest.services.first(),
-        None => None,
-        Some(named) => manifest.services.iter().find(|service| service.id == named),
-    }
 }
 
 /// One assertion, against the recording it names.

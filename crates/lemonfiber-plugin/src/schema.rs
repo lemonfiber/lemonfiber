@@ -294,6 +294,27 @@ impl Manifest {
             group: declared.and_then(|wiring| wiring.dashboard_group.as_deref()),
         }
     }
+
+    /// Which of this plugin's services a declaration asks, where that is settled.
+    ///
+    /// A proof, a contributed check and anything else written against one service
+    /// may name it, and may leave it out where the plugin declares a single service
+    /// because there is nothing to choose between. Nothing where it names one this
+    /// manifest does not declare, or names none and the manifest declares several:
+    /// both are refused when the manifest is read, and neither has a guess behind it
+    /// worth making — the service is what a recording's digest is held to.
+    ///
+    /// Here rather than beside each reader, because three of them had written it and
+    /// a fourth was about to. The one that fell behind would be answering a different
+    /// question from the rest while looking like it agreed.
+    #[must_use]
+    pub fn asks(&self, named: Option<&str>) -> Option<&Service> {
+        match named {
+            None if self.services.len() == 1 => self.services.first(),
+            None => None,
+            Some(named) => self.services.iter().find(|service| service.id == named),
+        }
+    }
 }
 
 /// A value the plugin will hold.

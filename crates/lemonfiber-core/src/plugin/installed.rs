@@ -335,7 +335,15 @@ impl Register {
     }
 }
 
-/// What an install came to.
+/// What an install came to, and what it took to get there.
+///
+/// **The three lists below are stated whether the run wrote anything or not, and that
+/// is the whole of what makes a rehearsal worth running.** A rehearsal that reported
+/// less than the real run would be a preview of a different operation; one that
+/// reported it from code of its own would be a second derivation free to disagree
+/// with the one that acts. So they are filled in one place, from the manifest and from
+/// the very list of writes the install is carried out from, and the surface says them
+/// in whichever tense `recorded` calls for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "PluginInstall")]
 pub struct Install {
@@ -343,6 +351,16 @@ pub struct Install {
     pub would: Installed,
     /// Whether it was written down. A rehearsal leaves this false.
     pub recorded: bool,
+    /// Every change it makes to the machine, in the order it makes them.
+    pub changes: Vec<super::Changing>,
+    /// Every proof that has to hold before the plugin is installed.
+    pub proofs: Vec<super::Proving>,
+    /// Every bundled thing the plugin declares it will change.
+    ///
+    /// The full extent rather than a sample of it: a manifest may change a bundled
+    /// setting only through a recipe, and a recipe reaching one no `[[override]]`
+    /// names is refused before anything is written.
+    pub overrides: Vec<super::Overriding>,
 }
 
 /// What is installed, and what installing one came to.
@@ -744,6 +762,9 @@ dashboard_group = "Library"
             install: whole().map(|would| Install {
                 would,
                 recorded: true,
+                changes: Vec::new(),
+                proofs: Vec::new(),
+                overrides: Vec::new(),
             }),
         };
         assert!(read.install.is_none());

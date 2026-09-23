@@ -181,9 +181,11 @@ pub fn asked(command: &Command) -> Asked {
         Command::Restart { .. } => ("restart", Rehearsal::Reports),
         Command::Pull { .. } => ("pull", Rehearsal::Reports),
         Command::ConfigSet(_) => ("config set", Rehearsal::Reports),
-        // The whole of what it changes is one small record, and it is written last:
-        // everything before it is reading the manifest and settling what the install
-        // decides, which a rehearsal does in full and then stops one line short of.
+        // Everything it changes is settled before anything is touched: the manifest
+        // is read, what the install decides is settled, and where every one of its
+        // writes lands is derived without a disk under it. A rehearsal does all of
+        // that, states it, and stops short of carrying it out — so what it reports is
+        // what the real run reports rather than a summary of it.
         Command::Plugins(plugins::Asked::Install { .. }) => ("plugin install", Rehearsal::Reports),
         Command::Wiring(Linking::Fill(_)) => ("wiring fill", Rehearsal::Reports),
         Command::Quality(_) => ("quality", Rehearsal::Reports),
