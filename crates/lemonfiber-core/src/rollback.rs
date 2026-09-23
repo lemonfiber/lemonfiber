@@ -195,7 +195,7 @@ pub fn standing(
         }
         if key == POINTS_AT_DATA {
             return Standing::partly(
-                "the setting goes back and the data does not move with it",
+                &format!("{key} goes back and the data does not move with it"),
                 Some("move the library yourself if it should follow"),
             );
         }
@@ -269,9 +269,30 @@ pub fn together<'a>(changes: &'a [Change], operation: &str, at: &str) -> Vec<&'a
         .collect()
 }
 
+/// Every change an operation ever made, across every run of it.
+///
+/// [`together`] is one run, and the doc above says why: an operation's name is reused by
+/// every run of that kind, so matching on the name alone would gather every apply this
+/// machine has ever made into one unit. That is exactly the wrong answer for an undo of
+/// a stamp — and exactly the right one where the operation names a thing rather than a
+/// kind of run.
+///
+/// A plugin's id is such a name. It is one plugin, installed once, and every change
+/// journalled under it is that plugin's doing — so taking the plugin off the machine
+/// means taking all of them back, whether they were written by the install or by
+/// something that wrote to it since. A removal that put back only the run that installed
+/// it would leave whatever came after standing with nothing to explain it.
+#[must_use]
+pub fn everything<'a>(changes: &'a [Change], operation: &str) -> Vec<&'a Change> {
+    changes
+        .iter()
+        .filter(|change| change.operation == operation)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{setting, standing, together, Reversal};
+    use super::{everything, setting, standing, together, Reversal};
     use crate::journal::{Change, Kind};
 
     fn set(operation: &str, key: &str, previous: Option<&str>, current: &str) -> Change {
@@ -285,6 +306,33 @@ mod tests {
                 current: current.to_owned(),
             },
         }
+    }
+
+    /// An operation's whole record, which is what taking the thing that made it off
+    /// the machine has to put back — not one run of it, which is what an undo of a
+    /// stamp asks for.
+    #[test]
+    fn everything_an_operation_made_is_every_run_of_it_and_nothing_else() {
+        let held = vec![
+            set("komga", "A", None, "1"),
+            Change {
+                at: "2".to_owned(),
+                ..set("komga", "B", None, "2")
+            },
+            set("apply", "C", None, "3"),
+        ];
+
+        let mine: Vec<&str> = everything(&held, "komga")
+            .iter()
+            .filter_map(|change| setting(change))
+            .collect();
+        assert_eq!(mine, vec!["A", "B"], "both runs of it, and nothing else");
+        assert_eq!(
+            together(&held, "komga", "1").len(),
+            1,
+            "where one run of it is one entry"
+        );
+        assert!(everything(&held, "nothing").is_empty());
     }
 
     /// A resource a service now holds, made by an operation of ours.

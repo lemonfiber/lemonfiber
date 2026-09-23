@@ -4245,6 +4245,12 @@
           ],
           "required": true
         },
+        "provides": {
+          "type": [
+            "array[string]"
+          ],
+          "required": false
+        },
         "services": {
           "type": [
             "array[ref:PluginPlaced]"
@@ -4273,6 +4279,12 @@
             "array[ref:PluginInstalled]"
           ],
           "required": true
+        },
+        "removal": {
+          "type": [
+            "anyOf(null,ref:PluginRemoval)"
+          ],
+          "required": false
         }
       },
       "variants": []
@@ -4422,6 +4434,35 @@
         "\"loopback\""
       ]
     },
+    "PluginRemoval": {
+      "fields": {
+        "leaves": {
+          "type": [
+            "array[ref:PluginUnfilled]"
+          ],
+          "required": true
+        },
+        "plugin": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "removed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "went_back": {
+          "type": [
+            "ref:UndoReversal"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginRequest": {
       "fields": {
         "accept": {
@@ -4437,6 +4478,23 @@
           "required": true
         },
         "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginUnfilled": {
+      "fields": {
+        "capability": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "filled_by": {
           "type": [
             "string"
           ],
@@ -7329,6 +7387,23 @@
       },
       "variants": []
     },
+    "UndoNoted": {
+      "fields": {
+        "because": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "target": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "UndoReversal": {
       "fields": {
         "left": {
@@ -7336,6 +7411,12 @@
             "array[ref:UndoLeft]"
           ],
           "required": true
+        },
+        "noted": {
+          "type": [
+            "array[ref:UndoNoted]"
+          ],
+          "required": false
         },
         "rehearsed": {
           "type": [

@@ -45,6 +45,11 @@ mod proving;
 // questions: one asks the plugin whether it works, the other asks the stack whether
 // it still does.
 mod verifying;
+// Taking a plugin off the machine. Its own file because a removal is the rollback
+// layer's work with a name on it, and what is here is only the three things that are
+// not a journal entry: the containers, the register, and what the machine is left
+// without.
+mod removing;
 // Carrying the writes out, and journalling each before it is made. Its own file
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
@@ -78,6 +83,15 @@ pub enum Asked {
     },
     /// Say what is installed, and what each install decided.
     Installed,
+    /// Take a plugin off the machine, putting back everything installing it wrote.
+    ///
+    /// The id rather than a path, because the plugin's own source may be long gone and
+    /// what is being removed is a record this machine holds rather than a document
+    /// somebody still has.
+    Remove {
+        /// The plugin's id, as `lemonfiber plugin installed` lists it.
+        plugin: String,
+    },
 }
 
 /// The source names no plugin this build can read.
@@ -124,8 +138,10 @@ pub(super) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Prob
         Asked::Installed => Ok(Outcome::Plugins(Installs {
             installed: held.installed().to_vec(),
             install: None,
+            removal: None,
         })),
         Asked::Install { path } => install(ctx, held, path).await,
+        Asked::Remove { plugin } => removing::remove(ctx, held, plugin).await,
     }
 }
 
@@ -252,6 +268,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
     let standing = if recorded { after } else { held };
 
     Ok(Outcome::Plugins(Installs {
+        removal: None,
         installed: standing.installed().to_vec(),
         install: Some(Install {
             would,
@@ -719,6 +736,46 @@ why    = "Until somebody does, the first caller on the household network becomes
             },
         )
         .await
+    }
+
+    /// Put a settings change on the record under one operation's name, the way a
+    /// recipe would once recipes are applied.
+    ///
+    /// Written directly rather than through a verb that makes one, because what is
+    /// under test is the rollback layer's judgement of such a change and no verb makes
+    /// one yet. The entry is the same shape an apply writes.
+    fn journal_a_set(ctx: &Ctx, operation: &str, key: &str, wrote: &str) {
+        let change = Change {
+            at: ctx.stamp(),
+            operation: operation.to_owned(),
+            target: ".env".to_owned(),
+            kind: crate::journal::Kind::Set {
+                key: key.to_owned(),
+                previous: None,
+                current: wrote.to_owned(),
+            },
+        };
+        let _ = crate::app::targets::layout(ctx).map(|paths| {
+            crate::app::recover::journalled(&paths.journal(), &[change], ctx.random.as_ref());
+        });
+    }
+
+    /// What removing that plugin came to.
+    async fn removing(ctx: &Ctx, plugin: &str) -> Result<Outcome, Box<crate::error::Problem>> {
+        asked(
+            ctx,
+            &Asked::Remove {
+                plugin: plugin.to_owned(),
+            },
+        )
+        .await
+    }
+
+    /// What a run's removal said, where it made one.
+    fn removal(
+        outcome: Result<Outcome, Box<crate::error::Problem>>,
+    ) -> Option<crate::plugin::Removal> {
+        report(outcome).and_then(|one| one.removal)
     }
 
     /// What the reading came to.
@@ -1507,6 +1564,379 @@ why    = "Until somebody does, the first caller on the household network becomes
                 .iter()
                 .any(|row| row.id == "komga:claimed" && row.service.as_deref() == Some("komga"))),
             "though the record keeps it, with the service it asks already settled"
+        );
+    }
+
+    /// The whole of what a removal is: everything the install wrote goes back, its
+    /// container comes off, and the record no longer holds it.
+    #[tokio::test]
+    async fn removing_a_plugin_puts_back_what_installing_it_wrote() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving("removing", runner.clone(), answering(200));
+        assert_eq!(
+            counted(installing(&ctx, &source("removing", PROVING)).await),
+            Some(1)
+        );
+        let document = stack_of(&ctx).join("compose/plugins/komga.yml");
+        assert!(document.is_file(), "it was installed");
+
+        let gone = removal(removing(&ctx, "komga").await);
+        assert_eq!(gone.as_ref().map(|one| one.removed), Some(true));
+        assert!(!document.exists(), "the document it wrote is gone");
+        assert!(
+            !stack_of(&ctx).join("config/komga").exists(),
+            "and so is the directory"
+        );
+        assert!(runner.ran("rm"), "its container was taken off the machine");
+        assert_eq!(
+            counted(reading(&ctx).await),
+            Some(0),
+            "nothing is installed"
+        );
+        assert!(
+            gone.is_some_and(|one| one.went_back.left.is_empty()),
+            "and nothing of its is still standing"
+        );
+        assert!(
+            !record_of(&ctx).exists(),
+            "and the record is taken away rather than kept empty, because an empty \
+             register is still a file a reading can find"
+        );
+    }
+
+    /// Taking one of two off leaves the record holding the other, rather than being
+    /// taken away with it.
+    #[tokio::test]
+    async fn removing_one_of_two_leaves_the_record_holding_the_other() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving("two-of-them", runner, answering(200));
+        assert_eq!(
+            counted(installing(&ctx, &source("two-of-them", PROVING)).await),
+            Some(1)
+        );
+        let second = PROVING.replace("\"komga\"", "\"kavita\"");
+        assert_eq!(
+            counted(installing(&ctx, &source("two-of-them-again", &second)).await),
+            Some(2)
+        );
+
+        let gone = removal(removing(&ctx, "komga").await);
+        assert!(gone.as_ref().is_some_and(|one| one.removed));
+        assert!(
+            gone.is_some_and(|one| one.went_back.left.iter().any(|left| left
+                .because
+                .contains("still holds something this run did not put there"))),
+            "the directory the two share is named and left, rather than taken with the \
+             other's document in it or stopping the reversal over it"
+        );
+        assert_eq!(
+            counted(reading(&ctx).await),
+            Some(1),
+            "the other is still there"
+        );
+        assert!(
+            record_of(&ctx).exists(),
+            "and the record is kept rather than taken away"
+        );
+    }
+
+    /// A stack this build cannot read stops a removal before it takes anything,
+    /// because what the machine would be left without cannot be answered without it —
+    /// and answering *nothing* would be a guess with a removal attached to it.
+    #[tokio::test]
+    async fn a_removal_on_an_unreadable_stack_is_refused_before_it_takes_anything() {
+        let ctx = proving(
+            "unreadable-stack",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("unreadable-stack", PROVING)).await),
+            Some(1)
+        );
+        let document = stack_of(&ctx).join("compose/plugins/komga.yml");
+
+        let blind = a_context()
+            .over(crate::test_support::nowhere())
+            .settings(ctx.settings.clone())
+            .build();
+        assert_eq!(
+            refusal(removing(&blind, "komga").await),
+            crate::stack::STACK_UNREADABLE.to_string()
+        );
+        assert!(document.is_file(), "and nothing of its was taken");
+    }
+
+    /// A rehearsal says what would go back and touches none of it. A removal an
+    /// operator has not agreed to yet is a reading, and a reading that removed a
+    /// container would be the write done to describe itself.
+    #[tokio::test]
+    async fn rehearsing_a_removal_says_what_would_go_back_and_takes_nothing() {
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving("rehearsed-removal", runner.clone(), answering(200));
+        assert_eq!(
+            counted(installing(&ctx, &source("rehearsed-removal", PROVING)).await),
+            Some(1)
+        );
+        let document = stack_of(&ctx).join("compose/plugins/komga.yml");
+
+        let mut rehearsing = ctx;
+        rehearsing.dry_run = true;
+        let gone = removal(removing(&rehearsing, "komga").await);
+
+        assert_eq!(gone.as_ref().map(|one| one.removed), Some(false));
+        assert!(
+            gone.is_some_and(|one| one.went_back.rehearsed && !one.went_back.reversed.is_empty()),
+            "it names what would go back"
+        );
+        assert!(document.is_file(), "and none of it went");
+        assert!(
+            !runner.ran("rm"),
+            "nothing was taken off the machine either"
+        );
+        assert_eq!(counted(reading(&rehearsing).await), Some(1));
+    }
+
+    /// A name nothing is installed under is refused, and the refusal says what is —
+    /// because the commonest reason to reach it is a name spelled the way an operator
+    /// remembers it rather than the way the plugin declares it.
+    #[tokio::test]
+    async fn removing_something_that_is_not_installed_is_refused_naming_what_is() {
+        let ctx = proving(
+            "not-installed",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            refusal(removing(&ctx, "komga").await),
+            "PLUGIN-10",
+            "on a machine with nothing installed"
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("not-installed", PROVING)).await),
+            Some(1)
+        );
+        let (code, said) = refused(removing(&ctx, "komgaa").await);
+        assert_eq!(code, "PLUGIN-10");
+        assert!(
+            said.contains("What is installed: komga"),
+            "it names what is there: {said}"
+        );
+    }
+
+    /// A container the engine would not take off is named as still standing, because
+    /// *some of it worked* is the sentence that sends somebody looking by hand — and
+    /// the exit status says so rather than reporting a removal that worked.
+    #[tokio::test]
+    async fn a_removal_whose_container_would_not_come_off_names_it_as_still_standing() {
+        let runner = Keyed::answering(
+            vec![("rm", Ok(engine_refused("no such container")))],
+            Ok(spoke("")),
+        );
+        let ctx = proving("stuck-removal", runner, answering(200));
+        assert_eq!(
+            counted(installing(&ctx, &source("stuck-removal", PROVING)).await),
+            Some(1)
+        );
+
+        let gone = removal(removing(&ctx, "komga").await);
+        assert!(
+            gone.as_ref().is_some_and(|one| one
+                .went_back
+                .left
+                .iter()
+                .any(|left| left.target == "komga"
+                    && left.because.contains("could not be taken off"))),
+            "the container is named with the reason it is still there"
+        );
+        assert!(
+            gone.is_some_and(|one| one.removed),
+            "and the record is written all the same: the files went back, so a plugin \
+             the register still named would be a plugin nothing describes"
+        );
+    }
+
+    /// A machine with nowhere to look for what was changed is refused by the rollback
+    /// layer, in the rollback layer's own words. A removal that answered anyway would
+    /// be reporting a plugin as gone on the strength of a record it never read.
+    #[tokio::test]
+    async fn a_removal_with_nowhere_to_look_for_the_record_is_refused_by_the_layer_that_looks() {
+        let ctx = proving(
+            "no-stack",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("no-stack", PROVING)).await),
+            Some(1)
+        );
+
+        let mut nowhere = ctx;
+        nowhere.settings.stack_dir = None;
+
+        assert_eq!(
+            refusal(removing(&nowhere, "komga").await),
+            "UNDO-4",
+            "the layer that looks for the record is the one that says it cannot"
+        );
+    }
+
+    /// A register that cannot be rewritten stops a removal the way it stops an
+    /// install, and says what the run left.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_register_that_cannot_be_rewritten_stops_the_removal() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let ctx = proving(
+            "unwritable-removal",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("unwritable-removal", PROVING)).await),
+            Some(1)
+        );
+        let register = record_of(&ctx);
+        assert!(
+            std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o400)).is_ok()
+        );
+
+        let (code, said) = refused(removing(&ctx, "komga").await);
+        assert_eq!(code, "PLUGIN-8");
+        assert!(said.contains("was put back"), "{said}");
+
+        let _ = std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o600));
+    }
+
+    /// **A removal inherits the rollback layer's refusals rather than restating them.**
+    /// A setting somebody has set by hand since is drift, and putting it back would
+    /// discard their edit — so the removal refuses and says what the file holds instead
+    /// of overwriting it.
+    #[tokio::test]
+    async fn a_setting_edited_since_the_install_refuses_the_removal() {
+        let ctx = proving(
+            "drifted",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("drifted", PROVING)).await),
+            Some(1)
+        );
+
+        // A setting the plugin is on the record as having written, and an operator's
+        // own value in the file where that change would be put back.
+        let key = "LEMONFIBER_PLUGIN_TEST_KEY";
+        journal_a_set(&ctx, "komga", key, "what the plugin wrote");
+        let _ = ctx
+            .settings
+            .env_file
+            .as_deref()
+            .map(|file| crate::config::store::set(file, key, "what the operator wrote"));
+
+        let (code, said) = refused(removing(&ctx, "komga").await);
+        assert_eq!(
+            code, "UNDO-3",
+            "the rollback layer's own refusal, not a second one"
+        );
+        assert!(
+            said.contains("somebody has set it since"),
+            "and its own words: {said}"
+        );
+    }
+
+    /// And the one refusal that is not a refusal: a change that re-points where data
+    /// lives goes back and says plainly that the data does not move with it.
+    #[tokio::test]
+    async fn re_pointing_where_data_lives_says_the_data_does_not_move_back() {
+        let ctx = proving(
+            "repointed",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("repointed", PROVING)).await),
+            Some(1)
+        );
+        journal_a_set(
+            &ctx,
+            "komga",
+            crate::config::DATA_ROOT_KEY,
+            "/srv/elsewhere",
+        );
+
+        let gone = removal(removing(&ctx, "komga").await);
+        assert!(
+            gone.as_ref().is_some_and(|one| one.removed),
+            "it is removed rather than refused"
+        );
+        assert!(
+            gone.is_some_and(|one| one
+                .went_back
+                .noted
+                .iter()
+                .any(|note| note.because.contains("data does not move with it"))),
+            "and the reversal says plainly that the library stays where it was moved to"
+        );
+    }
+
+    /// **What a plugin contributed goes with it, and the run afterwards reads as one on
+    /// a machine that never saw it.** Compared whole rather than checked for an absent
+    /// row, because *answers exactly as* is a claim about the report and not about the
+    /// absence of one line in it.
+    ///
+    /// Nothing withdraws anything. The rows a diagnosis runs are read from the register
+    /// on every run, so a plugin taken out of the register takes its rows with it —
+    /// which is why there is no withdrawal to get wrong.
+    #[tokio::test]
+    async fn what_a_plugin_contributed_goes_with_it_when_the_plugin_does() {
+        let ctx = proving(
+            "withdrawing",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            Fake::by_path(vec![
+                (
+                    "/api/v1/libraries",
+                    lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+                ),
+                (
+                    "/api/v1/claim",
+                    lemonfiber_fixtures::http::Answer::reply(200, "{}"),
+                ),
+            ]),
+        );
+        // Every finding but the one that counts lemonfiber's own files. A machine that
+        // has installed and removed a plugin has a history of having done so, and the
+        // journal holding it is one of the files whose permissions are checked. That is
+        // a true fact about the machine and must not be erased: what the rule asks to go
+        // is what the plugin contributed, not the record that it was here.
+        let looked = || async {
+            crate::app::diagnose(&ctx, &crate::doctor::Narrowing::Suite, false)
+                .await
+                .map(|report| {
+                    report
+                        .findings
+                        .into_iter()
+                        .filter(|finding| finding.check != "config.credential-permissions")
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        };
+
+        let never = looked().await;
+        assert!(!never.is_empty(), "the bundled rows ran");
+        assert_eq!(
+            counted(installing(&ctx, &source("withdrawing", CONTRIBUTING)).await),
+            Some(1)
+        );
+        let holding = looked().await;
+        assert_ne!(holding, never, "the plugin's row was there to be withdrawn");
+
+        assert!(removal(removing(&ctx, "komga").await).is_some_and(|one| one.removed));
+        assert_eq!(
+            looked().await,
+            never,
+            "and a run after it reads as one on a machine that never saw it"
         );
     }
 

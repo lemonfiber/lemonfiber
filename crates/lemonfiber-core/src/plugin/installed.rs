@@ -185,6 +185,21 @@ pub struct Installed {
     pub version: String,
     /// What was placed, one entry per service the plugin declares.
     pub services: Vec<Placed>,
+    /// Every core capability its services fill, as the install settled them.
+    ///
+    /// Core names only. A capability of the plugin's own is namespaced, nothing asks
+    /// for it, and it is inert by design — so a removal that named one as about to go
+    /// unfilled would be warning about something nothing was reaching for.
+    ///
+    /// Kept for the question a removal has to answer before it happens: what this
+    /// machine would have nothing filling once the plugin is off it. Asking the
+    /// manifest would be asking a file that may be gone.
+    ///
+    /// Defaulted for a register written before the field existed, which reads as a
+    /// plugin that fills nothing — the answer that names no capability rather than the
+    /// one that invents one.
+    #[serde(default)]
+    pub provides: Vec<String>,
     /// Every row it adds to a register lemonfiber already runs, as the install
     /// settled them.
     ///
@@ -225,6 +240,7 @@ impl Installed {
                 .iter()
                 .map(|service| Placed::of(manifest, service))
                 .collect(),
+            provides: filled(manifest),
             contributions: manifest
                 .contributions
                 .iter()
@@ -237,6 +253,28 @@ impl Installed {
                 .collect(),
         }
     }
+}
+
+/// Every core capability a manifest's services fill, in declaration order and once
+/// each.
+///
+/// Read off `provides` rather than off the claim blocks, because `provides` is what the
+/// wiring asks against — a claim is the evidence for one and the two are held together
+/// when the manifest is read. Namespaced names are left out: nothing asks for one, so
+/// nothing can be left without it.
+fn filled(manifest: &Manifest) -> Vec<String> {
+    let mut named: Vec<String> = Vec::new();
+    for capability in manifest
+        .services
+        .iter()
+        .flat_map(|service| service.provides.iter())
+        .filter(|name| lemonfiber_plugin::vocabulary::is_core_name(name))
+    {
+        if !named.iter().any(|held| held == capability) {
+            named.push(capability.clone());
+        }
+    }
+    named
 }
 
 /// Where a service published on this machine is reached.
@@ -407,83 +445,24 @@ impl Register {
         self.installed.insert(at, one);
         Ok(())
     }
-}
 
-/// What an install came to, and what it took to get there.
-///
-/// **The three lists below are stated whether the run wrote anything or not, and that
-/// is the whole of what makes a rehearsal worth running.** A rehearsal that reported
-/// less than the real run would be a preview of a different operation; one that
-/// reported it from code of its own would be a second derivation free to disagree
-/// with the one that acts. So they are filled in one place, from the manifest and from
-/// the very list of writes the install is carried out from, and the surface says them
-/// in whichever tense `recorded` calls for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[schemars(rename = "PluginInstall")]
-pub struct Install {
-    /// What the install settled, said whether or not it was written down.
-    pub would: Installed,
-    /// Whether it was written down. A rehearsal leaves this false.
-    pub recorded: bool,
-    /// Every change it makes to the machine, in the order it makes them.
-    pub changes: Vec<super::Changing>,
-    /// Every proof that has to hold before the plugin is installed, and on a run
-    /// that asked them, what each came to.
-    pub proofs: Vec<super::Proving>,
-    /// What those verdicts were reached against, or nothing where none were reached.
+    /// Take a plugin out of the record.
     ///
-    /// Carried rather than assumed, because the two kinds of evidence are not the
-    /// same claim: an author's read asks the recordings a plugin ships, and an
-    /// install asks the service running on this machine. The weaker must not be
-    /// readable as the stronger, and a reader handed a verdict has nothing else in
-    /// the document to tell them apart.
-    pub against: Option<super::Evidence>,
-    /// What the stack's own checks made of the install, or nothing on a run that
-    /// asked them nothing.
-    ///
-    /// The other half of what an install has to establish, and the half a plugin
-    /// cannot establish for itself: its proofs say the plugin works, and this says the
-    /// stack still does. Absent on a rehearsal, which writes nothing and so has
-    /// nothing to hold a reading against.
-    pub verified: Option<super::Verification>,
-    /// Every bundled thing the plugin declares it will change.
-    ///
-    /// The full extent rather than a sample of it: a manifest may change a bundled
-    /// setting only through a recipe, and a recipe reaching one no `[[override]]`
-    /// names is refused before anything is written.
-    pub overrides: Vec<super::Overriding>,
-    /// What putting the install back came to, where something failed and it was.
-    ///
-    /// The rollback layer's own report rather than a shape of this verb's: what went
-    /// back, and what did not with the reason each is still standing. Absent on a run
-    /// that had nothing to put back, which is both a rehearsal and an install that
-    /// held.
-    pub reversed: Option<crate::app::putting_back::Reversal>,
-}
-
-/// What is installed, and what installing one came to.
-///
-/// One answer for the reading and for the verb, because they are one question: an
-/// operator who has just installed something wants to see it among what they had, and
-/// a rehearsal that showed only the new entry would not say what it is joining.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[schemars(rename = "PluginInstalls")]
-pub struct Installs {
-    /// Every plugin the record holds.
-    ///
-    /// What it holds, rather than what it would hold: a rehearsal wrote nothing, so
-    /// what it settled is in `install` and not here. A listing that counted it
-    /// would report an install that did not happen.
-    pub installed: Vec<Installed>,
-    /// What this run's install came to, or nothing where it only read.
-    pub install: Option<Install>,
+    /// Silent about a name it does not hold, because the caller has already refused
+    /// that case by name and a second refusal here would be a second answer to a
+    /// question already settled. What this promises is the state afterwards: whatever
+    /// it held about that plugin, it holds nothing now.
+    pub fn forget(&mut self, plugin: &str) {
+        self.installed.retain(|one| one.plugin != plugin);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use lemonfiber_plugin::{Bind, Manifest};
 
-    use super::{Install, Installed, Installs, Placed, Reached, Register, Unreadable};
+    use super::super::reports::{Install, Installs};
+    use super::{Installed, Placed, Reached, Register, Unreadable};
 
     /// A plugin declaring two services, though the reader admits one at a time.
     ///
@@ -541,6 +520,34 @@ dashboard_group = "Library"
         let mut manifest = Manifest::from_toml(MANIFEST).ok()?;
         change(&mut manifest);
         Some(Installed::of(&manifest))
+    }
+
+    /// **Every core capability its services fill, once each, and nothing namespaced.**
+    /// A capability of the plugin's own is inert by design — nothing asks for one, so
+    /// nothing can be left without it, and a removal naming one would be warning about
+    /// something nobody was reaching for.
+    #[test]
+    fn what_a_plugin_fills_is_the_core_names_its_services_provide() {
+        let record = installed(|manifest| {
+            for service in &mut manifest.services {
+                service.provides = vec![
+                    "media.serve".to_owned(),
+                    "komga:kobo-sync".to_owned(),
+                    "media.serve".to_owned(),
+                ];
+            }
+        });
+
+        assert_eq!(
+            record.as_ref().map(|one| one.provides.clone()),
+            Some(vec!["media.serve".to_owned()]),
+            "the core one, once, and not the plugin's own"
+        );
+        assert_eq!(
+            whole().map(|one| one.provides),
+            Some(Vec::new()),
+            "and a plugin whose services fill nothing fills nothing"
+        );
     }
 
     /// A change to the first service the fixture declares.
@@ -854,8 +861,10 @@ dashboard_group = "Library"
         let read = Installs {
             installed: whole().into_iter().collect(),
             install: None,
+            removal: None,
         };
         let done = Installs {
+            removal: None,
             installed: whole().into_iter().collect(),
             install: whole().map(|would| Install {
                 would,

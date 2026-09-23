@@ -343,6 +343,10 @@ pub async fn retracting(ctx: &Ctx, paths: &Paths) -> Result<Reversal, Box<Proble
     retract(ctx, paths).await.map(|reversed| Reversal {
         reversed,
         left: Vec::new(),
+        // Nothing judged, so nothing to say beyond what went back. What a repair puts
+        // back is its own work of a moment ago rather than a run somebody named, and
+        // the one note that exists is about a setting no repair writes.
+        noted: Vec::new(),
         rehearsed: false,
     })
 }

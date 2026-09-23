@@ -16,8 +16,8 @@ use lemonfiber_core::app::putting_back::Reversal;
 use lemonfiber_core::doctor::Verdict as Checked;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
-    Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Verdict,
-    Verification,
+    Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Removal, Unfilled,
+    Verdict, Verification,
 };
 
 use super::super::Lines;
@@ -60,6 +60,9 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         if !install.recorded && install.reversed.is_none() {
             lines.spaced("Nothing was written. Run it again without --dry-run to install it.");
         }
+        lines.spaced(shelf(report.installed.len()));
+    } else if let Some(one) = &report.removal {
+        lines.extend(removal(one));
         lines.spaced(shelf(report.installed.len()));
     } else {
         lines.put(shelf(report.installed.len()));
@@ -222,18 +225,90 @@ fn stood(verdict: Option<&Checked>) -> String {
 /// operator with something left on their machine stops being told which thing.
 fn reversal(put_back: &Reversal) -> Lines {
     let mut lines = Lines::default();
-    lines.spaced("    It was put back:");
+    // The tense is the report's own flag rather than the caller's. A run that only said
+    // what it would do and one that did it name the same changes, and a heading chosen
+    // by whichever surface called this would be a second place for the two to disagree.
+    let done = !put_back.rehearsed;
+    lines.spaced(if done {
+        "    It was put back:"
+    } else {
+        "    What would go back:"
+    });
     for undo in &put_back.reversed {
         lines.put(format!("      {}", undone(undo)));
     }
     for left in &put_back.left {
         lines.put(format!(
-            "      {} is still there — {}",
-            left.target, left.because
+            "      {} {} — {}",
+            left.target,
+            if done {
+                "is still there"
+            } else {
+                "would be left"
+            },
+            left.because
         ));
     }
     if put_back.left.is_empty() {
-        lines.put("      Nothing it wrote is left on the machine.");
+        lines.put(if done {
+            "      Nothing it wrote is left on the machine."
+        } else {
+            "      Nothing of its would be left on the machine."
+        });
+    }
+    // What going back means beyond going back, which is neither of the two lists above:
+    // it did not fail, so it is not what was left, and saying only that it went back
+    // would send an operator looking for their files at an address that no longer
+    // names them.
+    for note in &put_back.noted {
+        lines.put(format!("      {}", note.because));
+    }
+    lines
+}
+
+/// What taking a plugin off the machine came to, or would come to.
+///
+/// **What it would leave without comes before what it put back**, because that is the
+/// half an operator can still act on. What went back is an account; what nothing is
+/// left filling is a decision they may want to take differently.
+fn removal(one: &Removal) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "{} {}:",
+        if one.removed {
+            "Removed"
+        } else {
+            "Would remove"
+        },
+        one.plugin
+    ));
+    lines.extend(leaves(&one.leaves, one.removed));
+    lines.extend(reversal(&one.went_back));
+    lines
+}
+
+/// Every capability the machine would have nothing filling afterwards.
+///
+/// **The empty case is worded and it is the common one.** A plugin that fills nothing
+/// the stack asks for takes nothing away with it, which is the thing an operator most
+/// wants to know before agreeing — and a blank section says it least clearly.
+fn leaves(going: &[Unfilled], removed: bool) -> Lines {
+    let mut lines = Lines::default();
+    if going.is_empty() {
+        lines.spaced(
+            "    Nothing on this machine is left asking for something with nothing to fill it.",
+        );
+        return lines;
+    }
+    lines.spaced(format!(
+        "    What {} nothing to fill it:",
+        if removed { "now has" } else { "would have" }
+    ));
+    for one in going {
+        lines.put(format!(
+            "      {} — {} is the only thing filling it",
+            one.capability, one.filled_by
+        ));
     }
     lines
 }
@@ -377,7 +452,7 @@ mod tests {
     use lemonfiber_core::journal::{Action, Undo};
     use lemonfiber_core::plugin::{
         Changing, Evidence, Install, Installed, Installs, Overriding, Placed, Proving, Puts,
-        Reached, Verdict, Verification,
+        Reached, Removal, Unfilled, Verdict, Verification,
     };
 
     use super::{installs, stood};
@@ -402,6 +477,7 @@ mod tests {
                 takes_data: reached.is_some(),
                 reached,
             }],
+            provides: Vec::new(),
             contributions: Vec::new(),
         }
     }
@@ -469,6 +545,7 @@ mod tests {
     #[test]
     fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: None,
         })
@@ -481,6 +558,7 @@ mod tests {
     #[test]
     fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
         let said = installs(&Installs {
+            removal: None,
             installed: vec![recorded("komga", Some(household()))],
             install: None,
         })
@@ -500,6 +578,7 @@ mod tests {
     #[test]
     fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
         let said = installs(&Installs {
+            removal: None,
             installed: vec![recorded("komga", Some(household())), recorded("plex", None)],
             install: None,
         })
@@ -518,6 +597,7 @@ mod tests {
     #[test]
     fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
         let said = installs(&Installs {
+            removal: None,
             installed: vec![recorded(
                 "komga",
                 Some(Reached::Loopback {
@@ -539,6 +619,7 @@ mod tests {
     #[test]
     fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
         let said = installs(&Installs {
+            removal: None,
             installed: vec![recorded(
                 "komga",
                 Some(Reached::Loopback {
@@ -557,6 +638,7 @@ mod tests {
     fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(install(one, true)),
         })
@@ -578,6 +660,7 @@ mod tests {
     fn the_install_shows_the_container_that_is_written_for_it() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(install(one.clone(), true)),
         })
@@ -602,6 +685,7 @@ mod tests {
         let one = recorded("komga", Some(household()));
         let shown = |recorded: bool| {
             installs(&Installs {
+                removal: None,
                 installed: Vec::new(),
                 install: Some(install(one.clone(), recorded)),
             })
@@ -622,6 +706,7 @@ mod tests {
     fn a_rehearsal_states_every_change_every_proof_and_every_override() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 changes: writes(),
@@ -662,6 +747,7 @@ mod tests {
     fn an_install_states_the_same_three_in_the_past_tense() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(Install {
                 changes: writes(),
@@ -685,6 +771,7 @@ mod tests {
     #[test]
     fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 changes: writes(),
@@ -712,6 +799,7 @@ mod tests {
     #[test]
     fn a_proof_that_settles_no_service_is_shown_without_one() {
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 changes: writes(),
@@ -734,6 +822,7 @@ mod tests {
     fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(Install {
                 changes: writes(),
@@ -760,6 +849,7 @@ mod tests {
     fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 changes: writes(),
@@ -825,6 +915,7 @@ mod tests {
     fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(Install {
                 verified: Some(Verification {
@@ -851,6 +942,7 @@ mod tests {
     fn a_check_the_install_made_worse_is_shown_at_both_readings() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 verified: Some(Verification {
@@ -930,6 +1022,7 @@ mod tests {
     fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 verified: None,
@@ -940,12 +1033,150 @@ mod tests {
         assert!(!said.contains("the stack's own checks"), "{said}");
     }
 
+    /// A removal built for the page: one plugin, one thing put back, and whatever it
+    /// is said to leave.
+    fn taking(
+        removed: bool,
+        leaves: Vec<Unfilled>,
+        left: Vec<lemonfiber_core::app::putting_back::Left>,
+    ) -> Installs {
+        Installs {
+            installed: Vec::new(),
+            install: None,
+            removal: Some(Removal {
+                plugin: "komga".to_owned(),
+                leaves,
+                removed,
+                went_back: Reversal {
+                    reversed: vec![Undo {
+                        target: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
+                        action: Action::Delete {
+                            path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
+                        },
+                    }],
+                    left,
+                    noted: Vec::new(),
+                    rehearsed: !removed,
+                },
+            }),
+        }
+    }
+
+    /// A removal says what it took off and what went back, in the tense it happened in.
+    #[test]
+    fn a_removal_says_what_went_back_and_that_nothing_is_left() {
+        let said = installs(&taking(true, Vec::new(), Vec::new())).text();
+        assert!(said.contains("Removed komga:"), "{said}");
+        assert!(said.contains("It was put back:"), "{said}");
+        assert!(
+            said.contains("removed /opt/lemonfiber/stack/compose/plugins/komga.yml"),
+            "{said}"
+        );
+        assert!(
+            said.contains("Nothing it wrote is left on the machine."),
+            "{said}"
+        );
+        assert!(
+            said.contains(
+                "Nothing on this machine is left asking for something with nothing to fill it."
+            ),
+            "the empty case is worded, because it is the common one: {said}"
+        );
+    }
+
+    /// And a rehearsal says the same things in the conditional, because a removal
+    /// nobody has agreed to yet has not happened.
+    #[test]
+    fn rehearsing_a_removal_reads_in_the_tense_it_is_in() {
+        let said = installs(&taking(false, Vec::new(), Vec::new())).text();
+        assert!(said.contains("Would remove komga:"), "{said}");
+        assert!(said.contains("What would go back:"), "{said}");
+        assert!(
+            said.contains("Nothing of its would be left on the machine."),
+            "{said}"
+        );
+        assert!(!said.contains("It was put back"), "{said}");
+
+        let cannot = installs(&taking(
+            false,
+            Vec::new(),
+            vec![lemonfiber_core::app::putting_back::Left {
+                target: "komga".to_owned(),
+                because: "it goes back through the service that made it".to_owned(),
+            }],
+        ))
+        .text();
+        assert!(
+            cannot.contains("komga would be left — it goes back through the service"),
+            "what a rehearsal cannot promise reads as what it is: {cannot}"
+        );
+        assert!(!cannot.contains("is still there"), "{cannot}");
+    }
+
+    /// What the machine would have nothing filling is named with the thing that is
+    /// filling it now, because a capability on its own does not say *this is the only
+    /// thing filling it*.
+    #[test]
+    fn a_capability_the_removal_would_leave_unfilled_is_named_with_what_fills_it() {
+        let said = installs(&taking(
+            false,
+            vec![Unfilled {
+                capability: "media.serve".to_owned(),
+                filled_by: "komga".to_owned(),
+            }],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            said.contains("What would have nothing to fill it:"),
+            "{said}"
+        );
+        assert!(
+            said.contains("media.serve — komga is the only thing filling it"),
+            "{said}"
+        );
+
+        let done = installs(&taking(
+            true,
+            vec![Unfilled {
+                capability: "media.serve".to_owned(),
+                filled_by: "komga".to_owned(),
+            }],
+            Vec::new(),
+        ))
+        .text();
+        assert!(
+            done.contains("What now has nothing to fill it:"),
+            "and a run that happened says it in the tense it happened in: {done}"
+        );
+    }
+
+    /// A reversal that put a change back and still left something behind says so.
+    /// Neither list can carry it: it did not fail, and saying only that it went back
+    /// would send somebody looking for their files at an address that no longer names
+    /// them.
+    #[test]
+    fn what_going_back_also_means_is_said_beside_what_went_back() {
+        let mut report = taking(true, Vec::new(), Vec::new());
+        let _ = report.removal.as_mut().map(|one| {
+            one.went_back.noted = vec![lemonfiber_core::app::putting_back::Noted {
+                target: ".env".to_owned(),
+                because: "DATA_ROOT goes back and the data does not move with it — move the \
+                          library yourself if it should follow"
+                    .to_owned(),
+            }];
+        });
+        let said = installs(&report).text();
+        assert!(said.contains("the data does not move with it"), "{said}");
+    }
+
     /// An install that went back says so in the rollback layer's own two lists: what
     /// went back, and what did not with the reason it is still standing.
     #[test]
     fn an_install_that_went_back_names_what_went_and_what_stayed() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 changes: writes(),
@@ -957,6 +1188,7 @@ mod tests {
                         },
                     }],
                     left: Vec::new(),
+                    noted: Vec::new(),
                     rehearsed: false,
                 }),
                 ..install(one, false)
@@ -992,6 +1224,7 @@ mod tests {
     fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(Install {
                 changes: writes(),
@@ -1001,6 +1234,7 @@ mod tests {
                         target: "komga".to_owned(),
                         because: "its container could not be taken off the machine".to_owned(),
                     }],
+                    noted: Vec::new(),
                     rehearsed: false,
                 }),
                 ..install(one, false)
@@ -1098,6 +1332,7 @@ mod tests {
     fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
         let one = recorded("komga", Some(household()));
         let said = installs(&Installs {
+            removal: None,
             installed: vec![one.clone()],
             install: Some(install(one, false)),
         })
@@ -1111,6 +1346,7 @@ mod tests {
     #[test]
     fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
         let said = installs(&Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(install(recorded("komga", Some(household())), false)),
         })
@@ -1125,6 +1361,7 @@ mod tests {
     #[test]
     fn the_printer_reaches_this_renderer_for_this_outcome() {
         let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Plugins(Installs {
+            removal: None,
             installed: vec![recorded("komga", Some(household()))],
             install: None,
         }))

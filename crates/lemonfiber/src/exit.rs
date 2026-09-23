@@ -1236,6 +1236,7 @@ mod tests {
             plugin: "komga".to_owned(),
             version: "1.2.0".to_owned(),
             services: Vec::new(),
+            provides: Vec::new(),
             contributions: Vec::new(),
         }
     }
@@ -1246,6 +1247,7 @@ mod tests {
         reversed: Option<lemonfiber_core::app::putting_back::Reversal>,
     ) -> Outcome {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            removal: None,
             installed: Vec::new(),
             install: Some(lemonfiber_core::plugin::Install {
                 would: komga(),
@@ -1285,12 +1287,63 @@ mod tests {
         );
     }
 
+    /// A removal that could not put everything back has left something on the machine
+    /// with nothing recording it, and *some of it worked* is the sentence a script must
+    /// not read as success.
+    #[test]
+    fn a_removal_that_left_something_standing_exits_as_a_refusal() {
+        let taking = |removed: bool, left: Vec<lemonfiber_core::app::putting_back::Left>| {
+            Outcome::Plugins(lemonfiber_core::plugin::Installs {
+                installed: Vec::new(),
+                install: None,
+                removal: Some(lemonfiber_core::plugin::Removal {
+                    plugin: "komga".to_owned(),
+                    leaves: Vec::new(),
+                    removed,
+                    went_back: lemonfiber_core::app::putting_back::Reversal {
+                        left,
+                        ..lemonfiber_core::app::putting_back::Reversal::default()
+                    },
+                }),
+            })
+        };
+
+        assert_eq!(
+            shown(settled(&taking(true, Vec::new()))),
+            success(),
+            "a removal that put everything back"
+        );
+        assert_eq!(
+            shown(settled(&taking(
+                true,
+                vec![lemonfiber_core::app::putting_back::Left {
+                    target: "komga".to_owned(),
+                    because: "its container could not be taken off".to_owned(),
+                }]
+            ))),
+            shown(std::process::ExitCode::from(VALIDATION)),
+            "and one that could not"
+        );
+        assert_eq!(
+            shown(settled(&taking(
+                false,
+                vec![lemonfiber_core::app::putting_back::Left {
+                    target: "komga".to_owned(),
+                    because: "it goes back through a service".to_owned(),
+                }]
+            ))),
+            success(),
+            "while a rehearsal names what it could not promise and has changed nothing"
+        );
+    }
+
     /// A reading is a reading, whatever is installed.
     #[test]
     fn reading_what_is_installed_always_succeeds() {
         assert_eq!(
             shown(settled(&Outcome::Plugins(
                 lemonfiber_core::plugin::Installs {
+                    removal: None,
                     installed: vec![komga()],
                     install: None,
                 }

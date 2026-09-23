@@ -43,7 +43,20 @@ pub(super) fn carrying(report: &lemonfiber_core::model::ImportReport) -> ExitCod
 ///
 /// A rehearsal is a reading of what would happen and exits as one. What it reports is
 /// that nothing was written, which is what it was asked for.
+///
+/// A removal is the other run that can arrive as a report and still be a failure: one
+/// that could not put everything back has left something on the machine with nothing
+/// recording it, and *some of it worked* is the sentence a script must not read as
+/// success. What it would have left is not a failure — nothing happened — so a
+/// rehearsal exits as the reading it is either way.
 pub(super) fn installing(report: &lemonfiber_core::plugin::Installs) -> ExitCode {
+    if report
+        .removal
+        .as_ref()
+        .is_some_and(|one| one.removed && !one.went_back.left.is_empty())
+    {
+        return ExitCode::from(VALIDATION);
+    }
     match &report.install {
         None => ExitCode::SUCCESS,
         Some(install) if install.recorded || install.reversed.is_none() => ExitCode::SUCCESS,

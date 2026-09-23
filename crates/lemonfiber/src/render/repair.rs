@@ -82,6 +82,15 @@ pub(crate) fn reversed(report: &Reversal) -> Lines {
             lines.put(format!("  {} — {}", standing.target, standing.because));
         }
     }
+    // What going back means beyond going back. Neither list above can carry it: it did
+    // not fail, so it is not what was left, and saying only that it went back would send
+    // somebody looking for their files at an address that no longer names them.
+    if !report.noted.is_empty() {
+        lines.put("Worth knowing:");
+        for note in &report.noted {
+            lines.put(format!("  {}", note.because));
+        }
+    }
     if report.rehearsed {
         lines.spaced("Nothing has been put back. Run it without --dry-run to do it.");
     }
@@ -343,8 +352,44 @@ mod tests {
         Reversal {
             reversed,
             left,
+            noted: Vec::new(),
             rehearsed: false,
         }
+    }
+
+    /// What going back also means is said beside what went back. Neither list can
+    /// carry it: it did not fail, so it is not what was left, and saying only that it
+    /// went back would send somebody looking for their files at an address that no
+    /// longer names them.
+    #[test]
+    fn what_going_back_also_means_is_said_beside_it() {
+        let said = reversed(&Reversal {
+            noted: vec![lemonfiber_core::app::putting_back::Noted {
+                target: ".env".to_owned(),
+                because: "DATA_ROOT goes back and the data does not move with it — move the \
+                          library yourself if it should follow"
+                    .to_owned(),
+            }],
+            ..putting_back(
+                vec![Undo {
+                    target: ".env".to_owned(),
+                    action: Action::Restore {
+                        key: "DATA_ROOT".to_owned(),
+                        value: Some("/srv/old".to_owned()),
+                        wrote: "/srv/new".to_owned(),
+                    },
+                }],
+                Vec::new(),
+            )
+        })
+        .text();
+
+        assert!(said.contains("Worth knowing:"), "{said}");
+        assert!(said.contains("the data does not move with it"), "{said}");
+        assert!(
+            said.contains("move the library yourself if it should follow"),
+            "and what to do about it: {said}"
+        );
     }
 
     /// A run with nothing to put back says so, rather than showing an empty list that
@@ -416,6 +461,7 @@ mod tests {
                 target: "downloadclient in sonarr".to_owned(),
                 because: "it goes back through the service that made it".to_owned(),
             }],
+            noted: Vec::new(),
             rehearsed: true,
         })
         .text();
