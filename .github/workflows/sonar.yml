@@ -186,7 +186,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@fa446d8dbc63dde506b688511b612f83ef448ac5 # v1.0.8
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
     with:
       # What this repository is carrying, declared here so it can be read without a
       # SonarCloud login (Q-R67). It was twenty-eight: an analyser enabled
