@@ -65,7 +65,7 @@ impl Mode {
 
     /// Whether carrying this mode out stops or alters what is already running.
     #[must_use]
-    pub const fn disturbs_what_is_running(self) -> bool {
+    pub(crate) const fn disturbs_what_is_running(self) -> bool {
         matches!(self, Self::Replace)
     }
 

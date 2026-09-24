@@ -113,7 +113,7 @@ impl Digest {
     /// half now and half later would mean the operator reads the emergency without
     /// the context arriving beside it.
     #[must_use]
-    pub fn overrides_quiet(&self) -> bool {
+    pub(crate) fn overrides_quiet(&self) -> bool {
         self.alerts.iter().any(Alert::overrides_quiet)
     }
 

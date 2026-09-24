@@ -30,7 +30,7 @@ pub const CHANNEL_CHECK: &str = "notify.channel";
 
 /// The kind of event a refusing channel raises — one kind however many channels
 /// refuse, so twelve dead channels are one thing wrong and not twelve.
-pub const CHANNEL_REFUSED: &str = "notify.channel.refused";
+pub(crate) const CHANNEL_REFUSED: &str = "notify.channel.refused";
 
 /// What one round of notifying did.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -49,7 +49,7 @@ pub struct Notified {
 impl Notified {
     /// Whether anything was worth saying at all.
     #[must_use]
-    pub fn is_quiet(&self) -> bool {
+    pub(crate) fn is_quiet(&self) -> bool {
         self.digest.is_empty()
     }
 }

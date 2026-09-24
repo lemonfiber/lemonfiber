@@ -24,7 +24,7 @@ pub fn repository(tag: &str) -> &str {
 
 /// The version part of a tag, which is what is left once the repository is dropped.
 #[must_use]
-pub fn version_of(tag: &str) -> &str {
+pub(crate) fn version_of(tag: &str) -> &str {
     let repository = repository(tag);
     tag.get(repository.len()..)
         .map_or(tag, |rest| rest.strip_prefix(':').unwrap_or(tag))
@@ -40,7 +40,7 @@ fn ours_among<'a>(image: &'a Image, ours: &[Ours]) -> Option<&'a String> {
 
 /// The version of a named service standing on a given project, where it is.
 #[must_use]
-pub fn standing_on(images: &[Image], project: &str, image: &str) -> Option<String> {
+pub(crate) fn standing_on(images: &[Image], project: &str, image: &str) -> Option<String> {
     images
         .iter()
         .filter(|pulled| pulled.projects.iter().any(|held| held == project))
@@ -62,7 +62,7 @@ pub fn standing_on(images: &[Image], project: &str, image: &str) -> Option<Strin
 /// migration survey would bury the one line that matters — a Jellyfin nobody can adopt
 /// because there is no project description to adopt it from.
 #[must_use]
-pub fn outside_compose(images: &[Image], ours: &[Ours]) -> Vec<UnsupportedReport> {
+pub(crate) fn outside_compose(images: &[Image], ours: &[Ours]) -> Vec<UnsupportedReport> {
     let mut named: Vec<UnsupportedReport> = images
         .iter()
         .filter(|image| image.projects.iter().any(String::is_empty))

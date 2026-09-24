@@ -364,16 +364,16 @@ fn distance(one: &str, other: &str) -> usize {
 }
 
 /// Raised when no form was named.
-pub const NO_FORM_NAMED: Code = Code::new("FORM-1");
+pub(crate) const NO_FORM_NAMED: Code = Code::new("FORM-1");
 
 /// Raised when a named form is not declared by the stack.
-pub const NO_SUCH_FORM: Code = Code::new("FORM-2");
+pub(crate) const NO_SUCH_FORM: Code = Code::new("FORM-2");
 
 /// Raised when forms that cannot be combined are named together.
-pub const FORMS_CONFLICT: Code = Code::new("FORM-3");
+pub(crate) const FORMS_CONFLICT: Code = Code::new("FORM-3");
 
 /// Raised when narrowing leaves nothing to run.
-pub const NOTHING_TO_RUN: Code = Code::new("FORM-4");
+pub(crate) const NOTHING_TO_RUN: Code = Code::new("FORM-4");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

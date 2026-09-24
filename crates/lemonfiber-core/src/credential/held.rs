@@ -140,7 +140,7 @@ impl Origin {
     /// provider issued it, a replacement is theirs to obtain — inventing one would
     /// produce a credential no service has ever heard of.
     #[must_use]
-    pub const fn mints_its_own(self) -> bool {
+    pub(crate) const fn mints_its_own(self) -> bool {
         matches!(self, Self::Lemonfiber)
     }
 }

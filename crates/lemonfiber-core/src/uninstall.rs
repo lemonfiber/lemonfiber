@@ -35,7 +35,7 @@ pub const NEEDS_AGREEING: Code = Code::new("GONE-1");
 
 /// Raised when an agreement names a reading of this machine that is not the one
 /// standing now.
-pub const ANOTHER_READING: Code = Code::new("GONE-2");
+pub(crate) const ANOTHER_READING: Code = Code::new("GONE-2");
 
 /// What sort of thing one line of a manifest is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

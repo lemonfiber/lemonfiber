@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 /// and a share pinned to a reading from last spring is a share of a number that no
 /// longer exists. Long enough that an idle stack is not nagged, short enough that
 /// nobody lives a year on one reading.
-pub const GOES_STALE_AFTER: u64 = 30 * 24 * 60 * 60;
+pub(crate) const GOES_STALE_AFTER: u64 = 30 * 24 * 60 * 60;
 
 /// Where a figure for the line came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -125,7 +125,7 @@ impl Capacity {
     /// nothing about the line at all. A figure the operator declared is theirs and
     /// is never overwritten by an observation.
     #[must_use]
-    pub fn raised_by(self, seen: Self) -> Self {
+    pub(crate) fn raised_by(self, seen: Self) -> Self {
         if self.source == Source::Declared {
             return self;
         }

@@ -302,7 +302,7 @@ pub struct Repeated {
 impl Repeated {
     /// Whether this happened more than once.
     #[must_use]
-    pub const fn is_repeated(&self) -> bool {
+    pub(crate) const fn is_repeated(&self) -> bool {
         self.times > 1
     }
 

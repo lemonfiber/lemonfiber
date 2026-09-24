@@ -25,31 +25,31 @@ use crate::error::{Code, Remedy};
 use crate::ports::service::{Failure, Indexers, UsenetAccounts};
 
 /// Raised when an account has nothing left to serve.
-pub const PROVIDER_EMPTY: Code = Code::new("PROVIDER-1");
+pub(crate) const PROVIDER_EMPTY: Code = Code::new("PROVIDER-1");
 
 /// Raised when an account is running out, with time left to act.
-pub const PROVIDER_LOW: Code = Code::new("PROVIDER-2");
+pub(crate) const PROVIDER_LOW: Code = Code::new("PROVIDER-2");
 
 /// Raised when the subscription behind an account ends soon.
-pub const PROVIDER_ENDING: Code = Code::new("PROVIDER-3");
+pub(crate) const PROVIDER_ENDING: Code = Code::new("PROVIDER-3");
 
 /// Raised when an account refuses the credential the client offers it.
-pub const PROVIDER_REFUSED: Code = Code::new("PROVIDER-6");
+pub(crate) const PROVIDER_REFUSED: Code = Code::new("PROVIDER-6");
 
 /// Raised when an account has stopped answering the client entirely.
-pub const PROVIDER_SILENT: Code = Code::new("PROVIDER-7");
+pub(crate) const PROVIDER_SILENT: Code = Code::new("PROVIDER-7");
 
 /// Raised when the client is set to open more connections than an account allows.
-pub const PROVIDER_CROWDED: Code = Code::new("PROVIDER-8");
+pub(crate) const PROVIDER_CROWDED: Code = Code::new("PROVIDER-8");
 
 /// Raised when an indexer has been failing and its aggregator has rested it.
-pub const INDEXER_RESTED: Code = Code::new("PROVIDER-4");
+pub(crate) const INDEXER_RESTED: Code = Code::new("PROVIDER-4");
 
 /// Raised when every indexer is failing at once.
-pub const INDEXERS_ALL_FAILING: Code = Code::new("PROVIDER-5");
+pub(crate) const INDEXERS_ALL_FAILING: Code = Code::new("PROVIDER-5");
 
 /// Raised when an indexer has spent the allowance recorded against it.
-pub const INDEXER_CAPPED: Code = Code::new("PROVIDER-9");
+pub(crate) const INDEXER_CAPPED: Code = Code::new("PROVIDER-9");
 
 /// Reports on the accounts behind the stack: what they have left, and whether they
 /// are still serving it.

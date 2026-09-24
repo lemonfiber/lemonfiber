@@ -53,14 +53,14 @@ pub use respite::Respite;
 pub use rhythm::{Period, Rhythm, Wall};
 
 /// Raised when a limit is expressed as a share of a line nothing has measured.
-pub const NOTHING_MEASURED: crate::error::Code = crate::error::Code::new("RATE-1");
+pub(crate) const NOTHING_MEASURED: crate::error::Code = crate::error::Code::new("RATE-1");
 
 /// Raised when a schedule is asked for and nothing says which zone the clients
 /// would read it in.
-pub const NO_ZONE: crate::error::Code = crate::error::Code::new("RATE-2");
+pub(crate) const NO_ZONE: crate::error::Code = crate::error::Code::new("RATE-2");
 
 /// Raised when what was asked for could not be read as a limit, a window or a cap.
-pub const UNREADABLE: crate::error::Code = crate::error::Code::new("RATE-3");
+pub(crate) const UNREADABLE: crate::error::Code = crate::error::Code::new("RATE-3");
 
 /// Raised when there is no download client to limit.
 pub const NOTHING_TO_LIMIT: crate::error::Code = crate::error::Code::new("RATE-4");
@@ -77,7 +77,7 @@ pub const NOTHING_TO_LIMIT: crate::error::Code = crate::error::Code::new("RATE-4
 /// *letting a download go* takes away, which is a ratio already earned, and this is
 /// what a limit does to the ratio still being earned. Saying either in the other's
 /// place would be telling somebody they were about to lose something they were not.
-pub const SLOWED_SEEDING: &str =
+pub(crate) const SLOWED_SEEDING: &str =
     "A limit on the upload slows what you give back. On a private tracker the ratio \
      you are earning is what your account is kept on, so a limit that runs for weeks \
      can cost standing you cannot buy back. Throttling is offered rather than \
@@ -228,7 +228,7 @@ impl Declared {
 
     /// The limit for one direction, or no limit where none was declared.
     #[must_use]
-    pub fn or_unlimited(limit: Option<Limit>) -> Limit {
+    pub(crate) fn or_unlimited(limit: Option<Limit>) -> Limit {
         limit.unwrap_or(Limit::Unlimited)
     }
 }
@@ -393,7 +393,7 @@ pub fn weigh(measured: &Measured) -> Sharing {
 /// handed to the clients and the request to stop them cannot disagree about
 /// whether the month is over.
 #[must_use]
-pub fn at_the_cap(declared: &Declared, reached: Option<Reached>) -> Option<WhenExceeded> {
+pub(crate) fn at_the_cap(declared: &Declared, reached: Option<Reached>) -> Option<WhenExceeded> {
     matches!(reached, Some(Reached::Exceeded))
         .then(|| declared.cap.map(|cap| cap.exceeded))
         .flatten()

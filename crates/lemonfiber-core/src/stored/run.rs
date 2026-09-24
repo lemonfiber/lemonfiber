@@ -17,7 +17,7 @@ use crate::stored::{stored, Left, Removal, Stored};
 use crate::app::Ctx;
 
 /// Raised when this run does not know where lemonfiber's own files go.
-pub const NOWHERE_KNOWN: Code = Code::new("KEPT-1");
+pub(crate) const NOWHERE_KNOWN: Code = Code::new("KEPT-1");
 
 /// What lemonfiber keeps on this machine, listed and not touched.
 ///

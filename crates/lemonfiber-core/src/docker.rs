@@ -70,7 +70,7 @@ impl State {
 
     /// Whether this state is one an operator needs to do something about.
     #[must_use]
-    pub const fn wants_attention(self) -> bool {
+    pub(crate) const fn wants_attention(self) -> bool {
         matches!(self, Self::Failed | Self::CrashLooping | Self::Unhealthy)
     }
 
@@ -82,7 +82,7 @@ impl State {
     /// too, but it is the operating system's and not lemonfiber's — which is the
     /// whole of what leaving a native Jellyfin alone comes to.
     #[must_use]
-    pub const fn stoppable(self) -> bool {
+    pub(crate) const fn stoppable(self) -> bool {
         !matches!(
             self,
             Self::Absent | Self::Stopped | Self::Failed | Self::HostManaged
@@ -360,7 +360,7 @@ pub fn condition(services: &[Service]) -> Condition {
 /// as they stand: refusing to stop them would be worse than stopping them in an order
 /// nobody can fault, since there is no correct one.
 #[must_use]
-pub fn stopping_order(running: &[Service], stopping: &[String]) -> Vec<String> {
+pub(crate) fn stopping_order(running: &[Service], stopping: &[String]) -> Vec<String> {
     let depends = |dependent: &str, on: &str| {
         running
             .iter()

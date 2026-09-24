@@ -87,16 +87,16 @@ pub struct Noted {
 }
 
 /// Raised when no run carries the stamp a reversal was asked for.
-pub const NO_SUCH_RUN: Code = Code::new("UNDO-1");
+pub(crate) const NO_SUCH_RUN: Code = Code::new("UNDO-1");
 
 /// Raised when a stamp names more than one run, so which to put back is not settled.
-pub const MORE_THAN_ONE_RUN: Code = Code::new("UNDO-2");
+pub(crate) const MORE_THAN_ONE_RUN: Code = Code::new("UNDO-2");
 
 /// Raised when a run cannot be put back, carrying the reason it cannot.
-pub const CANNOT_SUCCEED: Code = Code::new("UNDO-3");
+pub(crate) const CANNOT_SUCCEED: Code = Code::new("UNDO-3");
 
 /// Raised when a run cannot say where lemonfiber's own files are.
-pub const NOWHERE_TO_LOOK: Code = Code::new("UNDO-4");
+pub(crate) const NOWHERE_TO_LOOK: Code = Code::new("UNDO-4");
 
 /// The operation a reversal records its own work under, so it can be put back in turn.
 pub const OPERATION: &str = "undo";

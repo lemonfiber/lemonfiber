@@ -63,7 +63,7 @@ impl Thresholds {
     /// themselves, and waiting only spends more of the allowance — so they are
     /// said as soon as they are seen. Everything else waits.
     #[must_use]
-    pub const fn for_stall(self, stall: Stall) -> Duration {
+    pub(crate) const fn for_stall(self, stall: Stall) -> Duration {
         match stall {
             Stall::RedownloadLoop | Stall::RepeatedImportFailure => Duration::ZERO,
             Stall::CompletedNotImported | Stall::Orphaned => self.not_imported,

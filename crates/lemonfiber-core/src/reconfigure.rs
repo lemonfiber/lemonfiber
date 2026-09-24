@@ -77,7 +77,7 @@ pub struct Decision {
 /// appetite is not: setup writes it and nothing changes it afterwards, which is a
 /// decision made once and then unchangeable, which is the trap this catalogue exists to
 /// close. It is listed as owed rather than quietly left out.
-pub const DECISIONS: [Decision; 15] = [
+pub(crate) const DECISIONS: [Decision; 15] = [
     Decision {
         key: DATA_ROOT_KEY,
         cost: Cost::Consequential,

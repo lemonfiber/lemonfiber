@@ -63,7 +63,7 @@ impl Hostable {
     /// a definition at install time would be forms frozen on the day somebody
     /// installed it, which is the one answer that is certainly wrong.
     #[must_use]
-    pub const fn takes_forms(self) -> bool {
+    pub(crate) const fn takes_forms(self) -> bool {
         matches!(self, Self::Watch)
     }
 

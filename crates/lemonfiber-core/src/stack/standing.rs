@@ -155,7 +155,7 @@ fn all_up(running: &[Service], services: &[String]) -> bool {
 /// Named in the stack's own order and never including the forms being stopped,
 /// since a form losing its own services is the thing that was asked for.
 #[must_use]
-pub fn needed_by(
+pub(crate) fn needed_by(
     manifest: &Manifest,
     protocols: Protocols,
     running: &[Service],

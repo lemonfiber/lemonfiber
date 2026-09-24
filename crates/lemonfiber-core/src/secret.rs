@@ -17,7 +17,7 @@ use crate::ports::random::Random;
 ///
 /// Twenty-four bytes is 192 bits, far past any brute-force reach for a login
 /// password, and a round number of bytes so the rendering has no remainder.
-pub const SECRET_BYTES: usize = 24;
+pub(crate) const SECRET_BYTES: usize = 24;
 
 /// Generate a secret from the given source of randomness, or `None` where the
 /// randomness could not be obtained — never a weaker fallback, because a

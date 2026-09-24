@@ -124,7 +124,7 @@ pub fn kept(before: Protocols, after: Protocols, root: Option<&Path>) -> Vec<Str
 
 /// Whether the change takes a way of downloading away.
 #[must_use]
-pub const fn reduces(before: Protocols, after: Protocols) -> bool {
+pub(crate) const fn reduces(before: Protocols, after: Protocols) -> bool {
     (before.usenet && !after.usenet) || (before.torrent && !after.torrent)
 }
 

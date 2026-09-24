@@ -22,7 +22,7 @@ use crate::docker::{Service, State};
 use crate::error::Severity;
 
 /// The check the tunnel's egress is filed under.
-pub const EGRESS_CHECK: &str = "vpn.egress";
+pub(crate) const EGRESS_CHECK: &str = "vpn.egress";
 
 // The kinds of event this module raises. Named here rather than spelled at each
 // site, since a kind is what an operator switches off and what groups four
@@ -33,9 +33,9 @@ pub const LEAKING: &str = "vpn.egress.leaking";
 /// Whether it is behind the tunnel could not be established either way.
 pub const UNVERIFIED: &str = "vpn.egress.unverified";
 /// A service exited without being asked to.
-pub const STOPPED: &str = "service.stopped";
+pub(crate) const STOPPED: &str = "service.stopped";
 /// A service is exiting and restarting repeatedly.
-pub const CRASH_LOOPING: &str = "service.crash-looping";
+pub(crate) const CRASH_LOOPING: &str = "service.crash-looping";
 /// A service is running and its own probe says it is not working.
 pub const UNHEALTHY: &str = "service.unhealthy";
 

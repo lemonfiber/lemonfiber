@@ -31,10 +31,10 @@ use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::validate::{Credential, Validation, Validator};
 
 /// Raised when the indexer answers and refuses the key it was given.
-pub const INDEXER_REJECTED: Code = Code::new("CRED-2");
+pub(crate) const INDEXER_REJECTED: Code = Code::new("CRED-2");
 
 /// Raised when the indexer authenticates the key but cannot serve it right now.
-pub const INDEXER_LIMITED: Code = Code::new("CRED-3");
+pub(crate) const INDEXER_LIMITED: Code = Code::new("CRED-3");
 
 /// Re-proves the configured indexer against its live service.
 pub struct IndexerCheck {

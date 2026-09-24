@@ -19,7 +19,8 @@ use crate::config::{PortForward, Protocols};
 /// Deliberately about seeding rather than about NAT: an operator who reads that
 /// downloads still work and seeding does not can decide whether they mind, which
 /// is the whole point of saying it.
-pub const COST: &str = "No port is forwarded, so other peers cannot open connections to your \
+pub(crate) const COST: &str =
+    "No port is forwarded, so other peers cannot open connections to your \
                         torrent client. Downloads still work — those are connections it opens \
                         itself — but peers reach you only when they can, so seeding is slower and \
                         some torrents will barely seed at all.";

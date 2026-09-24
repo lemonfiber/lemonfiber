@@ -80,7 +80,7 @@ fn split(version: &str) -> (&str, Option<&str>) {
 /// used where its meaning is the true one: this for the program's own version,
 /// [`against`] for the tags of the images it runs.
 #[must_use]
-pub fn among_versions(one: &str, two: &str) -> Standing {
+pub(crate) fn among_versions(one: &str, two: &str) -> Standing {
     let (first, ahead) = split(one);
     let (second, behind) = split(two);
     match against(first, second) {

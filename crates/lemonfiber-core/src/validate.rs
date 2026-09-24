@@ -185,7 +185,7 @@ impl Live {
 
     /// The same, also able to prove a Usenet provider over `nntp`.
     #[must_use]
-    pub fn with_nntp(http: Arc<dyn Http>, nntp: Arc<dyn Nntp>) -> Self {
+    pub(crate) fn with_nntp(http: Arc<dyn Http>, nntp: Arc<dyn Nntp>) -> Self {
         Self {
             http,
             nntp: Some(nntp),

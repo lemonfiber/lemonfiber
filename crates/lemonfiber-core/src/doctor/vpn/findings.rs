@@ -162,10 +162,10 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
 pub(super) const PORT_MISMATCH_CHECK: &str = "vpn.port-forward-client";
 
 /// Raised when the client is listening somewhere other than the forwarded port.
-pub const PORT_MISMATCH: Code = Code::new("VPN-7");
+pub(crate) const PORT_MISMATCH: Code = Code::new("VPN-7");
 
 /// Raised when torrents are configured with nothing containing them.
-pub const NO_TUNNEL: Code = Code::new("VPN-8");
+pub(crate) const NO_TUNNEL: Code = Code::new("VPN-8");
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.

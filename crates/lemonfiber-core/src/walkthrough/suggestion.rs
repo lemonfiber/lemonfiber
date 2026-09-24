@@ -78,7 +78,7 @@ pub const SUGGESTIONS: &[Suggestion] = &[
 impl Suggestion {
     /// The suggestions a service of this kind could act on.
     #[must_use]
-    pub fn for_kind(kind: Kind) -> Vec<Self> {
+    pub(crate) fn for_kind(kind: Kind) -> Vec<Self> {
         SUGGESTIONS
             .iter()
             .filter(|suggestion| suggestion.kind == kind)
@@ -88,7 +88,7 @@ impl Suggestion {
 
     /// Everything the running stack could handle, safest first.
     #[must_use]
-    pub fn for_kinds(kinds: &[Kind]) -> Vec<Self> {
+    pub(crate) fn for_kinds(kinds: &[Kind]) -> Vec<Self> {
         SUGGESTIONS
             .iter()
             .filter(|suggestion| kinds.contains(&suggestion.kind))
@@ -111,7 +111,7 @@ impl Suggestion {
     /// trying, so a caller holding a running service never has to handle "and if there
     /// were nothing" — a branch it could not reach and could not test.
     #[must_use]
-    pub const fn safe_for(kind: Kind) -> &'static str {
+    pub(crate) const fn safe_for(kind: Kind) -> &'static str {
         match kind {
             Kind::Sonarr => "Pioneer One",
             Kind::Radarr => "Big Buck Bunny",

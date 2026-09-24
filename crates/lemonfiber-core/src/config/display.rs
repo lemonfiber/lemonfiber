@@ -309,7 +309,7 @@ pub use lemonfiber_error::withheld::without_credentials;
 /// shown)` on both sides. What it buys is that the credential nobody thought of is
 /// withheld there before anybody thinks of it.
 #[must_use]
-pub fn shown_in_a_file(name: &str) -> bool {
+pub(crate) fn shown_in_a_file(name: &str) -> bool {
     let name = name.trim();
     if shouts(name) {
         return in_full(name);

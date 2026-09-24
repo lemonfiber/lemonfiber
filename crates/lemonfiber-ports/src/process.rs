@@ -53,7 +53,7 @@ pub enum Failure {
 pub const MISSING_PROGRAM: Code = Code::new("PROC-1");
 
 /// Raised when a program exists but will not start.
-pub const UNUSABLE_PROGRAM: Code = Code::new("PROC-2");
+pub(crate) const UNUSABLE_PROGRAM: Code = Code::new("PROC-2");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

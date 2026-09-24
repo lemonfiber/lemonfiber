@@ -23,14 +23,14 @@ use crate::doctor::storage::LOW_SPACE_FLOOR;
 /// to be appended to, a temporary file to be made while an import runs. Below this
 /// the stack is not short of space, it is failing, and every service on the volume
 /// is failing at once.
-pub const EXHAUSTED_FLOOR: u64 = 256 * 1024 * 1024;
+pub(crate) const EXHAUSTED_FLOOR: u64 = 256 * 1024 * 1024;
 
 /// The room left at which nothing more can be relied on to fit.
 ///
 /// A single film at the presets this product offers is a few gigabytes, so a
 /// volume under this cannot take one more of anything the stack is likely to be
 /// fetching.
-pub const CRITICAL_FLOOR: u64 = 2 * 1024 * 1024 * 1024;
+pub(crate) const CRITICAL_FLOOR: u64 = 2 * 1024 * 1024 * 1024;
 
 /// The share of a volume's own size below which it is worth mentioning.
 ///
@@ -104,7 +104,7 @@ impl Level {
     /// One level does, and it is the one where carrying on risks more than the
     /// work being stopped would.
     #[must_use]
-    pub const fn halts(self) -> bool {
+    pub(crate) const fn halts(self) -> bool {
         matches!(self, Self::Exhausted)
     }
 

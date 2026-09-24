@@ -171,7 +171,7 @@ impl Severity {
     /// Whether this is a warning — a drift that broke something, not the ordinary
     /// informational kind.
     #[must_use]
-    pub const fn is_warning(&self) -> bool {
+    pub(crate) const fn is_warning(&self) -> bool {
         matches!(self, Self::Warning { .. })
     }
 }

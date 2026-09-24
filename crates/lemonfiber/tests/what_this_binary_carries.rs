@@ -11,7 +11,7 @@
 //! app was validated and never served, and every test passed. Nothing here read
 //! what the binary carries, so nothing could say.
 
-use lemonfiber::cli::{APP, STACK};
+use lemonfiber::carried::{APP, STACK};
 
 /// The app is carried, and it is the app rather than an empty directory.
 ///

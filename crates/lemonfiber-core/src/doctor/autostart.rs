@@ -44,7 +44,7 @@ use crate::ports::{FileSystem, Runner};
 /// on native Linux — and what has gone wrong is the same thing either way: nothing
 /// brings the engine up, so nothing reads the restart policies that would bring the
 /// containers back.
-pub const ENGINE_NOT_AT_BOOT: Code = Code::new("ENV-4");
+pub(crate) const ENGINE_NOT_AT_BOOT: Code = Code::new("ENV-4");
 
 /// The check this reports under, named once so a finding and an answer to it cannot
 /// drift apart on a rename.

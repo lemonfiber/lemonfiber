@@ -39,11 +39,11 @@ impl std::fmt::Display for Kind {
 /// A session opened by proving the operator's password.
 pub const ADMISSION: Kind = Kind("admission");
 /// What adopting a setup already on this machine came to.
-pub const ADOPTION: Kind = Kind("adoption");
+pub(crate) const ADOPTION: Kind = Kind("adoption");
 /// What the operator will be told about, and what changing it came to.
 pub const ALERTS: Kind = Kind("alerts");
 /// The backup archives this machine has kept.
-pub const ARCHIVES: Kind = Kind("archives");
+pub(crate) const ARCHIVES: Kind = Kind("archives");
 /// Where a backup archive was written, and what it covers.
 pub const BACKUP: Kind = Kind("backup");
 /// How the line is shared, what that costs, and whether the clients keep to it.
@@ -61,7 +61,7 @@ pub const CREDENTIALS: Kind = Kind("credentials");
 /// One moment of what the stack is doing, as the dashboard assembles it.
 pub const DASHBOARD: Kind = Kind("dashboard");
 /// What the diagnostic checks found.
-pub const DOCTOR: Kind = Kind("doctor");
+pub(crate) const DOCTOR: Kind = Kind("doctor");
 /// A command could not do what was asked.
 pub const ERROR: Kind = Kind("error");
 /// Every form the stack declares.
@@ -69,7 +69,7 @@ pub const FORMS: Kind = Kind("forms");
 /// The one address to hand somebody who lives here.
 pub const FRONT_DOOR: Kind = Kind("front-door");
 /// Every word this product explains.
-pub const GLOSSARY: Kind = Kind("glossary");
+pub(crate) const GLOSSARY: Kind = Kind("glossary");
 /// Which app to use on which device.
 pub const CLIENTS: Kind = Kind("clients");
 
@@ -83,16 +83,16 @@ pub const HOUSEHOLD: Kind = Kind("household");
 /// What one member can watch, as the media server answers it for them.
 pub const HELD: Kind = Kind("held");
 /// What copying an operator's own records across came to.
-pub const IMPORT: Kind = Kind("import");
+pub(crate) const IMPORT: Kind = Kind("import");
 /// An account offered to somebody in the house.
-pub const INVITATION: Kind = Kind("invitation");
+pub(crate) const INVITATION: Kind = Kind("invitation");
 
 /// Somebody taken out of the household, or what taking them would cost.
 pub const REMOVAL: Kind = Kind("removal");
 /// The name given to work that outlives the request that started it.
 pub const JOB: Kind = Kind("job");
 /// What a lifecycle command did, or would have done.
-pub const LIFECYCLE: Kind = Kind("lifecycle");
+pub(crate) const LIFECYCLE: Kind = Kind("lifecycle");
 /// One line of a service's log.
 pub const LOG: Kind = Kind("log");
 /// What is already on this machine, before anything is proposed.
@@ -102,9 +102,9 @@ pub const MUSIC: Kind = Kind("music");
 /// Everything that leaves this machine, and what the stack's own services reach.
 pub const OUTBOUND: Kind = Kind("outbound");
 /// Every plugin installed on this machine, and what installing one came to.
-pub const PLUGINS: Kind = Kind("plugins");
+pub(crate) const PLUGINS: Kind = Kind("plugins");
 /// What starting or stopping would do, before it is done.
-pub const PREVIEW: Kind = Kind("preview");
+pub(crate) const PREVIEW: Kind = Kind("preview");
 /// Where each service in the stack comes from, and under what licence.
 pub const PROVENANCE: Kind = Kind("provenance");
 /// One line the container engine wrote while pulling images.
@@ -112,9 +112,9 @@ pub const PULL: Kind = Kind("pull");
 /// The quality choice, what it means, and what a command did with it.
 pub const QUALITY: Kind = Kind("quality");
 /// What could be put right, and what became of the ones agreed to.
-pub const REPAIR: Kind = Kind("repair");
+pub(crate) const REPAIR: Kind = Kind("repair");
 /// What standing in place of a setup already here came to.
-pub const REPLACEMENT: Kind = Kind("replacement");
+pub(crate) const REPLACEMENT: Kind = Kind("replacement");
 /// What a full reset did, or would do.
 pub const RESET: Kind = Kind("reset");
 /// What a restore would overwrite, or what it put back.
@@ -135,7 +135,7 @@ pub const STATUS: Kind = Kind("status");
 /// One step of a walkthrough, said the moment it is true.
 pub const STEP: Kind = Kind("step");
 /// What letting one completed download go costs, and what became of letting it.
-pub const STOP_SEEDING: Kind = Kind("stop-seeding");
+pub(crate) const STOP_SEEDING: Kind = Kind("stop-seeding");
 /// Everything lemonfiber keeps on this machine, and what became of it.
 pub const STORED: Kind = Kind("stored");
 /// The items whose downloads are stuck.
@@ -143,27 +143,27 @@ pub const STUCK: Kind = Kind("stuck");
 /// Where one item is in the pipeline.
 pub const TRACE: Kind = Kind("trace");
 /// What putting back the last repair came to.
-pub const UNDO: Kind = Kind("undo");
+pub(crate) const UNDO: Kind = Kind("undo");
 /// What taking lemonfiber off this machine would come to, or came to.
 pub const UNINSTALL: Kind = Kind("uninstall");
 /// What moving the stack onto this build's pinned versions would change, or came to.
 pub const UPDATE: Kind = Kind("update");
 /// What upgrading existing content did, or would do.
-pub const UPGRADE: Kind = Kind("upgrade");
+pub(crate) const UPGRADE: Kind = Kind("upgrade");
 /// The versions in play: the binary, and the stack it operates.
 pub const VERSION: Kind = Kind("version");
 /// A walkthrough's outcome.
-pub const WALKTHROUGH: Kind = Kind("walkthrough");
+pub(crate) const WALKTHROUGH: Kind = Kind("walkthrough");
 /// A supervision run's findings.
 pub const WATCH: Kind = Kind("watch");
 /// Where a setup run stands, and what it is still asking for.
-pub const WIZARD: Kind = Kind("wizard");
+pub(crate) const WIZARD: Kind = Kind("wizard");
 /// One glossary term.
 pub const WORD: Kind = Kind("word");
 /// What this stack wires to what, and how each link was settled.
 pub const WIRING: Kind = Kind("wiring");
 /// A change of which service fills a capability, and what it costs.
-pub const SUBSTITUTION: Kind = Kind("substitution");
+pub(crate) const SUBSTITUTION: Kind = Kind("substitution");
 
 /// Every kind, so the contract cannot describe one that is never emitted.
 pub const ALL: &[Kind] = &[

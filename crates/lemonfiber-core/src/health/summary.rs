@@ -20,7 +20,7 @@ use crate::error::Severity;
 /// declaring it fixed in the gaps. So a fault that has come back before is still
 /// counted for a while after it clears: one continuous problem rather than a word
 /// that changes twice a minute.
-pub const STEADY: u64 = 30;
+pub(crate) const STEADY: u64 = 30;
 
 /// The one-line summary, and what it expands to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

@@ -53,7 +53,7 @@ pub fn again(attempt: u32) -> Option<Duration> {
 /// The distinction an operator acts on: a service that did not answer once may
 /// have been busy, and one that did not answer every time it was asked is down.
 #[must_use]
-pub const fn is_persistent(attempts: u32) -> bool {
+pub(crate) const fn is_persistent(attempts: u32) -> bool {
     attempts >= ATTEMPTS
 }
 

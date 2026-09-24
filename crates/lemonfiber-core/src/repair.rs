@@ -52,7 +52,7 @@ pub enum Stance {
 impl Stance {
     /// Whether a repair may be carried out at all under this stance.
     #[must_use]
-    pub const fn may_act(self) -> bool {
+    pub(crate) const fn may_act(self) -> bool {
         !matches!(self, Self::ReportOnly)
     }
 
@@ -322,7 +322,7 @@ pub fn undoing(changes: &[Change]) -> Vec<Undo> {
 /// only the second of them makes a field lemonfiber's to write again. A field it wrote and
 /// somebody has since changed reads as theirs, whoever wrote it first.
 #[must_use]
-pub fn may_write(recorded: Option<&Record>, holds: Option<&str>) -> Writing {
+pub(crate) fn may_write(recorded: Option<&Record>, holds: Option<&str>) -> Writing {
     match recorded {
         // Nothing recorded: lemonfiber never wrote here, so whatever is there is the
         // operator's own and not a difference from anything lemonfiber intended.
@@ -345,7 +345,7 @@ pub fn may_write(recorded: Option<&Record>, holds: Option<&str>) -> Writing {
 /// Reading `wrote` alone would call every one of those lemonfiber's to write over,
 /// which is the whole thing this rule exists to stop.
 #[must_use]
-pub fn may_put_back(wrote: &str, holds: Option<&str>) -> Writing {
+pub(crate) fn may_put_back(wrote: &str, holds: Option<&str>) -> Writing {
     if holds == Some(wrote) {
         Writing::Ours
     } else {

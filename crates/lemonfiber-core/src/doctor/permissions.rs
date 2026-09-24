@@ -29,7 +29,7 @@ use crate::error::{Code, Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 
 /// Raised when a file holding a credential can be read by more than its owner.
-pub const CREDENTIALS_EXPOSED: Code = Code::new("CONFIG-4");
+pub(crate) const CREDENTIALS_EXPOSED: Code = Code::new("CONFIG-4");
 
 /// The permission bits that grant anyone but the owner anything at all.
 const BEYOND_THE_OWNER: u32 = 0o077;

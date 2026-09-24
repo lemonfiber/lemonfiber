@@ -68,7 +68,7 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         // sharper reason than the rest: a second place that hashed one its own way
         // would be a second set of parameters, and the weaker of the two would be
         // invisible in everything it produced.
-        ("argon2", &["admission/credential.rs"]),
+        ("argon2", &["lemonfiber-core/src/admission.rs"]),
     ];
 
     for (crate_name, permitted) in confined {

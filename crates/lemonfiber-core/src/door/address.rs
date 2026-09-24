@@ -65,7 +65,7 @@ pub const fn publishes_a_name(environment: Environment) -> bool {
 /// operator wrote down is one their network resolves, which is not something this
 /// can check and not something it should overrule.
 #[must_use]
-pub fn reaches_the_household(recorded: &str) -> bool {
+pub(crate) fn reaches_the_household(recorded: &str) -> bool {
     let written = recorded.trim();
     if written.is_empty() {
         return false;

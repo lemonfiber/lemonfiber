@@ -67,7 +67,7 @@ pub enum Reading<T> {
 impl<T> Reading<T> {
     /// Whether this reading is current — a `Known`, however small its value.
     #[must_use]
-    pub const fn is_current(&self) -> bool {
+    pub(crate) const fn is_current(&self) -> bool {
         matches!(self, Self::Known(_))
     }
 
@@ -90,7 +90,7 @@ impl<T: Clone> Reading<T> {
     /// Carried forward until a fresh value arrives, since it remains the last thing
     /// the source actually said.
     #[must_use]
-    pub fn or_stale(self, previous: Option<&Self>) -> Self {
+    pub(crate) fn or_stale(self, previous: Option<&Self>) -> Self {
         match self {
             Self::Known(value) => Self::Known(value),
             Self::Stale(_) | Self::Unknown => match previous.and_then(Self::value) {
@@ -334,7 +334,7 @@ pub fn eta(remaining: u64, speed: u64) -> Option<Duration> {
 /// do — and a `done` past `total`, which clock or accounting skew can produce, is
 /// clamped to a hundred rather than reported as more-than-finished.
 #[must_use]
-pub fn percent(done: u64, total: u64) -> u8 {
+pub(crate) fn percent(done: u64, total: u64) -> u8 {
     let pct = u128::from(done)
         .saturating_mul(100)
         .checked_div(u128::from(total))

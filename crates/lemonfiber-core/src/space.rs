@@ -54,22 +54,22 @@ use crate::ports::occupancy::Occupant;
 use crate::ports::service::Seeded;
 
 /// Raised when the volume is full and new acquisitions are therefore halted.
-pub const HALTED: crate::error::Code = crate::error::Code::new("SPACE-1");
+pub(crate) const HALTED: crate::error::Code = crate::error::Code::new("SPACE-1");
 
 /// Raised when there is no data location to measure.
-pub const NOWHERE_TO_MEASURE: crate::error::Code = crate::error::Code::new("SPACE-2");
+pub(crate) const NOWHERE_TO_MEASURE: crate::error::Code = crate::error::Code::new("SPACE-2");
 
 /// Raised when the data location is there and could not be read.
-pub const WALK_REFUSED: crate::error::Code = crate::error::Code::new("SPACE-3");
+pub(crate) const WALK_REFUSED: crate::error::Code = crate::error::Code::new("SPACE-3");
 
 /// Raised when there is no torrent client here to be holding a completed download.
-pub const NOTHING_TO_ASK: crate::error::Code = crate::error::Code::new("SPACE-4");
+pub(crate) const NOTHING_TO_ASK: crate::error::Code = crate::error::Code::new("SPACE-4");
 
 /// Raised when the client answers and is holding nothing of the name given.
-pub const NOT_HELD: crate::error::Code = crate::error::Code::new("SPACE-5");
+pub(crate) const NOT_HELD: crate::error::Code = crate::error::Code::new("SPACE-5");
 
 /// Raised when an agreement names an offer that is not the one standing now.
-pub const ANOTHER_OFFER: crate::error::Code = crate::error::Code::new("SPACE-6");
+pub(crate) const ANOTHER_OFFER: crate::error::Code = crate::error::Code::new("SPACE-6");
 
 /// Raised when the client could not be reached, or would not let a download go.
 pub const STILL_HELD: crate::error::Code = crate::error::Code::new("SPACE-7");

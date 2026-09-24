@@ -431,7 +431,7 @@ impl Ctx {
     /// the first since a restart — without a machine that has actually restarted,
     /// which no test can arrange.
     #[must_use]
-    pub fn with_started(mut self, started: Arc<dyn Started>) -> Self {
+    pub(crate) fn with_started(mut self, started: Arc<dyn Started>) -> Self {
         self.started = started;
         self
     }
@@ -441,7 +441,7 @@ impl Ctx {
     /// For the reason above: the machine a test runs on is plugged into whatever it
     /// is plugged into, and both answers have to be exercised from it.
     #[must_use]
-    pub fn with_power(mut self, power: Arc<dyn Supply>) -> Self {
+    pub(crate) fn with_power(mut self, power: Arc<dyn Supply>) -> Self {
         self.power = power;
         self
     }

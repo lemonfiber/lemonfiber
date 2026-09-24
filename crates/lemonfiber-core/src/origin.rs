@@ -158,7 +158,7 @@ impl Origin {
 /// made by hand since is theirs no less than the answer was; what a change would
 /// land on is the drift question, asked where a change is being made.
 #[must_use]
-pub fn of_setting(key: &str, record: Option<&Record>) -> Origin {
+pub(crate) fn of_setting(key: &str, record: Option<&Record>) -> Origin {
     if record.is_some() {
         return Origin::Operator;
     }

@@ -43,31 +43,31 @@ pub enum State {
 /// What became of the request itself, as the request service numbers them.
 mod request_status {
     /// Nobody has approved or refused it yet.
-    pub const PENDING: u8 = 1;
+    pub(crate) const PENDING: u8 = 1;
     /// Approved — the services were asked for it.
-    pub const APPROVED: u8 = 2;
+    pub(crate) const APPROVED: u8 = 2;
     /// Turned down.
-    pub const DECLINED: u8 = 3;
+    pub(crate) const DECLINED: u8 = 3;
     /// The attempt to fetch it failed.
     pub const FAILED: u8 = 4;
     /// The request is finished with; where the media stands is the answer now.
-    pub const COMPLETED: u8 = 5;
+    pub(crate) const COMPLETED: u8 = 5;
 }
 
 /// What became of the media the request asked for, as the request service numbers them.
 mod media_status {
     /// Nothing is known about it yet.
-    pub const UNKNOWN: u8 = 1;
+    pub(crate) const UNKNOWN: u8 = 1;
     /// Known and waiting.
-    pub const PENDING: u8 = 2;
+    pub(crate) const PENDING: u8 = 2;
     /// Being fetched.
-    pub const PROCESSING: u8 = 3;
+    pub(crate) const PROCESSING: u8 = 3;
     /// Some of it is here.
-    pub const PARTIALLY_AVAILABLE: u8 = 4;
+    pub(crate) const PARTIALLY_AVAILABLE: u8 = 4;
     /// All of it is here.
-    pub const AVAILABLE: u8 = 5;
+    pub(crate) const AVAILABLE: u8 = 5;
     /// It was here and has been removed.
-    pub const DELETED: u8 = 7;
+    pub(crate) const DELETED: u8 = 7;
 }
 
 impl State {

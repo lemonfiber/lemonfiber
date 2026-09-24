@@ -37,7 +37,7 @@ pub use suggestion::{Availability, Suggestion, SUGGESTIONS};
 
 /// How large a download has to be before its size alone is worth calling out ahead of
 /// the wait, in bytes. Below this the wait is short enough that a figure is noise.
-pub const LARGE: u64 = 4 * 1024 * 1024 * 1024;
+pub(crate) const LARGE: u64 = 4 * 1024 * 1024 * 1024;
 
 #[cfg(test)]
 mod tests {

@@ -91,7 +91,7 @@ impl Alert {
     /// Only the critical, and only on the way in. A resolution is good news and can
     /// wait for morning; a leak cannot.
     #[must_use]
-    pub const fn overrides_quiet(&self) -> bool {
+    pub(crate) const fn overrides_quiet(&self) -> bool {
         matches!(self.severity, Severity::Critical) && matches!(self.moment, Moment::Onset)
     }
 

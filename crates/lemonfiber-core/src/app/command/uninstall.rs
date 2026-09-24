@@ -69,7 +69,7 @@ impl Removing {
     /// holds; that half is the caller's, because a rehearsal still reports what a
     /// confirmed run would take.
     #[must_use]
-    pub const fn goes_ahead(&self) -> bool {
+    pub(crate) const fn goes_ahead(&self) -> bool {
         self.confirm
     }
 }

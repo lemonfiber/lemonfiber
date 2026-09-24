@@ -57,7 +57,7 @@ pub fn receipt_under(home: &Path) -> PathBuf {
 /// one directory above the binary is the record for *that* binary rather than for a
 /// second cargo somewhere else on the machine.
 #[must_use]
-pub fn cargo_record_above(binary: &Path) -> Option<PathBuf> {
+pub(crate) fn cargo_record_above(binary: &Path) -> Option<PathBuf> {
     Some(binary.parent()?.parent()?.join(".crates2.json"))
 }
 
@@ -67,7 +67,7 @@ pub fn cargo_record_above(binary: &Path) -> Option<PathBuf> {
 /// the same directory and moving it into place, so the directory is what has to be
 /// writable and the binary itself is never touched by the asking.
 #[must_use]
-pub fn probe_beside(binary: &Path) -> Option<PathBuf> {
+pub(crate) fn probe_beside(binary: &Path) -> Option<PathBuf> {
     Some(binary.parent()?.join(PROBE))
 }
 

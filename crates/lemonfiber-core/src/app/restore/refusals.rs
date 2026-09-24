@@ -15,37 +15,37 @@ use crate::backup::Relocation;
 use crate::error::{Code, Problem, Remedy, Severity, State};
 
 /// Raised when a backup archive cannot be read to decide a restore.
-pub const CORRUPT: Code = Code::new("RESTORE-1");
+pub(crate) const CORRUPT: Code = Code::new("RESTORE-1");
 
 /// Raised when an archive was written by a newer lemonfiber than this one.
-pub const TOO_NEW: Code = Code::new("RESTORE-2");
+pub(crate) const TOO_NEW: Code = Code::new("RESTORE-2");
 
 /// Raised when an archive's format cannot be restored by this build.
-pub const INCOMPATIBLE: Code = Code::new("RESTORE-3");
+pub(crate) const INCOMPATIBLE: Code = Code::new("RESTORE-3");
 
 /// Raised when an archive holds a member that would be written outside its area.
-pub const UNSAFE: Code = Code::new("RESTORE-4");
+pub(crate) const UNSAFE: Code = Code::new("RESTORE-4");
 
 /// Raised when a restore onto a different data root awaits the operator's consent.
-pub const NEEDS_REPOINT: Code = Code::new("RESTORE-5");
+pub(crate) const NEEDS_REPOINT: Code = Code::new("RESTORE-5");
 
 /// Raised when an archive could not be unpacked.
-pub const NOT_RESTORED: Code = Code::new("RESTORE-6");
+pub(crate) const NOT_RESTORED: Code = Code::new("RESTORE-6");
 
 /// Raised when a restore could not be shown that nothing is writing to a database.
-pub const STILL_RUNNING: Code = Code::new("RESTORE-7");
+pub(crate) const STILL_RUNNING: Code = Code::new("RESTORE-7");
 
 /// Raised when a name does not name one of the backups this machine kept.
-pub const NOT_KEPT_HERE: Code = Code::new("RESTORE-8");
+pub(crate) const NOT_KEPT_HERE: Code = Code::new("RESTORE-8");
 
 /// Raised when this run has nowhere it knows to look for an archive.
-pub const NOWHERE_KEPT: Code = Code::new("RESTORE-9");
+pub(crate) const NOWHERE_KEPT: Code = Code::new("RESTORE-9");
 
 /// Raised when the restored settings could not be pointed at this machine's data root.
-pub const NOT_REPOINTED: Code = Code::new("RESTORE-10");
+pub(crate) const NOT_REPOINTED: Code = Code::new("RESTORE-10");
 
 /// Raised when the archive holds trees lemonfiber does not manage.
-pub const NOT_OURS: Code = Code::new("RESTORE-12");
+pub(crate) const NOT_OURS: Code = Code::new("RESTORE-12");
 
 /// The refusal for a run that cannot say where its own files go.
 pub(crate) fn nowhere() -> Problem {

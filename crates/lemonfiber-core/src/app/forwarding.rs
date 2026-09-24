@@ -136,7 +136,7 @@ pub async fn reconcile(ctx: &Ctx, granted: Option<u16>, project: Option<&Path>) 
 
 /// What the torrent client says it is listening on, where there is one and it can
 /// be authenticated to.
-pub async fn listening_port(
+pub(crate) async fn listening_port(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     project: Option<&std::path::Path>,
@@ -153,7 +153,10 @@ pub async fn listening_port(
 /// yesterday's port looks entirely healthy from inside while nobody outside can
 /// reach it. A diagnosis, which is only looking, offers the same fix instead of
 /// making it.
-pub async fn after_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Option<String> {
+pub(crate) async fn after_start(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+) -> Option<String> {
     let granted = crate::doctor::vpn::granted_port(
         ctx.engine.as_ref(),
         &ctx.settings.project,

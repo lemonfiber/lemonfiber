@@ -49,7 +49,7 @@ impl Watched {
     /// Twenty stalled downloads are one sentence and one remedy; printing twenty
     /// lines is how a report stops being read at the point it starts mattering.
     #[must_use]
-    pub fn by_category(&self) -> Vec<(Stall, usize)> {
+    pub(crate) fn by_category(&self) -> Vec<(Stall, usize)> {
         let mut counted: BTreeMap<Stall, usize> = BTreeMap::new();
         for stuck in &self.stuck {
             *counted.entry(stuck.stall).or_default() += 1;

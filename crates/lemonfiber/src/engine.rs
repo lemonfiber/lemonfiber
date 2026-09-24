@@ -495,7 +495,7 @@ mod tests {
             Arc::new(Absent),
             Arc::new(lemonfiber_adapters::System),
             lemonfiber_adapters::live(),
-            Source::Embedded(&lemonfiber::cli::STACK),
+            Source::Embedded(&lemonfiber::carried::STACK),
             settings,
             Environment::MacOs,
         )

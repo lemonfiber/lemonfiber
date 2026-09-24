@@ -85,20 +85,20 @@ impl Item {
     /// The failure nobody owns. An \*arr that has imported it is done — the client
     /// keeping the file to seed is not a problem, it is the arrangement working.
     #[must_use]
-    pub fn is_completed_not_imported(&self) -> bool {
+    pub(crate) fn is_completed_not_imported(&self) -> bool {
         let finished = self.fetching.is_some_and(Fetching::is_complete);
         finished && !self.importing.is_some_and(|importing| importing.imported)
     }
 
     /// Whether it is on disk with nothing waiting for it.
     #[must_use]
-    pub const fn is_orphaned(&self) -> bool {
+    pub(crate) const fn is_orphaned(&self) -> bool {
         self.fetching.is_some() && self.importing.is_none()
     }
 
     /// Whether nothing has been fetched for it at all.
     #[must_use]
-    pub const fn is_waiting(&self) -> bool {
+    pub(crate) const fn is_waiting(&self) -> bool {
         self.fetching.is_none()
     }
 }

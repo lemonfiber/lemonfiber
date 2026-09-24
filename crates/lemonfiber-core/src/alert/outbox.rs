@@ -79,13 +79,13 @@ impl Outbox {
 
     /// Everything waiting to be delivered.
     #[must_use]
-    pub fn owing(&self) -> &[Alert] {
+    pub(crate) fn owing(&self) -> &[Alert] {
         &self.owed
     }
 
     /// Whether anything is waiting.
     #[must_use]
-    pub fn owes_anything(&self) -> bool {
+    pub(crate) fn owes_anything(&self) -> bool {
         !self.owed.is_empty()
     }
 

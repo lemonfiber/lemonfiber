@@ -348,10 +348,10 @@ fn lines(journal: &Journal, seal: &Seal, random: &dyn Random) -> String {
 }
 
 /// Raised when apply is asked for before the answers have been reviewed.
-pub const NOT_REVIEWED: Code = Code::new("SETUP-1");
+pub(crate) const NOT_REVIEWED: Code = Code::new("SETUP-1");
 
 /// Raised when the operator's chosen data directory cannot be created.
-pub const DIR_NOT_MADE: Code = Code::new("SETUP-2");
+pub(crate) const DIR_NOT_MADE: Code = Code::new("SETUP-2");
 
 /// The problem of applying before review — nothing is settled to write.
 ///

@@ -25,7 +25,7 @@ use super::LibraryPath;
 /// The tree a root folder has to sit within for moving the data location to carry
 /// it: a path under this is re-pointed by the move, and a path outside it is not
 /// reachable by the move at all.
-pub const MOUNT: &str = "/data";
+pub(crate) const MOUNT: &str = "/data";
 
 /// One library path a service holds, as it was read from that service.
 #[derive(Debug, Clone, PartialEq, Eq)]

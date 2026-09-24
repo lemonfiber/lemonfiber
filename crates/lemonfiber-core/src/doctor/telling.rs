@@ -29,7 +29,7 @@ use crate::seed::observed_telling;
 
 /// Raised when the household is told about less than lemonfiber now sets out to tell
 /// them, through no choice of the operator's.
-pub const BEHIND: Code = Code::new("TELLING-1");
+pub(crate) const BEHIND: Code = Code::new("TELLING-1");
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "config.household-telling";

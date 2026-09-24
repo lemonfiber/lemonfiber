@@ -296,7 +296,7 @@ fn nothing_to_recover() -> Problem {
 }
 
 /// Raised when a recovery is asked for and no apply stopped part-way.
-pub const NOTHING_TO_RECOVER: Code = Code::new("SETUP-8");
+pub(crate) const NOTHING_TO_RECOVER: Code = Code::new("SETUP-8");
 
 /// The problem of answering setup on a machine that already holds configuration.
 fn already_set_up() -> Problem {

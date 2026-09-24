@@ -53,7 +53,7 @@ pub fn unmatched(carrying: &[Carried], profiles: &[String]) -> Vec<UnsupportedRe
 
 /// The records that can be carried, which is what is left once the rest are named.
 #[must_use]
-pub fn carryable(carrying: &[Carried], profiles: &[String]) -> Vec<Carried> {
+pub(crate) fn carryable(carrying: &[Carried], profiles: &[String]) -> Vec<Carried> {
     let refused = unmatched(carrying, profiles);
     carrying
         .iter()

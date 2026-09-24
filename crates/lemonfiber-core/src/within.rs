@@ -44,7 +44,7 @@ pub fn beneath(asked: &str) -> Option<PathBuf> {
 /// a directory of its own files — the archives this machine kept — where a
 /// subdirectory is not somewhere it ever wrote and so not somewhere to read from.
 #[must_use]
-pub fn one_file(asked: &str) -> Option<PathBuf> {
+pub(crate) fn one_file(asked: &str) -> Option<PathBuf> {
     let path = beneath(asked)?;
     let mut parts = path.components();
     let only = parts.next()?;

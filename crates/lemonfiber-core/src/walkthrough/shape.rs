@@ -84,7 +84,7 @@ impl Why {
 
     /// Whether this stack is offered a walk.
     #[must_use]
-    pub const fn is_offered(self) -> bool {
+    pub(crate) const fn is_offered(self) -> bool {
         self.shape().is_some()
     }
 }

@@ -71,7 +71,7 @@ impl Expiry {
     /// before any reading could carry it — so what the operator would see is requests
     /// disappearing and never one waiting on them.
     #[must_use]
-    pub fn too_soon(after: u32) -> bool {
+    pub(crate) fn too_soon(after: u32) -> bool {
         u64::from(after) < super::REMINDING_AFTER
     }
 }

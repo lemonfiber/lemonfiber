@@ -40,7 +40,7 @@ use crate::ports::http::{self, Http, Method};
 /// One code for all of them rather than one per plugin, because a code is a stable
 /// thing an operator searches for and a plugin's own name is not this build's to mint
 /// one from. Which check and which plugin is on the finding, where it can be read.
-pub const CONTRIBUTED_FAILED: Code = Code::new("PLUGIN-1");
+pub(crate) const CONTRIBUTED_FAILED: Code = Code::new("PLUGIN-1");
 
 /// Every check an installed plugin adds to the register, ready to be run with the rest.
 ///

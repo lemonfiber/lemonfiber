@@ -124,7 +124,7 @@ impl Stage {
     /// these is doing fine; an item resting at a non-progress stage below `Available`
     /// has stopped, and [`Stage::stall`] says why.
     #[must_use]
-    pub const fn in_progress(self) -> bool {
+    pub(crate) const fn in_progress(self) -> bool {
         matches!(self, Self::Searching | Self::Downloading | Self::Importing)
     }
 

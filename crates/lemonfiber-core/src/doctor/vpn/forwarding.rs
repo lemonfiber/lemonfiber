@@ -90,7 +90,7 @@ impl Forwarding {
     /// already on it — a write that changes nothing is still a write, and one made
     /// every run is a client restarted every run.
     #[must_use]
-    pub fn to_push(self) -> Option<u16> {
+    pub(crate) fn to_push(self) -> Option<u16> {
         let granted = self.granted?;
         (self.listening != Some(granted)).then_some(granted)
     }

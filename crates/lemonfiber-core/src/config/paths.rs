@@ -22,12 +22,12 @@ pub struct Paths {
 /// The change journal's file name, named once so a caller placing it beside the
 /// environment file — as a repair recording what it changed does — cannot place it
 /// somewhere the reversal will not look.
-pub const JOURNAL: &str = "journal.jsonl";
+pub(crate) const JOURNAL: &str = "journal.jsonl";
 
 /// The install record's file name, named once for the reason the journal's is: the
 /// command that writes it reaches it beside the environment file rather than through
 /// this layout, so the two spellings have to be one.
-pub const PLUGINS: &str = "plugins.json";
+pub(crate) const PLUGINS: &str = "plugins.json";
 
 impl Paths {
     /// The layout beneath a configuration base and a data base.

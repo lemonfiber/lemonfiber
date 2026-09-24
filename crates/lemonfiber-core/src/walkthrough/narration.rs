@@ -99,7 +99,7 @@ impl Speed {
 
     /// Whether this is large enough that its size is worth stating before the wait.
     #[must_use]
-    pub const fn is_large(self) -> bool {
+    pub(crate) const fn is_large(self) -> bool {
         self.total >= super::LARGE
     }
 

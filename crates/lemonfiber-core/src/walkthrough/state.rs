@@ -45,7 +45,7 @@ impl State {
     /// complete — and the first is not either: something still being chosen has not
     /// started, so it reads as the offer it came from.
     #[must_use]
-    pub const fn of_step(step: Step) -> Self {
+    pub(crate) const fn of_step(step: Step) -> Self {
         match step {
             Step::Choosing => Self::Offered,
             Step::Searching => Self::Searching,
@@ -61,7 +61,7 @@ impl State {
     /// Whether the walk is still going. A caller polling one asks this rather than
     /// listing the states it has to keep waiting through.
     #[must_use]
-    pub const fn is_running(self) -> bool {
+    pub(crate) const fn is_running(self) -> bool {
         matches!(
             self,
             Self::Searching | Self::Grabbing | Self::Downloading | Self::Importing

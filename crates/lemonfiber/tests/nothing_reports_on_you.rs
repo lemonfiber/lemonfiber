@@ -137,7 +137,7 @@ const MINTING: &[(&str, &str)] = &[
          authenticate with them, and sent to those services on this machine and nowhere else",
     ),
     (
-        "crates/lemonfiber-core/src/admission/credential.rs",
+        "crates/lemonfiber-core/src/admission.rs",
         "the salt one stored password is hashed with. Deliberately different for every record \
          and never sent anywhere: it is what stops two machines writing down the same password \
          the same way, which is the opposite of a value anything could be recognised by",

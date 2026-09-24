@@ -446,7 +446,7 @@ fn does_not_apply(rejected: Rejected) -> Problem {
 }
 
 /// Raised when an answer is not meaningful on the platform setup is running on.
-pub const DOES_NOT_APPLY: Code = Code::new("SETUP-5");
+pub(crate) const DOES_NOT_APPLY: Code = Code::new("SETUP-5");
 
 /// The problem of running setup on a wizard that is no longer gathering answers.
 fn already_underway() -> Problem {
@@ -460,7 +460,7 @@ fn already_underway() -> Problem {
 }
 
 /// Raised when setup is asked to gather answers for a wizard already past it.
-pub const ALREADY_UNDERWAY: Code = Code::new("SETUP-6");
+pub(crate) const ALREADY_UNDERWAY: Code = Code::new("SETUP-6");
 
 #[cfg(test)]
 mod tests {

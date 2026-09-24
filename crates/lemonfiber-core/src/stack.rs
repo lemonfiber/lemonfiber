@@ -60,7 +60,7 @@ impl Source {
     /// # Errors
     ///
     /// Returns [`Failure`] when there is no manifest, or it cannot be read.
-    pub fn manifest_text(self) -> Result<String, Failure> {
+    pub(crate) fn manifest_text(self) -> Result<String, Failure> {
         match self {
             Self::Embedded(dir) => dir
                 .get_file(MANIFEST)
@@ -137,7 +137,7 @@ impl Source {
     /// pointing at one is for — so an answer kept from last time would be about a
     /// stack that no longer exists.
     #[must_use]
-    pub fn crowded_mounts(self) -> Vec<mounts::Crowded> {
+    pub(crate) fn crowded_mounts(self) -> Vec<mounts::Crowded> {
         mounts::crowded(&self.compose_files())
     }
 
@@ -361,10 +361,10 @@ pub enum Failure {
 pub const STACK_UNREADABLE: Code = Code::new("STACK-1");
 
 /// Raised when a manifest is readable and this build cannot use it.
-pub const STACK_UNUSABLE: Code = Code::new("STACK-2");
+pub(crate) const STACK_UNUSABLE: Code = Code::new("STACK-2");
 
 /// Raised when the embedded stack is not intact.
-pub const STACK_NOT_EMBEDDED: Code = Code::new("STACK-3");
+pub(crate) const STACK_NOT_EMBEDDED: Code = Code::new("STACK-3");
 
 /// Raised when a manifest parses and breaks the contract.
 pub const STACK_INVALID: Code = Code::new("STACK-6");
@@ -376,10 +376,10 @@ pub const STACK_MALFORMED: Code = Code::new("STACK-7");
 pub const STACK_UNRECOGNISED: Code = Code::new("STACK-8");
 
 /// Raised when lemonfiber has nowhere to write the stack.
-pub const STACK_NOT_SET_UP: Code = Code::new("STACK-4");
+pub(crate) const STACK_NOT_SET_UP: Code = Code::new("STACK-4");
 
 /// Raised when the stack could not be written to disk.
-pub const STACK_NOT_WRITTEN: Code = Code::new("STACK-5");
+pub(crate) const STACK_NOT_WRITTEN: Code = Code::new("STACK-5");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

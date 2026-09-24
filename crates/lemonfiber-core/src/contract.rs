@@ -78,7 +78,7 @@ use crate::update::run::Report as StackUpdate;
 use crate::walkthrough::Line;
 
 /// Where the generated artefact is kept, relative to the workspace root.
-pub const CONTRACT_PATH: &str = "contract/web-api.contract.json";
+pub(crate) const CONTRACT_PATH: &str = "contract/web-api.contract.json";
 
 pub use stability::{Surface, SURFACE_PATH};
 

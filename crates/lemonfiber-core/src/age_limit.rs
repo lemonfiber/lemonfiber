@@ -75,7 +75,7 @@ pub fn steps() -> &'static [Step] {
 /// network and a browser has other ways at the same files. Said in one place because
 /// two surfaces wording a promise differently is two surfaces making different
 /// promises, and this is the promise it matters least to get wrong.
-pub const A_FILTER_NOT_A_LOCK: &str = "These limits are a content filter, not a \
+pub(crate) const A_FILTER_NOT_A_LOCK: &str = "These limits are a content filter, not a \
     security boundary: they decide what the media server offers an account, and \
     somebody with the run of the home network has other ways at the same files.";
 

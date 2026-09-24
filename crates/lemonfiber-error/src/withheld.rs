@@ -93,7 +93,7 @@ fn names_a_field(word: &str) -> bool {
 /// the URL a transport failure keeps, and inside a sentence that quotes one. A query
 /// nobody reads is a smaller loss than a key everybody can.
 #[must_use]
-pub fn without_query(value: &str) -> String {
+pub(crate) fn without_query(value: &str) -> String {
     match value.split_once('?') {
         None => value.to_owned(),
         Some((address, _)) => format!("{address}?{REDACTED}"),

@@ -24,13 +24,13 @@ use serde::{Deserialize, Serialize};
 /// Late enough that a household on a generous plan is not warned every month, and
 /// early enough that there is a tenth of the month's allowance left to change
 /// something with.
-pub const WARN_AT: u64 = 90;
+pub(crate) const WARN_AT: u64 = 90;
 
 /// The sentence that travels with every figure counted here.
 ///
 /// Stated the same way wherever a cap figure appears, because the whole risk of
 /// reporting one is that it gets read as the household's total.
-pub const ONLY_THE_STACK: &str =
+pub(crate) const ONLY_THE_STACK: &str =
     "This counts what lemonfiber's own download clients moved. Everything else in \
      the house — phones, consoles, video calls, anybody streaming from outside — \
      is on the same line and is not counted here, so the meter your provider keeps \
@@ -86,7 +86,7 @@ impl WhenExceeded {
     /// that shows them without saying so is one that reads as having forgotten the
     /// declaration.
     #[must_use]
-    pub const fn at_the_cap(self) -> &'static str {
+    pub(crate) const fn at_the_cap(self) -> &'static str {
         match self {
             Self::Pause => {
                 "The cap is spent, so the download clients are stopped: nothing new is \

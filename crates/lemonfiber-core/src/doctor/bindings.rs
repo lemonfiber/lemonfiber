@@ -35,15 +35,15 @@ use crate::platform::Environment;
 use crate::ports::docker::{Container, Engine};
 
 /// Raised when a service the stack calls admin answers somewhere off this machine.
-pub const BEYOND_LOOPBACK: Code = Code::new("BIND-1");
+pub(crate) const BEYOND_LOOPBACK: Code = Code::new("BIND-1");
 
 /// Raised where a published port is reached without the host's own firewall rules
 /// being consulted.
-pub const AROUND_THE_FIREWALL: Code = Code::new("BIND-2");
+pub(crate) const AROUND_THE_FIREWALL: Code = Code::new("BIND-2");
 
 /// Raised where an admin service answers off this machine and the operator has
 /// written down that they meant it to.
-pub const DELIBERATE: Code = Code::new("BIND-3");
+pub(crate) const DELIBERATE: Code = Code::new("BIND-3");
 
 /// The name this check's findings are given.
 const CHECK: &str = "network.bindings";

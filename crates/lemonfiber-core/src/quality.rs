@@ -64,7 +64,7 @@ impl Preset {
     /// The preset chosen when the operator expresses no preference: looks right on a
     /// television at sensible file sizes.
     #[must_use]
-    pub const fn default_preset() -> Self {
+    pub(crate) const fn default_preset() -> Self {
         Self::Balanced
     }
 
@@ -133,7 +133,7 @@ impl Preset {
     /// transcoding warns on, so the plain boolean lives beside the prose it agrees
     /// with rather than being read back out of that prose.
     #[must_use]
-    pub const fn likely_needs_transcoding(self) -> bool {
+    pub(crate) const fn likely_needs_transcoding(self) -> bool {
         matches!(self, Self::Maximum)
     }
 
@@ -143,7 +143,7 @@ impl Preset {
     /// storage projection turns on is the ratio between presets, which the midpoints
     /// preserve without the systematic over-estimate an upper bound would carry.
     #[must_use]
-    pub const fn bytes_per_hour(self) -> u64 {
+    pub(crate) const fn bytes_per_hour(self) -> u64 {
         // Decimal gigabytes, to read the same as the "GB per hour" the operator sees.
         // The midpoint of each stated range: 0.5–1 → 0.75, 2–3 → 2.5, 4–6 → 5,
         // 10–25 → 17.5.
@@ -199,12 +199,12 @@ impl Selection {
     /// Whether an audio format has been chosen for music — as opposed to the default
     /// standing in. Lets a surface show music only where it is genuinely set.
     #[must_use]
-    pub fn music_chosen(&self) -> bool {
+    pub(crate) fn music_chosen(&self) -> bool {
         self.music.is_some()
     }
 
     /// Choose the audio format for music.
-    pub fn set_music(&mut self, format: Format) {
+    pub(crate) fn set_music(&mut self, format: Format) {
         self.music = Some(format);
     }
 
@@ -217,7 +217,7 @@ impl Selection {
     /// The preset in force for a media type: its own exception where it has one,
     /// otherwise the global choice.
     #[must_use]
-    pub fn for_type(&self, media_type: &str) -> Preset {
+    pub(crate) fn for_type(&self, media_type: &str) -> Preset {
         self.per_type
             .get(media_type)
             .copied()
@@ -237,7 +237,7 @@ impl Selection {
     /// Change the preset in force where a type has no exception. Any exception that
     /// now matches the new global stops being one, so raising everything to a
     /// preset a type was already set to leaves no redundant override behind.
-    pub fn set_global(&mut self, preset: Preset) {
+    pub(crate) fn set_global(&mut self, preset: Preset) {
         self.global = preset;
         self.per_type.retain(|_, exception| *exception != preset);
     }
@@ -245,7 +245,7 @@ impl Selection {
     /// Set a media type's preset apart from the global choice. Setting it to the
     /// global preset is not an exception, so it is cleared rather than stored — a
     /// type only appears as an override while it genuinely differs.
-    pub fn set_type(&mut self, media_type: &str, preset: Preset) {
+    pub(crate) fn set_type(&mut self, media_type: &str, preset: Preset) {
         if preset == self.global {
             self.per_type.remove(media_type);
         } else {
@@ -259,7 +259,7 @@ impl Selection {
     /// global — which a deserialized or hand-edited selection can carry, bypassing
     /// [`Self::set_type`]'s pruning — is not mistaken for a genuine exception.
     #[must_use]
-    pub fn is_overridden(&self) -> bool {
+    pub(crate) fn is_overridden(&self) -> bool {
         self.per_type.values().any(|preset| *preset != self.global)
     }
 
@@ -269,7 +269,7 @@ impl Selection {
     /// accommodate that rate, so the warning turns on the hungriest choice rather
     /// than an average that would understate the risk.
     #[must_use]
-    pub fn most_demanding(&self) -> Preset {
+    pub(crate) fn most_demanding(&self) -> Preset {
         self.per_type
             .values()
             .copied()

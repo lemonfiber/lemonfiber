@@ -21,10 +21,10 @@ use crate::error::{Code, Problem, Remedy, Severity, State};
 use super::Ctx;
 
 /// Raised when this run has nowhere it knows to look for archives.
-pub const NOWHERE_KEPT: Code = Code::new("BACKUP-6");
+pub(crate) const NOWHERE_KEPT: Code = Code::new("BACKUP-6");
 
 /// Raised when the directory the archives are kept in could not be read.
-pub const NOT_LISTED: Code = Code::new("BACKUP-7");
+pub(crate) const NOT_LISTED: Code = Code::new("BACKUP-7");
 
 /// The archives this machine has kept.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]

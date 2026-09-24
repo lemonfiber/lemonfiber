@@ -171,7 +171,7 @@ pub const SCHEMA: u32 = 1;
 /// minutes is not a fault — it is a library nobody warned the operator about — and the
 /// difference between "this is taking a while" and "this has hung" is the whole of
 /// what somebody watching it needs.
-pub const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+pub(crate) const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// The slowest disk this is willing to reason about, in bytes a second.
 ///
@@ -250,7 +250,7 @@ mod area {
     /// Absent from [`super::destinations`] on purpose: there is no place on this
     /// machine lemonfiber may write these back to, so the area a restore would need
     /// to aim at simply does not exist.
-    pub const EXISTING: &str = "existing";
+    pub(crate) const EXISTING: &str = "existing";
 }
 
 /// Decide what a capture of `scope` copies, from the install layout.

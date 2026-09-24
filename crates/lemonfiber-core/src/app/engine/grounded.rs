@@ -50,7 +50,7 @@ const LOOKS: u32 = 60;
 const AGAIN: Duration = Duration::from_secs(2);
 
 /// Raised when a start was asked for over a data location that is not there.
-pub const NO_DATA_LOCATION: Code = Code::new("LIFE-5");
+pub(crate) const NO_DATA_LOCATION: Code = Code::new("LIFE-5");
 
 /// Refuse to start over a data location that is not present, waiting first.
 ///

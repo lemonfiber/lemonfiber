@@ -31,7 +31,7 @@ const ARCHIVES: [&str; 5] = ["rar", "zip", "7z", "tar", "gz"];
 /// different packers and a rule that saw only one of them would find half of what
 /// is there.
 #[must_use]
-pub fn is_archive(path: &Path) -> bool {
+pub(crate) fn is_archive(path: &Path) -> bool {
     let Some(extension) = path.extension().and_then(std::ffi::OsStr::to_str) else {
         return false;
     };
@@ -53,7 +53,7 @@ pub fn is_archive(path: &Path) -> bool {
 /// Returned as the occupants themselves so the caller counts them the same way it
 /// counts everything else — inode-aware, and against the same walk.
 #[must_use]
-pub fn already_unpacked(occupants: &[Occupant]) -> Vec<&Occupant> {
+pub(crate) fn already_unpacked(occupants: &[Occupant]) -> Vec<&Occupant> {
     let mut folders: BTreeMap<PathBuf, (Vec<&Occupant>, bool)> = BTreeMap::new();
     for occupant in occupants {
         let folder = occupant

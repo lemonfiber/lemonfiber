@@ -22,7 +22,7 @@ use super::rhythm::Period;
 /// figure it reports bounces around the limit rather than sitting under it. Calling
 /// every bounce an overrun would put a warning on a perfectly obedient client,
 /// which is how a report stops being read.
-pub const TOLERANCE: u64 = 10;
+pub(crate) const TOLERANCE: u64 = 10;
 
 /// What became of one limit, in one direction, on one client.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

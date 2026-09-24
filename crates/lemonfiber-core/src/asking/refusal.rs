@@ -21,26 +21,26 @@ pub const UNREACHABLE: Code = Code::new("QUOTA-1");
 pub const NO_LIMIT: Code = Code::new("QUOTA-2");
 
 /// Raised where no policy goes by the word that was given.
-pub const NO_SUCH_POLICY: Code = Code::new("QUOTA-3");
+pub(crate) const NO_SUCH_POLICY: Code = Code::new("QUOTA-3");
 
 /// Raised where the request named is not one that is waiting on anybody.
-pub const NOT_WAITING: Code = Code::new("QUOTA-4");
+pub(crate) const NOT_WAITING: Code = Code::new("QUOTA-4");
 
 /// Raised where a request was turned down and the reason said nothing.
-pub const NO_REASON: Code = Code::new("QUOTA-5");
+pub(crate) const NO_REASON: Code = Code::new("QUOTA-5");
 
 /// Raised where nobody in the household goes by the name that was given.
-pub const NOBODY: Code = Code::new("QUOTA-6");
+pub(crate) const NOBODY: Code = Code::new("QUOTA-6");
 
 /// Raised where the request service holds no account for somebody who has one here.
-pub const NEVER_HERE: Code = Code::new("QUOTA-7");
+pub(crate) const NEVER_HERE: Code = Code::new("QUOTA-7");
 
 /// Raised where a run was asked to close what has waited too long and the household has
 /// never said how long that is.
-pub const NOTHING_AGREED: Code = Code::new("QUOTA-8");
+pub(crate) const NOTHING_AGREED: Code = Code::new("QUOTA-8");
 
 /// Raised where the period named would close a request nobody was ever reminded about.
-pub const TOO_SOON: Code = Code::new("QUOTA-9");
+pub(crate) const TOO_SOON: Code = Code::new("QUOTA-9");
 
 /// Said where the request service could not be asked or would not answer.
 ///
@@ -65,7 +65,7 @@ pub fn unreachable(doing: &str) -> Problem {
 /// of what that policy is, and one invented here would be a household held to a figure
 /// nobody in it agreed to.
 #[must_use]
-pub fn no_limit_named() -> Problem {
+pub(crate) fn no_limit_named() -> Problem {
     Problem::new(
         NO_LIMIT,
         Severity::Error,
@@ -80,7 +80,7 @@ pub fn no_limit_named() -> Problem {
 
 /// Said where no policy goes by the word that was given, with the ones there are named.
 #[must_use]
-pub fn no_such_policy(written: &str) -> Problem {
+pub(crate) fn no_such_policy(written: &str) -> Problem {
     Problem::new(
         NO_SUCH_POLICY,
         Severity::Error,
@@ -98,7 +98,7 @@ pub fn no_such_policy(written: &str) -> Problem {
 /// correct silently: an operator approving something a second time has misread a list,
 /// and being told so is worth more than a second approval that changes nothing.
 #[must_use]
-pub fn nothing_to_decide(request: i64) -> Problem {
+pub(crate) fn nothing_to_decide(request: i64) -> Problem {
     Problem::new(
         NOT_WAITING,
         Severity::Error,
@@ -116,7 +116,7 @@ pub fn nothing_to_decide(request: i64) -> Problem {
 /// A blank reason is the silent decline this is here to prevent, arriving through the
 /// field meant to prevent it.
 #[must_use]
-pub fn no_reason_given() -> Problem {
+pub(crate) fn no_reason_given() -> Problem {
     Problem::new(
         NO_REASON,
         Severity::Error,
@@ -131,7 +131,7 @@ pub fn no_reason_given() -> Problem {
 
 /// Said where nobody in the household goes by the name that was given.
 #[must_use]
-pub fn nobody_called(named: &str, household: &[String]) -> Problem {
+pub(crate) fn nobody_called(named: &str, household: &[String]) -> Problem {
     Problem::new(
         NOBODY,
         Severity::Error,
@@ -149,7 +149,7 @@ pub fn nobody_called(named: &str, household: &[String]) -> Problem {
 /// when they first sign in to it, so this is an invitation nobody has used yet — and a
 /// limit written against nobody would read as a limit that had been applied.
 #[must_use]
-pub fn never_asked_here(name: &str) -> Problem {
+pub(crate) fn never_asked_here(name: &str) -> Problem {
     Problem::new(
         NEVER_HERE,
         Severity::Warning,
@@ -172,7 +172,7 @@ pub fn never_asked_here(name: &str) -> Problem {
 /// arranged this loses nothing by being asked again; one held to a figure it never named
 /// would have somebody's request closed on this program's authority.
 #[must_use]
-pub fn nothing_agreed() -> Problem {
+pub(crate) fn nothing_agreed() -> Problem {
     Problem::new(
         NOTHING_AGREED,
         Severity::Error,
@@ -193,7 +193,7 @@ pub fn nothing_agreed() -> Problem {
 /// requests disappearing, and the reminder — which exists so somebody can answer before it
 /// comes to this — would never once be reached.
 #[must_use]
-pub fn sooner_than_the_reminder(after: u32) -> Problem {
+pub(crate) fn sooner_than_the_reminder(after: u32) -> Problem {
     Problem::new(
         TOO_SOON,
         Severity::Error,

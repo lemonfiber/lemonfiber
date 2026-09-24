@@ -275,7 +275,7 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
 }
 
 /// Raised when a run cannot say where lemonfiber's own files are.
-pub const NOWHERE_TO_LOOK: Code = Code::new("REPAIR-2");
+pub(crate) const NOWHERE_TO_LOOK: Code = Code::new("REPAIR-2");
 
 /// Raised when a run that may not act was asked for the checks that disturb.
 pub const OFFER_CANNOT_DISTURB: Code = Code::new("REPAIR-3");

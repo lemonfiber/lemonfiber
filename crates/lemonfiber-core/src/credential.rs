@@ -73,7 +73,7 @@ impl State {
     /// working credential, and a product that retired it on a schedule would break a
     /// stack on a day its owner did not choose.
     #[must_use]
-    pub const fn worth_advising(self) -> bool {
+    pub(crate) const fn worth_advising(self) -> bool {
         matches!(self, Self::Stale | Self::Invalid | Self::Absent)
     }
 }

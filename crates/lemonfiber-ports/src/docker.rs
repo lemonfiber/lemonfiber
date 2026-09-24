@@ -181,7 +181,7 @@ impl LogQuery {
     /// walkthrough was watching — and the same answer is owed to both, because
     /// what an operator is shown of a failure should not depend on which of
     /// them noticed it.
-    pub const LAST_WORDS: u32 = 20;
+    pub(crate) const LAST_WORDS: u32 = 20;
 
     /// The last `tail` lines, and then nothing more.
     #[must_use]
@@ -280,25 +280,25 @@ pub enum Failure {
 pub const ENGINE_UNREACHABLE: Code = Code::new("DOCKER-1");
 
 /// Raised when a container that should exist does not.
-pub const NO_SUCH_CONTAINER: Code = Code::new("DOCKER-2");
+pub(crate) const NO_SUCH_CONTAINER: Code = Code::new("DOCKER-2");
 
 /// Raised when the host an endpoint names cannot be found on the network.
-pub const HOST_UNRESOLVED: Code = Code::new("DOCKER-3");
+pub(crate) const HOST_UNRESOLVED: Code = Code::new("DOCKER-3");
 
 /// Raised when the host is found and refuses the connection.
-pub const HOST_REFUSED: Code = Code::new("DOCKER-4");
+pub(crate) const HOST_REFUSED: Code = Code::new("DOCKER-4");
 
 /// Raised when the host is reached and will not accept the SSH login.
-pub const LOGIN_REJECTED: Code = Code::new("DOCKER-5");
+pub(crate) const LOGIN_REJECTED: Code = Code::new("DOCKER-5");
 
 /// Raised when an endpoint names a transport this build cannot drive.
-pub const ENDPOINT_UNSUPPORTED: Code = Code::new("DOCKER-6");
+pub(crate) const ENDPOINT_UNSUPPORTED: Code = Code::new("DOCKER-6");
 
 /// Raised when a named Docker context is not one this machine records.
-pub const UNKNOWN_CONTEXT: Code = Code::new("DOCKER-7");
+pub(crate) const UNKNOWN_CONTEXT: Code = Code::new("DOCKER-7");
 
 /// Raised when a remote host does not answer for a reason nothing here recognises.
-pub const HOST_SILENT: Code = Code::new("DOCKER-8");
+pub(crate) const HOST_SILENT: Code = Code::new("DOCKER-8");
 
 /// What to tell an operator whose engine is not answering at all.
 ///

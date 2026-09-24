@@ -94,7 +94,7 @@ pub(super) async fn remove(
 }
 
 /// Raised when the backup a destructive removal takes first could not be taken.
-pub const NOT_BACKED_UP: Code = Code::new("GONE-3");
+pub(crate) const NOT_BACKED_UP: Code = Code::new("GONE-3");
 
 /// The refusal for a removal whose backup would not be taken.
 ///

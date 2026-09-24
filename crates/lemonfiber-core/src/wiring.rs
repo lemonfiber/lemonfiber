@@ -34,7 +34,7 @@ pub use settling::{contested_by, filled, settle, unfilled};
 /// published artefact that grows and the set of settings is a list this build holds:
 /// a key per capability would be a second enumeration to keep in step, and the one
 /// thing certain about the first is that it will gain entries.
-pub const FILLS_KEY: &str = "LEMONFIBER_FILLS";
+pub(crate) const FILLS_KEY: &str = "LEMONFIBER_FILLS";
 
 /// Who settled a contest between claimants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

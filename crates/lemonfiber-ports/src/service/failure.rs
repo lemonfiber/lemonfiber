@@ -93,13 +93,13 @@ impl Diagnose for Failure {
 }
 
 /// Raised when a service is not answering yet.
-pub const SERVICE_UNAVAILABLE: Code = Code::new("SEED-1");
+pub(crate) const SERVICE_UNAVAILABLE: Code = Code::new("SEED-1");
 
 /// Raised when a service rejects the credential lemonfiber holds.
-pub const SERVICE_UNAUTHORISED: Code = Code::new("SEED-2");
+pub(crate) const SERVICE_UNAUTHORISED: Code = Code::new("SEED-2");
 
 /// Raised when a service answers with something unusable.
-pub const SERVICE_REFUSED: Code = Code::new("SEED-3");
+pub(crate) const SERVICE_REFUSED: Code = Code::new("SEED-3");
 
 /// Raised when a service does not serve the API version this build speaks.
-pub const SERVICE_UNSUPPORTED: Code = Code::new("SEED-4");
+pub(crate) const SERVICE_UNSUPPORTED: Code = Code::new("SEED-4");

@@ -621,7 +621,7 @@ pub(crate) mod tests {
             Arc::new(FakeEngine::down()),
             Arc::new(lemonfiber_adapters::System),
             lemonfiber_adapters::live(),
-            Source::Embedded(&lemonfiber::cli::STACK),
+            Source::Embedded(&lemonfiber::carried::STACK),
             Settings::default(),
             Environment::MacOs,
         )
@@ -641,7 +641,7 @@ pub(crate) mod tests {
             Arc::new(FakeEngine::down()),
             Arc::new(lemonfiber_adapters::System),
             lemonfiber_adapters::live(),
-            Source::Embedded(&lemonfiber::cli::STACK),
+            Source::Embedded(&lemonfiber::carried::STACK),
             Settings::default(),
             Environment::MacOs,
         )

@@ -48,7 +48,7 @@ pub struct EnvFile {
 /// edit could put there. What refuses it is the writer, because that is the one
 /// place every source passes through.
 #[must_use]
-pub fn is_one_line(text: &str) -> bool {
+pub(crate) fn is_one_line(text: &str) -> bool {
     !text.contains(['\n', '\r'])
 }
 

@@ -1,8 +1,5 @@
-//! What this binary carries inside itself.
-//!
-//! Apart from the parser beside it because the two are different subjects: that
-//! file is what an operator may ask for, and this is what the answer is served
-//! out of. Both are read at compile time and neither can fail at run time.
+//! What this binary carries inside itself: the stack and the web app, both read at
+//! compile time, so neither can fail at run time.
 
 use include_dir::{include_dir, Dir};
 

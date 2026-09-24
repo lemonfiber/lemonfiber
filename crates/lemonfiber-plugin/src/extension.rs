@@ -236,7 +236,7 @@ const DOCTOR_REMEDY: Point = Point {
 };
 
 /// Every point this build publishes, in the order the artefact lists them.
-pub const POINTS: &[Point] = &[DOCTOR_CHECK, DOCTOR_REMEDY];
+pub(crate) const POINTS: &[Point] = &[DOCTOR_CHECK, DOCTOR_REMEDY];
 
 /// The point a finding is contributed at.
 ///

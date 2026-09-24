@@ -91,7 +91,7 @@ impl Tier {
     /// daemon, and one that asked anyway would report a machine as half-unreadable
     /// over something it was never going to touch.
     #[must_use]
-    pub const fn touches_containers(self) -> bool {
+    pub(crate) const fn touches_containers(self) -> bool {
         matches!(self, Self::Stop | Self::Services)
     }
 
@@ -101,13 +101,13 @@ impl Tier {
     /// pulled is not part of what a stop is agreeing to — and asking would be a
     /// listing of the whole machine's images for a command that removes none of them.
     #[must_use]
-    pub const fn touches_images(self) -> bool {
+    pub(crate) const fn touches_images(self) -> bool {
         matches!(self, Self::Services)
     }
 
     /// Whether this tier removes anything lemonfiber or a service wrote down.
     #[must_use]
-    pub const fn touches_configuration(self) -> bool {
+    pub(crate) const fn touches_configuration(self) -> bool {
         matches!(self, Self::Configuration)
     }
 
@@ -118,7 +118,7 @@ impl Tier {
     /// a path under the data location may be removed reads this, and there is one
     /// value it can be true for.
     #[must_use]
-    pub const fn takes_media(self) -> bool {
+    pub(crate) const fn takes_media(self) -> bool {
         matches!(self, Self::Media)
     }
 
@@ -128,7 +128,7 @@ impl Tier {
     /// be required for one tier and not the other would be a second list to keep in
     /// step with the first.
     #[must_use]
-    pub const fn needs_its_own_agreement(self) -> bool {
+    pub(crate) const fn needs_its_own_agreement(self) -> bool {
         self.takes_media()
     }
 }

@@ -17,7 +17,6 @@ use std::path::PathBuf;
 
 use clap::{CommandFactory, Parser};
 
-mod carried;
 mod request;
 mod under;
 mod wiring;
@@ -32,7 +31,6 @@ pub use under::{
 // otherwise be a change at every call site that names it.
 pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
-pub use carried::{APP, STACK};
 pub use credentials::RawCredentials;
 pub use plugin::{Authoring, PluginCommand};
 pub use removing::{RawRemoval, RawRemoving};

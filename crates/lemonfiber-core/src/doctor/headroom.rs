@@ -26,7 +26,7 @@ use crate::ports::filesystem::FileSystem;
 use crate::quality::Preset;
 
 /// Raised when the free space holds too little content at the chosen quality.
-pub const HEADROOM_LOW: Code = Code::new("QUAL-1");
+pub(crate) const HEADROOM_LOW: Code = Code::new("QUAL-1");
 
 /// The hours of content a projection takes as a starter-library floor — roughly a
 /// dozen films and a couple of seasons. A heuristic, deliberately modest: the check

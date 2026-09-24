@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// The share of the line the download takes when a limit is asked for and no
 /// figure is given.
-pub const DOWNLOAD_SHARE: u8 = 80;
+pub(crate) const DOWNLOAD_SHARE: u8 = 80;
 
 /// The share the upload takes on the same terms.
 ///
@@ -24,7 +24,7 @@ pub const DOWNLOAD_SHARE: u8 = 80;
 /// the uplink is a fraction of the downlink — and a saturated uplink degrades
 /// *everything*, downloads included, because the acknowledgements that keep a
 /// download moving cannot get out past the queue of upload data.
-pub const UPLOAD_SHARE: u8 = 25;
+pub(crate) const UPLOAD_SHARE: u8 = 25;
 
 /// How much of the line something may take.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -104,7 +104,7 @@ impl Limit {
     /// Whether this is expressed as a proportion, which is what obliges the
     /// measured figure to be shown beside it.
     #[must_use]
-    pub const fn is_share(self) -> bool {
+    pub(crate) const fn is_share(self) -> bool {
         matches!(self, Self::Share(_))
     }
 

@@ -45,7 +45,7 @@ impl Standing {
 
     /// Whether this is a state an operator has to do something about.
     #[must_use]
-    pub const fn wants_attention(self) -> bool {
+    pub(crate) const fn wants_attention(self) -> bool {
         matches!(self, Self::Degraded | Self::Broken | Self::Critical)
     }
 

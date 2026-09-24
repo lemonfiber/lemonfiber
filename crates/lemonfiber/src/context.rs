@@ -29,7 +29,7 @@ use lemonfiber_core::ports::hosting::Manager;
 use lemonfiber_core::ports::{Host, Runner};
 use lemonfiber_core::stack::Source;
 
-use lemonfiber::cli::STACK;
+use lemonfiber::carried::STACK;
 
 /// Everything a command needs that the command itself does not carry.
 pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) -> Ctx {

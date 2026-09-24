@@ -46,7 +46,7 @@ pub enum Support {
 impl Support {
     /// Whether somebody should be told to try something else first.
     #[must_use]
-    pub const fn wants_an_alternative(self) -> bool {
+    pub(crate) const fn wants_an_alternative(self) -> bool {
         matches!(self, Self::Poor)
     }
 }
@@ -140,12 +140,12 @@ pub const DEVICES: &[Device] = &[
 ];
 
 /// True of every device. Rendered once per report, never per device.
-pub const ONLY_AT_HOME: &str =
+pub(crate) const ONLY_AT_HOME: &str =
     "All of this works on your home network and nowhere else. Away from the house, none of \
      these apps will find the server — that is how it is meant to be for now, not a fault.";
 
 /// What lemonfiber will not do, said where somebody might expect otherwise.
-pub const NOTHING_IS_INSTALLED: &str =
+pub(crate) const NOTHING_IS_INSTALLED: &str =
     "lemonfiber does not install anything on your device and cannot. What is here is where to \
      look and what to choose; the installing is yours.";
 

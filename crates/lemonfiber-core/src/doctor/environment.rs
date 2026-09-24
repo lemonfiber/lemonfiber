@@ -23,16 +23,16 @@ use crate::ports::process::Failure;
 use crate::ports::Runner;
 
 /// Raised when the Docker client is not installed.
-pub const DOCKER_ABSENT: Code = Code::new("ENV-1");
+pub(crate) const DOCKER_ABSENT: Code = Code::new("ENV-1");
 
 /// Raised when the Docker client is present but its daemon is not answering.
-pub const DAEMON_DOWN: Code = Code::new("ENV-2");
+pub(crate) const DAEMON_DOWN: Code = Code::new("ENV-2");
 
 /// Raised when the Compose plugin is missing or too old to drive.
-pub const COMPOSE_UNUSABLE: Code = Code::new("ENV-3");
+pub(crate) const COMPOSE_UNUSABLE: Code = Code::new("ENV-3");
 
 /// Raised when this machine and the daemon speak different Docker API generations.
-pub const API_MISMATCH: Code = Code::new("ENV-5");
+pub(crate) const API_MISMATCH: Code = Code::new("ENV-5");
 
 /// The oldest Compose the driver is willing to build against.
 ///

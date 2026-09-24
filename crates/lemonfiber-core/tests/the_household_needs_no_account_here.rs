@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use lemonfiber_core::admission::credential::{self, Credential, Weak};
+use lemonfiber_core::admission::{self as credential, Credential, Weak};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::support::a_password;

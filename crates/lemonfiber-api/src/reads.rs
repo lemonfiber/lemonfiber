@@ -102,7 +102,7 @@ pub const CONFIG: &str = "/api/config";
 pub const QUALITY: &str = "/api/quality";
 
 /// What one of this product's words means, or every word there is to ask about.
-pub const EXPLAIN: &str = "/api/explain";
+pub(crate) const EXPLAIN: &str = "/api/explain";
 
 /// Everything that leaves this machine, and what refusing each of it costs.
 ///
@@ -204,7 +204,7 @@ pub const CLIENTS: &str = "/api/clients";
 /// it keeps. The listing is the half of a restore that comes before naming one — a
 /// browser has no filesystem to look in, so a name it could not be told is a name
 /// it cannot use.
-pub const BACKUPS: &str = "/api/backups";
+pub(crate) const BACKUPS: &str = "/api/backups";
 
 /// What the services are saying, one document a line — or, where it was asked to
 /// keep reading, a name for work that will not end and lines that arrive elsewhere.
@@ -263,7 +263,7 @@ pub const OFFERED: &[&str] = &[
 pub const NO_TERM: &str = "What to follow must be named.";
 
 /// What is said to a request whose season is not a number.
-pub const NOT_A_SEASON: &str = "Which season to narrow to must be a number.";
+pub(crate) const NOT_A_SEASON: &str = "Which season to narrow to must be a number.";
 
 /// What is said to a request that named no setting to read.
 pub const NO_SETTING: &str = "Which setting to read must be named.";
@@ -276,20 +276,20 @@ pub const NO_MEMBER: &str = "Which member to narrow to must be named.";
 /// Apart from [`NO_MEMBER`] because the two refuse different things: that one is said
 /// where naming nobody would have meant everybody, and this is said where there is no
 /// everybody to fall back to.
-pub const NO_SHELF_WITHOUT_A_MEMBER: &str = "Whose shelf to read must be named.";
+pub(crate) const NO_SHELF_WITHOUT_A_MEMBER: &str = "Whose shelf to read must be named.";
 
 /// What is said to a request asking for a number of holdings that is not one.
-pub const NOT_A_COUNT: &str = "How many holdings to answer with must be a whole number.";
+pub(crate) const NOT_A_COUNT: &str = "How many holdings to answer with must be a whole number.";
 
 /// What is said to a request asking for more holdings than this answers in one go.
 ///
 /// Refused rather than quietly cut down to the ceiling. A caller that asked for five
 /// thousand and was handed five hundred has been told it has the whole shelf, and a
 /// narrower answer wearing the shape of the answer is the same failure as a wider one.
-pub const TOO_MANY_AT_ONCE: &str = "That is more holdings than one read answers with.";
+pub(crate) const TOO_MANY_AT_ONCE: &str = "That is more holdings than one read answers with.";
 
 /// What is said to a request naming a group of checks that is not one.
-pub const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
+pub(crate) const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
 
 /// What is said where no read goes by the name that was asked for.
 pub const NO_SUCH_READ: &str = "There is no read by that name.";
@@ -304,7 +304,7 @@ pub const NO_SUCH_REMOVAL: &str =
 /// other — one moves somebody's services and the other moves this program — so a page
 /// that asked about the stack and was handed the binary has been answered a question it
 /// did not ask.
-pub const NO_UPDATE_OBJECT: &str = "Which of stack or self to move forward must be named.";
+pub(crate) const NO_UPDATE_OBJECT: &str = "Which of stack or self to move forward must be named.";
 
 /// What a read was given, mirroring the flags its command takes.
 ///

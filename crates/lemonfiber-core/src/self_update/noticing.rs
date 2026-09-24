@@ -130,7 +130,7 @@ impl Noticed {
     /// Whether asking has been given up on, which is worth saying rather than
     /// leaving as an answer that never changes.
     #[must_use]
-    pub const fn given_up(&self) -> bool {
+    pub(crate) const fn given_up(&self) -> bool {
         self.quiet >= GIVEN_UP
     }
 }

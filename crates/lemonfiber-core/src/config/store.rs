@@ -55,7 +55,7 @@ pub use lemonfiber_error::withheld::{is_secret, withheld, withheld_by, withheld_
 /// store stamps for itself, and listing it would offer it as something to change.
 /// The two version numbers reach whoever needs them through the refusal that is
 /// about them, which is the moment they mean anything.
-pub const WRITTEN_BY_KEY: &str = "LEMONFIBER_CONFIG_VERSION";
+pub(crate) const WRITTEN_BY_KEY: &str = "LEMONFIBER_CONFIG_VERSION";
 
 /// The build doing the writing, which is what a marker is compared against.
 const RUNNING: &str = env!("CARGO_PKG_VERSION");
@@ -366,13 +366,13 @@ pub const CONFIG_UNREADABLE: Code = Code::new("CONFIG-1");
 pub const CONFIG_NOT_WRITTEN: Code = Code::new("CONFIG-2");
 
 /// Raised when there is nowhere to keep configuration.
-pub const CONFIG_NOWHERE: Code = Code::new("CONFIG-3");
+pub(crate) const CONFIG_NOWHERE: Code = Code::new("CONFIG-3");
 
 /// Raised when configuration was written by a newer lemonfiber.
-pub const CONFIG_TOO_NEW: Code = Code::new("CONFIG-5");
+pub(crate) const CONFIG_TOO_NEW: Code = Code::new("CONFIG-5");
 
 /// Raised when a setting's key or value spans more than one line.
-pub const CONFIG_SPANS_LINES: Code = Code::new("CONFIG-6");
+pub(crate) const CONFIG_SPANS_LINES: Code = Code::new("CONFIG-6");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

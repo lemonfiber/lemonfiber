@@ -488,7 +488,7 @@ mod tests {
     use super::LOOK;
     use super::{address, app, run, serving, surface, tokenless, Asked, Browser, NOT_A_PORT};
     use clap::Parser as _;
-    use lemonfiber_core::admission::credential;
+    use lemonfiber_core::admission as credential;
     use lemonfiber_fixtures::support::a_password;
     use std::path::PathBuf;
 
@@ -662,7 +662,7 @@ mod tests {
             Arc::new(lemonfiber_adapters::Daemon::local()),
             Arc::new(lemonfiber_adapters::System),
             lemonfiber_adapters::live(),
-            lemonfiber_core::stack::Source::Embedded(&lemonfiber::cli::STACK),
+            lemonfiber_core::stack::Source::Embedded(&lemonfiber::carried::STACK),
             settings,
             Environment::MacOs,
         )

@@ -53,7 +53,7 @@ impl Step {
     /// Stages before anything was asked for map to choosing: a walkthrough that has only
     /// just monitored an item has, as far as the operator can see, only chosen it.
     #[must_use]
-    pub const fn of_stage(stage: Stage) -> Self {
+    pub(crate) const fn of_stage(stage: Stage) -> Self {
         match stage {
             Stage::NotMonitored | Stage::Monitored => Self::Choosing,
             Stage::Searching | Stage::Found => Self::Searching,

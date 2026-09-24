@@ -29,10 +29,10 @@ use super::Ctx;
 pub const NOWHERE_TO_KEEP: Code = Code::new("BUNDLE-6");
 
 /// Raised when this run has nowhere it knows to look for a bundle it kept.
-pub const NOWHERE_HELD: Code = Code::new("BUNDLE-7");
+pub(crate) const NOWHERE_HELD: Code = Code::new("BUNDLE-7");
 
 /// Raised when a name does not name one of the bundles this run kept.
-pub const NOT_HELD: Code = Code::new("BUNDLE-8");
+pub(crate) const NOT_HELD: Code = Code::new("BUNDLE-8");
 
 /// Where a bundle is written.
 ///

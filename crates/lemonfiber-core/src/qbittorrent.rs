@@ -270,7 +270,7 @@ impl Qbittorrent {
     /// Returns [`Failure`] where qBittorrent cannot be reached, rejects the password,
     /// is holding nothing of that name or more than one of it, refuses the removal,
     /// or is still holding it afterwards.
-    pub async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
+    pub(crate) async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
         let password = self
             .password
             .as_deref()

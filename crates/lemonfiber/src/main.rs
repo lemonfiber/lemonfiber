@@ -388,7 +388,7 @@ async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCod
 /// place and a test outside this binary can read what it carries. See
 /// `.docs/architecture/embedded-stack.md` for the shape it arrives in.
 pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = Some(
-    lemonfiber_core::frontend::Source::Embedded(&lemonfiber::cli::APP),
+    lemonfiber_core::frontend::Source::Embedded(&lemonfiber::carried::APP),
 );
 
 /// Serve the web interface until the operator stops the process.

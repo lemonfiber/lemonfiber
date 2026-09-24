@@ -115,7 +115,7 @@ pub fn surveyed(
 /// acting on it because it happened to be the only thing here is the most expensive
 /// misreading in this family.
 #[must_use]
-pub fn one_setup(survey: &MigrationReport) -> Option<String> {
+pub(crate) fn one_setup(survey: &MigrationReport) -> Option<String> {
     let mut candidates = survey
         .standing
         .iter()

@@ -160,7 +160,7 @@ mod tests {
             Arc::new(lemonfiber_adapters::Daemon::local()),
             Arc::new(lemonfiber_adapters::System),
             lemonfiber_adapters::live(),
-            Source::Embedded(&lemonfiber::cli::STACK),
+            Source::Embedded(&lemonfiber::carried::STACK),
             Settings::default(),
             Environment::MacOs,
         )

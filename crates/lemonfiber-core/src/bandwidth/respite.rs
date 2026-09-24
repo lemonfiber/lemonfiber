@@ -72,7 +72,7 @@ impl Respite {
 impl Standing {
     /// Whether the limits are lifted right now.
     #[must_use]
-    pub const fn lifting(self) -> bool {
+    pub(crate) const fn lifting(self) -> bool {
         matches!(self, Self::InForce(_))
     }
 

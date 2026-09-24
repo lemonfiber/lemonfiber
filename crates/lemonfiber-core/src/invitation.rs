@@ -22,7 +22,7 @@
 use crate::ports::service::{Invited, Member};
 
 /// How long an invitation stands before it is withdrawn.
-pub const HOURS_TO_CLAIM: i64 = 48;
+pub(crate) const HOURS_TO_CLAIM: i64 = 48;
 
 /// How far back the record is read when dating invitations.
 ///
@@ -35,7 +35,7 @@ pub const HOURS_TO_CLAIM: i64 = 48;
 /// Beyond this the record is not read, and an invitation it does not cover is one
 /// nothing can date, which is left standing rather than withdrawn on a guess. The
 /// server trims its own record eventually, so no window makes that case go away.
-pub const HOURS_OF_RECORD: i64 = 24 * 30;
+pub(crate) const HOURS_OF_RECORD: i64 = 24 * 30;
 
 /// An account nobody has claimed, with when it was offered where that is known.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +92,7 @@ pub fn offered(household: Vec<Member>, invited: &[Invited]) -> Vec<Offered> {
 /// message an operator passes on says what running out costs rather than only that it
 /// happens.
 #[must_use]
-pub fn run_out<'a>(offered: &'a [Offered], cutoff: &str) -> Vec<&'a Offered> {
+pub(crate) fn run_out<'a>(offered: &'a [Offered], cutoff: &str) -> Vec<&'a Offered> {
     offered
         .iter()
         .filter(|invitation| {

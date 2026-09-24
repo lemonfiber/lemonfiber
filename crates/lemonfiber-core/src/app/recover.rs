@@ -100,7 +100,7 @@ pub fn journalled(path: &Path, changes: &[Change], random: &dyn Random) {
 /// caller reports them together. What was put back is put back either way: an operator with
 /// one service down should not be left with a half-reversed repair *and* no account of
 /// which half.
-pub async fn reconfigured(
+pub(crate) async fn reconfigured(
     ctx: &Ctx,
     undos: &[Undo],
     services: &[lemonfiber_manifest::Service],
@@ -248,7 +248,7 @@ pub struct Carried {
 /// # Errors
 ///
 /// Returns a [`Problem`] where a reversal could not be carried out at all.
-pub fn carrying_out(
+pub(crate) fn carrying_out(
     undos: &[Undo],
     env_file: &Path,
     already: Vec<String>,
@@ -484,13 +484,13 @@ fn not_put_back(settings: &[String]) -> Problem {
 }
 
 /// Raised when a directory from an interrupted apply could not be removed.
-pub const NOT_REMOVED: Code = Code::new("SETUP-3");
+pub(crate) const NOT_REMOVED: Code = Code::new("SETUP-3");
 
 /// Raised when a region a reversal would take out of a stack file cannot be.
-pub const NOT_WITHDRAWN: Code = Code::new("SETUP-12");
+pub(crate) const NOT_WITHDRAWN: Code = Code::new("SETUP-12");
 
 /// Raised when reversing needs the service that made a change.
-pub const NEEDS_SERVICE: Code = Code::new("SETUP-4");
+pub(crate) const NEEDS_SERVICE: Code = Code::new("SETUP-4");
 
 /// The problem naming the credentials a reversal could not read back.
 ///
@@ -516,7 +516,7 @@ fn not_opened(settings: &[String]) -> Problem {
 }
 
 /// Raised when a reversal would write over a setting the operator has since chosen.
-pub const NOT_PUT_BACK: Code = Code::new("SETUP-9");
+pub(crate) const NOT_PUT_BACK: Code = Code::new("SETUP-9");
 
 /// Raised when a reversal meets a credential whose sealed record will not open.
 pub const NOT_OPENED: Code = Code::new("SETUP-10");
@@ -546,7 +546,7 @@ fn left_holding(paths: &[String]) -> Problem {
 }
 
 /// Raised when a directory a reversal would remove still holds something else's files.
-pub const STILL_HOLDING: Code = Code::new("SETUP-11");
+pub(crate) const STILL_HOLDING: Code = Code::new("SETUP-11");
 
 #[cfg(test)]
 mod tests {

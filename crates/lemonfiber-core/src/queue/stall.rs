@@ -75,7 +75,7 @@ impl Stall {
     /// What is usually behind it, so the operator knows where to look before they
     /// have opened anything.
     #[must_use]
-    pub const fn typically(self) -> &'static str {
+    pub(crate) const fn typically(self) -> &'static str {
         match self {
             Self::RedownloadLoop => "an import that fails quietly and is retried",
             Self::RepeatedImportFailure => {
@@ -163,7 +163,7 @@ impl Stall {
 
     /// The first thing to try — the most likely of the two.
     #[must_use]
-    pub fn first_remedy(self) -> String {
+    pub(crate) fn first_remedy(self) -> String {
         let [first, _] = self.remedies();
         first
     }
@@ -174,7 +174,7 @@ impl Stall {
     /// Slow is not: it is moving, and an alert for something that is working is
     /// how a queue check gets muted along with everything else on the channel.
     #[must_use]
-    pub const fn wants_attention(self) -> bool {
+    pub(crate) const fn wants_attention(self) -> bool {
         !matches!(self, Self::Slow)
     }
 }

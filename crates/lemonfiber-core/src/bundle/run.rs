@@ -281,7 +281,7 @@ pub fn unconfirmed(fields: &[String]) -> Problem {
 /// Not something to paper over with a fixed salt: every replaced value carries a stand-in
 /// derived from it, and one anybody can reproduce is a way back to the value it stands for.
 #[must_use]
-pub fn without_marks() -> Problem {
+pub(crate) fn without_marks() -> Problem {
     Problem::new(
         BUNDLE_NO_MARKS,
         Severity::Error,

@@ -41,7 +41,7 @@ impl Origin {
     /// Whether this value was adopted from the operator rather than written by
     /// lemonfiber.
     #[must_use]
-    pub const fn is_adopted(self) -> bool {
+    pub(crate) const fn is_adopted(self) -> bool {
         matches!(self, Self::Adopted)
     }
 }

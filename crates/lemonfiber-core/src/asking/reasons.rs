@@ -146,7 +146,7 @@ impl Reasons {
     /// Written even where nothing was reached, because what this records is that the
     /// one attempt happened. Nothing for a request no reason is held for — there was
     /// nothing to carry, so there is nothing to say was carried.
-    pub fn passed_on(&mut self, request: i64, to: Vec<String>, at: Option<String>) {
+    pub(crate) fn passed_on(&mut self, request: i64, to: Vec<String>, at: Option<String>) {
         if let Some(kept) = self.given.get_mut(&request) {
             kept.told = Some(Passed { to, at });
         }

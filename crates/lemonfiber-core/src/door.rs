@@ -159,7 +159,7 @@ fn named(id: &str) -> Facing {
 /// configuration has no household front door — and it is said as one rather than
 /// filled in with the nearest thing that would open.
 #[must_use]
-pub fn begins_at(services: &[Service]) -> Option<(Facing, &Service)> {
+pub(crate) fn begins_at(services: &[Service]) -> Option<(Facing, &Service)> {
     let mut best: Option<(Facing, &Service)> = None;
     for service in services {
         let Some(facing) = facing(service) else {

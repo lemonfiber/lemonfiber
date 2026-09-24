@@ -24,7 +24,7 @@
 
 use std::collections::BTreeSet;
 
-use lemonfiber::cli::STACK;
+use lemonfiber::carried::STACK;
 use lemonfiber_core::config::display::SHOWN;
 use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_core::config::store::showing;

@@ -28,16 +28,16 @@ use crate::app::{quiesced, Ctx};
 const HEADROOM: u64 = 256 * 1024 * 1024;
 
 /// Raised when there is not enough room to write a backup.
-pub const NO_ROOM: Code = Code::new("BACKUP-1");
+pub(crate) const NO_ROOM: Code = Code::new("BACKUP-1");
 
 /// Raised when the backup archive could not be written.
-pub const NOT_WRITTEN: Code = Code::new("BACKUP-2");
+pub(crate) const NOT_WRITTEN: Code = Code::new("BACKUP-2");
 
 /// Raised when the room for a backup could not be measured.
-pub const NOT_MEASURED: Code = Code::new("BACKUP-3");
+pub(crate) const NOT_MEASURED: Code = Code::new("BACKUP-3");
 
 /// Raised when a capture could not be shown that nothing is writing to a database.
-pub const STILL_RUNNING: Code = Code::new("BACKUP-4");
+pub(crate) const STILL_RUNNING: Code = Code::new("BACKUP-4");
 
 /// Raised when this run has nowhere it knows to keep an archive.
 pub const NOWHERE_TO_KEEP: Code = Code::new("BACKUP-5");
@@ -47,7 +47,7 @@ pub const NOWHERE_TO_KEEP: Code = Code::new("BACKUP-5");
 /// Here rather than in the surface that used to say, because it is retention's
 /// policy and not one surface's: a browser and a shell that kept different numbers
 /// would prune each other's archives.
-pub const KEEP: usize = 5;
+pub(crate) const KEEP: usize = 5;
 
 /// What a capture does once its reckoning is done.
 ///

@@ -121,13 +121,13 @@ impl Policy {
 
     /// Whether choosing this policy needs a limit named alongside it.
     #[must_use]
-    pub const fn needs_a_limit(self) -> bool {
+    pub(crate) const fn needs_a_limit(self) -> bool {
         matches!(self, Self::WithinALimit)
     }
 
     /// Whether what somebody asks for arrives without anybody seeing it first.
     #[must_use]
-    pub const fn arrives_unseen(self) -> bool {
+    pub(crate) const fn arrives_unseen(self) -> bool {
         matches!(self, Self::Trusted | Self::WithinALimit)
     }
 }

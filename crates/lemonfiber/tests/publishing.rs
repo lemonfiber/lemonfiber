@@ -18,7 +18,7 @@ use std::collections::BTreeSet;
 use std::net::IpAddr;
 
 use include_dir::Dir;
-use lemonfiber::cli::STACK;
+use lemonfiber::carried::STACK;
 use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_manifest::{Bind, Manifest, Service};
 

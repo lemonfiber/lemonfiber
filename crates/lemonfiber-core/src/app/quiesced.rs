@@ -80,7 +80,7 @@ pub async fn required(ctx: &Ctx, code: Code, operation: &str) -> Result<(), Box<
 ///
 /// Returns a [`Problem`] where that project is running, or where the engine would
 /// not say whether it is.
-pub async fn required_of(
+pub(crate) async fn required_of(
     ctx: &Ctx,
     project: &str,
     code: Code,

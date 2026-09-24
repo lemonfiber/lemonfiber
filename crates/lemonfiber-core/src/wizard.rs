@@ -234,7 +234,7 @@ impl Wizard {
     /// A step that does not apply counts as answered: there is nothing to collect,
     /// so it never holds the wizard up.
     #[must_use]
-    pub const fn is_answered(&self, step: Step) -> bool {
+    pub(crate) const fn is_answered(&self, step: Step) -> bool {
         if !self.applies(step) {
             return true;
         }

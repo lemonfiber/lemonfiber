@@ -110,7 +110,7 @@ impl Environment {
     /// `PUID`/`PGID` at all: they are requested only where ownership is
     /// user-visible.
     #[must_use]
-    pub const fn ownership_is_real(self) -> bool {
+    pub(crate) const fn ownership_is_real(self) -> bool {
         matches!(self, Self::LinuxNative)
     }
 
@@ -132,7 +132,7 @@ impl Environment {
     /// True on Linux, where device passthrough works, and false where the
     /// engine runs in a virtual machine that cannot reach the encoder.
     #[must_use]
-    pub const fn can_transcode_in_docker(self) -> bool {
+    pub(crate) const fn can_transcode_in_docker(self) -> bool {
         matches!(self, Self::LinuxNative | Self::LinuxDesktop)
     }
 
@@ -141,7 +141,7 @@ impl Environment {
     /// It is a Docker Desktop convenience. Without it, a service reaching a
     /// host-run Jellyfin fails with nothing in any log explaining why.
     #[must_use]
-    pub const fn resolves_host_gateway(self) -> bool {
+    pub(crate) const fn resolves_host_gateway(self) -> bool {
         !matches!(self, Self::LinuxNative | Self::Unsupported)
     }
 }

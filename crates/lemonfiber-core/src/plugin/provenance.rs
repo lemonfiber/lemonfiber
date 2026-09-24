@@ -64,7 +64,7 @@ impl Provenance {
     /// Read rather than recomputed by each surface: *unproven is not verified* is one
     /// rule, and a second copy of it is free to disagree with this one.
     #[must_use]
-    pub const fn is_signed(&self) -> bool {
+    pub(crate) const fn is_signed(&self) -> bool {
         matches!(self, Self::Signed { .. })
     }
 

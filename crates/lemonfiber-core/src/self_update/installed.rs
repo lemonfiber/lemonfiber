@@ -126,7 +126,7 @@ impl Installed {
     /// tool that keeps an index asks it for one the index may not carry, and it
     /// answers with nothing rather than with the upgrade it could have done.
     #[must_use]
-    pub const fn resolves_newest(self) -> bool {
+    pub(crate) const fn resolves_newest(self) -> bool {
         matches!(
             self,
             Self::Homebrew | Self::Scoop | Self::Winget | Self::Distribution

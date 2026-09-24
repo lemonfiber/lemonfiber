@@ -79,7 +79,7 @@ pub const fn guidance(kind: Kind, preset: Preset) -> Guidance {
 /// can collapse a distinction without a difference rather than offer both — the
 /// three 1080p television presets being the case that arises in practice.
 #[must_use]
-pub fn same_profile(kind: Kind, first: Preset, second: Preset) -> bool {
+pub(crate) fn same_profile(kind: Kind, first: Preset, second: Preset) -> bool {
     guidance(kind, first) == guidance(kind, second)
 }
 

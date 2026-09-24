@@ -111,7 +111,7 @@ impl Condition {
 
     /// Whether this is wrong right now.
     #[must_use]
-    pub const fn is_raised(&self) -> bool {
+    pub(crate) const fn is_raised(&self) -> bool {
         self.cleared.is_none()
     }
 
@@ -159,7 +159,7 @@ impl Condition {
     /// Unknown rather than a confident zero, because a caller deciding whether
     /// something has settled must be able to tell "not long" from "cannot say".
     #[must_use]
-    pub fn settled_for(&self, now: &str) -> Option<u64> {
+    pub(crate) fn settled_for(&self, now: &str) -> Option<u64> {
         let cleared: u64 = self.cleared.as_deref()?.parse().ok()?;
         let now: u64 = now.parse().ok()?;
         Some(now.saturating_sub(cleared))

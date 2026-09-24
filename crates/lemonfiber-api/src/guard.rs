@@ -148,7 +148,7 @@ const fn digit(nibble: u8) -> char {
 /// A request without one is refused: `Host` is not optional in the version of
 /// HTTP a browser speaks, and its absence is not something to be lenient about.
 #[must_use]
-pub fn host_is_here(host: Option<&str>, at: Binding) -> bool {
+pub(crate) fn host_is_here(host: Option<&str>, at: Binding) -> bool {
     host.is_some_and(|host| names_here(host, at))
 }
 
@@ -158,7 +158,7 @@ pub fn host_is_here(host: Option<&str>, at: Binding) -> bool {
 /// and a script or a command-line client is entitled to say nothing — it is the
 /// browser this check exists to catch, and a browser always speaks.
 #[must_use]
-pub fn origin_is_here(origin: Option<&str>, at: Binding) -> bool {
+pub(crate) fn origin_is_here(origin: Option<&str>, at: Binding) -> bool {
     origin.is_none_or(|origin| {
         let stated = origin.strip_prefix("http://").unwrap_or(origin);
         names_here(stated, at)

@@ -182,13 +182,13 @@ pub enum Failure {
 }
 
 /// Raised where the platform has no service manager lemonfiber can configure.
-pub const NOTHING_TO_HOST_WITH: Code = Code::new("HOST-1");
+pub(crate) const NOTHING_TO_HOST_WITH: Code = Code::new("HOST-1");
 
 /// Raised where a service definition could not be written.
-pub const DEFINITION_UNWRITABLE: Code = Code::new("HOST-2");
+pub(crate) const DEFINITION_UNWRITABLE: Code = Code::new("HOST-2");
 
 /// Raised where the service manager refused what it was asked.
-pub const MANAGER_REFUSED: Code = Code::new("HOST-3");
+pub(crate) const MANAGER_REFUSED: Code = Code::new("HOST-3");
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

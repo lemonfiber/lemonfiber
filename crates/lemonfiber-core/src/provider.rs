@@ -28,21 +28,21 @@ use crate::validate::Validation;
 ///
 /// A week is long enough to top up an account or wait out a billing cycle, and short
 /// enough that an account with months in it is not nagged about.
-pub const NOTICE_DAYS: u64 = 7;
+pub(crate) const NOTICE_DAYS: u64 = 7;
 
 /// How much warning a subscription that is ending earns, in days.
 ///
 /// Longer than the capacity horizon because a lapsed subscription is not topped up in
 /// an afternoon: it is a payment, sometimes on an account whose card has expired, and
 /// the operator may be away for a week of it.
-pub const RENEWAL_NOTICE_DAYS: u64 = 14;
+pub(crate) const RENEWAL_NOTICE_DAYS: u64 = 14;
 
 /// The share of an allowance, in percent, under which what is left is called low when
 /// there is no observed consumption to project from.
 ///
 /// The weaker signal of the two, and deliberately the fallback: a tenth of a large
 /// account is weeks of headroom, so this only speaks where nothing has moved.
-pub const LOW_WATER_PERCENT: u64 = 10;
+pub(crate) const LOW_WATER_PERCENT: u64 = 10;
 
 /// What asking a provider established, before any arithmetic about capacity.
 ///
@@ -106,7 +106,7 @@ pub enum Renewal {
 impl Renewal {
     /// What an empty allowance of this kind amounts to.
     #[must_use]
-    pub const fn when_empty(self) -> Health {
+    pub(crate) const fn when_empty(self) -> Health {
         match self {
             Self::Bought => Health::Exhausted,
             Self::Refills => Health::Capped,
@@ -143,7 +143,7 @@ impl Burn {
     /// pessimistic one. A rate under a whole unit a day rounds to zero and leaves
     /// nothing to project from, rather than dividing by it.
     #[must_use]
-    pub const fn days_for(self, remaining: u64) -> Option<u64> {
+    pub(crate) const fn days_for(self, remaining: u64) -> Option<u64> {
         if self.per_day == 0 {
             return None;
         }
@@ -186,7 +186,7 @@ impl Allowance {
     /// How many days it lasts at the observed rate, where both what is left and a
     /// rate to spend it at are known.
     #[must_use]
-    pub fn days_left(&self) -> Option<u64> {
+    pub(crate) fn days_left(&self) -> Option<u64> {
         let remaining = self.remaining()?;
         self.burn?.days_for(remaining)
     }
@@ -252,7 +252,7 @@ impl Health {
     /// capacity is the ordinary case, not a fault, and treating it as one would make
     /// the whole check noise the operator learns to skip past.
     #[must_use]
-    pub const fn wants_attention(self) -> bool {
+    pub(crate) const fn wants_attention(self) -> bool {
         !matches!(self, Self::Healthy | Self::Unknown)
     }
 }

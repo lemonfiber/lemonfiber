@@ -181,7 +181,7 @@ impl Step {
     /// The distinction is what the non-interactive guard reports on: an informing
     /// step needs no answer, so its absence in a piped run is not a blocker.
     #[must_use]
-    pub const fn is_question(self) -> bool {
+    pub(crate) const fn is_question(self) -> bool {
         matches!(
             self,
             Self::Protocols

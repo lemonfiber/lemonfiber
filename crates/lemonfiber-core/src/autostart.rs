@@ -81,7 +81,7 @@ impl Wanted {
     /// working has to establish that separately — this says only that it was asked
     /// for, which is precisely the distinction `enabled-unverified` exists to keep.
     #[must_use]
-    pub const fn on_boot(self) -> bool {
+    pub(crate) const fn on_boot(self) -> bool {
         self.on_boot
     }
 }

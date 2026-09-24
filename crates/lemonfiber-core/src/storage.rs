@@ -62,7 +62,7 @@ pub enum Linked {
 /// yet created resolves it to a real ancestor first. Both probe names are cleared
 /// before and after, so a run interrupted between the link and its cleanup does
 /// not read as an inability to link on the next.
-pub async fn test_link(filesystem: &dyn FileSystem, dir: &Path) -> Linked {
+pub(crate) async fn test_link(filesystem: &dyn FileSystem, dir: &Path) -> Linked {
     let probe = dir.join(PROBE);
     let linked = dir.join(LINKED);
 

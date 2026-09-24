@@ -77,7 +77,7 @@ impl Freshness {
 
     /// Whether the figure may already have moved on without anybody being told.
     #[must_use]
-    pub const fn goes_stale(self) -> bool {
+    pub(crate) const fn goes_stale(self) -> bool {
         matches!(self, Self::AsOf(_))
     }
 }
@@ -145,7 +145,7 @@ impl Volume {
     /// are spread over. Two paths under no reported mount are not evidence of one
     /// volume, however equal two empty strings look.
     #[must_use]
-    pub fn shares_with(&self, other: &Self) -> bool {
+    pub(crate) fn shares_with(&self, other: &Self) -> bool {
         !self.point.is_empty() && self.point == other.point
     }
 }

@@ -45,7 +45,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use clap::CommandFactory as _;
 
-use lemonfiber::cli::{Cli, STACK};
+use lemonfiber::carried::STACK;
+use lemonfiber::cli::Cli;
 use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
 use lemonfiber_core::app::{
     dispatch, plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Ctx,

@@ -32,16 +32,16 @@ use crate::app::engine::{in_flight, Interrupted};
 use crate::app::{Ctx, Waiting};
 
 /// Raised when what this machine has pulled could not be read.
-pub const NOT_CHECKED: Code = Code::new("UPDATE-1");
+pub(crate) const NOT_CHECKED: Code = Code::new("UPDATE-1");
 
 /// Raised when the service an update was narrowed to is not one the stack declares.
-pub const NO_SUCH_SERVICE: Code = Code::new("UPDATE-2");
+pub(crate) const NO_SUCH_SERVICE: Code = Code::new("UPDATE-2");
 
 /// Raised when transfers are still in flight and the run was not asked to wait.
-pub const STILL_TRANSFERRING: Code = Code::new("UPDATE-3");
+pub(crate) const STILL_TRANSFERRING: Code = Code::new("UPDATE-3");
 
 /// Raised when the stack came down for the capture and the capture would not write.
-pub const CAPTURE_LEFT_IT_DOWN: Code = Code::new("UPDATE-4");
+pub(crate) const CAPTURE_LEFT_IT_DOWN: Code = Code::new("UPDATE-4");
 
 /// What was asked of an update.
 #[derive(Debug, Clone, PartialEq, Eq)]
