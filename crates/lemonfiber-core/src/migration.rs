@@ -22,6 +22,7 @@ pub mod image;
 pub mod importing;
 pub mod linking;
 pub mod mode;
+pub(crate) mod run;
 pub mod standing;
 pub mod version;
 

@@ -584,7 +584,7 @@ mod tests {
     fn bundling(write: bool) -> Command {
         Command::Support {
             write,
-            wanted: crate::app::bundle::Wanted::default(),
+            wanted: crate::bundle::run::Wanted::default(),
             dest: crate::app::support::Destination::Kept,
         }
     }
@@ -853,11 +853,11 @@ mod tests {
             },
             Command::QualityUpgrade { confirm: true },
             Command::Repair {
-                consent: crate::app::repair::Consent::Standing,
+                consent: crate::repair::run::Consent::Standing,
                 disruptive: false,
             },
             Command::Reset { confirm: true },
-            Command::Update(crate::app::update::Asked {
+            Command::Update(crate::update::run::Asked {
                 service: None,
                 confirm: true,
                 wait: Waiting::Never,

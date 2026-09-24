@@ -107,7 +107,7 @@ const RECORD: &str = "boot.json";
 /// services that never settled. A run that declines to start anything is not an
 /// error: declining is the correct answer to three of the four questions in front of
 /// it, and the report says which.
-pub(super) async fn at_boot(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn at_boot(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     waited(ctx, LOOKS, AGAIN, TRIES, BETWEEN).await
 }
 
@@ -409,7 +409,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
 /// about, so a machine that has been failing to come back for a fortnight says so at
 /// the next interaction and then stops, rather than prefixing every command they type
 /// for a fortnight.
-pub(super) async fn reported(ctx: &Ctx) {
+pub(crate) async fn reported(ctx: &Ctx) {
     // A rehearsal changes nothing, and marking an alert delivered is a change.
     if ctx.dry_run {
         return;
@@ -668,7 +668,7 @@ mod tests {
 
     /// Record what the operator asked for about starting on boot.
     fn asked(ctx: &Ctx, returning: &Returning) {
-        crate::app::autostart::save(ctx, returning);
+        crate::autostart::run::save(ctx, returning);
     }
 
     /// A machine asked to bring the library form back after a restart.

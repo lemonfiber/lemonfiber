@@ -30,7 +30,7 @@ use crate::ports::service::{Allowed, Household as _, NamedLibrary, Unrated};
 /// nothing about access, and writing "every library, no limit" for it would put an
 /// account somebody is being offered again back to open — undoing whatever the
 /// household had narrowed it to, and undoing it silently.
-pub(super) async fn allowing(
+pub(crate) async fn allowing(
     server: &crate::jellyfin::Jellyfin,
     allowance: &Allowance,
 ) -> Result<Option<Allowed>, Box<crate::error::Problem>> {
@@ -130,7 +130,7 @@ fn no_such_library(named: &str, held: &[NamedLibrary]) -> crate::error::Problem 
 /// Said as an account that exists and is open, because that is what is now true. An
 /// operator told only that something failed would not know whether to invite again or
 /// to go and narrow an account that is already there.
-pub(super) fn would_not_allow(name: &str) -> crate::error::Problem {
+pub(crate) fn would_not_allow(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::Code::new("INVITE-8"),
         crate::error::Severity::Error,

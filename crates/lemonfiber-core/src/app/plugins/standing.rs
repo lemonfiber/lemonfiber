@@ -14,7 +14,7 @@ use super::super::Ctx;
 ///
 /// Read off the recorded choices, so it answers for what the stack is doing now rather
 /// than for what any plugin declared.
-pub(super) fn substituted(
+pub(crate) fn substituted(
     installed: &[Installed],
     chosen: &crate::wiring::Chosen,
 ) -> Vec<crate::plugin::Substituted> {
@@ -43,7 +43,7 @@ pub(super) fn substituted(
 ///
 /// Where the stack's own manifest cannot be read. A rehearsal that could not say what
 /// the install would do to the wiring would be stating less than the install does.
-pub(super) fn contested(
+pub(crate) fn contested(
     ctx: &Ctx,
     held: &Register,
     would: &Installed,

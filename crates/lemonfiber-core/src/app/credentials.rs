@@ -29,7 +29,7 @@ use crate::error::Diagnose;
 /// # Errors
 ///
 /// Returns the [`Problem`] for a stack that could not be read.
-pub(super) async fn answer(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn answer(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> {
     let manifest = ctx
         .stack
         .manifest()

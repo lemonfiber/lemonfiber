@@ -32,6 +32,7 @@ use serde::Serialize;
 /// Sixteen is far past guessing, and the salt is the whole of what makes a stand-in
 mod allowed;
 mod prose;
+pub mod run;
 mod scan;
 
 pub use allowed::{settings, shown, Marks, SALT_BYTES};

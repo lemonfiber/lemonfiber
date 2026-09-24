@@ -47,7 +47,7 @@ use super::{NOWHERE, UNWRITABLE};
 ///
 /// Where a directory or a document cannot be written. The journal is already carrying
 /// whatever was made before the failure, so what did land is reversible.
-pub(super) fn carry_out(
+pub(crate) fn carry_out(
     ctx: &Ctx,
     plugin: &str,
     stamp: &str,
@@ -150,7 +150,7 @@ fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp:
 /// or the operator declared the area it sits in unmanaged, which is the one statement
 /// that lemonfiber writes nothing there and has to hold for a plugin as it does for
 /// everything else.
-pub(super) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
+pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
     planned
         .into_iter()
         .filter(|write| match &write.lands {
@@ -214,7 +214,7 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
 }
 
 /// Raised when a plugin's service would answer on a label another plugin's already does.
-pub(super) const ANSWERED: lemonfiber_error::Code = lemonfiber_error::Code::new("PLUGIN-13");
+pub(crate) const ANSWERED: lemonfiber_error::Code = lemonfiber_error::Code::new("PLUGIN-13");
 
 /// Refuse a plugin one of whose services would answer on a label another installed
 /// plugin's service already answers on, before anything is written.
@@ -222,7 +222,7 @@ pub(super) const ANSWERED: lemonfiber_error::Code = lemonfiber_error::Code::new(
 /// # Errors
 ///
 /// Where the label is taken, naming it and whose it is.
-pub(super) fn unanswered(
+pub(crate) fn unanswered(
     would: &crate::plugin::Installed,
     installed: &[crate::plugin::Installed],
 ) -> Result<(), Box<Problem>> {
@@ -248,7 +248,7 @@ pub(super) fn unanswered(
 }
 
 /// There is nowhere on this machine to write what the install decided.
-pub(super) fn nowhere_to_write(plugin: &str) -> Problem {
+pub(crate) fn nowhere_to_write(plugin: &str) -> Problem {
     Problem::new(
         NOWHERE,
         Severity::Error,

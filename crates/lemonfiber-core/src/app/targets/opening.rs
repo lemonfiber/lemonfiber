@@ -326,7 +326,7 @@ pub(crate) async fn jellyfin_key(
     services: &[lemonfiber_manifest::Service],
 ) -> Option<String> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
-    let password = crate::app::seed::identity::recorded_jellyfin_password(ctx)?;
+    let password = crate::seed::run::identity::recorded_jellyfin_password(ctx)?;
     let client = crate::jellyfin::Jellyfin::authenticated(
         ctx.http.clone(),
         addr.loopback,

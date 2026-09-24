@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
+pub(crate) mod run;
 mod settling;
 
 use settling::claimants;

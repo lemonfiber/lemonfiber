@@ -22,7 +22,7 @@ use super::Ctx;
 ///
 /// Returns the [`Problem`] a surface renders when the recorded choice cannot be read or a
 /// file cannot be written.
-pub(super) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem>> {
+pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem>> {
     let selection = super::quality::load_selection(ctx)?;
     let record = super::targets::beside_env(ctx, "materialised.json");
     let into = ctx.settings.stack_dir.as_deref();

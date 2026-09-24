@@ -30,7 +30,7 @@ use crate::stack::compose::{build, Action};
 use super::super::{Ctx, Outcome};
 
 /// Nothing by that name is installed on this machine.
-pub(super) const NOT_INSTALLED: Code = Code::new("PLUGIN-10");
+pub(crate) const NOT_INSTALLED: Code = Code::new("PLUGIN-10");
 
 /// Take a plugin off the machine, or say what taking it off would come to.
 ///
@@ -40,7 +40,7 @@ pub(super) const NOT_INSTALLED: Code = Code::new("PLUGIN-10");
 /// record of what was written, where the rollback layer refuses a change — asked before
 /// anything is taken, so a refusal leaves the plugin exactly as it was — or where the
 /// record of what is installed cannot be written afterwards.
-pub(super) async fn remove(
+pub(crate) async fn remove(
     ctx: &Ctx,
     held: Register,
     plugin: &str,

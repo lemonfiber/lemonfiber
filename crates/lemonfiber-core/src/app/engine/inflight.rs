@@ -161,7 +161,7 @@ const AGAIN: Duration = Duration::from_secs(10);
 /// The wait runs before the stack is claimed for the teardown, because it can last
 /// an hour and a claim held for an hour is a stack nothing else can touch while
 /// nothing is happening to it.
-pub(in crate::app) async fn teardown(
+pub(crate) async fn teardown(
     ctx: &Ctx,
     forms: &[String],
     wait: Waiting,
@@ -187,7 +187,7 @@ pub(in crate::app) async fn teardown(
 /// Said again only when the count changes, because a line repeated every ten seconds
 /// is one whoever is reading scrolls past — and the one moment it has news is the
 /// moment another download finishes.
-pub(in crate::app) async fn drained(ctx: &Ctx, forms: &[String]) {
+pub(crate) async fn drained(ctx: &Ctx, forms: &[String]) {
     let mut counted = usize::MAX;
     loop {
         let active = in_flight(ctx, forms).await;

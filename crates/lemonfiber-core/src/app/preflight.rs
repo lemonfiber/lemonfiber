@@ -49,7 +49,7 @@ use super::Ctx;
 /// Nothing is asked of the engine where the answer is already settled: a plan holding
 /// no service that publishes a port has nothing to clash over, and that is the common
 /// case for everything except a start.
-pub(super) async fn conflicting_ports(
+pub(crate) async fn conflicting_ports(
     ctx: &Ctx,
     manifest: &Manifest,
     starting: &[String],
@@ -141,7 +141,7 @@ async fn outside_the_engine(ctx: &Ctx, ours: &[Ours], seen: &[Container]) -> Vec
 /// the survey that shares this: that nothing was found and that nothing could be
 /// looked at are different facts, and only one of them makes it safe to stand a stack
 /// up here.
-pub(super) async fn every_container(ctx: &Ctx, images: &[Image]) -> Option<Vec<Container>> {
+pub(crate) async fn every_container(ctx: &Ctx, images: &[Image]) -> Option<Vec<Container>> {
     let mut projects: BTreeSet<&str> = BTreeSet::new();
     for image in images {
         projects.extend(

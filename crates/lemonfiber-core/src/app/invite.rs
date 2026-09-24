@@ -31,7 +31,7 @@ mod refusals;
 mod reissuing;
 mod standing;
 
-pub(super) use reissuing::reissued;
+pub(crate) use reissuing::reissued;
 
 use crate::app::{Allowance, Ctx};
 use crate::invitation::{Offered, HOURS_TO_CLAIM};
@@ -54,7 +54,7 @@ use standing::{already_here, has_run_out, held, standing_of, take_back, Held};
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server
 /// to hold the account, where it will not answer, or where no library goes by a name
 /// that was given.
-pub(super) async fn offer(
+pub(crate) async fn offer(
     ctx: &Ctx,
     name: String,
     allowance: Allowance,

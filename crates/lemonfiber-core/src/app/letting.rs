@@ -32,7 +32,7 @@ use super::Ctx;
 /// client here is holding anything, where the client is holding nothing of that name,
 /// where the agreement names some other reading, or where the client would not let it
 /// go.
-pub(super) async fn stop_seeding(
+pub(crate) async fn stop_seeding(
     ctx: &Ctx,
     download: String,
     agreement: Option<String>,

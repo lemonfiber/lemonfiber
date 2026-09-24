@@ -46,7 +46,7 @@ use crate::ports::service::Pipeline;
 /// carry, which spends a real search against the daily allowance they hold the operator
 /// to — the one thing a trace can do that reaches past this machine — so it is made only
 /// where it was asked for, and only where the trace has a silence it could explain.
-pub(super) async fn trace(
+pub(crate) async fn trace(
     ctx: &Ctx,
     term: &str,
     season: Option<u32>,
@@ -124,7 +124,7 @@ pub(super) async fn trace(
 /// about a silence it did not hear. One that has not finished starting, its key not yet
 /// readable, is skipped as it is everywhere else: a service still coming up holds nothing
 /// stuck, so its absence understates nothing.
-pub(super) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
+pub(crate) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())

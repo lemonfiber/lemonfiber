@@ -20,7 +20,7 @@ use crate::credential::{Held, Revealed, REVEALED, SHOULDER};
 /// Unconfirmed, the warning is the whole answer. Confirmed, the value comes with the
 /// warning still attached, because the thing worth saying is as true afterwards as it
 /// was before — the value is in the scrollback either way once it has been printed.
-pub(super) fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
+pub(crate) fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
     if !confirmed {
         return Revealed {
             name: held.name.clone(),
@@ -59,7 +59,7 @@ pub(super) fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
 /// A reveal rather than a rotation, because that is what was asked for. Reported as a
 /// rotation it would put a replacement nobody asked for into the answer, render as one
 /// on the terminal, and earn the exit code a failed replacement earns.
-pub(super) fn nothing_by_that_name(credential: &str, known: &[String]) -> Revealed {
+pub(crate) fn nothing_by_that_name(credential: &str, known: &[String]) -> Revealed {
     Revealed {
         name: credential.to_owned(),
         value: None,

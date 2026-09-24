@@ -26,7 +26,7 @@ const LIDARR: &str = "lidarr";
 /// then applied best-effort: a service not yet started, or a stack that cannot be read,
 /// is reported as not-started rather than failing the command, because the choice is
 /// recorded regardless and applying it again once the service is up will reach it.
-pub(super) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<Problem>> {
+pub(crate) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<Problem>> {
     let mut selection = super::quality::load_selection(ctx)?;
     selection.set_music(format);
     let choice = super::quality::music_choice(format);

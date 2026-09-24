@@ -49,7 +49,7 @@ use super::{arrangement, household, Ctx};
 /// a surface offered the choice could do instead is spend a household's afternoon asking
 /// somebody else's service for nothing, or leave a gap long enough that the arrangement
 /// reads as broken. Neither is a choice worth offering.
-pub(super) const SWEEPING: Duration = Duration::from_secs(3_600);
+pub(crate) const SWEEPING: Duration = Duration::from_secs(3_600);
 
 /// Arrange what happens to the requests nobody rules on, or begin doing it.
 ///
@@ -63,7 +63,7 @@ pub(super) const SWEEPING: Duration = Duration::from_secs(3_600);
 /// Where a run was asked to begin against an arrangement nobody made, where the period
 /// named would close a request before anybody was reminded of it, where there is nowhere
 /// to record the arrangement, or where the household itself could not be read afterwards.
-pub(super) async fn expiring(
+pub(crate) async fn expiring(
     ctx: &Ctx,
     arranged: Arranged,
     interval: Duration,

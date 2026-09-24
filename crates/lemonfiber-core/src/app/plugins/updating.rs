@@ -25,10 +25,10 @@ use super::super::{Ctx, Outcome};
 use super::{carry_out, nowhere_to_write, proving, verifying};
 
 /// Nothing by that id is installed, so there is no version to replace.
-pub(super) const NOT_INSTALLED: Code = Code::new("PLUGIN-11");
+pub(crate) const NOT_INSTALLED: Code = Code::new("PLUGIN-11");
 
 /// The version installed would not come off, so nothing else was touched.
-pub(super) const STUCK: Code = Code::new("PLUGIN-12");
+pub(crate) const STUCK: Code = Code::new("PLUGIN-12");
 
 /// Replace the installed version of a plugin with the one at this path, or say what
 /// doing so would come to.
@@ -41,7 +41,7 @@ pub(super) const STUCK: Code = Code::new("PLUGIN-12");
 /// come off. Every one of those is answered before anything is changed. What goes wrong
 /// after that is not an error: it is an update that did not hold, and the report says
 /// which version the machine is on.
-pub(super) async fn update(
+pub(crate) async fn update(
     ctx: &Ctx,
     held: Register,
     path: &Path,

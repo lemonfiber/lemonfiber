@@ -49,7 +49,7 @@ const CANNOT_BE_THERE: &str = ".lemonfiber-is-this-check-working";
 ///
 /// Returns the [`Problem`] naming an endpoint nothing here can drive, or a Docker
 /// context this machine does not have.
-pub(super) fn usable(ctx: &Ctx) -> Result<(), Box<Problem>> {
+pub(crate) fn usable(ctx: &Ctx) -> Result<(), Box<Problem>> {
     match ctx.settings.docker.refusal() {
         None => Ok(()),
         Some(failure) => Err(Box::new(failure.problem())),

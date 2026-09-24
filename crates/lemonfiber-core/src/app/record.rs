@@ -27,7 +27,7 @@ use crate::error::{Diagnose, Problem};
 /// Nothing configured means nowhere to keep it, which is not a fault: a machine
 /// with no configuration has no history to remember either.
 #[must_use]
-pub(super) fn kept<T: Default + DeserializeOwned>(path: Option<&Path>) -> T {
+pub(crate) fn kept<T: Default + DeserializeOwned>(path: Option<&Path>) -> T {
     path.and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
@@ -40,7 +40,7 @@ pub(super) fn kept<T: Default + DeserializeOwned>(path: Option<&Path>) -> T {
 /// rule is four places to drift; the body was factored then and the wrapper was not, and by
 /// the seventh record that wrapper was the duplication.
 #[must_use]
-pub(super) fn beside<T: Default + DeserializeOwned>(ctx: &Ctx, name: &str) -> T {
+pub(crate) fn beside<T: Default + DeserializeOwned>(ctx: &Ctx, name: &str) -> T {
     kept(super::targets::beside_env(ctx, name).as_deref())
 }
 
@@ -49,7 +49,7 @@ pub(super) fn beside<T: Default + DeserializeOwned>(ctx: &Ctx, name: &str) -> T 
 /// Best effort on the way out, unlike a record an operator decided: a history that could not
 /// be written is one the next run starts afresh from, which is a worse picture rather than a
 /// wrong claim, and never worth failing a command over.
-pub(super) fn keep_beside<T: Serialize>(ctx: &Ctx, name: &str, value: &T) {
+pub(crate) fn keep_beside<T: Serialize>(ctx: &Ctx, name: &str, value: &T) {
     let _ = keep(super::targets::beside_env(ctx, name).as_deref(), value);
 }
 
@@ -58,7 +58,7 @@ pub(super) fn keep_beside<T: Serialize>(ctx: &Ctx, name: &str, value: &T) {
 /// # Errors
 ///
 /// Where there is nowhere configured to keep it, or the file cannot be written.
-pub(super) fn keep<T: Serialize>(path: Option<&Path>, value: &T) -> Result<(), Box<Problem>> {
+pub(crate) fn keep<T: Serialize>(path: Option<&Path>, value: &T) -> Result<(), Box<Problem>> {
     let path = path.ok_or_else(|| Box::new(store::Failure::Nowhere.problem()))?;
     // A value that will not serialise writes as an empty record rather than
     // refusing: the types here are plain data with derived implementations, so it

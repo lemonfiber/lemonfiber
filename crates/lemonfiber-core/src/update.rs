@@ -18,6 +18,8 @@
 //! has pulled — so the whole of what an update would come to is decided in a test
 //! with no daemon present.
 
+pub mod run;
+
 use serde::Serialize;
 
 use crate::migration::version::{self, Jump, Standing};

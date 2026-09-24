@@ -13,7 +13,7 @@ use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::stack::compose::Action;
 
 /// Whether this action would ask a registry for anything the operator has refused.
-pub(super) fn refused(ctx: &Ctx, action: &Action) -> bool {
+pub(crate) fn refused(ctx: &Ctx, action: &Action) -> bool {
     matches!(action, Action::Pull) && !ctx.settings.reaching.allows(REACH_REGISTRY_KEY)
 }
 
@@ -23,7 +23,7 @@ pub(super) fn refused(ctx: &Ctx, action: &Action) -> bool {
 /// told the fetch happened, when nothing was fetched, is worse than being stopped.
 /// The setting is named in both halves, so the way out is on the screen rather than
 /// in a document.
-pub(super) fn refusal() -> Problem {
+pub(crate) fn refusal() -> Problem {
     Problem::new(
         crate::app::REGISTRY_REFUSED,
         Severity::Error,

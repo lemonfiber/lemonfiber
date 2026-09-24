@@ -26,7 +26,7 @@ use crate::ports::service::{Household as _, Member};
 /// answers them; an operator types a name, so it is the second that answers an operator.
 /// One resolution for both rather than two paths that could come to disagree about who
 /// was meant.
-pub(super) async fn held(ctx: &Ctx, member: &str, most: u32) -> Result<HeldReport, Box<Problem>> {
+pub(crate) async fn held(ctx: &Ctx, member: &str, most: u32) -> Result<HeldReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())

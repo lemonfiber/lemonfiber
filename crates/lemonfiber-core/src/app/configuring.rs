@@ -63,7 +63,7 @@ impl Asked {
 ///
 /// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
 /// settings file that could not be read or written.
-pub(super) async fn configuration(ctx: &Ctx, change: Setting) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn configuration(ctx: &Ctx, change: Setting) -> Result<Outcome, Box<Problem>> {
     // Trimmed on the way in, for the same reason setup trims what is pasted into it:
     // a key copied from a dashboard carries a trailing newline, it authenticates
     // nowhere, and the file format has no way to mean the whitespace deliberately. The
@@ -83,7 +83,7 @@ pub(super) async fn configuration(ctx: &Ctx, change: Setting) -> Result<Outcome,
 ///
 /// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
 /// settings file that could not be read.
-pub(super) async fn reading(ctx: &Ctx, key: Option<&str>) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn reading(ctx: &Ctx, key: Option<&str>) -> Result<Outcome, Box<Problem>> {
     settings(ctx, key, None).await
 }
 
@@ -346,7 +346,7 @@ fn stated(ctx: &Ctx, review: &Review, held: &EnvFile, key: &str, value: &str) ->
     }
     let mut proposed = held.clone();
     proposed.set(key, value);
-    super::seeding::on_change(
+    super::unforwarded::on_change(
         &port_forward_from_env(held),
         &port_forward_from_env(&proposed),
     )
@@ -498,7 +498,7 @@ mod tests {
         let ctx = ctx(env_at("off", "VPN_PORT_FORWARDING=on\n"));
         let said =
             consequence(&configuration(&ctx, Setting::to(VPN_PORT_FORWARDING_KEY, "off")).await);
-        assert_eq!(said.as_deref(), Some(crate::app::seeding::COST));
+        assert_eq!(said.as_deref(), Some(crate::app::unforwarded::COST));
     }
 
     #[tokio::test]
@@ -513,7 +513,7 @@ mod tests {
         // takes away — and the sentence is that one rather than the seeding sentence
         // sitting next to it.
         assert!(said.contains("whether Usenet runs"), "{said}");
-        assert!(!said.contains(crate::app::seeding::COST), "{said}");
+        assert!(!said.contains(crate::app::unforwarded::COST), "{said}");
     }
 
     #[tokio::test]
@@ -849,7 +849,7 @@ mod tests {
 
         assert_eq!(
             consequence(&said).as_deref(),
-            Some(crate::app::seeding::COST)
+            Some(crate::app::unforwarded::COST)
         );
         assert_eq!(stance(&said), Some(Stance::Pending));
         assert_eq!(

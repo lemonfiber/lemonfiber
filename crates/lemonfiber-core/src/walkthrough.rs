@@ -10,7 +10,7 @@
 //! This is the pure part of that: the steps in order, what each is called in plain
 //! language, where a walkthrough can stop and what to say when it does, what is safe to
 //! suggest to someone with no library yet, and what to point at when it works. Nothing
-//! here reaches a service — running it is [`crate::app::walkthrough`], and drawing it is
+//! here reaches a service — running it is [`crate::walkthrough::run`], and drawing it is
 //! the binary's.
 //!
 //! The pipeline it walks is the same one [`crate::trace`] reports on after the fact:
@@ -21,6 +21,7 @@
 mod diagnosis;
 mod handover;
 mod narration;
+pub(crate) mod run;
 mod shape;
 mod state;
 mod step;

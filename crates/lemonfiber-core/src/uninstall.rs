@@ -13,11 +13,12 @@
 //! disk cannot be spent on another.
 //!
 //! What this module holds is the vocabulary and the judgements over it. Gathering the
-//! facts is [`crate::app::uninstall`], which is where the engine, the filesystem and
+//! facts is [`crate::uninstall::run`], which is where the engine, the filesystem and
 //! the walk are reached.
 
 mod foreign;
 mod outside;
+pub(crate) mod run;
 mod tier;
 
 use serde::Serialize;

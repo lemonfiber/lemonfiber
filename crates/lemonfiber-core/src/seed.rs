@@ -43,6 +43,7 @@ mod clients;
 pub(crate) mod drift;
 mod report;
 mod roots;
+pub(crate) mod run;
 mod services;
 
 pub use clients::{client_field, wire_download_clients, Baselines, CLIENT};

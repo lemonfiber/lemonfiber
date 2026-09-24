@@ -157,7 +157,7 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 /// Where there is nowhere to look for the record, where the judgement says a change
 /// cannot be put back — drift, or a later change that depends on it — or for any reason
 /// the executor underneath gives.
-pub(super) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
+pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal());
     let changes = journal.changes();
@@ -177,7 +177,7 @@ pub(super) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, B
 ///
 /// The ones [`everything`] would give before touching anything: nowhere to look for
 /// the record, or a change the judgement will not put back.
-pub(super) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
+pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal());
     let changes = journal.changes();
@@ -272,7 +272,7 @@ async fn carried_out(
 /// and setting a field in order to discover that it could — which is the write, done to
 /// describe itself.
 #[must_use]
-pub(super) fn would_reverse(undos: Vec<Undo>) -> Reversal {
+pub(crate) fn would_reverse(undos: Vec<Undo>) -> Reversal {
     let (through_a_service, here): (Vec<Undo>, Vec<Undo>) = undos
         .into_iter()
         .partition(|undo| matches!(undo.action, crate::journal::Action::Reconfigure { .. }));

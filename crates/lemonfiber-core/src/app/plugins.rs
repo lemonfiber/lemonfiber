@@ -115,16 +115,16 @@ const UNRECORDED: Code = Code::new("PLUGIN-4");
 const ALREADY: Code = Code::new("PLUGIN-5");
 
 /// There is no stack on this machine to put a plugin's container in.
-pub(super) const NOWHERE: Code = Code::new("PLUGIN-6");
+pub(crate) const NOWHERE: Code = Code::new("PLUGIN-6");
 
 /// A directory or a document the install decided on would not land.
-pub(super) const UNWRITABLE: Code = Code::new("PLUGIN-7");
+pub(crate) const UNWRITABLE: Code = Code::new("PLUGIN-7");
 
 /// The wiring went down and the record of what is installed did not.
 const UNRECORDABLE: Code = Code::new("PLUGIN-8");
 
 /// The plugin's own service would not start, so nothing about it could be proved.
-pub(super) const UNPROVED: Code = Code::new("PLUGIN-9");
+pub(crate) const UNPROVED: Code = Code::new("PLUGIN-9");
 
 /// What is installed, and what installing one came to.
 ///
@@ -140,7 +140,7 @@ pub(super) const UNPROVED: Code = Code::new("PLUGIN-9");
 /// not land, where the plugin's own service would not start, or where the record of
 /// what is installed cannot be written. Every one of those after the first write puts
 /// the install back before it answers.
-pub(super) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> {
     let held = read(ctx)?;
     match action {
         Asked::Installed => Ok(Outcome::Plugins(Installs {
@@ -368,7 +368,7 @@ async fn reversing(
 ///
 /// One sentence for every refusal that puts the install back, so two refusals cannot
 /// describe the same machine differently.
-pub(super) fn left_behind(back: &super::putting_back::Reversal) -> String {
+pub(crate) fn left_behind(back: &super::putting_back::Reversal) -> String {
     if back.left.is_empty() {
         return "The install was put back, and nothing is recorded as installed. \
                 `lemonfiber history` says what went back."

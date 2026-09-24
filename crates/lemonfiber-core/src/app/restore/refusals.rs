@@ -48,7 +48,7 @@ pub const NOT_REPOINTED: Code = Code::new("RESTORE-10");
 pub const NOT_OURS: Code = Code::new("RESTORE-12");
 
 /// The refusal for a run that cannot say where its own files go.
-pub(super) fn nowhere() -> Problem {
+pub(crate) fn nowhere() -> Problem {
     Problem::new(
         NOWHERE_KEPT,
         Severity::Error,
@@ -66,7 +66,7 @@ pub(super) fn nowhere() -> Problem {
 /// one needs to see which. What it is not is followed: a name carrying a path is a
 /// request to read somewhere lemonfiber does not keep archives, and the server runs
 /// as the operator.
-pub(super) fn not_kept_here(name: &str) -> Problem {
+pub(crate) fn not_kept_here(name: &str) -> Problem {
     Problem::new(
         NOT_KEPT_HERE,
         Severity::Error,
@@ -84,7 +84,7 @@ pub(super) fn not_kept_here(name: &str) -> Problem {
 /// Its own refusal rather than the store's, because what failed is the last step of
 /// a restore that has already replaced the files: the archive is in place and its
 /// recorded data root is the one it was taken against, which is not here.
-pub(super) fn not_repointed(cause: &Problem) -> Problem {
+pub(crate) fn not_repointed(cause: &Problem) -> Problem {
     Problem::new(
         NOT_REPOINTED,
         Severity::Error,
@@ -98,7 +98,7 @@ pub(super) fn not_repointed(cause: &Problem) -> Problem {
 }
 
 /// The problem for an archive that cannot be read at all.
-pub(super) fn corrupt(fault: &Fault) -> Problem {
+pub(crate) fn corrupt(fault: &Fault) -> Problem {
     Problem::new(
         CORRUPT,
         Severity::Error,
@@ -111,7 +111,7 @@ pub(super) fn corrupt(fault: &Fault) -> Problem {
 }
 
 /// The problem for an archive from a newer lemonfiber.
-pub(super) fn too_new(archive: &str, current: &str) -> Problem {
+pub(crate) fn too_new(archive: &str, current: &str) -> Problem {
     Problem::new(
         TOO_NEW,
         Severity::Error,
@@ -124,7 +124,7 @@ pub(super) fn too_new(archive: &str, current: &str) -> Problem {
 }
 
 /// The problem for an archive in a format this build cannot restore.
-pub(super) fn incompatible(detail: &str) -> Problem {
+pub(crate) fn incompatible(detail: &str) -> Problem {
     Problem::new(
         INCOMPATIBLE,
         Severity::Error,
@@ -144,7 +144,7 @@ pub(super) fn incompatible(detail: &str) -> Problem {
 /// from this machine; this one protects a tree on this machine that was never
 /// lemonfiber's to write to, so the remedy hands the work over rather than
 /// suggesting another way to ask.
-pub(super) fn not_ours(project: &str, paths: &[String]) -> Problem {
+pub(crate) fn not_ours(project: &str, paths: &[String]) -> Problem {
     Problem::new(
         NOT_OURS,
         Severity::Error,
@@ -163,7 +163,7 @@ pub(super) fn not_ours(project: &str, paths: &[String]) -> Problem {
 }
 
 /// The problem for an archive whose members would escape their area.
-pub(super) fn unsafe_paths(escaping: &[String]) -> Problem {
+pub(crate) fn unsafe_paths(escaping: &[String]) -> Problem {
     Problem::new(
         UNSAFE,
         Severity::Critical,
@@ -175,7 +175,7 @@ pub(super) fn unsafe_paths(escaping: &[String]) -> Problem {
 }
 
 /// The problem for a restore that would land on a different data root.
-pub(super) fn needs_repoint(relocation: &Relocation) -> Problem {
+pub(crate) fn needs_repoint(relocation: &Relocation) -> Problem {
     Problem::new(
         NEEDS_REPOINT,
         Severity::Warning,
@@ -188,7 +188,7 @@ pub(super) fn needs_repoint(relocation: &Relocation) -> Problem {
 }
 
 /// The problem for an archive that could not be unpacked.
-pub(super) fn not_restored(fault: &Fault) -> Problem {
+pub(crate) fn not_restored(fault: &Fault) -> Problem {
     Problem::new(
         NOT_RESTORED,
         Severity::Error,

@@ -66,7 +66,7 @@ pub const NO_DATA_LOCATION: Code = Code::new("LIFE-5");
 ///
 /// Returns the [`Problem`] a surface should render where the data location never
 /// appeared.
-pub(super) async fn grounded(ctx: &Ctx, action: &Action) -> Result<(), Box<Problem>> {
+pub(crate) async fn grounded(ctx: &Ctx, action: &Action) -> Result<(), Box<Problem>> {
     waited(ctx, action, LOOKS, AGAIN).await
 }
 

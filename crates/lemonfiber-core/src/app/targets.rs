@@ -30,7 +30,7 @@ mod servarr;
 /// Sorted by the service it names, so a report reads the same twice and two reports
 /// carrying it agree line for line. The two sources cannot name one service between
 /// them — a shape is either spoken or not — so nothing is reported twice.
-pub(super) fn unsupported_here(
+pub(crate) fn unsupported_here(
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,
 ) -> Vec<crate::model::UnsupportedReport> {
@@ -40,11 +40,11 @@ pub(super) fn unsupported_here(
     found
 }
 
-pub(super) use downloads::*;
-pub(super) use layout::*;
-pub(super) use opening::*;
-pub(super) use secrets::*;
-pub(super) use servarr::*;
+pub(crate) use downloads::*;
+pub(crate) use layout::*;
+pub(crate) use opening::*;
+pub(crate) use secrets::*;
+pub(crate) use servarr::*;
 
 #[cfg(test)]
 mod tests {

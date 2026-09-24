@@ -32,7 +32,7 @@ use super::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 /// loop cannot wedge, and an operator who genuinely wants an unprotected run gets
 /// one. Warned and recorded, so a later diagnosis reads it as a decision rather
 /// than an oversight.
-pub(super) fn resolve_vpn(prompt: &dyn Prompt) -> Answer {
+pub(crate) fn resolve_vpn(prompt: &dyn Prompt) -> Answer {
     loop {
         if prompt.vpn() {
             return Answer::Vpn(Vpn::Carrying);
@@ -49,7 +49,7 @@ pub(super) fn resolve_vpn(prompt: &dyn Prompt) -> Answer {
 /// could not be tested — is put back to the operator with what was found, to use
 /// anyway or replace. The loop ends only when they accept a location, so it can
 /// never wedge: the way out is always to say yes to the one in hand.
-pub(super) async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileSystem) -> PathBuf {
+pub(crate) async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileSystem) -> PathBuf {
     loop {
         let chosen = prompt.data_location();
         match assess(filesystem, &chosen).await {
@@ -75,7 +75,7 @@ pub(super) async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileS
 /// prove it is told apart by cause and put back to them: try again, keep it
 /// unverified — recorded as such so a later diagnosis can point at it — or leave
 /// it unset. Entering nothing is a supported end, not a failure to answer.
-pub(super) async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
+pub(crate) async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
     loop {
         let Some((url, key)) = prompt.credential() else {
             return Answer::Credentials(None);
@@ -119,7 +119,7 @@ pub(super) async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Val
 /// on — proven, taken unverified, or left for now. The same shape as the indexer,
 /// against a different transport: nothing is kept before the login is attempted,
 /// and a login that does not take is put back to the operator by cause.
-pub(super) async fn resolve_provider(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
+pub(crate) async fn resolve_provider(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
     loop {
         let Some(entry) = prompt.usenet_provider() else {
             return Answer::Provider(None);

@@ -27,7 +27,7 @@ const NAME: &str = "expiring.json";
 
 /// What this household agreed to, or nothing where it has agreed to nothing.
 #[must_use]
-pub(super) fn load(ctx: &Ctx) -> Expiry {
+pub(crate) fn load(ctx: &Ctx) -> Expiry {
     super::record::beside(ctx, NAME)
 }
 
@@ -36,7 +36,7 @@ pub(super) fn load(ctx: &Ctx) -> Expiry {
 /// # Errors
 ///
 /// Where there is nowhere configured to keep it, or the file cannot be written.
-pub(super) fn keep(ctx: &Ctx, agreed: &Expiry) -> Result<(), Box<Problem>> {
+pub(crate) fn keep(ctx: &Ctx, agreed: &Expiry) -> Result<(), Box<Problem>> {
     super::record::keep(super::targets::beside_env(ctx, NAME).as_deref(), agreed)
 }
 

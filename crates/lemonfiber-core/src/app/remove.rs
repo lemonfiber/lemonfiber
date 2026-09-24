@@ -27,7 +27,7 @@ use crate::ports::service::{Household as _, Member, Requests as _};
 /// # Errors
 ///
 /// Returns whatever [`remove`] returns.
-pub(super) async fn dispatched(
+pub(crate) async fn dispatched(
     ctx: &Ctx,
     name: String,
     confirm: bool,
@@ -44,7 +44,7 @@ pub(super) async fn dispatched(
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
 /// where it will not answer, where nobody is named, where nobody by that name is here,
 /// or where the account named administers the server.
-pub(super) async fn remove(
+pub(crate) async fn remove(
     ctx: &Ctx,
     name: String,
     confirm: bool,

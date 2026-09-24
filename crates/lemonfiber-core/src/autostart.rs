@@ -19,6 +19,8 @@
 //! So this answers "what was asked for", under a name that cannot be misread as
 //! "and it works".
 
+pub(crate) mod run;
+
 use serde::{Deserialize, Serialize};
 
 /// What declining costs, in the terms the choice is actually about.

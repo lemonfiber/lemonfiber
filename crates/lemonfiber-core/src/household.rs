@@ -11,6 +11,8 @@
 //! and neither alone says where a member stands. Folding them into one word is all that
 //! happens here; nothing reaches a service.
 
+pub(crate) mod run;
+
 use serde::Serialize;
 
 /// Where one request stands, in the words the person who made it would use.

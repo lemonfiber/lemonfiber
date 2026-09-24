@@ -26,7 +26,7 @@ use crate::recyclarr::Kind;
 /// resolution \*arrs present in the stack are covered; a music or index service is
 /// not a resolution preset's concern, so it is left out rather than sent a command
 /// it has no equivalent for.
-pub(super) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, Box<Problem>> {
+pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, Box<Problem>> {
     let selection = super::quality::recorded_selection(ctx);
     let manifest = ctx
         .stack

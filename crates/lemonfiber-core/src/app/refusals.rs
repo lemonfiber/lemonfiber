@@ -25,7 +25,7 @@ const NAME: &str = "refusals.json";
 
 /// Every reason this machine holds, or none where nothing has been turned down here.
 #[must_use]
-pub(super) fn load(ctx: &Ctx) -> Reasons {
+pub(crate) fn load(ctx: &Ctx) -> Reasons {
     super::record::beside(ctx, NAME)
 }
 
@@ -37,7 +37,7 @@ pub(super) fn load(ctx: &Ctx) -> Reasons {
 /// rather than swallowed, unlike the histories a run can work out again: what is lost
 /// here is the only copy of somebody's words, and an operator told a reason is theirs to
 /// pass on while nothing kept it would find it gone the next time they looked.
-pub(super) fn keep(ctx: &Ctx, reasons: &Reasons) -> Result<(), Box<Problem>> {
+pub(crate) fn keep(ctx: &Ctx, reasons: &Reasons) -> Result<(), Box<Problem>> {
     super::record::keep(super::targets::beside_env(ctx, NAME).as_deref(), reasons)
 }
 

@@ -18,6 +18,8 @@
 //! duration is computed from one clock and never runs backwards, since a host and a
 //! container disagreeing about the time must not render as a negative countdown.
 
+pub mod run;
+
 use std::time::Duration;
 
 use serde::Serialize;

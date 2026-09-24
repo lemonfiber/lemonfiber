@@ -43,6 +43,7 @@ pub mod holding;
 pub mod limit;
 pub mod respite;
 pub mod rhythm;
+pub(crate) mod run;
 
 pub use cap::{Cap, Metered, Reached, WhenExceeded, CRAWL};
 pub use capacity::Capacity;

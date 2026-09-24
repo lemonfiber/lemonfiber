@@ -26,6 +26,7 @@
 
 mod assess;
 mod item;
+pub mod run;
 mod stall;
 mod threshold;
 

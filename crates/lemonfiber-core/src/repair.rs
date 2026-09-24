@@ -14,6 +14,8 @@
 //! findings it answers at once and when to stop offering it are all decided here, with no
 //! service to reach and no file to write; carrying one out happens above.
 
+pub mod run;
+
 use serde::{Deserialize, Serialize};
 
 use crate::baseline::Record;

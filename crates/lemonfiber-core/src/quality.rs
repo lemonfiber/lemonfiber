@@ -14,6 +14,8 @@
 //! the question. Nothing here reaches a service or a disk; it is the pure model the
 //! surface and the Recyclarr writer are built on.
 
+pub(crate) mod run;
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};

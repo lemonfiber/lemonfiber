@@ -33,7 +33,7 @@ const EVERY: Duration = Duration::from_secs(5);
 /// A wait shorter than [`EVERY`] says nothing at all. A stack that comes up in two
 /// seconds has nothing to report, and reporting it anyway would teach the operator
 /// that these lines are noise before the day one of them matters.
-pub(super) fn due(
+pub(crate) fn due(
     waiting: &[String],
     waited: Duration,
     patience: Duration,

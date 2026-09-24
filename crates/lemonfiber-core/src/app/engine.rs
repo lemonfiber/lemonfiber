@@ -22,18 +22,18 @@ mod lock;
 mod remote;
 // Reached from outside this module by the one lifecycle path that does not run the
 // prelude the rest share, which is the staged half of an update.
-pub(super) use remote::verified;
+pub(crate) use remote::verified;
 mod settling;
 mod stopping;
-pub(super) use settling::settled_into;
+pub(crate) use settling::settled_into;
 mod streaming;
 mod switch;
 mod waiting;
 
 pub use diagnosis::diagnose;
-pub(super) use diagnosis::{assembled, assembling, examined, Stack};
-pub(in crate::app) use inflight::drained;
-pub(super) use inflight::teardown;
+pub(crate) use diagnosis::{assembled, assembling, examined, Stack};
+pub(crate) use inflight::drained;
+pub(crate) use inflight::teardown;
 pub use inflight::{in_flight, Interrupted, Waiting};
 pub use lock::{claimed, released, Claim};
 pub use streaming::{logs, pull_progress, start_progress, started};
@@ -41,8 +41,8 @@ pub use streaming::{logs, pull_progress, start_progress, started};
 // whole run — which is the right level for it, since which checks name a service is a
 // separate question from what happens to a finding that does.
 #[cfg(test)]
-pub(super) use diagnosis::quoted;
-pub(super) use switch::switch;
+pub(crate) use diagnosis::quoted;
+pub(crate) use switch::switch;
 
 /// What resolving the forms into a runnable Compose command produced.
 ///
@@ -148,7 +148,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be read,
 /// resolved, or written.
-pub(super) fn invocation(
+pub(crate) fn invocation(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
@@ -162,7 +162,7 @@ pub(super) fn invocation(
 /// Naming no form reports the whole stack, because "what is running" is a
 /// question about the machine rather than about a form — and an operator asking
 /// it has usually forgotten which form they started.
-pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, Box<Problem>> {
+pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -292,7 +292,7 @@ async fn readied(
 /// Nothing here decides anything a surface could have decided differently, which
 /// is the point: `up` from a keypress and `up` from a subcommand reach this same
 /// function with the same arguments.
-pub(super) async fn lifecycle(
+pub(crate) async fn lifecycle(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
@@ -369,7 +369,7 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
 /// Silent about failure on purpose: a stack that cannot record this still starts, and
 /// the connection that needs the key reports its own absence rather than this stopping
 /// the services from running at all.
-pub(super) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) {
+pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) {
     let declares_bindery = manifest.services.iter().any(|service| {
         service
             .api
@@ -398,7 +398,7 @@ pub(super) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Ma
 /// Returns the [`Problem`] a surface should render when the stack cannot be read
 /// or the forms cannot be resolved — an unknown name among them, a form that
 /// refuses company, or a closure the configuration empties.
-pub(super) fn preview(ctx: &Ctx, forms: &[String]) -> Result<Plan, Box<Problem>> {
+pub(crate) fn preview(ctx: &Ctx, forms: &[String]) -> Result<Plan, Box<Problem>> {
     resolved(ctx, forms).map(|(_, plan)| plan)
 }
 
@@ -441,7 +441,7 @@ fn resolved(
 /// Returns the [`Problem`] a surface should render when the stack cannot be read. Boxed
 /// as a capture's refusals are: a refusal carries a good deal more than the listing it is
 /// refusing to give.
-pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
+pub(crate) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -474,7 +474,7 @@ pub(super) fn forms(ctx: &Ctx) -> Result<FormsReport, Box<Problem>> {
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be read, or
 /// when what it declares does not hold together. Boxed as the listing beside it is.
-pub(super) fn provenance(ctx: &Ctx) -> Result<ProvenanceReport, Box<Problem>> {
+pub(crate) fn provenance(ctx: &Ctx) -> Result<ProvenanceReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -497,7 +497,7 @@ pub(super) fn provenance(ctx: &Ctx) -> Result<ProvenanceReport, Box<Problem>> {
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be read, or
 /// when what it declares does not hold together. Boxed as the listing beside it is.
-pub(super) fn catalogue(ctx: &Ctx) -> Result<CatalogueReport, Box<Problem>> {
+pub(crate) fn catalogue(ctx: &Ctx) -> Result<CatalogueReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -511,7 +511,7 @@ pub(super) fn catalogue(ctx: &Ctx) -> Result<CatalogueReport, Box<Problem>> {
 /// An unreachable engine is reported as absent rather than as a failure: asking
 /// what versions are in play is exactly what an operator does when something is
 /// wrong, so it must still answer when the engine is down.
-pub(super) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
+pub(crate) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
     let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
     let compose = match ctx.runner.run(&argv).await {
         Ok(output) if output.succeeded() => Some(output.stdout.trim().to_owned()),

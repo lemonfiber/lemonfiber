@@ -8,7 +8,7 @@
 //!
 //! Only what the operator answered lives here. What running without a forwarded
 //! port costs is not answered at all: it is said at the moment the choice is made
-//! and never raised again, which [`super::seeding`] does without needing a record.
+//! and never raised again, which [`super::unforwarded`] does without needing a record.
 //!
 //! Kept with configuration rather than beside the stack, because it is a record of
 //! something the operator decided: a backup that restored the stack without it

@@ -241,7 +241,7 @@ pub fn resume(wizard: &mut Wizard, applying: &Applying<'_>) -> Result<(), Box<Pr
 /// # Errors
 ///
 /// Returns the [`Problem`] a real apply gives for answers that have not reached review.
-pub(super) fn would_apply(wizard: &mut Wizard) -> Result<(), Box<Problem>> {
+pub(crate) fn would_apply(wizard: &mut Wizard) -> Result<(), Box<Problem>> {
     if wizard.transition(Phase::Reviewing) {
         return Ok(());
     }
@@ -265,7 +265,7 @@ pub(super) fn would_apply(wizard: &mut Wizard) -> Result<(), Box<Problem>> {
 /// not be reversed, or where the apply that follows a resume or a roll back fails —
 /// which leaves the marker at `applying` for another attempt, exactly as an apply
 /// asked for directly does.
-pub(super) fn recovered(
+pub(crate) fn recovered(
     wizard: &mut Wizard,
     applying: &Applying<'_>,
     choice: Choice,

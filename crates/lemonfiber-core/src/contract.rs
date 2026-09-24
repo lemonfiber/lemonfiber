@@ -51,11 +51,9 @@ use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 use crate::app::archives::Listing;
-use crate::app::backup::Report as BackupReport;
-use crate::app::repair::{Report as RepairReport, Reversal};
 use crate::app::restore::Restoration;
 use crate::app::support::Bundle;
-use crate::app::update::Report as StackUpdate;
+use crate::backup::run::Report as BackupReport;
 use crate::clients::Guidance;
 use crate::credential::Inventory;
 use crate::dashboard::Snapshot;
@@ -73,8 +71,10 @@ use crate::outbound::Leaving;
 use crate::plugin::Installs;
 use crate::ports::docker::LogLine;
 use crate::ports::error::Problem;
+use crate::repair::run::{Report as RepairReport, Reversal};
 use crate::stack::closure::Plan;
 use crate::stored::Stored;
+use crate::update::run::Report as StackUpdate;
 use crate::walkthrough::Line;
 
 /// Where the generated artefact is kept, relative to the workspace root.
@@ -403,14 +403,14 @@ mod tests {
                 overall: crate::doctor::Overall::Healthy,
                 findings: Vec::new(),
             }),
-            Outcome::Repair(crate::app::repair::Report {
+            Outcome::Repair(crate::repair::run::Report {
                 offered: vec![a_repair()],
                 agreement: crate::repair::agreement(&[a_repair()]),
-                mended: vec![crate::app::repair::Mended {
+                mended: vec![crate::repair::run::Mended {
                     repair: a_repair(),
                     outcome: crate::repair::Outcome::Fixed,
                 }],
-                beyond: vec![crate::app::repair::Beyond {
+                beyond: vec![crate::repair::run::Beyond {
                     check: "vpn.killswitch".to_owned(),
                     remedy: crate::error::Remedy::new("ask for help"),
                 }],
@@ -422,7 +422,7 @@ mod tests {
     /// The next of them, continuing that order.
     fn the_next_of_them() -> Vec<Outcome> {
         vec![
-            Outcome::Undo(crate::app::repair::Reversal {
+            Outcome::Undo(crate::repair::run::Reversal {
                 reversed: vec![crate::journal::Undo {
                     target: "qbittorrent".to_owned(),
                     action: crate::journal::Action::Restore {
@@ -438,7 +438,7 @@ mod tests {
             Outcome::Seed(crate::seed::Report::default()),
             Outcome::Reset(ResetReport::default()),
             Outcome::Word(a_word()),
-            Outcome::Backup(crate::app::backup::Report {
+            Outcome::Backup(crate::backup::run::Report {
                 path: std::path::PathBuf::new(),
                 scope: crate::backup::Scope::WholeStack,
                 sensitive: true,
@@ -498,7 +498,7 @@ mod tests {
     /// Written out rather than defaulted, because the two lists are where its shape
     /// actually is: a report with no change and no service moved would describe half
     /// the document this kind writes.
-    fn an_update() -> crate::app::update::Report {
+    fn an_update() -> crate::update::run::Report {
         let change = crate::update::Change {
             service: "sonarr".to_owned(),
             current: "4.0.15".to_owned(),
@@ -508,7 +508,7 @@ mod tests {
             refused: false,
             because: "it migrates its state on first start".to_owned(),
         };
-        crate::app::update::Report {
+        crate::update::run::Report {
             state: crate::update::State::Partial,
             applied: vec![crate::update::Applied::ended(
                 &change,

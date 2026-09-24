@@ -85,7 +85,7 @@ async fn settle(
 /// not need a lemonfiber release to be able to say what its absence costs. A service
 /// the manifest does not describe contributes nothing rather than a placeholder — an
 /// empty sentence is better than a wrong one.
-pub(super) fn costs(manifest: &lemonfiber_manifest::Manifest, waiting: &[String]) -> String {
+pub(crate) fn costs(manifest: &lemonfiber_manifest::Manifest, waiting: &[String]) -> String {
     let said: Vec<String> = manifest
         .services
         .iter()
@@ -167,7 +167,7 @@ async fn never_settled(
 /// finished, so the reading has no second shape. There is nothing useful to say
 /// about output that cannot be read which the report it is attached to does not
 /// already say.
-pub(super) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
+pub(crate) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
     let (closed, silent) = tokio::sync::mpsc::channel(1);
     drop(closed);
 

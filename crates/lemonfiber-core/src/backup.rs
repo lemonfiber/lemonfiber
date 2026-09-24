@@ -411,6 +411,7 @@ fn single_segment(name: &str) -> bool {
 
 mod compatibility;
 mod retention;
+pub mod run;
 
 pub use compatibility::{relocation, Compatibility, Relocation};
 pub use retention::Retention;

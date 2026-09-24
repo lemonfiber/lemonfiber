@@ -48,7 +48,7 @@ const RECYCLARR_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 ///
 /// Returns [`Failure`] when there is nowhere to write an embedded stack to, or when
 /// a file cannot be written.
-pub(super) fn materialise(
+pub(crate) fn materialise(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -74,7 +74,7 @@ pub(super) fn materialise(
 /// # Errors
 ///
 /// Returns [`Failure`] when there is nowhere to write to, or a file cannot be written.
-pub(super) fn reset_stack(
+pub(crate) fn reset_stack(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -96,7 +96,7 @@ pub(super) fn reset_stack(
 /// # Errors
 ///
 /// Returns [`Failure`] where there is nowhere the stack could live to read from.
-pub(super) fn would_materialise(
+pub(crate) fn would_materialise(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -120,7 +120,7 @@ pub(super) fn would_materialise(
 /// # Errors
 ///
 /// Returns [`Failure`] only where there is nowhere the stack could live to read from.
-pub(super) fn pending_reverts(
+pub(crate) fn pending_reverts(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -278,7 +278,7 @@ fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) 
 /// False where there is nothing to judge against: no record of what lemonfiber
 /// wrote, or no config on disk. It is the same comparison [`decide`] makes — on-disk
 /// against the record — read without writing anything.
-pub(super) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Path>) -> bool {
+pub(crate) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Path>) -> bool {
     let Some(into) = into else {
         return false;
     };
@@ -310,7 +310,7 @@ pub(super) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Pat
 /// # Errors
 ///
 /// Returns [`Failure`] when there is nowhere to write, or the config cannot be written.
-pub(super) fn reapply_recyclarr(
+pub(crate) fn reapply_recyclarr(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,

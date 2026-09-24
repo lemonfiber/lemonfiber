@@ -18,12 +18,12 @@ use std::path::Path;
 
 use lemonfiber_manifest::{ApiKind, Service};
 
-use crate::app::seed::published_as;
 use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
 use crate::ports::service::{Client, Failure};
+use crate::seed::run::published_as;
 
 /// What a rehearsal says about replacing the credential lemonfiber mints itself.
 const MINTING: &str = "a real run would generate a new web UI password, set it on the \
@@ -44,7 +44,7 @@ const REPUBLISHING: &str = "a real run would read the key the service wrote for 
 /// acting: a rehearsal is turned back wherever a real run would be turned back, and
 /// reports only where a real run would actually attempt something. The third path
 /// writes nothing on any run, so a rehearsal of it is the run.
-pub(super) async fn rotate(
+pub(crate) async fn rotate(
     ctx: &Ctx,
     held: &Held,
     services: &[Service],

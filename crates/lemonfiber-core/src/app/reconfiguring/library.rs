@@ -18,16 +18,16 @@ use crate::reconfigure::LibraryPath;
 use super::Ctx;
 
 /// What the services hold, and why it could not be read where it could not.
-pub(super) struct Library {
+pub(crate) struct Library {
     /// What each path the services hold comes to after the move.
-    pub(super) paths: Vec<LibraryPath>,
+    pub(crate) paths: Vec<LibraryPath>,
     /// Why nothing could be read, where a library is here and nothing would say
     /// where it is filed.
-    pub(super) unread: Option<String>,
+    pub(crate) unread: Option<String>,
 }
 
 /// What moving the data location to `to` does to the library already here.
-pub(super) async fn moving(ctx: &Ctx, to: &Path) -> Library {
+pub(crate) async fn moving(ctx: &Ctx, to: &Path) -> Library {
     let Some(from) = ctx.settings.data_root.as_deref() else {
         // Nothing has been chosen yet, so there is no library at a previous location
         // for this to invalidate — this is setup's answer, not a move. A location

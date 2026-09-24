@@ -20,6 +20,7 @@
 mod installed;
 mod noticing;
 mod offered;
+pub(crate) mod run;
 mod upgrading;
 
 use std::path::{Path, PathBuf};

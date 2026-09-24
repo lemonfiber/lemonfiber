@@ -25,7 +25,7 @@ use crate::validate::Credential;
 
 /// What proving a replacement would take.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum Proving {
+pub(crate) enum Proving {
     /// Nothing to prove: this setting is not part of a credential.
     Nothing,
     /// Part of one, but the credential it belongs to is still missing a half, so
@@ -39,7 +39,7 @@ pub(super) enum Proving {
 }
 
 /// What proving the change to `key` would take, over the file as it stands.
-pub(super) fn wanted(file: &EnvFile, key: &str, value: &str) -> Proving {
+pub(crate) fn wanted(file: &EnvFile, key: &str, value: &str) -> Proving {
     let held = |wanted: &str| -> String {
         if wanted == key {
             value.to_owned()

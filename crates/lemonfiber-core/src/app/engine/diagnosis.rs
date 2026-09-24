@@ -203,7 +203,7 @@ fn indexer_still_answers(ctx: &Ctx) -> IndexerCheck {
 /// coming to complain. Built here rather than inline because the assembly it joins
 /// is already at the length a reader can hold.
 fn household_telling(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> TellingCheck {
-    let (requests, recorded) = crate::app::seed::managed_telling(ctx, services);
+    let (requests, recorded) = crate::seed::run::managed_telling(ctx, services);
     TellingCheck::new(requests, recorded)
 }
 
@@ -342,7 +342,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     let headroom = HeadroomCheck::new(
         ctx.filesystem.clone(),
         ctx.settings.data_root.clone(),
-        crate::app::quality::most_demanding_or_default(ctx),
+        crate::quality::run::most_demanding_or_default(ctx),
     );
     // Whether the chosen quality actually finds releases — a demanding preset can ask
     // for what the indexers do not carry, which reads as an indexer fault unless the two
@@ -362,7 +362,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     let wiring = WiringCheck::new(
         ctx.http.clone(),
         ctx.filesystem.clone(),
-        crate::app::seed::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
+        crate::seed::run::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
         ctx.stamp(),
     );
     // Where the stack is actually listening, asked of the container engine rather
@@ -397,7 +397,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
         ctx.filesystem.clone(),
         ctx.runner.clone(),
         ctx.environment,
-        crate::app::autostart::load(ctx).wanted().on_boot(),
+        crate::autostart::run::load(ctx).wanted().on_boot(),
         ctx.settings.home.clone(),
     );
     let mut checks: Vec<Box<dyn Check>> = vec![

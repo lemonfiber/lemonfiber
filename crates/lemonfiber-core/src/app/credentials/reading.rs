@@ -21,11 +21,11 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_manifest::{ApiKind, Service};
 
-use crate::app::seed::published_as;
 use crate::app::targets::{config_path, recorded_secret};
 use crate::app::Ctx;
 use crate::credential::{catalogue, fingerprint, Entry, Held, Origin, Reached, State};
 use crate::plugin::Installed;
+use crate::seed::run::published_as;
 
 /// Where a credential lives when there is no settings file resolved to name.
 const NOWHERE: &str = "nowhere yet — this machine has no settings file";
@@ -35,7 +35,7 @@ const NOWHERE: &str = "nowhere yet — this machine has no settings file";
 /// The declared ones first, in the order they are declared, then the ones the
 /// services minted for themselves in the order the manifest names them — so two runs
 /// against the same stack list the same things in the same places.
-pub(super) async fn taken(
+pub(crate) async fn taken(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&Path>,
@@ -256,7 +256,7 @@ fn service_key(
 /// them: the service itself, which minted the key and needs nothing done to it, and
 /// everything reading it out of the environment, which is fixed when a container is
 /// created and so needs one.
-pub(super) fn service_consumers(name: &str, setting: &str) -> Vec<(String, Reached)> {
+pub(crate) fn service_consumers(name: &str, setting: &str) -> Vec<(String, Reached)> {
     vec![
         (format!("{name}'s own API"), Reached::AtTheService),
         (

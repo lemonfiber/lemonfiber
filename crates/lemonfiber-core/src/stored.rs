@@ -21,6 +21,7 @@
 //! owed the entries.
 
 mod kept;
+pub(crate) mod run;
 
 use serde::Serialize;
 

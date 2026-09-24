@@ -57,7 +57,7 @@ const POLL: Duration = Duration::from_millis(500);
 /// Where the engine could not be run, or ran and refused — and in either case the
 /// install is put back first, so what the refusal says about the machine is what the
 /// reversal left rather than what it was hoped to leave.
-pub(super) async fn started(
+pub(crate) async fn started(
     ctx: &Ctx,
     installed: &Installed,
     stack: &Path,
@@ -95,7 +95,7 @@ pub(super) async fn started(
 /// itself, beside putting the old one back — or the old version being put back, where
 /// the only thing worse than it not starting is a reversal that took its files away
 /// again for not starting.
-pub(super) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option<String> {
+pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option<String> {
     let services: Vec<String> = installed
         .services
         .iter()
@@ -117,7 +117,7 @@ pub(super) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
 /// Answers whether it could, rather than failing: this runs inside an install that is
 /// already being put back, and a reversal that stopped at its first difficulty would
 /// leave more behind than one that carried on and said what it could not do.
-pub(super) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> bool {
+pub(crate) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> bool {
     let services: Vec<String> = installed
         .services
         .iter()
@@ -154,14 +154,14 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
 const PROXY: (&str, &str) = ("caddy", "proxy");
 
 /// Whether these writes put a route into the proxy's file.
-pub(super) fn routes_written(planned: &[crate::plugin::Write]) -> bool {
+pub(crate) fn routes_written(planned: &[crate::plugin::Write]) -> bool {
     planned.iter().any(|write| {
         matches!(&write.lands, crate::plugin::Lands::Region { key, .. } if key == crate::plugin::PROXY)
     })
 }
 
 /// Whether this reversal took a route back out of the proxy's file.
-pub(super) fn routes_withdrawn(back: &Reversal) -> bool {
+pub(crate) fn routes_withdrawn(back: &Reversal) -> bool {
     back.reversed.iter().any(|undo| {
         matches!(&undo.action, crate::journal::Action::Withdraw { key, .. } if key == crate::plugin::PROXY)
     })
@@ -179,7 +179,7 @@ pub(super) fn routes_withdrawn(back: &Reversal) -> bool {
 ///
 /// Told whether a route changed rather than finding out, because the writes and the
 /// reversal already say so, and a second look at the disk would be a second answer.
-pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
+pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
     if !routed {
         return;
     }
@@ -207,7 +207,7 @@ pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
 /// waiting out is a service that has not come up, and a plugin with five proofs
 /// against a service that never answers must not wait five times as long as one with
 /// a single proof.
-pub(super) async fn asked(
+pub(crate) async fn asked(
     ctx: &Ctx,
     manifest: &Manifest,
     installed: &Installed,
@@ -302,7 +302,7 @@ async fn answering(
 /// Reported as unproven either way. What it is called and what it costs are two
 /// decisions, and a verdict renamed to justify the cost would tell an operator their
 /// service is broken when what happened is that nothing answered.
-pub(super) fn held(proofs: &[Proving]) -> bool {
+pub(crate) fn held(proofs: &[Proving]) -> bool {
     proofs
         .iter()
         .all(|one| matches!(one.came_to, Some(Verdict::Passed)))
@@ -314,7 +314,7 @@ pub(super) fn held(proofs: &[Proving]) -> bool {
 /// field rather than a sentence for the reason the weaker value is one: a consumer
 /// handed a verdict has nothing else in the document to tell a recording that answered
 /// from a service that did.
-pub(super) const AGAINST: Evidence = Evidence::Service;
+pub(crate) const AGAINST: Evidence = Evidence::Service;
 
 /// The plugin's own container would not start.
 fn unstarted(plugin: &str, back: &Reversal) -> Problem {

@@ -54,7 +54,7 @@ const INSTEAD: &str = "lemonfiber does not configure this platform's way of star
 /// Returns a [`Problem`] where an install or a removal could not be carried out:
 /// a platform with no manager, a manager that refused, a machine that will not
 /// say where it keeps its files, or a guard named against no forms.
-pub(super) async fn hosting(ctx: &Ctx, asked: Keeping) -> Result<HostingReport, Box<Problem>> {
+pub(crate) async fn hosting(ctx: &Ctx, asked: Keeping) -> Result<HostingReport, Box<Problem>> {
     let changed = match asked {
         Keeping::Read => None,
         Keeping::Install { what, forms } => Some(install(ctx, what, &forms).await?),
@@ -109,7 +109,7 @@ async fn described(ctx: &Ctx, what: Hostable) -> HostedCommand {
 /// household, and a definition sitting on disk that the manager is not running
 /// keeps none of it. A manager that will not say is not one to promise on either,
 /// so anything short of a confirmed run reads as nothing running it.
-pub(super) async fn keeping(ctx: &Ctx, what: Hostable) -> bool {
+pub(crate) async fn keeping(ctx: &Ctx, what: Hostable) -> bool {
     ctx.hosting
         .standing(what.name())
         .await
@@ -329,7 +329,7 @@ mod tests {
 
     /// What this machine has recorded about bringing the stack back after a restart.
     fn wants_the_stack_back(ctx: &Ctx) -> bool {
-        crate::app::autostart::load(ctx).wanted().on_boot()
+        crate::autostart::run::load(ctx).wanted().on_boot()
     }
 
     /// The report, or the empty one — which no assertion below is satisfied by, so
@@ -769,7 +769,7 @@ mod tests {
     async fn the_other_two_say_nothing_about_what_happens_at_a_restart() {
         let ctx = recording("others", Fake::with(Manager::Launchd));
         let already = crate::autostart::Returning::default().answering(true);
-        crate::app::autostart::save(&ctx, &already);
+        crate::autostart::run::save(&ctx, &already);
 
         assert!(hosting(
             &ctx,

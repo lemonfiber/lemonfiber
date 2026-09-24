@@ -20,6 +20,7 @@
 
 mod address;
 mod chosen;
+pub(crate) mod run;
 
 use serde::Serialize;
 

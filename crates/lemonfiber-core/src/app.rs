@@ -9,91 +9,90 @@
 //! Whether this is a rehearsal is a property of the [`Ctx`], not a second code
 //! path, so there is no parallel implementation to fall out of step.
 
+use crate::asking::run as asking;
+use crate::autostart::run as autostart;
+use crate::backup::run as backup;
+use crate::bandwidth::run as bandwidth;
+use crate::bundle::run as bundle;
+use crate::dashboard::run as dashboard;
 use crate::doctor::Narrowing;
+use crate::door::run as door;
 use crate::error::{Code, Diagnose, Problem};
+use crate::household::run as household;
+use crate::migration::run as migration;
+use crate::notify::run as notify;
+use crate::quality::run as quality;
+use crate::queue::run as queue;
+use crate::repair::run as repair;
+use crate::seed::run as seed;
+use crate::self_update::run as self_update;
+use crate::space::run as space;
 use crate::stack::compose::Action;
+use crate::stored::run as stored;
+use crate::uninstall::run as uninstall;
+use crate::update::run as update;
+use crate::walkthrough::run as walkthrough;
+use crate::wiring::run as wiring;
 // The one function named rather than reached through its module below. The three
 // settings arms are the longest in the dispatcher, and the module prefix on each of
 // them is what pushed it past the length a function may be.
 
 pub mod accepted;
-mod adopt;
+pub(crate) mod adopt;
 pub mod appetite;
 pub mod apply;
 pub mod archives;
-mod arrangement;
-mod asking;
-mod autostart;
-pub mod backup;
-mod bandwidth;
-mod beside;
-mod boot;
-mod bounded;
-pub mod bundle;
-mod command;
+pub(crate) mod arrangement;
+pub(crate) mod beside;
+pub(crate) mod boot;
+pub(crate) mod bounded;
+pub(crate) mod command;
 pub mod conditions;
-mod configuring;
-mod credentials;
-mod ctx;
-pub mod dashboard;
+pub(crate) mod configuring;
+pub(crate) mod credentials;
+pub(crate) mod ctx;
 pub mod disturbance;
-mod door;
-mod engine;
-mod expiring;
+pub(crate) mod engine;
+pub(crate) mod expiring;
 #[cfg(test)]
-mod fixtures;
+pub(crate) mod fixtures;
 pub mod forwarding;
-mod held;
-mod history;
-mod hosting;
-mod household;
-mod import;
-mod invite;
-mod letting;
-mod materialise;
-mod migration;
-mod music;
-mod notify;
-mod outbox;
+pub(crate) mod held;
+pub(crate) mod history;
+pub(crate) mod hosting;
+pub(crate) mod import;
+pub(crate) mod invite;
+pub(crate) mod letting;
+pub(crate) mod materialise;
+pub(crate) mod music;
+pub(crate) mod outbox;
 pub mod plugins;
-mod preflight;
+pub(crate) mod preflight;
 pub mod putting_back;
-mod quality;
-pub mod queue;
-mod quiesced;
-mod reconfiguring;
-mod record;
+pub(crate) mod quiesced;
+pub(crate) mod reconfiguring;
+pub(crate) mod record;
 pub mod recover;
-mod refusals;
+pub(crate) mod refusals;
 pub mod rehearsal;
-mod remove;
-pub mod repair;
-mod repairs;
-mod replace;
-mod reset;
+pub(crate) mod remove;
+pub(crate) mod replace;
+pub(crate) mod reset;
 pub mod restore;
-mod screen;
-mod seed;
-pub mod seeding;
-mod self_update;
+pub(crate) mod screen;
 pub mod setup;
-mod space;
-mod stored;
 pub mod support;
-mod targets;
-mod trace;
-mod uninstall;
-pub mod update;
-mod upgrade;
-mod walkthrough;
+pub(crate) mod targets;
+pub(crate) mod trace;
+pub mod unforwarded;
+pub(crate) mod upgrade;
 pub mod watch;
-mod wiring;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
 };
-mod outcome;
+pub(crate) mod outcome;
 pub use ctx::{Ctx, PATIENCE};
 pub use outcome::Outcome;
 pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};
@@ -222,7 +221,7 @@ async fn traced(
 /// The bundle a support request asks for, gathered and put where it was asked for.
 async fn bundled(
     ctx: &Ctx,
-    wanted: crate::app::bundle::Wanted,
+    wanted: crate::bundle::run::Wanted,
     write_it: bool,
     dest: crate::app::support::Destination,
 ) -> Result<Outcome, Box<Problem>> {
@@ -1628,7 +1627,7 @@ mod tests {
             .build()
             .with_images(lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()));
         let json = dispatch(
-            Command::Update(crate::app::update::Asked {
+            Command::Update(crate::update::run::Asked {
                 service: None,
                 confirm: false,
                 wait: Waiting::Never,

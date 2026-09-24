@@ -25,7 +25,7 @@ use super::Ctx;
 mod capability;
 mod library;
 
-pub(super) use capability::waits_for_downloads;
+pub(crate) use capability::waits_for_downloads;
 
 /// The service name the settings baseline is kept under.
 ///
@@ -33,7 +33,7 @@ pub(super) use capability::waits_for_downloads;
 /// nothing the stack declares can collide with this. Kept in the same record seeding
 /// keeps rather than a second file, so one memory of what lemonfiber last wrote
 /// covers both the services and the settings.
-pub(super) const SETTINGS: &str = "lemonfiber:settings";
+pub(crate) const SETTINGS: &str = "lemonfiber:settings";
 
 /// The proposal, carrying what changing this setting comes to here — and turned away
 /// where what was found says it must not go ahead.
@@ -43,7 +43,7 @@ pub(super) const SETTINGS: &str = "lemonfiber:settings";
 /// The key and value are the ones the caller was given, not the ones the diff shows:
 /// a credential's diff is two redactions, and everything worked out here is about the
 /// value itself — where a path resolves, what a protocol switch comes to.
-pub(super) async fn assessed(
+pub(crate) async fn assessed(
     ctx: &Ctx,
     review: Review,
     held: &EnvFile,
@@ -140,7 +140,7 @@ fn edited(ctx: &Ctx, key: &str, found: Option<&str>, writing: &str) -> Option<Ed
 /// A record that is there but unreadable is left alone rather than judged against:
 /// it is the same loss seeding refuses to overwrite, and a change that treated it as
 /// absent would silently re-form it around whatever the file happens to hold.
-pub(super) fn recorded(ctx: &Ctx) -> Option<crate::baseline::Baseline> {
+pub(crate) fn recorded(ctx: &Ctx) -> Option<crate::baseline::Baseline> {
     match super::seed::load_baseline(ctx) {
         super::seed::Loaded::Formed(baseline) => Some(baseline),
         super::seed::Loaded::Fresh | super::seed::Loaded::Lost => None,
@@ -154,7 +154,7 @@ pub(super) fn recorded(ctx: &Ctx) -> Option<crate::baseline::Baseline> {
 /// still made the change, and what a lost write costs is that the next change reads
 /// this setting as one lemonfiber has no record of. A credential is deliberately left
 /// out — a second file holding a password would be a second file to leak one.
-pub(super) fn record(ctx: &Ctx, key: &str, value: &str) {
+pub(crate) fn record(ctx: &Ctx, key: &str, value: &str) {
     if is_secret(key) {
         return;
     }

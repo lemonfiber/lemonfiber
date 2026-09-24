@@ -6,7 +6,7 @@
 //! operator cannot act on has only told them to give up.
 
 /// Said where the stack holds no media server: there is nothing to make an account on.
-pub(super) fn no_media_server() -> crate::error::Problem {
+pub(crate) fn no_media_server() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::Code::new("INVITE-1"),
         crate::error::Severity::Error,
@@ -22,7 +22,7 @@ pub(super) fn no_media_server() -> crate::error::Problem {
 /// The media server refuses this too, in its own words, which are `400` and a link
 /// to the specification of that status. The operator asked for something reasonable
 /// and mistyped it, and is owed a sentence about the name rather than about HTTP.
-pub(super) fn nobody_named() -> crate::error::Problem {
+pub(crate) fn nobody_named() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::Code::new("INVITE-4"),
         crate::error::Severity::Error,
@@ -39,7 +39,7 @@ pub(super) fn nobody_named() -> crate::error::Problem {
 /// An invitation is an address somebody else types. Sending one built from a default
 /// would be sending a link that opens nothing, which is worse than saying there is
 /// none: the operator would learn it had failed from whoever they invited.
-pub(super) fn nowhere_to_send() -> crate::error::Problem {
+pub(crate) fn nowhere_to_send() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::Code::new("INVITE-3"),
         crate::error::Severity::Error,
@@ -57,7 +57,7 @@ pub(super) fn nowhere_to_send() -> crate::error::Problem {
 /// was offered. Reported rather than glossed over because the message the operator is
 /// about to send promises a window, and this one would be counted from whenever the
 /// invitation was first made, which has already passed.
-pub(super) fn would_not_renew(name: &str) -> crate::error::Problem {
+pub(crate) fn would_not_renew(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::Code::new("INVITE-5"),
         crate::error::Severity::Error,
@@ -69,7 +69,7 @@ pub(super) fn would_not_renew(name: &str) -> crate::error::Problem {
 }
 
 /// Said where the admin credential was never recorded: nothing can be asked of the server.
-pub(super) fn no_credential() -> crate::error::Problem {
+pub(crate) fn no_credential() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::Code::new("INVITE-2"),
         crate::error::Severity::Error,
