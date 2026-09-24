@@ -1258,6 +1258,7 @@ mod tests {
                 verified: None,
                 overrides: Vec::new(),
                 reversed,
+                contests: Vec::new(),
             }),
             update: None,
         })
@@ -1365,6 +1366,7 @@ mod tests {
                         verified: None,
                         overrides: Vec::new(),
                         reversed: None,
+                        contests: Vec::new(),
                     },
                     stopped: None,
                     restored: restored.then(|| lemonfiber_core::plugin::Restored {

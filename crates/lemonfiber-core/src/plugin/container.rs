@@ -203,6 +203,7 @@ mod tests {
                 hostname: "comics".to_owned(),
                 group: Some("Library".to_owned()),
             }),
+            provides: Vec::new(),
         }
     }
 

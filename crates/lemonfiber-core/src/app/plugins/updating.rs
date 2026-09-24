@@ -61,7 +61,10 @@ pub(super) async fn update(
         .stack_dir
         .as_deref()
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
-    let mut account = started(&was, &would, &manifest, stack);
+    let mut without = held.clone();
+    without.forget(&was.plugin);
+    let contests = super::contested(ctx, &without, &would)?;
+    let mut account = started(&was, &would, &manifest, stack, contests);
 
     // A rehearsal asks the reversal what it would put back, which judges it whole and
     // touches nothing.
@@ -165,6 +168,7 @@ fn started(
     would: &Installed,
     manifest: &lemonfiber_plugin::Manifest,
     stack: &Path,
+    contests: Vec<crate::wiring::Contest>,
 ) -> Update {
     Update {
         plugin: was.plugin.clone(),
@@ -183,6 +187,7 @@ fn started(
             proofs: crate::plugin::proofs(manifest),
             against: None,
             verified: None,
+            contests,
             overrides: crate::plugin::overrides(manifest),
             reversed: None,
         },

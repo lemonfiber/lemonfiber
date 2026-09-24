@@ -205,6 +205,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
         .as_deref()
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let planned = crate::plugin::writes(&would, stack);
+    let contests = contested(ctx, &held, &would)?;
 
     let mut stated = crate::plugin::proofs(&manifest);
     let mut against = None;
@@ -281,11 +282,39 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
             proofs: stated,
             against,
             verified: checked,
+            contests,
             overrides: crate::plugin::overrides(&manifest),
             reversed: put_back,
         }),
         update: None,
     }))
+}
+
+/// Every ask of the stack's that installing this would leave contested.
+///
+/// Read against the stack as it stands and the plugins already installed, so the answer
+/// is about this machine: an ask a plugin installed earlier has already contested is
+/// not this install's doing, and is not laid at its door.
+///
+/// # Errors
+///
+/// Where the stack's own manifest cannot be read. A rehearsal that could not say what
+/// the install would do to the wiring would be stating less than the install does.
+pub(super) fn contested(
+    ctx: &Ctx,
+    held: &Register,
+    would: &Installed,
+) -> Result<Vec<crate::wiring::Contest>, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
+    Ok(crate::wiring::contested_by(
+        &manifest,
+        held.installed(),
+        would,
+        &super::targets::chosen_fillers(ctx),
+    ))
 }
 
 /// The manifest at this path, read and held to everything this build refuses.
@@ -2224,6 +2253,74 @@ service = "komga""#,
             counted(reading(&ctx).await),
             Some(1),
             "it is still recorded"
+        );
+    }
+
+    /// Installing a plugin whose service claims what the stack asks for says, before it
+    /// happens, that the ask will be contested and reach nothing until somebody chooses —
+    /// read against the stack this build carries.
+    #[tokio::test]
+    async fn an_install_says_which_asks_it_would_leave_contested() {
+        let ctx = ctx("contesting");
+        let would = crate::plugin::read(&source("contesting", MANIFEST))
+            .ok()
+            .map(|manifest| crate::plugin::Installed::of(&manifest))
+            .map(|mut would| {
+                let _ = would.services.first_mut().map(|placed| {
+                    placed.provides = vec!["identity.source".to_owned()];
+                });
+                would
+            });
+
+        let contests = would
+            .and_then(|would| {
+                super::contested(&ctx, &crate::plugin::Register::empty(), &would).ok()
+            })
+            .unwrap_or_default();
+
+        assert_eq!(contests.len(), 1, "{contests:?}");
+        assert!(contests.first().is_some_and(|one| one.by == "seerr"
+            && one.capability == "identity.source"
+            && one
+                .claimants
+                .iter()
+                .any(|named| named == "komga (plugin komga)")));
+    }
+
+    /// An install or an update on a stack this build cannot read is refused before
+    /// anything is written, because what it would do to the wiring cannot be stated.
+    #[tokio::test]
+    async fn an_install_or_update_on_an_unreadable_stack_is_refused_first() {
+        let ctx = proving(
+            "contest-blind",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        assert_eq!(
+            counted(installing(&ctx, &source("contest-blind", PROVING)).await),
+            Some(1)
+        );
+        let blind = a_context()
+            .over(crate::test_support::nowhere())
+            .settings(ctx.settings.clone())
+            .build();
+        let refused = crate::stack::STACK_UNREADABLE.to_string();
+        assert_eq!(
+            refusal(updating(&blind, &source("contest-blind-next", &next())).await),
+            refused
+        );
+
+        let fresh = a_context()
+            .over(crate::test_support::nowhere())
+            .settings(crate::config::Settings {
+                env_file: Some(env_at("contest-blind-fresh", &a_password())),
+                stack_dir: ctx.settings.stack_dir.clone(),
+                ..crate::config::Settings::default()
+            })
+            .build();
+        assert_eq!(
+            refusal(installing(&fresh, &source("contest-blind", PROVING)).await),
+            refused
         );
     }
 

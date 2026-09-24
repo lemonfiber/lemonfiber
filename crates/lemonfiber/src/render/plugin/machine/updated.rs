@@ -26,6 +26,10 @@ pub(super) fn updated(one: &Update) -> Lines {
     lines.spaced(format!("    The version it replaces, {}:", one.from));
     lines.extend(super::reversal(&one.went_back));
     lines.spaced(format!("    The version it puts on, {}:", one.to));
+    lines.extend(super::contesting(
+        &one.install.contests,
+        one.install.recorded,
+    ));
     lines.extend(super::changes(&one.install.changes, acted));
     lines.extend(super::proving(
         &one.install.proofs,

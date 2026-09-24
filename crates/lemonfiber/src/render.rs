@@ -727,6 +727,7 @@ mod tests {
                         capability: "identity.source".to_owned(),
                         services: vec!["jellyfin".to_owned()],
                         settled: lemonfiber_core::wiring::Settled::Outright,
+                        origins: std::collections::BTreeMap::new(),
                     },
                 }],
                 unfilled: Vec::new(),

@@ -57,7 +57,17 @@ fn listing(ctx: &Ctx) -> Result<WiringReport, Box<Problem>> {
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let wired = wiring::settle(&manifest, &super::targets::chosen_fillers(ctx));
+    // What is installed is read with the stack, because a plugin's service that claims
+    // what the stack asks for is a candidate like any other. A record that is there and
+    // cannot be read refuses the listing, for the reason it refuses a diagnosis: an
+    // answer that quietly left a stranger's service out would settle a contest nobody
+    // was told about.
+    let installed = super::plugins::read(ctx)?;
+    let wired = wiring::settle(
+        &manifest,
+        installed.installed(),
+        &super::targets::chosen_fillers(ctx),
+    );
     Ok(WiringReport {
         unfilled: wiring::unfilled(&wired),
         wired,
@@ -82,8 +92,15 @@ fn substituting(ctx: &Ctx, filling: &super::Filling) -> Result<SubstitutionRepor
         .map_err(|err| Box::new(err.problem()))?;
 
     let held = super::targets::chosen_fillers(ctx);
-    let substitution = wiring::substitute(&manifest, &held, &filling.capability, &filling.service)
-        .map_err(|refused| Box::new(problem(&refused)))?;
+    let installed = super::plugins::read(ctx)?;
+    let substitution = wiring::substitute(
+        &manifest,
+        installed.installed(),
+        &held,
+        &filling.capability,
+        &filling.service,
+    )
+    .map_err(|refused| Box::new(problem(&refused)))?;
 
     if ctx.dry_run {
         return Ok(SubstitutionReport {

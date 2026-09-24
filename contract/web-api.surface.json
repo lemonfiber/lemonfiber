@@ -1893,6 +1893,12 @@
           ],
           "required": true
         },
+        "origin": {
+          "type": [
+            "ref:ValueOrigin"
+          ],
+          "required": true
+        },
         "said": {
           "type": [
             "null|string"
@@ -4200,6 +4206,12 @@
           ],
           "required": true
         },
+        "contests": {
+          "type": [
+            "array[ref:WiringContest]"
+          ],
+          "required": true
+        },
         "overrides": {
           "type": [
             "array[ref:PluginOverriding]"
@@ -4339,6 +4351,12 @@
             "string"
           ],
           "required": true
+        },
+        "provides": {
+          "type": [
+            "array[string]"
+          ],
+          "required": false
         },
         "reached": {
           "type": [
@@ -4977,6 +4995,12 @@
           "type": [
             "const:\"asked\"",
             "const:\"by-name\""
+          ],
+          "required": true
+        },
+        "origins": {
+          "type": [
+            "object{ref:ValueOrigin}"
           ],
           "required": true
         },
@@ -8352,6 +8376,29 @@
         "state": {
           "type": [
             "ref:SeedState"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "WiringContest": {
+      "fields": {
+        "by": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "capability": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "claimants": {
+          "type": [
+            "array[string]"
           ],
           "required": true
         }

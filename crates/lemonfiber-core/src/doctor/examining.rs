@@ -118,7 +118,7 @@ fn timed_out(check: &dyn Check) -> Finding {
             |one| one.check.clone(),
         ),
         category: check.category(),
-        service: reported.and_then(|one| one.service),
+        service: reported.as_ref().and_then(|one| one.service.clone()),
         caused_by: None,
         said: None,
         title: "Check timed out".to_owned(),
@@ -128,6 +128,9 @@ fn timed_out(check: &dyn Check) -> Finding {
                 "Run it again; if it keeps timing out, the engine or a service is not responding",
             ),
         },
+        origin: reported
+            .as_ref()
+            .map_or(crate::origin::Origin::Bundled, |one| one.origin.clone()),
     }
 }
 
@@ -204,6 +207,32 @@ mod tests {
         }
         fn budget(&self) -> Duration {
             Duration::from_secs(15)
+        }
+        async fn run(&self) -> Vec<Finding> {
+            std::future::pending::<()>().await;
+            Vec::new()
+        }
+    }
+
+    /// A plugin's check that never answers, and says whose it is.
+    struct HangingAndAttributed;
+
+    #[async_trait]
+    impl Check for HangingAndAttributed {
+        fn category(&self) -> Category {
+            Category::Services
+        }
+        fn budget(&self) -> Duration {
+            Duration::from_secs(15)
+        }
+        fn reports(&self) -> Option<crate::doctor::Reported> {
+            Some(crate::doctor::Reported {
+                check: "komga:libraries".to_owned(),
+                service: Some("komga".to_owned()),
+                origin: crate::origin::Origin::Plugin {
+                    named: "komga".to_owned(),
+                },
+            })
         }
         async fn run(&self) -> Vec<Finding> {
             std::future::pending::<()>().await;
@@ -502,5 +531,27 @@ depends_on = ["gluetun"]
         assert_eq!(report.overall, Overall::Unknown);
         let verdict = report.findings.first().map(|found| &found.verdict);
         assert!(matches!(verdict, Some(Verdict::Unverified { .. })));
+        assert_eq!(
+            report.findings.first().map(|found| &found.origin),
+            Some(&crate::origin::Origin::Bundled),
+            "a check of this build's own that says nothing is this build's own"
+        );
+    }
+
+    /// A plugin's check abandoned at its budget is written as that plugin's check not
+    /// having run — its own id, its own service, and whose it is — rather than as a row
+    /// of this build's.
+    #[tokio::test(start_paused = true)]
+    async fn a_plugin_s_check_that_will_not_answer_is_still_the_plugin_s() {
+        let checks: Vec<Box<dyn Check>> = vec![Box::new(HangingAndAttributed)];
+        let report = examine(&checks, &Narrowing::Suite).await;
+        let found = report.findings.first();
+        assert_eq!(found.map(|one| one.check.as_str()), Some("komga:libraries"));
+        assert_eq!(
+            found.map(|one| &one.origin),
+            Some(&crate::origin::Origin::Plugin {
+                named: "komga".to_owned()
+            })
+        );
     }
 }

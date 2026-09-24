@@ -168,6 +168,7 @@ mod tests {
             reports: Some(Reported {
                 check: check.to_owned(),
                 service: None,
+                origin: crate::origin::Origin::Bundled,
             }),
         }
     }

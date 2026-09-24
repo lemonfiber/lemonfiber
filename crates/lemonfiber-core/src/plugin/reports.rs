@@ -50,6 +50,13 @@ pub struct Install {
     /// stack still does. Absent on a rehearsal, which writes nothing and so has
     /// nothing to hold a reading against.
     pub verified: Option<super::Verification>,
+    /// Every ask of the stack's the install leaves contested that is not contested
+    /// now, as it would then stand.
+    ///
+    /// A plugin's service that claims what the stack asks for is a candidate like any
+    /// other, so installing it leaves the ask refused until somebody chooses — which is
+    /// a change to what the stack does, and stated with the rest before it happens.
+    pub contests: Vec<crate::wiring::Contest>,
     /// Every bundled thing the plugin declares it will change.
     ///
     /// The full extent rather than a sample of it: a manifest may change a bundled
