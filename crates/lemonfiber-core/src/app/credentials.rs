@@ -35,7 +35,12 @@ pub(super) async fn answer(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Prob
         .manifest()
         .map_err(|err| Box::new(err.problem()))?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let held = reading::taken(ctx, &manifest.services, project.as_deref()).await;
+    // What is installed is part of the answer, and a record that is there and will not
+    // read refuses it: a list of what this stack holds that quietly left a plugin's
+    // secrets off would be believed.
+    let installed = super::plugins::read(ctx)?;
+    let installed = installed.installed();
+    let held = reading::taken(ctx, &manifest.services, project.as_deref(), installed).await;
 
     let inventory = match asked {
         Asking::Read => Inventory::of(held),
@@ -50,6 +55,7 @@ pub(super) async fn answer(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Prob
                 &credential,
                 &manifest.services,
                 project.as_deref(),
+                installed,
             )
             .await
         }
@@ -73,6 +79,7 @@ async fn replacing(
     credential: &str,
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,
+    installed: &[crate::plugin::Installed],
 ) -> Inventory {
     let Some(found) = named(&held, credential) else {
         let known = named_ones(&held);
@@ -81,7 +88,7 @@ async fn replacing(
     let rotated = rotating::rotate(ctx, found, services, project).await;
     // Read again, because a landed replacement has changed what the answer is and an
     // inventory taken before it would report the state the rotation just left behind.
-    let after = reading::taken(ctx, services, project).await;
+    let after = reading::taken(ctx, services, project, installed).await;
     Inventory::of(after).after(rotated)
 }
 
@@ -139,6 +146,7 @@ mod tests {
             consumers: Vec::new(),
             location: "somewhere".to_owned(),
             origin: Origin::Lemonfiber,
+            from: crate::origin::Origin::Bundled,
             state: State::Active,
             fingerprint: None,
             advisory: None,

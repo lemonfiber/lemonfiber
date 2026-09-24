@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn a_message_goes_only_where_the_enumeration_names() {
         let allowed: Vec<String> =
-            crate::outbound::leaving(&crate::config::Settings::default(), &[])
+            crate::outbound::leaving(&crate::config::Settings::default(), &[], &[])
                 .ours
                 .into_iter()
                 .filter(|entry| entry.reach == crate::outbound::Reach::Household)

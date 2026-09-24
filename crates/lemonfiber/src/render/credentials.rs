@@ -20,6 +20,9 @@ pub(crate) fn listing(inventory: &Inventory) -> Lines {
     lines.put("The credentials this stack holds. None of their values is shown.");
     for held in &inventory.held {
         lines.spaced(format!("  {} — {}", held.name, held.state.as_str()));
+        if let Some(plugin) = held.plugins() {
+            lines.put(format!("    brought by   the plugin {plugin}"));
+        }
         lines.put(format!("    recorded as  {}", held.setting));
         lines.put(format!("    kept in      {}", held.location));
         for consumer in &held.consumers {
@@ -166,6 +169,7 @@ mod tests {
             consumers: vec!["the tunnel's forwarded-port push".to_owned()],
             location: "/somewhere/.env".to_owned(),
             origin: Origin::Lemonfiber,
+            from: lemonfiber_core::origin::Origin::Bundled,
             state,
             fingerprint: None,
             advisory: advisory.map(ToOwned::to_owned),
@@ -180,6 +184,21 @@ mod tests {
     /// A value built rather than written, so nothing reads it as a real credential.
     fn a_value() -> String {
         format!("{}{}", "the-", "value-itself")
+    }
+
+    #[test]
+    fn a_plugins_secret_says_which_plugin_brought_it_and_the_stacks_own_say_nothing() {
+        let mut theirs = held(State::Absent, None);
+        theirs.from = lemonfiber_core::origin::Origin::Plugin {
+            named: "comics".to_owned(),
+        };
+        let text = drawn(Inventory::of(vec![theirs, held(State::Active, None)]));
+
+        assert_eq!(
+            text.matches("brought by   the plugin comics").count(),
+            1,
+            "{text}"
+        );
     }
 
     #[test]

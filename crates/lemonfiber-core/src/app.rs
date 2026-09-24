@@ -162,9 +162,14 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         .stack
         .manifest()
         .map_err(|err| Box::new(err.problem()))?;
+    // What is installed is part of the answer, and a record that is there and will not
+    // read refuses it: an account of what leaves this machine that quietly left a
+    // stranger's plugin out would be believed.
+    let installed = plugins::read(ctx)?;
     Ok(Outcome::Outbound(crate::outbound::leaving(
         &ctx.settings,
         &manifest.services,
+        installed.installed(),
     )))
 }
 

@@ -64,10 +64,26 @@ fn theirs(services: &[Elsewhere]) -> Lines {
     }
     lines.spaced("What the services in this stack send, which is theirs and not lemonfiber's:");
     for service in services {
-        lines.spaced(format!("  {} — {}", service.service, goes(service)));
+        lines.spaced(format!(
+            "  {}{} — {}",
+            service.service,
+            brought_by(&service.origin),
+            goes(service)
+        ));
         lines.put(format!("    {}", service.purpose));
     }
     lines
+}
+
+/// Whose request it is, where that is not the stack's own, beside the name.
+///
+/// Nothing for the stack's own, which is every row this heading has always held; the
+/// heading already says whose those are.
+fn brought_by(origin: &lemonfiber_core::origin::Origin) -> String {
+    match origin {
+        lemonfiber_core::origin::Origin::Plugin { named } => format!(" (plugin {named})"),
+        _ => String::new(),
+    }
 }
 
 /// Where one service reaches, as the line above its explanation.
@@ -89,6 +105,7 @@ fn goes(service: &Elsewhere) -> String {
 #[cfg(test)]
 mod tests {
     use lemonfiber_core::config::{Reaching, Settings};
+    use lemonfiber_core::origin::Origin;
     use lemonfiber_core::outbound::{leaving as gathered, Elsewhere, Leaving};
 
     use super::leaving;
@@ -97,7 +114,7 @@ mod tests {
     /// which is every entry lemonfiber makes on its own account, and nothing of the
     /// stack's, since what the services reach is read from the services there are.
     fn shown(settings: &Settings) -> String {
-        leaving(&gathered(settings, &[])).text()
+        leaving(&gathered(settings, &[], &[])).text()
     }
 
     #[test]
@@ -161,6 +178,7 @@ mod tests {
                 destination: "the indexers you configured".to_owned(),
                 purpose: "Runs the searches everything else asks for.".to_owned(),
                 recorded: true,
+                origin: Origin::Bundled,
             }],
         })
         .text();
@@ -172,6 +190,24 @@ mod tests {
     }
 
     #[test]
+    fn a_plugins_request_is_marked_with_the_plugin_that_brought_it() {
+        let said = leaving(&Leaving {
+            ours: Vec::new(),
+            theirs: vec![Elsewhere {
+                service: "komga".to_owned(),
+                destination: "metadata.example".to_owned(),
+                purpose: "A destination this plugin's recipes declare.".to_owned(),
+                recorded: true,
+                origin: Origin::Plugin {
+                    named: "comics".to_owned(),
+                },
+            }],
+        })
+        .text();
+        assert!(said.contains("komga (plugin comics) — "), "{said}");
+    }
+
+    #[test]
     fn a_service_that_reaches_nothing_says_nothing_leaves_rather_than_nowhere() {
         let said = leaving(&Leaving {
             ours: Vec::new(),
@@ -180,6 +216,7 @@ mod tests {
                 destination: String::new(),
                 purpose: "Nothing. It extracts what it finds on this machine.".to_owned(),
                 recorded: true,
+                origin: Origin::Bundled,
             }],
         })
         .text();
@@ -194,7 +231,7 @@ mod tests {
     /// reaches renders nowhere however good the renderer under it is.
     #[test]
     fn the_printer_reaches_this_renderer_for_this_outcome() {
-        let report = gathered(&Settings::default(), &[]);
+        let report = gathered(&Settings::default(), &[], &[]);
         let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Outbound(report)).text();
         assert!(drawn.contains("What lemonfiber sends"), "{drawn}");
         assert!(drawn.contains("registry"), "{drawn}");
@@ -211,6 +248,7 @@ mod tests {
                 destination: "not known to lemonfiber".to_owned(),
                 purpose: "This service is not one lemonfiber knows.".to_owned(),
                 recorded: false,
+                origin: Origin::Bundled,
             }],
         })
         .text();

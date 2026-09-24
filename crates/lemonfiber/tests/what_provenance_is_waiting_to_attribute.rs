@@ -1,24 +1,23 @@
 //! Which surfaces still show a value with nothing saying where it came from.
 //!
-//! Three of them say it now — settings, wirings and checks. The rest show a value and
-//! leave the reader to know, and the reason each is still like that is a fact worth
-//! keeping somewhere a gate can read — because a reason kept in prose outlives the thing it excuses, and the
-//! requirement stays unanswered with a note explaining why that was once reasonable.
+//! Every listing says it now — settings, wirings, checks, credentials and what leaves
+//! this machine. What is left is two states the vocabulary does not have yet, and the
+//! reason each is still missing is a fact worth keeping somewhere a gate can read —
+//! because a reason kept in prose outlives the thing it excuses, and the requirement
+//! stays unanswered with a note explaining why that was once reasonable.
 //!
 //! So each is a row, and each row is checked in the direction that goes unnoticed:
-//! **the day a surface carries the vocabulary, its row goes red and says which
-//! requirement to go and answer.** A row is removed by answering its requirement,
-//! never by deleting the row.
+//! **the day the answer arrives, its row goes red and says which requirement to go and
+//! answer.** A row is removed by answering its requirement, never by deleting the row.
 //!
-//! What a row watches for is the vocabulary arriving in the module that owns the
-//! listing, which is wider than watching for one field on one type. That is
-//! deliberate, and it is the lesson this pattern is usually taught by: a row that
-//! guesses precisely where an answer will land stops noticing when it lands
-//! somewhere else, and a register that has quietly stopped noticing is worse than
-//! none. A false positive sends somebody to read a row. A false negative is the
-//! register becoming decoration.
+//! What a row watches for is wider than the one field it expects, deliberately: a row
+//! that guesses precisely where an answer will land stops noticing when it lands
+//! somewhere else, and a register that has quietly stopped noticing is worse than none.
+//! A false positive sends somebody to read a row. A false negative is the register
+//! becoming decoration. The rows that watched listings — a credential and an outbound
+//! host — came off by going red when those listings took the vocabulary.
 //!
-//! Two rows watch the vocabulary itself rather than a listing. The states an
+//! The two left watch the vocabulary itself rather than a listing. The states an
 //! overridden value and an orphaned one need are not in it, and neither can be until
 //! something can set a value that a removal would put back.
 //!
@@ -55,26 +54,6 @@ const VOCABULARY: &str = "origin::Origin";
 
 /// Everything provenance is waiting to attribute.
 const WAITING: &[Waiting] = &[
-    Waiting {
-        requirement: "F7-R8",
-        asks: "a plugin's secrets appear on the credentials listing, attributed, and never \
-               with their values",
-        at: "crates/lemonfiber-core/src/credential.rs",
-        arrives_as: VOCABULARY,
-        because: "the listing is the seven this build declares plus the keys the stack's own \
-                  services mint; there is no path by which a plugin's declared secret reaches \
-                  it, because nothing installs one",
-    },
-    Waiting {
-        requirement: "F7-R9",
-        asks: "a plugin's declared hosts appear in the account of what leaves this machine, \
-               attributed to it",
-        at: "crates/lemonfiber-core/src/outbound.rs",
-        arrives_as: VOCABULARY,
-        because: "the account of what somebody else reaches is already read from the stack \
-                  rather than from a table here, so a plugin's service would appear in it the \
-                  day one is installed — unattributed, which is the half this asks for",
-    },
     Waiting {
         requirement: "F7-R4",
         asks: "a value a plugin overrode exposes both what is in force and the value it \

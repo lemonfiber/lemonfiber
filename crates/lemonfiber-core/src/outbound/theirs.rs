@@ -42,6 +42,11 @@ use lemonfiber_manifest::Service;
 /// leaves this machine* in this report and the two are opposite claims.
 const UNKNOWN: &str = "not known to lemonfiber";
 
+/// What is said about a destination a plugin's recipes declare.
+const CARRIED: &str = "A destination this plugin's recipes declare they may call, or carry \
+                       a value it captured to. Declared in its manifest and held to it: a \
+                       recipe reaching anywhere else is refused before it is installed.";
+
 /// What is said about a service this build ships no record for.
 const NO_RECORD: &str = "This service is not one lemonfiber knows, so nothing here can say \
                          where it reaches or what it asks for. It is listed because leaving \
@@ -76,6 +81,7 @@ fn from_the_stack(service: &Service) -> Option<Elsewhere> {
         destination,
         purpose,
         recorded: true,
+        origin: crate::origin::Origin::Bundled,
     })
 }
 
@@ -91,7 +97,53 @@ fn no_record_of(service: &Service) -> Elsewhere {
         destination: UNKNOWN.to_owned(),
         purpose: NO_RECORD.to_owned(),
         recorded: false,
+        origin: crate::origin::Origin::Bundled,
     }
+}
+
+/// What installed plugins bring to this account: each of their services, and every
+/// destination outside the stack their recipes declare.
+///
+/// A plugin's service says nothing about where it reaches — the manifest format has no
+/// field for it — so it is listed as one lemonfiber has no record of, attributed to its
+/// plugin, for the reason an undescribed bundled service is listed: leaving it out
+/// would make the account read as complete while it was short. A destination a recipe
+/// declares is recorded, because the plugin declared it and was held to it, and it is
+/// listed only where it is outside the stack: a recipe reaching one of the stack's own
+/// services is not something leaving the machine.
+pub(super) fn brought(stack: &[Service], installed: &[crate::plugin::Installed]) -> Vec<Elsewhere> {
+    let inside = |to: &str| stack.iter().any(|service| service.id == to);
+    installed
+        .iter()
+        .flat_map(|one| {
+            let origin = crate::origin::Origin::Plugin {
+                named: one.plugin.clone(),
+            };
+            let services = one.services.iter().map({
+                let origin = origin.clone();
+                move |placed| Elsewhere {
+                    service: placed.service.clone(),
+                    destination: UNKNOWN.to_owned(),
+                    purpose: NO_RECORD.to_owned(),
+                    recorded: false,
+                    origin: origin.clone(),
+                }
+            });
+            let hosts = one
+                .declared
+                .reaches
+                .iter()
+                .filter(|to| !inside(to))
+                .map(move |to| Elsewhere {
+                    service: one.plugin.clone(),
+                    destination: to.clone(),
+                    purpose: CARRIED.to_owned(),
+                    recorded: true,
+                    origin: origin.clone(),
+                });
+            services.chain(hosts).collect::<Vec<Elsewhere>>()
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -376,5 +428,94 @@ mod tests {
             services.len(),
             "every declared service reaches the inventory: {found:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod brought {
+    use super::{brought, CARRIED, NO_RECORD};
+    use crate::origin::Origin;
+    use crate::plugin::Register;
+
+    /// One installed plugin with one service, whose recipes reach one host outside the
+    /// stack and one of the stack's own services.
+    const INSTALLED: &str = r#"{
+      "installed": [
+        {
+          "plugin": "comics",
+          "version": "1.2.0",
+          "services": [
+            {
+              "service": "komga",
+              "image": "docker.io/gotson/komga",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "tag": "1.11.0",
+              "config_path": "/config",
+              "takes_data": true
+            }
+          ],
+          "declared": { "reaches": ["metadata.example", "sonarr"] }
+        }
+      ]
+    }"#;
+
+    fn stack() -> Vec<lemonfiber_manifest::Service> {
+        crate::test_support::stack()
+            .manifest()
+            .map(|manifest| manifest.services)
+            .unwrap_or_default()
+    }
+
+    /// What the plugin in [`INSTALLED`] brings to the shipped stack's account.
+    fn listed() -> Vec<super::Elsewhere> {
+        Register::parse(INSTALLED)
+            .map(|register| brought(&stack(), register.installed()))
+            .unwrap_or_default()
+    }
+
+    fn comics() -> Origin {
+        Origin::Plugin {
+            named: "comics".to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_plugins_service_is_listed_as_unrecorded_and_as_the_plugins() {
+        let listed = listed();
+
+        let service = listed.iter().find(|one| one.service == "komga");
+        assert_eq!(
+            service.map(|one| (one.recorded, one.purpose.as_str(), one.origin.clone())),
+            Some((false, NO_RECORD, comics())),
+            "{listed:?}"
+        );
+    }
+
+    #[test]
+    fn a_host_its_recipes_declare_is_listed_as_the_plugins_and_one_inside_the_stack_is_not() {
+        let listed = listed();
+
+        let hosts: Vec<(&str, &str, bool, Origin)> = listed
+            .iter()
+            .filter(|one| one.purpose == CARRIED)
+            .map(|one| {
+                (
+                    one.service.as_str(),
+                    one.destination.as_str(),
+                    one.recorded,
+                    one.origin.clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            hosts,
+            vec![("comics", "metadata.example", true, comics())],
+            "{listed:?}"
+        );
+    }
+
+    #[test]
+    fn nothing_installed_brings_nothing() {
+        assert!(brought(&stack(), &[]).is_empty());
     }
 }

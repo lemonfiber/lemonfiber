@@ -25,6 +25,7 @@ use crate::app::seed::published_as;
 use crate::app::targets::{config_path, recorded_secret};
 use crate::app::Ctx;
 use crate::credential::{catalogue, fingerprint, Entry, Held, Origin, Reached, State};
+use crate::plugin::Installed;
 
 /// Where a credential lives when there is no settings file resolved to name.
 const NOWHERE: &str = "nowhere yet — this machine has no settings file";
@@ -34,7 +35,12 @@ const NOWHERE: &str = "nowhere yet — this machine has no settings file";
 /// The declared ones first, in the order they are declared, then the ones the
 /// services minted for themselves in the order the manifest names them — so two runs
 /// against the same stack list the same things in the same places.
-pub(super) async fn taken(ctx: &Ctx, services: &[Service], project: Option<&Path>) -> Vec<Held> {
+pub(super) async fn taken(
+    ctx: &Ctx,
+    services: &[Service],
+    project: Option<&Path>,
+    installed: &[Installed],
+) -> Vec<Held> {
     let mut taken: Vec<Held> = catalogue(ctx.settings.protocols)
         .into_iter()
         .map(|entry| recorded(ctx, entry))
@@ -59,7 +65,46 @@ pub(super) async fn taken(ctx: &Ctx, services: &[Service], project: Option<&Path
             published.as_deref(),
         ));
     }
+    taken.extend(installed.iter().flat_map(declared));
     taken
+}
+
+/// Where a plugin's secret lives, which is nowhere yet.
+const UNHELD: &str = "nowhere yet — lemonfiber holds a plugin's secret only once the plugin's \
+                      recipes capture it, and this build runs none";
+
+/// Every secret one installed plugin declared it would hold, attributed to it.
+///
+/// Listed from what the install recorded rather than from anything on disk, because
+/// there is nothing on disk: nothing captures a plugin's secret until its recipes run.
+/// So each is absent, and says why, and carries no likeness of a value there is not —
+/// a plugin's secret is on this list the day the plugin is, which is the day an
+/// operator needs to know it will be.
+fn declared(plugin: &Installed) -> Vec<Held> {
+    plugin
+        .declared
+        .secrets
+        .iter()
+        .map(|secret| Held {
+            name: format!("{} {}", plugin.plugin, secret.id),
+            setting: format!("{}/{}", plugin.plugin, secret.id),
+            consumers: vec![secret.of.clone()],
+            location: UNHELD.to_owned(),
+            origin: Origin::Service,
+            from: crate::origin::Origin::Plugin {
+                named: plugin.plugin.clone(),
+            },
+            state: State::Absent,
+            fingerprint: None,
+            // The author's reason goes last and as written, so the sentence around it
+            // reads the same whatever punctuation it arrived with.
+            advisory: Some(format!(
+                "The plugin {} declared it will hold {} for {}. Nothing holds it yet, \
+                 because nothing runs a plugin's recipes. What it said it is for: {}",
+                plugin.plugin, secret.id, secret.of, secret.why
+            )),
+        })
+        .collect()
 }
 
 /// The reader that takes one service's own key out of the file it wrote it into.
@@ -120,6 +165,7 @@ fn recorded(ctx: &Ctx, entry: Entry) -> Held {
             .collect(),
         location: settings_file(ctx),
         origin: entry.origin,
+        from: crate::origin::Origin::Bundled,
         state,
         fingerprint: value.as_deref().map(fingerprint),
         advisory,
@@ -195,6 +241,7 @@ fn service_key(
             .collect(),
         location: config.display().to_string(),
         origin: Origin::Service,
+        from: crate::origin::Origin::Bundled,
         state,
         fingerprint: held.map(fingerprint),
         advisory,
