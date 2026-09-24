@@ -121,6 +121,7 @@ fn restoring(action: &Action) -> String {
             resource, field, ..
         } => format!("{resource}'s {field} cleared, as it was"),
         Action::Delete { path } => format!("{path} removed"),
+        Action::Withdraw { owner, path, .. } => format!("{owner}'s region taken out of {path}"),
         Action::Repin { previous, .. } => format!("the version pinned back to {previous}"),
     }
 }
@@ -304,6 +305,15 @@ mod tests {
                 },
             },
             Undo {
+                target: "proxy".to_owned(),
+                action: Action::Withdraw {
+                    path: "/stack/config/caddy/Caddyfile".to_owned(),
+                    key: "config/caddy/Caddyfile".to_owned(),
+                    owner: "plugin komga".to_owned(),
+                    written: 0,
+                },
+            },
+            Undo {
                 target: "sonarr".to_owned(),
                 action: Action::Repin {
                     previous: "4.0.14".to_owned(),
@@ -336,6 +346,10 @@ mod tests {
         assert!(said.contains("PROXY removed, as it was"), "{said}");
         assert!(said.contains("downloadclient 3 removed"), "{said}");
         assert!(said.contains("/tmp/lemonfiber-scratch removed"), "{said}");
+        assert!(
+            said.contains("plugin komga's region taken out of /stack/config/caddy/Caddyfile"),
+            "{said}"
+        );
         assert!(said.contains("the version pinned back to 4.0.14"), "{said}");
         assert!(
             said.contains("downloadclient's tvCategory back to old-sonarr"),

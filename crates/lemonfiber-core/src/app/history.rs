@@ -38,6 +38,9 @@ pub fn history(ctx: &Ctx) -> HistoryReport {
             .map(str::to_owned)
     };
 
+    // And what a file holds, for a region: whether it is still the one written.
+    let reads = |path: &str| -> Option<String> { std::fs::read_to_string(path).ok() };
+
     let mut read: Vec<ChangeReport> = changes
         .iter()
         .enumerate()
@@ -45,7 +48,7 @@ pub fn history(ctx: &Ctx) -> HistoryReport {
             let later = changes.get(at + 1..).unwrap_or_default();
             told(
                 change,
-                standing(change, later, &holds),
+                standing(change, later, &holds, &reads),
                 together(changes, &change.operation, &change.at).len(),
             )
         })
@@ -116,6 +119,7 @@ fn did(kind: &Kind) -> String {
             |was| format!("changed {key} from {was} to {current}"),
         ),
         Kind::Made { path } => format!("made {path}"),
+        Kind::Region { owner, path, .. } => format!("wrote {owner}'s region into {path}"),
         Kind::Pinned {
             previous, current, ..
         } => format!("moved from {previous} to {current}"),
@@ -125,7 +129,21 @@ fn did(kind: &Kind) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::stamped;
+    use super::{did, stamped};
+
+    /// A region reads as what it was: something written into a file that was there.
+    #[test]
+    fn a_region_reads_as_whose_it_is_and_which_file_it_went_into() {
+        assert_eq!(
+            did(&crate::journal::Kind::Region {
+                path: "/stack/config/caddy/Caddyfile".to_owned(),
+                key: "config/caddy/Caddyfile".to_owned(),
+                owner: "plugin komga".to_owned(),
+                written: 0,
+            }),
+            "wrote plugin komga's region into /stack/config/caddy/Caddyfile"
+        );
+    }
 
     /// Every stamp this build writes goes out as it was written.
     #[test]

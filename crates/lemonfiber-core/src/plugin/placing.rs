@@ -6,13 +6,10 @@
 //! disagree with the derivation, so there is one place that turns an installed
 //! plugin into a list of paths and one place that turns it into a container.
 //!
-//! **Every write is a path lemonfiber creates, and that is what makes the reversal
-//! ordinary.** A file the install makes is journalled as [`crate::journal::Kind::Made`],
-//! which the rollback layer already classifies as reversible in full and already
-//! undoes by removing exactly the path that was made. Nothing here needs a reversal
-//! of its own, and nothing here may write *into* a file somebody else owns — a
-//! bounded region inside another file is a change the journal has no shape for, so a
-//! plugin's wiring goes in files of its own or it does not go in.
+//! **Almost every write is a path lemonfiber creates, and that is what makes the
+//! reversal ordinary.** A file the install makes is journalled as
+//! [`crate::journal::Kind::Made`], which the rollback layer already classifies as
+//! reversible in full and already undoes by removing exactly the path that was made.
 //!
 //! **One file per plugin rather than one file for all of them.** A single shared
 //! document would be rewritten by every install and every removal, which makes each
@@ -20,6 +17,14 @@
 //! for that is not `Made`. Per plugin, an install creates exactly one document and a
 //! removal removes exactly the one it created, so what the record says and what the
 //! reversal does are the same sentence.
+//!
+//! **The exception is the stack's own wiring.** The proxy reads one file and the
+//! dashboard another, and a plugin's service is reachable through the first and
+//! listed on the second only if it is written *into* them. So those two writes are a
+//! region each, marked out inside the file and owned by the plugin
+//! ([`crate::region`]), and journalled as [`crate::journal::Kind::Region`]: the
+//! reversal takes out exactly the region, and refuses where somebody has edited it.
+//! What goes in them is [`super::fronting`]'s to say.
 //!
 //! Nothing here touches a disk. It is given a record and a stack directory and
 //! answers with a list, so every arrangement can be put in front of a test without
@@ -46,39 +51,69 @@ const CONFIGURATION: &str = "config";
 
 /// One thing an install puts on the machine.
 ///
-/// A path and, where it is a file, what goes in it. The two are one type rather than
-/// two because the caller does the same thing with both — journals it, then makes it
-/// — and a caller holding two lists is a caller free to journal one and write the
-/// other.
+/// A path and what lands at it. The two are one type rather than two because the
+/// caller does the same thing with every one — journals it, then makes it — and a
+/// caller holding two lists is a caller free to journal one and write the other.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Write {
     /// Where it goes.
     pub path: PathBuf,
-    /// What goes in it, or nothing where it is a directory.
-    pub content: Option<String>,
+    /// What lands there.
+    pub lands: Lands,
+}
+
+/// What one write puts at its path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Lands {
+    /// A directory brought into being.
+    Directory,
+    /// A file written whole, holding this.
+    Document(String),
+    /// A region inside a file the stack already has, holding this.
+    Region {
+        /// The file beneath the stack directory, as the record of what lemonfiber
+        /// materialised names it.
+        key: String,
+        /// Whose region it is, as its markers name it.
+        owner: String,
+        /// What it holds.
+        body: String,
+    },
 }
 
 impl Write {
     /// A directory the install makes.
-    fn directory(path: PathBuf) -> Self {
+    const fn directory(path: PathBuf) -> Self {
         Self {
             path,
-            content: None,
+            lands: Lands::Directory,
         }
     }
 
     /// A file the install writes, and what it holds.
-    fn file(path: PathBuf, content: String) -> Self {
+    const fn file(path: PathBuf, content: String) -> Self {
         Self {
             path,
-            content: Some(content),
+            lands: Lands::Document(content),
+        }
+    }
+
+    /// A region the install writes into one of the stack's own files.
+    fn region(stack: &Path, key: &str, owner: String, body: String) -> Self {
+        Self {
+            path: stack.join(key),
+            lands: Lands::Region {
+                key: key.to_owned(),
+                owner,
+                body,
+            },
         }
     }
 
     /// Whether this write is a directory rather than a file.
     #[must_use]
     pub const fn is_directory(&self) -> bool {
-        self.content.is_none()
+        matches!(self.lands, Lands::Directory)
     }
 }
 
@@ -135,9 +170,12 @@ pub fn documents(installed: &[String], stack: &Path) -> Vec<PathBuf> {
 /// that is not there. And within the directories a parent comes before its child, so
 /// a reversal walking the record backwards removes the child first.
 ///
-/// The document is last for the same reason the applied marker is last in an apply:
-/// it is the write that makes the rest take effect, so a run that stopped short of it
-/// has changed nothing Compose will read.
+/// The document comes after them for the same reason the applied marker is last in an
+/// apply: it is the write that makes the rest take effect, so a run that stopped short
+/// of it has changed nothing Compose will read. The proxy's region and the dashboard's
+/// follow it, because a route to a service that is not declared is a route to nothing.
+/// Each is planned only where it would hold something, so a plugin whose services
+/// nothing reaches writes into neither.
 #[must_use]
 pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
     let mut planned: Vec<Write> = installed
@@ -149,6 +187,18 @@ pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
         overlay(stack, &installed.plugin),
         super::container::written(installed),
     ));
+    let owner = super::fronting::owner(&installed.plugin);
+    for (key, body) in [
+        (super::fronting::PROXY, super::fronting::proxied(installed)),
+        (
+            super::fronting::DASHBOARD,
+            super::fronting::listed(installed),
+        ),
+    ] {
+        if !body.is_empty() {
+            planned.push(Write::region(stack, key, owner.clone(), body));
+        }
+    }
     planned
 }
 
@@ -156,7 +206,7 @@ pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{configuration, documents, overlay, writes};
+    use super::{configuration, documents, overlay, writes, Lands, Write};
     use crate::plugin::installed::{Installed, Placed, Reached};
 
     /// The stack directory these are written beneath.
@@ -180,6 +230,8 @@ mod tests {
                 group: None,
             }),
             provides: Vec::new(),
+            name: "Komga".to_owned(),
+            description: "Reads comics".to_owned(),
         }
     }
 
@@ -230,6 +282,77 @@ mod tests {
         );
     }
 
+    /// What the one document in a plan holds.
+    fn document(planned: &[Write]) -> Option<String> {
+        planned.iter().find_map(|one| match &one.lands {
+            Lands::Document(content) => Some(content.clone()),
+            Lands::Directory | Lands::Region { .. } => None,
+        })
+    }
+
+    /// Every region a plan writes, as the file it goes in and whose it is.
+    fn regions(planned: &[Write]) -> Vec<(String, String)> {
+        planned
+            .iter()
+            .filter_map(|one| match &one.lands {
+                Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
+                Lands::Directory | Lands::Document(_) => None,
+            })
+            .collect()
+    }
+
+    /// A household service gets a region in the proxy and one on the dashboard, both
+    /// the plugin's, both after the document that declares the service.
+    #[test]
+    fn a_household_service_is_written_into_the_proxy_and_the_dashboard_after_its_document() {
+        let planned = writes(&installed("komga", &["komga"]), stack());
+
+        assert_eq!(
+            regions(&planned),
+            vec![
+                (crate::plugin::PROXY.to_owned(), "plugin komga".to_owned()),
+                (
+                    crate::plugin::DASHBOARD.to_owned(),
+                    "plugin komga".to_owned()
+                ),
+            ]
+        );
+        assert!(planned
+            .iter()
+            .take(planned.len() - 2)
+            .all(|one| !matches!(one.lands, Lands::Region { .. })));
+    }
+
+    /// The tier decides: an operator surface is listed and not proxied, and a service
+    /// nothing reaches is neither, so a plugin of only those writes no proxy region.
+    #[test]
+    fn a_service_the_household_does_not_reach_is_given_no_route() {
+        let mut plugin = installed("komga", &["komga", "worker"]);
+        let _ = plugin.services.first_mut().map(|one| {
+            one.reached = Some(crate::plugin::Reached::Loopback {
+                port: 8090,
+                group: None,
+            });
+        });
+        let _ = plugin.services.get_mut(1).map(|one| one.reached = None);
+
+        assert_eq!(
+            regions(&writes(&plugin, stack())),
+            vec![(
+                crate::plugin::DASHBOARD.to_owned(),
+                "plugin komga".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn a_plugin_whose_services_nothing_reaches_writes_into_neither() {
+        let mut plugin = installed("komga", &["komga"]);
+        let _ = plugin.services.first_mut().map(|one| one.reached = None);
+
+        assert!(regions(&writes(&plugin, stack())).is_empty());
+    }
+
     #[test]
     fn installing_writes_a_directory_for_each_service_and_one_document_for_the_plugin() {
         let planned = writes(&installed("komga", &["komga", "komga-worker"]), stack());
@@ -240,6 +363,8 @@ mod tests {
                 PathBuf::from("/opt/lemonfiber/stack/config/komga"),
                 PathBuf::from("/opt/lemonfiber/stack/config/komga-worker"),
                 PathBuf::from("/opt/lemonfiber/stack/compose/plugins/komga.yml"),
+                PathBuf::from("/opt/lemonfiber/stack/config/caddy/Caddyfile"),
+                PathBuf::from("/opt/lemonfiber/stack/config/homepage/services.yaml"),
             ]
         );
     }
@@ -252,7 +377,14 @@ mod tests {
     fn the_directories_a_document_mounts_are_written_before_the_document() {
         let planned = writes(&installed("komga", &["komga"]), stack());
         let document = planned.iter().position(|one| !one.is_directory());
-        assert_eq!(document, Some(planned.len() - 1));
+        let first = document
+            .and_then(|at| planned.get(at))
+            .map(|one| matches!(one.lands, Lands::Document(_)));
+        assert_eq!(
+            first,
+            Some(true),
+            "the first thing after the directories is the document"
+        );
         assert!(planned
             .iter()
             .take(document.unwrap_or_default())
@@ -264,12 +396,13 @@ mod tests {
         let planned = writes(&installed("komga", &["komga"]), stack());
         assert_eq!(
             planned.len(),
-            2,
-            "one service is one directory and one document"
+            4,
+            "one household service is one directory, one document, and a region in each \
+             of the proxy and the dashboard"
         );
         assert_eq!(planned.first().map(super::Write::is_directory), Some(true));
         assert_eq!(
-            planned.last().and_then(|one| one.content.clone()),
+            document(&planned),
             Some(crate::plugin::container::written(&installed(
                 "komga",
                 &["komga"]
@@ -284,10 +417,7 @@ mod tests {
     fn what_is_written_is_the_container_the_record_derives_and_not_a_copy_of_it() {
         let one = installed("komga", &["komga"]);
         let planned = writes(&one, stack());
-        let written = planned
-            .last()
-            .and_then(|write| write.content.clone())
-            .unwrap_or_default();
+        let written = document(&planned).unwrap_or_default();
         assert!(written.starts_with("services:\n"));
         assert!(written.contains("profiles: [plugin-komga]"));
     }

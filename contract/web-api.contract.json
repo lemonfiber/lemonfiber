@@ -9141,6 +9141,41 @@
               ]
             },
             {
+              "description": "Take a region lemonfiber wrote back out of the file it was written into.\n\nOnly where the region is still what was written. One that was edited since, or\nwhose markers were, is somebody else's work now, and is left exactly as it is.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "withdraw"
+                },
+                "key": {
+                  "description": "The same file beneath the stack directory, as the record of what lemonfiber\nmaterialised names it.",
+                  "type": "string"
+                },
+                "owner": {
+                  "description": "Whose region it is, as its markers name it.",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "The file the region is in.",
+                  "type": "string"
+                },
+                "written": {
+                  "description": "The checksum of what was written between the markers, which has to still be\nwhat is there for taking it out to be taking out lemonfiber's own work.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "does",
+                "path",
+                "key",
+                "owner",
+                "written"
+              ]
+            },
+            {
               "description": "Pin a service back to the version it was standing on.\n\nThe one reversal nothing in this product carries out. Which version runs is\ndecided by the materialised stack and by what Compose was told to start, and\na reversal of settings and files reaches neither — so this is worked out,\nreported, and left for the operator rather than attempted.",
               "type": "object",
               "properties": {
@@ -9765,7 +9800,7 @@
           ]
         },
         "PluginChange": {
-          "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches: a\nplugin's wiring goes in files of its own, so there is no change here that is an\nedit to something somebody else owns.",
+          "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches. Two of\nthem can be edits to a file the stack already has — the proxy's and the\ndashboard's — and those say so, as a region, so an operator reading the account\nknows which of their files the install writes into.",
           "type": "object",
           "properties": {
             "path": {
@@ -10108,6 +10143,11 @@
               "description": "Where inside the container its one configuration directory is mounted.\n\nResolved rather than optional. The record answers where the directory is, and\na run that re-derived the fallback would answer for a container it did not\nwrite the day that fallback moved.",
               "type": "string"
             },
+            "description": {
+              "description": "What the plugin says it does for the operator, which is what its dashboard entry\nsays beside it.",
+              "type": "string",
+              "default": ""
+            },
             "digest": {
               "description": "The digest that fixes what runs.",
               "type": "string"
@@ -10115,6 +10155,11 @@
             "image": {
               "description": "The registry path, carrying no pin of its own.",
               "type": "string"
+            },
+            "name": {
+              "description": "What it is called, for a reader, which is what its dashboard entry is listed as.\n\nDefaulted for a record written before this was kept, which lists it by its id\nrather than leaving it off the panel.",
+              "type": "string",
+              "default": ""
             },
             "provides": {
               "description": "Every core capability this one service fills, which is what makes it a candidate\nwhen the stack asks for one.\n\nPer service rather than read off the plugin's whole list, because a wiring\nreaches a service and not a plugin: of a plugin's two services, the one that\nfills a capability is the one an ask for it would reach. Defaulted for a record\nwritten before this was kept, which reads as filling nothing — a service nothing\nis wired to, rather than one wired to on a guess.",
@@ -10216,6 +10261,11 @@
               "description": "A document written, which is the container lemonfiber derives for the plugin.",
               "type": "string",
               "const": "document"
+            },
+            {
+              "description": "A region written into one of the stack's own files, marked out as the plugin's:\nits route through the proxy, or its entry on the dashboard.",
+              "type": "string",
+              "const": "region"
             }
           ]
         },
@@ -15186,6 +15236,41 @@
               "required": [
                 "does",
                 "path"
+              ]
+            },
+            {
+              "description": "Take a region lemonfiber wrote back out of the file it was written into.\n\nOnly where the region is still what was written. One that was edited since, or\nwhose markers were, is somebody else's work now, and is left exactly as it is.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "withdraw"
+                },
+                "key": {
+                  "description": "The same file beneath the stack directory, as the record of what lemonfiber\nmaterialised names it.",
+                  "type": "string"
+                },
+                "owner": {
+                  "description": "Whose region it is, as its markers name it.",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "The file the region is in.",
+                  "type": "string"
+                },
+                "written": {
+                  "description": "The checksum of what was written between the markers, which has to still be\nwhat is there for taking it out to be taking out lemonfiber's own work.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "does",
+                "path",
+                "key",
+                "owner",
+                "written"
               ]
             },
             {

@@ -433,3 +433,34 @@ async fn a_secret_says_that_it_changed_and_never_what_to() {
         "and a setting that is not a credential still says what it became"
     );
 }
+
+/// A region a plugin wrote reads as that, and the file it is in reaches the drift
+/// question: one somebody has edited since is refused, as a drifted setting is.
+#[tokio::test]
+async fn a_region_edited_since_is_refused_and_one_that_is_not_can_go_back() {
+    let root = scratch("region");
+    let file = root.join("Caddyfile");
+    let _ = std::fs::create_dir_all(&root);
+    let written = lemonfiber_core::region::put("watch {\n}\n", "plugin komga", "komga\n");
+    assert!(std::fs::write(&file, &written).is_ok(), "the proxy's file");
+    let region = |body: &str| Change {
+        at: "2000".to_owned(),
+        operation: "komga".to_owned(),
+        target: file.display().to_string(),
+        kind: Kind::Region {
+            path: file.display().to_string(),
+            key: "config/caddy/Caddyfile".to_owned(),
+            owner: "plugin komga".to_owned(),
+            written: lemonfiber_core::materialised::checksum(body.as_bytes()),
+        },
+    };
+    journalled(&root, &[region("komga\n"), region("something else\n")]);
+    let ctx = ctx(&root);
+
+    let report = recorded(&ctx).await;
+
+    let reversals: Vec<Reversal> = report
+        .map(|read| read.changes.iter().map(|change| change.reversal).collect())
+        .unwrap_or_default();
+    assert_eq!(reversals, vec![Reversal::None, Reversal::Whole]);
+}

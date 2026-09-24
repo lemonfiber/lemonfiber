@@ -204,6 +204,8 @@ mod tests {
                 group: Some("Library".to_owned()),
             }),
             provides: Vec::new(),
+            name: "Komga".to_owned(),
+            description: "Reads comics".to_owned(),
         }
     }
 

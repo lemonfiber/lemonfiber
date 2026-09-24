@@ -294,6 +294,23 @@ fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
     match action {
         Action::Restore { key, value, wrote } => put_back(env_file, key, value.as_deref(), wrote),
         Action::Delete { path } => remove(Path::new(path)),
+        Action::Withdraw {
+            path,
+            key,
+            owner,
+            written,
+        } => {
+            let record = super::bounded::record_beside(env_file);
+            match super::bounded::withdraw(Path::new(path), key, owner, *written, Some(&record)) {
+                Ok(super::bounded::Withdrawn::Done) => Ok(Step::Done),
+                // Somebody's work now, like a setting chosen since: left, and named.
+                Ok(super::bounded::Withdrawn::TheirsNow) => Ok(Step::TheirsNow(path.clone())),
+                Err(reason) => Err(Fault::NotWithdrawn {
+                    path: PathBuf::from(path),
+                    reason,
+                }),
+            }
+        }
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
         // reversal that took the second for an ordinary setting would write the field's
@@ -387,6 +404,13 @@ fn remove(path: &Path) -> Result<Step, Fault> {
 enum Fault {
     /// The environment file could not be rewritten.
     Store(store::Failure),
+    /// A region lemonfiber wrote into one of the stack's files could not be taken out.
+    NotWithdrawn {
+        /// The file the region is in.
+        path: PathBuf,
+        /// The operating system's own words.
+        reason: String,
+    },
     /// A directory could not be removed.
     NotRemoved {
         /// The directory left in place.
@@ -407,6 +431,15 @@ impl Fault {
                 "A directory from the interrupted setup could not be removed",
                 "The rest of the setup was reversed; this one directory is still there. It holds nothing.",
                 Remedy::new("Remove it by hand, or leave it where it is"),
+            )
+            .with_detail(format!("{}: {reason}", path.display())),
+            Self::NotWithdrawn { path, reason } => Problem::new(
+                NOT_WITHDRAWN,
+                Severity::Error,
+                "A region lemonfiber wrote into one of the stack's files could not be taken out",
+                "Everything before it was put back; this region is still in the file, between \
+                 the markers that name whose it is.",
+                Remedy::new("Delete the region by hand, markers included, or run it again"),
             )
             .with_detail(format!("{}: {reason}", path.display())),
         }
@@ -452,6 +485,9 @@ fn not_put_back(settings: &[String]) -> Problem {
 
 /// Raised when a directory from an interrupted apply could not be removed.
 pub const NOT_REMOVED: Code = Code::new("SETUP-3");
+
+/// Raised when a region a reversal would take out of a stack file cannot be.
+pub const NOT_WITHDRAWN: Code = Code::new("SETUP-12");
 
 /// Raised when reversing needs the service that made a change.
 pub const NEEDS_SERVICE: Code = Code::new("SETUP-4");
@@ -802,6 +838,51 @@ mod tests {
         assert_eq!(
             carried.map(|carried| (carried.done.len(), carried.beyond_reach)),
             Some((0, vec!["version 4.0.15".to_owned()]))
+        );
+    }
+
+    /// The undo of a region an install wrote: taken out where it is still what was
+    /// written, left and named where somebody has edited it, and a failure — not a
+    /// quiet success — where its file cannot be written.
+    #[test]
+    fn a_region_is_taken_out_left_where_edited_and_refused_where_unwritable() {
+        let dir = scratch("withdraw");
+        let file = dir.join("Caddyfile");
+        let env = dir.join(".env");
+        let withdraw = |at: &Path, body: &str| Undo {
+            target: at.display().to_string(),
+            action: Action::Withdraw {
+                path: at.display().to_string(),
+                key: "config/caddy/Caddyfile".to_owned(),
+                owner: "plugin komga".to_owned(),
+                written: crate::materialised::checksum(body.as_bytes()),
+            },
+        };
+        assert!(std::fs::create_dir_all(&dir).is_ok());
+        assert!(std::fs::write(
+            &file,
+            crate::region::put("watch\n", "plugin komga", "komga\n")
+        )
+        .is_ok());
+
+        let edited = super::carrying_out(&[withdraw(&file, "something else\n")], &env, Vec::new());
+        assert_eq!(
+            edited.ok().map(|carried| carried.theirs),
+            Some(vec![file.display().to_string()]),
+            "a region that is not what was written is named and left"
+        );
+
+        let taken = super::carrying_out(&[withdraw(&file, "komga\n")], &env, Vec::new());
+        assert_eq!(taken.ok().map(|carried| carried.done.len()), Some(1));
+        assert_eq!(
+            std::fs::read_to_string(&file).ok().as_deref(),
+            Some("watch\n")
+        );
+
+        let unreadable = super::carrying_out(&[withdraw(&dir, "komga\n")], &env, Vec::new());
+        assert!(
+            matches!(unreadable, Err(problem) if problem.code == super::NOT_WITHDRAWN),
+            "a file that cannot be read back is a region that could not be taken out"
         );
     }
 

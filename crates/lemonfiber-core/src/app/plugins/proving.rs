@@ -148,6 +148,51 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
     build(&plan, &settings, stack, action, ctx.environment)
 }
 
+/// The stack's proxy, as its Compose service and the profile that runs it.
+const PROXY: (&str, &str) = ("caddy", "proxy");
+
+/// Whether these writes put a route into the proxy's file.
+pub(super) fn routes_written(planned: &[crate::plugin::Write]) -> bool {
+    planned.iter().any(|write| {
+        matches!(&write.lands, crate::plugin::Lands::Region { key, .. } if key == crate::plugin::PROXY)
+    })
+}
+
+/// Whether this reversal took a route back out of the proxy's file.
+pub(super) fn routes_withdrawn(back: &Reversal) -> bool {
+    back.reversed.iter().any(|undo| {
+        matches!(&undo.action, crate::journal::Action::Withdraw { key, .. } if key == crate::plugin::PROXY)
+    })
+}
+
+/// Have the stack's proxy read its configuration again, where a route was just written
+/// into it or taken out of it.
+///
+/// The proxy reads its file once, when it starts, so a route written while it runs is
+/// a route nothing serves until it is restarted. A restart and not a start: a proxy the
+/// operator does not run is not started by a plugin, and restarting what is not running
+/// is nothing. Best effort, and said nowhere, because the file is already right. What
+/// a restart that did not happen costs is a route that is served from the next time
+/// the proxy starts, which is the same thing a bundled stanza gets.
+///
+/// Told whether a route changed rather than finding out, because the writes and the
+/// reversal already say so, and a second look at the disk would be a second answer.
+pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
+    if !routed {
+        return;
+    }
+    let (service, profile) = PROXY;
+    let plan = Plan {
+        forms: Vec::new(),
+        profiles: std::iter::once(profile.to_owned()).collect(),
+        services: vec![service.to_owned()],
+        dropped: Vec::new(),
+    };
+    let restart = Action::Restart(vec![service.to_owned()]);
+    let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);
+    let _ = ctx.runner.run(&command).await;
+}
+
 /// Ask every proof of the service it names, now that there is one to ask.
 ///
 /// The stated list and the manifest's own proofs are one list read twice — the first

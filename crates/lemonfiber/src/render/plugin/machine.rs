@@ -103,6 +103,7 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
             match one.puts {
                 Puts::Directory => "a directory ",
                 Puts::Document => "a document  ",
+                Puts::Region => "a region in ",
             },
             one.path
         ));
@@ -367,9 +368,10 @@ fn leaves(going: &[Unfilled], removed: bool) -> Lines {
 fn undone(undo: &Undo) -> String {
     match &undo.action {
         Action::Delete { path } => format!("removed {path}"),
+        Action::Withdraw { owner, path, .. } => format!("took {owner}'s region out of {path}"),
         // Every other shape is a change a plugin install never makes: it writes files
-        // and nothing else. Named rather than left to a wildcard so the day one of
-        // them can appear here, somebody has to say what it reads as.
+        // and regions and nothing else. Named rather than left to a wildcard so the day
+        // one of them can appear here, somebody has to say what it reads as.
         Action::Remove { resource, .. } => format!("{resource} on {}", undo.target),
         Action::Restore { key, .. } => format!("put {key} back"),
         Action::Repin { previous, .. } => format!("{} back to {previous}", undo.target),
@@ -527,6 +529,8 @@ mod tests {
                 takes_data: reached.is_some(),
                 reached,
                 provides: Vec::new(),
+                name: "Komga".to_owned(),
+                description: "Reads comics".to_owned(),
             }],
             provides: Vec::new(),
             contributions: Vec::new(),
@@ -564,6 +568,10 @@ mod tests {
             Changing {
                 path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
                 puts: Puts::Document,
+            },
+            Changing {
+                path: "/opt/lemonfiber/stack/config/caddy/Caddyfile".to_owned(),
+                puts: Puts::Region,
             },
         ]
     }
@@ -799,6 +807,10 @@ mod tests {
         );
         assert!(
             said.contains("a document   /opt/lemonfiber/stack/compose/plugins/komga.yml"),
+            "{said}"
+        );
+        assert!(
+            said.contains("a region in  /opt/lemonfiber/stack/config/caddy/Caddyfile"),
             "{said}"
         );
         assert!(said.contains("What would have to hold for it:"), "{said}");
@@ -1671,6 +1683,15 @@ mod tests {
                 path: "/x/komga.yml".to_owned()
             }),
             "removed /x/komga.yml"
+        );
+        assert_eq!(
+            undone(Action::Withdraw {
+                path: "/x/Caddyfile".to_owned(),
+                key: "config/caddy/Caddyfile".to_owned(),
+                owner: "plugin komga".to_owned(),
+                written: 0,
+            }),
+            "took plugin komga's region out of /x/Caddyfile"
         );
         assert_eq!(
             undone(Action::Remove {

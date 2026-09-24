@@ -7,10 +7,10 @@
 //! with a list and reaches nothing.
 //!
 //! Nothing here reverses anything, and that is the point. Every write goes into the
-//! journal as a path lemonfiber made, which the rollback layer already knows how to
-//! classify and the reversal already knows how to undo — so removal, when it arrives,
-//! is that machinery pointed at these entries rather than a second implementation of
-//! undoing.
+//! journal first — a path lemonfiber made, or a region it wrote into one of the stack's
+//! own files — which the rollback layer knows how to classify and the reversal knows
+//! how to undo, so removal is that machinery pointed at these entries rather than a
+//! second implementation of undoing.
 
 use std::path::{Path, PathBuf};
 
@@ -63,30 +63,103 @@ pub(super) fn carry_out(
     let journal = paths.journal();
 
     for write in planned {
-        // Both writers below bring the whole missing chain into being, so all of it
-        // is what a reversal has to remove. Recorded parent-first and so unwound
-        // child-first, exactly as an apply records the data root it makes.
-        let making = missing_from(&write.path, write.is_directory());
-        let changes: Vec<Change> = making
-            .iter()
-            .map(|path| made(plugin, path, stamp))
-            .collect();
-        crate::app::recover::journalled(&journal, &changes, ctx.random.as_ref());
-
-        match &write.content {
-            None => std::fs::create_dir_all(&write.path)
-                .map_err(|why| Box::new(unwritable(&write.path, &why.to_string())))?,
-            // The writer brings the directory into being on its way to the file, so
-            // there is no second answer here to where a document's directory comes
-            // from. Its failure is reported as this install's own: the writer is
-            // shared with the settings file and says *your settings could not be
-            // saved*, which about a plugin's Compose document names the wrong file
-            // and offers the wrong remedy.
-            Some(content) => crate::config::store::write(&write.path, content)
-                .map_err(|failure| Box::new(unwritable(&write.path, &failure.to_string())))?,
-        }
+        let (key, owner, body) = match &write.lands {
+            crate::plugin::Lands::Region { key, owner, body } => (key, owner, body),
+            crate::plugin::Lands::Directory => {
+                made_whole(ctx, plugin, stamp, &journal, &write.path, None)?;
+                continue;
+            }
+            crate::plugin::Lands::Document(content) => {
+                made_whole(ctx, plugin, stamp, &journal, &write.path, Some(content))?;
+                continue;
+            }
+        };
+        // Journalled first, as every write is, holding what goes between the markers so
+        // the reversal can tell its own region from one somebody has edited since.
+        crate::app::recover::journalled(
+            &journal,
+            &[bounded(plugin, &write.path, key, owner, body, stamp)],
+            ctx.random.as_ref(),
+        );
+        let record = ctx
+            .settings
+            .env_file
+            .as_deref()
+            .map(super::super::bounded::record_beside);
+        super::super::bounded::put(&write.path, key, owner, body, record.as_deref())
+            .map_err(|why| Box::new(unwritable(&write.path, &why)))?;
     }
     Ok(())
+}
+
+/// Make one directory, or write one whole document holding `content`, journalling
+/// every path it brings into being first.
+fn made_whole(
+    ctx: &Ctx,
+    plugin: &str,
+    stamp: &str,
+    journal: &Path,
+    path: &Path,
+    content: Option<&str>,
+) -> Result<(), Box<Problem>> {
+    // Both writers below bring the whole missing chain into being, so all of it is what
+    // a reversal has to remove. Recorded parent-first and so unwound child-first,
+    // exactly as an apply records the data root it makes.
+    let making = missing_from(path, content.is_none());
+    let changes: Vec<Change> = making
+        .iter()
+        .map(|made_here| made(plugin, made_here, stamp))
+        .collect();
+    crate::app::recover::journalled(journal, &changes, ctx.random.as_ref());
+
+    match content {
+        None => std::fs::create_dir_all(path)
+            .map_err(|why| Box::new(unwritable(path, &why.to_string()))),
+        // The writer brings the directory into being on its way to the file, so there
+        // is no second answer here to where a document's directory comes from. Its
+        // failure is reported as this install's own: the writer is shared with the
+        // settings file and says *your settings could not be saved*, which about a
+        // plugin's Compose document names the wrong file and offers the wrong remedy.
+        Some(content) => crate::config::store::write(path, content)
+            .map_err(|failure| Box::new(unwritable(path, &failure.to_string()))),
+    }
+}
+
+/// The journal entry for a region an install wrote into one of the stack's files.
+fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp: &str) -> Change {
+    let path = path.display().to_string();
+    Change {
+        at: stamp.to_owned(),
+        operation: plugin.to_owned(),
+        target: path.clone(),
+        kind: Kind::Region {
+            path,
+            key: key.to_owned(),
+            owner: owner.to_owned(),
+            written: super::super::bounded::written(body),
+        },
+    }
+}
+
+/// What the install decided, less every region with nowhere to land.
+///
+/// Settled before the account is stated as well as before the writes are carried out,
+/// so what a rehearsal says the install touches is what it touches. A region goes in a
+/// file the stack already has, and two things mean it does not go in at all: the file
+/// is not there, which is a stack that carries no proxy or no dashboard to be put on;
+/// or the operator declared the area it sits in unmanaged, which is the one statement
+/// that lemonfiber writes nothing there and has to hold for a plugin as it does for
+/// everything else.
+pub(super) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
+    planned
+        .into_iter()
+        .filter(|write| match &write.lands {
+            crate::plugin::Lands::Region { key, .. } => {
+                write.path.is_file() && !crate::unmanaged::covers(&ctx.settings.unmanaged, key)
+            }
+            crate::plugin::Lands::Directory | crate::plugin::Lands::Document(_) => true,
+        })
+        .collect()
 }
 
 /// Every path this write has to bring into being, parent before child.
@@ -138,6 +211,41 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
         target: path.clone(),
         kind: Kind::Made { path },
     }
+}
+
+/// Raised when a plugin's service would answer on a label another plugin's already does.
+pub(super) const ANSWERED: lemonfiber_ports::error::Code =
+    lemonfiber_ports::error::Code::new("PLUGIN-13");
+
+/// Refuse a plugin one of whose services would answer on a label another installed
+/// plugin's service already answers on, before anything is written.
+///
+/// # Errors
+///
+/// Where the label is taken, naming it and whose it is.
+pub(super) fn unanswered(
+    would: &crate::plugin::Installed,
+    installed: &[crate::plugin::Installed],
+) -> Result<(), Box<Problem>> {
+    crate::plugin::label_taken(would, installed).map_or(Ok(()), |(label, plugin)| {
+        Err(Box::new(
+            Problem::new(
+                ANSWERED,
+                Severity::Error,
+                format!(
+                    "{} would answer on {label}, which {plugin} already does",
+                    would.plugin
+                ),
+                "Nothing was written. The stack's proxy will not start with two sites at one \
+                 address, and every household route would go down with it.",
+                Remedy::new(format!(
+                    "Give {}'s service another hostname in its manifest, or remove {plugin} first",
+                    would.plugin
+                )),
+            )
+            .in_state(State::Guided),
+        ))
+    })
 }
 
 /// There is nowhere on this machine to write what the install decided.
