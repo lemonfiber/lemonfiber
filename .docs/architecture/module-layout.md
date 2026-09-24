@@ -28,9 +28,10 @@ crates/
 │   │                     written where it is a set of files
 │   └── tests/            the architecture tests, from the top of the graph
 │
-├── lemonfiber-api/       lib — the JSON endpoints answered on loopback, and the
-│                              serving of the web app beside them. Chooses no
-│                              address: the binary binds the socket.
+├── lemonfiber-api/       lib — the JSON endpoints answered on loopback, the
+│                              serving of the web app beside them, and the
+│                              contract artefact describing what they write.
+│                              Chooses no address: the binary binds the socket.
 │
 ├── lemonfiber-adapters/  lib — the implementations of the ports' traits that
 │                              reach the machine: the container runtime, the
@@ -69,12 +70,14 @@ into `reference/commands.md`, the pages under `reference/commands/`, and
 The split exists because an artefact is written by a program that is not this binary,
 and it has to read the same declarations rather than a second description of them.
 `cargo run --example reference` and `--example codes` are those programs, and
-`just reference` and `just codes` run them. `--example contract` is the same shape in
-`lemonfiber-core`, for the web-API contract, and `just contract` runs it.
+`just reference` and `just codes` run them. `--example contract` and
+`--example surface` are the same shape in `lemonfiber-api`, for the web-API contract
+the api crate serves, and `just contract` and `just surface` run them.
 
-`--example codes` and `--example contract` are a `print!` around one function, which
-the recipe redirects to the file the tests compare against. `--example reference` is
-not, because the command reference is a set of files rather than one: an index at
+`--example codes` is a `print!` around one function; its recipe writes the output
+beside the artefact and moves it over the committed file, so a failed run leaves the
+file as it was. `--example contract` writes its artefact the same way itself.
+`--example reference` writes a set of files rather than one: an index at
 `reference/commands.md` and a page per top-level command beside it, each carrying
 everything declared beneath that command. The grouping is clap's own tree rather than
 a table somebody maintains, so a command added gets a page and one removed takes its
@@ -84,23 +87,17 @@ against the declarations **and** the directory's contents against the set of pag
 because a page left behind for a command that is gone would otherwise match itself
 for ever.
 
-`--example surface` is the fourth and the one that is not merely a `print!`: it reads
-the artefact it is about to replace before it writes, and refuses where the new one
-drops a name or a type the committed one describes under an unchanged wire version.
-That is the difference between the two contract artefacts. `web-api.contract.json`
-says what the surfaces exchange now, so a comparison against it can only ever say
-"regenerate it" — a removal and an addition are equally stale to it.
-`web-api.surface.json` is names and types with every description stripped out, so it
-moves only when the interface moves, and it is what a removed or retyped field is
-caught against. `just surface` writes it through a temporary file, since a redirect
-would truncate the very thing the program compares against.
+`--example surface` reads the artefact it is about to replace before it writes, and
+refuses where the new one drops a name or a type the committed one describes under
+an unchanged wire version. That is the difference between the two contract
+artefacts. `web-api.contract.json` says what the surfaces exchange now, so a
+comparison against it can only ever say "regenerate it" — a removal and an addition
+are equally stale to it. `web-api.surface.json` is names and types with every
+description stripped out, so it moves only when the interface moves, and it is what
+a removed or retyped field is caught against.
 
-`codes.rs` reads source text rather than values, because a code is a `const` beside
-what raises it and there is no registry to enumerate. It reads it with a lexer that
-tells code from a string from a comment, so the call it looks for is invisible where
-it is merely quoted, and it reports a declaration it cannot account for rather than
-leaving it out. The same reader answers the architecture test that no two problems
-share a code, so what counts as a declaration is decided in one place.
+`codes.rs` renders the error-code reference from `lemonfiber_error::codes::EVERY`,
+the registry every code is declared in.
 
 `lemonfiber-core` re-exports the ports crate as `crate::ports`, so call sites read
 `ports::Engine` whichever crate they are in. Why the boundary is a crate rather

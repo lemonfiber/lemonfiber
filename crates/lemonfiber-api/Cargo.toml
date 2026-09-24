@@ -22,7 +22,11 @@ form_urlencoded = { workspace = true }
 # `unfold`, for turning one client's place in the event stream into a body that
 # stays open. Only the combinator is taken; already in the tree via reqwest.
 futures-util = { workspace = true }
+# The contract artefact: the schema of every envelope this surface writes, and the
+# document it is committed as.
+schemars = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 # `rt` as well as `sync`: work an action starts is handed to the runtime rather
 # than awaited, so that what happens to the request afterwards cannot reach it.
 tokio = { workspace = true, features = ["rt", "sync", "time"] }
@@ -44,9 +48,6 @@ tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 # Calling the assembled router as the service it is, so a test reaches an endpoint
 # through the guard rather than around it. Already in the tree, via axum.
 tower = { workspace = true, features = ["util"] }
-# Reading a request body back as the types that parse it, so what a caller may
-# send is checked against the parser rather than against a second description.
-serde_json = { workspace = true }
 
 [lints]
 workspace = true

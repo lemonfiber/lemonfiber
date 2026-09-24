@@ -145,10 +145,9 @@ pub const fn of(command: &Command, patience: Duration) -> Option<Disturbance> {
 /// Which situation this command puts the stack in, or none where this does not
 /// yet say.
 ///
-/// Split from [`of`] so that what a command *is* and how long that *takes* are
-/// answered in different places: the first is a routing decision this file owns,
-/// the second is a length the run is held to. A payload listing every situation
-/// reads the second half without going near the first.
+/// Read from the table that describes every command, [`super::rehearsal::asked`],
+/// so a command is described once. How long a situation *takes* is answered here,
+/// and a payload listing every situation reads that without going near a command.
 #[must_use]
 const fn situation(command: &Command) -> Option<Situation> {
     super::rehearsal::asked(command).disturbs

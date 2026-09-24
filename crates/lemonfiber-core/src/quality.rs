@@ -259,7 +259,7 @@ impl Selection {
     /// global — which a deserialized or hand-edited selection can carry, bypassing
     /// [`Self::set_type`]'s pruning — is not mistaken for a genuine exception.
     #[must_use]
-    pub(crate) fn is_overridden(&self) -> bool {
+    pub fn is_overridden(&self) -> bool {
         self.per_type.values().any(|preset| *preset != self.global)
     }
 

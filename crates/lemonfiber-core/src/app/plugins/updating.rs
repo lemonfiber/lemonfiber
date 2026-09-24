@@ -24,7 +24,7 @@ use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 use super::super::{Ctx, Outcome};
 use super::{carry_out, nowhere_to_write, proving, verifying};
 
-pub(crate) use crate::error::codes::plugin::NOT_INSTALLED_11 as NOT_INSTALLED;
+pub(crate) use crate::error::codes::plugin::NOTHING_TO_UPDATE;
 
 pub(crate) use crate::error::codes::plugin::STUCK;
 
@@ -299,7 +299,7 @@ fn answering(installed: Vec<Installed>, update: Update) -> Outcome {
 /// No version of this plugin is installed, so there is nothing to replace.
 fn not_installed(plugin: &str) -> Problem {
     Problem::new(
-        NOT_INSTALLED,
+        NOTHING_TO_UPDATE,
         Severity::Error,
         format!("{plugin} is not installed, so there is nothing to update"),
         "Nothing was changed. An update replaces a version this machine already has.",

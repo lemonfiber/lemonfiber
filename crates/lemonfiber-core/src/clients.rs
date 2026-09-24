@@ -46,7 +46,7 @@ pub enum Support {
 impl Support {
     /// Whether somebody should be told to try something else first.
     #[must_use]
-    pub(crate) const fn wants_an_alternative(self) -> bool {
+    pub const fn wants_an_alternative(self) -> bool {
         matches!(self, Self::Poor)
     }
 }

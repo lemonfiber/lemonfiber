@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// The share of the line the download takes when a limit is asked for and no
 /// figure is given.
-pub(crate) const DOWNLOAD_SHARE: u8 = 80;
+pub const DOWNLOAD_SHARE: u8 = 80;
 
 /// The share the upload takes on the same terms.
 ///

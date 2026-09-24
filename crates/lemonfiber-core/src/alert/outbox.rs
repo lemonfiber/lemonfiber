@@ -85,7 +85,7 @@ impl Outbox {
 
     /// Whether anything is waiting.
     #[must_use]
-    pub(crate) fn owes_anything(&self) -> bool {
+    pub fn owes_anything(&self) -> bool {
         !self.owed.is_empty()
     }
 

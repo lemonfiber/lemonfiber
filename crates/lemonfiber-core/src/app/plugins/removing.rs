@@ -29,7 +29,7 @@ use crate::stack::compose::{build, Action};
 
 use super::super::{Ctx, Outcome};
 
-pub(crate) use crate::error::codes::plugin::NOT_INSTALLED_10 as NOT_INSTALLED;
+pub(crate) use crate::error::codes::plugin::NOTHING_TO_REMOVE;
 
 /// Take a plugin off the machine, or say what taking it off would come to.
 ///
@@ -276,7 +276,7 @@ fn not_installed(plugin: &str, held: &[Installed]) -> Problem {
         )
     };
     Problem::new(
-        NOT_INSTALLED,
+        NOTHING_TO_REMOVE,
         Severity::Error,
         format!("{plugin} is not installed"),
         meaning,

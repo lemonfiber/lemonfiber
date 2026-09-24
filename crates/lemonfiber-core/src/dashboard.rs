@@ -67,7 +67,7 @@ pub enum Reading<T> {
 impl<T> Reading<T> {
     /// Whether this reading is current — a `Known`, however small its value.
     #[must_use]
-    pub(crate) const fn is_current(&self) -> bool {
+    pub const fn is_current(&self) -> bool {
         matches!(self, Self::Known(_))
     }
 

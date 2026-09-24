@@ -49,7 +49,7 @@ pub struct Notified {
 impl Notified {
     /// Whether anything was worth saying at all.
     #[must_use]
-    pub(crate) fn is_quiet(&self) -> bool {
+    pub fn is_quiet(&self) -> bool {
         self.digest.is_empty()
     }
 }

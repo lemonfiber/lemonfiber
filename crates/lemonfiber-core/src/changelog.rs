@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use crate::migration::version::{among_versions, Standing};
 
 /// Where the generated record is kept, relative to the workspace root.
-pub(crate) const RECORD_PATH: &str = "reference/changelog.json";
+pub const RECORD_PATH: &str = "reference/changelog.json";
 
 /// The record this build carries.
 const CARRIED: &str = include_str!("../../../reference/changelog.json");

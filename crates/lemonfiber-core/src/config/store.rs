@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use super::env::{is_one_line, EnvFile};
-use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// Withholding a credential from text that has no field names to read.
 ///
@@ -41,7 +41,7 @@ use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 /// allow-list in [`super::display`] instead: a keyword rule cannot answer about a
 /// name nobody has thought of yet, and that is the name that leaks. A file's line has
 /// names to read, so it goes through `withheld_by` with that same list.
-pub use lemonfiber_error::withheld::{is_secret, withheld, withheld_by, withheld_text, REDACTED};
+pub use crate::error::withheld::{is_secret, withheld, withheld_by, withheld_text, REDACTED};
 
 /// The setting recording which lemonfiber last wrote this file.
 ///

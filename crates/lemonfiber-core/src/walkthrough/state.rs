@@ -45,7 +45,7 @@ impl State {
     /// complete — and the first is not either: something still being chosen has not
     /// started, so it reads as the offer it came from.
     #[must_use]
-    pub(crate) const fn of_step(step: Step) -> Self {
+    pub const fn of_step(step: Step) -> Self {
         match step {
             Step::Choosing => Self::Offered,
             Step::Searching => Self::Searching,

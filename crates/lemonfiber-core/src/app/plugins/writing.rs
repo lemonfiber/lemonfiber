@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};

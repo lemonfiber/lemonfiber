@@ -25,9 +25,9 @@ use crate::model::{
 /// Declares [`Outcome`] from one list: each variant, the payload it carries and the
 /// `kind` its envelope is written under.
 ///
-/// The enum, its envelope, how it serialises, the kinds it can be written under and
-/// the contract's shape for each are all generated from that list, so a new answer is
-/// one line here rather than an arm in five tables that have to agree.
+/// The enum, the kind each variant is written under, how it serialises and the
+/// contract's shape for each are all generated from that list, so a new answer is one
+/// line here rather than an arm in four tables that have to agree.
 macro_rules! outcomes {
     ($($(#[doc = $doc:literal])* $variant:ident($payload:ty) => $kind:ident,)*) => {
         /// What dispatching produced.
@@ -37,9 +37,6 @@ macro_rules! outcomes {
         }
 
         impl Outcome {
-            /// Every kind an outcome is written under, in declaration order.
-            pub const KINDS: &'static [Kind] = &[$(kind::$kind,)*];
-
             /// The kind this outcome is written under.
             #[must_use]
             pub const fn kind(&self) -> Kind {

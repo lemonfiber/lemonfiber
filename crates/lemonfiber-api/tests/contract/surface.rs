@@ -1,6 +1,6 @@
 //! The committed surface is the one this build emits, and it never loses anything.
 //!
-//! [`lemonfiber_core::contract::stability`] explains why the surface exists and what
+//! [`lemonfiber_api::contract::stability`] explains why the surface exists and what
 //! counts as breaking it. What it did not have until now is anything that runs: the
 //! guard was asked by the generator and by nothing else, which makes it a guard
 //! against the person who runs `just surface` and no guard at all against the person
@@ -15,8 +15,8 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::contract::stability::{rendered, Surface, SURFACE_PATH};
-use lemonfiber_core::contract::Contract;
+use lemonfiber_api::contract::stability::{rendered, Surface, SURFACE_PATH};
+use lemonfiber_api::contract::Contract;
 
 /// Where the committed surface lives, from this crate.
 fn committed_path() -> PathBuf {

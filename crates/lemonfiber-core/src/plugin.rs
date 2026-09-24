@@ -94,13 +94,13 @@ pub use lemonfiber_plugin::Violation;
 const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
 
 /// Where the generated manifest schema is kept, relative to the workspace root.
-pub(crate) const SCHEMA_PATH: &str = "contract/plugin-manifest.schema.json";
+pub const SCHEMA_PATH: &str = "contract/plugin-manifest.schema.json";
 
 /// Where the generated capability vocabulary is kept, relative to the workspace root.
-pub(crate) const VOCABULARY_PATH: &str = "contract/capability-vocabulary.json";
+pub const VOCABULARY_PATH: &str = "contract/capability-vocabulary.json";
 
 /// Where the generated extension points are kept, relative to the workspace root.
-pub(crate) const POINTS_PATH: &str = "contract/extension-points.json";
+pub const POINTS_PATH: &str = "contract/extension-points.json";
 
 /// What stops the capability vocabulary being written.
 ///

@@ -172,7 +172,7 @@ impl Rhythm {
 
     /// How long the active hours run, in minutes.
     #[must_use]
-    pub(crate) fn active_minutes(&self) -> u16 {
+    pub fn active_minutes(&self) -> u16 {
         let (from, to) = (self.from.into_day(), self.to.into_day());
         if from < to {
             to - from

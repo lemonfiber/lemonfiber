@@ -29,6 +29,7 @@
 //! wrong password. A client that cannot tell them apart cannot know whether
 //! offering a login is worth anything.
 
+pub mod admitted;
 pub mod attempts;
 pub mod sessions;
 
@@ -46,7 +47,7 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
-use lemonfiber_core::admission::{credential, Credential};
+use lemonfiber_core::admission::{self as credential, Credential};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::service::Household;
 use serde::Deserialize;

@@ -11,7 +11,6 @@
 /// as features are added. Removing or retyping a field increments it.
 pub const API_VERSION: u32 = 1;
 
-mod admission;
 mod alerts;
 mod asking;
 mod catalogue;
@@ -23,7 +22,6 @@ mod history;
 mod hosting;
 mod household;
 mod invitation;
-mod job;
 pub mod kind;
 mod migration;
 mod provenance;
@@ -37,7 +35,6 @@ mod upgrade;
 mod walkthrough;
 mod wiring;
 
-pub use admission::*;
 pub use alerts::*;
 pub use asking::*;
 pub use catalogue::*;
@@ -49,7 +46,6 @@ pub use history::*;
 pub use hosting::*;
 pub use household::*;
 pub use invitation::*;
-pub use job::*;
 pub use migration::*;
 pub use provenance::*;
 pub use quality::*;

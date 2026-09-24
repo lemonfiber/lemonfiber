@@ -30,7 +30,7 @@
 //! reports the report it would have filled in and stops short of the one irreversible
 //! step. See `.docs/architecture/rehearsal.md`.
 
-use lemonfiber_error::{Amiss, Problem, Remedy, Severity, State};
+use crate::error::{Amiss, Problem, Remedy, Severity, State};
 
 use super::command::{Asking, Keeping, Linking, MigrateAction};
 use super::disturbance::Situation;

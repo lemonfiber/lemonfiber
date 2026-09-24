@@ -21,6 +21,8 @@ path = "src/main.rs"
 
 [build-dependencies]
 lemonfiber-manifest = { workspace = true }
+# Reading the wire version the embedded app and the contract each declare.
+serde_json = { workspace = true }
 
 [dependencies]
 lemonfiber-adapters = { workspace = true }

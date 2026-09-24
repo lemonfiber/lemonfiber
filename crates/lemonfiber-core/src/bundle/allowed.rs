@@ -156,7 +156,7 @@ fn setting(line: &str, marks: &Marks, terms: &Terms) -> String {
 /// bundle marks rather than drops, so the same key can be recognised where it appears
 /// twice; the password half is the shared rule, asked rather than restated.
 fn url(value: &str, marks: &Marks) -> String {
-    let value = lemonfiber_error::withheld::without_password(value);
+    let value = crate::error::withheld::without_password(value);
     match value.split_once('?') {
         None => value.clone(),
         Some((address, query)) => format!("{address}?{}", marks.of(query)),

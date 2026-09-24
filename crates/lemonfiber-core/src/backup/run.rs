@@ -33,7 +33,7 @@ pub(crate) use crate::error::codes::backup::NOT_WRITTEN;
 
 pub(crate) use crate::error::codes::backup::NOT_MEASURED;
 
-pub(crate) use crate::error::codes::backup::ASKED as STILL_RUNNING;
+pub(crate) use crate::error::codes::backup::STILL_RUNNING;
 
 pub use crate::error::codes::backup::NOWHERE_TO_KEEP;
 

@@ -37,6 +37,8 @@
 //! survive the process doing it, and a record that did would describe jobs nothing
 //! is running.
 
+pub mod started;
+
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
@@ -50,8 +52,10 @@ use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{kind, Envelope, Started};
+use lemonfiber_core::model::{kind, Envelope};
+
 use lemonfiber_core::ports::random::Random;
+use started::Started;
 use tokio::sync::Mutex;
 use tokio::task::AbortHandle;
 

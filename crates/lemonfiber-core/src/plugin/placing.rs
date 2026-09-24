@@ -112,7 +112,7 @@ impl Write {
 
     /// Whether this write is a directory rather than a file.
     #[must_use]
-    pub(crate) const fn is_directory(&self) -> bool {
+    pub const fn is_directory(&self) -> bool {
         matches!(self.lands, Lands::Directory)
     }
 }

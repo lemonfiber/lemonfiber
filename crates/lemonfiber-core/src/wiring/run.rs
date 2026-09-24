@@ -8,7 +8,7 @@
 //! for the same reason: an operator told afterwards that something stopped being
 //! filled has been told about a thing they can no longer choose.
 
-use lemonfiber_error::{Code, Problem, Remedy, Severity};
+use crate::error::{Code, Problem, Remedy, Severity};
 
 use crate::app::Ctx;
 use crate::error::Diagnose;
@@ -186,7 +186,7 @@ fn problem(refused: &Refused) -> Problem {
             "Nothing was changed, and nothing needed to be.",
             listing,
         )
-        .in_state(lemonfiber_error::State::Guided),
+        .in_state(crate::error::State::Guided),
     }
 }
 
@@ -419,7 +419,7 @@ mod tests {
         .map(|report| report.applied)
         .map_err(|problem| problem.severity);
 
-        assert_eq!(answered, Err(lemonfiber_error::Severity::Error));
+        assert_eq!(answered, Err(crate::error::Severity::Error));
     }
 
     /// The read and the verb arrive as one command and come back as two answers.

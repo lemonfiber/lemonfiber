@@ -80,9 +80,8 @@ codes! {
         NOT_WRITTEN = "BACKUP-2",
         /// Raised when the room for a backup could not be measured.
         NOT_MEASURED = "BACKUP-3",
-        /// A code of this module's own, so the tests are about the refusal rather than
-        /// about which caller asked for it.
-        ASKED = "BACKUP-4",
+        /// Raised when a capture could not be shown that nothing is writing to a database.
+        STILL_RUNNING = "BACKUP-4",
         /// Raised when this run has nowhere it knows to keep an archive.
         NOWHERE_TO_KEEP = "BACKUP-5",
         /// Raised when this run has nowhere it knows to look for archives.
@@ -311,9 +310,9 @@ codes! {
         /// The plugin's own service would not start, so nothing about it could be proved.
         UNPROVED = "PLUGIN-9",
         /// Nothing by that name is installed on this machine.
-        NOT_INSTALLED_10 = "PLUGIN-10",
+        NOTHING_TO_REMOVE = "PLUGIN-10",
         /// Nothing by that id is installed, so there is no version to replace.
-        NOT_INSTALLED_11 = "PLUGIN-11",
+        NOTHING_TO_UPDATE = "PLUGIN-11",
         /// The version installed would not come off, so nothing else was touched.
         STUCK = "PLUGIN-12",
         /// Raised when a plugin's service would answer on a label another plugin's already does.

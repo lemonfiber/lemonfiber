@@ -1,9 +1,5 @@
 //! What starting long-running work answers with.
 //!
-//! One of the report families the machine-readable contract is made of; they live in
-//! separate files and are re-exported as one, so `crate::model::X` reads the same as it
-//! always did.
-//!
 //! An action that reaches the container engine or a service runs for minutes, and a
 //! reply that waited for it would tie the work to whoever asked. So the reply is a
 //! name for the work instead, and what happens to that request afterwards — answered,

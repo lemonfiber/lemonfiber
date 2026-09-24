@@ -141,7 +141,7 @@ impl Environment {
     /// It is a Docker Desktop convenience. Without it, a service reaching a
     /// host-run Jellyfin fails with nothing in any log explaining why.
     #[must_use]
-    pub(crate) const fn resolves_host_gateway(self) -> bool {
+    pub const fn resolves_host_gateway(self) -> bool {
         !matches!(self, Self::LinuxNative | Self::Unsupported)
     }
 }

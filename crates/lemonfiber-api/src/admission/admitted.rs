@@ -1,9 +1,5 @@
 //! What proving who you are answers with.
 //!
-//! One of the report families the machine-readable contract is made of; they live in
-//! separate files and are re-exported as one, so `crate::model::X` reads the same as it
-//! always did.
-//!
 //! The password is exchanged **once**, for this. Verifying one is deliberately
 //! expensive — that is the whole of what makes it worth storing the way it is stored —
 //! and a credential re-sent on every request is a credential with more chances to leak.
@@ -51,7 +47,7 @@ impl Admitted {
     pub fn opened(token: String, until: SystemTime, member: Option<String>) -> Option<Self> {
         Some(Self {
             token,
-            until: crate::instant::written(until)?,
+            until: lemonfiber_core::instant::written(until)?,
             member,
         })
     }

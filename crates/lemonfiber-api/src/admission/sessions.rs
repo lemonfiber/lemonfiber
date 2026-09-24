@@ -22,8 +22,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
+use super::admitted::Admitted;
 use lemonfiber_core::admission::Credential;
-use lemonfiber_core::model::Admitted;
 use lemonfiber_core::ports::random::Random;
 use tokio::sync::Mutex;
 
