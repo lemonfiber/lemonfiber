@@ -50,31 +50,14 @@ use std::collections::BTreeMap;
 use schemars::{schema_for, Schema};
 use serde::Serialize;
 
-use crate::app::archives::Listing;
-use crate::app::restore::Restoration;
-use crate::app::support::Bundle;
-use crate::backup::run::Report as BackupReport;
-use crate::clients::Guidance;
-use crate::credential::Inventory;
+use crate::app::Outcome;
 use crate::dashboard::Snapshot;
-use crate::glossary::{Term, Vocabulary};
+use crate::error::Problem;
 use crate::model::{
     kind::{self, Kind},
-    Admitted, AdoptReport, AlertReport, BesideReport, CatalogueReport, ConfigReport, DoctorReport,
-    Envelope, FormsReport, FrontDoorReport, HistoryReport, HostingReport, HouseholdRemoval,
-    HouseholdReport, ImportReport, Invitation, LifecycleReport, MigrationReport, MusicReport,
-    ProvenanceReport, QualityReport, ReplaceReport, ResetReport, SetupReport, Started,
-    StatusReport, StuckReport, SubstitutionReport, SupervisionReport, TraceReport, UpdateReport,
-    UpgradeReport, VersionReport, WalkthroughReport, WiringReport, WizardReport, API_VERSION,
+    Admitted, Envelope, SetupReport, Started, API_VERSION,
 };
-use crate::outbound::Leaving;
-use crate::plugin::Installs;
 use crate::ports::docker::LogLine;
-use crate::ports::error::Problem;
-use crate::repair::run::{Report as RepairReport, Reversal};
-use crate::stack::closure::Plan;
-use crate::stored::Stored;
-use crate::update::run::Report as StackUpdate;
 use crate::walkthrough::Line;
 
 /// Where the generated artefact is kept, relative to the workspace root.
@@ -119,148 +102,10 @@ impl Contract {
     }
 }
 
-/// The shapes a command's own answer takes, one per [`Outcome`] variant.
-///
-/// The sentence above is checked rather than asserted: the sample set below is compared
-/// against these keys, so a variant added here without one is named, and a sample for
-/// something no answer carries is named too.
+/// The shapes a command's own answer takes, one per [`Outcome`] variant, as the
+/// list that declares [`Outcome`] names them.
 fn answered(kinds: &mut BTreeMap<String, Schema>) {
-    the_first_kinds(kinds);
-    the_rest_of_the_kinds(kinds);
-}
-
-/// The first of them, in the order the contract lists their kinds.
-///
-/// Split in two only because one call per kind outgrew what a function may be, which
-/// is the reason the sample set below is in three. The halves mean nothing apart: a
-/// kind falls in whichever of them its own name does, and [`answered`] is the only
-/// caller either has.
-fn the_first_kinds(kinds: &mut BTreeMap<String, Schema>) {
-    describing(kinds, kind::ADOPTION, schema_for!(Envelope<AdoptReport>));
-    describing(kinds, kind::ALERTS, schema_for!(Envelope<AlertReport>));
-    describing(kinds, kind::ARCHIVES, schema_for!(Envelope<Listing>));
-    describing(kinds, kind::BACKUP, schema_for!(Envelope<BackupReport>));
-    describing(kinds, kind::BESIDE, schema_for!(Envelope<BesideReport>));
-    describing(kinds, kind::BUNDLE, schema_for!(Envelope<Bundle>));
-    describing(
-        kinds,
-        kind::CATALOGUE,
-        schema_for!(Envelope<CatalogueReport>),
-    );
-    describing(kinds, kind::CONFIG, schema_for!(Envelope<ConfigReport>));
-    describing(kinds, kind::CREDENTIALS, schema_for!(Envelope<Inventory>));
-    describing(kinds, kind::DOCTOR, schema_for!(Envelope<DoctorReport>));
-    describing(kinds, kind::FORMS, schema_for!(Envelope<FormsReport>));
-    describing(
-        kinds,
-        kind::FRONT_DOOR,
-        schema_for!(Envelope<FrontDoorReport>),
-    );
-    describing(kinds, kind::GLOSSARY, schema_for!(Envelope<Vocabulary>));
-    describing(
-        kinds,
-        kind::HELD,
-        schema_for!(Envelope<crate::model::HeldReport>),
-    );
-    describing(kinds, kind::HOSTING, schema_for!(Envelope<HostingReport>));
-    describing(kinds, kind::CLIENTS, schema_for!(Envelope<Guidance>));
-    describing(kinds, kind::INVITATION, schema_for!(Envelope<Invitation>));
-    describing(
-        kinds,
-        kind::REMOVAL,
-        schema_for!(Envelope<HouseholdRemoval>),
-    );
-    describing(
-        kinds,
-        kind::HOUSEHOLD,
-        schema_for!(Envelope<HouseholdReport>),
-    );
-    describing(
-        kinds,
-        kind::LIFECYCLE,
-        schema_for!(Envelope<LifecycleReport>),
-    );
-    describing(kinds, kind::HISTORY, schema_for!(Envelope<HistoryReport>));
-    describing(kinds, kind::IMPORT, schema_for!(Envelope<ImportReport>));
-    describing(
-        kinds,
-        kind::MIGRATION,
-        schema_for!(Envelope<MigrationReport>),
-    );
-    describing(kinds, kind::MUSIC, schema_for!(Envelope<MusicReport>));
-    describing(kinds, kind::OUTBOUND, schema_for!(Envelope<Leaving>));
-    describing(kinds, kind::PLUGINS, schema_for!(Envelope<Installs>));
-    describing(kinds, kind::PREVIEW, schema_for!(Envelope<Plan>));
-}
-
-/// The rest of them, continuing that order.
-fn the_rest_of_the_kinds(kinds: &mut BTreeMap<String, Schema>) {
-    describing(
-        kinds,
-        kind::PROVENANCE,
-        schema_for!(Envelope<ProvenanceReport>),
-    );
-    describing(kinds, kind::QUALITY, schema_for!(Envelope<QualityReport>));
-    describing(
-        kinds,
-        kind::REPLACEMENT,
-        schema_for!(Envelope<ReplaceReport>),
-    );
-    describing(kinds, kind::REPAIR, schema_for!(Envelope<RepairReport>));
-    describing(kinds, kind::RESET, schema_for!(Envelope<ResetReport>));
-    describing(kinds, kind::RESTORE, schema_for!(Envelope<Restoration>));
-    describing(
-        kinds,
-        kind::SEED,
-        schema_for!(Envelope<crate::seed::Report>),
-    );
-    describing(
-        kinds,
-        kind::SPACE,
-        schema_for!(Envelope<crate::space::Reckoning>),
-    );
-    describing(
-        kinds,
-        kind::BANDWIDTH,
-        schema_for!(Envelope<crate::bandwidth::Sharing>),
-    );
-    describing(kinds, kind::STATUS, schema_for!(Envelope<StatusReport>));
-    describing(
-        kinds,
-        kind::STOP_SEEDING,
-        schema_for!(Envelope<crate::space::Letting>),
-    );
-    describing(kinds, kind::STORED, schema_for!(Envelope<Stored>));
-    describing(kinds, kind::STUCK, schema_for!(Envelope<StuckReport>));
-    describing(kinds, kind::TRACE, schema_for!(Envelope<TraceReport>));
-    describing(kinds, kind::UNDO, schema_for!(Envelope<Reversal>));
-    describing(
-        kinds,
-        kind::UNINSTALL,
-        schema_for!(Envelope<crate::uninstall::Uninstall>),
-    );
-    describing(
-        kinds,
-        kind::SELF_UPDATE,
-        schema_for!(Envelope<UpdateReport>),
-    );
-    describing(kinds, kind::UPDATE, schema_for!(Envelope<StackUpdate>));
-    describing(kinds, kind::UPGRADE, schema_for!(Envelope<UpgradeReport>));
-    describing(kinds, kind::VERSION, schema_for!(Envelope<VersionReport>));
-    describing(
-        kinds,
-        kind::WALKTHROUGH,
-        schema_for!(Envelope<WalkthroughReport>),
-    );
-    describing(kinds, kind::WATCH, schema_for!(Envelope<SupervisionReport>));
-    describing(kinds, kind::WIZARD, schema_for!(Envelope<WizardReport>));
-    describing(kinds, kind::WIRING, schema_for!(Envelope<WiringReport>));
-    describing(
-        kinds,
-        kind::SUBSTITUTION,
-        schema_for!(Envelope<SubstitutionReport>),
-    );
-    describing(kinds, kind::WORD, schema_for!(Envelope<Term>));
+    Outcome::schemas(|kind, shape| describing(kinds, kind, shape));
 }
 
 /// The shapes that belong to no command's answer.
@@ -299,8 +144,9 @@ mod tests {
 
     use serde_json::Value;
 
-    use super::{Contract, Inventory, CONTRACT_PATH};
+    use super::{Contract, CONTRACT_PATH};
     use crate::app::Outcome;
+    use crate::credential::Inventory;
     use crate::glossary::{Term, Vocabulary};
     use crate::model::{
         AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, ConfigReport,

@@ -33,6 +33,8 @@
 use lemonfiber_error::{Amiss, Code, Problem, Remedy, Severity, State};
 
 use super::command::{Asking, Keeping, Linking, MigrateAction};
+use super::disturbance::Situation;
+use super::engine::Waiting;
 use super::plugins;
 use super::setup::SetupAction;
 use super::{repair, restore, update, Command, Ctx};
@@ -90,10 +92,55 @@ pub struct Asked {
     pub named: &'static str,
     /// What a rehearsal of it means.
     pub rehearsal: Rehearsal,
+    /// Which situation it puts the stack in, where it is one of the verbs that start
+    /// or stop services. `None` means unstated rather than free: setup, an uninstall
+    /// and a restore take something away too, and what bounds each of them is a
+    /// different subsystem's answer.
+    pub disturbs: Option<Situation>,
 }
 
-/// What a rehearsal of this command comes to.
+impl Asked {
+    /// The same answer, putting the stack in `situation` while it runs.
+    #[must_use]
+    pub const fn disturbing(self, situation: Situation) -> Self {
+        Self {
+            disturbs: Some(situation),
+            ..self
+        }
+    }
+}
+
+/// A command that changes nothing, so the rehearsal is the command.
+const fn reads(named: &'static str) -> Asked {
+    Asked {
+        named,
+        rehearsal: Rehearsal::Reads,
+        disturbs: None,
+    }
+}
+
+/// A command that reports what it would do and stops short of doing it.
+const fn reports(named: &'static str) -> Asked {
+    Asked {
+        named,
+        rehearsal: Rehearsal::Reports,
+        disturbs: None,
+    }
+}
+
+/// A command whose effect cannot be known without producing it.
+const fn cannot(named: &'static str, why: &'static str) -> Asked {
+    Asked {
+        named,
+        rehearsal: Rehearsal::Cannot(why),
+        disturbs: None,
+    }
+}
+
+/// What each command is: the name an operator knows it by, what a rehearsal of it
+/// comes to, and what it takes away while it runs.
 ///
+/// One table for all three, so a command added to [`Command`] is described once.
 /// Exhaustive on purpose, and the reason this is a function rather than a field on
 /// each handler: a handler carrying its own answer can be added without one, and
 /// nothing would say so. Here, the build says so.
@@ -102,41 +149,39 @@ pub struct Asked {
 /// credential and rotating one arrive as the same command, and refusing the flag on
 /// the read would be refusing it on something that changes nothing.
 #[must_use]
-pub fn asked(command: &Command) -> Asked {
-    let (named, rehearsal) = match command {
+pub const fn asked(command: &Command) -> Asked {
+    match command {
         // Reads. Nothing here reaches for anything it could put back.
-        Command::Version => ("version", Rehearsal::Reads),
-        Command::Forms | Command::Preview { .. } => ("forms", Rehearsal::Reads),
-        Command::ConfigGet { .. } => ("config get", Rehearsal::Reads),
-        Command::ConfigShow => ("config", Rehearsal::Reads),
-        Command::History => ("history", Rehearsal::Reads),
-        Command::Ps { .. } => ("ps", Rehearsal::Reads),
-        Command::Stuck => ("stuck", Rehearsal::Reads),
-        Command::FrontDoor => ("front-door", Rehearsal::Reads),
-        Command::Explain { .. } => ("explain", Rehearsal::Reads),
-        Command::Glossary => ("glossary", Rehearsal::Reads),
-        Command::Clients => ("clients", Rehearsal::Reads),
-        Command::Catalogue => ("catalogue", Rehearsal::Reads),
-        Command::Wiring(Linking::Read) => ("wiring", Rehearsal::Reads),
-        Command::Outbound => ("outbound", Rehearsal::Reads),
-        Command::Provenance => ("provenance", Rehearsal::Reads),
-        Command::Stored => ("stored", Rehearsal::Reads),
-        Command::Plugins(plugins::Asked::Installed) => ("plugin installed", Rehearsal::Reads),
-        Command::Archives => ("archives", Rehearsal::Reads),
-        Command::Migrate(MigrateAction::Survey) => ("migrate", Rehearsal::Reads),
-        Command::Credentials(Asking::Read | Asking::Reveal { .. }) => {
-            ("credentials", Rehearsal::Reads)
-        }
-        Command::Hosting(Keeping::Read) => ("hosting", Rehearsal::Reads),
-        Command::Setup(SetupAction::Where) => ("setup --status", Rehearsal::Reads),
-        Command::Support { write: false, .. } => ("support", Rehearsal::Reads),
+        Command::Version => reads("version"),
+        Command::Forms | Command::Preview { .. } => reads("forms"),
+        Command::ConfigGet { .. } => reads("config get"),
+        Command::ConfigShow => reads("config"),
+        Command::History => reads("history"),
+        Command::Ps { .. } => reads("ps"),
+        Command::Stuck => reads("stuck"),
+        Command::FrontDoor => reads("front-door"),
+        Command::Explain { .. } => reads("explain"),
+        Command::Glossary => reads("glossary"),
+        Command::Clients => reads("clients"),
+        Command::Catalogue => reads("catalogue"),
+        Command::Wiring(Linking::Read) => reads("wiring"),
+        Command::Outbound => reads("outbound"),
+        Command::Provenance => reads("provenance"),
+        Command::Stored => reads("stored"),
+        Command::Plugins(plugins::Asked::Installed) => reads("plugin installed"),
+        Command::Archives => reads("archives"),
+        Command::Migrate(MigrateAction::Survey) => reads("migrate"),
+        Command::Credentials(Asking::Read | Asking::Reveal { .. }) => reads("credentials"),
+        Command::Hosting(Keeping::Read) => reads("hosting"),
+        Command::Setup(SetupAction::Where) => reads("setup --status"),
+        Command::Support { write: false, .. } => reads("support"),
         // Its own doc comment is the verdict: it replaces nothing, and what it answers
         // with is the command for whichever tool owns the copy that is running. It was
         // refusing the flag it did not need to refuse, which costs an operator a run
         // and teaches them the flag is unreliable. The one thing a rehearsal holds
         // back is the note it keeps of having asked, so that a question does not move
         // the day the next real run is due to ask on.
-        Command::SelfUpdate { .. } => ("update self", Rehearsal::Reads),
+        Command::SelfUpdate { .. } => reads("update self"),
 
         // A search asks an indexer, and the answer exists only once it has been
         // asked. Refused rather than reported because the asking is the part with a
@@ -144,8 +189,8 @@ pub fn asked(command: &Command) -> Asked {
         // a rehearsal is one the operator no longer has.
         Command::Trace {
             searching: true, ..
-        } => ("trace --search", Rehearsal::Cannot(A_SEARCH_IS_THE_ANSWER)),
-        Command::Trace { .. } => ("trace", Rehearsal::Reads),
+        } => cannot("trace --search", A_SEARCH_IS_THE_ANSWER),
+        Command::Trace { .. } => reads("trace"),
 
         // The killswitch check *is* the disruption. It takes the tunnel's own route
         // down inside the container and watches what the rest of the stack does,
@@ -154,99 +199,108 @@ pub fn asked(command: &Command) -> Asked {
         // the whole of what was asked for.
         Command::Doctor {
             disruptive: true, ..
-        } => (
-            "doctor --disruptive",
-            Rehearsal::Cannot(THE_CHECK_IS_THE_DISRUPTION),
-        ),
-        Command::Doctor { accept: None, .. } => ("doctor", Rehearsal::Reads),
-        Command::Doctor { .. } => ("doctor --accept", Rehearsal::Reports),
+        } => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
+        Command::Doctor { accept: None, .. } => reads("doctor"),
+        Command::Doctor { .. } => reports("doctor --accept"),
 
         // Same shape, for the same reason: a walk adds an item, waits for the stack to
         // do something with it, and reports what actually happened at each stage. What
         // it would report is what the stack did, and a rehearsal has no stack doing
         // anything.
-        Command::Walkthrough { .. } => (
-            "walkthrough",
-            Rehearsal::Cannot(THE_WALK_IS_THE_OBSERVATION),
-        ),
+        Command::Walkthrough { .. } => cannot("walkthrough", THE_WALK_IS_THE_OBSERVATION),
 
         // Reports. Each of these builds the report it would have filled in and stops
         // before the step it cannot take back.
-        Command::Up { .. } => ("up", Rehearsal::Reports),
-        Command::AtBoot => ("up --at-boot", Rehearsal::Reports),
-        Command::Start { .. } => ("start", Rehearsal::Reports),
-        Command::Down { .. } => ("down", Rehearsal::Reports),
-        Command::Halt { .. } => ("stop", Rehearsal::Reports),
-        Command::Switch { .. } => ("switch", Rehearsal::Reports),
-        Command::Restart { .. } => ("restart", Rehearsal::Reports),
-        Command::Pull { .. } => ("pull", Rehearsal::Reports),
-        Command::ConfigSet(_) => ("config set", Rehearsal::Reports),
+        Command::Up { .. } => reports("up").disturbing(Situation::Starting),
+        // A boot runs the same start in the middle by calling it, and is held to the same
+        // clock: what it was prepared to wait is what somebody reads back afterwards to
+        // understand why a four-in-the-morning start gave up when it did.
+        Command::AtBoot => reports("up --at-boot").disturbing(Situation::Starting),
+        Command::Start { .. } => reports("start").disturbing(Situation::Starting),
+        Command::Down {
+            wait: Waiting::ForTheDownloads,
+            ..
+        } => reports("down").disturbing(Situation::StoppingAfterDownloads),
+        Command::Down { .. } => reports("down").disturbing(Situation::Stopping),
+        Command::Halt { .. } => reports("stop").disturbing(Situation::Stopping),
+        Command::Switch { .. } => reports("switch").disturbing(Situation::Switching),
+        Command::Restart { .. } => reports("restart").disturbing(Situation::Restarting),
+        Command::Pull { .. } => reports("pull"),
+        Command::ConfigSet(_) => reports("config set"),
         // Everything it changes is settled before anything is touched: the manifest
         // is read, what the install decides is settled, and where every one of its
         // writes lands is derived without a disk under it. A rehearsal does all of
         // that, states it, and stops short of carrying it out — so what it reports is
         // what the real run reports rather than a summary of it.
-        Command::Plugins(plugins::Asked::Install { .. }) => ("plugin install", Rehearsal::Reports),
+        Command::Plugins(plugins::Asked::Install { .. }) => reports("plugin install"),
         // The same, read backwards. What a removal puts back is judged before a byte of
         // it is touched — the rollback layer's own judgement, which is the whole of
         // what can be known without acting — and what it would leave with nothing
         // filling it is a fact about the record rather than about a machine mid-run.
-        Command::Plugins(plugins::Asked::Remove { .. }) => ("plugin remove", Rehearsal::Reports),
+        // Taking a plugin off stops its containers through the same engine stop, held to
+        // the same grace.
+        Command::Plugins(plugins::Asked::Remove { .. }) => {
+            reports("plugin remove").disturbing(Situation::Stopping)
+        }
         // Both of those at once, as the one account the update is. What goes back is the
         // rollback layer's judgement and what comes on is the install's settled writes
         // and declared proofs, and neither needs anything touched to be known.
-        Command::Plugins(plugins::Asked::Update { .. }) => ("plugin update", Rehearsal::Reports),
-        Command::Wiring(Linking::Fill(_)) => ("wiring fill", Rehearsal::Reports),
-        Command::Quality(_) => ("quality", Rehearsal::Reports),
-        Command::Alerts(_) => ("alerts", Rehearsal::Reports),
-        Command::QualityMusic { .. } => ("quality music", Rehearsal::Reports),
-        Command::Household { .. } => ("household", Rehearsal::Reports),
-        Command::Held { .. } => ("held", Rehearsal::Reports),
-        Command::Allowing(_) => ("allow", Rehearsal::Reports),
-        Command::Deciding(_) => ("decide", Rehearsal::Reports),
-        Command::Expiring(_) => ("expiring", Rehearsal::Reports),
-        Command::Hosting(_) => ("hosting", Rehearsal::Reports),
-        Command::Invite { .. } => ("invite", Rehearsal::Reports),
-        Command::Reissue { .. } => ("reissue", Rehearsal::Reports),
-        Command::Forget { .. } => ("forget", Rehearsal::Reports),
-        Command::Space { .. } => ("space", Rehearsal::Reports),
-        Command::StopSeeding { .. } => ("stop-seeding", Rehearsal::Reports),
-        Command::Bandwidth(_) => ("bandwidth", Rehearsal::Reports),
-        Command::Uninstall(_) => ("uninstall", Rehearsal::Reports),
+        // The version installed comes off and another comes on in its place, held to the
+        // same settle wait a switch is.
+        Command::Plugins(plugins::Asked::Update { .. }) => {
+            reports("plugin update").disturbing(Situation::Switching)
+        }
+        Command::Wiring(Linking::Fill(_)) => reports("wiring fill"),
+        Command::Quality(_) => reports("quality"),
+        Command::Alerts(_) => reports("alerts"),
+        Command::QualityMusic { .. } => reports("quality music"),
+        Command::Household { .. } => reports("household"),
+        Command::Held { .. } => reports("held"),
+        Command::Allowing(_) => reports("allow"),
+        Command::Deciding(_) => reports("decide"),
+        Command::Expiring(_) => reports("expiring"),
+        Command::Hosting(_) => reports("hosting"),
+        Command::Invite { .. } => reports("invite"),
+        Command::Reissue { .. } => reports("reissue"),
+        Command::Forget { .. } => reports("forget"),
+        Command::Space { .. } => reports("space"),
+        Command::StopSeeding { .. } => reports("stop-seeding"),
+        Command::Bandwidth(_) => reports("bandwidth"),
+        Command::Uninstall(_) => reports("uninstall"),
         // A guard is the one command with no ending of its own, so a rehearsal of it
         // cannot be the command run with the last step left out — it would hold the
         // terminal until the drive was pulled. What it reports instead is the watch it
         // would keep: the location, how often it would look, and the invocation it
         // would run the moment that location went. The invocation is the lifecycle
         // stop's own, built by the same path a real watch builds it with.
-        Command::Watch { .. } => ("watch", Rehearsal::Reports),
+        Command::Watch { .. } => reports("watch"),
         // Which changes would go back, and which of them need a service that is
         // answering. The judgement is already made before anything is touched, because
         // a run goes back whole or not at all — so the report a rehearsal wants is the
         // one this command has already formed by the time it would act.
-        Command::Undo { .. } => ("undo", Rehearsal::Reports),
+        Command::Undo { .. } => reports("undo"),
         // Which credential would be replaced, where its value lives, and what would
         // still need doing before every consumer held the new one. No replacement is
         // generated: a value minted to describe a rotation is a secret that exists
         // because somebody asked a question, and it would have to go somewhere.
-        Command::Credentials(_) => ("credentials --rotate", Rehearsal::Reports),
+        Command::Credentials(_) => reports("credentials --rotate"),
         // What a capture would hold, how large it would be, and the exact path it
         // would be written to — read off the same room check a real capture makes
         // before it writes anything.
-        Command::Backup { .. } => ("backup", Rehearsal::Reports),
+        Command::Backup { .. } => reports("backup"),
 
         // The eight whose yes a rehearsal takes back. Each already answers twice —
         // unconfirmed it says what it would do, confirmed it does it — so the report a
         // rehearsal wants is the one it already gives, in the same words. See
         // [`unconfirmed`].
-        Command::Migrate(_) => ("migrate", Rehearsal::Reports),
-        Command::Remove { .. } => ("remove", Rehearsal::Reports),
-        Command::QualityUpgrade { .. } => ("quality upgrade", Rehearsal::Reports),
-        Command::Repair { .. } => ("doctor --fix", Rehearsal::Reports),
-        Command::Reset { .. } => ("reset", Rehearsal::Reports),
-        Command::Update(_) => ("update", Rehearsal::Reports),
-        Command::Restore { .. } => ("restore", Rehearsal::Reports),
-        Command::Support { .. } => ("support --write", Rehearsal::Reports),
+        Command::Migrate(_) => reports("migrate"),
+        Command::Remove { .. } => reports("remove"),
+        Command::QualityUpgrade { .. } => reports("quality upgrade"),
+        Command::Repair { .. } => reports("doctor --fix"),
+        Command::Reset { .. } => reports("reset"),
+        Command::Update(_) => reports("update"),
+        Command::Restore { .. } => reports("restore"),
+        Command::Support { .. } => reports("support --write"),
 
         // Setup is split where the split is real, the way `credentials` and `doctor`
         // are. Reading where the walk stands changes nothing; every other step records
@@ -254,7 +308,7 @@ pub fn asked(command: &Command) -> Asked {
         // configuration — and each reports what it would record instead of recording
         // it. The answers gathered so far are the report either way, so a rehearsal is
         // the same walk with the file left alone.
-        Command::Setup(_) => ("setup", Rehearsal::Reports),
+        Command::Setup(_) => reports("setup"),
 
         // One pass over one graph, reported per connection: the field, what the service
         // holds now, and what would be pushed. The three-way reconcile every driver
@@ -266,10 +320,9 @@ pub fn asked(command: &Command) -> Asked {
         // Adopting is the same survey in the other direction: nothing is written to any
         // service, and what a real run would move is lemonfiber's record of what it
         // expects, so a rehearsal of it names the values that would be taken on.
-        Command::Seed => ("seed", Rehearsal::Reports),
-        Command::Adopt => ("adopt", Rehearsal::Reports),
-    };
-    Asked { named, rehearsal }
+        Command::Seed => reports("seed"),
+        Command::Adopt => reports("adopt"),
+    }
 }
 
 /// The command as this run should carry it out.
@@ -475,6 +528,7 @@ mod tests {
         let untaught = Asked {
             named: "invent",
             rehearsal: Rehearsal::Untaught,
+            disturbs: None,
         };
 
         // Carried as a `Result` rather than opened with a `let ... else`. The else

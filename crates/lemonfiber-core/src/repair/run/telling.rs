@@ -10,8 +10,8 @@
 //! second one is short enough to read whole.
 
 use crate::config::store::is_secret;
+use crate::error::withheld::REDACTED;
 use crate::journal::{Action, Undo};
-use crate::ports::withheld::REDACTED;
 
 /// One reversal as it is safe to report.
 ///

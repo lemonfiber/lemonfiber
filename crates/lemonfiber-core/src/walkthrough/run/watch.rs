@@ -508,7 +508,7 @@ mod tests {
         ctx.patience = Duration::from_secs(90);
 
         let heard = super::super::fixtures::Recording::default();
-        let report = crate::walkthrough::run(&ctx, Some("Sintel"), &heard).await;
+        let report = crate::app::walkthrough(&ctx, Some("Sintel"), &heard).await;
         assert!(
             report.is_ok_and(|report| report.in_background),
             "it looked more than once and then handed the download over"

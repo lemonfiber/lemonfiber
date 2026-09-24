@@ -170,10 +170,10 @@ async fn watched(ctx: &Ctx, projecting: bool) -> Result<Watched, Box<Problem>> {
 /// removes one of those downloads has to be addressed to the client that reported it.
 pub(crate) struct Gathered {
     /// What was measured.
-    pub(super) measured: Measured,
+    pub(crate) measured: Measured,
     /// The torrent client the completed downloads came from, where the stack has one
     /// this run can authenticate to.
-    pub(super) holder: Option<crate::qbittorrent::Qbittorrent>,
+    pub(crate) holder: Option<crate::qbittorrent::Qbittorrent>,
 }
 
 /// Read everything one reckoning is made of.

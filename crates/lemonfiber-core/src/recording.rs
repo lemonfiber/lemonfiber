@@ -31,9 +31,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::error::withheld::{withheld, without_credentials};
 use crate::ports::http::{Http, Request, Response, Unreachable};
 use crate::ports::time::Clock;
-use crate::ports::withheld::{withheld, without_credentials};
 
 /// How many lines are kept.
 ///

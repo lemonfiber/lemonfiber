@@ -14,8 +14,6 @@
 
 use std::time::Duration;
 
-use super::engine::Waiting;
-use super::plugins::Asked;
 use super::{Command, Ctx};
 
 /// What the container engine gives a service to stop in.
@@ -153,98 +151,7 @@ pub const fn of(command: &Command, patience: Duration) -> Option<Disturbance> {
 /// reads the second half without going near the first.
 #[must_use]
 const fn situation(command: &Command) -> Option<Situation> {
-    match command {
-        // Apart from one another because they are apart in [`Command`], and a
-        // day where a service start is held to a different clock from a form
-        // start is a day this reads as two lines rather than being rewritten.
-        // A boot joins the two because it runs the same start in the middle by
-        // calling it, and is held to the same clock. Nobody is watching one —
-        // that is the whole of why it reports to a store rather than to a person
-        // — but the length it was prepared to wait is exactly what somebody reads
-        // back afterwards to understand why a four-in-the-morning start gave up
-        // when it did.
-        Command::Up { .. } | Command::Start { .. } | Command::AtBoot => Some(Situation::Starting),
-        Command::Restart { .. } => Some(Situation::Restarting),
-        // An update is the running set changing to a different one: the version
-        // installed comes off and another comes on in its place, held to the same
-        // settle wait a switch is.
-        Command::Switch { .. } | Command::Plugins(Asked::Update { .. }) => {
-            Some(Situation::Switching)
-        }
-        Command::Down {
-            wait: Waiting::ForTheDownloads,
-            ..
-        } => Some(Situation::StoppingAfterDownloads),
-        // Taking a plugin off stops its containers through the same engine stop, held
-        // to the same grace. Which ones is the removal's to say, since only it has read
-        // the record of what the plugin placed; the length is this file's.
-        //
-        // An install is not here: it starts a container that was not running, and
-        // takes nothing away from anybody while it does.
-        Command::Down { .. } | Command::Halt { .. } | Command::Plugins(Asked::Remove { .. }) => {
-            Some(Situation::Stopping)
-        }
-        // Everything else, listed rather than left to a wildcard. A command
-        // added here would otherwise answer *disturbs nothing* by default, and
-        // a machine taken away in silence is the failure this exists to prevent —
-        // so a new one stops the build until somebody has decided.
-        Command::Version
-        | Command::Catalogue
-        | Command::Wiring(_)
-        | Command::Forms
-        | Command::Preview { .. }
-        | Command::Pull { .. }
-        | Command::ConfigGet { .. }
-        | Command::ConfigSet(..)
-        | Command::ConfigShow
-        | Command::Ps { .. }
-        | Command::Doctor { .. }
-        | Command::Repair { .. }
-        | Command::Undo { .. }
-        | Command::Quality(..)
-        | Command::Alerts(..)
-        | Command::History
-        | Command::Migrate(..)
-        | Command::QualityUpgrade { .. }
-        | Command::QualityMusic { .. }
-        | Command::Trace { .. }
-        | Command::Household { .. }
-        | Command::Held { .. }
-        | Command::Allowing(..)
-        | Command::Deciding(..)
-        | Command::Expiring(..)
-        | Command::Stuck
-        | Command::FrontDoor
-        | Command::Explain { .. }
-        | Command::Glossary
-        | Command::Clients
-        | Command::Invite { .. }
-        | Command::Reissue { .. }
-        | Command::Remove { .. }
-        | Command::Outbound
-        | Command::Provenance
-        | Command::Credentials(..)
-        | Command::Stored
-        | Command::Plugins(Asked::Install { .. } | Asked::Installed)
-        | Command::Forget { .. }
-        | Command::SelfUpdate { .. }
-        | Command::Uninstall(..)
-        | Command::Space { .. }
-        | Command::StopSeeding { .. }
-        | Command::Bandwidth(..)
-        | Command::Watch { .. }
-        | Command::Hosting(..)
-        | Command::Walkthrough { .. }
-        | Command::Seed
-        | Command::Adopt
-        | Command::Reset { .. }
-        | Command::Update(..)
-        | Command::Backup { .. }
-        | Command::Support { .. }
-        | Command::Archives
-        | Command::Restore { .. }
-        | Command::Setup(..) => None,
-    }
+    super::rehearsal::asked(command).disturbs
 }
 
 /// Say what this is about to take away, before it takes it.
@@ -285,6 +192,8 @@ fn sentence(disturbance: Disturbance) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::engine::Waiting;
+    use crate::app::plugins::Asked;
 
     /// A patience unlike any default, so a length read from it cannot be a
     /// constant that happens to match.

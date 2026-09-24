@@ -5,10 +5,9 @@
 //! describing a kind nobody emits.
 //!
 //! Nowhere else is enforced by the type rather than by a reader: a kind cannot be
-//! built outside this module, so a call site cannot spell one out. It was a plain
-//! string until two kinds reached the wire without a schema — and neither the
-//! contract check nor the emitters could see it, because both read [`ALL`] and a
-//! spelled-out kind never reaches [`ALL`].
+//! built outside this module, so a call site cannot spell one out. Each kind is
+//! declared once, in the list below, and [`ALL`] is generated from that list, so a
+//! kind cannot exist without the contract reading it.
 
 /// What an envelope calls itself, so a consumer can branch before parsing `data`.
 ///
@@ -35,259 +34,140 @@ impl std::fmt::Display for Kind {
         out.write_str(self.0)
     }
 }
+/// Declares each kind and [`ALL`] from one list.
+macro_rules! kinds {
+    ($($(#[doc = $doc:literal])* $name:ident = $wire:literal,)*) => {
+        $($(#[doc = $doc])* pub const $name: Kind = Kind($wire);)*
 
-/// A session opened by proving the operator's password.
-pub const ADMISSION: Kind = Kind("admission");
-/// What adopting a setup already on this machine came to.
-pub(crate) const ADOPTION: Kind = Kind("adoption");
-/// What the operator will be told about, and what changing it came to.
-pub const ALERTS: Kind = Kind("alerts");
-/// The backup archives this machine has kept.
-pub(crate) const ARCHIVES: Kind = Kind("archives");
-/// Where a backup archive was written, and what it covers.
-pub const BACKUP: Kind = Kind("backup");
-/// How the line is shared, what that costs, and whether the clients keep to it.
-pub const BANDWIDTH: Kind = Kind("bandwidth");
-/// What standing lemonfiber beside an existing setup came to.
-pub const BESIDE: Kind = Kind("beside");
-/// What a support bundle would hold, or where one went.
-pub const BUNDLE: Kind = Kind("bundle");
-/// What each service in the stack is for, and what became of the ones that went.
-pub const CATALOGUE: Kind = Kind("catalogue");
-/// The settings asked about, and what a change did to them.
-pub const CONFIG: Kind = Kind("config");
-/// Every credential this stack holds, and what became of acting on one.
-pub const CREDENTIALS: Kind = Kind("credentials");
-/// One moment of what the stack is doing, as the dashboard assembles it.
-pub const DASHBOARD: Kind = Kind("dashboard");
-/// What the diagnostic checks found.
-pub(crate) const DOCTOR: Kind = Kind("doctor");
-/// A command could not do what was asked.
-pub const ERROR: Kind = Kind("error");
-/// Every form the stack declares.
-pub const FORMS: Kind = Kind("forms");
-/// The one address to hand somebody who lives here.
-pub const FRONT_DOOR: Kind = Kind("front-door");
-/// Every word this product explains.
-pub(crate) const GLOSSARY: Kind = Kind("glossary");
-/// Which app to use on which device.
-pub const CLIENTS: Kind = Kind("clients");
+        /// Every kind there is, in the order the list declares them.
+        pub const ALL: &[Kind] = &[$($name,)*];
+    };
+}
 
-/// What this machine keeps running for lemonfiber.
-pub const HOSTING: Kind = Kind("hosting");
-/// Everything lemonfiber changed, and how far each could be put back.
-pub const HISTORY: Kind = Kind("history");
-/// What the household asked for, member by member.
-pub const HOUSEHOLD: Kind = Kind("household");
-
-/// What one member can watch, as the media server answers it for them.
-pub const HELD: Kind = Kind("held");
-/// What copying an operator's own records across came to.
-pub(crate) const IMPORT: Kind = Kind("import");
-/// An account offered to somebody in the house.
-pub(crate) const INVITATION: Kind = Kind("invitation");
-
-/// Somebody taken out of the household, or what taking them would cost.
-pub const REMOVAL: Kind = Kind("removal");
-/// The name given to work that outlives the request that started it.
-pub const JOB: Kind = Kind("job");
-/// What a lifecycle command did, or would have done.
-pub(crate) const LIFECYCLE: Kind = Kind("lifecycle");
-/// One line of a service's log.
-pub const LOG: Kind = Kind("log");
-/// What is already on this machine, before anything is proposed.
-pub const MIGRATION: Kind = Kind("migration");
-/// The music format chosen, and what became of applying it.
-pub const MUSIC: Kind = Kind("music");
-/// Everything that leaves this machine, and what the stack's own services reach.
-pub const OUTBOUND: Kind = Kind("outbound");
-/// Every plugin installed on this machine, and what installing one came to.
-pub(crate) const PLUGINS: Kind = Kind("plugins");
-/// What starting or stopping would do, before it is done.
-pub(crate) const PREVIEW: Kind = Kind("preview");
-/// Where each service in the stack comes from, and under what licence.
-pub const PROVENANCE: Kind = Kind("provenance");
-/// One line the container engine wrote while pulling images.
-pub const PULL: Kind = Kind("pull");
-/// The quality choice, what it means, and what a command did with it.
-pub const QUALITY: Kind = Kind("quality");
-/// What could be put right, and what became of the ones agreed to.
-pub(crate) const REPAIR: Kind = Kind("repair");
-/// What standing in place of a setup already here came to.
-pub(crate) const REPLACEMENT: Kind = Kind("replacement");
-/// What a full reset did, or would do.
-pub const RESET: Kind = Kind("reset");
-/// What a restore would overwrite, or what it put back.
-pub const RESTORE: Kind = Kind("restore");
-/// What seeding wired, and what it left for a re-run.
-pub const SEED: Kind = Kind("seed");
-/// Where this copy of lemonfiber stands, and what moving it would come to.
-pub const SELF_UPDATE: Kind = Kind("self-update");
-/// What setup settled on.
-pub const SETUP: Kind = Kind("setup");
-/// Where the disk stands, where the room went, and what could be got back.
-pub const SPACE: Kind = Kind("space");
-/// One line said while services are starting: what the container engine wrote, or
-/// what the wait after it is still waiting for.
-pub const START: Kind = Kind("start");
-/// What each service is doing.
-pub const STATUS: Kind = Kind("status");
-/// One step of a walkthrough, said the moment it is true.
-pub const STEP: Kind = Kind("step");
-/// What letting one completed download go costs, and what became of letting it.
-pub(crate) const STOP_SEEDING: Kind = Kind("stop-seeding");
-/// Everything lemonfiber keeps on this machine, and what became of it.
-pub const STORED: Kind = Kind("stored");
-/// The items whose downloads are stuck.
-pub const STUCK: Kind = Kind("stuck");
-/// Where one item is in the pipeline.
-pub const TRACE: Kind = Kind("trace");
-/// What putting back the last repair came to.
-pub(crate) const UNDO: Kind = Kind("undo");
-/// What taking lemonfiber off this machine would come to, or came to.
-pub const UNINSTALL: Kind = Kind("uninstall");
-/// What moving the stack onto this build's pinned versions would change, or came to.
-pub const UPDATE: Kind = Kind("update");
-/// What upgrading existing content did, or would do.
-pub(crate) const UPGRADE: Kind = Kind("upgrade");
-/// The versions in play: the binary, and the stack it operates.
-pub const VERSION: Kind = Kind("version");
-/// A walkthrough's outcome.
-pub(crate) const WALKTHROUGH: Kind = Kind("walkthrough");
-/// A supervision run's findings.
-pub const WATCH: Kind = Kind("watch");
-/// Where a setup run stands, and what it is still asking for.
-pub(crate) const WIZARD: Kind = Kind("wizard");
-/// One glossary term.
-pub const WORD: Kind = Kind("word");
-/// What this stack wires to what, and how each link was settled.
-pub const WIRING: Kind = Kind("wiring");
-/// A change of which service fills a capability, and what it costs.
-pub(crate) const SUBSTITUTION: Kind = Kind("substitution");
-
-/// Every kind, so the contract cannot describe one that is never emitted.
-pub const ALL: &[Kind] = &[
-    ADMISSION,
-    ADOPTION,
-    ALERTS,
-    ARCHIVES,
-    BACKUP,
-    BANDWIDTH,
-    BESIDE,
-    BUNDLE,
-    CATALOGUE,
-    CONFIG,
-    CREDENTIALS,
-    DASHBOARD,
-    DOCTOR,
-    ERROR,
-    FORMS,
-    FRONT_DOOR,
-    GLOSSARY,
-    CLIENTS,
-    HOSTING,
-    HISTORY,
-    HOUSEHOLD,
-    HELD,
-    IMPORT,
-    INVITATION,
-    REMOVAL,
-    JOB,
-    LIFECYCLE,
-    LOG,
-    MIGRATION,
-    MUSIC,
-    OUTBOUND,
-    PLUGINS,
-    PREVIEW,
-    PROVENANCE,
-    PULL,
-    QUALITY,
-    REPAIR,
-    REPLACEMENT,
-    RESET,
-    RESTORE,
-    SEED,
-    SELF_UPDATE,
-    SETUP,
-    SPACE,
-    START,
-    STATUS,
-    STEP,
-    STOP_SEEDING,
-    STORED,
-    STUCK,
-    TRACE,
-    UNDO,
-    UNINSTALL,
-    UPDATE,
-    UPGRADE,
-    VERSION,
-    WALKTHROUGH,
-    WATCH,
-    WIZARD,
-    WORD,
-    WIRING,
-    SUBSTITUTION,
-];
-
-#[cfg(test)]
-mod tests {
-    use super::ALL;
-
-    /// The part of this file that ships, which is everything before these tests.
-    ///
-    /// Read rather than opened: the text is compiled in, so there is no file that
-    /// could be missing and no failure to handle.
-    fn shipped() -> &'static str {
-        let mut parts = include_str!("kind.rs").split("#[cfg(test)]");
-        parts.next().unwrap_or_default()
-    }
-
-    /// The kinds declared above, in the order they are written.
-    fn declared() -> Vec<&'static str> {
-        shipped()
-            .lines()
-            .filter_map(|line| line.strip_prefix("pub const "))
-            .filter_map(|rest| rest.split_once(": Kind = "))
-            .map(|(name, _)| name)
-            .collect()
-    }
-
-    /// The kinds `ALL` lists, read from the block it is written as.
-    fn listed() -> Vec<&'static str> {
-        shipped()
-            .split("] = &[")
-            .skip(1)
-            .flat_map(|rest| rest.split("];").take(1))
-            .flat_map(str::lines)
-            .map(str::trim)
-            .filter_map(|line| line.strip_suffix(','))
-            .collect()
-    }
-
-    /// A kind that exists must be one the contract reads.
-    ///
-    /// The type stops a kind being spelled out at a call site. It does not stop one
-    /// being declared here and left out of `ALL`, which lands in the same place: it
-    /// is emitted, it is never described, and the check that the contract and the
-    /// emitters agree cannot see it, because both of its halves read `ALL`.
-    #[test]
-    fn every_kind_declared_here_is_one_the_contract_reads() {
-        let declared = declared();
-        assert!(
-            !declared.is_empty(),
-            "the scanner read no declarations, so it is reading the wrong text"
-        );
-        assert_eq!(declared, listed());
-    }
-
-    /// And the block that was read is the one that was compiled.
-    ///
-    /// Without this the two readings above could agree with each other about a
-    /// region of text that is not the list anything uses.
-    #[test]
-    fn the_list_that_was_read_is_the_list_that_is_compiled() {
-        assert_eq!(declared().len(), ALL.len());
-    }
+kinds! {
+    /// A session opened by proving the operator's password.
+    ADMISSION = "admission",
+    /// What adopting a setup already on this machine came to.
+    ADOPTION = "adoption",
+    /// What the operator will be told about, and what changing it came to.
+    ALERTS = "alerts",
+    /// The backup archives this machine has kept.
+    ARCHIVES = "archives",
+    /// Where a backup archive was written, and what it covers.
+    BACKUP = "backup",
+    /// How the line is shared, what that costs, and whether the clients keep to it.
+    BANDWIDTH = "bandwidth",
+    /// What standing lemonfiber beside an existing setup came to.
+    BESIDE = "beside",
+    /// What a support bundle would hold, or where one went.
+    BUNDLE = "bundle",
+    /// What each service in the stack is for, and what became of the ones that went.
+    CATALOGUE = "catalogue",
+    /// The settings asked about, and what a change did to them.
+    CONFIG = "config",
+    /// Every credential this stack holds, and what became of acting on one.
+    CREDENTIALS = "credentials",
+    /// One moment of what the stack is doing, as the dashboard assembles it.
+    DASHBOARD = "dashboard",
+    /// What the diagnostic checks found.
+    DOCTOR = "doctor",
+    /// A command could not do what was asked.
+    ERROR = "error",
+    /// Every form the stack declares.
+    FORMS = "forms",
+    /// The one address to hand somebody who lives here.
+    FRONT_DOOR = "front-door",
+    /// Every word this product explains.
+    GLOSSARY = "glossary",
+    /// Which app to use on which device.
+    CLIENTS = "clients",
+    /// What this machine keeps running for lemonfiber.
+    HOSTING = "hosting",
+    /// Everything lemonfiber changed, and how far each could be put back.
+    HISTORY = "history",
+    /// What the household asked for, member by member.
+    HOUSEHOLD = "household",
+    /// What one member can watch, as the media server answers it for them.
+    HELD = "held",
+    /// What copying an operator's own records across came to.
+    IMPORT = "import",
+    /// An account offered to somebody in the house.
+    INVITATION = "invitation",
+    /// Somebody taken out of the household, or what taking them would cost.
+    REMOVAL = "removal",
+    /// The name given to work that outlives the request that started it.
+    JOB = "job",
+    /// What a lifecycle command did, or would have done.
+    LIFECYCLE = "lifecycle",
+    /// One line of a service's log.
+    LOG = "log",
+    /// What is already on this machine, before anything is proposed.
+    MIGRATION = "migration",
+    /// The music format chosen, and what became of applying it.
+    MUSIC = "music",
+    /// Everything that leaves this machine, and what the stack's own services reach.
+    OUTBOUND = "outbound",
+    /// Every plugin installed on this machine, and what installing one came to.
+    PLUGINS = "plugins",
+    /// What starting or stopping would do, before it is done.
+    PREVIEW = "preview",
+    /// Where each service in the stack comes from, and under what licence.
+    PROVENANCE = "provenance",
+    /// One line the container engine wrote while pulling images.
+    PULL = "pull",
+    /// The quality choice, what it means, and what a command did with it.
+    QUALITY = "quality",
+    /// What could be put right, and what became of the ones agreed to.
+    REPAIR = "repair",
+    /// What standing in place of a setup already here came to.
+    REPLACEMENT = "replacement",
+    /// What a full reset did, or would do.
+    RESET = "reset",
+    /// What a restore would overwrite, or what it put back.
+    RESTORE = "restore",
+    /// What seeding wired, and what it left for a re-run.
+    SEED = "seed",
+    /// Where this copy of lemonfiber stands, and what moving it would come to.
+    SELF_UPDATE = "self-update",
+    /// What setup settled on.
+    SETUP = "setup",
+    /// Where the disk stands, where the room went, and what could be got back.
+    SPACE = "space",
+    /// One line said while services are starting: what the container engine wrote, or
+    /// what the wait after it is still waiting for.
+    START = "start",
+    /// What each service is doing.
+    STATUS = "status",
+    /// One step of a walkthrough, said the moment it is true.
+    STEP = "step",
+    /// What letting one completed download go costs, and what became of letting it.
+    STOP_SEEDING = "stop-seeding",
+    /// Everything lemonfiber keeps on this machine, and what became of it.
+    STORED = "stored",
+    /// The items whose downloads are stuck.
+    STUCK = "stuck",
+    /// Where one item is in the pipeline.
+    TRACE = "trace",
+    /// What putting back the last repair came to.
+    UNDO = "undo",
+    /// What taking lemonfiber off this machine would come to, or came to.
+    UNINSTALL = "uninstall",
+    /// What moving the stack onto this build's pinned versions would change, or came to.
+    UPDATE = "update",
+    /// What upgrading existing content did, or would do.
+    UPGRADE = "upgrade",
+    /// The versions in play: the binary, and the stack it operates.
+    VERSION = "version",
+    /// A walkthrough's outcome.
+    WALKTHROUGH = "walkthrough",
+    /// A supervision run's findings.
+    WATCH = "watch",
+    /// Where a setup run stands, and what it is still asking for.
+    WIZARD = "wizard",
+    /// One glossary term.
+    WORD = "word",
+    /// What this stack wires to what, and how each link was settled.
+    WIRING = "wiring",
+    /// A change of which service fills a capability, and what it costs.
+    SUBSTITUTION = "substitution",
 }
