@@ -28,29 +28,32 @@ crates/
 │   │                     written where it is a set of files
 │   └── tests/            the architecture tests, from the top of the graph
 │
-├── lemonfiber-core/      lib — all logic, no UI, no terminal
-│   ├── app/              the one entry point: command in, outcome out
-│   ├── model/            the values surfaces render, and serialise
-│   ├── adapters/         the only code that talks to Docker, HTTP or processes
-│   ├── platform.rs       the only cfg!(target_os)
-│   └── …                 one directory per subsystem — doctor, seed, config, …
-│
 ├── lemonfiber-api/       lib — the JSON endpoints answered on loopback, and the
 │                              serving of the web app beside them. Chooses no
 │                              address: the binary binds the socket.
 │
+├── lemonfiber-adapters/  lib — the implementations of the ports' traits that
+│                              reach the machine: the container runtime, the
+│                              transport, the TLS connection, the disk. Depends on
+│                              ports only, and sits above core rather than below
+│                              it — the core is handed these, and cannot build one.
+│
+├── lemonfiber-core/      lib — all logic, no UI, no terminal
+│   ├── app/              the one entry point: command in, outcome out
+│   ├── model/            the values surfaces render, and serialise
+│   ├── platform.rs       the only cfg!(target_os)
+│   └── …                 one directory per subsystem — doctor, seed, config, …
+│
+├── lemonfiber-fixtures/  lib — the fakes for the ports' traits, reachable from
+│                              both in-crate tests and `tests/`. Depends on ports
+│                              only.
+│
+├── lemonfiber-plugin/    lib — plugin.toml parse, and the vocabularies a plugin
+│                              is written against. Depends on the manifest only.
+│
 ├── lemonfiber-ports/     lib — the traits the outside world is reached through,
 │                              and the vocabulary that crosses them. Depends on
 │                              nothing of ours but the manifest.
-│
-├── lemonfiber-adapters/  lib — the implementations of those traits that reach the
-│                              machine: the container runtime, the transport, the
-│                              TLS connection, the disk. Depends on ports only, and
-│                              sits above core rather than below it — the core is
-│                              handed these, and cannot build one.
-│
-├── lemonfiber-fixtures/  lib — the fakes for those traits, reachable from both
-│                              in-crate tests and `tests/`. Depends on ports only.
 │
 └── lemonfiber-manifest/  lib — stack.toml parse + validate
 ```
@@ -61,8 +64,9 @@ into `reference/commands.md`, the pages under `reference/commands/`, and
 `reference/error-codes.md`; `main.rs` and everything it reaches stay in the binary.
 The split exists because an artefact is written by a program that is not this binary,
 and it has to read the same declarations rather than a second description of them.
-`cargo run --example reference`, `--example codes` and `--example contract` are those
-programs, and `just reference`, `just codes` and `just contract` run them.
+`cargo run --example reference` and `--example codes` are those programs, and
+`just reference` and `just codes` run them. `--example contract` is the same shape in
+`lemonfiber-core`, for the web-API contract, and `just contract` runs it.
 
 `--example codes` and `--example contract` are a `print!` around one function, which
 the recipe redirects to the file the tests compare against. `--example reference` is

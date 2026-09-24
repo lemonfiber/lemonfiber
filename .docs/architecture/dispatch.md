@@ -10,15 +10,15 @@ This is how it is built.
 ## The three types
 
 ```rust
-pub enum Command { Version }              // what was asked for
-pub struct Ctx { dry_run: bool, runner: Arc<dyn Runner> }   // everything else it needs
-pub enum Outcome { Version(VersionReport) }                 // what came back
+pub enum Command { Version, /* … */ }                             // what was asked for
+pub struct Ctx { pub dry_run: bool, pub runner: Arc<dyn Runner>, /* … */ }  // everything else it needs
+pub enum Outcome { Version(VersionReport), /* … */ }              // what came back
 
-pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Problem>;
+pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>>;
 ```
 
-`clap` parses into a `Command`. A keypress will build a `Command`. An HTTP route
-will build a `Command`. None of them can do anything else, because there is
+`clap` parses into a `Command`. A keypress builds a `Command`. An HTTP route
+builds a `Command`. None of them can do anything else, because there is
 nothing else public to call.
 
 ## `Command` and `Outcome` are deliberately exhaustive
@@ -39,7 +39,7 @@ with the first — the golden tests that cover a rehearsal are covering the real
 thing too.
 
 ```rust
-let ctx = Ctx::new(Arc::new(Local)).rehearsing();
+let ctx = Ctx::new(runner, engine, clock, seams, stack, settings, environment).rehearsing();
 ```
 
 ## Why `dispatch` is async when nothing in it blocks yet
@@ -57,7 +57,7 @@ envelope — is exercised by tests from the first commit.
 ## The spine, end to end
 
 ```rust
-let ctx = Ctx::new(Arc::new(Local));
+let ctx = Ctx::new(runner, engine, clock, seams, stack, settings, environment);
 let outcome = dispatch(Command::Version, &ctx).await?;
 println!("{}", serde_json::to_string(&outcome.envelope())?);
 ```
@@ -84,13 +84,13 @@ holds or why one was left out.
 
 `ps` and `logs` are deliberately **not** here. They are reads, and reads go
 through the Engine API rather than through Compose — polling a subprocess once a
-second across nineteen services would be both wasteful and visibly jittery.
-`Action` therefore covers only `up`, `down`, `stop`, `restart`, `pull` and
-`config`, which is exactly the split the architecture draws.
+second across twenty services would be both wasteful and visibly jittery.
+`Action` therefore covers only `Up`, `Start`, `Down`, `Stop`, `Remove`, `Restart`,
+`Pull` and `Config`, which is exactly the split the architecture draws.
 
 ## Errors come back as values
 
-`dispatch` returns `Result<Outcome, Problem>`, never a formatted string. The core
+`dispatch` returns `Result<Outcome, Box<Problem>>`, never a formatted string. The core
 cannot print, so a surface receives the parts and decides how to show them —
 colour and wrapping in the terminal, an object over HTTP. See
 [error-model.md](error-model.md).
@@ -100,14 +100,17 @@ colour and wrapping in the terminal, an object over HTTP. See
 A fake `Runner` and no daemon:
 
 ```rust
-struct Scripted(Result<Output, Failure>);
+pub struct Scripted(pub Result<Output, Failure>);
 
 #[async_trait]
 impl Runner for Scripted {
     async fn run(&self, _argv: &[String]) -> Result<Output, Failure> { … }
 }
 
-let ctx = Ctx::new(Arc::new(Scripted(Ok(spoke("v2.32.1")))));
+let ctx = a_context()
+    .runner(Arc::new(Scripted(Ok(spoke("v2.32.1\n")))))
+    .engine(Arc::new(Reporting::default()))
+    .build();
 ```
 
 Four cases are covered for `Version` alone: the engine answers, the engine is

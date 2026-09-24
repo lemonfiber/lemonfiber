@@ -5,7 +5,7 @@ default:
 # Turn on the repository's own git hooks. Once per clone.
 hooks:
     git config core.hooksPath .githooks
-    @echo "hooks on: .githooks/pre-push"
+    @echo "hooks on: .githooks/pre-commit, .githooks/commit-msg, .githooks/pre-push"
 
 # Cut and push a release tag, the way the maintainer one-click already does it.
 #

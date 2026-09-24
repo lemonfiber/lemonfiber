@@ -12,7 +12,7 @@ page is about the adapter: `adapters::docker::Daemon`, on `bollard`.
 
 | Port method | Engine route | Why not Compose |
 |-------------|--------------|-----------------|
-| `list` | `GET /containers/json` | One poll per second across nineteen services |
+| `list` | `GET /containers/json` | One poll per second across twenty services |
 | `logs` | `GET /containers/{id}/logs` | Streams, and Compose cannot narrow to a service list |
 | `stats` | `GET /containers/{id}/stats` | Compose has no equivalent |
 | `exec` | `POST /containers/{id}/exec` | The leak test runs the same command in two namespaces |
@@ -92,7 +92,7 @@ a typed `Health`. Neither needs parsing.
 One thing it does not: the **exit code**. It appears only inside the
 human-readable status line, `Exited (137) 2 hours ago`, so that is where it is
 read from. The alternative — inspecting each container — is one request per
-service per refresh, which at a dashboard's rate is nineteen requests a second
+service per refresh, which at a dashboard's rate is twenty requests a second
 to learn one number.
 
 ## Streams become channels

@@ -18,9 +18,6 @@ are about Rust rather than about the product.
 | [surface-parity.md](surface-parity.md) | What each surface reaches, the one intrinsic exception, and the guard that reads the table |
 | [parental-controls.md](parental-controls.md) | Which service carries which half of a limit, the regional rating table, the mapping that stands in for it, and what the media server then shows a restricted member |
 
-Planned as their subsystems land: `render-loop.md`, `vpn-port-forwarding.md`,
-`seed-clients.md`, `compose-construction.md`.
-
 ## The rule of thumb
 
 If a reader needs it to change this code, and it is not a decision about what the

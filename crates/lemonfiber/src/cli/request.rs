@@ -311,7 +311,7 @@ pub enum Request {
     FrontDoor,
     /// Say what each service in this stack is for, and what became of any it dropped.
     ///
-    /// Nineteen names convey nothing on their own. This gives each of them a sentence
+    /// Twenty names convey nothing on their own. This gives each of them a sentence
     /// in plain language — what it does for you, what you lose while it is down, and
     /// how much that loss matters — so a stack you can list becomes a stack you can
     /// judge. Anything the stack used to carry and no longer does is listed after
