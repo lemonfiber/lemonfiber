@@ -17,7 +17,7 @@
 //! nobody has been told about, and the judgement is already available without touching
 //! anything.
 
-use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::{Change, Undo};
 use crate::rollback::{standing, together, Reversal as Judgement};
 
@@ -86,17 +86,13 @@ pub struct Noted {
     pub because: String,
 }
 
-/// Raised when no run carries the stamp a reversal was asked for.
-pub(crate) const NO_SUCH_RUN: Code = Code::new("UNDO-1");
+pub(crate) use crate::error::codes::undo::NO_SUCH_RUN;
 
-/// Raised when a stamp names more than one run, so which to put back is not settled.
-pub(crate) const MORE_THAN_ONE_RUN: Code = Code::new("UNDO-2");
+pub(crate) use crate::error::codes::undo::MORE_THAN_ONE_RUN;
 
-/// Raised when a run cannot be put back, carrying the reason it cannot.
-pub(crate) const CANNOT_SUCCEED: Code = Code::new("UNDO-3");
+pub(crate) use crate::error::codes::undo::CANNOT_SUCCEED;
 
-/// Raised when a run cannot say where lemonfiber's own files are.
-pub(crate) const NOWHERE_TO_LOOK: Code = Code::new("UNDO-4");
+pub(crate) use crate::error::codes::undo::NOWHERE_TO_LOOK;
 
 /// The operation a reversal records its own work under, so it can be put back in turn.
 pub const OPERATION: &str = "undo";

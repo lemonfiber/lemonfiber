@@ -33,18 +33,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::ports::{FileSystem, Runner};
 
-/// Raised when the container engine is confirmed not to start with this machine.
-///
-/// One code for both arrangements it can be. What is not set differs by platform —
-/// Docker Desktop's open-at-login setting on macOS and Windows, the daemon's own unit
-/// on native Linux — and what has gone wrong is the same thing either way: nothing
-/// brings the engine up, so nothing reads the restart policies that would bring the
-/// containers back.
-pub(crate) const ENGINE_NOT_AT_BOOT: Code = Code::new("ENV-4");
+pub(crate) use crate::error::codes::env::ENGINE_NOT_AT_BOOT;
 
 /// The check this reports under, named once so a finding and an answer to it cannot
 /// drift apart on a rename.

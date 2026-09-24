@@ -13,7 +13,7 @@ use serde::Serialize;
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 
-use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 mod locations;
 mod target;
@@ -276,29 +276,21 @@ pub enum Failure {
     },
 }
 
-/// Raised when the container engine cannot be reached.
-pub const ENGINE_UNREACHABLE: Code = Code::new("DOCKER-1");
+pub use lemonfiber_error::codes::docker::ENGINE_UNREACHABLE;
 
-/// Raised when a container that should exist does not.
-pub(crate) const NO_SUCH_CONTAINER: Code = Code::new("DOCKER-2");
+pub(crate) use lemonfiber_error::codes::docker::NO_SUCH_CONTAINER;
 
-/// Raised when the host an endpoint names cannot be found on the network.
-pub(crate) const HOST_UNRESOLVED: Code = Code::new("DOCKER-3");
+pub(crate) use lemonfiber_error::codes::docker::HOST_UNRESOLVED;
 
-/// Raised when the host is found and refuses the connection.
-pub(crate) const HOST_REFUSED: Code = Code::new("DOCKER-4");
+pub(crate) use lemonfiber_error::codes::docker::HOST_REFUSED;
 
-/// Raised when the host is reached and will not accept the SSH login.
-pub(crate) const LOGIN_REJECTED: Code = Code::new("DOCKER-5");
+pub(crate) use lemonfiber_error::codes::docker::LOGIN_REJECTED;
 
-/// Raised when an endpoint names a transport this build cannot drive.
-pub(crate) const ENDPOINT_UNSUPPORTED: Code = Code::new("DOCKER-6");
+pub(crate) use lemonfiber_error::codes::docker::ENDPOINT_UNSUPPORTED;
 
-/// Raised when a named Docker context is not one this machine records.
-pub(crate) const UNKNOWN_CONTEXT: Code = Code::new("DOCKER-7");
+pub(crate) use lemonfiber_error::codes::docker::UNKNOWN_CONTEXT;
 
-/// Raised when a remote host does not answer for a reason nothing here recognises.
-pub(crate) const HOST_SILENT: Code = Code::new("DOCKER-8");
+pub(crate) use lemonfiber_error::codes::docker::HOST_SILENT;
 
 /// What to tell an operator whose engine is not answering at all.
 ///

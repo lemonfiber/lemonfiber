@@ -28,7 +28,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_error::{Code, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Problem, Remedy, Severity, State};
 
 use crate::doctor::BUNDLED_CHECKS;
 use crate::plugin::{Install, Installed, Installs, Register};
@@ -102,29 +102,21 @@ pub enum Asked {
     },
 }
 
-/// The source names no plugin this build can read.
-const UNREADABLE: Code = Code::new("PLUGIN-2");
+use crate::error::codes::plugin::UNREADABLE;
 
-/// The manifest is read and this build refuses what it declares.
-const REFUSED: Code = Code::new("PLUGIN-3");
+use crate::error::codes::plugin::REFUSED;
 
-/// The record of what is installed cannot be read.
-const UNRECORDED: Code = Code::new("PLUGIN-4");
+use crate::error::codes::plugin::UNRECORDED;
 
-/// The plugin is installed already.
-const ALREADY: Code = Code::new("PLUGIN-5");
+use crate::error::codes::plugin::ALREADY;
 
-/// There is no stack on this machine to put a plugin's container in.
-pub(crate) const NOWHERE: Code = Code::new("PLUGIN-6");
+pub(crate) use crate::error::codes::plugin::NOWHERE;
 
-/// A directory or a document the install decided on would not land.
-pub(crate) const UNWRITABLE: Code = Code::new("PLUGIN-7");
+pub(crate) use crate::error::codes::plugin::UNWRITABLE;
 
-/// The wiring went down and the record of what is installed did not.
-const UNRECORDABLE: Code = Code::new("PLUGIN-8");
+use crate::error::codes::plugin::UNRECORDABLE;
 
-/// The plugin's own service would not start, so nothing about it could be proved.
-pub(crate) const UNPROVED: Code = Code::new("PLUGIN-9");
+pub(crate) use crate::error::codes::plugin::UNPROVED;
 
 /// What is installed, and what installing one came to.
 ///

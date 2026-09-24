@@ -134,7 +134,7 @@ mod tests {
         // A failed egress comparison blocks; a check nobody could run is not evidence of
         // a leak, but neither is it proof.
         let problem = crate::error::Problem::unknown(
-            crate::error::Code::new("VPN-1"),
+            crate::error::codes::vpn::LEAKING,
             crate::error::Severity::Error,
             "traffic is leaving outside the tunnel",
             "the two ends report different addresses",

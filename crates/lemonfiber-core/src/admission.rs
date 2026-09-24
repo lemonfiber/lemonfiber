@@ -47,7 +47,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::store::{self, Failure};
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::ports::random::Random;
 use crate::PRODUCT;
 
@@ -65,11 +65,9 @@ const SALT_BYTES: usize = 16;
 /// side of it is a machine that never gets bored, not a person who gives up.
 pub const LEAST: usize = 12;
 
-/// Raised when a password is too short to stand in front of this.
-pub(crate) const TOO_SHORT: Code = Code::new("ADMIT-1");
+pub(crate) use crate::error::codes::admit::TOO_SHORT;
 
-/// Raised when this machine will not supply the salt a record is made with.
-pub(crate) const NO_SALT: Code = Code::new("ADMIT-2");
+pub(crate) use crate::error::codes::admit::NO_SALT;
 
 /// The operator's password, as it is kept: something that proves an answer right
 /// and holds no answer.

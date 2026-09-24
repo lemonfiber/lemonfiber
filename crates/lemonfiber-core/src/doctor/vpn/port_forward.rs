@@ -8,12 +8,11 @@ use super::VpnCheck;
 use super::NOT_ENABLED;
 use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::docker::{Container, Engine};
 use lemonfiber_manifest::Manifest;
 
-/// Raised when port forwarding was asked for but the provider granted no port.
-pub const NO_FORWARDED_PORT: Code = Code::new("VPN-4");
+pub use crate::error::codes::vpn::NO_FORWARDED_PORT;
 
 /// What the gateway's forwarded-port status file amounted to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

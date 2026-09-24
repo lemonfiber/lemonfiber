@@ -28,18 +28,16 @@ use std::time::Duration;
 
 use tokio::time::{timeout, Instant};
 
-use crate::error::{Code, Remedy};
+use crate::error::Remedy;
 
 use super::leak::Reach;
 use super::probe::running;
 use super::Verdict;
 use crate::ports::docker::Container;
 
-/// The code a stack whose traffic survives its tunnel earns.
-pub const KILLSWITCH_LEAKS: Code = Code::new("VPN-5");
+pub use crate::error::codes::vpn::KILLSWITCH_LEAKS;
 
-/// The code a stack whose tunnel could not be put back earns.
-pub const TUNNEL_NOT_RESTORED: Code = Code::new("VPN-6");
+pub use crate::error::codes::vpn::TUNNEL_NOT_RESTORED;
 
 /// Seconds the download client is given to answer while the tunnel is down.
 const PROBE_SECONDS: u64 = 5;

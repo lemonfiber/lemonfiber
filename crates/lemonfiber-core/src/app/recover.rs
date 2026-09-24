@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::config::store;
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy, Severity};
 use crate::journal::{is_sealed, kept, Action, Change, Journal, Seal, Undo};
 use crate::ports::random::Random;
 use crate::ports::service::Client as _;
@@ -483,14 +483,11 @@ fn not_put_back(settings: &[String]) -> Problem {
     .with_detail(settings.join(", "))
 }
 
-/// Raised when a directory from an interrupted apply could not be removed.
-pub(crate) const NOT_REMOVED: Code = Code::new("SETUP-3");
+pub(crate) use crate::error::codes::setup::NOT_REMOVED;
 
-/// Raised when a region a reversal would take out of a stack file cannot be.
-pub(crate) const NOT_WITHDRAWN: Code = Code::new("SETUP-12");
+pub(crate) use crate::error::codes::setup::NOT_WITHDRAWN;
 
-/// Raised when reversing needs the service that made a change.
-pub(crate) const NEEDS_SERVICE: Code = Code::new("SETUP-4");
+pub(crate) use crate::error::codes::setup::NEEDS_SERVICE;
 
 /// The problem naming the credentials a reversal could not read back.
 ///
@@ -515,11 +512,9 @@ fn not_opened(settings: &[String]) -> Problem {
     .with_detail(settings.join(", "))
 }
 
-/// Raised when a reversal would write over a setting the operator has since chosen.
-pub(crate) const NOT_PUT_BACK: Code = Code::new("SETUP-9");
+pub(crate) use crate::error::codes::setup::NOT_PUT_BACK;
 
-/// Raised when a reversal meets a credential whose sealed record will not open.
-pub const NOT_OPENED: Code = Code::new("SETUP-10");
+pub use crate::error::codes::setup::NOT_OPENED;
 
 /// The problem naming the directories a reversal left because something this run did not
 /// put there is inside them.
@@ -545,8 +540,7 @@ fn left_holding(paths: &[String]) -> Problem {
     .with_detail(paths.join(", "))
 }
 
-/// Raised when a directory a reversal would remove still holds something else's files.
-pub(crate) const STILL_HOLDING: Code = Code::new("SETUP-11");
+pub(crate) use crate::error::codes::setup::STILL_HOLDING;
 
 #[cfg(test)]
 mod tests {

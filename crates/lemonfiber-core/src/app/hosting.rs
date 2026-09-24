@@ -17,21 +17,18 @@
 //! asked to guard a volume this afternoon has not asked for something on their
 //! machine that starts at every login.
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{Changed, HostedCommand, Hosting, HostingReport};
 use crate::ports::hosting::{Held, Hosted, Manager, Standing};
 
 use super::command::{Hostable, Keeping, HOSTABLE};
 use super::Ctx;
 
-/// Raised when this machine will not say where it keeps its own files.
-pub(crate) const NOWHERE_TO_WRITE: Code = Code::new("HOST-4");
+pub(crate) use crate::error::codes::host::NOWHERE_TO_WRITE;
 
-/// Raised when this run cannot say where its own program is.
-pub(crate) const NO_PROGRAM: Code = Code::new("HOST-5");
+pub(crate) use crate::error::codes::host::NO_PROGRAM;
 
-/// Raised when the guard is to be hosted against nothing.
-pub(crate) const NOTHING_NAMED_TO_GUARD: Code = Code::new("HOST-6");
+pub(crate) use crate::error::codes::host::NOTHING_NAMED_TO_GUARD;
 
 /// What a systemd user session does not do, said before it is relied on.
 const UNTIL_LOGOUT: &str = "A user service runs while you are logged in. Surviving a logout \

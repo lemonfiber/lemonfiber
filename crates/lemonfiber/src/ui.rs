@@ -40,7 +40,7 @@ use lemonfiber_api::guard::{Binding, Token};
 use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State as Standing};
+use lemonfiber_core::error::{Problem, Remedy, Severity, State as Standing};
 use lemonfiber_core::frontend::Source;
 use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::PRODUCT;
@@ -51,8 +51,7 @@ use crate::say::say;
 use crate::ui::reach::{address, held, permitted, unauthenticated, Offered, Reach};
 use crate::ui::said::{announcement, opening, reverted, Browser};
 
-/// Raised when this machine will not supply the randomness a token is made of.
-const NO_TOKEN: Code = Code::new("SERVE-2");
+use lemonfiber_core::error::codes::serve::NO_TOKEN;
 
 /// What `ui` was asked for.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

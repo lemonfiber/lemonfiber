@@ -19,7 +19,7 @@ use serde::Serialize;
 use crate::archive::{Archive, Fault, Space};
 use crate::backup::{self, Manifest, Pace, Retention, Scope};
 use crate::config::paths::Paths;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 use crate::app::{quiesced, Ctx};
 
@@ -27,20 +27,15 @@ use crate::app::{quiesced, Ctx};
 /// disk it exists to protect.
 const HEADROOM: u64 = 256 * 1024 * 1024;
 
-/// Raised when there is not enough room to write a backup.
-pub(crate) const NO_ROOM: Code = Code::new("BACKUP-1");
+pub(crate) use crate::error::codes::backup::NO_ROOM;
 
-/// Raised when the backup archive could not be written.
-pub(crate) const NOT_WRITTEN: Code = Code::new("BACKUP-2");
+pub(crate) use crate::error::codes::backup::NOT_WRITTEN;
 
-/// Raised when the room for a backup could not be measured.
-pub(crate) const NOT_MEASURED: Code = Code::new("BACKUP-3");
+pub(crate) use crate::error::codes::backup::NOT_MEASURED;
 
-/// Raised when a capture could not be shown that nothing is writing to a database.
-pub(crate) const STILL_RUNNING: Code = Code::new("BACKUP-4");
+pub(crate) use crate::error::codes::backup::ASKED as STILL_RUNNING;
 
-/// Raised when this run has nowhere it knows to keep an archive.
-pub const NOWHERE_TO_KEEP: Code = Code::new("BACKUP-5");
+pub use crate::error::codes::backup::NOWHERE_TO_KEEP;
 
 /// How many backups of each scope are kept before the oldest are pruned.
 ///

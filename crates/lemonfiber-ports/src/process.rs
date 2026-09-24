@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::{channel, Receiver};
 
-use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// What a finished process left behind.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,11 +49,9 @@ pub enum Failure {
     },
 }
 
-/// Raised when the program a subprocess needs is missing.
-pub const MISSING_PROGRAM: Code = Code::new("PROC-1");
+pub use lemonfiber_error::codes::proc::MISSING_PROGRAM;
 
-/// Raised when a program exists but will not start.
-pub(crate) const UNUSABLE_PROGRAM: Code = Code::new("PROC-2");
+pub(crate) use lemonfiber_error::codes::proc::UNUSABLE_PROGRAM;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

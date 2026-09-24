@@ -16,15 +16,13 @@
 use serde::Serialize;
 
 use crate::archive::Fault;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 use super::Ctx;
 
-/// Raised when this run has nowhere it knows to look for archives.
-pub(crate) const NOWHERE_KEPT: Code = Code::new("BACKUP-6");
+pub(crate) use crate::error::codes::backup::NOWHERE_KEPT;
 
-/// Raised when the directory the archives are kept in could not be read.
-pub(crate) const NOT_LISTED: Code = Code::new("BACKUP-7");
+pub(crate) use crate::error::codes::backup::NOT_LISTED;
 
 /// The archives this machine has kept.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]

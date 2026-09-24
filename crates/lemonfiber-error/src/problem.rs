@@ -10,13 +10,23 @@ use serde::{Deserialize, Serialize};
 /// A stable identifier for a kind of problem.
 ///
 /// Stability is the whole point: an operator who searches for a code should find
-/// the same answer a year later. Codes are declared as constants beside the code
-/// that raises them, and are never recycled.
+/// the same answer a year later. Every code is declared in [`crate::codes`], and a
+/// code is never recycled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, schemars::JsonSchema)]
 pub struct Code(&'static str);
 
 impl Code {
-    /// Declare a problem code.
+    /// A code as the registry declares it.
+    pub(crate) const fn declared(id: &'static str) -> Self {
+        Self(id)
+    }
+
+    /// A code no problem lemonfiber raises carries, for a test that needs one.
+    ///
+    /// Present only in a build with the `testing` feature, which the workspace's
+    /// crates take as a development dependency, so a code declared anywhere but
+    /// [`crate::codes`] does not build.
+    #[cfg(any(test, feature = "testing"))]
     #[must_use]
     pub const fn new(id: &'static str) -> Self {
         Self(id)

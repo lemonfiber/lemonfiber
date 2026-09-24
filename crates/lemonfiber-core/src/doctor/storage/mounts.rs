@@ -26,13 +26,11 @@
 //! answerable, so `lemonfiber doctor --accept storage.single-mount` settles it once and
 //! it stops leading afterwards, the way running torrents with no tunnel does.
 
-use super::{finding, Code, Finding, Problem, Remedy, Severity, State, Verdict};
+use super::{finding, Finding, Problem, Remedy, Severity, State, Verdict};
 use crate::stack::mounts::Crowded;
 use crate::storage::COPY_CONSEQUENCE;
 
-/// Raised where a service would see more than one mount beneath the data location,
-/// so anything imported between them is copied rather than linked.
-pub const SPLIT_MOUNTS: Code = Code::new("STORAGE-7");
+pub use crate::error::codes::storage::SPLIT_MOUNTS;
 
 /// The name these findings are given.
 const CHECK: &str = "storage.single-mount";

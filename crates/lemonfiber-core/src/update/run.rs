@@ -22,7 +22,7 @@ mod staging;
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::migration::{pins, Ours};
 use crate::model::StackEdit;
 use crate::plural::s;
@@ -31,17 +31,13 @@ use crate::update::{self, Applied, Change, State as Standing};
 use crate::app::engine::{in_flight, Interrupted};
 use crate::app::{Ctx, Waiting};
 
-/// Raised when what this machine has pulled could not be read.
-pub(crate) const NOT_CHECKED: Code = Code::new("UPDATE-1");
+pub(crate) use crate::error::codes::update::NOT_CHECKED;
 
-/// Raised when the service an update was narrowed to is not one the stack declares.
-pub(crate) const NO_SUCH_SERVICE: Code = Code::new("UPDATE-2");
+pub(crate) use crate::error::codes::update::NO_SUCH_SERVICE;
 
-/// Raised when transfers are still in flight and the run was not asked to wait.
-pub(crate) const STILL_TRANSFERRING: Code = Code::new("UPDATE-3");
+pub(crate) use crate::error::codes::update::STILL_TRANSFERRING;
 
-/// Raised when the stack came down for the capture and the capture would not write.
-pub(crate) const CAPTURE_LEFT_IT_DOWN: Code = Code::new("UPDATE-4");
+pub(crate) use crate::error::codes::update::CAPTURE_LEFT_IT_DOWN;
 
 /// What was asked of an update.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -12,35 +12,25 @@
 //! limits, which is exactly the distinction that matters: an operator who read a full
 //! disk as somebody's quota would go and raise a quota and watch it happen again.
 
-use crate::error::{Amiss, Code, Problem, Remedy, Severity};
+use crate::error::{Amiss, Problem, Remedy, Severity};
 
-/// Raised where the request service would not answer, so nothing was changed.
-pub const UNREACHABLE: Code = Code::new("QUOTA-1");
+pub use crate::error::codes::quota::UNREACHABLE;
 
-/// Raised where a policy that lives inside a limit was chosen without one.
-pub const NO_LIMIT: Code = Code::new("QUOTA-2");
+pub use crate::error::codes::quota::NO_LIMIT;
 
-/// Raised where no policy goes by the word that was given.
-pub(crate) const NO_SUCH_POLICY: Code = Code::new("QUOTA-3");
+pub(crate) use crate::error::codes::quota::NO_SUCH_POLICY;
 
-/// Raised where the request named is not one that is waiting on anybody.
-pub(crate) const NOT_WAITING: Code = Code::new("QUOTA-4");
+pub(crate) use crate::error::codes::quota::NOT_WAITING;
 
-/// Raised where a request was turned down and the reason said nothing.
-pub(crate) const NO_REASON: Code = Code::new("QUOTA-5");
+pub(crate) use crate::error::codes::quota::NO_REASON;
 
-/// Raised where nobody in the household goes by the name that was given.
-pub(crate) const NOBODY: Code = Code::new("QUOTA-6");
+pub(crate) use crate::error::codes::quota::NOBODY;
 
-/// Raised where the request service holds no account for somebody who has one here.
-pub(crate) const NEVER_HERE: Code = Code::new("QUOTA-7");
+pub(crate) use crate::error::codes::quota::NEVER_HERE;
 
-/// Raised where a run was asked to close what has waited too long and the household has
-/// never said how long that is.
-pub(crate) const NOTHING_AGREED: Code = Code::new("QUOTA-8");
+pub(crate) use crate::error::codes::quota::NOTHING_AGREED;
 
-/// Raised where the period named would close a request nobody was ever reminded about.
-pub(crate) const TOO_SOON: Code = Code::new("QUOTA-9");
+pub(crate) use crate::error::codes::quota::TOO_SOON;
 
 /// Said where the request service could not be asked or would not answer.
 ///

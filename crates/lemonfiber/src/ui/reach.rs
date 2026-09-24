@@ -24,15 +24,13 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State};
+use lemonfiber_core::error::{Problem, Remedy, Severity, State};
 use lemonfiber_core::PRODUCT;
 use tokio::net::TcpListener;
 
-/// Raised when the address the surface was asked to serve on cannot be taken.
-const ADDRESS_TAKEN: Code = Code::new("SERVE-1");
+use lemonfiber_core::error::codes::serve::ADDRESS_TAKEN;
 
-/// Raised when the network was asked for and nothing here can say who is knocking.
-const NO_PASSWORD: Code = Code::new("SERVE-3");
+use lemonfiber_core::error::codes::serve::NO_PASSWORD;
 
 /// How far this surface was asked to be reachable.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

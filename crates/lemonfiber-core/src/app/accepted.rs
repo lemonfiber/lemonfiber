@@ -23,13 +23,12 @@ use std::path::PathBuf;
 
 use crate::doctor::acknowledged::{suppressing, Accepted};
 use crate::doctor::Verdict;
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy, Severity};
 use crate::model::DoctorReport;
 
 use super::Ctx;
 
-/// Raised when an answer names something nothing is warning about.
-const NOT_WARNED: Code = Code::new("ACK-1");
+use crate::error::codes::ack::NOT_WARNED;
 
 /// What the operator has answered, or nothing where they have answered nothing.
 #[must_use]
@@ -239,7 +238,7 @@ mod tests {
             check,
             "Torrent traffic is contained",
             crate::doctor::Verdict::Warn(crate::error::Problem::new(
-                crate::error::Code::new("VPN-8"),
+                crate::error::codes::vpn::NO_TUNNEL,
                 crate::error::Severity::Warning,
                 "Torrent traffic is not contained by a VPN",
                 "It leaves under this connection's own address.",
@@ -320,7 +319,7 @@ mod tests {
             "vpn.egress-match",
             "The tunnel",
             crate::doctor::Verdict::Fail(crate::error::Problem::new(
-                crate::error::Code::new("VPN-1"),
+                crate::error::codes::vpn::LEAKING,
                 crate::error::Severity::Critical,
                 "Traffic is leaving outside the tunnel",
                 "Every torrent is visible under this machine's own address.",

@@ -25,7 +25,7 @@ pub(crate) use telling::told;
 
 use crate::config::paths::Paths;
 use crate::doctor::{Check, Finding};
-use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::Undo;
 use crate::repair::{self, Outcome, Repair, Stance, Writing};
 
@@ -274,11 +274,9 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
     Ok(undos.into_iter().map(told).collect())
 }
 
-/// Raised when a run cannot say where lemonfiber's own files are.
-pub(crate) const NOWHERE_TO_LOOK: Code = Code::new("REPAIR-2");
+pub(crate) use crate::error::codes::repair::NOWHERE_TO_LOOK;
 
-/// Raised when a run that may not act was asked for the checks that disturb.
-pub const OFFER_CANNOT_DISTURB: Code = Code::new("REPAIR-3");
+pub use crate::error::codes::repair::OFFER_CANNOT_DISTURB;
 
 pub use crate::app::putting_back::{Left, Reversal};
 
@@ -427,12 +425,12 @@ mod tests {
     use crate::app::fixtures::ctx_at;
     use crate::condition::{Conditions, Fault};
     use crate::doctor::{Category, Finding, Verdict};
-    use crate::error::{Code, Problem, Remedy, Severity};
+    use crate::error::{Problem, Remedy, Severity};
     use crate::repair::{Attempt, Outcome, Repair, ATTEMPTS};
 
     fn problem() -> Problem {
         Problem::new(
-            Code::new("VPN-7"),
+            crate::error::codes::vpn::PORT_MISMATCH,
             Severity::Warning,
             "it is on the wrong port",
             "peers cannot reach it",

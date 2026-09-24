@@ -21,35 +21,26 @@ use async_trait::async_trait;
 use lemonfiber_manifest::Date;
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Remedy};
+use crate::error::Remedy;
 use crate::ports::service::{Failure, Indexers, UsenetAccounts};
 
-/// Raised when an account has nothing left to serve.
-pub(crate) const PROVIDER_EMPTY: Code = Code::new("PROVIDER-1");
+pub(crate) use crate::error::codes::provider::PROVIDER_EMPTY;
 
-/// Raised when an account is running out, with time left to act.
-pub(crate) const PROVIDER_LOW: Code = Code::new("PROVIDER-2");
+pub(crate) use crate::error::codes::provider::PROVIDER_LOW;
 
-/// Raised when the subscription behind an account ends soon.
-pub(crate) const PROVIDER_ENDING: Code = Code::new("PROVIDER-3");
+pub(crate) use crate::error::codes::provider::PROVIDER_ENDING;
 
-/// Raised when an account refuses the credential the client offers it.
-pub(crate) const PROVIDER_REFUSED: Code = Code::new("PROVIDER-6");
+pub(crate) use crate::error::codes::provider::PROVIDER_REFUSED;
 
-/// Raised when an account has stopped answering the client entirely.
-pub(crate) const PROVIDER_SILENT: Code = Code::new("PROVIDER-7");
+pub(crate) use crate::error::codes::provider::PROVIDER_SILENT;
 
-/// Raised when the client is set to open more connections than an account allows.
-pub(crate) const PROVIDER_CROWDED: Code = Code::new("PROVIDER-8");
+pub(crate) use crate::error::codes::provider::PROVIDER_CROWDED;
 
-/// Raised when an indexer has been failing and its aggregator has rested it.
-pub(crate) const INDEXER_RESTED: Code = Code::new("PROVIDER-4");
+pub(crate) use crate::error::codes::provider::INDEXER_RESTED;
 
-/// Raised when every indexer is failing at once.
-pub(crate) const INDEXERS_ALL_FAILING: Code = Code::new("PROVIDER-5");
+pub(crate) use crate::error::codes::provider::INDEXERS_ALL_FAILING;
 
-/// Raised when an indexer has spent the allowance recorded against it.
-pub(crate) const INDEXER_CAPPED: Code = Code::new("PROVIDER-9");
+pub(crate) use crate::error::codes::provider::INDEXER_CAPPED;
 
 /// Reports on the accounts behind the stack: what they have left, and whether they
 /// are still serving it.

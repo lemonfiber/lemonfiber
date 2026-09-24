@@ -30,18 +30,15 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::doctor::credentials::Target;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{QualityReleases, ReleaseProbe};
 use crate::recyclarr::Kind;
 
-/// Raised when releases exist but the profile — the chosen quality included — wants
-/// none of them.
-pub const PRESET_UNMET: Code = Code::new("QUAL-2");
+pub use crate::error::codes::qual::PRESET_UNMET;
 
-/// Raised when a clean search turns up nothing at all for wanted content.
-pub const NONE_AVAILABLE: Code = Code::new("QUAL-3");
+pub use crate::error::codes::qual::NONE_AVAILABLE;
 
 /// The id under which the check reports where there is nothing to run it against.
 const NONE: &str = "services.releases";

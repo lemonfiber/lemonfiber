@@ -34,6 +34,7 @@ tokio = { workspace = true }
 chacha20poly1305 = { workspace = true }
 
 [dev-dependencies]
+lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes both this crate's own tests and its integration tests drive the real code
 # through. It depends on `lemonfiber-ports` alone, so there is no cycle back to here.
 lemonfiber-fixtures = { workspace = true }

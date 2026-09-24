@@ -18,12 +18,11 @@
 //! This is a race and replay guard, not a permission. Whoever can send the second
 //! request could have sent the first.
 
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 use super::Preview;
 
-/// Raised when consent was given for a listing that no longer stands.
-pub const MOVED_ON: Code = Code::new("RESTORE-11");
+pub use crate::error::codes::restore::MOVED_ON;
 
 /// How much of a restore this run was given consent for.
 ///

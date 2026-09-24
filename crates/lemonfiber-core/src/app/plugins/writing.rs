@@ -213,8 +213,7 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
     }
 }
 
-/// Raised when a plugin's service would answer on a label another plugin's already does.
-pub(crate) const ANSWERED: lemonfiber_error::Code = lemonfiber_error::Code::new("PLUGIN-13");
+pub(crate) use crate::error::codes::plugin::ANSWERED;
 
 /// Refuse a plugin one of whose services would answer on a label another installed
 /// plugin's service already answers on, before anything is written.

@@ -30,7 +30,7 @@
 //! reports the report it would have filled in and stops short of the one irreversible
 //! step. See `.docs/architecture/rehearsal.md`.
 
-use lemonfiber_error::{Amiss, Code, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Amiss, Problem, Remedy, Severity, State};
 
 use super::command::{Asking, Keeping, Linking, MigrateAction};
 use super::disturbance::Situation;
@@ -39,8 +39,7 @@ use super::plugins;
 use super::setup::SetupAction;
 use super::{repair, restore, update, Command, Ctx};
 
-/// The flag cannot be honoured by this command, and never will be.
-const CANNOT: Code = Code::new("REHEARSE-1");
+use crate::error::codes::rehearse::CANNOT;
 
 /// Why a search cannot be rehearsed.
 ///
@@ -62,8 +61,7 @@ const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observ
      what it reports is what this stack actually did with a real item, which cannot be \
      known without asking it to";
 
-/// The flag is not honoured by this command yet.
-const NOT_YET: Code = Code::new("REHEARSE-2");
+use crate::error::codes::rehearse::NOT_YET;
 
 /// What a rehearsal means for one command.
 #[derive(Clone, Copy, PartialEq, Eq)]

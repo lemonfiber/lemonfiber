@@ -295,8 +295,7 @@ fn nothing_to_recover() -> Problem {
     .lies_in(Amiss::Asking)
 }
 
-/// Raised when a recovery is asked for and no apply stopped part-way.
-pub(crate) const NOTHING_TO_RECOVER: Code = Code::new("SETUP-8");
+pub(crate) use crate::error::codes::setup::NOTHING_TO_RECOVER;
 
 /// The problem of answering setup on a machine that already holds configuration.
 fn already_set_up() -> Problem {
@@ -312,8 +311,7 @@ fn already_set_up() -> Problem {
     .lies_in(Amiss::Asking)
 }
 
-/// Raised when setup is answered on a machine that is already set up.
-pub const ALREADY_SET_UP: Code = Code::new("SETUP-7");
+pub use crate::error::codes::setup::ALREADY_SET_UP;
 
 #[cfg(test)]
 mod tests {

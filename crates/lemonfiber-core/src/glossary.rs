@@ -29,7 +29,7 @@
 
 use serde::Serialize;
 
-use crate::error::{Amiss, Code, Problem, Remedy, Severity};
+use crate::error::{Amiss, Problem, Remedy, Severity};
 
 /// A word this product uses, and what somebody meeting it needs to know.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -326,7 +326,7 @@ pub fn vocabulary() -> Vocabulary {
 pub fn unrecognised(word: &str) -> Problem {
     let words: Vec<&str> = TERMS.iter().map(|term| term.word).collect();
     Problem::new(
-        Code::new("WORD-1"),
+        crate::error::codes::word::UNRECOGNISED,
         Severity::Error,
         format!("`{word}` is not one of the words this product explains"),
         "What is explained here is this ecosystem's own vocabulary — the words that \

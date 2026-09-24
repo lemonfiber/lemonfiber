@@ -11,13 +11,12 @@
 //! else; it reports what a confirmed run would take rather than taking it.
 
 use crate::config::paths::Paths;
-use crate::error::{Amiss, Code, Problem, Remedy, Severity};
+use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::stored::{stored, Left, Removal, Stored};
 
 use crate::app::Ctx;
 
-/// Raised when this run does not know where lemonfiber's own files go.
-pub(crate) const NOWHERE_KNOWN: Code = Code::new("KEPT-1");
+pub(crate) use crate::error::codes::kept::NOWHERE_KNOWN;
 
 /// What lemonfiber keeps on this machine, listed and not touched.
 ///

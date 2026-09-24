@@ -21,12 +21,11 @@ use async_trait::async_trait;
 
 use super::storage::LOW_SPACE_FLOOR;
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::filesystem::FileSystem;
 use crate::quality::Preset;
 
-/// Raised when the free space holds too little content at the chosen quality.
-pub(crate) const HEADROOM_LOW: Code = Code::new("QUAL-1");
+pub(crate) use crate::error::codes::qual::HEADROOM_LOW;
 
 /// The hours of content a projection takes as a starter-library floor — roughly a
 /// dozen films and a couple of seasons. A heuristic, deliberately modest: the check

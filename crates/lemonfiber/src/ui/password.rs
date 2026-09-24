@@ -17,14 +17,13 @@ use std::path::Path;
 
 use lemonfiber_core::admission::{credential, Credential};
 use lemonfiber_core::config::store::Failure;
-use lemonfiber_core::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
+use lemonfiber_core::error::{Diagnose as _, Problem, Remedy, Severity, State};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::PRODUCT;
 
 use crate::prompt::Answers;
 
-/// Raised when the two answers were not the same word.
-const MISTYPED: Code = Code::new("ADMIT-3");
+use lemonfiber_core::error::codes::admit::MISTYPED;
 
 /// What is asked above the first answer.
 const ASKS: &str = "A password for the web interface:";

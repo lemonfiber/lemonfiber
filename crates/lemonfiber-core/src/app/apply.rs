@@ -27,7 +27,7 @@ use crate::autostart::Returning;
 use crate::baseline::Baseline;
 use crate::config::paths::Paths;
 use crate::config::store::{self, is_secret};
-use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind, Seal};
 use crate::ports::random::Random;
 use crate::quality::{Preset, Selection};
@@ -347,11 +347,9 @@ fn lines(journal: &Journal, seal: &Seal, random: &dyn Random) -> String {
         .join("\n")
 }
 
-/// Raised when apply is asked for before the answers have been reviewed.
-pub(crate) const NOT_REVIEWED: Code = Code::new("SETUP-1");
+pub(crate) use crate::error::codes::setup::NOT_REVIEWED;
 
-/// Raised when the operator's chosen data directory cannot be created.
-pub(crate) const DIR_NOT_MADE: Code = Code::new("SETUP-2");
+pub(crate) use crate::error::codes::setup::DIR_NOT_MADE;
 
 /// The problem of applying before review — nothing is settled to write.
 ///

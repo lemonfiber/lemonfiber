@@ -100,7 +100,7 @@ async fn chosen(
 /// does not exist when what happened is that nobody could ask.
 fn no_libraries_read() -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("INVITE-6"),
+        crate::error::codes::invite::NO_LIBRARIES_READ,
         crate::error::Severity::Error,
         "the media server would not say what libraries it holds, so nobody was invited",
         "Choosing which libraries somebody may open starts by finding them, and that \
@@ -115,7 +115,7 @@ fn no_libraries_read() -> crate::error::Problem {
 fn no_such_library(named: &str, held: &[NamedLibrary]) -> crate::error::Problem {
     let there: Vec<&str> = held.iter().map(|library| library.name.as_str()).collect();
     crate::error::Problem::new(
-        crate::error::Code::new("INVITE-7"),
+        crate::error::codes::invite::NO_SUCH_LIBRARY,
         crate::error::Severity::Error,
         format!("this media server holds no library called {named}, so nobody was invited"),
         "Libraries are named the way the media server's own screens name them, though \
@@ -132,7 +132,7 @@ fn no_such_library(named: &str, held: &[NamedLibrary]) -> crate::error::Problem 
 /// to go and narrow an account that is already there.
 pub(crate) fn would_not_allow(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("INVITE-8"),
+        crate::error::codes::invite::WOULD_NOT_ALLOW,
         crate::error::Severity::Error,
         format!("{name} has an account, but the media server would not set what it may watch"),
         "The account exists and is open — every library, no age limit — so it is not an \

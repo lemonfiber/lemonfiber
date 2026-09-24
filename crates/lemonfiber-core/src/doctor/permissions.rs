@@ -25,11 +25,10 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::config::paths::Paths;
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 
-/// Raised when a file holding a credential can be read by more than its owner.
-pub(crate) const CREDENTIALS_EXPOSED: Code = Code::new("CONFIG-4");
+pub(crate) use crate::error::codes::config::CREDENTIALS_EXPOSED;
 
 /// The permission bits that grant anyone but the owner anything at all.
 const BEYOND_THE_OWNER: u32 = 0o077;

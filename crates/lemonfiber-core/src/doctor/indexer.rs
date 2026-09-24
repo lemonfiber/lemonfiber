@@ -27,14 +27,12 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::config::Indexer;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::validate::{Credential, Validation, Validator};
 
-/// Raised when the indexer answers and refuses the key it was given.
-pub(crate) const INDEXER_REJECTED: Code = Code::new("CRED-2");
+pub(crate) use crate::error::codes::cred::INDEXER_REJECTED;
 
-/// Raised when the indexer authenticates the key but cannot serve it right now.
-pub(crate) const INDEXER_LIMITED: Code = Code::new("CRED-3");
+pub(crate) use crate::error::codes::cred::INDEXER_LIMITED;
 
 /// Re-proves the configured indexer against its live service.
 pub struct IndexerCheck {

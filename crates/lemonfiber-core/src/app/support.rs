@@ -20,19 +20,16 @@ use serde::Serialize;
 use crate::error::Amiss;
 
 use crate::bundle::Contents;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 use super::bundle::{collect, measure, unconfirmed, without_marks, write, Wanted};
 use super::Ctx;
 
-/// Raised when this run has nowhere it knows to keep a bundle.
-pub const NOWHERE_TO_KEEP: Code = Code::new("BUNDLE-6");
+pub use crate::error::codes::bundle::NOWHERE_TO_KEEP;
 
-/// Raised when this run has nowhere it knows to look for a bundle it kept.
-pub(crate) const NOWHERE_HELD: Code = Code::new("BUNDLE-7");
+pub(crate) use crate::error::codes::bundle::NOWHERE_HELD;
 
-/// Raised when a name does not name one of the bundles this run kept.
-pub(crate) const NOT_HELD: Code = Code::new("BUNDLE-8");
+pub(crate) use crate::error::codes::bundle::NOT_HELD;
 
 /// Where a bundle is written.
 ///

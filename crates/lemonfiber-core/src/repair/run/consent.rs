@@ -12,13 +12,12 @@
 //! held between the two requests, which is also why a browser tab closed halfway
 //! through leaves nothing half-consented: there is nothing to leave.
 
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy, Severity};
 use crate::repair::{self, Repair, Stance};
 
 use super::{Confirm, Report};
 
-/// Raised when consent was given for an offer that no longer stands.
-pub const STALE: Code = Code::new("REPAIR-1");
+pub use crate::error::codes::repair::STALE;
 
 /// How much of the putting-right this run was given consent for.
 ///

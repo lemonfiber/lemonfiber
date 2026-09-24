@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use super::env::{is_one_line, EnvFile};
-use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// Withholding a credential from text that has no field names to read.
 ///
@@ -359,20 +359,15 @@ pub enum Failure {
     },
 }
 
-/// Raised when configuration exists and cannot be read.
-pub const CONFIG_UNREADABLE: Code = Code::new("CONFIG-1");
+pub use crate::error::codes::config::CONFIG_UNREADABLE;
 
-/// Raised when configuration cannot be written.
-pub const CONFIG_NOT_WRITTEN: Code = Code::new("CONFIG-2");
+pub use crate::error::codes::config::CONFIG_NOT_WRITTEN;
 
-/// Raised when there is nowhere to keep configuration.
-pub(crate) const CONFIG_NOWHERE: Code = Code::new("CONFIG-3");
+pub(crate) use crate::error::codes::config::CONFIG_NOWHERE;
 
-/// Raised when configuration was written by a newer lemonfiber.
-pub(crate) const CONFIG_TOO_NEW: Code = Code::new("CONFIG-5");
+pub(crate) use crate::error::codes::config::CONFIG_TOO_NEW;
 
-/// Raised when a setting's key or value spans more than one line.
-pub(crate) const CONFIG_SPANS_LINES: Code = Code::new("CONFIG-6");
+pub(crate) use crate::error::codes::config::CONFIG_SPANS_LINES;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

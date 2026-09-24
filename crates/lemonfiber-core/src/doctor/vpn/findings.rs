@@ -11,7 +11,7 @@ use super::port_forward::port_forward_offline;
 use super::Pair;
 use super::{Category, Finding, Verdict};
 use crate::config::PortForward;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 pub(super) fn assemble(
     pair: &Pair,
@@ -161,11 +161,9 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
 /// raises it cannot drift apart on a rename.
 pub(super) const PORT_MISMATCH_CHECK: &str = "vpn.port-forward-client";
 
-/// Raised when the client is listening somewhere other than the forwarded port.
-pub(crate) const PORT_MISMATCH: Code = Code::new("VPN-7");
+pub(crate) use crate::error::codes::vpn::PORT_MISMATCH;
 
-/// Raised when torrents are configured with nothing containing them.
-pub(crate) const NO_TUNNEL: Code = Code::new("VPN-8");
+pub(crate) use crate::error::codes::vpn::NO_TUNNEL;
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.

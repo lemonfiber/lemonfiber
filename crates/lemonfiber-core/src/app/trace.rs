@@ -166,7 +166,7 @@ mod tests {
         Reads, TraceReport,
     };
     use crate::doctor::{Category, Finding, Verdict};
-    use crate::error::{Code, Problem, Remedy, Severity};
+    use crate::error::{Problem, Remedy, Severity};
     use crate::jellyfin::Jellyfin;
     use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
     use crate::recyclarr::Kind;
@@ -1263,7 +1263,7 @@ mod tests {
     /// A problem whose summary is what a stall would quote.
     fn problem(summary: &str) -> Problem {
         Problem::new(
-            Code::new("PROVIDER-1"),
+            crate::error::codes::provider::PROVIDER_EMPTY,
             Severity::Warning,
             summary,
             "why it matters",

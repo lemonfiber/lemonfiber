@@ -29,18 +29,13 @@ use lemonfiber_plugin::extension;
 use lemonfiber_plugin::{Contribution, Expect};
 
 use super::{Category, Check, Finding, Reported, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::recorded::Answer;
 use crate::plugin::Installed;
 use crate::ports::http::{self, Http, Method};
 
-/// A check a plugin contributed did not hold.
-///
-/// One code for all of them rather than one per plugin, because a code is a stable
-/// thing an operator searches for and a plugin's own name is not this build's to mint
-/// one from. Which check and which plugin is on the finding, where it can be read.
-pub(crate) const CONTRIBUTED_FAILED: Code = Code::new("PLUGIN-1");
+pub(crate) use crate::error::codes::plugin::CONTRIBUTED_FAILED;
 
 /// Every check an installed plugin adds to the register, ready to be run with the rest.
 ///

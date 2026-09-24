@@ -13,7 +13,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::model::{SupervisionReport, Vigil};
 use crate::ports::filesystem::{Presence, Volume};
 use crate::stack::compose::Action;
@@ -28,12 +28,9 @@ use super::{Ctx, Outcome};
 /// would spin a core to catch an event that arrives in seconds at worst.
 pub const WATCH: Duration = Duration::from_secs(5);
 
-/// Raised when a watch is asked for but no data location is configured to watch.
-pub const NOTHING_TO_WATCH: Code = Code::new("WATCH-1");
+pub use crate::error::codes::watch::NOTHING_TO_WATCH;
 
-/// Raised when the data location is already gone when the watch is asked to
-/// start.
-pub const ALREADY_GONE: Code = Code::new("WATCH-2");
+pub use crate::error::codes::watch::ALREADY_GONE;
 
 /// What a run that only said what a watch would do puts where the ending goes.
 ///

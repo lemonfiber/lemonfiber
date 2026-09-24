@@ -139,7 +139,6 @@ file name is the question; the tests inside it are the ways of asking:
 | `how_long_a_file_may_be.rs` | 550 production lines a shipped file, 1,200 a test file, and the test module declared where the counter stops |
 | `the_one_way_out.rs` | Output leaves through `say.rs`, treated on the way; a failure lands on stderr; what a parser reads is never folded for a person |
 | `each_requirement_is_claimed_once.rs` | Every requirement appears exactly once in the status table |
-| `one_code_one_problem.rs` | An error code an operator searches for means one thing |
 | `what_a_check_can_see.rs` | Every diagnostic check is handed something to ask, and says how long it disturbs the stack for |
 | `a_latch_is_settled_once.rs` | Reading a value settled at startup never settles it |
 | `nothing_shapes_this_machines_traffic.rs` | Nothing shipped reaches for a traffic shaper |

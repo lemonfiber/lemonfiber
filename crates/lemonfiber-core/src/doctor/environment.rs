@@ -17,22 +17,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::docker::Target;
 use crate::ports::process::Failure;
 use crate::ports::Runner;
 
-/// Raised when the Docker client is not installed.
-pub(crate) const DOCKER_ABSENT: Code = Code::new("ENV-1");
+pub(crate) use crate::error::codes::env::DOCKER_ABSENT;
 
-/// Raised when the Docker client is present but its daemon is not answering.
-pub(crate) const DAEMON_DOWN: Code = Code::new("ENV-2");
+pub(crate) use crate::error::codes::env::DAEMON_DOWN;
 
-/// Raised when the Compose plugin is missing or too old to drive.
-pub(crate) const COMPOSE_UNUSABLE: Code = Code::new("ENV-3");
+pub(crate) use crate::error::codes::env::COMPOSE_UNUSABLE;
 
-/// Raised when this machine and the daemon speak different Docker API generations.
-pub(crate) const API_MISMATCH: Code = Code::new("ENV-5");
+pub(crate) use crate::error::codes::env::API_MISMATCH;
 
 /// The oldest Compose the driver is willing to build against.
 ///

@@ -242,20 +242,15 @@ async fn configuration(ctx: &Ctx) -> Option<String> {
 /// disk the operator is already asking for help about.
 const HEADROOM: u64 = 64 * 1024 * 1024;
 
-/// Raised when a bundle would still hold something that reads as a credential.
-pub const BUNDLE_LEAK: Code = Code::new("BUNDLE-1");
+pub use crate::error::codes::bundle::BUNDLE_LEAK;
 
-/// Raised when there is not enough room to write a bundle.
-pub const BUNDLE_NO_ROOM: Code = Code::new("BUNDLE-2");
+pub use crate::error::codes::bundle::BUNDLE_NO_ROOM;
 
-/// Raised when the archive could not be written.
-pub const BUNDLE_UNWRITTEN: Code = Code::new("BUNDLE-3");
+pub use crate::error::codes::bundle::BUNDLE_UNWRITTEN;
 
-/// Raised when a setting was asked to be shown as it is without that being confirmed.
-pub const BUNDLE_UNCONFIRMED: Code = Code::new("BUNDLE-4");
+pub use crate::error::codes::bundle::BUNDLE_UNCONFIRMED;
 
-/// Raised when the machine can offer no randomness to derive stand-ins from.
-pub const BUNDLE_NO_MARKS: Code = Code::new("BUNDLE-5");
+pub use crate::error::codes::bundle::BUNDLE_NO_MARKS;
 
 /// Refuse to show a setting nobody confirmed showing.
 ///

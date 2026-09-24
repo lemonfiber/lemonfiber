@@ -30,20 +30,15 @@ use async_trait::async_trait;
 use lemonfiber_manifest::{Bind, Service};
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::ports::docker::{Container, Engine};
 
-/// Raised when a service the stack calls admin answers somewhere off this machine.
-pub(crate) const BEYOND_LOOPBACK: Code = Code::new("BIND-1");
+pub(crate) use crate::error::codes::bind::BEYOND_LOOPBACK;
 
-/// Raised where a published port is reached without the host's own firewall rules
-/// being consulted.
-pub(crate) const AROUND_THE_FIREWALL: Code = Code::new("BIND-2");
+pub(crate) use crate::error::codes::bind::AROUND_THE_FIREWALL;
 
-/// Raised where an admin service answers off this machine and the operator has
-/// written down that they meant it to.
-pub(crate) const DELIBERATE: Code = Code::new("BIND-3");
+pub(crate) use crate::error::codes::bind::DELIBERATE;
 
 /// The name this check's findings are given.
 const CHECK: &str = "network.bindings";

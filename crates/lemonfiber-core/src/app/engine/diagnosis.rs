@@ -25,15 +25,14 @@ use crate::doctor::telling::TellingCheck;
 use crate::doctor::vpn::VpnCheck;
 use crate::doctor::wiring::WiringCheck;
 use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy, Severity};
 use crate::model::DoctorReport;
 use crate::ports::service::{Indexers, UsenetAccounts};
 
 use crate::app::targets::{committed_bytes, project_directory, servarr_targets};
 use crate::app::Ctx;
 
-/// Raised when a run is narrowed to a check nothing in this stack reports.
-const NO_SUCH_CHECK: Code = Code::new("DIAG-1");
+use crate::error::codes::diag::NO_SUCH_CHECK;
 
 /// Run the diagnostic checks: the whole suite, one category, or one check.
 ///

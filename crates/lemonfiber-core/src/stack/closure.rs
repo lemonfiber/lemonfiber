@@ -20,7 +20,7 @@ pub use lemonfiber_manifest::Protocol;
 use thiserror::Error;
 
 use crate::config::Protocols;
-use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
 
 /// What will be run, and what was left out.
 ///
@@ -363,17 +363,13 @@ fn distance(one: &str, other: &str) -> usize {
     row.last().copied().unwrap_or(edge)
 }
 
-/// Raised when no form was named.
-pub(crate) const NO_FORM_NAMED: Code = Code::new("FORM-1");
+pub(crate) use crate::error::codes::form::NO_FORM_NAMED;
 
-/// Raised when a named form is not declared by the stack.
-pub(crate) const NO_SUCH_FORM: Code = Code::new("FORM-2");
+pub(crate) use crate::error::codes::form::NO_SUCH_FORM;
 
-/// Raised when forms that cannot be combined are named together.
-pub(crate) const FORMS_CONFLICT: Code = Code::new("FORM-3");
+pub(crate) use crate::error::codes::form::FORMS_CONFLICT;
 
-/// Raised when narrowing leaves nothing to run.
-pub(crate) const NOTHING_TO_RUN: Code = Code::new("FORM-4");
+pub(crate) use crate::error::codes::form::NOTHING_TO_RUN;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

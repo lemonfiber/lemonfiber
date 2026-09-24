@@ -28,6 +28,7 @@ serde = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
+lemonfiber-error = { workspace = true, features = ["testing"] }
 # The real seams, for the tests that drive a context against this machine.
 lemonfiber-adapters = { workspace = true }
 # The fakes a command is driven through, so an endpoint is exercised against the

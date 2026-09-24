@@ -21,7 +21,7 @@ use crate::alert::Appetite;
 use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
-use crate::error::{Amiss, Code, Problem, Remedy, Severity};
+use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::validate::{Validation, Validator};
@@ -445,8 +445,7 @@ fn does_not_apply(rejected: Rejected) -> Problem {
     .with_detail(format!("{rejected:?}"))
 }
 
-/// Raised when an answer is not meaningful on the platform setup is running on.
-pub(crate) const DOES_NOT_APPLY: Code = Code::new("SETUP-5");
+pub(crate) use crate::error::codes::setup::DOES_NOT_APPLY;
 
 /// The problem of running setup on a wizard that is no longer gathering answers.
 fn already_underway() -> Problem {
@@ -459,8 +458,7 @@ fn already_underway() -> Problem {
     )
 }
 
-/// Raised when setup is asked to gather answers for a wizard already past it.
-pub(crate) const ALREADY_UNDERWAY: Code = Code::new("SETUP-6");
+pub(crate) use crate::error::codes::setup::ALREADY_UNDERWAY;
 
 #[cfg(test)]
 mod tests {

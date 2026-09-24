@@ -52,18 +52,13 @@ pub use limit::{Limit, Resolved};
 pub use respite::Respite;
 pub use rhythm::{Period, Rhythm, Wall};
 
-/// Raised when a limit is expressed as a share of a line nothing has measured.
-pub(crate) const NOTHING_MEASURED: crate::error::Code = crate::error::Code::new("RATE-1");
+pub(crate) use crate::error::codes::rate::NOTHING_MEASURED;
 
-/// Raised when a schedule is asked for and nothing says which zone the clients
-/// would read it in.
-pub(crate) const NO_ZONE: crate::error::Code = crate::error::Code::new("RATE-2");
+pub(crate) use crate::error::codes::rate::NO_ZONE;
 
-/// Raised when what was asked for could not be read as a limit, a window or a cap.
-pub(crate) const UNREADABLE: crate::error::Code = crate::error::Code::new("RATE-3");
+pub(crate) use crate::error::codes::rate::UNREADABLE;
 
-/// Raised when there is no download client to limit.
-pub const NOTHING_TO_LIMIT: crate::error::Code = crate::error::Code::new("RATE-4");
+pub use crate::error::codes::rate::NOTHING_TO_LIMIT;
 
 /// What throttling the upload costs, said the same way wherever it is said.
 ///

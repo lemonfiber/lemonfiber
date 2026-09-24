@@ -32,7 +32,7 @@ use include_dir::{Dir, DirEntry};
 use lemonfiber_manifest::{validate, Date, Manifest};
 use thiserror::Error;
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// The manifest's filename, at the root of any stack directory.
 const MANIFEST: &str = "stack.toml";
@@ -357,29 +357,21 @@ pub enum Failure {
     },
 }
 
-/// Raised when a stack directory holds no readable manifest.
-pub const STACK_UNREADABLE: Code = Code::new("STACK-1");
+pub use crate::error::codes::stack::STACK_UNREADABLE;
 
-/// Raised when a manifest is readable and this build cannot use it.
-pub(crate) const STACK_UNUSABLE: Code = Code::new("STACK-2");
+pub(crate) use crate::error::codes::stack::STACK_UNUSABLE;
 
-/// Raised when the embedded stack is not intact.
-pub(crate) const STACK_NOT_EMBEDDED: Code = Code::new("STACK-3");
+pub(crate) use crate::error::codes::stack::STACK_NOT_EMBEDDED;
 
-/// Raised when a manifest parses and breaks the contract.
-pub const STACK_INVALID: Code = Code::new("STACK-6");
+pub use crate::error::codes::stack::STACK_INVALID;
 
-/// Raised when a manifest is not TOML at all.
-pub const STACK_MALFORMED: Code = Code::new("STACK-7");
+pub use crate::error::codes::stack::STACK_MALFORMED;
 
-/// Raised when a manifest declares names this build does not know.
-pub const STACK_UNRECOGNISED: Code = Code::new("STACK-8");
+pub use crate::error::codes::stack::STACK_UNRECOGNISED;
 
-/// Raised when lemonfiber has nowhere to write the stack.
-pub(crate) const STACK_NOT_SET_UP: Code = Code::new("STACK-4");
+pub(crate) use crate::error::codes::stack::STACK_NOT_SET_UP;
 
-/// Raised when the stack could not be written to disk.
-pub(crate) const STACK_NOT_WRITTEN: Code = Code::new("STACK-5");
+pub(crate) use crate::error::codes::stack::STACK_NOT_WRITTEN;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

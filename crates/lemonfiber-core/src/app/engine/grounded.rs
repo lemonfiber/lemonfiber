@@ -26,7 +26,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::filesystem::Presence;
 use crate::stack::compose::Action;
 
@@ -49,8 +49,7 @@ const LOOKS: u32 = 60;
 /// arrives in seconds at worst.
 const AGAIN: Duration = Duration::from_secs(2);
 
-/// Raised when a start was asked for over a data location that is not there.
-pub(crate) const NO_DATA_LOCATION: Code = Code::new("LIFE-5");
+pub(crate) use crate::error::codes::life::NO_DATA_LOCATION;
 
 /// Refuse to start over a data location that is not present, waiting first.
 ///

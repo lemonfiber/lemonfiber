@@ -27,15 +27,9 @@ pub use foreign::{beside, ours, Foreign};
 pub use outside::{against, looked_for, Beside, Outside, EVERY as BESIDE};
 pub use tier::{Tier, EVERY as TIERS};
 
-use crate::error::Code;
+pub use crate::error::codes::gone::NEEDS_AGREEING;
 
-/// Raised when the tier that takes the library was confirmed without its own
-/// agreement.
-pub const NEEDS_AGREEING: Code = Code::new("GONE-1");
-
-/// Raised when an agreement names a reading of this machine that is not the one
-/// standing now.
-pub(crate) const ANOTHER_READING: Code = Code::new("GONE-2");
+pub(crate) use crate::error::codes::gone::ANOTHER_READING;
 
 /// What sort of thing one line of a manifest is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

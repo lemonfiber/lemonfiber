@@ -22,15 +22,14 @@
 
 use std::collections::BTreeSet;
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::plugin::{Installed, Register, Removal, Unfilled};
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 
 use super::super::{Ctx, Outcome};
 
-/// Nothing by that name is installed on this machine.
-pub(crate) const NOT_INSTALLED: Code = Code::new("PLUGIN-10");
+pub(crate) use crate::error::codes::plugin::NOT_INSTALLED_10 as NOT_INSTALLED;
 
 /// Take a plugin off the machine, or say what taking it off would come to.
 ///

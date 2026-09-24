@@ -19,7 +19,7 @@
 //! drops the rest, and a request that named two things to follow and was answered
 //! about one of them has been answered about something it did not ask.
 
-use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Amiss, Problem, Remedy, Severity};
 
 use super::{
     Wanted, ALERTS, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS,
@@ -27,11 +27,9 @@ use super::{
     STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
 };
 
-/// Raised where a read was given a parameter its answer has nowhere to put.
-const UNWANTED: Code = Code::new("READ-1");
+use lemonfiber_core::error::codes::read::UNWANTED;
 
-/// Raised where a parameter carrying one value was given more than once.
-const REPEATED: Code = Code::new("READ-2");
+use lemonfiber_core::error::codes::read::REPEATED;
 
 /// The parameter naming a form to narrow to.
 pub(crate) const FORM: &str = "form";

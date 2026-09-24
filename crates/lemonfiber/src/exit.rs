@@ -24,6 +24,7 @@ pub(crate) use reports::{repairing, reset_exit, seed_exit, upgrade_exit};
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
+use lemonfiber_core::error::codes::{leaves, Leaves};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{Disposition, Triggered};
 
@@ -47,22 +48,13 @@ pub(crate) const VALIDATION: u8 = 5;
 ///
 /// A script branching on failure needs to know whether to fix its own input,
 /// start Docker, or wait longer, and one code for all three tells it nothing.
+/// Which of those a code means is declared beside the code, in the registry.
 pub(crate) fn exit_code(problem: &Problem) -> u8 {
-    use lemonfiber_core::{app, config, ports, stack};
-
-    match problem.code {
-        app::NEVER_SETTLED => NEVER_SETTLED,
-        ports::process::MISSING_PROGRAM | ports::docker::ENGINE_UNREACHABLE => PREFLIGHT,
-        // Everything here is the operator's own input: a stack that cannot be found,
-        // one that will not parse, one declaring words this build does not know, one
-        // that contradicts itself, and a settings file that cannot be read. A script
-        // that gets these back has something to fix and nothing to wait for.
-        stack::STACK_INVALID
-        | stack::STACK_MALFORMED
-        | stack::STACK_UNRECOGNISED
-        | stack::STACK_UNREADABLE
-        | config::store::CONFIG_UNREADABLE => VALIDATION,
-        _ => FAILURE,
+    match leaves(problem.code) {
+        Leaves::NeverSettled => NEVER_SETTLED,
+        Leaves::Preflight => PREFLIGHT,
+        Leaves::Validation => VALIDATION,
+        Leaves::Failure => FAILURE,
     }
 }
 

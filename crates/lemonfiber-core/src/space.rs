@@ -53,26 +53,19 @@ pub use waste::{ratio_reads, Candidate, Standing, RATIO_CONSEQUENCE};
 use crate::ports::occupancy::Occupant;
 use crate::ports::service::Seeded;
 
-/// Raised when the volume is full and new acquisitions are therefore halted.
-pub(crate) const HALTED: crate::error::Code = crate::error::Code::new("SPACE-1");
+pub(crate) use crate::error::codes::space::HALTED;
 
-/// Raised when there is no data location to measure.
-pub(crate) const NOWHERE_TO_MEASURE: crate::error::Code = crate::error::Code::new("SPACE-2");
+pub(crate) use crate::error::codes::space::NOWHERE_TO_MEASURE;
 
-/// Raised when the data location is there and could not be read.
-pub(crate) const WALK_REFUSED: crate::error::Code = crate::error::Code::new("SPACE-3");
+pub(crate) use crate::error::codes::space::WALK_REFUSED;
 
-/// Raised when there is no torrent client here to be holding a completed download.
-pub(crate) const NOTHING_TO_ASK: crate::error::Code = crate::error::Code::new("SPACE-4");
+pub(crate) use crate::error::codes::space::NOTHING_TO_ASK;
 
-/// Raised when the client answers and is holding nothing of the name given.
-pub(crate) const NOT_HELD: crate::error::Code = crate::error::Code::new("SPACE-5");
+pub(crate) use crate::error::codes::space::NOT_HELD;
 
-/// Raised when an agreement names an offer that is not the one standing now.
-pub(crate) const ANOTHER_OFFER: crate::error::Code = crate::error::Code::new("SPACE-6");
+pub(crate) use crate::error::codes::space::ANOTHER_OFFER;
 
-/// Raised when the client could not be reached, or would not let a download go.
-pub const STILL_HELD: crate::error::Code = crate::error::Code::new("SPACE-7");
+pub use crate::error::codes::space::STILL_HELD;
 
 /// An import that stopped part-way, in the words of whatever stopped it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]

@@ -18,17 +18,15 @@
 
 use std::path::Path;
 
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
 use super::super::{Ctx, Outcome};
 use super::{carry_out, nowhere_to_write, proving, verifying};
 
-/// Nothing by that id is installed, so there is no version to replace.
-pub(crate) const NOT_INSTALLED: Code = Code::new("PLUGIN-11");
+pub(crate) use crate::error::codes::plugin::NOT_INSTALLED_11 as NOT_INSTALLED;
 
-/// The version installed would not come off, so nothing else was touched.
-pub(crate) const STUCK: Code = Code::new("PLUGIN-12");
+pub(crate) use crate::error::codes::plugin::STUCK;
 
 /// Replace the installed version of a plugin with the one at this path, or say what
 /// doing so would come to.

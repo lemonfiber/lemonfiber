@@ -15,14 +15,10 @@ use crate::error::Diagnose;
 use crate::model::{SubstitutionReport, WiringReport};
 use crate::wiring::{self, Refused};
 
-/// A capability was named that no service in this stack provides.
-pub(crate) const NO_SUCH_FILLER: Code = Code::new("WIRE-1");
-/// The service named cannot do the thing it was asked to fill.
-pub(crate) const CANNOT_FILL: Code = Code::new("WIRE-2");
-/// Nothing in this stack asks for the capability, so a choice would change nothing.
-pub(crate) const NOTHING_ASKS: Code = Code::new("WIRE-3");
-/// The setting recording the choice could not be written.
-pub(crate) const CHOICE_UNWRITABLE: Code = Code::new("WIRE-4");
+pub(crate) use crate::error::codes::wire::CANNOT_FILL;
+pub(crate) use crate::error::codes::wire::CHOICE_UNWRITABLE;
+pub(crate) use crate::error::codes::wire::NOTHING_ASKS;
+pub(crate) use crate::error::codes::wire::NO_SUCH_FILLER;
 
 /// Read what reaches what, or change one of those links.
 ///

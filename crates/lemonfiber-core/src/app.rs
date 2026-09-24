@@ -113,20 +113,15 @@ use self_update::standing as stands;
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, ALREADY_GONE, NOTHING_TO_WATCH, WATCH};
 
-/// Raised when a service never reached a state that starting could accept.
-pub const NEVER_SETTLED: Code = Code::new("LIFE-1");
+pub use crate::error::codes::life::NEVER_SETTLED;
 
-/// Raised when stopping would take a service out from under a form still running.
-pub const STILL_NEEDED: Code = Code::new("LIFE-2");
+pub use crate::error::codes::life::STILL_NEEDED;
 
-/// Another run is already working on this stack.
-pub const ALREADY_WORKING: Code = Code::new("LIFE-3");
+pub use crate::error::codes::life::ALREADY_WORKING;
 
-/// Fetching images is switched off, so there was nothing to fetch with.
-pub const REGISTRY_REFUSED: Code = Code::new("LIFE-4");
+pub use crate::error::codes::life::REGISTRY_REFUSED;
 
-/// Raised when the stack's own location is not on the machine being operated.
-pub const ABSENT_THERE: Code = Code::new("LIFE-6");
+pub use crate::error::codes::life::ABSENT_THERE;
 
 /// Ask the engine to act on a set of services, which three commands do identically.
 ///
@@ -3094,7 +3089,7 @@ mod tests {
 
         assert_eq!(
             outcome.as_ref().err().map(|problem| problem.code),
-            Some(crate::error::Code::new("DIAG-1")),
+            Some(crate::error::codes::diag::NO_SUCH_CHECK),
             "a name this stack does not report should be refused: {outcome:?}"
         );
     }

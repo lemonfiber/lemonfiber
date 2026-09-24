@@ -146,7 +146,7 @@ mod tests {
 
     /// A code of this module's own, so the tests are about the refusal rather than
     /// about which caller asked for it.
-    const ASKED: Code = Code::new("BACKUP-4");
+    const ASKED: Code = crate::error::codes::backup::ASKED;
 
     fn ctx(engine: Arc<dyn Engine>) -> Ctx {
         crate::test_support::a_context().engine(engine).build()

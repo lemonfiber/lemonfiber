@@ -18,7 +18,7 @@
 use std::path::Path;
 
 use crate::app::{Ctx, Outcome, Waiting};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::stack::compose::Action;
 use crate::uninstall::{Left, Manifest, Removal, Sort, Tier};
@@ -93,8 +93,7 @@ pub(super) async fn remove(
     })
 }
 
-/// Raised when the backup a destructive removal takes first could not be taken.
-pub(crate) const NOT_BACKED_UP: Code = Code::new("GONE-3");
+pub(crate) use crate::error::codes::gone::NOT_BACKED_UP;
 
 /// The refusal for a removal whose backup would not be taken.
 ///

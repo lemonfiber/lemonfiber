@@ -46,6 +46,7 @@ serde_json = { workspace = true }
 ratatui = { workspace = true }
 
 [dev-dependencies]
+lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes the ports are driven through, shared with every other crate's tests
 # rather than written again here.
 lemonfiber-fixtures = { workspace = true }
