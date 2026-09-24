@@ -22,7 +22,7 @@ skip = [
 # evaluate a program handed to it at runtime, which is how a plugin would stop
 # being data — the property everything about extensions rests on.
 #
-# This list is the only copy. The guards in `crates/lemonfiber/tests/refused/` read
+# This list is the only copy. The guards in `crates/lemonfiber/tests/architecture/refused.rs` read
 # it, group it by `reason`, and sweep the resolved graph for each stem by prefix
 # where cargo-deny matches one name at a time.
 deny = [

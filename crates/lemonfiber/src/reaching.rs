@@ -12,7 +12,7 @@
 //! tests hold every action and every question the screen offers to an entry here, and
 //! every entry here to something the screen offers; the parity table's terminal column
 //! is held to the same list by
-//! [`surface_parity.rs`](../../../crates/lemonfiber/tests/surface_parity.rs). A row
+//! [`surface_parity.rs`](../../../crates/lemonfiber/tests/architecture/surface_parity.rs). A row
 //! claiming this screen reaches a request it does not, and an offer no row accounts
 //! for, each fail — which is what the web column has had since the table was written.
 //!

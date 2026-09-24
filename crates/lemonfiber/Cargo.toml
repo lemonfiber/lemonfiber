@@ -67,6 +67,10 @@ tokio = { workspace = true, features = ["test-util"] }
 # TOML, and a hand-rolled reader for either would be a second opinion about what
 # they say. Already in the tree via the manifest parser.
 toml = { workspace = true }
+# The architecture checks: the syntax tree they read the code as, and the lexer the
+# comment rules read comments with.
+syn = { workspace = true }
+rustc_lexer = { workspace = true }
 
 [lints]
 workspace = true

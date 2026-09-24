@@ -4,7 +4,7 @@ Four artefacts describe the same set of read endpoints, and until now only three
 of them were read by anything:
 
   crates/lemonfiber-api/src/read/table.rs  the routes, declared in `OFFERED`
-  .docs/architecture/surface-parity.md   held to them by tests/surface_parity.rs
+  .docs/architecture/surface-parity.md   held to them by tests/architecture/surface_parity.rs
   spec 20-architecture/contracts/web-api.md, `## Reading`   held to nothing
   the docs site's envelope table      recounted against its vendored copy of the
                                       page above, so only ever as current as that

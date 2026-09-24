@@ -101,11 +101,17 @@ rpassword = "7"
 # bundled Mozilla roots, so the static musl release carries its own trust anchors.
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 rustls-pki-types = "1"
+# rustc's own lexer, for the checks that read comments: what counts as a comment is
+# decided the way the compiler decides it.
+rustc_lexer = { package = "ra-ap-rustc_lexer", version = "0.174" }
 serde_json = "1"
 # Compose files are YAML, and the single-mount rule can only be read from them. A
 # parser rather than line-matching, because anchors, merge keys and both volume
 # syntaxes have to read the way Compose reads them.
 serde_yaml_ng = "0.10"
+# The syntax tree the architecture checks read the code as, on the line the
+# workspace's proc macros already build on.
+syn = { version = "3", default-features = false, features = ["full", "parsing", "printing", "visit"] }
 tar = "0.4"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 webpki-roots = "1"
