@@ -148,13 +148,15 @@ const POINTS_AT_DATA: &str = "DATA_ROOT";
 /// What putting `change` back would come to, given the journal it sits in and what the
 /// machine holds now.
 ///
-/// `later` is every change made after it, and `holds` answers what a setting currently
-/// holds — the two questions a reversal cannot be judged without.
+/// `later` is every change made after it, `holds` answers what a setting currently
+/// holds, and `reads` what a file currently holds — the questions a reversal cannot be
+/// judged without.
 #[must_use]
 pub fn standing(
     change: &Change,
     later: &[Change],
     holds: &dyn Fn(&str) -> Option<String>,
+    reads: &dyn Fn(&str) -> Option<String>,
 ) -> Standing {
     if let Some((key, left, replaced)) = touched(change) {
         // Asked ahead of drift, because a sealed value that will not open is not a value
@@ -240,9 +242,54 @@ pub fn standing(
             &migrated(&change.target, previous, current),
             Some(&capture(backup.as_deref())),
         ),
+        Kind::Region {
+            path,
+            owner,
+            written,
+            ..
+        } => bounded(path, owner, *written, reads),
         // A setting, a path, or one field of a service's record — each reversed by
         // something this product actually does.
         Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } => Standing::whole(),
+    }
+}
+
+/// What taking a region back out comes to, given what its file holds now.
+///
+/// A region is lemonfiber's only while it is exactly what was written, inside the
+/// markers it was written with. Edited since, it holds somebody's work; with its
+/// markers edited, which lines are lemonfiber's can no longer be told from which are
+/// not. Either way taking it out would take something that is not lemonfiber's, so
+/// the reversal is refused — the same answer drift in a setting gets. A file that is
+/// not there any more has no region left in it to take, and nothing is owed.
+fn bounded(
+    path: &str,
+    owner: &str,
+    written: u32,
+    reads: &dyn Fn(&str) -> Option<String>,
+) -> Standing {
+    let Some(text) = reads(path) else {
+        return Standing::whole();
+    };
+    match crate::region::within(&text, owner) {
+        None => Standing::refused(
+            &format!(
+                "{owner}'s region in {path} is no longer marked out the way it was written — \
+                 its markers were edited or taken out — so which lines are lemonfiber's can \
+                 no longer be told from which are not"
+            ),
+            Some("take the region out by hand, or put its markers back as they were"),
+        ),
+        Some(body) if crate::materialised::checksum(body.as_bytes()) != written => {
+            Standing::refused(
+                &format!(
+                    "{owner}'s region in {path} has been edited since it was written, and \
+                     taking it out would discard that edit"
+                ),
+                Some("take it out by hand if the edit is not wanted"),
+            )
+        }
+        Some(_) => Standing::whole(),
     }
 }
 
@@ -394,6 +441,11 @@ mod tests {
     }
 
     /// What the machine holds, for a test that chooses.
+    /// A machine where no file reads, for a judgement that asks about none.
+    fn unread(_: &str) -> Option<String> {
+        None
+    }
+
     fn holding(pairs: &'static [(&'static str, &'static str)]) -> impl Fn(&str) -> Option<String> {
         move |key| {
             pairs
@@ -407,7 +459,7 @@ mod tests {
     /// an operator acts on it, and finds out in the middle.
     #[test]
     fn a_version_move_is_refused_with_something_to_do_instead() {
-        let read = standing(&pinned("4.0.15", "4.1.0"), &[], &holding(&[]));
+        let read = standing(&pinned("4.0.15", "4.1.0"), &[], &holding(&[]), &unread);
         assert_eq!(read.reversal, Reversal::None);
         assert_eq!(
             read.refusal
@@ -430,7 +482,7 @@ mod tests {
     /// conclude they could do it by hand, which is the attempt being prevented.
     #[test]
     fn a_migrated_service_says_what_migrated_and_which_capture_to_go_back_to() {
-        let refusal = standing(&pinned("4.0.15", "4.1.0"), &[], &holding(&[])).refusal;
+        let refusal = standing(&pinned("4.0.15", "4.1.0"), &[], &holding(&[]), &unread).refusal;
         assert_eq!(
             refusal
                 .as_ref()
@@ -460,7 +512,7 @@ mod tests {
             backup: None,
         };
         assert_eq!(
-            standing(&change, &[], &holding(&[]))
+            standing(&change, &[], &holding(&[]), &unread)
                 .refusal
                 .and_then(|refusal| refusal.instead),
             Some("restore from the capture taken before the update".to_owned())
@@ -470,7 +522,7 @@ mod tests {
     #[test]
     fn a_setting_still_holding_what_the_change_left_goes_back_whole() {
         let change = set("reconfigure", "PUID", Some("1000"), "1001");
-        let read = standing(&change, &[], &holding(&[("PUID", "1001")]));
+        let read = standing(&change, &[], &holding(&[("PUID", "1001")]), &unread);
         assert_eq!(read.reversal, Reversal::Whole);
     }
 
@@ -491,6 +543,7 @@ mod tests {
             &change,
             &[],
             &holding(&[("INDEXER_APIKEY", "chosen-since")]),
+            &unread,
         );
 
         let said = read.refusal.map(|why| why.because).unwrap_or_default();
@@ -513,7 +566,12 @@ mod tests {
     fn a_credential_whose_earlier_value_will_not_open_is_refused_too() {
         let change = set("reconfigure", "USENET_PASS", Some("sealed:1:00"), "chosen");
 
-        let read = standing(&change, &[], &holding(&[("USENET_PASS", "chosen")]));
+        let read = standing(
+            &change,
+            &[],
+            &holding(&[("USENET_PASS", "chosen")]),
+            &unread,
+        );
 
         assert_eq!(read.reversal, Reversal::None);
     }
@@ -532,7 +590,7 @@ mod tests {
         let holds = move |_: &str| Some(held.clone());
         let change = set("apply", "INDEXER_APIKEY", None, "what-apply-left");
 
-        let standing = standing(&change, &[], &holds);
+        let standing = standing(&change, &[], &holds, &unread);
         let said = standing
             .refusal
             .map(|why| format!("{} {}", why.because, why.instead.unwrap_or_default()))
@@ -552,7 +610,7 @@ mod tests {
     #[test]
     fn a_setting_edited_by_hand_since_is_drift_and_is_refused() {
         let change = set("reconfigure", "PUID", Some("1000"), "1001");
-        let read = standing(&change, &[], &holding(&[("PUID", "1234")]));
+        let read = standing(&change, &[], &holding(&[("PUID", "1234")]), &unread);
         assert_eq!(read.reversal, Reversal::None);
         let said = read.refusal.map(|why| why.because).unwrap_or_default();
         assert!(said.contains("1234"), "{said}");
@@ -564,7 +622,7 @@ mod tests {
     fn a_change_a_later_one_depends_on_is_refused_until_that_one_goes_back() {
         let change = set("reconfigure", "PUID", Some("1000"), "1001");
         let later = [set("reconfigure", "PUID", Some("1001"), "1002")];
-        let read = standing(&change, &later, &holding(&[("PUID", "1001")]));
+        let read = standing(&change, &later, &holding(&[("PUID", "1001")]), &unread);
         assert_eq!(read.reversal, Reversal::None);
         let said = read.refusal.and_then(|why| why.instead).unwrap_or_default();
         assert!(said.contains("later change"), "{said}");
@@ -575,7 +633,7 @@ mod tests {
     fn a_later_change_to_another_setting_is_not_in_the_way() {
         let change = set("reconfigure", "PUID", Some("1000"), "1001");
         let later = [set("reconfigure", "PGID", Some("1000"), "1001")];
-        let read = standing(&change, &later, &holding(&[("PUID", "1001")]));
+        let read = standing(&change, &later, &holding(&[("PUID", "1001")]), &unread);
         assert_eq!(read.reversal, Reversal::Whole);
     }
 
@@ -583,7 +641,7 @@ mod tests {
     #[test]
     fn putting_the_data_location_back_moves_no_data_and_says_so() {
         let change = set("reconfigure", "DATA_ROOT", Some("/old"), "/new");
-        let read = standing(&change, &[], &holding(&[("DATA_ROOT", "/new")]));
+        let read = standing(&change, &[], &holding(&[("DATA_ROOT", "/new")]), &unread);
         assert_eq!(read.reversal, Reversal::Partial);
         let said = read.refusal.map(|why| why.because).unwrap_or_default();
         assert!(said.contains("data does not move"), "{said}");
@@ -592,7 +650,7 @@ mod tests {
     /// A change that never held a value cannot have drifted from one.
     #[test]
     fn a_path_lemonfiber_made_goes_back_whole() {
-        let read = standing(&made("/srv/media"), &[], &holding(&[]));
+        let read = standing(&made("/srv/media"), &[], &holding(&[]), &unread);
         assert_eq!(read.reversal, Reversal::Whole);
     }
 
@@ -635,7 +693,13 @@ mod tests {
     fn a_field_of_a_services_record_goes_back_whole() {
         let holds = holding(&[("PUID", "9999")]);
         assert_eq!(
-            standing(&configured("removeCompletedDownloads"), &[], &holds).reversal,
+            standing(
+                &configured("removeCompletedDownloads"),
+                &[],
+                &holds,
+                &unread
+            )
+            .reversal,
             Reversal::Whole
         );
     }
@@ -649,7 +713,7 @@ mod tests {
     #[test]
     fn what_a_service_created_is_refused_because_nothing_removes_it() {
         let holds = holding(&[("PUID", "9999")]);
-        let standing = standing(&created("downloadclient"), &[], &holds);
+        let standing = standing(&created("downloadclient"), &[], &holds, &unread);
         assert_eq!(standing.reversal, Reversal::None);
         assert!(
             standing
@@ -664,5 +728,68 @@ mod tests {
                 .is_some_and(|refusal| refusal.instead.is_some()),
             "and says where it can be removed instead"
         );
+    }
+
+    /// The region a plugin's install wrote into the proxy, holding `body`.
+    fn region(body: &str) -> Change {
+        Change {
+            at: "1".to_owned(),
+            operation: "komga".to_owned(),
+            target: "/stack/config/caddy/Caddyfile".to_owned(),
+            kind: Kind::Region {
+                path: "/stack/config/caddy/Caddyfile".to_owned(),
+                key: "config/caddy/Caddyfile".to_owned(),
+                owner: "plugin komga".to_owned(),
+                written: crate::materialised::checksum(body.as_bytes()),
+            },
+        }
+    }
+
+    /// The proxy's file as it holds `body` in the plugin's region.
+    fn holding_region(body: &'static str) -> impl Fn(&str) -> Option<String> {
+        move |_| Some(crate::region::put("watch {\n}\n", "plugin komga", body))
+    }
+
+    #[test]
+    fn a_region_still_as_it_was_written_goes_back_whole() {
+        let read = standing(
+            &region("komga\n"),
+            &[],
+            &holding(&[]),
+            &holding_region("komga\n"),
+        );
+
+        assert_eq!(read.reversal, Reversal::Whole);
+    }
+
+    #[test]
+    fn a_region_whose_file_is_gone_has_nothing_left_to_take() {
+        let read = standing(&region("komga\n"), &[], &holding(&[]), &unread);
+
+        assert_eq!(read.reversal, Reversal::Whole);
+    }
+
+    #[test]
+    fn a_region_edited_since_it_was_written_is_refused_as_drift() {
+        let read = standing(
+            &region("komga\n"),
+            &[],
+            &holding(&[]),
+            &holding_region("komga, edited\n"),
+        );
+
+        assert_eq!(read.reversal, Reversal::None);
+        let said = read.refusal.map(|why| why.because).unwrap_or_default();
+        assert!(said.contains("edited since it was written"), "{said}");
+    }
+
+    #[test]
+    fn a_region_whose_markers_were_edited_is_refused_rather_than_guessed_at() {
+        let edited = |_: &str| Some("watch {\n}\n# >>> somebody's own\nkomga\n".to_owned());
+        let read = standing(&region("komga\n"), &[], &holding(&[]), &edited);
+
+        assert_eq!(read.reversal, Reversal::None);
+        let said = read.refusal.map(|why| why.because).unwrap_or_default();
+        assert!(said.contains("no longer marked out"), "{said}");
     }
 }

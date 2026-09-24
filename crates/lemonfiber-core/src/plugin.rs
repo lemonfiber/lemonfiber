@@ -24,6 +24,7 @@ mod claimed;
 // is the one that derives.
 mod container;
 mod declared;
+mod fronting;
 mod installed;
 mod register;
 // Where an install puts what it writes. Beside the record and the container rather
@@ -63,8 +64,9 @@ pub use claimed::{
 };
 pub use container::{profile, written};
 pub use declared::{Declaration, Secret};
+pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
 pub use installed::{answering, Installed, Placed, Reached};
-pub use placing::{documents, overlay, writes, Write};
+pub use placing::{documents, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
 pub use register::{Already, Register, Unreadable as Unrecorded};

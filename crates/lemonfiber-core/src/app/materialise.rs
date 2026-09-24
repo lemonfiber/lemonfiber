@@ -195,8 +195,9 @@ fn write_stack(
             None => Cow::Borrowed(content),
         };
         let target = into.join(&relative);
-        let desired = checksum(&content);
         let on_disk = std::fs::read(&target).ok();
+        let content = carrying_regions(content, on_disk.as_deref());
+        let desired = checksum(&content);
         let actual = on_disk.as_deref().map(checksum);
         match decide(record.checksum(&key), actual, desired) {
             Decision::Write if writing => {
@@ -232,6 +233,28 @@ fn write_stack(
         save(record_path, &record);
     }
     Ok((into.to_path_buf(), edits))
+}
+
+/// What lemonfiber intends for a stack file, with every region written into it since
+/// carried over from the copy on disk.
+///
+/// A region is lemonfiber's own writing — a plugin's route through the proxy, its entry
+/// on the dashboard — so what lemonfiber intends for the file is the shipped content
+/// and the regions both. Intending the shipped content alone would read the file as
+/// out of date and write the shipped copy over the regions, taking a plugin off the
+/// proxy while it is still installed. The same on every pass: a reset puts back what
+/// the operator changed and keeps what lemonfiber wrote, and a preview says so.
+fn carrying_regions<'a>(content: Cow<'a, [u8]>, on_disk: Option<&[u8]>) -> Cow<'a, [u8]> {
+    let carried = match (
+        on_disk.map(String::from_utf8_lossy),
+        std::str::from_utf8(&content),
+    ) {
+        (Some(disk), Ok(desired)) => {
+            Some(crate::region::carried(&disk, desired)).filter(|carried| carried != desired)
+        }
+        _ => None,
+    };
+    carried.map_or(content, |carried| Cow::Owned(carried.into_bytes()))
 }
 
 /// The content lemonfiber intends for a stack file, given the quality choice: the
@@ -434,6 +457,60 @@ mod tests {
         let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
             .unwrap_or((PathBuf::new(), Vec::new()));
         assert!(again.is_empty(), "an unchanged file is left, not reported");
+    }
+
+    /// A region written into a stack file since is lemonfiber's own, so the next pass
+    /// neither reports it as the operator's edit nor writes the shipped copy over it.
+    #[test]
+    fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
+        let (into, record) = scratch("region-kept");
+        let source = Source::Embedded(&STACKLET);
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+        let file = into.join("compose.yaml");
+        let _ = super::super::bounded::put(
+            &file,
+            "compose.yaml",
+            "plugin komga",
+            "# komga\n",
+            Some(&record),
+        );
+        let with_region = read(&file);
+
+        let edits = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
+            .map(|(_, edits)| edits.len());
+
+        assert_eq!(
+            edits.ok(),
+            Some(0),
+            "nothing is reported as the operator's edit"
+        );
+        assert_eq!(read(&file), with_region);
+    }
+
+    /// A reset puts back what the operator changed and keeps what lemonfiber wrote,
+    /// which includes a plugin's region.
+    #[test]
+    fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
+        let (into, record) = scratch("region-reset");
+        let source = Source::Embedded(&STACKLET);
+        let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+        let file = into.join("compose.yaml");
+        let shipped = read(&file);
+        let _ = super::super::bounded::put(
+            &file,
+            "compose.yaml",
+            "plugin komga",
+            "# komga\n",
+            Some(&record),
+        );
+        let _ = std::fs::write(&file, read(&file).replace("sonarr", "my-own-sonarr"));
+
+        let _ = reset_stack(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+
+        assert_eq!(
+            read(&file),
+            crate::region::put(&shipped, "plugin komga", "# komga\n")
+        );
     }
 
     #[test]

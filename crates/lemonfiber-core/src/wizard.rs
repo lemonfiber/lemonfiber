@@ -1134,6 +1134,15 @@ mod tests {
             })),
             "a root folder"
         );
+        assert_eq!(
+            described(&change(Kind::Region {
+                path: "/srv/stack/config/caddy/Caddyfile".to_owned(),
+                key: "config/caddy/Caddyfile".to_owned(),
+                owner: "plugin komga".to_owned(),
+                written: 0,
+            })),
+            "plugin komga's region in /srv/stack/config/caddy/Caddyfile"
+        );
         // An update's own record, found for the same reason as a repair's: the journal
         // is one file, and what a recovery offers to leave alone has to have a name.
         assert_eq!(

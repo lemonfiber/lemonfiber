@@ -339,6 +339,9 @@ fn judged(
             .map(str::to_owned)
     };
 
+    // What a file holds, for a region: whether it is still the one that was written.
+    let reads = |path: &str| -> Option<String> { std::fs::read_to_string(path).ok() };
+
     // Judged whole before anything is touched. The refusal carries the reason the
     // judgement gave and what to do instead, which for a change nothing here can put
     // back is the only useful half of the answer.
@@ -349,7 +352,7 @@ fn judged(
             .position(|held| held == *change)
             .unwrap_or(changes.len());
         let later = changes.get(position + 1..).unwrap_or_default();
-        let verdict = standing(change, later, &holds);
+        let verdict = standing(change, later, &holds, &reads);
         if verdict.reversal == Judgement::None {
             // The reason and what to do instead, joined rather than branched on: a
             // refusal carrying no remedy is a shape this judgement does not produce, and
@@ -480,7 +483,9 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             previous: Some(current.clone()),
             current: previous.clone().unwrap_or_default(),
         }),
-        Kind::Created { .. } | Kind::Made { .. } | Kind::Pinned { .. } => None,
+        Kind::Created { .. } | Kind::Made { .. } | Kind::Region { .. } | Kind::Pinned { .. } => {
+            None
+        }
     }
 }
 

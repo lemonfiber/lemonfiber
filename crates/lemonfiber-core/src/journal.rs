@@ -71,6 +71,26 @@ pub enum Kind {
         /// The path that was created.
         path: String,
     },
+    /// A region was written into a file lemonfiber does not own the whole of — a
+    /// bounded stretch of it, marked out as lemonfiber's (see [`crate::region`]).
+    /// Undoing takes out exactly the region and nothing around it.
+    ///
+    /// Apart from [`Self::Made`], which is a path lemonfiber created and can remove
+    /// whole. A region sits in a file that was there before and stays after, among
+    /// lines that are somebody else's, so what a reversal may take is bounded by the
+    /// markers and by what was written between them — kept here as a checksum, so a
+    /// region somebody has edited since is told apart from the one that was written.
+    Region {
+        /// The file the region is in.
+        path: String,
+        /// The same file beneath the stack directory, as the record of what lemonfiber
+        /// materialised names it, so taking the region out keeps that record true.
+        key: String,
+        /// Whose region it is, as its markers name it.
+        owner: String,
+        /// The checksum of what was written between the markers.
+        written: u32,
+    },
     /// A service was moved from one pinned version to another.
     ///
     /// The largest change this product makes to a machine, and the only one whose
@@ -137,6 +157,17 @@ impl Change {
                 wrote: current.clone(),
             },
             Kind::Made { path } => Action::Delete { path: path.clone() },
+            Kind::Region {
+                path,
+                key,
+                owner,
+                written,
+            } => Action::Withdraw {
+                path: path.clone(),
+                key: key.clone(),
+                owner: owner.clone(),
+                written: *written,
+            },
             Kind::Pinned {
                 previous, current, ..
             } => Action::Repin {
@@ -205,6 +236,22 @@ pub enum Action {
     Delete {
         /// The path to remove.
         path: String,
+    },
+    /// Take a region lemonfiber wrote back out of the file it was written into.
+    ///
+    /// Only where the region is still what was written. One that was edited since, or
+    /// whose markers were, is somebody else's work now, and is left exactly as it is.
+    Withdraw {
+        /// The file the region is in.
+        path: String,
+        /// The same file beneath the stack directory, as the record of what lemonfiber
+        /// materialised names it.
+        key: String,
+        /// Whose region it is, as its markers name it.
+        owner: String,
+        /// The checksum of what was written between the markers, which has to still be
+        /// what is there for taking it out to be taking out lemonfiber's own work.
+        written: u32,
     },
     /// Pin a service back to the version it was standing on.
     ///

@@ -22,7 +22,7 @@ use lemonfiber_plugin::Manifest;
 use serde::Serialize;
 
 use super::claimed::Verdict;
-use super::placing::Write;
+use super::placing::{Lands, Write};
 
 /// What an install puts at one path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -34,13 +34,17 @@ pub enum Puts {
     Directory,
     /// A document written, which is the container lemonfiber derives for the plugin.
     Document,
+    /// A region written into one of the stack's own files, marked out as the plugin's:
+    /// its route through the proxy, or its entry on the dashboard.
+    Region,
 }
 
 /// One change installing a plugin makes to the machine.
 ///
-/// A path and what goes at it, which is the whole of what an install touches: a
-/// plugin's wiring goes in files of its own, so there is no change here that is an
-/// edit to something somebody else owns.
+/// A path and what goes at it, which is the whole of what an install touches. Two of
+/// them can be edits to a file the stack already has — the proxy's and the
+/// dashboard's — and those say so, as a region, so an operator reading the account
+/// knows which of their files the install writes into.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "PluginChange")]
 pub struct Changing {
@@ -105,10 +109,10 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
         .iter()
         .map(|write| Changing {
             path: write.path.display().to_string(),
-            puts: if write.is_directory() {
-                Puts::Directory
-            } else {
-                Puts::Document
+            puts: match write.lands {
+                Lands::Directory => Puts::Directory,
+                Lands::Document(_) => Puts::Document,
+                Lands::Region { .. } => Puts::Region,
             },
         })
         .collect()
@@ -249,6 +253,14 @@ why = "a request for a comic has to reach the library that holds comics"
                 Changing {
                     path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
                     puts: Puts::Document,
+                },
+                Changing {
+                    path: "/opt/lemonfiber/stack/config/caddy/Caddyfile".to_owned(),
+                    puts: Puts::Region,
+                },
+                Changing {
+                    path: "/opt/lemonfiber/stack/config/homepage/services.yaml".to_owned(),
+                    puts: Puts::Region,
                 },
             ]
         );

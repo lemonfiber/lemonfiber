@@ -67,7 +67,12 @@ pub(super) async fn update(
     let mut without = held.clone();
     without.forget(&was.plugin);
     let contests = super::standing::contested(ctx, &without, &would)?;
-    let mut account = started(&was, &would, &manifest, stack, contests);
+    super::writing::unanswered(&would, without.installed())?;
+    let changes = crate::plugin::changes(&super::writing::landing(
+        ctx,
+        crate::plugin::writes(&would, stack),
+    ));
+    let mut account = started(&was, &would, &manifest, changes, contests);
 
     // A rehearsal asks the reversal what it would put back, which judges it whole and
     // touches nothing.
@@ -142,6 +147,12 @@ pub(super) async fn update(
             match super::super::record::keep(super::kept_at(ctx).as_deref(), &after) {
                 Ok(()) => {
                     account.install.recorded = true;
+                    let proxy = stack.join(crate::plugin::PROXY).display().to_string();
+                    let written = account.install.changes.iter().any(|change| {
+                        change.puts == crate::plugin::Puts::Region && change.path == proxy
+                    });
+                    let routed = written || super::proving::routes_withdrawn(&account.went_back);
+                    super::proving::refronted(ctx, stack, routed).await;
                     return Ok(answering(after.installed().to_vec(), account));
                 }
                 Err(why) => Came::Stopped(format!(
@@ -169,7 +180,7 @@ fn started(
     was: &Installed,
     would: &Installed,
     manifest: &lemonfiber_plugin::Manifest,
-    stack: &Path,
+    changes: Vec<crate::plugin::Changing>,
     contests: Vec<crate::wiring::Contest>,
 ) -> Update {
     Update {
@@ -185,7 +196,7 @@ fn started(
         install: Install {
             would: would.clone(),
             recorded: false,
-            changes: crate::plugin::changes(&crate::plugin::writes(would, stack)),
+            changes,
             proofs: crate::plugin::proofs(manifest),
             against: None,
             verified: None,
@@ -231,7 +242,7 @@ enum Came {
 /// reading taken before anything moved. It carries out no reversal of its own; the
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
-    let planned = crate::plugin::writes(coming.would, coming.stack);
+    let planned = super::writing::landing(ctx, crate::plugin::writes(coming.would, coming.stack));
     if let Err(why) = carry_out(ctx, &coming.would.plugin, coming.stamp, &planned) {
         return Came::Stopped(why.detail.unwrap_or(why.summary));
     }
@@ -261,7 +272,13 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
 /// started where the files would not land, since a container started without its
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
-    let placed = carry_out(ctx, &was.plugin, stamp, &crate::plugin::writes(was, stack)).is_ok();
+    let placed = carry_out(
+        ctx,
+        &was.plugin,
+        stamp,
+        &super::writing::landing(ctx, crate::plugin::writes(was, stack)),
+    )
+    .is_ok();
     let running = placed && proving::up(ctx, was, stack).await.is_none();
     Restored {
         version: was.version.clone(),

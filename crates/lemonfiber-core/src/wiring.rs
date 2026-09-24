@@ -932,6 +932,8 @@ mod tests {
                 takes_data: false,
                 reached: None,
                 provides: vec![capability.to_owned()],
+                name: "Komga".to_owned(),
+                description: "Reads comics".to_owned(),
             }],
             provides: vec![capability.to_owned()],
             contributions: Vec::new(),

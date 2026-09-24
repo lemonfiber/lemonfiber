@@ -79,7 +79,8 @@
             "const:\"reconfigure\"",
             "const:\"remove\"",
             "const:\"repin\"",
-            "const:\"restore\""
+            "const:\"restore\"",
+            "const:\"withdraw\""
           ],
           "required": true
         },
@@ -96,6 +97,12 @@
           "required": true
         },
         "key": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "owner": {
           "type": [
             "string"
           ],
@@ -125,6 +132,12 @@
           ],
           "required": false
         },
+        "written": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
         "wrote": {
           "type": [
             "string"
@@ -137,7 +150,8 @@
         "\"reconfigure\"",
         "\"remove\"",
         "\"repin\"",
-        "\"restore\""
+        "\"restore\"",
+        "\"withdraw\""
       ]
     },
     "Active": {
@@ -4423,6 +4437,12 @@
           ],
           "required": true
         },
+        "description": {
+          "type": [
+            "string"
+          ],
+          "required": false
+        },
         "digest": {
           "type": [
             "string"
@@ -4434,6 +4454,12 @@
             "string"
           ],
           "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": false
         },
         "provides": {
           "type": [
@@ -4513,7 +4539,8 @@
       "fields": {},
       "variants": [
         "\"directory\"",
-        "\"document\""
+        "\"document\"",
+        "\"region\""
       ]
     },
     "PluginReached": {

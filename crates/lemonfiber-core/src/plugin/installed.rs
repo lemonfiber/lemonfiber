@@ -156,6 +156,16 @@ pub struct Placed {
     /// is wired to, rather than one wired to on a guess.
     #[serde(default)]
     pub provides: Vec<String>,
+    /// What it is called, for a reader, which is what its dashboard entry is listed as.
+    ///
+    /// Defaulted for a record written before this was kept, which lists it by its id
+    /// rather than leaving it off the panel.
+    #[serde(default)]
+    pub name: String,
+    /// What the plugin says it does for the operator, which is what its dashboard entry
+    /// says beside it.
+    #[serde(default)]
+    pub description: String,
 }
 
 impl Placed {
@@ -175,6 +185,8 @@ impl Placed {
                 .filter(|name| lemonfiber_plugin::vocabulary::is_core_name(name))
                 .cloned()
                 .collect(),
+            name: service.name.clone(),
+            description: manifest.plugin.description.clone(),
         }
     }
 

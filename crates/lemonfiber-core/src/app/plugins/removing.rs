@@ -149,6 +149,13 @@ pub(super) async fn remove(
         let _ = at.map(std::fs::remove_file);
     }
 
+    // Its route came out of the proxy's file with everything else it wrote, and the
+    // proxy only reads that file when it starts. The stack is the one the judgement
+    // above already needed the layout of, so it is there.
+    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
+    let routed = super::proving::routes_withdrawn(&went_back);
+    super::proving::refronted(ctx, &stack, routed).await;
+
     Ok(answering(
         after.installed().to_vec(),
         Removal {
