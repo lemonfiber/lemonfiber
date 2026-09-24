@@ -2502,7 +2502,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         }
       }
@@ -3044,7 +3110,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         }
       }
@@ -5592,7 +5724,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         }
       }
@@ -9027,7 +9225,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         }
       }
@@ -10922,7 +11186,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         },
         "WiringContest": {
@@ -17586,7 +17916,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         },
         "Whose": {
@@ -17974,7 +18370,73 @@
                 "origin",
                 "why"
               ]
+            },
+            {
+              "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set what is in force.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "overridden"
+                },
+                "replaced": {
+                  "description": "What it replaced, and where that came from.",
+                  "$ref": "#/$defs/ValueReplaced"
+                }
+              },
+              "required": [
+                "origin",
+                "named",
+                "replaced"
+              ]
+            },
+            {
+              "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which plugin set it.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "orphaned"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
             }
+          ]
+        },
+        "ValueReplaced": {
+          "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
+            "value": {
+              "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "withheld": {
+              "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "withheld",
+            "from"
           ]
         },
         "WizardReport": {

@@ -122,16 +122,38 @@ async fn settings(
     // machine that cannot produce it answers *unknown* for every setting instead of
     // failing a read that is otherwise perfectly good.
     let recorded = super::reconfiguring::recorded(ctx);
+    // What a plugin set is read off the journal, against the record of what is installed
+    // — and a record that will not read is carried as that, so no setting is called
+    // orphaned by a plugin the machine may still have.
+    let journalled = super::targets::layout(ctx)
+        .map(|paths| {
+            super::recover::journal_at(&paths.journal())
+                .changes()
+                .to_vec()
+        })
+        .unwrap_or_default();
+    let installed: Option<Vec<String>> = super::plugins::read(ctx).ok().map(|register| {
+        register
+            .installed()
+            .iter()
+            .map(|one| one.plugin.clone())
+            .collect()
+    });
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
         .map(|shown| {
-            let origin = origin::of_setting(
-                &shown.key,
-                recorded
-                    .as_ref()
-                    .and_then(|held| held.entry(super::reconfiguring::SETTINGS, &shown.key)),
-            );
+            let holds = file.get(&shown.key).unwrap_or_default();
+            let origin =
+                origin::of_journalled(&shown.key, holds, &journalled, installed.as_deref())
+                    .unwrap_or_else(|| {
+                        origin::of_setting(
+                            &shown.key,
+                            recorded.as_ref().and_then(|held| {
+                                held.entry(super::reconfiguring::SETTINGS, &shown.key)
+                            }),
+                        )
+                    });
             SettingReport::of(shown, origin)
         })
         .collect();
@@ -639,6 +661,136 @@ mod tests {
             origin_of(&read, EXPLANATIONS_KEY),
             Some(crate::origin::Origin::Operator)
         );
+    }
+
+    /// Put what a plugin install and one of its setting changes would write into this
+    /// machine's journal, by hand — nothing in this build writes a setting under a
+    /// plugin's name until recipes apply, so this is the shape they will write.
+    fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, current: &str) {
+        let changes = [
+            crate::journal::Change {
+                at: "1".to_owned(),
+                operation: plugin.to_owned(),
+                target: "document".to_owned(),
+                kind: crate::journal::Kind::Made {
+                    path: format!("/stack/compose/plugins/{plugin}.yml"),
+                },
+            },
+            crate::journal::Change {
+                at: "1".to_owned(),
+                operation: plugin.to_owned(),
+                target: ".env".to_owned(),
+                kind: crate::journal::Kind::Set {
+                    key: key.to_owned(),
+                    previous: previous.map(str::to_owned),
+                    current: current.to_owned(),
+                },
+            },
+        ];
+        let _ = crate::app::targets::layout(ctx).map(|paths| {
+            crate::app::recover::journalled(&paths.journal(), &changes, ctx.random.as_ref());
+        });
+    }
+
+    /// A context over that file with a stack directory beside it, which is what places
+    /// the journal: a machine set up has both.
+    fn set_up(env_file: &std::path::Path) -> Ctx {
+        let mut ctx = ctx(env_file.to_path_buf());
+        ctx.settings.stack_dir = env_file.parent().map(|dir| dir.join("data").join("stack"));
+        ctx
+    }
+
+    /// Record `plugins` as installed, beside the settings file, or write a record that
+    /// will not read where there are none to name and `readable` is false.
+    fn registered(env: &std::path::Path, plugins: &[&str], readable: bool) {
+        let entries: Vec<String> = plugins
+            .iter()
+            .map(|one| format!(r#"{{"plugin":"{one}","version":"1.0.0","services":[]}}"#))
+            .collect();
+        let text = if readable {
+            format!(r#"{{"installed":[{}]}}"#, entries.join(","))
+        } else {
+            "{ not a register".to_owned()
+        };
+        let _ = env
+            .parent()
+            .map(|dir| std::fs::write(dir.join(crate::config::paths::PLUGINS), text));
+    }
+
+    /// A value an installed plugin set over the operator's is read as overridden, with
+    /// the value it replaced and whose that was; one a plugin left behind when it went
+    /// is read as orphaned; and where the record of what is installed will not read,
+    /// neither is claimed.
+    #[tokio::test]
+    async fn a_value_a_plugin_set_is_overridden_while_it_is_installed_and_orphaned_after() {
+        let env = env_at("origin-overridden", "LEMONFIBER_EXPLANATIONS=off\n");
+        let ctx = set_up(&env);
+        a_plugin_set(&ctx, "komga", EXPLANATIONS_KEY, Some("on"), "off");
+
+        registered(&env, &["komga"], true);
+        let held = origin_of(
+            &reading(&ctx, Some(EXPLANATIONS_KEY)).await,
+            EXPLANATIONS_KEY,
+        );
+        assert!(
+            matches!(&held, Some(crate::origin::Origin::Overridden { named, replaced })
+                if named == "komga" && replaced.value.as_deref() == Some("on") && !replaced.from.is_settled()),
+            "{held:?}"
+        );
+
+        registered(&env, &[], true);
+        let held = origin_of(
+            &reading(&ctx, Some(EXPLANATIONS_KEY)).await,
+            EXPLANATIONS_KEY,
+        );
+        assert_eq!(
+            held,
+            Some(crate::origin::Origin::Orphaned {
+                named: "komga".to_owned()
+            })
+        );
+
+        registered(&env, &[], false);
+        let held = origin_of(
+            &reading(&ctx, Some(EXPLANATIONS_KEY)).await,
+            EXPLANATIONS_KEY,
+        );
+        assert!(
+            held.as_ref()
+                .and_then(crate::origin::Origin::why)
+                .is_some_and(|why| why.contains("will not read")),
+            "{held:?}"
+        );
+    }
+
+    /// A credential a plugin replaced is read out of the sealed journal to be judged,
+    /// and is never put on the listing.
+    #[tokio::test]
+    async fn a_credential_a_plugin_replaced_is_never_shown() {
+        let env = env_at("origin-credential-replaced", "INDEXER_APIKEY=the-new-one\n");
+        let ctx = set_up(&env);
+        a_plugin_set(
+            &ctx,
+            "komga",
+            INDEXER_APIKEY_KEY,
+            Some("the-old-one"),
+            "the-new-one",
+        );
+        registered(&env, &["komga"], true);
+
+        let read = reading(&ctx, Some(INDEXER_APIKEY_KEY)).await;
+
+        let held = origin_of(&read, INDEXER_APIKEY_KEY);
+        assert!(
+            matches!(&held, Some(crate::origin::Origin::Overridden { replaced, .. })
+                if replaced.value.is_none() && replaced.withheld),
+            "{held:?}"
+        );
+        let json = read
+            .ok()
+            .and_then(|outcome| serde_json::to_string(&outcome).ok())
+            .unwrap_or_default();
+        assert!(!json.is_empty() && !json.contains("the-old-one") && !json.contains("the-new-one"));
     }
 
     #[tokio::test]

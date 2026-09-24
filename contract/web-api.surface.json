@@ -8210,8 +8210,16 @@
           "type": [
             "const:\"bundled\"",
             "const:\"operator\"",
+            "const:\"orphaned\"",
+            "const:\"overridden\"",
             "const:\"plugin\"",
             "const:\"unknown\""
+          ],
+          "required": true
+        },
+        "replaced": {
+          "type": [
+            "ref:ValueReplaced"
           ],
           "required": true
         },
@@ -8225,9 +8233,34 @@
       "variants": [
         "\"bundled\"",
         "\"operator\"",
+        "\"orphaned\"",
+        "\"overridden\"",
         "\"plugin\"",
         "\"unknown\""
       ]
+    },
+    "ValueReplaced": {
+      "fields": {
+        "from": {
+          "type": [
+            "ref:ValueOrigin"
+          ],
+          "required": true
+        },
+        "value": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "withheld": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
     },
     "VersionReport": {
       "fields": {
