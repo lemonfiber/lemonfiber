@@ -511,7 +511,7 @@ fn already(held: &crate::plugin::Already) -> Problem {
          of changes back before it applies another — doing it as an install would leave the \
          record describing one version and the machine carrying two.",
         Remedy::new(format!(
-            "Remove {} first, or wait for the word that updates one",
+            "Run `lemonfiber plugin update` on the new source, or remove {} first",
             held.plugin
         )),
     )
