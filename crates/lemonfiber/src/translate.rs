@@ -102,11 +102,11 @@ pub(crate) fn held(member: String, most: Option<u32>) -> Result<Command, u8> {
     // Taken from the served read rather than restated, so a terminal and a browser
     // looking at one household cannot come to see two different shelves. A number
     // written down twice is a number that drifts the first time one of them moves.
-    let most = most.unwrap_or(lemonfiber_api::reads::A_SHELF);
-    if most == 0 || most > lemonfiber_api::reads::MOST_AT_ONCE {
+    let most = most.unwrap_or(lemonfiber_api::read::table::A_SHELF);
+    if most == 0 || most > lemonfiber_api::read::table::MOST_AT_ONCE {
         complain!(
             "error: `--most` takes a number from 1 to {}",
-            lemonfiber_api::reads::MOST_AT_ONCE
+            lemonfiber_api::read::table::MOST_AT_ONCE
         );
         return Err(USAGE);
     }
@@ -611,7 +611,7 @@ mod tests {
             super::held("Ada".to_owned(), None),
             Ok(Command::Held {
                 member: "Ada".to_owned(),
-                most: lemonfiber_api::reads::A_SHELF,
+                most: lemonfiber_api::read::table::A_SHELF,
             })
         );
     }
@@ -620,7 +620,7 @@ mod tests {
     /// was shown five hundred has been told that is the shelf.
     #[test]
     fn a_count_outside_what_one_shelf_shows_is_refused_at_either_end() {
-        let ceiling = lemonfiber_api::reads::MOST_AT_ONCE;
+        let ceiling = lemonfiber_api::read::table::MOST_AT_ONCE;
         assert!(super::held("Ada".to_owned(), Some(0)).is_err());
         assert!(super::held("Ada".to_owned(), Some(ceiling + 1)).is_err());
         assert!(super::held("Ada".to_owned(), Some(ceiling)).is_ok());

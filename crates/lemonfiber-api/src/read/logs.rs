@@ -1,9 +1,5 @@
-//! What this stack is, what it declares, and what it is doing.
-//!
-//! The versions in play, the forms the stack offers, the state of every service,
-//! and what those services are saying. Five reads of one running stack, cut four
-//! ways because the command line cuts it four ways — what is running and what each
-//! service is are one question asked at two scales, and each scale is a command.
+//! What the services are saying, the one read of the stack that is not a command's
+//! envelope: it may stay open and hand on each line as it arrives.
 
 use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
@@ -14,11 +10,10 @@ use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 
-use crate::admission::Caller;
-use crate::reads::{Asked, FOLLOW, FORM, FORMS, LOGS, SERVICE, SERVICES, STATUS, TAIL, VERSION};
+use crate::read::table::{Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
 use crate::router::Serving;
 
-use super::{enveloped, reading, unreadable, went_wrong};
+use super::{enveloped, unreadable, went_wrong};
 
 /// The most existing lines this read will begin with.
 ///
@@ -40,54 +35,9 @@ fn not_a_count() -> String {
 /// What is said to a request whose follow is neither yes nor no.
 const NOT_A_CHOICE: &str = "Whether to keep reading must be true or false.";
 
-/// The reads about the stack itself.
+/// The read of what the services are saying.
 pub(super) fn routes() -> Router<Serving> {
-    Router::new()
-        .route(VERSION, get(version))
-        .route(FORMS, get(forms))
-        .route(STATUS, get(status))
-        .route(SERVICES, get(services))
-        .route(LOGS, get(log_lines))
-}
-
-/// The versions in play: this binary, the stack it operates, and the engine's.
-async fn version(
-    State(serving): State<Serving>,
-    caller: Caller,
-    RawQuery(query): RawQuery,
-) -> Response {
-    reading(&serving.ctx, &caller, VERSION, query.as_deref()).await
-}
-
-/// Every form the stack declares, or what naming some of them would come to.
-///
-/// Forms come from the stack rather than from lemonfiber, so their names are not
-/// something a caller can hold in advance. Naming none lists them and naming some
-/// resolves them, which is the fork `lemonfiber forms` takes on the same word.
-async fn forms(
-    State(serving): State<Serving>,
-    caller: Caller,
-    RawQuery(query): RawQuery,
-) -> Response {
-    reading(&serving.ctx, &caller, FORMS, query.as_deref()).await
-}
-
-/// What the whole stack is doing.
-async fn status(
-    State(serving): State<Serving>,
-    caller: Caller,
-    RawQuery(query): RawQuery,
-) -> Response {
-    reading(&serving.ctx, &caller, STATUS, query.as_deref()).await
-}
-
-/// What each service is doing, narrowed to the forms that were named.
-async fn services(
-    State(serving): State<Serving>,
-    caller: Caller,
-    RawQuery(query): RawQuery,
-) -> Response {
-    reading(&serving.ctx, &caller, SERVICES, query.as_deref()).await
+    Router::new().route(LOGS, get(log_lines))
 }
 
 /// What the services are saying, and — where it is asked for — what they say next.

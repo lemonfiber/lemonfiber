@@ -451,7 +451,7 @@ is the one this workspace deliberately does not test.
 
 **The question is the web's read.** A question is held by the path the web serves
 it at, and that name goes through
-[`reads.rs`](../../crates/lemonfiber-api/src/reads.rs) — the same table the
+[`reads.rs`](../../crates/lemonfiber-api/src/read/table.rs) — the same table the
 endpoints themselves go through — so a question asked at this screen reaches the
 command a browser reaches. What a question must be given before it can be asked is
 that table's too: a trace with nothing typed is refused in the sentence a browser is

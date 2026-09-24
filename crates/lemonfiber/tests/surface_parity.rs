@@ -553,13 +553,21 @@ fn served() -> BTreeSet<String> {
 /// The paths, and the route calls whose path could not be read.
 fn routing() -> (BTreeSet<String>, Vec<String>) {
     let source = api();
-    let mut paths = BTreeSet::new();
+    let mut paths: BTreeSet<String> = lemonfiber_api::read::table::OFFERED
+        .iter()
+        .map(|path| (*path).to_owned())
+        .collect();
     let mut unreadable = Vec::new();
     for rest in source.split(".route(").skip(1) {
         let Some((argument, _)) = rest.split_once(',') else {
             unreadable.push(named(rest));
             continue;
         };
+        // The reads are routed from their table, one route per name it offers, and
+        // the table is read above rather than the call that walks it.
+        if argument.trim() == "read" {
+            continue;
+        }
         match path_of(argument.trim(), &source) {
             Some(path) => {
                 paths.insert(path);

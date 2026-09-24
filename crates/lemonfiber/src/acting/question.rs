@@ -24,7 +24,7 @@
 //! operator is looking at is always the argument the word will fill.
 //!
 //! Each question is held by the name of the read every surface answers it at. That
-//! name is what [`lemonfiber_api::reads`] turns into one of the core's own
+//! name is what [`lemonfiber_api::read::table`] turns into one of the core's own
 //! commands, and this reaches that table rather than carrying a second one — so a
 //! question asked on this screen reaches the command a browser reaches, and a
 //! terminal read that could ask something no other surface can ask is not a state
@@ -47,7 +47,7 @@ mod shape;
 
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
-use lemonfiber_api::reads::{
+use lemonfiber_api::read::table::{
     named, ALERTS, BANDWIDTH, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR,
     HELD, HISTORY, HOSTING, MIGRATION, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED, STUCK,
     TRACE, UNINSTALL, UPDATE, VERSION,
@@ -481,7 +481,7 @@ pub(super) fn waiting(stage: &mut Stage, waiting_on: Stage, press: &Press) -> Wa
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{all, asked_at, every, Narrows, Needed, Question, CONFIG, FORMS, OPENS_ON, TRACE};
-    use lemonfiber_api::reads::{
+    use lemonfiber_api::read::table::{
         NO_MEMBER, NO_SETTING, NO_SUCH_REMOVAL, NO_TERM, OFFERED as SERVED,
     };
     use lemonfiber_core::app::Command;

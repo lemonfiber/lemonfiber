@@ -27,12 +27,11 @@ use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::support::{held, Held};
 
-use crate::admission::Caller;
-use crate::reads::{wanted, BACKUPS, BUNDLE};
+use crate::read::table::{wanted, BUNDLE};
 use crate::router::Serving;
 use crate::serve::carrying;
 
-use super::{reading, went_wrong};
+use super::went_wrong;
 
 /// What a bundle is served as.
 ///
@@ -48,23 +47,7 @@ const KEEP_IT: &str = "attachment";
 
 /// The reads about the files lemonfiber keeps.
 pub(super) fn routes() -> Router<Serving> {
-    Router::new()
-        .route(BACKUPS, get(backups))
-        .route(BUNDLE, get(bundle))
-}
-
-/// The backup archives this machine has kept, by the names they were written under.
-///
-/// The half of a restore that comes before naming one. A shell lists the directory;
-/// a browser cannot, and a name nothing could tell it is a name it cannot use — so
-/// the listing is a command both surfaces read rather than a directory one of them
-/// walks.
-async fn backups(
-    State(serving): State<Serving>,
-    caller: Caller,
-    RawQuery(query): RawQuery,
-) -> Response {
-    reading(&serving.ctx, &caller, BACKUPS, query.as_deref()).await
+    Router::new().route(BUNDLE, get(bundle))
 }
 
 /// One support bundle this run kept, handed over whole.

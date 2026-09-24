@@ -1725,7 +1725,10 @@ mod tests {
         assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
 
         let said = showing(&acting);
-        assert!(said.contains(lemonfiber_api::reads::NO_TERM), "{said}");
+        assert!(
+            said.contains(lemonfiber_api::read::table::NO_TERM),
+            "{said}"
+        );
     }
 
     /// Moving over the line being typed changes neither it nor the screen, and
@@ -1970,12 +1973,18 @@ mod tests {
         let mut acting = asking("one setting");
         assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
         let said = showing(&acting);
-        assert!(said.contains(lemonfiber_api::reads::NO_SETTING), "{said}");
+        assert!(
+            said.contains(lemonfiber_api::read::table::NO_SETTING),
+            "{said}"
+        );
 
         let mut acting = asking("what one person asked for");
         assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
         let said = showing(&acting);
-        assert!(said.contains(lemonfiber_api::reads::NO_MEMBER), "{said}");
+        assert!(
+            said.contains(lemonfiber_api::read::table::NO_MEMBER),
+            "{said}"
+        );
     }
 
     /// Moving over the questions and typing at them take nothing, the way the list

@@ -13,7 +13,7 @@
 //! cap is a limit on what can be read in one sitting, and two slices landing on one
 //! file in a day does not make that file easier to read.
 
-use lemonfiber_api::reads::{named, Wanted as Asking};
+use lemonfiber_api::read::table::{named, Wanted as Asking};
 use lemonfiber_core::app::Command;
 
 use crate::acting::chooser::Listed;
@@ -21,7 +21,7 @@ use crate::acting::chooser::Listed;
 /// Which of a read's own arguments a narrowing fills.
 ///
 /// Named rather than assembled. What is typed or taken at this screen goes into the
-/// field [`lemonfiber_api::reads::Wanted`] names for that read, and the translation
+/// field [`lemonfiber_api::read::table::Wanted`] names for that read, and the translation
 /// decides what to do with it — so a narrowing offered here is one a query string
 /// can carry, and one it cannot is not a state this can hold. It is also what keeps
 /// the refusals honest: an argument left empty is refused in the sentence the same

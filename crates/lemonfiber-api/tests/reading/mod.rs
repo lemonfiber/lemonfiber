@@ -18,7 +18,7 @@ pub(crate) use lemonfiber_api::events::Streaming;
 pub(crate) use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 pub(crate) use lemonfiber_api::jobs::Jobs;
 pub(crate) use lemonfiber_api::read::enveloped;
-pub(crate) use lemonfiber_api::reads;
+pub(crate) use lemonfiber_api::read::table;
 pub(crate) use lemonfiber_api::router::{routes, Serving};
 pub(crate) use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
 pub(crate) use lemonfiber_core::config::store::REDACTED;

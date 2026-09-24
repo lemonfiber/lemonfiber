@@ -15,7 +15,7 @@
 //! indexers settles it, and that asking spends a search against the same allowance.
 //!
 //! **Neither is a question.** Every question on this screen goes through
-//! [`lemonfiber_api::reads`], and a read that disturbed something would not be a read —
+//! [`lemonfiber_api::read::table`], and a read that disturbed something would not be a read —
 //! the argument the web surface settled this on. So each widened run goes through the
 //! table of *actions*, by the names `diagnose` and `search`, which are the same names and
 //! the same required word a browser sends.
@@ -51,7 +51,7 @@
 //! rather than a refusal produced after somebody has agreed to something.
 
 use lemonfiber_api::actions::{named, Arguments, Disturbing};
-use lemonfiber_api::reads::{CHECKS, TRACE};
+use lemonfiber_api::read::table::{CHECKS, TRACE};
 use lemonfiber_core::app::Command;
 
 use super::question::Question;

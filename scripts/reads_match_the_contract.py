@@ -3,7 +3,7 @@
 Four artefacts describe the same set of read endpoints, and until now only three
 of them were read by anything:
 
-  crates/lemonfiber-api/src/read/     the routes, declared
+  crates/lemonfiber-api/src/read/table.rs  the routes, declared in `OFFERED`
   .docs/architecture/surface-parity.md   held to them by tests/surface_parity.rs
   spec 20-architecture/contracts/web-api.md, `## Reading`   held to nothing
   the docs site's envelope table      recounted against its vendored copy of the
@@ -16,13 +16,13 @@ site went on counting twelve because the page it counts still said twelve. This
 reads it, in both directions — a route the block does not name, and a name
 nothing serves.
 
-Scope is `crates/lemonfiber-api/src/read/`, which is exactly what the block is
-about. `crate::read::routes()` merges the modules in that directory and nothing
-else: the stream, the actions, the jobs and the wizard are each their own
-section of the same page and are named there rather than here. A route naming a
-constant is resolved against the crate that declares it, since the paths are
-declared once and named by the surfaces that ask for them; a constant nothing
-declares is reported rather than skipped.
+Scope is what `crate::read::routes()` serves: one route per name in `OFFERED`,
+and the routes the modules under `crates/lemonfiber-api/src/read/` add beside
+them. The actions, the jobs and the wizard are each their own section of the
+same page and are named there rather than here. A route naming a constant is
+resolved against the crate that declares it, since the paths are declared once
+and named by the surfaces that ask for them; a constant nothing declares is
+reported rather than skipped.
 
 The spec is a different repository and this one does not vendor it, so the page
 arrives as an argument. CI checks it out beside the tree under review; by hand
@@ -43,6 +43,10 @@ import sys
 
 # Where the reads are declared, relative to the repository root.
 READS = pathlib.Path("crates/lemonfiber-api/src/read")
+
+# The table every read the envelope answers is routed from, and the list in it.
+TABLE = pathlib.Path("crates/lemonfiber-api/src/read/table.rs")
+OFFERED = re.compile(r"pub const OFFERED: &\[&str\] = &\[(.*?)\];", re.DOTALL)
 
 # Where a path held in a constant is declared, relative to the same root.
 DECLARING = pathlib.Path("crates/lemonfiber-api/src")
@@ -116,6 +120,18 @@ def served(root: pathlib.Path) -> tuple[set[str], list[str]]:
     constants = declared(root)
     paths: set[str] = set()
     problems: list[str] = []
+    table = OFFERED.search((root / TABLE).read_text(encoding="utf-8"))
+    if table is None:
+        problems.append(f"{root / TABLE} declares no `OFFERED` list")
+    else:
+        for name in re.findall(r"[A-Z][A-Z0-9_]*", table.group(1)):
+            if name in constants:
+                paths.add(constants[name])
+            else:
+                problems.append(
+                    f"{root / TABLE}: `OFFERED` names `{name}`, which this crate "
+                    "does not declare as a path"
+                )
     for source in sorted(here.rglob("*.rs")):
         text = source.read_text(encoding="utf-8")
         for argument in ROUTE.findall(text):

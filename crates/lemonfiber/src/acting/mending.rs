@@ -62,7 +62,7 @@
 mod warning;
 
 use lemonfiber_api::actions::{named, Arguments};
-use lemonfiber_api::reads::{named as asked, Wanted as Asking, CHECKS};
+use lemonfiber_api::read::table::{named as asked, Wanted as Asking, CHECKS};
 use lemonfiber_core::app::repair::Report;
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::error::Problem;

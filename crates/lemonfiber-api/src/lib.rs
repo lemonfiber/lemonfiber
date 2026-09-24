@@ -18,7 +18,6 @@ pub mod frontend;
 pub mod guard;
 pub mod jobs;
 pub mod read;
-pub mod reads;
 pub mod router;
 pub mod serve;
 pub mod setup;
