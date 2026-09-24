@@ -22,6 +22,7 @@ use lemonfiber_core::plugin::{
 
 use super::super::Lines;
 
+mod listed;
 mod updated;
 
 /// What is installed on this machine, and what installing one came to.
@@ -75,6 +76,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
     }
     for one in &report.installed {
         lines.spaced(format!("  {}", named(one)));
+        lines.extend(listed::provenance(one, &report.substituted));
         lines.extend(services(one));
     }
     lines
@@ -528,6 +530,9 @@ mod tests {
             }],
             provides: Vec::new(),
             contributions: Vec::new(),
+            declared: lemonfiber_core::plugin::Declaration::default(),
+            from: String::new(),
+            installed_at: String::new(),
         }
     }
 
@@ -599,6 +604,7 @@ mod tests {
             installed: Vec::new(),
             install: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert_eq!(said, "No plugins are installed.");
@@ -613,6 +619,7 @@ mod tests {
             installed: vec![recorded("komga", Some(household()))],
             install: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("One plugin is installed:"), "{said}");
@@ -634,6 +641,7 @@ mod tests {
             installed: vec![recorded("komga", Some(household())), recorded("plex", None)],
             install: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("2 plugins are installed:"), "{said}");
@@ -660,6 +668,7 @@ mod tests {
             )],
             install: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -683,6 +692,7 @@ mod tests {
             )],
             install: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -695,8 +705,9 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(install(one, true)),
+            install: Some(Box::new(install(one, true))),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
@@ -718,8 +729,9 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(install(one.clone(), true)),
+            install: Some(Box::new(install(one.clone(), true))),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -744,8 +756,9 @@ mod tests {
             installs(&Installs {
                 removal: None,
                 installed: Vec::new(),
-                install: Some(install(one.clone(), recorded)),
+                install: Some(Box::new(install(one.clone(), recorded))),
                 update: None,
+                substituted: Vec::new(),
             })
             .text()
         };
@@ -766,13 +779,14 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 proofs: vec![proof()],
                 overrides: vec![override_of()],
                 ..install(one, false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -808,13 +822,14 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 proofs: vec![proof()],
                 overrides: vec![override_of()],
                 ..install(one, true)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("What it put on this machine:"), "{said}");
@@ -833,11 +848,12 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 ..install(recorded("komga", Some(household())), false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -862,15 +878,16 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 proofs: vec![Proving {
                     of: None,
                     ..proof()
                 }],
                 ..install(recorded("komga", Some(household())), false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("asks GET /api/v1/libraries"), "{said}");
@@ -886,7 +903,7 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 proofs: vec![Proving {
                     came_to: Some(Verdict::Passed),
@@ -894,8 +911,9 @@ mod tests {
                 }],
                 against: Some(Evidence::Service),
                 ..install(one, true)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("held"), "{said}");
@@ -914,7 +932,7 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 proofs: vec![
                     Proving {
@@ -934,8 +952,9 @@ mod tests {
                 ],
                 against: Some(Evidence::Service),
                 ..install(one, false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -982,14 +1001,15 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 verified: Some(Verification {
                     broke: Vec::new(),
                     unsettled: Vec::new(),
                 }),
                 ..install(one, true)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -1010,7 +1030,7 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 verified: Some(Verification {
                     broke: vec![lemonfiber_core::plugin::Changed {
                         now: found(
@@ -1031,8 +1051,9 @@ mod tests {
                     }],
                 }),
                 ..install(one, false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -1091,11 +1112,12 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 verified: None,
                 ..install(one, false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(!said.contains("the stack's own checks"), "{said}");
@@ -1109,25 +1131,27 @@ mod tests {
         let one = recorded("komga", None);
         let quiet = installs(&Installs {
             installed: Vec::new(),
-            install: Some(install(one.clone(), false)),
+            install: Some(Box::new(install(one.clone(), false))),
             removal: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(!quiet.contains("contested"), "{quiet}");
 
         let said = installs(&Installs {
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 contests: vec![lemonfiber_core::wiring::Contest {
                     by: "seerr".to_owned(),
                     capability: "identity.source".to_owned(),
                     claimants: vec!["jellyfin".to_owned(), "komga (plugin komga)".to_owned()],
                 }],
                 ..install(one, false)
-            }),
+            })),
             removal: None,
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -1152,6 +1176,85 @@ mod tests {
         )
         .text();
         assert!(done.contains("What is now contested"), "{done}");
+    }
+
+    /// Each installed plugin says, beneath its name, everything the record knows about
+    /// what it is doing — and a record that kept none of it says so rather than going
+    /// quiet.
+    #[test]
+    fn the_listing_says_what_each_plugin_is_doing() {
+        let mut full = recorded("komga", None);
+        full.from = "/srv/plugins/komga".to_owned();
+        full.installed_at = "1709287200".to_owned();
+        full.provides = vec!["media.serve".to_owned()];
+        full.contributions = Vec::new();
+        full.declared = lemonfiber_core::plugin::Declaration {
+            upstream: "https://github.com/gotson/komga".to_owned(),
+            license: "MIT".to_owned(),
+            reviewed: false,
+            claims: vec!["media.serve".to_owned(), "komga:kobo-sync".to_owned()],
+            overrides: vec![Overriding {
+                setting: "homepage.services".to_owned(),
+                why: "Add its own entry".to_owned(),
+            }],
+            reaches: vec!["metadata.example.org".to_owned()],
+            secrets: vec![lemonfiber_core::plugin::Secret {
+                id: "api-key".to_owned(),
+                of: "komga".to_owned(),
+                why: "Read the library counts".to_owned(),
+            }],
+        };
+        let said = installs(&Installs {
+            installed: vec![full, recorded("bare", None)],
+            install: None,
+            removal: None,
+            update: None,
+            substituted: vec![lemonfiber_core::plugin::Substituted {
+                plugin: "komga".to_owned(),
+                capability: "media.serve".to_owned(),
+                service: "komga".to_owned(),
+            }],
+        })
+        .text();
+        for expected in [
+            "from       /srv/plugins/komga — unreviewed: nobody vouched for it",
+            "installed  at 1709287200 (seconds since the epoch)",
+            "upstream   https://github.com/gotson/komga (MIT)",
+            "claims     media.serve, komga:kobo-sync",
+            "fills      media.serve",
+            "stands in  komga fills media.serve, because you chose it",
+            "may change homepage.services — Add its own entry",
+            "reaches    metadata.example.org",
+            "holds      api-key for komga — Read the library counts",
+            "from       not recorded — unreviewed",
+            "installed  at a moment the record does not hold",
+        ] {
+            assert!(
+                said.contains(expected),
+                "{expected:?} missing from:\n{said}"
+            );
+        }
+    }
+
+    /// A reviewed plugin says so, and one row it adds is counted in the singular.
+    #[test]
+    fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
+        let mut one = recorded("komga", None);
+        one.declared.reviewed = true;
+        one.contributions = serde_json::from_str(
+            r#"[{"at":"doctor.remedy","id":"komga:a","for":"komga:b","why":"w","action":"a"}]"#,
+        )
+        .unwrap_or_default();
+        let said = installs(&Installs {
+            installed: vec![one],
+            install: None,
+            removal: None,
+            update: None,
+            substituted: Vec::new(),
+        })
+        .text();
+        assert!(said.contains("— reviewed"), "{said}");
+        assert!(said.contains("adds       1 row to registers"), "{said}");
     }
 
     /// An update built for the page: from one version to the next, with whatever it
@@ -1179,6 +1282,7 @@ mod tests {
                 stopped: stopped.map(str::to_owned),
                 restored,
             })),
+            substituted: Vec::new(),
         }
     }
 
@@ -1304,6 +1408,7 @@ mod tests {
                 },
             }),
             update: None,
+            substituted: Vec::new(),
         }
     }
 
@@ -1448,7 +1553,7 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 reversed: Some(Reversal {
                     reversed: vec![Undo {
@@ -1462,8 +1567,9 @@ mod tests {
                     rehearsed: false,
                 }),
                 ..install(one, false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -1497,7 +1603,7 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(Install {
+            install: Some(Box::new(Install {
                 changes: writes(),
                 reversed: Some(Reversal {
                     reversed: Vec::new(),
@@ -1509,8 +1615,9 @@ mod tests {
                     rehearsed: false,
                 }),
                 ..install(one, false)
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(
@@ -1606,8 +1713,9 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(install(one, false)),
+            install: Some(Box::new(install(one, false))),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.starts_with("Would install komga 1.2.0:"), "{said}");
@@ -1621,8 +1729,12 @@ mod tests {
         let said = installs(&Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(install(recorded("komga", Some(household())), false)),
+            install: Some(Box::new(install(
+                recorded("komga", Some(household())),
+                false,
+            ))),
             update: None,
+            substituted: Vec::new(),
         })
         .text();
         assert!(said.contains("Nothing was written."), "{said}");
@@ -1639,6 +1751,7 @@ mod tests {
             installed: vec![recorded("komga", Some(household()))],
             install: None,
             update: None,
+            substituted: Vec::new(),
         }))
         .text();
         assert!(drawn.contains("komga 1.2.0"), "{drawn}");

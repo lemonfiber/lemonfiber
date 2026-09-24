@@ -54,7 +54,14 @@ pub enum PluginCommand {
         /// The plugin's source: its directory, or the `plugin.toml` inside it.
         path: PathBuf,
     },
-    /// Say what is installed, and what each install decided.
+    /// Say what is installed, and what each plugin is doing.
+    ///
+    /// The one place to look when something about the stack is surprising. For each
+    /// plugin: where it was installed from and whether anybody reviewed it, when it
+    /// was installed, where it is published and under what licence, what it claims and
+    /// fills, what it added, what you chose it to stand in for, what it may change,
+    /// where it may reach and what it holds — and, for each of its services, what runs
+    /// and how it is reached.
     ///
     /// Read from the record rather than from the manifests, so it answers for a
     /// machine whose plugin sources are long gone. A machine with none answers with

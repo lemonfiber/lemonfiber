@@ -177,6 +177,24 @@ pub struct Update {
     pub restored: Option<Restored>,
 }
 
+/// A capability the operator chose one of a plugin's services to fill.
+///
+/// The only way anything a plugin brought comes to fill what the stack asks for in
+/// place of the stack's own: a plugin cannot choose, and wiring by name is not
+/// something a plugin can introduce. So what a plugin substituted is what the operator
+/// substituted with it, and it is read off the recorded choices rather than off the
+/// plugin.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginSubstituted")]
+pub struct Substituted {
+    /// The plugin whose service it is.
+    pub plugin: String,
+    /// The capability it fills.
+    pub capability: String,
+    /// The service chosen.
+    pub service: String,
+}
+
 /// What is installed, and what installing one came to.
 ///
 /// One answer for the reading and for the verb, because they are one question: an
@@ -192,7 +210,10 @@ pub struct Installs {
     /// would report an install that did not happen.
     pub installed: Vec<Installed>,
     /// What this run's install came to, or nothing where it only read.
-    pub install: Option<Install>,
+    ///
+    /// Boxed for the reason the update is: it carries a whole account, and every other
+    /// run's report would otherwise be as large as the one run that installs.
+    pub install: Option<Box<Install>>,
     /// What this run's removal came to, or nothing where it removed nothing.
     ///
     /// Beside the install rather than in place of it, and never both at once: an
@@ -210,4 +231,11 @@ pub struct Installs {
     /// every other run's report would otherwise be as large as the one run that updates.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub update: Option<Box<Update>>,
+    /// Every capability the operator chose an installed plugin's service to fill.
+    ///
+    /// Filled on the reading of what is installed, which is the one read of what each
+    /// plugin is doing; a run that installs, updates or removes one leaves it empty,
+    /// because none of them changes a choice.
+    #[serde(default)]
+    pub substituted: Vec<Substituted>,
 }

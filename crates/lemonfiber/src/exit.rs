@@ -1238,6 +1238,9 @@ mod tests {
             services: Vec::new(),
             provides: Vec::new(),
             contributions: Vec::new(),
+            declared: lemonfiber_core::plugin::Declaration::default(),
+            from: String::new(),
+            installed_at: String::new(),
         }
     }
 
@@ -1249,7 +1252,7 @@ mod tests {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
             removal: None,
             installed: Vec::new(),
-            install: Some(lemonfiber_core::plugin::Install {
+            install: Some(Box::new(lemonfiber_core::plugin::Install {
                 would: komga(),
                 recorded,
                 changes: Vec::new(),
@@ -1259,8 +1262,9 @@ mod tests {
                 overrides: Vec::new(),
                 reversed,
                 contests: Vec::new(),
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         })
     }
 
@@ -1309,6 +1313,7 @@ mod tests {
                     },
                 }),
                 update: None,
+                substituted: Vec::new(),
             })
         };
 
@@ -1375,6 +1380,7 @@ mod tests {
                         running: true,
                     }),
                 })),
+                substituted: Vec::new(),
             })
         };
         assert_eq!(
@@ -1404,6 +1410,7 @@ mod tests {
                     installed: vec![komga()],
                     install: None,
                     update: None,
+                    substituted: Vec::new(),
                 }
             ))),
             success()

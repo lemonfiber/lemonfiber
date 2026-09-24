@@ -9662,6 +9662,60 @@
             "now"
           ]
         },
+        "PluginDeclaration": {
+          "description": "What a plugin declared about itself, as its install read it.",
+          "type": "object",
+          "properties": {
+            "claims": {
+              "description": "Every capability it claims, core and its own, in the order it declares them.\n\nApart from what its services fill: a claim is what it says it can do and has to\ndemonstrate, and a capability of its own is claimed without anything asking for\nit.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "license": {
+              "description": "The licence it is distributed under.",
+              "type": "string",
+              "default": ""
+            },
+            "overrides": {
+              "description": "Every bundled setting it declares it may change.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PluginOverriding"
+              }
+            },
+            "reaches": {
+              "description": "Every destination a recipe of its could reach that is not one of its own\nservices: a service of this stack's, or a name outside it.\n\nRecorded as declared rather than sorted into the two here, because which names\nare this stack's is a question about the stack, and the stack a record is read\nagainst is the one on the machine when it is read.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "reviewed": {
+              "description": "Whether anybody reviewed it before it was installed.\n\nFalse for every install from a path an operator named — which is every install\nthis build makes. Carried rather than left implicit, because an unreviewed\nplugin is to be said to be one for as long as it is installed, and a field that\nis only ever false today is still the field a reviewed install will set.",
+              "type": "boolean",
+              "default": false
+            },
+            "secrets": {
+              "description": "Every credential it says it will hold.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PluginSecret"
+              }
+            },
+            "upstream": {
+              "description": "Where its source is published, as the plugin names it.",
+              "type": "string",
+              "default": ""
+            }
+          },
+          "additionalProperties": false
+        },
         "PluginEvidence": {
           "description": "What the verdicts in a report were reached against.\n\nOne value, because one is all this build can produce: nothing here asks a service\nanything. It is a field rather than a sentence for the reason a verdict is one — a\nreader handed `demonstrated` has nothing else in the document to tell a recording\nthat answered from a service that did, and the weaker of those two claims must not\nbe readable as the stronger. The prose says it on the page; this says it to\nwhatever consumes the report: an author's own CI, a catalogue, anything counting\npasses. Naming the axis now is what made the second kind of evidence a change the\ncompiler walked somebody through rather than one they had to remember.",
           "oneOf": [
@@ -9772,6 +9826,29 @@
                 "$ref": "#/$defs/Contribution"
               }
             },
+            "declared": {
+              "description": "What the plugin declared about itself: where it is published, whether it was\nreviewed, what it claims, what it may change, where it may reach and what it\nwill hold.",
+              "$ref": "#/$defs/PluginDeclaration",
+              "default": {
+                "claims": [],
+                "license": "",
+                "overrides": [],
+                "reaches": [],
+                "reviewed": false,
+                "secrets": [],
+                "upstream": ""
+              }
+            },
+            "from": {
+              "description": "The source it was installed from, as the operator named it.\n\nEmpty for a record written before this was kept. A rehearsal's account carries\nthe source it was asked about, because that is what it would record.",
+              "type": "string",
+              "default": ""
+            },
+            "installed_at": {
+              "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Empty where the record predates\nit; a rehearsal's account carries the moment it was asked, which is the stamp\nthe install would have run under.",
+              "type": "string",
+              "default": ""
+            },
             "plugin": {
               "description": "The plugin's id: the name it is installed and journalled under.",
               "type": "string"
@@ -9808,7 +9885,7 @@
           "type": "object",
           "properties": {
             "install": {
-              "description": "What this run's install came to, or nothing where it only read.",
+              "description": "What this run's install came to, or nothing where it only read.\n\nBoxed for the reason the update is: it carries a whole account, and every other\nrun's report would otherwise be as large as the one run that installs.",
               "anyOf": [
                 {
                   "$ref": "#/$defs/PluginInstall"
@@ -9835,6 +9912,14 @@
                   "type": "null"
                 }
               ]
+            },
+            "substituted": {
+              "description": "Every capability the operator chose an installed plugin's service to fill.\n\nFilled on the reading of what is installed, which is the one read of what each\nplugin is doing; a run that installs, updates or removes one leaves it empty,\nbecause none of them changes a choice.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PluginSubstituted"
+              }
             },
             "update": {
               "description": "What this run's update came to, or nothing where it updated nothing.\n\nA third field rather than an install and a removal filled in together, for the\nreason those two are apart: an update is one operation with one account.\n\nBoxed because it carries a whole install's account beside the reversal, and\nevery other run's report would otherwise be as large as the one run that updates.",
@@ -9865,6 +9950,7 @@
               "type": "string"
             }
           },
+          "additionalProperties": false,
           "required": [
             "setting",
             "why"
@@ -10146,6 +10232,53 @@
             "version",
             "placed",
             "running"
+          ]
+        },
+        "PluginSecret": {
+          "description": "One credential a plugin says it will hold, without a value and with no place for one.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "What the value is, within the plugin.",
+              "type": "string"
+            },
+            "of": {
+              "description": "Whose credential it is.",
+              "type": "string"
+            },
+            "why": {
+              "description": "What holding it is for.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "of",
+            "why"
+          ]
+        },
+        "PluginSubstituted": {
+          "description": "A capability the operator chose one of a plugin's services to fill.\n\nThe only way anything a plugin brought comes to fill what the stack asks for in\nplace of the stack's own: a plugin cannot choose, and wiring by name is not\nsomething a plugin can introduce. So what a plugin substituted is what the operator\nsubstituted with it, and it is read off the recorded choices rather than off the\nplugin.",
+          "type": "object",
+          "properties": {
+            "capability": {
+              "description": "The capability it fills.",
+              "type": "string"
+            },
+            "plugin": {
+              "description": "The plugin whose service it is.",
+              "type": "string"
+            },
+            "service": {
+              "description": "The service chosen.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "plugin",
+            "capability",
+            "service"
           ]
         },
         "PluginUnfilled": {

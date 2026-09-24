@@ -30,7 +30,6 @@
 
 use lemonfiber_plugin::{Bind, Manifest, Service};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 /// How an installed service is reached, where it is reached at all.
 ///
@@ -232,6 +231,26 @@ pub struct Installed {
     /// say.
     #[serde(default)]
     pub contributions: Vec<lemonfiber_plugin::Contribution>,
+    /// What the plugin declared about itself: where it is published, whether it was
+    /// reviewed, what it claims, what it may change, where it may reach and what it
+    /// will hold.
+    #[serde(default)]
+    pub declared: super::declared::Declaration,
+    /// The source it was installed from, as the operator named it.
+    ///
+    /// Empty for a record written before this was kept. A rehearsal's account carries
+    /// the source it was asked about, because that is what it would record.
+    #[serde(default)]
+    pub from: String,
+    /// When it was installed, as the record stamps every change: whole seconds since
+    /// the epoch.
+    ///
+    /// The install's own stamp, the one its changes are journalled under, so the
+    /// listing and the history name the same moment. Empty where the record predates
+    /// it; a rehearsal's account carries the moment it was asked, which is the stamp
+    /// the install would have run under.
+    #[serde(default)]
+    pub installed_at: String,
 }
 
 impl Installed {
@@ -267,6 +286,23 @@ impl Installed {
                     ..entry.clone()
                 })
                 .collect(),
+            declared: super::declared::Declaration::of(manifest),
+            from: String::new(),
+            installed_at: String::new(),
+        }
+    }
+
+    /// The same record, as installed from this source at this moment.
+    ///
+    /// Apart from [`Self::of`], which is a function of the manifest alone and stays
+    /// one: where it came from and when are facts about this machine, known only to the
+    /// run that installs it.
+    #[must_use]
+    pub fn installed(self, from: &std::path::Path, at: &str) -> Self {
+        Self {
+            from: from.display().to_string(),
+            installed_at: at.to_owned(),
+            ..self
         }
     }
 }
@@ -324,161 +360,13 @@ pub fn answering(installed: &[Installed]) -> std::collections::BTreeMap<String, 
         .collect()
 }
 
-/// Why a register could not be read.
-///
-/// Two ways, and neither of them is *there is no file*. No file, an empty file and a
-/// machine that has never installed anything are one answer — an empty register — and
-/// that answer is not a fault. These two are: a file that is there and will not parse,
-/// and one that parses and says two different things about the same plugin.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum Unreadable {
-    /// The record is there and this build cannot read it.
-    #[error("the record of installed plugins could not be read: {0}")]
-    Damaged(String),
-
-    /// The record names one plugin twice.
-    #[error("the record of installed plugins holds {0} twice, so what is installed under that name cannot be said")]
-    Twice(String),
-}
-
-/// Why a plugin could not be recorded as installed.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{plugin} is already installed, at version {version}")]
-pub struct Already {
-    /// Which plugin the record already holds.
-    pub plugin: String,
-    /// The version it holds for it.
-    pub version: String,
-}
-
-/// Every plugin this machine has installed.
-///
-/// Kept in one file beside the settings rather than one file per plugin: what an
-/// operator asks is *what is installed*, a directory answers that only by being
-/// listed, and a half-written directory has no shape a read can refuse.
-///
-/// The order is the plugins' own ids, so the file reads the same twice and a diff of
-/// it says what changed rather than where something was appended.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Register {
-    /// One record per installed plugin.
-    #[serde(default)]
-    installed: Vec<Installed>,
-}
-
-impl Register {
-    /// Nothing installed.
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self {
-            installed: Vec::new(),
-        }
-    }
-
-    /// What the record holds, or why it cannot be said.
-    ///
-    /// **A damaged record is refused rather than read as empty**, which is where this
-    /// parts company with every other small record beside the settings. Those hold an
-    /// answer that can be given again: a forgotten preference is asked for a second
-    /// time, and the cost is a question. This one is the only memory that a stranger's
-    /// service is on this machine at all — reading it as empty would report a stack
-    /// with a plugin in it as a stack with none, and every later reading of what is
-    /// installed, what is overridden and what a removal would put back would be
-    /// confidently wrong.
-    ///
-    /// # Errors
-    ///
-    /// [`Unreadable`] where the text is not a register this build can read, or names
-    /// one plugin twice.
-    pub fn parse(text: &str) -> Result<Self, Unreadable> {
-        if text.trim().is_empty() {
-            return Ok(Self::empty());
-        }
-        let read: Self =
-            serde_json::from_str(text).map_err(|why| Unreadable::Damaged(why.to_string()))?;
-        read.once_each()?;
-        Ok(read)
-    }
-
-    /// Whether any plugin appears twice.
-    ///
-    /// Checked on the way in rather than trusted to the writer. The id is the name a
-    /// plugin is installed and journalled under, so two records for one name is two
-    /// answers to *what is installed as this* — and a reader taking the first would
-    /// silently prefer whichever was written earlier.
-    fn once_each(&self) -> Result<(), Unreadable> {
-        let mut seen: Vec<&str> = Vec::new();
-        for one in &self.installed {
-            if seen.contains(&one.plugin.as_str()) {
-                return Err(Unreadable::Twice(one.plugin.clone()));
-            }
-            seen.push(&one.plugin);
-        }
-        Ok(())
-    }
-
-    /// As it is kept: sorted by plugin id, one trailing newline.
-    ///
-    /// `None` only where it will not serialise, which strings and numbers cannot.
-    #[must_use]
-    pub fn to_json(&self) -> Option<String> {
-        serde_json::to_string_pretty(self)
-            .ok()
-            .map(|text| text + "\n")
-    }
-
-    /// What is installed, in the order the record keeps them.
-    #[must_use]
-    pub fn installed(&self) -> &[Installed] {
-        &self.installed
-    }
-
-    /// What is recorded for this plugin, where anything is.
-    #[must_use]
-    pub fn holds(&self, plugin: &str) -> Option<&Installed> {
-        self.installed.iter().find(|one| one.plugin == plugin)
-    }
-
-    /// Record an install, keeping the order the file is read back in.
-    ///
-    /// # Errors
-    ///
-    /// [`Already`] where this plugin is recorded. An install over an install is an
-    /// update, which reverses one set of changes and applies another; treating it as
-    /// a write would leave the record describing the new version and the machine
-    /// carrying both.
-    pub fn record(&mut self, one: Installed) -> Result<(), Already> {
-        if let Some(held) = self.holds(&one.plugin) {
-            return Err(Already {
-                plugin: held.plugin.clone(),
-                version: held.version.clone(),
-            });
-        }
-        let at = self
-            .installed
-            .partition_point(|held| held.plugin < one.plugin);
-        self.installed.insert(at, one);
-        Ok(())
-    }
-
-    /// Take a plugin out of the record.
-    ///
-    /// Silent about a name it does not hold, because the caller has already refused
-    /// that case by name and a second refusal here would be a second answer to a
-    /// question already settled. What this promises is the state afterwards: whatever
-    /// it held about that plugin, it holds nothing now.
-    pub fn forget(&mut self, plugin: &str) {
-        self.installed.retain(|one| one.plugin != plugin);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use lemonfiber_plugin::{Bind, Manifest};
 
+    use super::super::register::{Register, Unreadable};
     use super::super::reports::{Install, Installs};
-    use super::{Installed, Placed, Reached, Register, Unreadable};
+    use super::{Installed, Placed, Reached};
 
     /// A plugin declaring two services, though the reader admits one at a time.
     ///
@@ -879,22 +767,26 @@ dashboard_group = "Library"
             install: None,
             removal: None,
             update: None,
+            substituted: Vec::new(),
         };
         let done = Installs {
             removal: None,
             installed: whole().into_iter().collect(),
-            install: whole().map(|would| Install {
-                would,
-                recorded: true,
-                changes: Vec::new(),
-                proofs: Vec::new(),
-                against: None,
-                verified: None,
-                overrides: Vec::new(),
-                reversed: None,
-                contests: Vec::new(),
+            install: whole().map(|would| {
+                Box::new(Install {
+                    would,
+                    recorded: true,
+                    changes: Vec::new(),
+                    proofs: Vec::new(),
+                    against: None,
+                    verified: None,
+                    overrides: Vec::new(),
+                    reversed: None,
+                    contests: Vec::new(),
+                })
             }),
             update: None,
+            substituted: Vec::new(),
         };
         assert!(read.install.is_none());
         assert_eq!(done.install.map(|one| one.recorded), Some(true));

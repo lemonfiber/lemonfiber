@@ -180,6 +180,13 @@ impl Chosen {
         )
     }
 
+    /// Every choice recorded, as the capability and the service chosen for it.
+    pub fn choices(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .map(|(capability, service)| (capability.as_str(), service.as_str()))
+    }
+
     /// Who the operator chose to fill this capability, where they chose.
     #[must_use]
     pub fn filler(&self, capability: &str) -> Option<&str> {
@@ -928,6 +935,9 @@ mod tests {
             }],
             provides: vec![capability.to_owned()],
             contributions: Vec::new(),
+            declared: crate::plugin::Declaration::default(),
+            from: String::new(),
+            installed_at: String::new(),
         }
     }
 

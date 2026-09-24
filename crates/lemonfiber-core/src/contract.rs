@@ -775,11 +775,14 @@ mod tests {
             }],
             provides: Vec::new(),
             contributions: Vec::new(),
+            declared: crate::plugin::Declaration::default(),
+            from: String::new(),
+            installed_at: String::new(),
         };
         crate::plugin::Installs {
             removal: None,
             installed: vec![one.clone()],
-            install: Some(crate::plugin::Install {
+            install: Some(Box::new(crate::plugin::Install {
                 changes: vec![
                     crate::plugin::Changing {
                         path: "/opt/lemonfiber/stack/config/komga".to_owned(),
@@ -812,8 +815,9 @@ mod tests {
                 recorded: true,
                 reversed: None,
                 contests: Vec::new(),
-            }),
+            })),
             update: None,
+            substituted: Vec::new(),
         }
     }
 
