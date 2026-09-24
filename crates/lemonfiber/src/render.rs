@@ -451,6 +451,18 @@ fn came_from(origin: &Origin) -> String {
         Origin::Operator => "yours".to_owned(),
         Origin::Plugin { named } => format!("set by plugin {named}"),
         Origin::Unknown { .. } => "origin unknown".to_owned(),
+        Origin::Overridden { named, replaced } => format!(
+            "set by plugin {named}, replacing {} ({})",
+            match (&replaced.value, replaced.withheld) {
+                (_, true) => "a withheld value",
+                (Some(value), false) => value.as_str(),
+                (None, false) => "nothing",
+            },
+            came_from(&replaced.from)
+        ),
+        Origin::Orphaned { named } => {
+            format!("left by plugin {named}, which is no longer installed")
+        }
     }
 }
 
@@ -464,7 +476,13 @@ fn unsettled(settings: &[SettingReport]) -> Lines {
     let mut lines = Lines::default();
     let mut said: Vec<&str> = Vec::new();
     for setting in settings {
-        if let Some(why) = setting.origin.why() {
+        // The value a plugin replaced has an origin of its own, and an unknown one is
+        // explained here as a setting's own is.
+        let why = setting.origin.why().or(match &setting.origin {
+            Origin::Overridden { replaced, .. } => replaced.from.why(),
+            _ => None,
+        });
+        if let Some(why) = why {
             if !said.contains(&why) {
                 said.push(why);
             }
@@ -863,6 +881,64 @@ mod tests {
             rehearsed: false,
             review: None,
         }
+    }
+
+    /// What a plugin replaced is on the line with what it put there, with whose the
+    /// replaced value was — and a credential's is never printed.
+    #[test]
+    fn an_overridden_setting_says_what_it_replaced_and_an_orphaned_one_whose_it_was() {
+        let replaced =
+            |value: Option<&str>, withheld: bool, from: Origin| lemonfiber_core::origin::Replaced {
+                value: value.map(str::to_owned),
+                withheld,
+                from: Box::new(from),
+            };
+        let komga = |replaced| Origin::Overridden {
+            named: "komga".to_owned(),
+            replaced,
+        };
+        let text = settings(&listing(vec![
+            (
+                "E",
+                komga(replaced(Some("Europe/Paris"), false, Origin::Operator)),
+            ),
+            ("F", komga(replaced(None, false, Origin::Bundled))),
+            ("G", komga(replaced(None, true, Origin::Operator))),
+            (
+                "H",
+                Origin::Orphaned {
+                    named: "plex".to_owned(),
+                },
+            ),
+            (
+                "I",
+                komga(replaced(
+                    Some("x"),
+                    false,
+                    Origin::Unknown {
+                        why: "nothing recorded it".to_owned(),
+                    },
+                )),
+            ),
+        ]))
+        .text();
+        assert!(text.contains("  nothing recorded it"), "{text}");
+        assert!(
+            text.contains("E=/data  — set by plugin komga, replacing Europe/Paris (yours)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("F=/data  — set by plugin komga, replacing nothing (lemonfiber's own)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("G=/data  — set by plugin komga, replacing a withheld value (yours)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("H=/data  — left by plugin plex, which is no longer installed"),
+            "{text}"
+        );
     }
 
     /// Every origin reads as words on the line the value is on, because a reader who

@@ -31,6 +31,10 @@ use serde::Serialize;
 
 use crate::baseline::Record;
 
+mod journalled;
+
+pub use journalled::of_journalled;
+
 /// Where a value in force came from.
 ///
 /// Published under a name of its own because the generated schema keys on the type's
@@ -57,6 +61,44 @@ pub enum Origin {
         /// than as a shrug.
         why: String,
     },
+    /// An installed plugin set it over a value that was there before, and that value
+    /// is carried with it: what is in force and what it replaced are read together.
+    Overridden {
+        /// Which plugin set what is in force.
+        named: String,
+        /// What it replaced, and where that came from.
+        replaced: Replaced,
+    },
+    /// A plugin set it and is no longer installed, and the value is still in force.
+    ///
+    /// Only where the record of what is installed was read and does not hold that
+    /// plugin. A record that would not read cannot say a plugin is gone, so that is
+    /// an unknown rather than this.
+    Orphaned {
+        /// Which plugin set it.
+        named: String,
+    },
+}
+
+/// The value a plugin's change replaced, and where that value came from.
+///
+/// Its own origin rather than assumed to be this build's default: before a plugin
+/// set a value, the operator may have, or another plugin, and calling that value
+/// *bundled* would tell somebody putting it back that they are returning to a
+/// default when they are returning to a choice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "ValueReplaced")]
+pub struct Replaced {
+    /// What it held, where there was a value and it may be shown. Nothing where nothing
+    /// was set — this build's default was in force — or where it is withheld.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// Whether a value is withheld because the setting holds a credential. A replaced
+    /// credential is shown as sealed and never in clear, as the one in force is.
+    pub withheld: bool,
+    /// Where the replaced value came from, read from the record of the change that
+    /// wrote it, and unknown where nothing recorded one.
+    pub from: Box<Origin>,
 }
 
 impl Origin {
@@ -68,6 +110,8 @@ impl Origin {
             Self::Operator => "operator",
             Self::Plugin { .. } => "plugin",
             Self::Unknown { .. } => "unknown",
+            Self::Overridden { .. } => "overridden",
+            Self::Orphaned { .. } => "orphaned",
         }
     }
 
@@ -84,7 +128,9 @@ impl Origin {
     #[must_use]
     pub fn plugin(&self) -> Option<&str> {
         match self {
-            Self::Plugin { named } => Some(named),
+            Self::Plugin { named } | Self::Overridden { named, .. } | Self::Orphaned { named } => {
+                Some(named)
+            }
             _ => None,
         }
     }
@@ -144,6 +190,27 @@ mod tests {
             at: "0".to_owned(),
             origin,
         }
+    }
+
+    /// The two states a plugin's own change leaves have a word, and name the plugin.
+    #[test]
+    fn an_overridden_and_an_orphaned_value_have_a_word_and_name_their_plugin() {
+        let overridden = Origin::Overridden {
+            named: "komga".to_owned(),
+            replaced: super::Replaced {
+                value: None,
+                withheld: false,
+                from: Box::new(Origin::Bundled),
+            },
+        };
+        let orphaned = Origin::Orphaned {
+            named: "plex".to_owned(),
+        };
+
+        assert_eq!(overridden.as_str(), "overridden");
+        assert_eq!(orphaned.as_str(), "orphaned");
+        assert_eq!(overridden.plugin(), Some("komga"));
+        assert_eq!(orphaned.plugin(), Some("plex"));
     }
 
     #[test]
