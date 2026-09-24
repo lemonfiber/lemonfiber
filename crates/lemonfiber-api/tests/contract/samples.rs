@@ -22,17 +22,17 @@ use built::{
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
 ///
-/// Split in three only because one list of every outcome this product has is
-/// longer than a function may be; the parts mean nothing apart.
+/// Gathered from four lists, one for each part of what the product does.
 pub(crate) fn samples() -> Vec<Outcome> {
-    let mut every = the_first_of_them();
-    every.extend(the_next_of_them());
-    every.extend(the_last_of_them());
+    let mut every = running();
+    every.extend(diagnosing());
+    every.extend(serving());
+    every.extend(keeping());
     every
 }
 
-/// The first of them, in the order the contract lists their kinds.
-fn the_first_of_them() -> Vec<Outcome> {
+/// What running the stack answers with.
+fn running() -> Vec<Outcome> {
     vec![
         Outcome::Version(VersionReport {
             binary: "0.1.0".to_owned(),
@@ -68,21 +68,6 @@ fn the_first_of_them() -> Vec<Outcome> {
             consequence: None,
             review: None,
         }),
-        Outcome::Quality(QualityReport::default()),
-        Outcome::Adoption(AdoptReport::default()),
-        Outcome::Beside(BesideReport::default()),
-        Outcome::Replacement(ReplaceReport::default()),
-        Outcome::Import(ImportReport::default()),
-        Outcome::Alerts(AlertReport::default()),
-        Outcome::History(HistoryReport::default()),
-        Outcome::Migration(MigrationReport::default()),
-        Outcome::Upgrade(UpgradeReport::default()),
-        Outcome::Music(MusicReport::default()),
-        Outcome::Trace(TraceReport::default()),
-        Outcome::Hosting(HostingReport::default()),
-        Outcome::Household(HouseholdReport::default()),
-        Outcome::Held(lemonfiber_core::model::HeldReport::default()),
-        Outcome::Stuck(StuckReport::default()),
         Outcome::Status(StatusReport {
             forms: Vec::new(),
             active_forms: Vec::new(),
@@ -97,6 +82,26 @@ fn the_first_of_them() -> Vec<Outcome> {
                     .to_owned(),
             }],
         }),
+        Outcome::Wizard(a_setup_part_way()),
+        Outcome::Watch(SupervisionReport {
+            forms: vec!["media".to_owned()],
+            reason: "the data location went away".to_owned(),
+            stopped: true,
+            would: None,
+        }),
+        Outcome::Walkthrough(a_walk()),
+        // Every optional half filled, so the shape is compared whole: a version to
+        // move to, one asked for, a command, a probe that answered, and the
+        // sentence a downgrade is owed.
+        Outcome::Update(an_update()),
+        Outcome::SelfUpdate(where_this_copy_stands()),
+        Outcome::Uninstall(a_removal()),
+    ]
+}
+
+/// What diagnosing and wiring the stack answers with.
+fn diagnosing() -> Vec<Outcome> {
+    vec![
         Outcome::Doctor(DoctorReport {
             overall: lemonfiber_core::doctor::Overall::Healthy,
             findings: Vec::new(),
@@ -114,12 +119,6 @@ fn the_first_of_them() -> Vec<Outcome> {
             }],
             acted: true,
         }),
-    ]
-}
-
-/// The next of them, continuing that order.
-fn the_next_of_them() -> Vec<Outcome> {
-    vec![
         Outcome::Undo(lemonfiber_core::repair::run::Reversal {
             reversed: vec![lemonfiber_core::journal::Undo {
                 target: "qbittorrent".to_owned(),
@@ -135,34 +134,54 @@ fn the_next_of_them() -> Vec<Outcome> {
         }),
         Outcome::Seed(lemonfiber_core::seed::Report::default()),
         Outcome::Reset(ResetReport::default()),
-        Outcome::Word(a_word()),
-        Outcome::Backup(lemonfiber_core::backup::run::Report {
-            path: std::path::PathBuf::new(),
-            scope: lemonfiber_core::backup::Scope::WholeStack,
-            sensitive: true,
-            pruned: Vec::new(),
-            pace: lemonfiber_core::backup::Pace::of(0),
-            rehearsed: false,
+        Outcome::Wiring(what_is_wired()),
+        Outcome::Substituted(a_substitution()),
+        Outcome::Catalogue(CatalogueReport {
+            services: vec![CataloguedService {
+                id: "bazarr".to_owned(),
+                name: "Bazarr".to_owned(),
+                describes: "Finds and downloads subtitles".to_owned(),
+                without_it: "No automatic subtitles".to_owned(),
+                criticality: lemonfiber_manifest::Criticality::Enhancing,
+            }],
+            removed: vec![RemovedService {
+                id: "readarr".to_owned(),
+                removed_in: "0.1.0".to_owned(),
+                reason: "Discontinued upstream in 2025".to_owned(),
+                replaced_by: Some("bindery".to_owned()),
+            }],
         }),
-        Outcome::Update(an_update()),
-        Outcome::Support(lemonfiber_core::app::support::Bundle {
-            contents: lemonfiber_core::bundle::Contents::default(),
-            bytes: 0,
-            path: None,
-            would_go: None,
+        Outcome::Provenance(ProvenanceReport {
+            services: vec![ServiceProvenance {
+                id: "sonarr".to_owned(),
+                name: "Sonarr".to_owned(),
+                license: "GPL-3.0-only".to_owned(),
+                upstream: "https://github.com/Sonarr/Sonarr".to_owned(),
+                image: "lscr.io/linuxserver/sonarr".to_owned(),
+                pinned: "4.0.15".to_owned(),
+            }],
         }),
-        Outcome::Restore(lemonfiber_core::app::restore::Restoration {
-            would: lemonfiber_core::app::restore::Preview {
-                manifest: manifest(),
-                downgrade: false,
-                relocation: None,
-                agreement: "5c3a1d20".to_owned(),
-            },
-            done: None,
-        }),
-        Outcome::Glossary(Vocabulary {
-            words: vec![a_word()],
-        }),
+        // One service and one removal rather than a whole stack: every field of
+        // both entries is on it, which is all the shape comparison reads, and a
+        // listing of nineteen would be nineteen copies of the same schema.
+        Outcome::Plugins(what_is_installed()),
+        // One service rather than a whole stack: every field of the entry is on
+        // it, which is all the shape comparison reads, and a listing of nineteen
+        // would be nineteen copies of the same schema.
+    ]
+}
+
+/// What the household and the words answer with.
+fn serving() -> Vec<Outcome> {
+    vec![
+        Outcome::Quality(QualityReport::default()),
+        Outcome::Music(MusicReport::default()),
+        Outcome::Upgrade(UpgradeReport::default()),
+        Outcome::Trace(TraceReport::default()),
+        Outcome::Hosting(HostingReport::default()),
+        Outcome::Household(HouseholdReport::default()),
+        Outcome::Held(lemonfiber_core::model::HeldReport::default()),
+        Outcome::Stuck(StuckReport::default()),
         Outcome::Invited(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
             address: "http://a-machine.local:8096".to_owned(),
@@ -188,12 +207,6 @@ fn the_next_of_them() -> Vec<Outcome> {
             revoked: lemonfiber_core::model::Revoked::Nothing,
             findings: Vec::new(),
         }),
-    ]
-}
-
-/// The last of them, continuing that order.
-fn the_last_of_them() -> Vec<Outcome> {
-    vec![
         Outcome::FrontDoor(a_front_door()),
         // Carrying its caution rather than leaving it out, so the optional half
         // of the shape is compared too.
@@ -202,41 +215,49 @@ fn the_last_of_them() -> Vec<Outcome> {
                 preset: lemonfiber_core::quality::Preset::Maximum,
             },
         ))),
-        Outcome::Outbound(what_leaves()),
-        Outcome::Plugins(what_is_installed()),
-        // One service rather than a whole stack: every field of the entry is on
-        // it, which is all the shape comparison reads, and a listing of nineteen
-        // would be nineteen copies of the same schema.
-        Outcome::Provenance(ProvenanceReport {
-            services: vec![ServiceProvenance {
-                id: "sonarr".to_owned(),
-                name: "Sonarr".to_owned(),
-                license: "GPL-3.0-only".to_owned(),
-                upstream: "https://github.com/Sonarr/Sonarr".to_owned(),
-                image: "lscr.io/linuxserver/sonarr".to_owned(),
-                pinned: "4.0.15".to_owned(),
-            }],
+        Outcome::Alerts(AlertReport::default()),
+        Outcome::Word(a_word()),
+        Outcome::Glossary(Vocabulary {
+            words: vec![a_word()],
         }),
-        // One service and one removal rather than a whole stack: every field of
-        // both entries is on it, which is all the shape comparison reads, and a
-        // listing of nineteen would be nineteen copies of the same schema.
-        Outcome::Catalogue(CatalogueReport {
-            services: vec![CataloguedService {
-                id: "bazarr".to_owned(),
-                name: "Bazarr".to_owned(),
-                describes: "Finds and downloads subtitles".to_owned(),
-                without_it: "No automatic subtitles".to_owned(),
-                criticality: lemonfiber_manifest::Criticality::Enhancing,
-            }],
-            removed: vec![RemovedService {
-                id: "readarr".to_owned(),
-                removed_in: "0.1.0".to_owned(),
-                reason: "Discontinued upstream in 2025".to_owned(),
-                replaced_by: Some("bindery".to_owned()),
-            }],
+    ]
+}
+
+/// What keeping, moving and accounting for things answers with.
+fn keeping() -> Vec<Outcome> {
+    vec![
+        Outcome::Adoption(AdoptReport::default()),
+        Outcome::Beside(BesideReport::default()),
+        Outcome::Replacement(ReplaceReport::default()),
+        Outcome::Import(ImportReport::default()),
+        Outcome::History(HistoryReport::default()),
+        Outcome::Migration(MigrationReport::default()),
+        Outcome::Backup(lemonfiber_core::backup::run::Report {
+            path: std::path::PathBuf::new(),
+            scope: lemonfiber_core::backup::Scope::WholeStack,
+            sensitive: true,
+            pruned: Vec::new(),
+            pace: lemonfiber_core::backup::Pace::of(0),
+            rehearsed: false,
         }),
-        Outcome::Wiring(what_is_wired()),
-        Outcome::Substituted(a_substitution()),
+        Outcome::Support(lemonfiber_core::app::support::Bundle {
+            contents: lemonfiber_core::bundle::Contents::default(),
+            bytes: 0,
+            path: None,
+            would_go: None,
+        }),
+        Outcome::Restore(lemonfiber_core::app::restore::Restoration {
+            would: lemonfiber_core::app::restore::Preview {
+                manifest: manifest(),
+                downgrade: false,
+                relocation: None,
+                agreement: "5c3a1d20".to_owned(),
+            },
+            done: None,
+        }),
+        Outcome::Archives(lemonfiber_core::app::archives::Listing {
+            archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
+        }),
         Outcome::Stored(lemonfiber_core::stored::stored(
             &lemonfiber_core::config::paths::Paths::rooted(
                 std::path::Path::new("/home/op/.config"),
@@ -263,21 +284,6 @@ fn the_last_of_them() -> Vec<Outcome> {
             },
         )),
         Outcome::Bandwidth(a_shared_line()),
-        Outcome::Uninstall(a_removal()),
-        Outcome::Wizard(a_setup_part_way()),
-        Outcome::Archives(lemonfiber_core::app::archives::Listing {
-            archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
-        }),
-        Outcome::Watch(SupervisionReport {
-            forms: vec!["media".to_owned()],
-            reason: "the data location went away".to_owned(),
-            stopped: true,
-            would: None,
-        }),
-        Outcome::Walkthrough(a_walk()),
-        // Every optional half filled, so the shape is compared whole: a version to
-        // move to, one asked for, a command, a probe that answered, and the
-        // sentence a downgrade is owed.
-        Outcome::SelfUpdate(where_this_copy_stands()),
+        Outcome::Outbound(what_leaves()),
     ]
 }

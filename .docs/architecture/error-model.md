@@ -180,8 +180,11 @@ codes! {
 }
 ```
 
-`crates/lemonfiber-error/src/codes.rs` declares every code, one module per family,
-with what a run that ends on it leaves with where that is not a general failure.
+`crates/lemonfiber-error/src/codes/` declares every code, one module per family, in
+two files — `operating.rs` for lemonfiber and the stack it runs, `serving.rs` for
+what the stack does for the household — with what a run that ends on a code leaves
+with where that is not a general failure. `codes.rs` re-exports the families, so a
+code is always `codes::<family>::<NAME>`.
 The code that raises a problem names it through that module, and a module that
 names one often enough brings it in with `use`. `Code` is a newtype rather than an
 enum so it can cross every crate as one `&'static str`, and only the registry can
@@ -193,7 +196,7 @@ Codes are never recycled. An operator who searches for one should find the same
 answer a year later, so a published code keeps its spelling even where two prefixes
 name one domain, as `WIRE` and `WIRING` do.
 
-`reference/error-codes.md` is rendered from `codes::EVERY`, and a test compares the
+`reference/error-codes.md` is rendered from `codes::every()`, and a test compares the
 committed bytes with a fresh rendering; `just codes` rewrites it. The binary's exit
 code for a problem is read from the same registry, through `codes::leaves`.
 

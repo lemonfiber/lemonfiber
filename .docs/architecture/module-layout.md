@@ -96,7 +96,7 @@ are equally stale to it. `web-api.surface.json` is names and types with every
 description stripped out, so it moves only when the interface moves, and it is what
 a removed or retyped field is caught against.
 
-`codes.rs` renders the error-code reference from `lemonfiber_error::codes::EVERY`,
+`codes.rs` renders the error-code reference from `lemonfiber_error::codes::every()`,
 the registry every code is declared in.
 
 `lemonfiber-core` re-exports the ports crate as `crate::ports`, so call sites read

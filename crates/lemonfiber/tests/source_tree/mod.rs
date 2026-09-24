@@ -121,11 +121,23 @@ fn only_for_tests(all: &BTreeMap<String, String>) -> BTreeSet<String> {
                 continue;
             }
             if let Some(name) = module_named(declared) {
-                trees.insert(format!("{}/{name}", path.trim_end_matches(".rs")));
+                trees.insert(format!("{}/{name}", directory_of(path)));
             }
         }
     }
     trees
+}
+
+/// The directory a file's own child modules live in: beside a crate root or a
+/// `mod.rs`, and in a directory named for the file otherwise.
+fn directory_of(path: &str) -> &str {
+    let stem = path.trim_end_matches(".rs");
+    for root in ["/lib", "/main", "/mod"] {
+        if let Some(parent) = stem.strip_suffix(root) {
+            return parent;
+        }
+    }
+    stem
 }
 
 /// The module one line declares as a file of its own, where it declares one.

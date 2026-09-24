@@ -10,6 +10,7 @@
 //! Below `lemonfiber-ports` rather than inside it: a port reports failures in this
 //! vocabulary, and the vocabulary is not itself a port.
 
+pub mod codes;
 pub mod plural;
 mod problem;
 pub mod retry;

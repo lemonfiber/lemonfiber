@@ -3,7 +3,7 @@
 //! Its own file because it answers a different question from the module beside it:
 //! `app.rs` is how a command is carried out, and this is what one comes back as. The
 //! two move for different reasons — a new command adds an arm there, a new kind of
-//! answer adds a variant here — and each was pushing the other over the line cap.
+//! answer adds a variant here.
 //!
 //! The variants are tagged by name rather than told apart by which field is present,
 //! because a surface that is not in this process reads them back.
