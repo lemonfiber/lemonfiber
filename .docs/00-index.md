@@ -10,7 +10,7 @@ comments — `GOV-R6`). These pages, in turn, cite the spec.
 | Area | Holds |
 |------|-------|
 | `architecture/` | How subsystems are built — the ports boundary, dispatch, the engine API, the embedded stack, the error model |
-| `conventions/` | Naming, error style; the comment policy is canonical in the spec |
+| `conventions/` | Where the conventions are kept: the comment policy is canonical in the spec |
 
 See the three-layer model in
 [spec 40-quality/code-comments.md](https://github.com/lemonfiber/spec/blob/main/40-quality/code-comments.md).

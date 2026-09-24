@@ -106,11 +106,14 @@ is supposed to make it impossible, so reaching it means the binary was assembled
 by something other than its own build, and guessing at a remedy would be
 inventing one.
 
-## What is not here yet
+## Writing it to disk
 
-Materialising the stack's compose files to disk. `Source` reads the manifest
-today; writing the fragments out arrives with the compose driver, which is the
-first thing that needs them.
+Compose reads files, so an embedded stack is written out before it runs:
+`Source::materialise` writes it on every invocation rather than caching it, so no
+stale copy survives an upgrade, and returns an external stack's path as it is.
+[`materialised.rs`](../../crates/lemonfiber-core/src/materialised.rs) keeps a
+checksum of each file lemonfiber last wrote, so a later write can tell an
+operator's edit from a version they have not upgraded yet.
 
 ## Related
 

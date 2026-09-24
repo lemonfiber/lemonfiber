@@ -23,14 +23,18 @@
 
 ---
 
-> **Status: shipping (`0.10.0`).** The core, compose driver, CLI, setup wizard,
-> trust checks, seed and lifecycle work are built and released. Every request
-> reaches all three surfaces: the command line, a terminal dashboard that acts
-> rather than only watching, and a web API a browser is served from.
+> **Status: shipping (`0.15.0`).** The core, compose driver, CLI, setup wizard,
+> trust checks, seed and lifecycle work are built and released. Most requests
+> reach all three surfaces: the command line, a terminal dashboard that acts
+> rather than only watching, and a web API a browser is served from;
+> [the parity table](.docs/architecture/surface-parity.md) names each one that
+> reaches a surface in part or not at all. The
+> `lemonfiber plugin` commands — `install`, `installed`, `update` and `remove`
+> among them — are on `main` and in no release; `0.15.0` has none of them.
 > See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
 > built-vs-roadmap and the
 > [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
-> (this repo is milestones **M2–M10**).
+> (this repo is milestones **M2–M15**).
 
 ## What it is
 
@@ -64,7 +68,9 @@ crates/
 ├── lemonfiber/          bin — the only crate that draws a terminal (CLI, TUI)
 ├── lemonfiber-core/     lib — all logic, no UI
 ├── lemonfiber-api/      lib — the HTTP endpoints, and serving the web app
+├── lemonfiber-adapters/ lib — the ports' implementations that reach the machine
 ├── lemonfiber-ports/    lib — the boundary and its vocabulary
+├── lemonfiber-plugin/   lib — parses plugin.toml
 ├── lemonfiber-manifest/ lib — parses stack.toml
 └── lemonfiber-fixtures/ lib — shared test fixtures
 .docs/                   repo-local technical docs (Rust-specific HOW)
@@ -74,14 +80,16 @@ crates/
 
 ```
 cargo build --workspace     # or: just build
-just ci                     # everything CI runs
+just ci                     # what the build job reads, plus spelling and the scripts
 ```
 
-`just ci` also turns on this repository's pre-push hook, which refuses a push
-that would leave a branch carrying no commit `origin/main` does not — what
-pushing the trunk over a feature branch looks like. It is `git config
-core.hooksPath .githooks`, per clone, and `just hooks` does only that. A clone
-where neither has run has no hook: git cannot read `.githooks/` on its own.
+`just ci` also turns on this repository's git hooks: `pre-commit` (rustfmt and
+spelling), `commit-msg` (the subject, sign-off, `Spec:` trailer and attribution CI
+checks), and `pre-push`, which refuses a push that would leave a branch carrying
+no commit `origin/main` does not — what pushing the trunk over a feature branch
+looks like. It is `git config core.hooksPath .githooks`, per clone, and `just
+hooks` does only that. A clone where neither has run has no hook: git cannot read
+`.githooks/` on its own.
 
 ## Contributing
 

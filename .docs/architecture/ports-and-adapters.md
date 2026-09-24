@@ -177,18 +177,14 @@ would add over the real thing and the secret-file mode handling has to be real.
 | `adapters::docker::Daemon` | Real. `bollard`; see [engine-api.md](engine-api.md). |
 | `adapters::filesystem::Disk` | Real. Standard-library I/O; `sysinfo` for the filesystem type. Implements `Volume`, `Eraser` and `Occupancy` too. |
 | `adapters::http::Web` | Real. `reqwest` + `rustls`, with connect and request timeouts and a host-scoped cookie store for session-auth services. |
-| `adapters::network::Here` | Real. `hostname` through the process port, so there stays one place in this workspace that spawns anything. |
+| `network::Here` (core) | Real. `hostname` through the process port, so there stays one place in this workspace that spawns anything. |
 | `adapters::hosting::{Launchd, Systemd, Unhosted}` | Real. Both write a definition with `std::fs` and drive `launchctl` / `systemctl --user` through the process port, so neither spawns anything itself. Which one a run holds is decided at the edge from `HOST_OS`; `Unhosted` is the honest third, and is the default a context nobody told carries. |
-| `nntp` (binary crate) | Real. `tokio-rustls` for a TLS-wrapped NNTP dial; lives in the binary crate, not core. |
+| `adapters::nntp::Dialer` | Real. `tokio-rustls` for a TLS-wrapped NNTP dial. |
 | `archive` (binary crate) | Real. `flate2` + `tar` for backup/restore; lives in the binary crate, so core carries no archive dependency. |
 
-The port for the last one is defined, so the logic above it can be written and
-tested first. That ordering is the point of the seam: nothing waits on an
-adapter.
-
 The architecture test reserves their filenames — `bollard` is permitted only in
-`adapters/docker.rs` and `reqwest` only in `adapters/http.rs`, the latter before
-the file exists. A first attempt to reach the network from somewhere else fails
+`adapters/docker.rs` and three files under `adapters/docker/`, and `reqwest` only
+in `adapters/http.rs`. A first attempt to reach the network from somewhere else fails
 the build rather than being noticed in review, or not.
 
 It is coarse enough to catch the *name* rather than the use: a prose mention of
