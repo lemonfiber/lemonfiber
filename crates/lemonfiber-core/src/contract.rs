@@ -537,6 +537,7 @@ mod tests {
             consumers: vec!["the tunnel's forwarded-port push".to_owned()],
             location: "/home/op/.config/lemonfiber/.env".to_owned(),
             origin: crate::credential::Origin::Lemonfiber,
+            from: crate::origin::Origin::Bundled,
             state: crate::credential::State::Active,
             fingerprint: Some(crate::credential::fingerprint("a")),
             advisory: None,
@@ -837,6 +838,7 @@ mod tests {
                 destination: "the indexers you configured".to_owned(),
                 purpose: "runs the searches everything else asks for".to_owned(),
                 recorded: true,
+                origin: crate::origin::Origin::Bundled,
             }],
         }
     }

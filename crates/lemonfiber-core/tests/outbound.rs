@@ -419,3 +419,85 @@ async fn a_request_that_went_is_written_down_where_the_operator_can_read_it() {
         "the indexer key was written down, in the URL or the header"
     );
 }
+
+/// A settings file for the named case with the given register kept beside it, the
+/// way an install leaves one.
+fn beside(name: &str, register: &str) -> Settings {
+    let dir =
+        std::env::temp_dir().join(format!("lemonfiber-outbound-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        std::fs::create_dir_all(&dir).is_ok(),
+        "the scratch directory"
+    );
+    assert!(
+        std::fs::write(dir.join("plugins.json"), register).is_ok(),
+        "the register"
+    );
+    Settings {
+        env_file: Some(dir.join(".env")),
+        ..Settings::default()
+    }
+}
+
+/// One installed plugin whose recipes reach a host outside the stack.
+const INSTALLED: &str = r#"{
+  "installed": [
+    {
+      "plugin": "comics",
+      "version": "1.2.0",
+      "services": [
+        {
+          "service": "komga",
+          "image": "docker.io/gotson/komga",
+          "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "tag": "1.11.0",
+          "config_path": "/config",
+          "takes_data": true
+        }
+      ],
+      "declared": { "reaches": ["metadata.example"] }
+    }
+  ]
+}"#;
+
+/// What an installed plugin brings is in the same account as everything else, and
+/// every line of it says whose it is.
+#[tokio::test]
+async fn what_a_plugin_brings_is_in_the_account_and_says_it_is_the_plugins() {
+    let report = listed(beside("plugin", INSTALLED)).await;
+
+    let theirs: Vec<(&str, &str)> = report
+        .theirs
+        .iter()
+        .filter(|one| {
+            one.origin
+                == lemonfiber_core::origin::Origin::Plugin {
+                    named: "comics".to_owned(),
+                }
+        })
+        .map(|one| (one.service.as_str(), one.destination.as_str()))
+        .collect();
+    assert_eq!(theirs.len(), 2, "{:?}", report.theirs);
+    assert!(theirs.iter().any(|(service, _)| *service == "komga"));
+    assert!(theirs.contains(&("comics", "metadata.example")));
+}
+
+/// A register that is there and will not read refuses the account rather than being
+/// read past: one that quietly left a stranger's plugin out would be believed.
+#[tokio::test]
+async fn a_register_that_will_not_read_refuses_the_account() {
+    let answered = dispatch(
+        Command::Outbound,
+        &ctx(
+            Source::External(project()),
+            beside("broken", "{ not a register"),
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        answered.err().map(|problem| problem.code.to_string()),
+        Some("PLUGIN-4".to_owned())
+    );
+}

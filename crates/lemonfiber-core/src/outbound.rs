@@ -125,6 +125,11 @@ pub struct Elsewhere {
     /// and a reader counting the services on their machine against the ones on this
     /// list is the reader this surface exists for.
     pub recorded: bool,
+    /// Whose request it is: the stack's own, or an installed plugin's, named.
+    ///
+    /// A column in this account rather than an account of its own, because what leaves
+    /// this machine is one question however many parties are asking it.
+    pub origin: crate::origin::Origin,
 }
 
 /// Everything that leaves this machine: lemonfiber's own requests, and the stack's.
@@ -142,14 +147,23 @@ pub struct Leaving {
 /// because a service that is stopped still reaches the network the moment it is
 /// started, and an operator deciding what they are comfortable with is deciding
 /// about the stack rather than about this minute.
+///
+/// Every installed plugin is part of the stack for this, read from its record: each of
+/// its services, and every destination its recipes declare outside it.
 #[must_use]
-pub fn leaving(settings: &Settings, services: &[Service]) -> Leaving {
+pub fn leaving(
+    settings: &Settings,
+    services: &[Service],
+    installed: &[crate::plugin::Installed],
+) -> Leaving {
+    let mut theirs = theirs::elsewhere(services);
+    theirs.extend(theirs::brought(services, installed));
     Leaving {
         ours: EVERY
             .iter()
             .map(|reach| ours::outbound(*reach, settings, services))
             .collect(),
-        theirs: theirs::elsewhere(services),
+        theirs,
     }
 }
 
@@ -167,7 +181,7 @@ mod tests {
 
     #[test]
     fn every_request_this_product_makes_is_listed_once() {
-        let listed: Vec<Reach> = leaving(&Settings::default(), &a_stack())
+        let listed: Vec<Reach> = leaving(&Settings::default(), &a_stack(), &[])
             .ours
             .into_iter()
             .map(|entry| entry.reach)
@@ -181,7 +195,7 @@ mod tests {
 
     #[test]
     fn each_entry_says_where_it_goes_why_what_it_sends_and_what_refusing_costs() {
-        let ours = leaving(&Settings::default(), &a_stack()).ours;
+        let ours = leaving(&Settings::default(), &a_stack(), &[]).ours;
         // An empty list of what leaves this machine is the answer a reader would most
         // like to be true and the one this must not report by accident.
         assert!(!ours.is_empty(), "nothing was listed as leaving");
@@ -216,7 +230,7 @@ mod tests {
             reaching: Reaching::none(),
             ..Settings::default()
         };
-        let refused: Vec<Reach> = leaving(&settings, &a_stack())
+        let refused: Vec<Reach> = leaving(&settings, &a_stack(), &[])
             .ours
             .into_iter()
             .filter(|entry| entry.allowed)
@@ -227,7 +241,7 @@ mod tests {
 
     #[test]
     fn the_stacks_own_requests_are_listed_as_the_stacks() {
-        let theirs = leaving(&Settings::default(), &a_stack()).theirs;
+        let theirs = leaving(&Settings::default(), &a_stack(), &[]).theirs;
         assert!(!theirs.is_empty(), "the stack reaches the network");
         for entry in &theirs {
             assert!(!entry.service.is_empty());
@@ -241,7 +255,7 @@ mod tests {
 
     #[test]
     fn a_stack_with_no_services_leaves_the_stacks_own_list_empty() {
-        let leaving = leaving(&Settings::default(), &[]);
+        let leaving = leaving(&Settings::default(), &[], &[]);
         assert!(leaving.theirs.is_empty());
         assert_eq!(leaving.ours.len(), EVERY.len());
     }

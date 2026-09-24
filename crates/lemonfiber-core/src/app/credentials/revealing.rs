@@ -28,6 +28,13 @@ pub(super) fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
             warning: SHOULDER.to_owned(),
         };
     }
+    if let Some(plugin) = held.plugins() {
+        return Revealed {
+            name: held.name.clone(),
+            value: None,
+            warning: held.unheld(plugin),
+        };
+    }
     match recorded_secret(ctx, &held.setting) {
         Some(value) => Revealed {
             name: held.name.clone(),
@@ -79,6 +86,7 @@ mod tests {
             consumers: vec!["qBittorrent".to_owned()],
             location: "the settings file".to_owned(),
             origin: Origin::Lemonfiber,
+            from: crate::origin::Origin::Bundled,
             state: State::Active,
             fingerprint: None,
             advisory: None,
@@ -126,6 +134,27 @@ mod tests {
 
         assert_eq!(revealed.value.as_deref(), Some(secret.as_str()));
         assert_eq!(revealed.warning, REVEALED);
+    }
+
+    /// Even where a value happens to sit under the same name, because a plugin's
+    /// secret is not one lemonfiber has captured and anything found there is not it.
+    #[test]
+    fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
+        let ctx = keeping("plugin");
+        record_secret(&ctx, "comics/api_key", &a_value());
+        let mut held = line("comics/api_key");
+        held.from = crate::origin::Origin::Plugin {
+            named: "comics".to_owned(),
+        };
+
+        let revealed = reveal(&ctx, &held, true);
+
+        assert_eq!(revealed.value, None);
+        assert!(
+            revealed.warning.contains("the plugin comics's"),
+            "{}",
+            revealed.warning
+        );
     }
 
     #[test]

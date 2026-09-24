@@ -50,6 +50,14 @@ pub(super) async fn rotate(
     services: &[Service],
     project: Option<&Path>,
 ) -> Rotation {
+    if let Some(plugin) = held.plugins() {
+        return Rotation::stopped(
+            &held.name,
+            Settled::Elsewhere {
+                detail: held.unheld(plugin),
+            },
+        );
+    }
     match held.origin {
         Origin::Service => republished(ctx, held, services, project).await,
         Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {
@@ -391,6 +399,7 @@ mod tests {
             consumers: Vec::new(),
             location: "the environment file".to_owned(),
             origin: crate::credential::Origin::Lemonfiber,
+            from: crate::origin::Origin::Bundled,
             state: crate::credential::State::Active,
             fingerprint: None,
             advisory: None,

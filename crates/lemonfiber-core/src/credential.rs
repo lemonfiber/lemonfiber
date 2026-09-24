@@ -96,6 +96,12 @@ pub struct Held {
     pub location: String,
     /// Who produced it.
     pub origin: Origin,
+    /// Whose line it is: the stack's own, or an installed plugin's, named.
+    ///
+    /// A different question from who produced it. A plugin's secret is minted by the
+    /// service it belongs to like any other, and what the operator needs to know as well
+    /// is that the service is one a plugin brought.
+    pub from: crate::origin::Origin,
     /// Where it stands.
     pub state: State,
     /// A short likeness of the value, for telling two copies apart in a report.
@@ -107,6 +113,31 @@ pub struct Held {
     /// What is worth saying about this one, where anything is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advisory: Option<String>,
+}
+
+impl Held {
+    /// The installed plugin this line is the secret of, where it is one.
+    #[must_use]
+    pub fn plugins(&self) -> Option<&str> {
+        match &self.from {
+            crate::origin::Origin::Plugin { named } => Some(named),
+            _ => None,
+        }
+    }
+
+    /// What is said of a plugin's secret wherever its value is asked for.
+    ///
+    /// One sentence for a reveal and a rotation both, because the answer to each is the
+    /// same fact: nothing holds it, so there is nothing to print and nothing to replace.
+    #[must_use]
+    pub fn unheld(&self, plugin: &str) -> String {
+        format!(
+            "{} is the plugin {plugin}'s, and nothing holds it yet: lemonfiber holds a \
+             plugin's secret only once the plugin's recipes capture it, and this build runs \
+             none. There is no value to show or to replace.",
+            self.name
+        )
+    }
 }
 
 /// One stored value, handed back because the operator asked for it and said so.
@@ -234,6 +265,7 @@ mod tests {
             consumers: vec!["SABnzbd".to_owned()],
             location: "the settings file".to_owned(),
             origin: Origin::Operator,
+            from: crate::origin::Origin::Bundled,
             state,
             fingerprint: None,
             advisory: advisory.map(ToOwned::to_owned),
