@@ -47,7 +47,10 @@ pub(super) async fn update(
     path: &Path,
 ) -> Result<Outcome, Box<Problem>> {
     let manifest = super::accepted(path)?;
-    let would = Installed::of(&manifest);
+    // The stamp the whole update is journalled under, taken before anything is decided
+    // so the record of the new version says it was installed at that moment.
+    let stamp = ctx.stamp();
+    let would = Installed::of(&manifest).installed(path, &stamp);
     let Some(was) = held
         .installed()
         .iter()
@@ -63,7 +66,7 @@ pub(super) async fn update(
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let mut without = held.clone();
     without.forget(&was.plugin);
-    let contests = super::contested(ctx, &without, &would)?;
+    let contests = super::standing::contested(ctx, &without, &would)?;
     let mut account = started(&was, &would, &manifest, stack, contests);
 
     // A rehearsal asks the reversal what it would put back, which judges it whole and
@@ -104,7 +107,6 @@ pub(super) async fn update(
     // report a refusal about a machine that is neither version. The judgement above has
     // already passed, so what can still go wrong is the disk, and the answer to that is
     // the same as to a new version that does not hold — the old one goes back on.
-    let stamp = ctx.stamp();
     match super::super::putting_back::everything(ctx, &was.plugin).await {
         Ok(went_back) => account.went_back = went_back,
         Err(why) => {
@@ -119,8 +121,8 @@ pub(super) async fn update(
         }
     }
 
-    // One stamp for the whole operation, taken above, so what the new version writes and
-    // what putting the old one back rewrites read in the history as the one run they are.
+    // The one stamp, taken at the start, so what the new version writes and what putting
+    // the old one back rewrites read in the history as the one run they are.
     let coming = Coming {
         manifest: &manifest,
         would: &would,
@@ -275,6 +277,7 @@ fn answering(installed: Vec<Installed>, update: Update) -> Outcome {
         install: None,
         removal: None,
         update: Some(Box::new(update)),
+        substituted: Vec::new(),
     })
 }
 

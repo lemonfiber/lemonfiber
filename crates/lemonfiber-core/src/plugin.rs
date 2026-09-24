@@ -23,7 +23,9 @@ mod claimed;
 // hold: a copy of one is free to disagree with it, so there is one of each and this
 // is the one that derives.
 mod container;
+mod declared;
 mod installed;
+mod register;
 // Where an install puts what it writes. Beside the record and the container rather
 // than inside either: the record says what was decided and the container says what
 // follows from it, and this says where both of those land on the machine.
@@ -60,13 +62,13 @@ pub use claimed::{
     Verdict,
 };
 pub use container::{profile, written};
-pub use installed::{
-    answering, Already, Installed, Placed, Reached, Register, Unreadable as Unrecorded,
-};
+pub use declared::{Declaration, Secret};
+pub use installed::{answering, Installed, Placed, Reached};
 pub use placing::{documents, overlay, writes, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
-pub use reports::{Install, Installs, Removal, Restored, Unfilled, Update};
+pub use register::{Already, Register, Unreadable as Unrecorded};
+pub use reports::{Install, Installs, Removal, Restored, Substituted, Unfilled, Update};
 pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
 pub use verified::{against, Changed, Verification};
 

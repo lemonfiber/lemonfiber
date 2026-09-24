@@ -53,6 +53,7 @@ mod removing;
 // Carrying the writes out, and journalling each before it is made. Its own file
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
+mod standing;
 mod updating;
 mod writing;
 
@@ -143,14 +144,21 @@ pub(super) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Prob
     let held = read(ctx)?;
     match action {
         Asked::Installed => Ok(Outcome::Plugins(Installs {
+            substituted: standing::substituted(
+                held.installed(),
+                &super::targets::chosen_fillers(ctx),
+            ),
             installed: held.installed().to_vec(),
             install: None,
             removal: None,
             update: None,
         })),
-        Asked::Install { path } => install(ctx, held, path).await,
-        Asked::Remove { plugin } => removing::remove(ctx, held, plugin).await,
-        Asked::Update { path } => updating::update(ctx, held, path).await,
+        // Boxed, because each carries a whole install's worth of state across its awaits
+        // — the stack's checks read twice, a reversal, a record — and every command the
+        // dispatcher runs would otherwise be as large as the one that installs.
+        Asked::Install { path } => Box::pin(install(ctx, held, path)).await,
+        Asked::Remove { plugin } => Box::pin(removing::remove(ctx, held, plugin)).await,
+        Asked::Update { path } => Box::pin(updating::update(ctx, held, path)).await,
     }
 }
 
@@ -189,7 +197,10 @@ pub(super) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Prob
 async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Problem>> {
     let manifest = accepted(path)?;
 
-    let would = Installed::of(&manifest);
+    // One stamp for the run, taken before anything is decided, so the record says it
+    // was installed at the moment its changes are journalled under.
+    let stamp = ctx.stamp();
+    let would = Installed::of(&manifest).installed(path, &stamp);
     let mut after = held.clone();
     after
         .record(would.clone())
@@ -205,7 +216,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
         .as_deref()
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let planned = crate::plugin::writes(&would, stack);
-    let contests = contested(ctx, &held, &would)?;
+    let contests = standing::contested(ctx, &held, &would)?;
 
     let mut stated = crate::plugin::proofs(&manifest);
     let mut against = None;
@@ -214,7 +225,6 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
     let mut recorded = false;
 
     if !ctx.dry_run {
-        let stamp = ctx.stamp();
         // Read before a byte of it is written, and that order is the whole of what
         // makes the second reading mean anything. What this has to tell apart is a
         // check the install broke from one that was already failing, and after the
@@ -275,7 +285,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
     Ok(Outcome::Plugins(Installs {
         removal: None,
         installed: standing.installed().to_vec(),
-        install: Some(Install {
+        install: Some(Box::new(Install {
             would,
             recorded,
             changes: crate::plugin::changes(&planned),
@@ -285,36 +295,10 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
             contests,
             overrides: crate::plugin::overrides(&manifest),
             reversed: put_back,
-        }),
+        })),
         update: None,
+        substituted: Vec::new(),
     }))
-}
-
-/// Every ask of the stack's that installing this would leave contested.
-///
-/// Read against the stack as it stands and the plugins already installed, so the answer
-/// is about this machine: an ask a plugin installed earlier has already contested is
-/// not this install's doing, and is not laid at its door.
-///
-/// # Errors
-///
-/// Where the stack's own manifest cannot be read. A rehearsal that could not say what
-/// the install would do to the wiring would be stating less than the install does.
-pub(super) fn contested(
-    ctx: &Ctx,
-    held: &Register,
-    would: &Installed,
-) -> Result<Vec<crate::wiring::Contest>, Box<Problem>> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    Ok(crate::wiring::contested_by(
-        &manifest,
-        held.installed(),
-        would,
-        &super::targets::chosen_fillers(ctx),
-    ))
 }
 
 /// The manifest at this path, read and held to everything this build refuses.
@@ -2274,7 +2258,7 @@ service = "komga""#,
 
         let contests = would
             .and_then(|would| {
-                super::contested(&ctx, &crate::plugin::Register::empty(), &would).ok()
+                super::standing::contested(&ctx, &crate::plugin::Register::empty(), &would).ok()
             })
             .unwrap_or_default();
 
@@ -2321,6 +2305,47 @@ service = "komga""#,
         assert_eq!(
             refusal(installing(&fresh, &source("contest-blind", PROVING)).await),
             refused
+        );
+    }
+
+    /// The one read of what each plugin is doing: where it came from and when, that
+    /// nobody reviewed it, what it declared, and what the operator chose it to stand in
+    /// for — all from the record, with the author's directory gone.
+    #[tokio::test]
+    async fn the_reading_says_where_a_plugin_came_from_when_and_what_it_stands_in_for() {
+        let ctx = proving(
+            "one-read",
+            Arc::new(Recording::answering(Ok(spoke("")))),
+            answering(200),
+        );
+        let at = source("one-read", PROVING);
+        assert_eq!(counted(installing(&ctx, &at).await), Some(1));
+        let _ = std::fs::remove_dir_all(&at);
+        let _ = ctx.settings.env_file.as_deref().map(|file| {
+            crate::config::store::set(file, crate::wiring::FILLS_KEY, "media.serve=komga,x=y")
+        });
+
+        let read = report(reading(&ctx).await);
+        let one = read.as_ref().and_then(|one| one.installed.first());
+
+        assert_eq!(
+            one.map(|one| one.from.as_str()),
+            Some(at.display().to_string().as_str())
+        );
+        assert_eq!(
+            one.map(|one| one.installed_at.clone()),
+            Some(ctx.stamp()),
+            "stamped as its changes are journalled"
+        );
+        assert_eq!(one.map(|one| one.declared.reviewed), Some(false));
+        assert_eq!(
+            read.map(|one| one.substituted),
+            Some(vec![crate::plugin::Substituted {
+                plugin: "komga".to_owned(),
+                capability: "media.serve".to_owned(),
+                service: "komga".to_owned(),
+            }]),
+            "a choice naming a service no plugin brought is not this read's"
         );
     }
 

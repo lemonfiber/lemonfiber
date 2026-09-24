@@ -84,7 +84,8 @@ pub struct Proving {
 }
 
 /// One bundled thing a plugin declares it will change.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 #[schemars(rename = "PluginOverriding")]
 pub struct Overriding {
     /// Which bundled setting it changes.

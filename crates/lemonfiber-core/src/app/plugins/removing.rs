@@ -168,6 +168,7 @@ fn answering(installed: Vec<Installed>, removal: Removal) -> Outcome {
         install: None,
         removal: Some(removal),
         update: None,
+        substituted: Vec::new(),
     })
 }
 
@@ -290,6 +291,9 @@ mod tests {
             services: Vec::new(),
             provides: provides.iter().map(|one| (*one).to_owned()).collect(),
             contributions: Vec::new(),
+            declared: crate::plugin::Declaration::default(),
+            from: String::new(),
+            installed_at: String::new(),
         }
     }
 

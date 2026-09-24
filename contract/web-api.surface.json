@@ -4185,6 +4185,53 @@
       },
       "variants": []
     },
+    "PluginDeclaration": {
+      "fields": {
+        "claims": {
+          "type": [
+            "array[string]"
+          ],
+          "required": false
+        },
+        "license": {
+          "type": [
+            "string"
+          ],
+          "required": false
+        },
+        "overrides": {
+          "type": [
+            "array[ref:PluginOverriding]"
+          ],
+          "required": false
+        },
+        "reaches": {
+          "type": [
+            "array[string]"
+          ],
+          "required": false
+        },
+        "reviewed": {
+          "type": [
+            "boolean"
+          ],
+          "required": false
+        },
+        "secrets": {
+          "type": [
+            "array[ref:PluginSecret]"
+          ],
+          "required": false
+        },
+        "upstream": {
+          "type": [
+            "string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
     "PluginEvidence": {
       "fields": {},
       "variants": [
@@ -4259,6 +4306,24 @@
           ],
           "required": false
         },
+        "declared": {
+          "type": [
+            "ref:PluginDeclaration"
+          ],
+          "required": false
+        },
+        "from": {
+          "type": [
+            "string"
+          ],
+          "required": false
+        },
+        "installed_at": {
+          "type": [
+            "string"
+          ],
+          "required": false
+        },
         "plugin": {
           "type": [
             "string"
@@ -4303,6 +4368,12 @@
         "removal": {
           "type": [
             "anyOf(null,ref:PluginRemoval)"
+          ],
+          "required": false
+        },
+        "substituted": {
+          "type": [
+            "array[ref:PluginSubstituted]"
           ],
           "required": false
         },
@@ -4539,6 +4610,52 @@
           "required": true
         },
         "version": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginSecret": {
+      "fields": {
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "of": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginSubstituted": {
+      "fields": {
+        "capability": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "plugin": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "service": {
           "type": [
             "string"
           ],

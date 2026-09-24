@@ -19,7 +19,7 @@ Commands:
   claims            Read a plugin's source and say what its claims come to
   provenance        Ask each image's registry whether anybody has said it is theirs
   install           Install a plugin, recording what installing it decided
-  installed         Say what is installed, and what each install decided
+  installed         Say what is installed, and what each plugin is doing
   remove            Take a plugin off this machine, putting back everything installing it wrote
   update            Replace an installed plugin with another version of it, as one operation
   help              Print this message or the help of the given subcommand(s)
@@ -275,7 +275,9 @@ Options:
 ## `lemonfiber plugin installed`
 
 ```text
-Say what is installed, and what each install decided.
+Say what is installed, and what each plugin is doing.
+
+The one place to look when something about the stack is surprising. For each plugin: where it was installed from and whether anybody reviewed it, when it was installed, where it is published and under what licence, what it claims and fills, what it added, what you chose it to stand in for, what it may change, where it may reach and what it holds — and, for each of its services, what runs and how it is reached.
 
 Read from the record rather than from the manifests, so it answers for a machine whose plugin sources are long gone. A machine with none answers with an empty list and says so.
 
