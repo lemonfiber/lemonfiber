@@ -706,6 +706,11 @@ mod tests {
                         capability: "identity.source".to_owned(),
                         services: vec!["jellyfin".to_owned()],
                         settled: Settled::Outright,
+                        origins: std::iter::once((
+                            "jellyfin".to_owned(),
+                            crate::origin::Origin::Bundled,
+                        ))
+                        .collect(),
                     },
                 },
                 Wired {
@@ -766,6 +771,7 @@ mod tests {
                     hostname: "comics".to_owned(),
                     group: Some("Library".to_owned()),
                 }),
+                provides: Vec::new(),
             }],
             provides: Vec::new(),
             contributions: Vec::new(),
@@ -805,6 +811,7 @@ mod tests {
                 would: one,
                 recorded: true,
                 reversed: None,
+                contests: Vec::new(),
             }),
             update: None,
         }

@@ -147,6 +147,16 @@ pub struct Placed {
     pub takes_data: bool,
     /// How it is reached, or nothing where it has no listener.
     pub reached: Option<Reached>,
+    /// Every core capability this one service fills, which is what makes it a candidate
+    /// when the stack asks for one.
+    ///
+    /// Per service rather than read off the plugin's whole list, because a wiring
+    /// reaches a service and not a plugin: of a plugin's two services, the one that
+    /// fills a capability is the one an ask for it would reach. Defaulted for a record
+    /// written before this was kept, which reads as filling nothing — a service nothing
+    /// is wired to, rather than one wired to on a guess.
+    #[serde(default)]
+    pub provides: Vec<String>,
 }
 
 impl Placed {
@@ -160,6 +170,12 @@ impl Placed {
             config_path: service.configuration().to_owned(),
             takes_data: service.takes_data,
             reached: Reached::of(service, manifest.entry(service)),
+            provides: service
+                .provides
+                .iter()
+                .filter(|name| lemonfiber_plugin::vocabulary::is_core_name(name))
+                .cloned()
+                .collect(),
         }
     }
 
@@ -876,6 +892,7 @@ dashboard_group = "Library"
                 verified: None,
                 overrides: Vec::new(),
                 reversed: None,
+                contests: Vec::new(),
             }),
             update: None,
         };

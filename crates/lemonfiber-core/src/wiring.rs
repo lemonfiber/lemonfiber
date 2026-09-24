@@ -19,10 +19,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lemonfiber_manifest::{Manifest, Wiring};
+use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
-use crate::filling::{fills, Claimant, Filling, Shown};
+mod settling;
+
+use settling::claimants;
+pub use settling::{contested_by, filled, settle, unfilled};
 
 /// The setting holding which service the operator chose to fill a capability.
 ///
@@ -84,6 +87,13 @@ pub enum Reaches {
         services: Vec<String>,
         /// How it was settled.
         settled: Settled,
+        /// Where each service that claims it came from: this build's stack, or a
+        /// named plugin.
+        ///
+        /// Every claimant rather than only what the ask reaches, because a contest
+        /// reaches nothing and is exactly where an operator most needs to know which of
+        /// the names in front of them is not the stack's.
+        origins: BTreeMap<String, crate::origin::Origin>,
     },
     /// A link deliberately kept to a named service, shown as the exception it is.
     ByName {
@@ -101,6 +111,19 @@ pub struct Wired {
     pub by: String,
     /// What it reaches.
     pub reaches: Reaches,
+}
+
+/// An ask several services claim and nothing has chosen between, so it reaches
+/// nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "WiringContest")]
+pub struct Contest {
+    /// The service that asked.
+    pub by: String,
+    /// What it asked for.
+    pub capability: String,
+    /// Every claimant, named — a plugin's with the plugin beside it.
+    pub claimants: Vec<String>,
 }
 
 /// A capability something asks for and nothing fills, and what asked for it.
@@ -187,160 +210,6 @@ impl Chosen {
     }
 }
 
-/// Every service the stack declares as providing a capability, in declaration order.
-fn claimants(manifest: &Manifest, capability: &str) -> Vec<String> {
-    manifest
-        .services
-        .iter()
-        .filter(|service| service.provides.iter().any(|named| named == capability))
-        .map(|service| service.id.clone())
-        .collect()
-}
-
-/// What one ask comes to, given its claimants and whatever has been chosen.
-fn asked(
-    wiring: &Wiring,
-    capability: &str,
-    held: &[String],
-    chosen: &Chosen,
-) -> (Vec<String>, Settled) {
-    if wiring.each && !held.is_empty() {
-        return (held.to_vec(), Settled::Each);
-    }
-
-    // The operator's choice over the stack's, because the stack's is the default they
-    // were offered and theirs is the answer they gave. Either is only a choice while
-    // the service it names still claims the capability — one that stopped claiming it
-    // at a pin bump leaves a contest rather than a filler nothing can demonstrate.
-    //
-    // And only where there is something to choose between. One service claiming it is
-    // answered by the one service, not by crediting whoever wrote the setting with a
-    // decision they were never offered.
-    let picked = chosen
-        .filler(capability)
-        .map(|service| (service, Whose::Operator, None))
-        .or_else(|| {
-            wiring
-                .filled_by
-                .as_deref()
-                .map(|service| (service, Whose::Stack, wiring.why.clone()))
-        })
-        .filter(|(service, _, _)| held.len() > 1 && held.iter().any(|one| one == service));
-
-    match picked {
-        Some((service, whose, why)) => (
-            vec![service.to_owned()],
-            Settled::Chosen {
-                whose,
-                why,
-                over: held.iter().filter(|one| *one != service).cloned().collect(),
-            },
-        ),
-        // Nobody chose, so the claimants answer for themselves — through the one
-        // function that decides what a set of claims comes to, rather than through a
-        // second opinion about it kept here.
-        None => match fills(&candidates(held)) {
-            Filling::By { service } => (vec![service], Settled::Outright),
-            Filling::Contested { claimants } => (Vec::new(), Settled::Contested { claimants }),
-            Filling::Unfilled => (Vec::new(), Settled::Unfilled),
-        },
-    }
-}
-
-/// The stack's own claimants, as candidates nothing has yet asked about.
-///
-/// `Claimed` rather than `Demonstrated`: a declaration is what the manifest holds and
-/// running the probes is a separate act, so a stack whose probes have not been run
-/// wires as it always did rather than wiring nothing.
-fn candidates(held: &[String]) -> Vec<Claimant> {
-    held.iter()
-        .map(|service| Claimant {
-            service: service.clone(),
-            plugin: None,
-            shown: Shown::Claimed,
-        })
-        .collect()
-}
-
-/// Every link the stack declares, answered against what its services provide.
-///
-/// A link naming a `why` it should not have, or asking for something of the wrong
-/// shape, is the validator's business rather than this one's: what is read here is a
-/// manifest that has already been checked, and a reader that second-guessed it would
-/// be a second opinion on the same file.
-#[must_use]
-pub fn settle(manifest: &Manifest, chosen: &Chosen) -> Vec<Wired> {
-    manifest
-        .wirings
-        .iter()
-        .filter_map(|wiring| {
-            let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
-                (Some(capability), None) => {
-                    let held = claimants(manifest, capability);
-                    let (services, settled) = asked(wiring, capability, &held, chosen);
-                    Reaches::Asked {
-                        capability: capability.to_owned(),
-                        services,
-                        settled,
-                    }
-                }
-                (None, Some(service)) => Reaches::ByName {
-                    service: service.to_owned(),
-                    why: wiring.why.clone().unwrap_or_default(),
-                },
-                _ => return None,
-            };
-            Some(Wired {
-                by: wiring.by.clone(),
-                reaches,
-            })
-        })
-        .collect()
-}
-
-/// Every ask nothing fills, each naming what asked for it.
-#[must_use]
-pub fn unfilled(wired: &[Wired]) -> Vec<Unfilled> {
-    wired
-        .iter()
-        .filter_map(|one| match &one.reaches {
-            Reaches::Asked {
-                capability,
-                settled: Settled::Unfilled,
-                ..
-            } => Some(Unfilled {
-                by: one.by.clone(),
-                capability: capability.clone(),
-            }),
-            _ => None,
-        })
-        .collect()
-}
-
-/// Which service fills each capability the stack asks for, for whatever wires it.
-///
-/// A capability asked for by several links resolves the same way for all of them, so
-/// the answer is one map rather than one per asker. Only what is settled appears: a
-/// contest and an unfilled ask are both *nobody*, and a caller handed a name for
-/// either would be wiring to a guess.
-#[must_use]
-pub fn filled(wired: &[Wired]) -> BTreeMap<String, Vec<String>> {
-    let mut held: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for one in wired {
-        if let Reaches::Asked {
-            capability,
-            services,
-            ..
-        } = &one.reaches
-        {
-            if !services.is_empty() {
-                held.insert(capability.clone(), services.clone());
-            }
-        }
-    }
-    held
-}
-
 /// Why a substitution cannot be made.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Refused {
@@ -399,20 +268,28 @@ pub struct Substitution {
 ///
 /// # Errors
 ///
-/// [`Refused`] where the named service is not one of this stack's, does not provide
-/// the capability, already fills it, or where nothing asks for it at all.
+/// [`Refused`] where the named service is not one of this stack's — a bundled service
+/// or an installed plugin's — does not provide the capability, already fills it, or
+/// where nothing asks for it at all.
 pub fn substitute(
     manifest: &Manifest,
+    installed: &[crate::plugin::Installed],
     chosen: &Chosen,
     capability: &str,
     service: &str,
 ) -> Result<Substitution, Refused> {
-    if !manifest.services.iter().any(|one| one.id == service) {
+    // A plugin's service is one of this stack's once it is installed, and choosing one
+    // is how a contest a plugin made is settled in the plugin's favour.
+    let brought = installed
+        .iter()
+        .flat_map(|one| one.services.iter())
+        .any(|placed| placed.service == service);
+    if !brought && !manifest.services.iter().any(|one| one.id == service) {
         return Err(Refused::NoSuchService(service.to_owned()));
     }
-    if !claimants(manifest, capability)
+    if !claimants(manifest, installed, capability)
         .iter()
-        .any(|one| one == service)
+        .any(|one| one.service == service)
     {
         return Err(Refused::DoesNotProvide {
             service: service.to_owned(),
@@ -420,7 +297,7 @@ pub fn substitute(
         });
     }
 
-    let before = settle(manifest, chosen);
+    let before = settle(manifest, installed, chosen);
     let asked_by: Vec<String> = before
         .iter()
         .filter(|one| asks_for(one, capability))
@@ -444,7 +321,7 @@ pub fn substitute(
     }
 
     let setting = chosen.with(capability, service);
-    let after = settle(manifest, &Chosen::read(Some(&setting)));
+    let after = settle(manifest, installed, &Chosen::read(Some(&setting)));
     let standing: BTreeSet<(String, String)> = unfilled(&before)
         .into_iter()
         .map(|one| (one.by, one.capability))
@@ -499,10 +376,18 @@ pub const OPERATION: &str = "substitute";
 #[cfg(test)]
 mod tests {
     use super::{
-        filled, recorded, settle, substitute, unfilled, Chosen, Reaches, Refused, Settled,
-        Substitution, Unfilled, Whose, FILLS_KEY,
+        contested_by, filled, recorded, settle, substitute, unfilled, Chosen, Reaches, Refused,
+        Settled, Substitution, Unfilled, Whose, FILLS_KEY,
     };
     use lemonfiber_manifest::Manifest;
+
+    /// Where each of these services came from, where every one is the stack's own.
+    fn bundled(services: &[&str]) -> std::collections::BTreeMap<String, crate::origin::Origin> {
+        services
+            .iter()
+            .map(|one| ((*one).to_owned(), crate::origin::Origin::Bundled))
+            .collect()
+    }
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
 
@@ -538,7 +423,7 @@ mod tests {
     /// What one named link came to.
     fn came(manifest: Option<Manifest>, chosen: &Chosen, by: &str) -> Option<Reaches> {
         manifest.and_then(|manifest| {
-            settle(&manifest, chosen)
+            settle(&manifest, &[], chosen)
                 .into_iter()
                 .find(|one| one.by == by)
                 .map(|one| one.reaches)
@@ -548,7 +433,7 @@ mod tests {
     /// Every ask the stack leaves unfilled, as an option that carries a stack that
     /// did not read at all rather than reporting it as nothing missing.
     fn nothing_fills(manifest: Option<Manifest>, chosen: &Chosen) -> Option<Vec<super::Unfilled>> {
-        manifest.map(|manifest| unfilled(&settle(&manifest, chosen)))
+        manifest.map(|manifest| unfilled(&settle(&manifest, &[], chosen)))
     }
 
     /// What a substitution against that manifest comes to.
@@ -558,7 +443,7 @@ mod tests {
         capability: &str,
         service: &str,
     ) -> Option<Result<Substitution, Refused>> {
-        manifest.map(|manifest| substitute(&manifest, chosen, capability, service))
+        manifest.map(|manifest| substitute(&manifest, &[], chosen, capability, service))
     }
 
     /// One field of a substitution, where it was worked out at all. Three of them,
@@ -590,6 +475,7 @@ mod tests {
                 capability: "media.serve".to_owned(),
                 services: vec!["server".to_owned()],
                 settled: Settled::Outright,
+                origins: bundled(&["server"]),
             })
         );
     }
@@ -611,6 +497,7 @@ mod tests {
                     "bindery".to_owned(),
                 ],
                 settled: Settled::Each,
+                origins: bundled(&["sonarr", "radarr", "lidarr", "bindery"]),
             })
         );
     }
@@ -633,6 +520,7 @@ mod tests {
                 settled: Settled::Contested {
                     claimants: vec!["one".to_owned(), "two".to_owned()],
                 },
+                origins: bundled(&["one", "two"]),
             })
         );
     }
@@ -652,6 +540,7 @@ mod tests {
                         why: Some(said),
                         over,
                     },
+                    ..
                 } if capability == "indexer.search"
                     && services.as_slice() == ["prowlarr".to_owned()]
                     && said.contains("NZBHydra2")
@@ -925,7 +814,7 @@ mod tests {
     #[test]
     fn what_fills_each_capability_is_one_answer_for_every_asker() {
         let held = stack()
-            .map(|manifest| filled(&settle(&manifest, &Chosen::default())))
+            .map(|manifest| filled(&settle(&manifest, &[], &Chosen::default())))
             .unwrap_or_default();
         assert_eq!(
             held.get("download.torrent").map(Vec::as_slice),
@@ -966,7 +855,7 @@ mod tests {
     #[test]
     fn every_link_the_shipped_stack_declares_is_answered() {
         let counted = stack().map(|manifest| {
-            let wired = settle(&manifest, &Chosen::default());
+            let wired = settle(&manifest, &[], &Chosen::default());
             let by_name = wired
                 .iter()
                 .filter(|one| matches!(one.reaches, Reaches::ByName { .. }))
@@ -995,6 +884,7 @@ mod tests {
                 capability: "library.curate".to_owned(),
                 services: Vec::new(),
                 settled: Settled::Unfilled,
+                origins: bundled(&[]),
             })
         );
     }
@@ -1015,8 +905,158 @@ mod tests {
                 capability: "media.serve".to_owned(),
                 services: vec!["server".to_owned()],
                 settled: Settled::Outright,
+                origins: bundled(&["server"]),
             })
         );
+    }
+
+    /// An installed plugin whose one service claims `capability`, as its record holds it.
+    fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugin::Installed {
+        crate::plugin::Installed {
+            plugin: plugin.to_owned(),
+            version: "1.0.0".to_owned(),
+            services: vec![crate::plugin::Placed {
+                service: service.to_owned(),
+                image: format!("example.invalid/{service}"),
+                digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                    .to_owned(),
+                tag: "1".to_owned(),
+                config_path: "/config".to_owned(),
+                takes_data: false,
+                reached: None,
+                provides: vec![capability.to_owned()],
+            }],
+            provides: vec![capability.to_owned()],
+            contributions: Vec::new(),
+        }
+    }
+
+    /// One bundled server and one asker, which is the shape a plugin walks into.
+    fn one_server() -> Option<Manifest> {
+        written(&format!(
+            "{}{}\n[[wiring]]\nby = \"asker\"\nasks = \"media.serve\"\n",
+            service("asker", ""),
+            service("server", "\"media.serve\"")
+        ))
+    }
+
+    /// An installed plugin's service that claims what the stack asks for is a candidate
+    /// on the same terms as the stack's own, so the ask is contested and refused rather
+    /// than settled in the stack's favour by leaving the plugin out — and every claimant
+    /// is named beside where it came from.
+    #[test]
+    fn a_plugin_claiming_what_the_stack_asks_for_contests_it_and_says_whose_each_is() {
+        let installed = [plugin_filling("kavita", "kavita", "media.serve")];
+        let reaches = one_server().and_then(|manifest| {
+            settle(&manifest, &installed, &Chosen::default())
+                .into_iter()
+                .find(|one| one.by == "asker")
+                .map(|one| one.reaches)
+        });
+        let mut origins = bundled(&["server"]);
+        origins.insert(
+            "kavita".to_owned(),
+            crate::origin::Origin::Plugin {
+                named: "kavita".to_owned(),
+            },
+        );
+        assert_eq!(
+            reaches,
+            Some(Reaches::Asked {
+                capability: "media.serve".to_owned(),
+                services: Vec::new(),
+                settled: Settled::Contested {
+                    claimants: vec!["server".to_owned(), "kavita (plugin kavita)".to_owned()],
+                },
+                origins,
+            })
+        );
+    }
+
+    /// And the operator settles it by choosing the plugin's service, which is then what
+    /// the ask reaches — the way a contest between two bundled services is settled.
+    #[test]
+    fn choosing_a_plugin_s_service_settles_the_contest_it_made() {
+        let installed = [plugin_filling("kavita", "kavita", "media.serve")];
+        let chosen = Chosen::read(Some("media.serve=kavita"));
+        let reached = one_server().and_then(|manifest| {
+            filled(&settle(&manifest, &installed, &chosen))
+                .get("media.serve")
+                .cloned()
+        });
+        assert_eq!(reached, Some(vec!["kavita".to_owned()]));
+    }
+
+    /// Substitution can choose a plugin's service, and still refuses a name that is
+    /// neither the stack's nor any installed plugin's.
+    #[test]
+    fn a_plugin_s_service_can_be_chosen_and_a_stranger_still_cannot() {
+        let installed = [plugin_filling("kavita", "kavita", "media.serve")];
+        let chose = one_server().map(|manifest| {
+            substitute(
+                &manifest,
+                &installed,
+                &Chosen::default(),
+                "media.serve",
+                "kavita",
+            )
+            .map(|one| one.now)
+        });
+        assert_eq!(chose, Some(Ok("kavita".to_owned())));
+        let stranger = one_server().map(|manifest| {
+            substitute(
+                &manifest,
+                &installed,
+                &Chosen::default(),
+                "media.serve",
+                "nobody",
+            )
+        });
+        assert_eq!(
+            stranger,
+            Some(Err(Refused::NoSuchService("nobody".to_owned())))
+        );
+    }
+
+    /// What installing a plugin would leave contested is exactly the asks it turns into
+    /// contests — not an ask that was already contested before it came, which is not its
+    /// doing and is not laid at its door.
+    #[test]
+    fn what_an_install_leaves_contested_is_only_what_it_turns_into_a_contest() {
+        let first = plugin_filling("kavita", "kavita", "media.serve");
+        let made =
+            one_server().map(|manifest| contested_by(&manifest, &[], &first, &Chosen::default()));
+        assert_eq!(
+            made,
+            Some(vec![super::Contest {
+                by: "asker".to_owned(),
+                capability: "media.serve".to_owned(),
+                claimants: vec!["server".to_owned(), "kavita (plugin kavita)".to_owned()],
+            }])
+        );
+
+        let second = plugin_filling("komga", "komga", "media.serve");
+        let joined = one_server().map(|manifest| {
+            contested_by(
+                &manifest,
+                std::slice::from_ref(&first),
+                &second,
+                &Chosen::default(),
+            )
+        });
+        assert_eq!(joined, Some(Vec::new()), "it was contested already");
+    }
+
+    /// A plugin's service that fills something else is not a candidate for this.
+    #[test]
+    fn a_plugin_filling_something_else_is_not_a_candidate() {
+        let installed = [plugin_filling("uptime", "uptime", "status.watch")];
+        let reached = one_server().and_then(|manifest| {
+            filled(&settle(&manifest, &installed, &Chosen::default()))
+                .get("media.serve")
+                .cloned()
+        });
+        assert_eq!(reached, Some(vec!["server".to_owned()]));
     }
 
     /// A link that is neither an ask nor a by-name wiring is nothing this can answer.
@@ -1030,7 +1070,7 @@ mod tests {
         ));
         assert_eq!(came(manifest.clone(), &Chosen::default(), "asker"), None);
         assert_eq!(
-            manifest.map(|manifest| settle(&manifest, &Chosen::default())),
+            manifest.map(|manifest| settle(&manifest, &[], &Chosen::default())),
             Some(Vec::new())
         );
     }

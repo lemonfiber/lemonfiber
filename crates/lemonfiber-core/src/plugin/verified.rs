@@ -161,6 +161,7 @@ mod tests {
             caused_by: None,
             said: None,
             verdict,
+            origin: crate::origin::Origin::Bundled,
         }
     }
 

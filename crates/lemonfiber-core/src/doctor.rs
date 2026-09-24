@@ -201,6 +201,13 @@ pub struct Finding {
     /// things.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub said: Option<String>,
+    /// Whose check this is: one this build ships, or one a named plugin contributed.
+    ///
+    /// Carried rather than read off the identifier. A contributed check's id is
+    /// namespaced with the plugin's, and a reader could decode that from the colon —
+    /// but an origin a reader has to decode is one a reader gets wrong, and the day a
+    /// bundled id grew a colon every such reader would misattribute it in silence.
+    pub origin: crate::origin::Origin,
 }
 
 impl Finding {
@@ -217,6 +224,7 @@ impl Finding {
             service: None,
             caused_by: None,
             said: None,
+            origin: crate::origin::Origin::Bundled,
         }
     }
 
@@ -295,6 +303,9 @@ pub struct Reported {
     pub check: String,
     /// The service the finding is about, where it is about one.
     pub service: Option<String>,
+    /// Whose check it is, so a finding the run writes in its place — one abandoned at
+    /// its budget — is attributed as the check's own would have been.
+    pub origin: crate::origin::Origin,
 }
 
 /// A single diagnostic, run in isolation from every other.

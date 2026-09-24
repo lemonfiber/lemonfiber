@@ -1,8 +1,8 @@
 //! Which surfaces still show a value with nothing saying where it came from.
 //!
-//! One of them says it now. The rest show a value and leave the reader to know, and
-//! the reason each is still like that is a fact worth keeping somewhere a gate can
-//! read — because a reason kept in prose outlives the thing it excuses, and the
+//! Three of them say it now — settings, wirings and checks. The rest show a value and
+//! leave the reader to know, and the reason each is still like that is a fact worth
+//! keeping somewhere a gate can read — because a reason kept in prose outlives the thing it excuses, and the
 //! requirement stays unanswered with a note explaining why that was once reasonable.
 //!
 //! So each is a row, and each row is checked in the direction that goes unnoticed:
@@ -55,25 +55,6 @@ const VOCABULARY: &str = "origin::Origin";
 
 /// Everything provenance is waiting to attribute.
 const WAITING: &[Waiting] = &[
-    Waiting {
-        requirement: "F7-R3",
-        asks: "a wiring says whether the service filling it is this build's own or a plugin's",
-        at: "crates/lemonfiber-core/src/wiring.rs",
-        arrives_as: VOCABULARY,
-        because: "a claimant carries a plugin name already and the answer drops it: one \
-                  candidate is reported as the bare service, and only a contest names who \
-                  brought each. Nothing shows the difference today because nothing installs \
-                  a plugin, so the wrong answer is unreachable rather than absent",
-    },
-    Waiting {
-        requirement: "F7-R3",
-        asks: "a check says whether it is one this build ships or one a plugin contributed",
-        at: "crates/lemonfiber-core/src/doctor.rs",
-        arrives_as: VOCABULARY,
-        because: "a finding's origin is inferred from punctuation rather than carried — a \
-                  bundled identity never holds a colon, so a namespaced one is a plugin's — \
-                  and an origin a reader has to decode is one a reader gets wrong",
-    },
     Waiting {
         requirement: "F7-R8",
         asks: "a plugin's secrets appear on the credentials listing, attributed, and never \

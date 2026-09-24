@@ -179,6 +179,7 @@ mod tests {
                 hostname: "komga".to_owned(),
                 group: None,
             }),
+            provides: Vec::new(),
         }
     }
 

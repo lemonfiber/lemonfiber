@@ -5262,6 +5262,10 @@
               "description": "A stable identifier for the thing checked, such as `vpn.egress-match`.",
               "type": "string"
             },
+            "origin": {
+              "description": "Whose check this is: one this build ships, or one a named plugin contributed.\n\nCarried rather than read off the identifier. A contributed check's id is\nnamespaced with the plugin's, and a reader could decode that from the colon —\nbut an origin a reader has to decode is one a reader gets wrong, and the day a\nbundled id grew a colon every such reader would misattribute it in silence.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
             "said": {
               "description": "What the service said for itself, lately.\n\nCarried on the finding rather than left for the operator to go and fetch,\nbecause the explanation is almost always in it: a check can say a service is\nnot answering, and only the service can say why. Absent where the finding is\nnot about a service, where the service is fine, or where the engine would not\nsay — an empty section would be a promise of evidence that is not there.\n\nSet after the run, like [`Self::caused_by`], since reading a service's output\nis not the check's own business and a check that did it would be doing two\nthings.",
               "type": [
@@ -5289,7 +5293,8 @@
             "check",
             "category",
             "title",
-            "verdict"
+            "verdict",
+            "origin"
           ]
         },
         "Overall": {
@@ -5449,6 +5454,73 @@
           },
           "required": [
             "action"
+          ]
+        },
+        "ValueOrigin": {
+          "description": "Where a value in force came from.\n\nPublished under a name of its own because the generated schema keys on the type's\nbare name, and a second `Origin` in the crate would be merged with this one into a\nsingle definition carrying the variants of both — a published contract saying a\ncredential may be *unknown* and a setting may be *service*, neither of which is\ntrue, and neither of which the additive-only surface check would refuse.",
+          "oneOf": [
+            {
+              "description": "This build's own, out of what lemonfiber ships rather than out of a choice.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "bundled"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "The operator settled it, whether by answering for it or by editing it since.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "operator"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "A named plugin set it.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which one, so the thread back to it is a name rather than a search.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "plugin"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
+            },
+            {
+              "description": "It could not be established, and what stopped it.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "unknown"
+                },
+                "why": {
+                  "description": "What stopped it being established, so the gap reads as a reason rather\nthan as a shrug.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "origin",
+                "why"
+              ]
+            }
           ]
         }
       }
@@ -9513,6 +9585,10 @@
               "description": "A stable identifier for the thing checked, such as `vpn.egress-match`.",
               "type": "string"
             },
+            "origin": {
+              "description": "Whose check this is: one this build ships, or one a named plugin contributed.\n\nCarried rather than read off the identifier. A contributed check's id is\nnamespaced with the plugin's, and a reader could decode that from the colon —\nbut an origin a reader has to decode is one a reader gets wrong, and the day a\nbundled id grew a colon every such reader would misattribute it in silence.",
+              "$ref": "#/$defs/ValueOrigin"
+            },
             "said": {
               "description": "What the service said for itself, lately.\n\nCarried on the finding rather than left for the operator to go and fetch,\nbecause the explanation is almost always in it: a check can say a service is\nnot answering, and only the service can say why. Absent where the finding is\nnot about a service, where the service is fine, or where the engine would not\nsay — an empty section would be a promise of evidence that is not there.\n\nSet after the run, like [`Self::caused_by`], since reading a service's output\nis not the check's own business and a check that did it would be doing two\nthings.",
               "type": [
@@ -9540,7 +9616,8 @@
             "check",
             "category",
             "title",
-            "verdict"
+            "verdict",
+            "origin"
           ]
         },
         "PluginChange": {
@@ -9622,6 +9699,13 @@
                 "$ref": "#/$defs/PluginChange"
               }
             },
+            "contests": {
+              "description": "Every ask of the stack's the install leaves contested that is not contested\nnow, as it would then stand.\n\nA plugin's service that claims what the stack asks for is a candidate like any\nother, so installing it leaves the ask refused until somebody chooses — which is\na change to what the stack does, and stated with the rest before it happens.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WiringContest"
+              }
+            },
             "overrides": {
               "description": "Every bundled thing the plugin declares it will change.\n\nThe full extent rather than a sample of it: a manifest may change a bundled\nsetting only through a recipe, and a recipe reaching one no `[[override]]`\nnames is refused before anything is written.",
               "type": "array",
@@ -9672,6 +9756,7 @@
             "recorded",
             "changes",
             "proofs",
+            "contests",
             "overrides"
           ]
         },
@@ -9800,6 +9885,14 @@
             "image": {
               "description": "The registry path, carrying no pin of its own.",
               "type": "string"
+            },
+            "provides": {
+              "description": "Every core capability this one service fills, which is what makes it a candidate\nwhen the stack asks for one.\n\nPer service rather than read off the plugin's whole list, because a wiring\nreaches a service and not a plugin: of a plugin's two services, the one that\nfills a capability is the one an ask for it would reach. Defaulted for a record\nwritten before this was kept, which reads as filling nothing — a service nothing\nis wired to, rather than one wired to on a guess.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
             },
             "reached": {
               "description": "How it is reached, or nothing where it has no listener.",
@@ -10436,6 +10529,99 @@
             "reversed",
             "left",
             "rehearsed"
+          ]
+        },
+        "ValueOrigin": {
+          "description": "Where a value in force came from.\n\nPublished under a name of its own because the generated schema keys on the type's\nbare name, and a second `Origin` in the crate would be merged with this one into a\nsingle definition carrying the variants of both — a published contract saying a\ncredential may be *unknown* and a setting may be *service*, neither of which is\ntrue, and neither of which the additive-only surface check would refuse.",
+          "oneOf": [
+            {
+              "description": "This build's own, out of what lemonfiber ships rather than out of a choice.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "bundled"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "The operator settled it, whether by answering for it or by editing it since.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "operator"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "A named plugin set it.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which one, so the thread back to it is a name rather than a search.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "plugin"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
+            },
+            {
+              "description": "It could not be established, and what stopped it.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "unknown"
+                },
+                "why": {
+                  "description": "What stopped it being established, so the gap reads as a reason rather\nthan as a shrug.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "origin",
+                "why"
+              ]
+            }
+          ]
+        },
+        "WiringContest": {
+          "description": "An ask several services claim and nothing has chosen between, so it reaches\nnothing.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "description": "The service that asked.",
+              "type": "string"
+            },
+            "capability": {
+              "description": "What it asked for.",
+              "type": "string"
+            },
+            "claimants": {
+              "description": "Every claimant, named — a plugin's with the plugin beside it.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "by",
+            "capability",
+            "claimants"
           ]
         }
       }
@@ -16904,6 +17090,13 @@
                   "type": "string",
                   "const": "asked"
                 },
+                "origins": {
+                  "description": "Where each service that claims it came from: this build's stack, or a\nnamed plugin.\n\nEvery claimant rather than only what the ask reaches, because a contest\nreaches nothing and is exactly where an operator most needs to know which of\nthe names in front of them is not the stack's.",
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/ValueOrigin"
+                  }
+                },
                 "services": {
                   "description": "What the ask reaches — empty where nothing fills it or a contest stands.",
                   "type": "array",
@@ -16920,7 +17113,8 @@
                 "how",
                 "capability",
                 "services",
-                "settled"
+                "settled",
+                "origins"
               ]
             },
             {
@@ -16964,6 +17158,73 @@
           "required": [
             "by",
             "capability"
+          ]
+        },
+        "ValueOrigin": {
+          "description": "Where a value in force came from.\n\nPublished under a name of its own because the generated schema keys on the type's\nbare name, and a second `Origin` in the crate would be merged with this one into a\nsingle definition carrying the variants of both — a published contract saying a\ncredential may be *unknown* and a setting may be *service*, neither of which is\ntrue, and neither of which the additive-only surface check would refuse.",
+          "oneOf": [
+            {
+              "description": "This build's own, out of what lemonfiber ships rather than out of a choice.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "bundled"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "The operator settled it, whether by answering for it or by editing it since.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "operator"
+                }
+              },
+              "required": [
+                "origin"
+              ]
+            },
+            {
+              "description": "A named plugin set it.",
+              "type": "object",
+              "properties": {
+                "named": {
+                  "description": "Which one, so the thread back to it is a name rather than a search.",
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "const": "plugin"
+                }
+              },
+              "required": [
+                "origin",
+                "named"
+              ]
+            },
+            {
+              "description": "It could not be established, and what stopped it.",
+              "type": "object",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "const": "unknown"
+                },
+                "why": {
+                  "description": "What stopped it being established, so the gap reads as a reason rather\nthan as a shrug.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "origin",
+                "why"
+              ]
+            }
           ]
         },
         "Whose": {

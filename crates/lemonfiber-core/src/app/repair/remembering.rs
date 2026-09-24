@@ -141,6 +141,7 @@ mod tests {
             service: None,
             caused_by: None,
             said: None,
+            origin: crate::origin::Origin::Bundled,
         }
     }
 

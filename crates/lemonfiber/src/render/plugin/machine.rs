@@ -48,6 +48,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             named(&install.would)
         ));
         lines.extend(services(&install.would));
+        lines.extend(contesting(&install.contests, install.recorded));
         lines.extend(changes(&install.changes, acted));
         lines.extend(proving(&install.proofs, install.against, acted));
         lines.extend(verified(install.verified.as_ref()));
@@ -309,6 +310,31 @@ fn removal(one: &Removal) -> Lines {
     lines
 }
 
+/// Every ask of the stack's the install leaves contested, and what to do about it.
+///
+/// Nothing at all where it contests nothing, which is the common case and needs no
+/// line: this is a warning, and a warning printed on every install stops being read.
+pub(super) fn contesting(contests: &[lemonfiber_core::wiring::Contest], recorded: bool) -> Lines {
+    let mut lines = Lines::default();
+    if contests.is_empty() {
+        return lines;
+    }
+    lines.spaced(format!(
+        "    What {} contested, and reaches nothing until you choose:",
+        if recorded { "is now" } else { "it would leave" }
+    ));
+    for one in contests {
+        lines.put(format!(
+            "      {} asks for {} — claimed by {}",
+            one.by,
+            one.capability,
+            one.claimants.join(", ")
+        ));
+    }
+    lines.put("      Choose which fills it with `lemonfiber wiring fill`.");
+    lines
+}
+
 /// Every capability the machine would have nothing filling afterwards.
 ///
 /// **The empty case is worded and it is the common one.** A plugin that fills nothing
@@ -498,6 +524,7 @@ mod tests {
                 config_path: "/app/data".to_owned(),
                 takes_data: reached.is_some(),
                 reached,
+                provides: Vec::new(),
             }],
             provides: Vec::new(),
             contributions: Vec::new(),
@@ -518,6 +545,7 @@ mod tests {
             verified: None,
             overrides: Vec::new(),
             reversed: None,
+            contests: Vec::new(),
         }
     }
 
@@ -930,6 +958,7 @@ mod tests {
             caused_by: None,
             said: None,
             verdict,
+            origin: lemonfiber_core::origin::Origin::Bundled,
         }
     }
 
@@ -1070,6 +1099,59 @@ mod tests {
         })
         .text();
         assert!(!said.contains("the stack's own checks"), "{said}");
+    }
+
+    /// What an install would leave contested is said before it happens, with every
+    /// claimant and how to settle it — and nothing at all is said where it contests
+    /// nothing, which is the common case.
+    #[test]
+    fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent() {
+        let one = recorded("komga", None);
+        let quiet = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(install(one.clone(), false)),
+            removal: None,
+            update: None,
+        })
+        .text();
+        assert!(!quiet.contains("contested"), "{quiet}");
+
+        let said = installs(&Installs {
+            installed: Vec::new(),
+            install: Some(Install {
+                contests: vec![lemonfiber_core::wiring::Contest {
+                    by: "seerr".to_owned(),
+                    capability: "identity.source".to_owned(),
+                    claimants: vec!["jellyfin".to_owned(), "komga (plugin komga)".to_owned()],
+                }],
+                ..install(one, false)
+            }),
+            removal: None,
+            update: None,
+        })
+        .text();
+        assert!(
+            said.contains("What it would leave contested, and reaches nothing until you choose:"),
+            "{said}"
+        );
+        assert!(
+            said.contains(
+                "seerr asks for identity.source — claimed by jellyfin, komga (plugin komga)"
+            ),
+            "{said}"
+        );
+        assert!(said.contains("lemonfiber wiring fill"), "{said}");
+
+        let done = super::contesting(
+            &[lemonfiber_core::wiring::Contest {
+                by: "seerr".to_owned(),
+                capability: "identity.source".to_owned(),
+                claimants: Vec::new(),
+            }],
+            true,
+        )
+        .text();
+        assert!(done.contains("What is now contested"), "{done}");
     }
 
     /// An update built for the page: from one version to the next, with whatever it

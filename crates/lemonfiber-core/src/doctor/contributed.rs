@@ -240,6 +240,7 @@ impl Check for Contributed {
         Some(Reported {
             check: self.check.clone(),
             service: self.service.clone(),
+            origin: self.origin(),
         })
     }
 
@@ -249,6 +250,13 @@ impl Check for Contributed {
 }
 
 impl Contributed {
+    /// Whose row this is: the plugin that declared it, named.
+    fn origin(&self) -> crate::origin::Origin {
+        crate::origin::Origin::Plugin {
+            named: self.plugin.clone(),
+        }
+    }
+
     /// The finding this row produces, attributed to the plugin that declared it.
     fn found(&self, verdict: Verdict) -> Finding {
         Finding {
@@ -259,6 +267,7 @@ impl Contributed {
             service: self.service.clone(),
             caused_by: None,
             said: None,
+            origin: self.origin(),
         }
     }
 

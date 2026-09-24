@@ -18,7 +18,7 @@ use super::Lines;
 pub(super) fn diagnosis(report: &DoctorReport) -> Lines {
     let mut lines = Lines::default();
     for finding in &report.findings {
-        let title = &finding.title;
+        let title = &titled(finding);
         match &finding.verdict {
             Verdict::Pass { note } => match note {
                 Some(note) => lines.put(format!("  ✓ {title}   {note}")),
@@ -58,8 +58,37 @@ pub(super) fn diagnosis(report: &DoctorReport) -> Lines {
         lines.extend(said(finding.said.as_deref()));
     }
 
+    // Said once, and only where a row is marked, so what the unmarked rows are is never
+    // left to be inferred from the marked ones.
+    if report
+        .findings
+        .iter()
+        .any(|finding| finding.origin != lemonfiber_core::origin::Origin::Bundled)
+    {
+        lines.spaced(
+            "A check marked with where it came from is not this build's own; every other is.",
+        );
+    }
     lines.spaced(overall(report.overall));
     lines
+}
+
+/// A finding's title, with where it came from beside it wherever that is not this
+/// build.
+///
+/// Beside the title rather than in a section of its own, so reading the row and reading
+/// whose it is are the same act — the operator it matters most to is the one who did
+/// not think to ask. This build's own rows are left unmarked because they are nearly
+/// every row, and a word repeated on forty lines is a word nobody reads; the line at
+/// the foot says so wherever anything is marked.
+fn titled(finding: &lemonfiber_core::doctor::Finding) -> String {
+    match &finding.origin {
+        lemonfiber_core::origin::Origin::Bundled => finding.title.clone(),
+        lemonfiber_core::origin::Origin::Plugin { named } => {
+            format!("{} (from plugin {named})", finding.title)
+        }
+        other => format!("{} (from {})", finding.title, other.as_str()),
+    }
 }
 
 /// A service's own recent output, indented under the finding it belongs to.
@@ -130,6 +159,7 @@ mod tests {
             caused_by: None,
             said: None,
             verdict: Verdict::Fail(a_problem()),
+            origin: lemonfiber_core::origin::Origin::Bundled,
         }
     }
 
@@ -152,6 +182,46 @@ mod tests {
             text.contains("        Retrying in 30s"),
             "every line is indented under the finding, not just the first: {text}"
         );
+    }
+
+    /// A plugin's check is marked as the plugin's beside its title, and the page says
+    /// what an unmarked row is; a page of only this build's own marks nothing and says
+    /// nothing about marks.
+    #[test]
+    fn a_plugin_s_check_says_whose_it_is_beside_its_title() {
+        let theirs = Finding {
+            title: "Komga libraries".to_owned(),
+            origin: lemonfiber_core::origin::Origin::Plugin {
+                named: "komga".to_owned(),
+            },
+            ..a_failing_finding()
+        };
+        let unknown = Finding {
+            title: "A stray row".to_owned(),
+            origin: lemonfiber_core::origin::Origin::Unknown {
+                why: "nothing said".to_owned(),
+            },
+            ..a_failing_finding()
+        };
+        let mixed = diagnosis(&DoctorReport {
+            overall: Overall::Broken,
+            findings: vec![a_failing_finding(), theirs, unknown],
+        })
+        .text();
+        assert!(
+            mixed.contains("✗ Komga libraries (from plugin komga)"),
+            "{mixed}"
+        );
+        assert!(mixed.contains("✗ A stray row (from unknown)"), "{mixed}");
+        assert!(mixed.contains("✗ Sonarr answers   "), "{mixed}");
+        assert!(mixed.contains("every other is"), "{mixed}");
+
+        let ours = diagnosis(&DoctorReport {
+            overall: Overall::Broken,
+            findings: vec![a_failing_finding()],
+        })
+        .text();
+        assert!(!ours.contains("every other is"), "{ours}");
     }
 
     /// A heading with nothing under it promises evidence that is not there.
@@ -200,6 +270,7 @@ mod tests {
                 verdict: Verdict::Pass {
                     note: Some("plenty of room".to_owned()),
                 },
+                origin: lemonfiber_core::origin::Origin::Bundled,
             },
             Finding {
                 check: "b".to_owned(),
@@ -209,6 +280,7 @@ mod tests {
                 caused_by: None,
                 said: None,
                 verdict: Verdict::Pass { note: None },
+                origin: lemonfiber_core::origin::Origin::Bundled,
             },
             Finding {
                 check: "c".to_owned(),
@@ -218,6 +290,7 @@ mod tests {
                 caused_by: None,
                 said: None,
                 verdict: Verdict::Warn(a_problem()),
+                origin: lemonfiber_core::origin::Origin::Bundled,
             },
             Finding {
                 check: "d".to_owned(),
@@ -227,6 +300,7 @@ mod tests {
                 caused_by: None,
                 said: None,
                 verdict: Verdict::Fail(a_problem()),
+                origin: lemonfiber_core::origin::Origin::Bundled,
             },
             Finding {
                 check: "e".to_owned(),
@@ -239,6 +313,7 @@ mod tests {
                     reason: "nothing answered".to_owned(),
                     remedy: Remedy::new("start it").with_detail("compose up"),
                 },
+                origin: lemonfiber_core::origin::Origin::Bundled,
             },
             Finding {
                 check: "f".to_owned(),
@@ -250,6 +325,7 @@ mod tests {
                 verdict: Verdict::Skipped {
                     reason: "not applicable".to_owned(),
                 },
+                origin: lemonfiber_core::origin::Origin::Bundled,
             },
         ];
         let report = DoctorReport {
@@ -283,6 +359,7 @@ mod tests {
                     reason: "nothing answered".to_owned(),
                     remedy: Remedy::new("start it"),
                 },
+                origin: lemonfiber_core::origin::Origin::Bundled,
             }],
         };
         assert!(diagnosis(&report).text().contains("→ start it"));
@@ -329,6 +406,7 @@ mod tests {
                 caused_by: None,
                 said: None,
                 verdict: Verdict::Warn(a_problem().in_state(State::Suppressed)),
+                origin: lemonfiber_core::origin::Origin::Bundled,
             }],
         };
         let text = diagnosis(&report).text();

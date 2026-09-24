@@ -75,7 +75,7 @@ fn machine(named: &str, manifest: &str, recorded: u16) -> PathBuf {
         std::process::id()
     ));
     let _ = std::fs::remove_dir_all(&root);
-    for dir in ["source/fixtures", "stack", "config", "data", "empty"] {
+    for dir in ["source/fixtures", "config", "data", "empty"] {
         let _ = std::fs::create_dir_all(root.join(dir));
     }
     let _ = std::fs::write(root.join("source/plugin.toml"), manifest);
@@ -96,12 +96,13 @@ fn machine(named: &str, manifest: &str, recorded: u16) -> PathBuf {
 /// is never a meaningful answer and is failed as one.
 fn unattended(root: &Path, argv: &[&str]) -> Option<i32> {
     std::process::Command::new(BINARY)
-        .args(
-            ["--stack-dir", "--config-dir", "--data-dir"]
-                .iter()
-                .zip(["stack", "config", "data"])
-                .flat_map(|(flag, dir)| [(*flag).to_owned(), root.join(dir).display().to_string()]),
-        )
+        // The stack this binary carries rather than one of this test's making: a
+        // rehearsal states what the install would do to the stack's own wiring, and a
+        // directory with no stack in it is a machine the install could not run on.
+        .arg("--config-dir")
+        .arg(root.join("config"))
+        .arg("--data-dir")
+        .arg(root.join("data"))
         .args(argv)
         .env_clear()
         .env("PATH", "")
@@ -116,7 +117,7 @@ fn unattended(root: &Path, argv: &[&str]) -> Option<i32> {
 /// Every file on the machine outside the plugin's own source, which is what a step
 /// that promises to write nothing has to leave empty.
 fn written(root: &Path) -> Vec<PathBuf> {
-    ["stack", "config", "data"]
+    ["config", "data"]
         .iter()
         .flat_map(|dir| {
             std::fs::read_dir(root.join(dir))

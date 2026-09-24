@@ -141,6 +141,32 @@ async fn a_row_a_plugin_declared_runs_where_the_bundled_ones_run() {
         ),
         "the plugin's own row answered, on the port its install published"
     );
+    assert_eq!(
+        origin_of(&ctx, "komga:libraries").await,
+        Some(lemonfiber_core::origin::Origin::Plugin {
+            named: "komga".to_owned()
+        }),
+        "and it says whose row it is, beside it rather than in its punctuation"
+    );
+    assert_eq!(
+        origin_of(&ctx, "environment.compose").await,
+        Some(lemonfiber_core::origin::Origin::Bundled),
+        "while one of this build's own says that"
+    );
+}
+
+/// Whose check the finding with this id says it is.
+async fn origin_of(ctx: &Ctx, check: &str) -> Option<lemonfiber_core::origin::Origin> {
+    diagnose(ctx, &Narrowing::Suite, false)
+        .await
+        .ok()
+        .and_then(|report| {
+            report
+                .findings
+                .into_iter()
+                .find(|finding| finding.check == check)
+                .map(|finding| finding.origin)
+        })
 }
 
 /// A row whose service does not answer is unrun and says so, naming the plugin. It is

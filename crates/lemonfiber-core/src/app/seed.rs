@@ -98,8 +98,14 @@ pub(super) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // bundled service a change to the manifest and the setting rather than a change
     // here. Settled after withholding, because a service the operator manages
     // themselves is not one this pass wires to.
+    // What is installed is read here too, because a plugin's service that claims what
+    // the stack asks for is a candidate like any other — and a record that is there and
+    // will not read refuses the seed rather than letting it wire past a contest nobody
+    // could see.
+    let installed = super::plugins::read(ctx)?;
     let filled = crate::wiring::filled(&crate::wiring::settle(
         &manifest,
+        installed.installed(),
         &super::targets::chosen_fillers(ctx),
     ));
 

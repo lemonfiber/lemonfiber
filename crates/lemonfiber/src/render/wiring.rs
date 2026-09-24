@@ -49,9 +49,10 @@ fn entry(link: &Wired) -> Lines {
             capability,
             services,
             settled,
+            origins,
         } => {
             lines.spaced(format!("  {} asks for {capability}", link.by));
-            lines.put(format!("    reaches  {}", reached(services)));
+            lines.put(format!("    reaches  {}", reached(services, origins)));
             for said in settling(settled) {
                 lines.put(format!("    {said}"));
             }
@@ -64,11 +65,36 @@ fn entry(link: &Wired) -> Lines {
     lines
 }
 
-/// What an ask reaches, or that it reaches nothing.
-fn reached(services: &[String]) -> String {
+/// What an ask reaches, or that it reaches nothing, each beside where it came from.
+///
+/// Beside the name rather than in a column of its own, because reading the one and
+/// reading the other has to be the same act: an operator who never thought to ask
+/// whether a plugin is involved is the one this is for.
+fn reached(
+    services: &[String],
+    origins: &std::collections::BTreeMap<String, lemonfiber_core::origin::Origin>,
+) -> String {
     match services {
         [] => "nothing".to_owned(),
-        named => named.join(", "),
+        named => named
+            .iter()
+            .map(|service| format!("{service} ({})", from(origins.get(service))))
+            .collect::<Vec<String>>()
+            .join(", "),
+    }
+}
+
+/// Where one service came from, in the words a listing uses.
+///
+/// A service the answer names no origin for is said to be of unknown origin rather
+/// than left bare, which would read as this build's own.
+fn from(origin: Option<&lemonfiber_core::origin::Origin>) -> String {
+    match origin {
+        Some(lemonfiber_core::origin::Origin::Plugin { named }) => format!("plugin {named}"),
+        // The vocabulary's own word for every other origin — `bundled` for the stack's —
+        // so this is one more reader of it rather than a second list of the words.
+        Some(other) => other.as_str().to_owned(),
+        None => "unknown".to_owned(),
     }
 }
 
@@ -178,9 +204,10 @@ fn cost(leaves: &[Unfilled], applied: bool) -> Lines {
 mod tests {
     use super::{substituted, wired};
     use lemonfiber_core::model::{SubstitutionReport, WiringReport};
+    use lemonfiber_core::origin::Origin;
     use lemonfiber_core::wiring::{Reaches, Settled, Substitution, Unfilled, Whose, Wired};
 
-    /// A link asking for a capability, settled as given.
+    /// A link asking for a capability, settled as given, reaching the stack's own.
     fn asking(by: &str, capability: &str, services: &[&str], settled: Settled) -> Wired {
         Wired {
             by: by.to_owned(),
@@ -188,6 +215,10 @@ mod tests {
                 capability: capability.to_owned(),
                 services: services.iter().map(|one| (*one).to_owned()).collect(),
                 settled,
+                origins: services
+                    .iter()
+                    .map(|one| ((*one).to_owned(), Origin::Bundled))
+                    .collect(),
             },
         }
     }
@@ -210,7 +241,36 @@ mod tests {
             unfilled: Vec::new(),
         });
         assert!(said.contains("seerr asks for identity.source"), "{said}");
-        assert!(said.contains("reaches  jellyfin"), "{said}");
+        assert!(said.contains("reaches  jellyfin (bundled)"), "{said}");
+    }
+
+    /// A service a plugin brought is named as the plugin's beside the name, and one the
+    /// answer gives no origin for says so rather than reading as this build's own.
+    #[test]
+    fn what_an_ask_reaches_says_where_each_service_came_from() {
+        let link = Wired {
+            by: "seerr".to_owned(),
+            reaches: Reaches::Asked {
+                capability: "media.serve".to_owned(),
+                services: vec!["kavita".to_owned(), "stray".to_owned()],
+                settled: Settled::Each,
+                origins: std::iter::once((
+                    "kavita".to_owned(),
+                    Origin::Plugin {
+                        named: "kavita".to_owned(),
+                    },
+                ))
+                .collect(),
+            },
+        };
+        let said = shown(&WiringReport {
+            wired: vec![link],
+            unfilled: Vec::new(),
+        });
+        assert!(
+            said.contains("reaches  kavita (plugin kavita), stray (unknown)"),
+            "{said}"
+        );
     }
 
     /// A by-name link is shown as one, with the reason it is the exception.
@@ -244,7 +304,10 @@ mod tests {
             )],
             unfilled: Vec::new(),
         });
-        assert!(said.contains("reaches  sonarr, radarr"), "{said}");
+        assert!(
+            said.contains("reaches  sonarr (bundled), radarr (bundled)"),
+            "{said}"
+        );
         assert!(
             said.contains("reaching  every service that fills it"),
             "{said}"
