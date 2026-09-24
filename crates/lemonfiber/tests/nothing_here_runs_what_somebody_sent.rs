@@ -38,7 +38,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod refused;
 mod source_tree;
 
-use refused::{belongs, resolved, RUNTIMES};
+use refused::{banned, belongs, family, resolved, RUNNING};
 use source_tree::shipped;
 
 /// Words an operator-facing surface would use if some part of a plugin executed.
@@ -88,9 +88,14 @@ const CONFINED: &[&str] = &[
 /// though it had looked.
 #[test]
 fn nothing_this_binary_is_built_from_can_run_what_it_was_handed() {
+    let runtimes = family(RUNNING);
+    assert!(
+        !runtimes.is_empty(),
+        "deny.toml gives no package the reason {RUNNING:?}, so this sweeps for nothing"
+    );
     let carried: Vec<String> = resolved()
         .into_iter()
-        .filter(|name| belongs(name, RUNTIMES))
+        .filter(|name| belongs(name, &runtimes))
         .collect();
     assert!(
         carried.is_empty(),
@@ -100,7 +105,7 @@ fn nothing_this_binary_is_built_from_can_run_what_it_was_handed() {
     );
 }
 
-/// Every stem the sweep carries is one a graph could actually hold.
+/// Every stem the ban list carries is one a graph could actually hold.
 ///
 /// A list of names is only a guard while the names are the ones crates are
 /// published under. A typo is a stem that matches nothing, and a sweep of stems
@@ -109,8 +114,9 @@ fn nothing_this_binary_is_built_from_can_run_what_it_was_handed() {
 /// is the shape crates.io allows a name to take, and that no stem is written
 /// twice — a duplicate being the mark of one added without reading the list.
 #[test]
-fn every_stem_this_sweeps_for_is_shaped_like_a_package_name() {
-    let malformed: Vec<&&str> = RUNTIMES
+fn every_stem_the_ban_list_carries_is_shaped_like_a_package_name() {
+    let stems: Vec<String> = banned().into_iter().map(|(stem, _)| stem).collect();
+    let malformed: Vec<&String> = stems
         .iter()
         .filter(|stem| {
             stem.len() < 2
@@ -127,8 +133,8 @@ fn every_stem_this_sweeps_for_is_shaped_like_a_package_name() {
         "these could not be the start of a crate name, so they refuse nothing: {malformed:?}"
     );
     assert_eq!(
-        RUNTIMES.len(),
-        RUNTIMES.iter().collect::<BTreeSet<_>>().len(),
+        stems.len(),
+        stems.iter().collect::<BTreeSet<_>>().len(),
         "a stem is written twice, which means one of them was added without reading the list"
     );
 }

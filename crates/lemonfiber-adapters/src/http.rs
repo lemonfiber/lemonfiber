@@ -13,9 +13,9 @@ use async_trait::async_trait;
 use reqwest::header::HeaderValue;
 use reqwest::Url;
 
+use lemonfiber_error::withheld::without_credentials;
+use lemonfiber_error::withheld::REDACTED;
 use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
-use lemonfiber_ports::withheld::without_credentials;
-use lemonfiber_ports::withheld::REDACTED;
 
 /// How long to wait for a service to accept a connection before treating it as
 /// not answering. One that is up answers a local connection at once; the wait is

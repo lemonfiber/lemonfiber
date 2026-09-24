@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 mod addressing;
 mod aggregators;
@@ -26,6 +26,7 @@ mod notices;
 mod providers;
 mod quality;
 mod requests;
+pub mod stage;
 mod subtitles;
 mod throttling;
 mod trace;
@@ -255,7 +256,7 @@ mod tests {
         Application, ApplicationKind, Category, ClientKind, Credential, Diagnose, DownloadClient,
         Failure, Identity, RegisteredApplication, RootFolder,
     };
-    use crate::error::{Severity, State};
+    use lemonfiber_error::{Severity, State};
 
     #[test]
     fn an_absent_service_is_skipped_rather_than_failed() {

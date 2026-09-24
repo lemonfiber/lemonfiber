@@ -26,7 +26,7 @@
 //! mints a secret's value. Neither can say *unknown*, because neither is read by
 //! somebody deciding how much to trust what is in front of them.
 
-use lemonfiber_ports::withheld::is_secret;
+use lemonfiber_error::withheld::is_secret;
 use serde::Serialize;
 
 use crate::baseline::Record;

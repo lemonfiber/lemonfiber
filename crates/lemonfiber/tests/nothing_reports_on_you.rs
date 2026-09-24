@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod refused;
 mod source_tree;
 
-use refused::{banned, belongs, every_stem, resolved, COLLECTORS};
+use refused::{banned, belongs, family, resolved, COLLECTING, RUNNING};
 use source_tree::shipped;
 
 /// Whether lemonfiber itself sends a request to a host it names.
@@ -231,9 +231,14 @@ fn hosts() -> BTreeMap<String, Vec<String>> {
 /// it had looked.
 #[test]
 fn nothing_this_binary_is_built_from_collects() {
+    let collectors = family(COLLECTING);
+    assert!(
+        !collectors.is_empty(),
+        "deny.toml gives no package the reason {COLLECTING:?}, so this sweeps for nothing"
+    );
     let carried: Vec<String> = resolved()
         .into_iter()
-        .filter(|name| belongs(name, COLLECTORS))
+        .filter(|name| belongs(name, &collectors))
         .collect();
     assert!(
         carried.is_empty(),
@@ -242,25 +247,21 @@ fn nothing_this_binary_is_built_from_collects() {
     );
 }
 
-/// The ban list names every stem a guard sweeps for, and nothing else.
+/// Every package the ban list refuses belongs to a family a guard sweeps for.
 ///
-/// Two gates over one claim, and they answer different questions: this test reads
-/// the graph as resolved and matches a family by its stem, while `cargo deny` reads
-/// a name at a time and is the one that runs on a dependency bump nobody opened.
-/// Neither is redundant, and a stem on one and not the other is a stem nothing
-/// enforces on the path it was written for.
-///
-/// Held against both families rather than this file's own, because `deny.toml`
-/// carries one list for two subjects. Asserting the collectors alone would pass
-/// while reading as though it had checked the file, and every stem the other guard
-/// added would be a stem this one silently declared surplus.
+/// `cargo deny` reads a name at a time and is the one that runs on a dependency bump
+/// nobody opened; the guards read the graph as resolved and match a family by its
+/// stem. An entry whose reason is neither family's is a refusal no sweep reads, and
+/// an entry with no reason at all is one no guard can place.
 #[test]
-fn what_the_dependency_gate_refuses_is_what_the_guards_name() {
-    assert_eq!(
-        banned(),
-        every_stem(),
-        "the ban list cargo-deny reads and the stems these guards sweep for disagree — one of \
-         them is enforcing something the other is not"
+fn every_refusal_belongs_to_a_family_a_guard_sweeps_for() {
+    let stray: Vec<(String, String)> = banned()
+        .into_iter()
+        .filter(|(_, reason)| reason != COLLECTING && reason != RUNNING)
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "deny.toml refuses these for a reason neither guard sweeps for: {stray:?}"
     );
 }
 

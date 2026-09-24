@@ -93,7 +93,7 @@ fn destination(reach: Reach, settings: &Settings, services: &[Service]) -> Vec<S
         Reach::Guides => vec![GUIDE_SOURCE.to_owned()],
         Reach::Echo => settings.ip_echo.clone(),
         Reach::Indexer => settings.indexer.as_ref().map_or_else(Vec::new, |indexer| {
-            vec![lemonfiber_ports::withheld::without_credentials(
+            vec![lemonfiber_error::withheld::without_credentials(
                 &indexer.url,
             )]
         }),

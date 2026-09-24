@@ -39,8 +39,9 @@
 // already uses. The traits and the vocabulary that crosses them are a crate of their own —
 // see `lemonfiber-ports` — so the fakes that stand in for them are reachable from this
 // crate's own tests and from its integration tests alike.
+pub use lemonfiber_error as error;
 pub use lemonfiber_ports as ports;
-pub use lemonfiber_ports::{error, trace};
+pub use lemonfiber_ports::service::stage as trace;
 
 pub mod acknowledged;
 pub mod admission;
@@ -90,7 +91,7 @@ pub mod notify;
 pub mod origin;
 pub mod outbound;
 pub mod platform;
-pub use lemonfiber_ports::plural;
+pub use lemonfiber_error::plural;
 pub mod network;
 pub mod plugin;
 pub mod prerequisites;
@@ -105,7 +106,7 @@ pub mod recording;
 pub mod recyclarr;
 pub mod region;
 pub mod repair;
-pub use lemonfiber_ports::retry;
+pub use lemonfiber_error::retry;
 pub mod rollback;
 pub mod sabnzbd;
 pub mod secret;

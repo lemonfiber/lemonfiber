@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// The service manager a machine has, or the absence of one lemonfiber configures.
 ///

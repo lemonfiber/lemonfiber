@@ -3,7 +3,17 @@ version = 2
 yanked = "deny"
 
 [bans]
-multiple-versions = "warn"
+# A second copy of a crate is refused. Each entry below is one the workspace cannot
+# remove itself: the older copy belongs to a dependency, and the reason names which.
+multiple-versions = "deny"
+skip = [
+  { crate = "getrandom@0.2", reason = "ring, under rustls, is on the 0.2 line" },
+  { crate = "hashbrown@0.16", reason = "kasuari, under ratatui, is on the 0.16 line" },
+  { crate = "miniz_oxide@0.8", reason = "backtrace, under color-eyre, is on the 0.8 line" },
+  { crate = "syn@2", reason = "several proc-macro crates are on the 2.x line" },
+  { crate = "windows-sys@0.52", reason = "ring is on the 0.52 line" },
+  { crate = "windows-sys@0.59", reason = "rtoolbox, under rpassword, is on the 0.59 line" },
+]
 # Two families are refused as dependencies rather than merely avoided as a habit,
 # and both are stems: a family is published under one prefix, and banning the one
 # somebody reaches for first would leave the rest.
@@ -12,50 +22,49 @@ multiple-versions = "warn"
 # evaluate a program handed to it at runtime, which is how a plugin would stop
 # being data — the property everything about extensions rests on.
 #
-# The same stems are swept over the resolved graph by the guards in
-# `crates/lemonfiber/tests/refused/`, which match a family by its prefix where this
-# matches one name at a time, and which hold this list to theirs. Add to both or
-# neither.
+# This list is the only copy. The guards in `crates/lemonfiber/tests/refused/` read
+# it, group it by `reason`, and sweep the resolved graph for each stem by prefix
+# where cargo-deny matches one name at a time.
 deny = [
-  "amplitude",
-  "aptabase",
-  "bugsnag",
-  "countly",
-  "datadog",
-  "google-analytics",
-  "libhoney",
-  "mixpanel",
-  "opentelemetry",
-  "posthog",
-  "rollbar",
-  "segment",
-  "sentry",
-  "snowplow",
-  "abi_stable",
-  "dlopen",
-  "libloading",
-  "sharedlib",
-  "boa_engine",
-  "deno_core",
-  "dyon",
-  "extism",
-  "gluon",
-  "hlua",
-  "koto",
-  "lua",
-  "mlua",
-  "quickjs",
-  "rhai",
-  "rlua",
-  "rquickjs",
-  "rustpython",
-  "starlark",
-  "v8",
-  "wasm3",
-  "wasmedge",
-  "wasmer",
-  "wasmi",
-  "wasmtime",
+  { crate = "amplitude", reason = "reports on the person running it" },
+  { crate = "aptabase", reason = "reports on the person running it" },
+  { crate = "bugsnag", reason = "reports on the person running it" },
+  { crate = "countly", reason = "reports on the person running it" },
+  { crate = "datadog", reason = "reports on the person running it" },
+  { crate = "google-analytics", reason = "reports on the person running it" },
+  { crate = "libhoney", reason = "reports on the person running it" },
+  { crate = "mixpanel", reason = "reports on the person running it" },
+  { crate = "opentelemetry", reason = "reports on the person running it" },
+  { crate = "posthog", reason = "reports on the person running it" },
+  { crate = "rollbar", reason = "reports on the person running it" },
+  { crate = "segment", reason = "reports on the person running it" },
+  { crate = "sentry", reason = "reports on the person running it" },
+  { crate = "snowplow", reason = "reports on the person running it" },
+  { crate = "abi_stable", reason = "runs code it was handed" },
+  { crate = "dlopen", reason = "runs code it was handed" },
+  { crate = "libloading", reason = "runs code it was handed" },
+  { crate = "sharedlib", reason = "runs code it was handed" },
+  { crate = "boa_engine", reason = "runs code it was handed" },
+  { crate = "deno_core", reason = "runs code it was handed" },
+  { crate = "dyon", reason = "runs code it was handed" },
+  { crate = "extism", reason = "runs code it was handed" },
+  { crate = "gluon", reason = "runs code it was handed" },
+  { crate = "hlua", reason = "runs code it was handed" },
+  { crate = "koto", reason = "runs code it was handed" },
+  { crate = "lua", reason = "runs code it was handed" },
+  { crate = "mlua", reason = "runs code it was handed" },
+  { crate = "quickjs", reason = "runs code it was handed" },
+  { crate = "rhai", reason = "runs code it was handed" },
+  { crate = "rlua", reason = "runs code it was handed" },
+  { crate = "rquickjs", reason = "runs code it was handed" },
+  { crate = "rustpython", reason = "runs code it was handed" },
+  { crate = "starlark", reason = "runs code it was handed" },
+  { crate = "v8", reason = "runs code it was handed" },
+  { crate = "wasm3", reason = "runs code it was handed" },
+  { crate = "wasmedge", reason = "runs code it was handed" },
+  { crate = "wasmer", reason = "runs code it was handed" },
+  { crate = "wasmi", reason = "runs code it was handed" },
+  { crate = "wasmtime", reason = "runs code it was handed" },
 ]
 
 [licenses]

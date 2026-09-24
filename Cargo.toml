@@ -12,9 +12,19 @@ rust-version = "1.95"
 repository = "https://github.com/lemonfiber/lemonfiber"
 authors = ["NightWorks.io"]
 
-# Versions are declared once here so the workspace's crates cannot drift onto
-# different minors of the same dependency. See spec 30-repos/lemonfiber.md.
+# Every dependency, the workspace's own crates included, is declared here and
+# nowhere else: a crate names what it uses with `workspace = true` and adds only
+# features. `deny.toml` refuses a second version of any crate, so a declaration
+# here that differs from what the graph already carries fails rather than drifts.
 [workspace.dependencies]
+lemonfiber-adapters = { path = "crates/lemonfiber-adapters" }
+lemonfiber-api = { path = "crates/lemonfiber-api" }
+lemonfiber-core = { path = "crates/lemonfiber-core" }
+lemonfiber-error = { path = "crates/lemonfiber-error" }
+lemonfiber-fixtures = { path = "crates/lemonfiber-fixtures" }
+lemonfiber-manifest = { path = "crates/lemonfiber-manifest" }
+lemonfiber-plugin = { path = "crates/lemonfiber-plugin" }
+lemonfiber-ports = { path = "crates/lemonfiber-ports" }
 schemars = "1.2"
 async-trait = "0.1"
 # Argon2id for the one password lemonfiber verifies rather than reads: the operator's
@@ -42,8 +52,7 @@ jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-zon
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
 etcetera = "0.11"
-# The operating system's CSPRNG, for the one secret lemonfiber generates itself:
-# qBittorrent's WebUI password. 0.2 is already in the tree via rustls.
+# The operating system's CSPRNG, for every secret lemonfiber mints itself.
 getrandom = "0.4"
 include_dir = "0.7"
 # rustls, not the platform's TLS: it keeps the musl static release target free of
@@ -68,8 +77,40 @@ tokio-stream = "0.1"
 # in the tree via axum; only the combinators are taken.
 tower = { version = "0.5", default-features = false }
 toml = "1.1"
+# Decoding the base64 a PEM key and a registry's signature are carried in. The 0.22
+# line is the one reqwest and bollard use.
+base64 = "0.22"
+# Encrypting what the store keeps at rest.
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+crc32fast = "1"
+# A backup archive is a gzip-compressed tar. flate2's default `miniz_oxide` backend
+# is pure Rust, so the static musl release needs no system zlib.
+flate2 = "1"
+# Turning the front door's address into something a phone camera reads. It has no
+# optional dependencies: a QR code is a grid of bits, and drawing it is left to the
+# terminal code that knows the terminal.
+qrcodegen = "1.8"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+# Verifying the signature a registry offers beside an image, with the library rustls
+# already builds on.
+ring = "0.17"
+# Reading a secret without echoing it needs raw-terminal control, which
+# `unsafe_code = "forbid"` rules out doing directly.
+rpassword = "7"
+# Proving a Usenet provider means a real TLS-wrapped NNTP connection. rustls with
+# bundled Mozilla roots, so the static musl release carries its own trust anchors.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-pki-types = "1"
+serde_json = "1"
+# Compose files are YAML, and the single-mount rule can only be read from them. A
+# parser rather than line-matching, because anchors, merge keys and both volume
+# syntaxes have to read the way Compose reads them.
+serde_yaml_ng = "0.10"
+tar = "0.4"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+webpki-roots = "1"
 
-# Strict, zero-suppression posture — see spec 40-quality/code-standards.md (Q-R11, Q-R12).
+# Strict, zero-suppression posture — see spec 40-quality/code-standards.md.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"

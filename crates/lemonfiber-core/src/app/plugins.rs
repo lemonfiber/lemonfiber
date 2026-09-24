@@ -28,7 +28,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_ports::error::{Code, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Code, Problem, Remedy, Severity, State};
 
 use crate::doctor::BUNDLED_CHECKS;
 use crate::plugin::{Install, Installed, Installs, Register};

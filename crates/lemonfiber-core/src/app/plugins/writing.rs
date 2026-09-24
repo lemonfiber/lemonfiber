@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_ports::error::{Problem, Remedy, Severity, State};
+use lemonfiber_error::{Problem, Remedy, Severity, State};
 
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
@@ -214,8 +214,7 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
 }
 
 /// Raised when a plugin's service would answer on a label another plugin's already does.
-pub(super) const ANSWERED: lemonfiber_ports::error::Code =
-    lemonfiber_ports::error::Code::new("PLUGIN-13");
+pub(super) const ANSWERED: lemonfiber_error::Code = lemonfiber_error::Code::new("PLUGIN-13");
 
 /// Refuse a plugin one of whose services would answer on a label another installed
 /// plugin's service already answers on, before anything is written.

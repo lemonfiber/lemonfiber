@@ -105,8 +105,8 @@ fn names(said: &str, markers: &[&str]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::classify;
+    use lemonfiber_error::Diagnose as _;
     use lemonfiber_ports::docker::{Origin, Target};
-    use lemonfiber_ports::error::Diagnose as _;
 
     /// The endpoint each condition is exercised against, since two of the three are
     /// only told apart for a host reached over SSH.

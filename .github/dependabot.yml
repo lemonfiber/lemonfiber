@@ -68,6 +68,11 @@ updates:
       include: scope
     cooldown:
       default-days: 3
+    # base64 stays on the line reqwest and bollard carry, because `deny.toml` refuses
+    # a second copy of a crate and a bump of ours alone would be one.
+    ignore:
+      - dependency-name: base64
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       cargo:
         patterns: ["*"]

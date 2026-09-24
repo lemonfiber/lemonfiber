@@ -13,7 +13,7 @@ use serde::Serialize;
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 mod locations;
 mod target;

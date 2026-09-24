@@ -17,8 +17,8 @@
 
 use async_trait::async_trait;
 
+use lemonfiber_error::retry;
 use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
-use lemonfiber_ports::retry;
 
 /// A transport that retries what is safe to retry.
 pub struct Retrying<H> {
@@ -79,7 +79,7 @@ mod tests {
 
     use super::{Http, Method, Request, Response, Retrying, Unreachable};
     use async_trait::async_trait;
-    use lemonfiber_ports::retry::ATTEMPTS;
+    use lemonfiber_error::retry::ATTEMPTS;
 
     /// A transport that fails the first `failures` times and answers after that,
     /// counting how many times it was asked.

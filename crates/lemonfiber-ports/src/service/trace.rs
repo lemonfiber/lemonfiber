@@ -26,7 +26,7 @@ pub struct FoundItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceEvent {
     /// What happened.
-    pub outcome: crate::trace::Outcome,
+    pub outcome: crate::service::stage::Outcome,
     /// When it happened, as the service reported it.
     pub at: String,
     /// The part of the item it happened to — an episode — where the service files its
@@ -46,7 +46,7 @@ pub struct QueueItem {
     /// one. A film's queue record names no part; the record is for the whole item.
     pub part: Option<i64>,
     /// The furthest stage the queue shows this record at.
-    pub stage: crate::trace::Stage,
+    pub stage: crate::service::stage::Stage,
     /// Whether it is stuck — a warning or error tracked-download status.
     pub stuck: bool,
 }
@@ -81,7 +81,7 @@ pub struct StuckItem {
     /// The item's title, as a person would name it — the term its trace is searched by.
     pub title: String,
     /// The stage its download is stuck at.
-    pub stage: crate::trace::Stage,
+    pub stage: crate::service::stage::Stage,
 }
 
 /// Reading one \*arr's fragment of an item's journey — the service that monitors the

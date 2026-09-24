@@ -53,7 +53,11 @@ crates/
 │
 ├── lemonfiber-ports/     lib — the traits the outside world is reached through,
 │                              and the vocabulary that crosses them. Depends on
-│                              nothing of ours but the manifest.
+│                              nothing of ours but the manifest and the error model.
+│
+├── lemonfiber-error/     lib — Problem and Code, the withholding a problem's
+│                              detail passes through, retry wording, plurals.
+│                              Depends on nothing of ours.
 │
 └── lemonfiber-manifest/  lib — stack.toml parse + validate
 ```

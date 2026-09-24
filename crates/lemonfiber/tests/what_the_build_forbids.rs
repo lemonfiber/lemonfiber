@@ -63,14 +63,21 @@ fn declarations(manifest: &str) -> String {
 /// is a cycle — this states the rule anyway, because the manifest is where a
 /// future dependency would be added and this is where it should be argued with.
 #[test]
-fn the_ports_crate_depends_on_nothing_of_ours_but_the_manifest() {
+fn the_ports_crate_depends_on_nothing_of_ours_but_the_manifest_and_the_error_model() {
     let root = workspace_root();
     let Ok(manifest) = fs::read_to_string(root.join("crates/lemonfiber-ports/Cargo.toml")) else {
         unreachable!("the ports crate has a manifest");
     };
 
     let declared = declarations(&manifest);
-    for forbidden in ["lemonfiber-core", "lemonfiber-fixtures", "lemonfiber ="] {
+    for forbidden in [
+        "lemonfiber-core",
+        "lemonfiber-fixtures",
+        "lemonfiber-adapters",
+        "lemonfiber-plugin",
+        "lemonfiber-api",
+        "lemonfiber =",
+    ] {
         assert!(
             !declared.contains(forbidden),
             "lemonfiber-ports must not depend on `{forbidden}` — a boundary that reaches \

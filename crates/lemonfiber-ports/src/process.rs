@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::{channel, Receiver};
 
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// What a finished process left behind.
 #[derive(Debug, Clone, PartialEq, Eq)]

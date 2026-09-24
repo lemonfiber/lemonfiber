@@ -43,8 +43,14 @@ depend on the core.
 ## The boundary is a crate
 
 `lemonfiber-ports` holds the traits and the vocabulary that crosses them, and
-nothing else — it depends on `lemonfiber-manifest` and no other crate of ours.
-`lemonfiber-core` re-exports it as `crate::ports`, so call sites are unchanged.
+nothing else — it depends on `lemonfiber-manifest` and `lemonfiber-error` and no
+other crate of ours. `lemonfiber-core` re-exports it as `crate::ports`.
+
+The error model is a crate of its own below the ports, `lemonfiber-error`: `Problem`
+and its `Code`, the withholding every problem's detail passes through, how a
+retried failure is said, and how a count is written. A port reports failures in
+that vocabulary, and the vocabulary is not a port. `lemonfiber-core` re-exports it
+as `crate::error`.
 
 A crate rather than a module, for two reasons that turned out to be one:
 
@@ -104,10 +110,10 @@ is what every service answers; `MediaServer`, `Requests`, `Indexers`,
 asked only of the services that have them. Splitting them means a fake answers
 the one question a test is about rather than standing in for a whole service.
 
-`ports::error`, `ports::media`, `ports::trace` and `ports::withheld` define no
-seam at all. They are the vocabulary that crosses one — a problem an adapter
-reports, the stage an item has reached, a value deliberately not shown. A port
-that could not name what it returns would push the naming into every caller.
+`ports::media` and `ports::service::stage` define no seam at all. They are the
+vocabulary that crosses one — what a media file is, the stage an item has
+reached. A port that could not name what it returns would push the naming into
+every caller.
 
 ## `async_trait`, not native async fn
 

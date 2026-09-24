@@ -14,7 +14,7 @@
 //! are changing.
 
 use super::Failure;
-use crate::withheld::without_credentials;
+use lemonfiber_error::withheld::without_credentials;
 
 /// The context name Docker gives the machine's own defaults.
 ///

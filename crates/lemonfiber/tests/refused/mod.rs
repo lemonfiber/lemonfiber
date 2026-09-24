@@ -7,10 +7,8 @@
 //! on a dependency bump nobody opened and by a sweep of the resolved graph on a
 //! pull request, and each is only as good as those two lists agreeing.
 //!
-//! They agreed by being copied, once. A second family made that arrangement a
-//! choice rather than an accident: `deny.toml` carries one list and the guards
-//! carry two, so the equality somebody has to hold is between the file and the
-//! union — which no single guard can see from inside its own file.
+//! `deny.toml` is the one list. Each entry names the family it belongs to in its
+//! `reason`, and the guards read the file rather than carrying a copy of it.
 
 // Each test binary declaring this module compiles all of it, and each reads the
 // part of it that its own subject needs.
@@ -20,93 +18,45 @@ use std::collections::BTreeSet;
 
 use crate::source_tree::workspace_root;
 
-/// Package names that would mean this product had started collecting.
+/// The `reason` `deny.toml` gives a package that would mean this product had
+/// started collecting.
 ///
 /// Stems rather than exact names: a family of crates is published under one
 /// prefix — an exporter, a core, an integration — and banning the one somebody
 /// happens to reach for first would leave the rest. A package matches a stem when
 /// its name is the stem, or begins with the stem and a separator.
-///
-/// This is not a guess at what is out there. It is the list `deny.toml` carries, so
-/// the two cannot drift, and [`every_stem`] holds them to each other.
-pub(crate) const COLLECTORS: &[&str] = &[
-    "amplitude",
-    "aptabase",
-    "bugsnag",
-    "countly",
-    "datadog",
-    "google-analytics",
-    "libhoney",
-    "mixpanel",
-    "opentelemetry",
-    "posthog",
-    "rollbar",
-    "segment",
-    "sentry",
-    "snowplow",
-];
+pub(crate) const COLLECTING: &str = "reports on the person running it";
 
-/// Package names that would give this process a way to run code it was handed.
+/// The `reason` `deny.toml` gives a package that would give this process a way to
+/// run code it was handed.
 ///
-/// Two shapes, and the list is worth reading as two. The first four load a unit of
-/// machine code chosen after this binary was built — a shared object, a plugin ABI.
-/// The rest evaluate a program supplied as data: a script engine, a bytecode
-/// runtime, a JavaScript or WebAssembly host.
-///
-/// Neither shape is here because it is dangerous in general. They are here because
-/// arriving at one is how a plugin stops being data — and a plugin is data is the
-/// property the whole extension design rests on, not a habit. The list is the same
-/// kind of claim as its sibling above: an absence that is true today by nobody
-/// having added anything, and that one commit undoes.
-pub(crate) const RUNTIMES: &[&str] = &[
-    "abi_stable",
-    "dlopen",
-    "libloading",
-    "sharedlib",
-    "boa_engine",
-    "deno_core",
-    "dyon",
-    "extism",
-    "gluon",
-    "hlua",
-    "koto",
-    "lua",
-    "mlua",
-    "quickjs",
-    "rhai",
-    "rlua",
-    "rquickjs",
-    "rustpython",
-    "starlark",
-    "v8",
-    "wasm3",
-    "wasmedge",
-    "wasmer",
-    "wasmi",
-    "wasmtime",
-];
+/// Two shapes: one loads a unit of machine code chosen after this binary was built
+/// — a shared object, a plugin ABI — and the other evaluates a program supplied as
+/// data. Arriving at either is how a plugin stops being data, and a plugin is data
+/// is the property the whole extension design rests on.
+pub(crate) const RUNNING: &str = "runs code it was handed";
 
 /// A package this workspace is known to depend on, so a reader of `Cargo.lock` that
 /// found nothing is told apart from a graph that holds nothing.
 const KNOWN_DEPENDENCY: &str = "reqwest";
 
-/// Every stem either family names.
+/// The stems `deny.toml` refuses for one reason.
 ///
-/// What `deny.toml` is held to. A stem in one list and not in the file is a stem
-/// nothing enforces on the path it was written for, and the file holding a stem
-/// neither list names is a refusal with no reason attached to it.
-pub(crate) fn every_stem() -> BTreeSet<String> {
-    COLLECTORS
-        .iter()
-        .chain(RUNTIMES)
-        .map(|stem| (*stem).to_owned())
+/// The file is the only list. A guard that carried its own copy would be a second
+/// opinion about what is refused, and the two would drift the first time somebody
+/// added to one of them.
+pub(crate) fn family(reason: &str) -> Vec<String> {
+    banned()
+        .into_iter()
+        .filter(|(_, given)| given == reason)
+        .map(|(stem, _)| stem)
         .collect()
 }
 
 /// Whether a package name belongs to a family, by its stem.
-pub(crate) fn belongs(name: &str, family: &[&str]) -> bool {
+pub(crate) fn belongs(name: &str, family: &[String]) -> bool {
     family.iter().any(|stem| {
-        name == *stem
+        name == stem
             || name
                 .strip_prefix(stem)
                 .is_some_and(|rest| rest.starts_with('-') || rest.starts_with('_'))
@@ -142,8 +92,8 @@ pub(crate) fn resolved() -> BTreeSet<String> {
     found
 }
 
-/// The names cargo-deny is told to refuse.
-pub(crate) fn banned() -> BTreeSet<String> {
+/// The names cargo-deny is told to refuse, each with the reason it gives.
+pub(crate) fn banned() -> Vec<(String, String)> {
     let root = workspace_root();
     let Ok(text) = std::fs::read_to_string(root.join("deny.toml")) else {
         unreachable!("the workspace this test is compiled from configures cargo-deny")
@@ -158,9 +108,11 @@ pub(crate) fn banned() -> BTreeSet<String> {
         .map(|entries| {
             entries
                 .iter()
-                .filter_map(|entry| entry.get("name").or(Some(entry)))
-                .filter_map(toml::Value::as_str)
-                .map(str::to_owned)
+                .filter_map(|entry| {
+                    let stem = entry.as_str().or_else(|| entry.get("crate")?.as_str())?;
+                    let reason = entry.get("reason").and_then(toml::Value::as_str);
+                    Some((stem.to_owned(), reason.unwrap_or_default().to_owned()))
+                })
                 .collect()
         })
         .unwrap_or_default()

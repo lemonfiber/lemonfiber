@@ -26,7 +26,7 @@
 //! port and whether the login was proven are all shown beside it. A keyword rule cannot
 //! tell those two apart, because it is not a fact about the name.
 //!
-//! The counterpart rule is in [`lemonfiber_ports::withheld`], which handles text that has
+//! The counterpart rule is in [`lemonfiber_error::withheld`], which handles text that has
 //! no field names for a list to work from. Two surfaces, two rules, balanced opposite
 //! ways on purpose: here a name is read against a list and anything unvouched-for is
 //! withheld; there every rule is a guess about somebody else's sentence, so only the
@@ -285,7 +285,7 @@ pub fn in_full(name: &str) -> bool {
 /// reaches an operator three ways — displayed, kept on a transport failure, and quoted
 /// inside a sentence somebody else wrote — and a second copy of the rule is a second
 /// place for it to be right in.
-pub use lemonfiber_ports::withheld::without_credentials;
+pub use lemonfiber_error::withheld::without_credentials;
 
 /// Whether a line of a settings file may be shown with its value.
 ///
