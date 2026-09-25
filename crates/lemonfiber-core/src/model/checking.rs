@@ -159,8 +159,15 @@ pub struct StatusReport {
     /// configuration being honoured, not a service that did not start.
     pub filtered: Vec<crate::stack::closure::Filtered>,
     /// What the services amount to, as one word.
+    ///
+    /// For the whole stack, counted over what the active forms hold and whatever else
+    /// is there, so a stack running part of itself on purpose reads as active. With no
+    /// form up, and for the forms asked about, counted over every service listed.
     pub condition: crate::docker::Condition,
     /// Each service, worst first.
+    ///
+    /// A service the active forms filtered out is listed only while it is there; one
+    /// that is not is in `filtered` and nowhere else.
     pub services: Vec<crate::docker::Service>,
     /// The containers running under this project that the stack never declared.
     ///

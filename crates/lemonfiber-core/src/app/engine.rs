@@ -4,7 +4,7 @@
 //! these live in the parent module; this is the engine work each command carries out.
 
 use super::Ctx;
-use crate::docker::{condition, survey, undeclared};
+use crate::docker::{condition, condition_of_the_stack, survey, undeclared, State};
 use crate::error::{Diagnose, Problem};
 use crate::model::{
     CatalogueReport, FormReport, FormsReport, LifecycleReport, ProvenanceReport, StackEdit,
@@ -194,10 +194,22 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
     // about every service they hold rather than about the ones asked after.
     let everything = survey(&manifest, &whole, &containers, protocols);
     let brought = brought(&manifest, protocols, &everything);
+    let active_forms: Vec<String> = brought.iter().map(|(form, _)| form.clone()).collect();
+    let filtered = left_out(&manifest, &brought);
+    // A service an active form's closure left out, and that is not there, is reported
+    // among what was filtered. Listing it again as absent would say it failed to start.
     let services: Vec<_> = everything
         .into_iter()
         .filter(|service| profiles.contains(&service.profile))
+        .filter(|service| {
+            service.state != State::Absent || !filtered.iter().any(|out| out.id == service.id)
+        })
         .collect();
+    let condition = if forms.is_empty() {
+        condition_of_the_stack(&services, &active_forms)
+    } else {
+        condition(&services)
+    };
 
     // Read from the manifest rather than from what is running, because a declaration
     // this build cannot reach is unreachable whether or not the container is up — and
@@ -208,9 +220,9 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
 
     Ok(StatusReport {
         forms: forms.to_vec(),
-        active_forms: brought.iter().map(|(form, _)| form.clone()).collect(),
-        filtered: left_out(&manifest, &brought),
-        condition: condition(&services),
+        active_forms,
+        filtered,
+        condition,
         undeclared: undeclared(&manifest, &containers),
         services,
         disturbs: crate::model::Disturbances::all(ctx.patience),

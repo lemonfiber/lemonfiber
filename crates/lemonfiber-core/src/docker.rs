@@ -342,6 +342,27 @@ pub fn condition(services: &[Service]) -> Condition {
     Condition::Partial
 }
 
+/// What the whole stack amounts to, counted over what was asked of it.
+///
+/// Where a form is up, what it holds is what somebody asked for, and a service no
+/// active form holds counts only while it is there: a stack running part of itself
+/// on purpose is doing what it was asked, not falling short of a whole. With no form
+/// up there is nothing to count against, so every service is.
+#[must_use]
+pub(crate) fn condition_of_the_stack(services: &[Service], active_forms: &[String]) -> Condition {
+    if active_forms.is_empty() {
+        return condition(services);
+    }
+    let counted: Vec<Service> = services
+        .iter()
+        .filter(|service| {
+            !service.forms.is_empty() || !matches!(service.state, State::Absent | State::Stopped)
+        })
+        .cloned()
+        .collect();
+    condition(&counted)
+}
+
 /// The order to stop these in: whatever depends on a service goes down before it does.
 ///
 /// A torrent client shares the tunnel's network namespace, so the moment the tunnel
