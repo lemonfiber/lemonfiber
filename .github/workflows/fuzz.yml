@@ -1,9 +1,9 @@
-# Fuzzing for the manifest crate (Q-R63).
+# Fuzzing for what arrives from outside.
 #
-# `stack.toml` is the one file users are invited to edit by hand, so malformed
-# input is ordinary rather than adversarial — and the parser must answer with a
-# diagnostic, never a panic. These targets exist to find the inputs nobody
-# thought to write a test for.
+# `stack.toml` is the one file users are invited to edit by hand, a `plugin.toml`
+# is written by somebody else, and a request to the web API carries whatever its
+# sender put in it. Each must be answered with a diagnostic or a refusal, never a
+# panic. These targets exist to find the inputs nobody thought to write a test for.
 #
 # Two modes. Every pull request that touches the parser or the harness builds
 # the targets and gives each a short smoke run, which is enough to catch a
@@ -14,15 +14,16 @@ name: fuzz
 on:
   pull_request:
     paths:
+      - "crates/lemonfiber-api/**"
       - "crates/lemonfiber-manifest/**"
+      - "crates/lemonfiber-plugin/**"
       - "fuzz/**"
       - ".github/workflows/fuzz.yml"
       # Everything these targets are built from, not only the crate they exercise.
       # The compiler is not the one the repository pins, and the parser they drive is
       # mostly somebody else's code — so a toolchain pin or a `toml` bump is a change
-      # to whether these build and to what they are testing. Left off this list, that
-      # break lands and waits for the next manifest change to surface it, which is
-      # exactly how it happened. `fuzz/Cargo.lock` needs no entry; `fuzz/**` has it.
+      # to whether these build and to what they are testing. `fuzz/Cargo.lock` needs
+      # no entry; `fuzz/**` has it.
       - "rust-toolchain.toml"
       - "Cargo.lock"
   schedule:
@@ -50,7 +51,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [manifest_from_toml, manifest_validate, date_parse]
+        target:
+          - manifest_from_toml
+          - manifest_validate
+          - date_parse
+          - plugin_from_toml
+          - api_read_query
+          - api_action_arguments
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
