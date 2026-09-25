@@ -1,17 +1,18 @@
 """Check that `.github/workflows/release.yml` still carries every patch.
 
-`dist generate` writes that file, and four scripts then rewrite parts of what it
+`dist generate` writes that file, and five scripts then rewrite parts of what it
 wrote: the release is left as a draft, every installer is checked against a
 pinned digest, every action is pinned to a commit, the tag reaches each command
-through the environment rather than as script, and the token that can write a
-release belongs to the one job that writes one. `just release-workflow` applies
-all of it in order.
+through the environment rather than as script, the token that can write a
+release belongs to the one job that writes one, a release is built only from a
+version tag on a commit on `main`, and the shell installer it publishes refuses a
+download it cannot check. `just release-workflow` applies all of it in order.
 
 Regenerating the file without running that recipe drops every patch at once, and
 the result is a workflow that reads as normal: it builds, it signs, it publishes.
 Nothing about it looks different until a release is already out.
 
-Seven claims are read from the tree, and each is a claim rather than a string:
+Ten claims are read from the tree, and each is a claim rather than a string:
 
   applied      the file carries each patch's output verbatim, comments included
   draft        every `gh release create` carries `--draft`
@@ -24,6 +25,11 @@ Seven claims are read from the tree, and each is a claim rather than a string:
   token        the jobs holding `contents: write` are exactly the jobs that
                  create a release, and the workflow grants none
   allow-dirty  `[workspace.metadata.dist]` still carries `allow-dirty = ["ci"]`
+  version-tag  the release starts on a `v`-prefixed version tag and no other
+  on-main      the plan job refuses a tagged commit that is not on `main`, before
+                 anything is built
+  installer-refuses
+               the global build rewrites the shell installer before uploading it
 
 `--self-test` breaks each claim in turn against a copy of the real files and
 fails unless that claim refuses the copy. A claim that cannot fail is not a gate.
@@ -43,6 +49,7 @@ import tomllib
 
 import pin_release_actions
 import scope_release_permissions as permissions
+import the_commit_a_release_is_cut_from as cut_from
 import the_tag_a_shell_never_sees as by_env
 import verify_dist_installer as installers
 import yaml
@@ -251,6 +258,9 @@ WRITTEN = {
     "the global build step": by_env.GLOBAL_BY_ENV,
     "the host step": by_env.HOST_BY_ENV,
     "the release step's tag": by_env.CREATES_BY_ENV,
+    "the tag trigger": cut_from.TRIGGER_VERSION,
+    "the check that the tag is on main": cut_from.ON_MAIN,
+    "the installer's rewrite": cut_from.INSTALLER_REFUSES,
 }
 
 
@@ -311,6 +321,74 @@ def claim_token(workflow: dict, _cargo: dict) -> list[str]:
     return problems
 
 
+ANCESTRY = "git merge-base --is-ancestor"
+# The one condition the ancestry check may carry: it runs on every tag push.
+ON_A_TAG = "${{ github.event_name == 'push' }}"
+REWRITES_THE_INSTALLER = "scripts/the_installer_refuses_what_it_cannot_check.py"
+
+
+def claim_version_tag(workflow: dict, _cargo: dict) -> list[str]:
+    # PyYAML reads the bare key `on` as the boolean true.
+    triggers = workflow.get("on", workflow.get(True)) or {}
+    tags = ((triggers.get("push") or {}).get("tags")) or []
+    if not tags:
+        return ["no tag starts the release, so a tag would build nothing"]
+    return [
+        f"the release starts on tags matching {pattern!r}, which is not only "
+        "`v`-prefixed version tags"
+        for pattern in tags
+        if not str(pattern).startswith("v[0-9]")
+    ]
+
+
+def claim_on_main(workflow: dict, _cargo: dict) -> list[str]:
+    plan = ((workflow.get("jobs") or {}).get("plan") or {}).get("steps") or []
+    checks = [n for n, step in enumerate(plan) if ANCESTRY in (step.get("run") or "")]
+    if not checks:
+        return [
+            (
+                "the plan job never asks whether the tagged commit is on main, so a "
+                "tag on an unmerged branch builds and drafts a release"
+            )
+        ]
+    first_dist = next(
+        (n for n, step in enumerate(plan) if "dist " in (step.get("run") or "")),
+        len(plan),
+    )
+    step = plan[checks[0]]
+    problems = []
+    if checks[0] > first_dist:
+        problems.append("the plan job asks whether the tag is on main after dist has run")
+    if "refs/heads/main" not in (step.get("run") or ""):
+        problems.append("the ancestry check does not read main")
+    if step.get("continue-on-error"):
+        problems.append("the ancestry check may fail without failing the job")
+    if step.get("if", ON_A_TAG) != ON_A_TAG:
+        problems.append(
+            f"the ancestry check runs only when {step.get('if')!r}, which is not "
+            "every tag push"
+        )
+    return problems
+
+
+def claim_installer_refuses(workflow: dict, _cargo: dict) -> list[str]:
+    job = ((workflow.get("jobs") or {}).get("build-global-artifacts") or {}).get("steps") or []
+    rewrites = [n for n, step in enumerate(job) if REWRITES_THE_INSTALLER in (step.get("run") or "")]
+    if not rewrites:
+        return [
+            (
+                "the global build uploads the installer as `dist` wrote it, which "
+                "places a download unchecked where the machine has no sha256sum"
+            )
+        ]
+    uploads = [
+        n for n, step in enumerate(job) if "upload-artifact" in str(step.get("uses") or "")
+    ]
+    if not uploads or rewrites[0] > uploads[0]:
+        return ["the installer is rewritten after it is uploaded, so the upload is the unchecked one"]
+    return []
+
+
 def claim_allow_dirty(_workflow: dict, cargo: dict) -> list[str]:
     dist = cargo.get("workspace", {}).get("metadata", {}).get("dist", {})
     if "ci" in (dist.get("allow-dirty") or []):
@@ -350,6 +428,10 @@ CLAIMS = {
     "token": claim_token,
     "token-can-write": claim_token,
     "allow-dirty": claim_allow_dirty,
+    "version-tag": claim_version_tag,
+    "on-main": claim_on_main,
+    "on-main-behind-a-condition": claim_on_main,
+    "installer-refuses": claim_installer_refuses,
 }
 
 # Claims that read the file rather than the parsed workflow. YAML drops comments,
@@ -384,6 +466,24 @@ BREAKS = {
         c,
     ),
     "allow-dirty": lambda w, c: (w, c.replace('allow-dirty = ["ci"]\n', "")),
+    "version-tag": lambda w, c: (
+        w.replace(cut_from.TRIGGER_VERSION, cut_from.TRIGGER_GENERATED),
+        c,
+    ),
+    "on-main": lambda w, c: (w.replace(cut_from.ON_MAIN, cut_from.PLAN_INSTALL), c),
+    # Still in the file, and never run: the shape a check takes when it is
+    # switched off rather than removed.
+    "on-main-behind-a-condition": lambda w, c: (
+        w.replace(
+            f"      - name: The tagged commit is on main\n        if: {ON_A_TAG}\n",
+            "      - name: The tagged commit is on main\n        if: ${{ false }}\n",
+        ),
+        c,
+    ),
+    "installer-refuses": lambda w, c: (
+        w.replace(cut_from.INSTALLER_REFUSES, cut_from.GLOBAL_BUILT),
+        c,
+    ),
 }
 
 
