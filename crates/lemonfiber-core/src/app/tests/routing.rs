@@ -18,7 +18,7 @@ async fn lists_the_forms_the_stack_declares_in_its_own_words() {
                 .any(|form| form.id == "search" && form.name == "Search" && form.composable)));
 }
 
-/// Also driven from `tests/forms.rs`, against the real stack. Kept here as well
+/// Also driven from `tests/integration/forms.rs`, against the real stack. Kept here as well
 /// because this crate is compiled twice — once with its own test modules and once as
 /// the library those binaries link — and a command dispatched from only one of them
 /// leaves the other's copy of the arm counted as never run.

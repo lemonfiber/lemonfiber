@@ -3,12 +3,12 @@ use std::time::Duration;
 use super::{tls_config, unreachable, Dialer};
 use lemonfiber_ports::nntp::{Endpoint, Nntp};
 
-/// The behaviour of this adapter is proven from `tests/nntp.rs`, against real
-/// sockets — it is the outside world, and that is where the outside world is
-/// reached. What is here is what a library test can settle without one, and it
-/// is here at all because this crate is compiled twice: once for its own tests
-/// and once for the integration suite to link, and a copy nothing runs counts
-/// against the coverage gate whichever copy it is.
+/// The behaviour of this adapter is proven from the core's `tests/integration/nntp.rs`,
+/// against real sockets — it is the outside world, and that is where the outside world
+/// is reached. What is here is what a library test can settle without one, and it is
+/// here at all because this crate is compiled twice: once for its own tests and once
+/// for the integration suite to link, and a copy nothing runs counts against the
+/// coverage gate whichever copy it is.
 #[tokio::test]
 async fn a_dialer_reports_a_provider_it_cannot_reach() {
     // Port zero listens nowhere, so this settles the whole path — construct,
