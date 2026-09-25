@@ -26,7 +26,9 @@ crates/
 │   │                     file must not hold
 │   ├── examples/         emitters: one generated artefact each, printed or
 │   │                     written where it is a set of files
-│   └── tests/            the architecture tests, from the top of the graph
+│   └── tests/            two binaries: `architecture/`, the checks that read the
+│                         whole workspace from the top of the graph, and
+│                         `integration/`, the binary driven from outside
 │
 ├── lemonfiber-api/       lib — the JSON endpoints answered on loopback, the
 │                              serving of the web app beside them, and the
@@ -45,9 +47,14 @@ crates/
 │   ├── platform.rs       the only cfg!(target_os)
 │   └── …                 one directory per subsystem — doctor, seed, config, …
 │
-├── lemonfiber-fixtures/  lib — the fakes for the ports' traits, reachable from
-│                              both in-crate tests and `tests/`. Depends on ports
-│                              only.
+├── lemonfiber-fixtures/  lib — the fakes for the ports' traits, and the scratch
+│                              directories tests write into, reachable from both
+│                              in-crate tests and `tests/`. Depends on ports only.
+│
+├── lemonfiber-testing/   lib — the context a test drives a command through,
+│                              built from one of two starting points. The core's
+│                              own tests compile the same file as a module, since
+│                              depending on this crate would build the core twice.
 │
 ├── lemonfiber-plugin/    lib — plugin.toml parse, and the vocabularies a plugin
 │                              is written against. Depends on the manifest only.
@@ -116,24 +123,31 @@ a module's own documentation is not buried under a directory listing, and
 `git log` on `doctor.rs` shows changes to the module rather than to a folder.
 
 A file splits into a directory when it stops being one concern — or, failing
-that, when it crosses 550 production lines, which is the mechanical floor the
+that, when it crosses 550 lines, which is the mechanical floor the
 architecture test puts under that judgement. The split goes at a seam the file
 already has: the parent keeps the type and the surface, and each child takes one
 question the type answers. Moved items widen to `pub(crate)` — a parent cannot
 see a child's private items, and `mod child; use child::*;` compiles happily
 while importing nothing at all.
 
+## Tests
+
+Each crate's integration tests are one binary, `tests/integration/main.rs`, with a
+module per file: the shared fakes are compiled once and the suite links once. Unit
+tests sit beside their source in a `tests.rs` of their own, and every file — source
+or test — is held to a cap over all of its lines: 550 for source, 800 for tests.
+
 ## What the architecture tests check
 
-One file per seam under `crates/lemonfiber/tests/`, all run by `cargo test`. The
-file name is the question; the tests inside it are the ways of asking:
+One module per seam under `crates/lemonfiber/tests/architecture/`, all one binary.
+The file name is the question; the tests inside it are the ways of asking:
 
 | File | Enforces |
 |------|----------|
 | `what_the_build_forbids.rs` | The core cannot render and cannot reach the network; the ports and fixtures crates depend on nothing of ours that would make them a cycle. Read from the manifests, where a dependency is actually enforced |
 | `where_the_outside_world_is_reached.rs` | Each external crate appears in exactly one file, and no `target_os` outside `platform.rs` |
 | `what_a_source_file_may_not_say.rs` | No `#[allow(…)]` anywhere in `src/`, and no spec or area identifier in a comment |
-| `how_long_a_file_may_be.rs` | 550 production lines a shipped file, 1,200 a test file, and the test module declared where the counter stops |
+| `how_long_a_file_may_be.rs` | 550 lines a source file and 800 a test file, counted over the whole file, and a source file's tests kept beside it rather than inline |
 | `the_one_way_out.rs` | Output leaves through `say.rs`, treated on the way; a failure lands on stderr; what a parser reads is never folded for a person |
 | `each_requirement_is_claimed_once.rs` | Every requirement appears exactly once in the status table |
 | `what_a_check_can_see.rs` | Every diagnostic check is handed something to ask, and says how long it disturbs the stack for |
@@ -141,20 +155,13 @@ file name is the question; the tests inside it are the ways of asking:
 | `nothing_shapes_this_machines_traffic.rs` | Nothing shipped reaches for a traffic shaper |
 | `what_seeding_does_in_order.rs` | Every declared API kind is acted on, and the request service has an owner before anything is registered into it |
 
-They read source text rather than the compiled crate. That is coarse and it is
-enough — every rule above is about where a *name* is allowed to appear, and a
-name that appears in a string but not in code is a false positive we would
-rather have than the false negative.
-
+The workspace is crawled once and each file parsed with `syn`, so a rule about
+code reads the syntax tree and a name in a comment or a string is never mistaken
+for a call. The checks about comments read them with rustc's own lexer.
 It lives in the binary crate because that crate sits at the top of the graph and
 can see every source file, and because a test crate inside `lemonfiber-core`
 would be checking itself.
 
-### The one it caught first
-
-The identifier test failed on its own doc comment, which used a real identifier
-as an example. The rule is stated in prose there now. Worth knowing before you
-write the next one.
 
 ## Naming, and why it looks slightly off
 

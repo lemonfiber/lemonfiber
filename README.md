@@ -23,14 +23,12 @@
 
 ---
 
-> **Status: shipping (`0.15.0`).** The core, compose driver, CLI, setup wizard,
-> trust checks, seed and lifecycle work are built and released. Most requests
-> reach all three surfaces: the command line, a terminal dashboard that acts
-> rather than only watching, and a web API a browser is served from;
+> **Status: shipping (`0.16.0`).** The core, compose driver, CLI, setup wizard,
+> trust checks, seed, lifecycle and plugin work are built and released. Most
+> requests reach all three surfaces: the command line, a terminal dashboard that
+> acts rather than only watching, and a web API a browser is served from;
 > [the parity table](.docs/architecture/surface-parity.md) names each one that
-> reaches a surface in part or not at all. The
-> `lemonfiber plugin` commands — `install`, `installed`, `update` and `remove`
-> among them — are on `main` and in no release; `0.15.0` has none of them.
+> reaches a surface in part or not at all.
 > See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
 > built-vs-roadmap and the
 > [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
@@ -70,9 +68,11 @@ crates/
 ├── lemonfiber-api/      lib — the HTTP endpoints, and serving the web app
 ├── lemonfiber-adapters/ lib — the ports' implementations that reach the machine
 ├── lemonfiber-ports/    lib — the boundary and its vocabulary
+├── lemonfiber-error/    lib — the error model and the registry of every code
 ├── lemonfiber-plugin/   lib — parses plugin.toml
 ├── lemonfiber-manifest/ lib — parses stack.toml
-└── lemonfiber-fixtures/ lib — shared test fixtures
+├── lemonfiber-fixtures/ lib — the fakes tests stand in for the world with
+└── lemonfiber-testing/  lib — the context tests drive a command through
 .docs/                   repo-local technical docs (Rust-specific HOW)
 ```
 

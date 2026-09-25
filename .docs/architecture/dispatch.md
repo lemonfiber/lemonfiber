@@ -9,9 +9,15 @@ This is how it is built.
 
 ## The three types
 
+A context is the seams a run reaches the world through, bundled as `Seams`, plus
+what the operator chose and how the run behaves. A command reaches a port as
+`ctx.seams.http`; a context's builders are named `with_*` for a seam or an observer
+replaced, and a verb for a way of running — `rehearsing`, `forcing`,
+`recording_at`.
+
 ```rust
 pub enum Command { Version, /* … */ }                             // what was asked for
-pub struct Ctx { pub dry_run: bool, pub runner: Arc<dyn Runner>, /* … */ }  // everything else it needs
+pub struct Ctx { pub dry_run: bool, pub seams: Seams, /* … */ }      // everything else it needs
 pub enum Outcome { Version(VersionReport), /* … */ }              // what came back
 
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>>;
@@ -29,7 +35,6 @@ point. The surfaces ship in the same binary as the core, so adding a command
 wildcard arm would let a new command render as nothing at all, which is the exact
 failure the single entry point exists to prevent.
 
-If the core ever ships to a consumer outside this workspace, revisit this.
 
 ## `dry_run` lives on the context
 
@@ -39,25 +44,18 @@ with the first — the golden tests that cover a rehearsal are covering the real
 thing too.
 
 ```rust
-let ctx = Ctx::new(runner, engine, clock, seams, stack, settings, environment).rehearsing();
+let ctx = Ctx::new(seams, stack, settings, environment).rehearsing();
 ```
 
-## Why `dispatch` is async when nothing in it blocks yet
+## Why `dispatch` is async
 
-Because the first command it carries out already reaches a port. `Command::Version`
-asks the engine for its version through `Runner`, which is genuinely async, so
-the signature is honest today rather than aspirational.
-
-That was a deliberate choice of first command. A version report that only read
-constants would have needed a fake `.await` to satisfy `clippy::unused_async`,
-and a fake await is a lie that survives into every future reader's mental model.
-Reaching a port instead means the whole spine — command, context, port, outcome,
-envelope — is exercised by tests from the first commit.
+Because the commands it carries out reach ports, and the ports are async:
+`Command::Version` alone asks the engine for its version through `Runner`.
 
 ## The spine, end to end
 
 ```rust
-let ctx = Ctx::new(runner, engine, clock, seams, stack, settings, environment);
+let ctx = Ctx::new(seams, stack, settings, environment);
 let outcome = dispatch(Command::Version, &ctx).await?;
 println!("{}", serde_json::to_string(&outcome.envelope())?);
 ```
@@ -69,13 +67,14 @@ output is the same value a person sees rather than a second rendering of it.
 tagging itself, because the envelope already carries `kind` and a serde tag would
 put the discriminant in twice.
 
-## Lifecycle: one function, four commands
+## Lifecycle: one function, every compose command
 
-`up`, `down`, `restart` and `pull` all reach the same `lifecycle` function with a
-different `Action`. Resolve the manifest, resolve the forms, materialise the
-stack, build the command, run it — and a rehearsal returns *after* the build and
-before the run, so what it reports is the command that would run rather than an
-approximation of it.
+`up`, `pull`, `start`, `halt` and `restart` reach the same `lifecycle` function
+with a different `Action`; `down` reaches it through `teardown`, which first waits
+for the downloads a stop would interrupt when it was asked to, and a rehearsal never
+waits. Resolve the manifest, resolve the forms, materialise the stack, build the
+command, run it — and a rehearsal returns *after* the build and before the run, so
+what it reports is the command that would run rather than an approximation of it.
 
 A preview is that pipeline stopped after its second step: resolve the manifest, resolve
 the forms, answer. It shares those two steps with the lifecycle path rather than repeating
@@ -97,7 +96,8 @@ colour and wrapping in the terminal, an object over HTTP. See
 
 ## Testing it
 
-A fake `Runner` and no daemon:
+A fake `Runner` and no daemon, through the builder in `lemonfiber-testing`, which
+settles everything a test does not name:
 
 ```rust
 pub struct Scripted(pub Result<Output, Failure>);
