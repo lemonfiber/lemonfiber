@@ -12,7 +12,7 @@
 mod answering;
 mod proving;
 
-pub use answering::{setting_up, SetupAction};
+pub use answering::{setup, SetupAction};
 use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_vpn};
 
 use std::path::{Path, PathBuf};

@@ -42,7 +42,7 @@ const COMFORTABLE_SHARE: u64 = 10;
 
 /// Where a volume stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Level {
     /// Usage cannot be determined.
     ///

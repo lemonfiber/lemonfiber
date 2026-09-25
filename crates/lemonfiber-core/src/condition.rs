@@ -3,7 +3,7 @@
 //! A check produces a finding: what is true at the moment it ran. That is enough
 //! to print, and not enough for anything else the trust features need. "Stop
 //! offering this fix until the condition clears and recurs" needs to know it was
-//! ever raised. "The stall resolved itself" needs to know it used to be there.
+//! ever raised. "The stall resolved itself" needs to know it was there before.
 //! "Notify at warning severity without being sought" needs to know this is new
 //! rather than the same thing said again — an operator warned every run about the
 //! same thing stops reading the warnings, which is worse than not warning.

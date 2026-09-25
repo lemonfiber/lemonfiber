@@ -35,7 +35,7 @@ fn ctx(scripted: Result<Output, Failure>) -> Ctx {
 /// besides.
 fn invited(made: &Result<Outcome, Box<super::Problem>>) -> Option<&crate::model::Invitation> {
     match made {
-        Ok(Outcome::Invited(report)) => Some(report),
+        Ok(Outcome::Invitation(report)) => Some(report),
         _ => None,
     }
 }
@@ -46,7 +46,7 @@ fn invited(made: &Result<Outcome, Box<super::Problem>>) -> Option<&crate::model:
 /// assertion leaves the gate a line it cannot see executed.
 fn removed(said: &Result<Outcome, Box<super::Problem>>) -> Option<&crate::model::HouseholdRemoval> {
     match said {
-        Ok(Outcome::Removed(report)) => Some(report),
+        Ok(Outcome::Removal(report)) => Some(report),
         _ => None,
     }
 }
@@ -148,11 +148,11 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::Word(_)
             | Outcome::Glossary(_)
             | Outcome::Clients(_)
-            | Outcome::Invited(_)
-            | Outcome::Removed(_)
+            | Outcome::Invitation(_)
+            | Outcome::Removal(_)
             | Outcome::Catalogue(_)
             | Outcome::Wiring(_)
-            | Outcome::Substituted(_)
+            | Outcome::Substitution(_)
             | Outcome::Outbound(_)
             | Outcome::Plugins(_)
             | Outcome::Provenance(_)
@@ -160,7 +160,7 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::Stored(_)
             | Outcome::SelfUpdate(_)
             | Outcome::Space(_)
-            | Outcome::Letting(_)
+            | Outcome::StopSeeding(_)
             | Outcome::Bandwidth(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)
@@ -172,7 +172,7 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::Wizard(_)
             | Outcome::Update(_)
             | Outcome::Backup(_)
-            | Outcome::Support(_)
+            | Outcome::Bundle(_)
             | Outcome::Archives(_)
             | Outcome::Restore(_)
             | Outcome::Watch(_)
@@ -246,11 +246,11 @@ fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, 
             | Outcome::Word(_)
             | Outcome::Glossary(_)
             | Outcome::Clients(_)
-            | Outcome::Invited(_)
-            | Outcome::Removed(_)
+            | Outcome::Invitation(_)
+            | Outcome::Removal(_)
             | Outcome::Catalogue(_)
             | Outcome::Wiring(_)
-            | Outcome::Substituted(_)
+            | Outcome::Substitution(_)
             | Outcome::Outbound(_)
             | Outcome::Plugins(_)
             | Outcome::Provenance(_)
@@ -258,7 +258,7 @@ fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, 
             | Outcome::Stored(_)
             | Outcome::SelfUpdate(_)
             | Outcome::Space(_)
-            | Outcome::Letting(_)
+            | Outcome::StopSeeding(_)
             | Outcome::Bandwidth(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)
@@ -269,7 +269,7 @@ fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, 
             | Outcome::Wizard(_)
             | Outcome::Update(_)
             | Outcome::Backup(_)
-            | Outcome::Support(_)
+            | Outcome::Bundle(_)
             | Outcome::Archives(_)
             | Outcome::Restore(_)
             | Outcome::Watch(_)

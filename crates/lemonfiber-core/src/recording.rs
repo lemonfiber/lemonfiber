@@ -71,11 +71,10 @@ impl<H> Recording<H> {
 /// order is the whole of it rather than a tidiness. Both places a URL can carry a
 /// credential — the query, and the password in front of the host — are withheld by
 /// the first; the second is the scrubber a support bundle's text takes, kept after
-/// it so a credential shaped like a setting inside the path is caught too. Taking
-/// the query off *before* either of them is what this used to do, and it disabled
-/// them: the general scrubber reaches the address rule only through a token that
-/// still carries a `?…=…`, so a login written in front of the host fell through
-/// both and was written down verbatim.
+/// it so a credential shaped like a setting inside the path is caught too. The query
+/// is not taken off before either of them: the general scrubber reaches the address
+/// rule only through a token that still carries a `?…=…`, so a login written in
+/// front of the host would fall through both and be written down verbatim.
 ///
 /// Withheld rather than deleted, so the line still says a query was sent — a record
 /// that quietly drops the fact reads as a smaller request than the one that left.

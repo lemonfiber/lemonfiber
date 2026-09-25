@@ -32,7 +32,7 @@ pub(crate) fn listing(ctx: &Ctx) -> Result<Stored, Box<Problem>> {
 /// # Errors
 ///
 /// Returns a [`Problem`] where this run could not resolve where its own files go.
-pub(crate) async fn forgetting(ctx: &Ctx, confirm: bool) -> Result<Stored, Box<Problem>> {
+pub(crate) async fn forget(ctx: &Ctx, confirm: bool) -> Result<Stored, Box<Problem>> {
     let paths = layout(ctx)?.clone();
     if !confirm || ctx.dry_run {
         return Ok(stored(&paths, Removal::Unconfirmed));

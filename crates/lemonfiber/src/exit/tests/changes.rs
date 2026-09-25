@@ -79,7 +79,7 @@ fn a_capture_and_a_bundle_succeed_by_having_arrived() {
         success()
     );
     assert_eq!(
-        shown(settled(&Outcome::Support(Bundle {
+        shown(settled(&Outcome::Bundle(Bundle {
             contents: Contents::default(),
             bytes: 0,
             path: None,
@@ -528,7 +528,7 @@ fn a_listing_with_an_ask_nothing_fills_exits_as_a_configuration_problem() {
 #[test]
 fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out() {
     let made = |applied| {
-        Outcome::Substituted(lemonfiber_core::model::SubstitutionReport {
+        Outcome::Substitution(lemonfiber_core::model::SubstitutionReport {
             substitution: lemonfiber_core::wiring::Substitution {
                 capability: "indexer.search".to_owned(),
                 was: Some("prowlarr".to_owned()),

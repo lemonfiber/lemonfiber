@@ -19,7 +19,7 @@ mod revealing;
 mod rotating;
 
 use super::targets::project_directory;
-use super::{Ctx, Outcome, Problem};
+use super::{Ctx, Problem};
 use crate::app::command::Asking;
 use crate::credential::{Held, Inventory, Rotation, Settled};
 use crate::error::Diagnose;
@@ -29,7 +29,7 @@ use crate::error::Diagnose;
 /// # Errors
 ///
 /// Returns the [`Problem`] for a stack that could not be read.
-pub(crate) async fn answer(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, Box<Problem>> {
     let manifest = ctx
         .stack
         .manifest()
@@ -60,7 +60,7 @@ pub(crate) async fn answer(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Prob
             .await
         }
     };
-    Ok(Outcome::Credentials(inventory))
+    Ok(inventory)
 }
 
 /// The inventory with one value printed, or with the reason there is nothing to print.

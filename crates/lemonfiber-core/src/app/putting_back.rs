@@ -101,20 +101,7 @@ const NEEDS_THE_SERVICE: &str = "it goes back through the service that made it, 
 /// Returns a [`Problem`] where the run cannot be found, where the stamp names more than
 /// one, where the judgement says the run cannot be put back, or for any reason the
 /// executor underneath gives.
-pub async fn undo(ctx: &Ctx, run: Option<String>) -> Result<super::Outcome, Box<Problem>> {
-    reversing(ctx, run.as_deref())
-        .await
-        .map(super::Outcome::Undo)
-}
-
-/// Put back the last repair, or the run a stamp names.
-///
-/// # Errors
-///
-/// Returns a [`Problem`] where the run cannot be found, where the stamp names more than
-/// one, where the judgement says the run cannot be put back, or for any reason the
-/// executor underneath gives.
-pub async fn reversing(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>> {
+pub async fn undo(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>> {
     match run {
         None => super::repair::reversing(ctx).await,
         Some(at) => named(ctx, at).await,

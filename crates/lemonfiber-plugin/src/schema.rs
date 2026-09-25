@@ -16,7 +16,7 @@ mod recipe;
 use serde::Deserialize;
 
 use crate::conforming::nonconforming;
-use crate::{is_compatible, Error, SUPPORTED_SCHEMA_VERSIONS};
+use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
 pub use evidence::{
     Claim, ClaimProbe, Contribution, Expect, Expected, ExpectedKind, Proof, Request,
@@ -76,18 +76,18 @@ impl Manifest {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Syntax`] if the text is not a well-formed manifest,
-    /// [`Error::UnsupportedSchema`] if it declares a generation this build does not
-    /// read, and [`Error::Nonconforming`] if what it declares is not what the published
+    /// Returns [`Failure::Syntax`] if the text is not a well-formed manifest,
+    /// [`Failure::UnsupportedSchema`] if it declares a generation this build does not
+    /// read, and [`Failure::Nonconforming`] if what it declares is not what the published
     /// schema describes.
-    pub fn from_toml(text: &str) -> Result<Self, Error> {
+    pub fn from_toml(text: &str) -> Result<Self, Failure> {
         // Read only the generation first. A newer generation may add or drop fields
         // the full parse would reject as unknown; reading it alone lets an old binary
         // say "you need a newer lemonfiber" rather than describe a field it has simply
         // never heard of.
         let generation: Generation = toml::from_str(text)?;
         if !is_compatible(generation.schema_version) {
-            return Err(Error::UnsupportedSchema {
+            return Err(Failure::UnsupportedSchema {
                 found: generation.schema_version,
                 supported: SUPPORTED_SCHEMA_VERSIONS.to_vec(),
             });
@@ -99,7 +99,7 @@ impl Manifest {
         // everything they have to change, each placed where they wrote it.
         let refused = nonconforming(text);
         if !refused.is_empty() {
-            return Err(Error::Nonconforming(refused));
+            return Err(Failure::Nonconforming(refused));
         }
 
         Ok(toml::from_str(text)?)
@@ -366,7 +366,7 @@ pub struct Requires {
 /// a bundled service, so the two-tier policy stays a property of the system rather
 /// than a request the plugin makes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginBind")]
 pub enum Bind {
     /// Reachable only from the host.
@@ -383,7 +383,7 @@ pub enum Bind {
 /// drives how failures are reported and how hard lemonfiber tries to stop the operator
 /// proceeding. A manifest declaring it is refused by name, with these four listed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginCriticality")]
 pub enum Criticality {
     /// The form does not work without it.
@@ -413,7 +413,7 @@ pub struct Health {
 
 /// The kinds of health probe a plugin's service can declare.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginHealthKind")]
 pub enum HealthKind {
     /// Fetch a path on the service's port.

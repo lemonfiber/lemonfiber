@@ -148,7 +148,7 @@ async fn an_answer_this_platform_does_not_offer_is_refused_and_nothing_is_kept()
 async fn a_credential_records_what_the_service_said_and_says_what_that_was() {
     let (_scratch, paths) = scratch("proven");
     let context = ctx(&paths);
-    assert!(setting_up(
+    assert!(setup(
         &context,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )
@@ -177,7 +177,7 @@ async fn a_credential_records_what_the_service_said_and_says_what_that_was() {
 async fn a_credential_the_service_will_not_take_is_kept_unproven_and_said_so() {
     let (_scratch, paths) = scratch("unproven");
     let context = proving(&paths, turned_away());
-    assert!(setting_up(
+    assert!(setup(
         &context,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )
@@ -185,7 +185,7 @@ async fn a_credential_the_service_will_not_take_is_kept_unproven_and_said_so() {
     .is_ok());
 
     // Both arrive asserting they were proven, and the service refused both.
-    assert!(setting_up(&context, SetupAction::Answer(an_indexer(true)))
+    assert!(setup(&context, SetupAction::Answer(an_indexer(true)))
         .await
         .is_ok());
     let report = walked(&context, SetupAction::Answer(a_provider(true))).await;
@@ -213,7 +213,7 @@ async fn a_credential_the_service_will_not_take_is_kept_unproven_and_said_so() {
 async fn entering_no_credential_at_all_asks_nothing_of_any_service() {
     let (_scratch, paths) = scratch("none-entered");
     let context = ctx(&paths);
-    assert!(setting_up(
+    assert!(setup(
         &context,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )
@@ -233,13 +233,13 @@ async fn entering_no_credential_at_all_asks_nothing_of_any_service() {
 async fn what_was_entered_is_never_repeated_back() {
     let (_scratch, paths) = scratch("withholding");
     let context = ctx(&paths);
-    assert!(setting_up(
+    assert!(setup(
         &context,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )
     .await
     .is_ok());
-    assert!(setting_up(&context, SetupAction::Answer(an_indexer(false)))
+    assert!(setup(&context, SetupAction::Answer(an_indexer(false)))
         .await
         .is_ok());
     let report = walked(&context, SetupAction::Answer(a_provider(false))).await;
@@ -283,7 +283,7 @@ async fn what_a_service_said_about_a_credential_is_reported_without_the_credenti
         &paths,
         Arc::new(Saying(Validation::Rejected { detail: said })),
     );
-    assert!(setting_up(
+    assert!(setup(
         &context,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )

@@ -99,7 +99,7 @@ fn a_confirmed_removal_says_what_it_did_and_how_far_it_reached() {
 /// arrives at it, which is the half a renderer's own tests cannot see.
 #[test]
 fn the_dispatch_draws_a_removal() {
-    let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Removed(asked(1))).text();
+    let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Removal(asked(1))).text();
 
     assert!(
         drawn.contains("Removing ana would take all of this:"),

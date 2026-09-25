@@ -34,7 +34,7 @@ use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 /// nothing is known about, and guessing at a manager is how a report comes to
 /// claim a platform it never asked.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Manager {
     /// macOS, through a launch agent in the operator's own login session.
     Launchd,

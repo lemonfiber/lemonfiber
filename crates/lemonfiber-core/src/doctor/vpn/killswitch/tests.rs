@@ -74,10 +74,10 @@ fn traffic_that_stops_is_the_guarantee_proven_rather_than_assumed() {
 
 #[test]
 fn a_client_that_answered_unreadably_is_not_a_killswitch_that_held() {
-    // The dangerous half of what used to be one state. `Blocked` meant both
-    // "wget could not transfer" and "wget transferred and the body is not an
-    // address" — and the second is a completed round trip to a public host
-    // while the tunnel was down, reported as the guarantee proven.
+    // The dangerous half of two states that are easy to read as one. "wget
+    // could not transfer" is `Blocked`; "wget transferred and the body is not an
+    // address" is a completed round trip to a public host while the tunnel was
+    // down, and reading it as `Blocked` would report the guarantee proven.
     //
     // A captive portal, an ISP interception page, an echo answering JSON, and
     // any 4xx or 5xx from a server that did answer all produce it.

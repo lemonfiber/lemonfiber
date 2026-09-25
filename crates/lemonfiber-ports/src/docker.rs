@@ -124,7 +124,7 @@ pub struct Stats {
 
 /// Which stream a log line arrived on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Stream {
     /// Standard output.
     Stdout,

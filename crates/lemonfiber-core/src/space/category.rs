@@ -18,7 +18,7 @@ use super::tally::Tally;
 
 /// What one line of the accounting is about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case", tag = "of", content = "name")]
+#[serde(rename_all = "kebab-case", tag = "of", content = "name")]
 #[schemars(rename = "SpaceCategory")]
 pub enum Category {
     /// One directory beneath the data root, named as the operator named it.

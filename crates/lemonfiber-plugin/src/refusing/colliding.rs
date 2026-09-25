@@ -66,8 +66,8 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
 /// costs is that the thing behind `watch` is no longer the thing that was behind
 /// `watch` — with both services running, both healthy, and nothing failing.
 fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
-    // Every declared wiring rather than the one a manifest used to be able to
-    // hold. A plugin with two services has a stanza each, and checking the first
+    // Every declared wiring, not only the first. A plugin with two services has a
+    // stanza each, and checking the first
     // would leave the second free to take a name the stack already answers on —
     // which is the collision this exists to refuse, arrived at by the back door.
     let taken = manifest

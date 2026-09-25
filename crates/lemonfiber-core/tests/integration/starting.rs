@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{start_progress, started, Ctx, Outcome};
+use lemonfiber_core::app::{start_progress, started, Ctx};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::model::LifecycleReport;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -74,8 +74,7 @@ async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
 /// an assertion that cannot tell them apart names neither.
 async fn reported(ctx: &Ctx, status: Option<i32>) -> Result<LifecycleReport, String> {
     match started(ctx, &named(&["library"]), &[], status).await {
-        Ok(Outcome::Lifecycle(report)) => Ok(report),
-        Ok(other) => Err(format!("not a lifecycle report: {other:?}")),
+        Ok(report) => Ok(report),
         Err(problem) => Err(problem.summary.clone()),
     }
 }
@@ -156,8 +155,7 @@ async fn a_start_aimed_at_services_names_only_those() {
     let ctx = ctx(Ok(spoke("")));
 
     let report = match started(&ctx, &named(&["library"]), &named(&["jellyfin"]), Some(1)).await {
-        Ok(Outcome::Lifecycle(report)) => Ok(report),
-        Ok(other) => Err(format!("not a lifecycle report: {other:?}")),
+        Ok(report) => Ok(report),
         Err(problem) => Err(problem.summary.clone()),
     };
 
@@ -180,9 +178,8 @@ async fn naming_no_form_starts_everything_the_stack_declares() {
     let everything = started(&ctx, &[], &[], Some(1)).await;
     let one_form = started(&ctx, &named(&["library"]), &[], Some(1)).await;
 
-    let counted = |outcome: Result<Outcome, Box<lemonfiber_core::error::Problem>>| match outcome {
-        Ok(Outcome::Lifecycle(report)) => Some(report.plan.services.len()),
-        _ => None,
+    let counted = |outcome: Result<LifecycleReport, Box<lemonfiber_core::error::Problem>>| {
+        outcome.ok().map(|report| report.plan.services.len())
     };
 
     let (all, one) = (counted(everything), counted(one_form));

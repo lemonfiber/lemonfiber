@@ -312,10 +312,9 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
 /// A path lemonfiber made goes back — it removes it — and a record a service made does
 /// not, because nothing in this product asks the service to delete what it created.
 ///
-/// The two used to read alike and both said `whole`. Only one of them was true: the
-/// reversal of a creation is worked out and then set aside as beyond a host's reach,
-/// every time, so `whole` was a promise no surface kept. The reason is carried now, and
-/// so is somewhere else to go.
+/// Only the first is `whole`. The reversal of a creation is worked out and then set
+/// aside as beyond a host's reach, every time, so `whole` there would be a promise no
+/// surface keeps. It carries the reason instead, and somewhere else to go.
 #[tokio::test]
 async fn what_was_made_goes_back_and_what_a_service_created_does_not() {
     let root = scratch("services");

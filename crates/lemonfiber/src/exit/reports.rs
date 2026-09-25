@@ -143,7 +143,7 @@ pub(super) fn adopting(report: &AdoptReport) -> ExitCode {
 /// arm below, on the reasoning that whether the stack settled is raised as a problem
 /// by the core. It is not. Waiting for services to become usable happens only where
 /// Compose exited zero, so a start whose Compose invocation failed raises nothing,
-/// returns a report, and used to exit zero — a `lemonfiber up` that started nothing
+/// and returns a report — which, read alone, is a `lemonfiber up` that started nothing
 /// telling its caller it had worked.
 ///
 /// So the Compose status is the verdict. A rehearsal ran nothing and therefore failed

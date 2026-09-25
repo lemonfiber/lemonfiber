@@ -16,6 +16,9 @@ use crate::bandwidth::run as bandwidth;
 use crate::bundle::run as bundle;
 use crate::doctor::Narrowing;
 use crate::door::run as door;
+use crate::error::codes::life::{
+    ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
+};
 use crate::error::{Diagnose, Problem};
 use crate::household::run as household;
 use crate::migration::run as migration;
@@ -31,9 +34,6 @@ use crate::uninstall::run as uninstall;
 use crate::update::run as update;
 use crate::walkthrough::run as walkthrough;
 use crate::wiring::run as wiring;
-// The one function named rather than reached through its module below. The three
-// settings arms are the longest in the dispatcher, and the module prefix on each of
-// them is what pushed it past the length a function may be.
 
 pub mod accepted;
 pub(crate) mod adopt;
@@ -104,41 +104,73 @@ pub use engine::{
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
-// Named at the import rather than at the arm: every other command in the dispatch
-// below is one line, and the module and the variant behind this one are together long
-// enough that spelling it out there is three.
-use crate::error::codes::life::{
-    ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
-};
+// Named at the import rather than at the arm: the module and the variant behind this
+// one are together long enough that spelling it out there takes the arm past a line.
 use self_update::standing as stands;
 
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, WATCH};
 
-/// Ask the engine to act on a set of services, which three commands do identically.
+/// Ask the engine to act on a set of services, which five commands do identically.
 ///
-/// Named apart because they differ only in the action, and three arms that said the same
-/// thing three times is what left `dispatch` with no room for a new command.
-async fn acting(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcome, Box<Problem>> {
-    engine::lifecycle(ctx, forms, &action).await
+/// Named apart because they differ only in the action, and five arms that each spelled
+/// out the call and the variant would leave `dispatch` with no room for a new command.
+async fn lifecycle(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcome, Box<Problem>> {
+    engine::lifecycle(ctx, forms, &action)
+        .await
+        .map(Outcome::Lifecycle)
+}
+
+/// Take the stack down, having waited for its downloads first where that was asked.
+///
+/// Beside the table because its row, spelled out, is longer than one line.
+async fn down(ctx: &Ctx, forms: &[String], wait: Waiting) -> Result<Outcome, Box<Problem>> {
+    engine::teardown(ctx, forms, wait)
+        .await
+        .map(Outcome::Lifecycle)
+}
+
+/// Remove somebody from the household, or say what that would cost.
+///
+/// Beside the table for the reason [`down`] is.
+async fn removed(ctx: &Ctx, name: String, confirm: bool) -> Result<Outcome, Box<Problem>> {
+    remove::remove(ctx, name, confirm)
+        .await
+        .map(Outcome::Removal)
+}
+
+/// Put back the last repair, or the run a stamp names.
+///
+/// Beside the table for the reason [`down`] is.
+async fn undone(ctx: &Ctx, run: Option<&str>) -> Result<Outcome, Box<Problem>> {
+    putting_back::undo(ctx, run).await.map(Outcome::Undo)
+}
+
+/// Read, reveal or rotate what the stack holds as credentials.
+///
+/// Beside the table for the reason [`down`] is.
+async fn inventoried(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> {
+    credentials::credentials(ctx, asked)
+        .await
+        .map(Outcome::Credentials)
 }
 
 /// Offer somebody an account, which is the one request this table takes apart.
 ///
-/// Named apart for the reason [`acting`] is: every other row here passes what it was
+/// Named apart for the reason [`lifecycle`] is: every other row here passes what it was
 /// given straight along in one line, and an invitation carries three things. Spelling
 /// them out in the table would make the request this file does least with the longest
 /// arm in it.
 async fn invited(ctx: &Ctx, name: String, allowance: Allowance) -> Result<Outcome, Box<Problem>> {
     invite::offer(ctx, name, allowance)
         .await
-        .map(Outcome::Invited)
+        .map(Outcome::Invitation)
 }
 
 /// What the services themselves reach out for, which needs the stack read first.
 ///
-/// Named apart for the reason [`acting`] is: every other row here passes what it was
+/// Named apart for the reason [`lifecycle`] is: every other row here passes what it was
 /// given straight along, and this one has a step before it. The stack has to be
 /// readable, because half the answer is about it: a manifest that could not be read
 /// would leave the services' own requests reading as none at all, which is a claim
@@ -161,7 +193,7 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
 
 /// A diagnosis, and the warning it was told to consider answered.
 ///
-/// Named apart for the reason [`acting`] is: the run happens first and what it found
+/// Named apart for the reason [`lifecycle`] is: the run happens first and what it found
 /// is then read against what was accepted, which is two steps rather than a
 /// pass-along.
 async fn diagnosed(
@@ -182,7 +214,7 @@ async fn letting(
 ) -> Result<Outcome, Box<Problem>> {
     letting::stop_seeding(ctx, download, agreement)
         .await
-        .map(Outcome::Letting)
+        .map(Outcome::StopSeeding)
 }
 
 /// A walk through the stack, said onto whatever the surface is listening with.
@@ -213,7 +245,7 @@ async fn bundled(
 ) -> Result<Outcome, Box<Problem>> {
     support::run(ctx, &wanted, write_it, &dest)
         .await
-        .map(Outcome::Support)
+        .map(Outcome::Bundle)
 }
 
 /// What an archive would put back, or the putting back of it.
@@ -333,23 +365,23 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
-        Command::Up { forms } => engine::lifecycle(ctx, &forms, &Action::Up).await,
-        Command::AtBoot => boot::at_boot(ctx).await,
-        Command::Start { forms, services } => acting(ctx, &forms, Action::Start(services)).await,
-        Command::Down { forms, wait } => engine::teardown(ctx, &forms, wait).await,
-        Command::Halt { forms, services } => acting(ctx, &forms, Action::Stop(services)).await,
-        Command::Switch { forms } => engine::switch(ctx, &forms).await,
+        Command::Up { forms } => lifecycle(ctx, &forms, Action::Up).await,
+        Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::Lifecycle),
+        Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
+        Command::Down { forms, wait } => down(ctx, &forms, wait).await,
+        Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
+        Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
         Command::Restart { forms, services } => {
-            acting(ctx, &forms, Action::Restart(services)).await
+            lifecycle(ctx, &forms, Action::Restart(services)).await
         }
-        Command::Pull { forms } => engine::lifecycle(ctx, &forms, &Action::Pull).await,
-        Command::ConfigGet { key } => configuring::reading(ctx, Some(&key)).await,
-        Command::ConfigSet(change) => configuring::configuration(ctx, change).await,
-        Command::ConfigShow => configuring::reading(ctx, None).await,
+        Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull).await,
+        Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
+        Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),
+        Command::ConfigShow => configuring::get(ctx, None).await.map(Outcome::Config),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
-        Command::Alerts(action) => appetite::hearing(ctx, action),
+        Command::Alerts(action) => appetite::alerts(ctx, action).map(Outcome::Alerts),
         Command::History => Ok(Outcome::History(history::history(ctx))),
-        Command::Migrate(action) => migration::migrating(ctx, action).await,
+        Command::Migrate(action) => migration::migrate(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {
             term,
@@ -378,16 +410,16 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             quality::straining(ctx),
         ))),
         Command::Invite { name, allowance } => invited(ctx, name, allowance).await,
-        Command::Reissue { name } => invite::reissued(ctx, name).await.map(Outcome::Invited),
-        Command::Remove { name, confirm } => remove::dispatched(ctx, name, confirm).await,
+        Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
+        Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
-        Command::Wiring(asked) => wiring::dispatched(ctx, &asked),
+        Command::Wiring(asked) => wiring::wiring(ctx, &asked),
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => {
             upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
         }
-        Command::Ps { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
+        Command::Status { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor {
             narrowing,
             disruptive,
@@ -397,17 +429,17 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             consent,
             disruptive,
         } => mended(ctx, &consent, disruptive).await,
-        Command::Undo { run } => putting_back::undo(ctx, run).await,
-        Command::Credentials(asked) => credentials::answer(ctx, asked).await,
+        Command::Undo { run } => undone(ctx, run.as_deref()).await,
+        Command::Credentials(asked) => inventoried(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
-        Command::Plugins(action) => plugins::asked(ctx, &action).await,
+        Command::Plugins(action) => plugins::plugins(ctx, &action).await.map(Outcome::Plugins),
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.
         Command::SelfUpdate { to } => Ok(Outcome::SelfUpdate(stands(ctx, to.as_deref()).await)),
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
-        Command::Forget { confirm } => stored::forgetting(ctx, confirm).await.map(Outcome::Stored),
+        Command::Forget { confirm } => stored::forget(ctx, confirm).await.map(Outcome::Stored),
         // The same shape, over the operator's own disk rather than over lemonfiber's
         // files: unconfirmed it accounts and offers, confirmed it takes what the
         // account named as costing nothing.
@@ -431,19 +463,19 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Walkthrough { item } => walked(ctx, item).await,
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
-        Command::Uninstall(asked) => uninstall::uninstalled(ctx, asked).await,
+        Command::Uninstall(how) => uninstall::uninstall(ctx, how).await.map(Outcome::Uninstall),
         Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
-        Command::Setup(action) => setup::setting_up(ctx, action).await.map(Outcome::Wizard),
+        Command::Setup(action) => setup::setup(ctx, action).await.map(Outcome::Wizard),
         // Unconfirmed it says what moving onto this build's pins would change, and
         // touches nothing; confirmed it takes those steps behind a backup.
         Command::Update(asked) => update::update(ctx, asked).await.map(Outcome::Update),
-        Command::Backup { service } => backup::run(ctx, service).await.map(Outcome::Backup),
+        Command::Backup { service } => backup::backup(ctx, service).await.map(Outcome::Backup),
         Command::Support {
             write,
             wanted,
             dest,
         } => bundled(ctx, wanted, write, dest).await,
-        Command::Archives => archives::run(ctx).await.map(Outcome::Archives),
+        Command::Archives => archives::archives(ctx).await.map(Outcome::Archives),
         Command::Restore {
             archive,
             repoint,

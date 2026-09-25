@@ -249,7 +249,9 @@ fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
 /// What an invitation says about a member being narrowed, for one stack.
 fn requesting(made: Option<Outcome>) -> Option<lemonfiber_core::model::Linked> {
     match made {
-        Some(Outcome::Invited(invitation)) => invitation.applied.map(|applied| applied.requesting),
+        Some(Outcome::Invitation(invitation)) => {
+            invitation.applied.map(|applied| applied.requesting)
+        }
         _ => None,
     }
 }

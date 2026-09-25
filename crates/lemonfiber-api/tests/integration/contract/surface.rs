@@ -5,7 +5,7 @@
 //! guard was asked by the generator and by nothing else, which makes it a guard
 //! against the person who runs `just surface` and no guard at all against the person
 //! who does not. A removal landed by somebody who never ran it would be invisible
-//! until the next release went out and somebody's script stopped parsing.
+//! until a release carried it and somebody's script stopped parsing.
 //!
 //! So the two halves are asserted here, where the suite runs them on every change.
 //! They are deliberately two rules rather than one comparison, because they fail for

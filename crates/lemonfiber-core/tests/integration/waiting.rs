@@ -69,8 +69,8 @@ async fn starting(health: Health) -> (Vec<String>, bool) {
 /// The requirement: a wait long enough to read as a hang says what it is waiting
 /// for, and goes on saying it.
 ///
-/// This is the test that fails when the wait goes quiet again. Every assertion
-/// below is about the same three minutes of silence the operator used to meet: that
+/// This is the test that fails when the wait goes quiet. Every assertion below is
+/// about the same three minutes an operator would otherwise spend in silence: that
 /// something arrives at all, that it keeps arriving, and that what arrives names the
 /// services rather than merely proving the process is alive.
 #[tokio::test(start_paused = true)]

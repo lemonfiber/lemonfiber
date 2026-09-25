@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::recognising::unrecognised;
-use crate::{is_compatible, Error, SUPPORTED_SCHEMA_VERSIONS};
+use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
 /// A whole stack manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -57,18 +57,18 @@ impl Manifest {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Syntax`] if the text is not a well-formed manifest,
-    /// [`Error::UnsupportedSchema`] if it declares a generation this build does
-    /// not read, and [`Error::Unrecognised`] if it declares anything by a name
+    /// Returns [`Failure::Syntax`] if the text is not a well-formed manifest,
+    /// [`Failure::UnsupportedSchema`] if it declares a generation this build does
+    /// not read, and [`Failure::Unrecognised`] if it declares anything by a name
     /// this build does not know.
-    pub fn from_toml(text: &str) -> Result<Self, Error> {
+    pub fn from_toml(text: &str) -> Result<Self, Failure> {
         // Read only the generation first. A newer generation may add or drop
         // fields the full parse would reject as unknown; reading it alone lets an
         // old binary say "you need a newer lemonfiber" rather than describe a
         // field it has simply never heard of.
         let generation: Generation = toml::from_str(text)?;
         if !is_compatible(generation.schema_version) {
-            return Err(Error::UnsupportedSchema {
+            return Err(Failure::UnsupportedSchema {
                 found: generation.schema_version,
                 supported: SUPPORTED_SCHEMA_VERSIONS.to_vec(),
             });
@@ -80,7 +80,7 @@ impl Manifest {
         // vocabulary it wrote rather than the parser's.
         let unknown = unrecognised(text);
         if !unknown.is_empty() {
-            return Err(Error::Unrecognised(unknown));
+            return Err(Failure::Unrecognised(unknown));
         }
 
         Ok(toml::from_str(text)?)
@@ -134,7 +134,7 @@ pub struct Profile {
     Serialize,
     schemars::JsonSchema,
 )]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "StackProtocol")]
 pub enum Protocol {
     /// Needs a Usenet provider.
@@ -346,7 +346,7 @@ pub struct Wiring {
 
 /// Which interface a service's port is published on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Bind {
     /// Reachable only from the host.
     Loopback,
@@ -360,7 +360,7 @@ pub enum Bind {
 /// report that says a service is down without saying whether that matters
 /// leaves them to guess, and the manifest already holds the answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Criticality {
     /// Its failure has consequences outside the machine.
     Critical,
@@ -390,7 +390,7 @@ pub struct Health {
 
 /// The kinds of health probe a service can declare.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum HealthKind {
     /// Fetch a path on the service's port.
     Http,
@@ -429,7 +429,7 @@ pub struct Api {
 /// the neighbouring reason: it is told about the \*arrs rather than being one of
 /// them, in a form body a client of the shared shape could not send.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum ApiKind {
     /// Sonarr, Radarr, Lidarr and Prowlarr.
     Servarr,

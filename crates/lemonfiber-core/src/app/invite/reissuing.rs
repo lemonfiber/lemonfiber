@@ -34,7 +34,7 @@ use super::{reaching, Reaching};
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
 /// where it will not answer, where nobody is named, where nobody by that name is here,
 /// or where the account named administers the server.
-pub(crate) async fn reissued(
+pub(crate) async fn reissue(
     ctx: &Ctx,
     name: String,
 ) -> Result<Invitation, Box<crate::error::Problem>> {
@@ -61,14 +61,14 @@ pub(crate) async fn reissued(
     }
 
     if ctx.dry_run {
-        return Ok(reissue(member.name, reachable, true));
+        return Ok(renewed(member.name, reachable, true));
     }
     if server.unclaim(&member.id).await.is_err() {
         return Err(Box::new(would_not_reissue(&member.name)));
     }
-    Ok(reissue(member.name, reachable, false))
+    Ok(renewed(member.name, reachable, false))
 }
-/// The invitation a reissued account is sent with.
+/// The invitation a reissue account is sent with.
 ///
 /// `Reset` rather than `Made`, because what the person needs to hear is different: nobody
 /// is being invited, and the news is that the password they had has stopped working. The
@@ -76,7 +76,7 @@ pub(crate) async fn reissued(
 /// which for an account somebody has watched on is a larger loss than for an offer nobody
 /// took up. That is why the message says what happens at the end of it rather than
 /// leaving the word "lapses" to carry it.
-fn reissue(name: String, reachable: crate::door::Address, rehearsed: bool) -> Invitation {
+fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> Invitation {
     Invitation {
         name,
         address: reachable.url,

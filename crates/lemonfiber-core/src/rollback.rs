@@ -19,7 +19,7 @@ use crate::journal::{is_sealed, Change, Kind};
 /// be one of three: a surface that lays out a history branches on it, and a set the
 /// contract names is one a generated reader can match exhaustively.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "ChangeReversal")]
 pub enum Reversal {
     /// It can be put back exactly.

@@ -322,9 +322,8 @@ fn what_a_run_with_no_screen_is_told_is_the_whole_of_it() {
 
 #[test]
 fn a_run_nobody_is_watching_is_told_where_to_go_next() {
-    // Two ways on rather than a refusal: this is guidance, not a misuse. The
-    // third used to be a line saying where the help is, and the help itself is
-    // printed under these now.
+    // Two ways on rather than a refusal: this is guidance, not a misuse. The help
+    // itself is printed under these.
     let said = already_set_up();
     assert!(said
         .first()

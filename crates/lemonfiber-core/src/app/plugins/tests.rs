@@ -6,8 +6,8 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::{refused as engine_refused, spoke, Keyed, Recording};
 
-use super::{asked, Asked};
-use crate::app::{Ctx, Outcome};
+use super::{plugins, Asked};
+use crate::app::Ctx;
 use crate::config::paths::PLUGINS;
 use crate::journal::Change;
 use crate::plugin::Installs;
@@ -237,8 +237,8 @@ fn source(named: &str, manifest: &str) -> PathBuf {
 }
 
 /// What installing that source came to.
-async fn installing(ctx: &Ctx, at: &Path) -> Result<Outcome, Box<crate::error::Problem>> {
-    asked(
+async fn installing(ctx: &Ctx, at: &Path) -> Result<Installs, Box<crate::error::Problem>> {
+    plugins(
         ctx,
         &Asked::Install {
             path: at.to_path_buf(),
@@ -270,8 +270,8 @@ fn journal_a_set(ctx: &Ctx, operation: &str, key: &str, wrote: &str) {
 }
 
 /// What removing that plugin came to.
-async fn removing(ctx: &Ctx, plugin: &str) -> Result<Outcome, Box<crate::error::Problem>> {
-    asked(
+async fn removing(ctx: &Ctx, plugin: &str) -> Result<Installs, Box<crate::error::Problem>> {
+    plugins(
         ctx,
         &Asked::Remove {
             plugin: plugin.to_owned(),
@@ -281,30 +281,29 @@ async fn removing(ctx: &Ctx, plugin: &str) -> Result<Outcome, Box<crate::error::
 }
 
 /// What a run's removal said, where it made one.
-fn removal(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<crate::plugin::Removal> {
+fn removal(
+    outcome: Result<Installs, Box<crate::error::Problem>>,
+) -> Option<crate::plugin::Removal> {
     report(outcome).and_then(|one| one.removal)
 }
 
 /// What the reading came to.
-async fn reading(ctx: &Ctx) -> Result<Outcome, Box<crate::error::Problem>> {
-    asked(ctx, &Asked::Installed).await
+async fn reading(ctx: &Ctx) -> Result<Installs, Box<crate::error::Problem>> {
+    plugins(ctx, &Asked::Installed).await
 }
 
 /// The report an answer carries, or nothing where it was not one.
-fn report(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<Installs> {
-    match outcome {
-        Ok(Outcome::Plugins(report)) => Some(report),
-        _ => None,
-    }
+fn report(outcome: Result<Installs, Box<crate::error::Problem>>) -> Option<Installs> {
+    outcome.ok()
 }
 
 /// How many plugins the record holds, as the answer says.
-fn counted(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<usize> {
+fn counted(outcome: Result<Installs, Box<crate::error::Problem>>) -> Option<usize> {
     report(outcome).map(|one| one.installed.len())
 }
 
 /// The code a refusal carries, or nothing where the answer was not one.
-fn refusal(outcome: Result<Outcome, Box<crate::error::Problem>>) -> String {
+fn refusal(outcome: Result<Installs, Box<crate::error::Problem>>) -> String {
     outcome
         .err()
         .map(|problem| problem.code.to_string())
@@ -313,7 +312,7 @@ fn refusal(outcome: Result<Outcome, Box<crate::error::Problem>>) -> String {
 
 /// A refusal's code and what it told the operator it left them with, read off the
 /// one problem rather than by asking twice.
-fn refused(outcome: Result<Outcome, Box<crate::error::Problem>>) -> (String, String) {
+fn refused(outcome: Result<Installs, Box<crate::error::Problem>>) -> (String, String) {
     outcome
         .err()
         .map(|problem| (problem.code.to_string(), problem.meaning))
@@ -379,8 +378,8 @@ fn next() -> String {
 }
 
 /// What updating to that source came to.
-async fn updating(ctx: &Ctx, at: &Path) -> Result<Outcome, Box<crate::error::Problem>> {
-    asked(
+async fn updating(ctx: &Ctx, at: &Path) -> Result<Installs, Box<crate::error::Problem>> {
+    plugins(
         ctx,
         &Asked::Update {
             path: at.to_path_buf(),
@@ -390,7 +389,7 @@ async fn updating(ctx: &Ctx, at: &Path) -> Result<Outcome, Box<crate::error::Pro
 }
 
 /// A run's update account, where it made one.
-fn update(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<crate::plugin::Update> {
+fn update(outcome: Result<Installs, Box<crate::error::Problem>>) -> Option<crate::plugin::Update> {
     report(outcome).and_then(|one| one.update.map(|boxed| *boxed))
 }
 

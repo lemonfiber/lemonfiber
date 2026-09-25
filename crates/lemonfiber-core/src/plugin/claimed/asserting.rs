@@ -25,7 +25,7 @@ use super::Verdict;
 /// two are, because neither belongs to a capability: one gates the install of this
 /// plugin and the other is a row in a register that runs every day afterwards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Assertion {
     /// What must hold before this plugin is installed.
     Proof,

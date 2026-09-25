@@ -4,11 +4,12 @@ use std::time::Duration;
 use async_trait::async_trait;
 
 use super::{confirmed, on_battery_said, reported, waited, ALREADY_DONE, CHECK};
-use crate::app::{Ctx, Outcome};
+use crate::app::Ctx;
 use crate::autostart::Returning;
 use crate::condition::Fault;
 use crate::config::{Protocols, Settings};
 use crate::error::{Problem, Severity};
+use crate::model::LifecycleReport;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::machine::{Power, Started, Supply};
 use crate::ports::process::Output;
@@ -170,16 +171,13 @@ const fn plugged_in(at: u64) -> Machine {
 }
 
 /// The run, driven with no waiting at all.
-async fn run(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
+async fn run(ctx: &Ctx) -> Result<LifecycleReport, Box<Problem>> {
     waited(ctx, 2, Duration::ZERO, 2, Duration::ZERO).await
 }
 
 /// Why a run started nothing, where it started nothing.
-fn held(outcome: &Result<Outcome, Box<Problem>>) -> Option<String> {
-    match outcome {
-        Ok(Outcome::Lifecycle(report)) => report.held.clone(),
-        _ => None,
-    }
+fn held(outcome: &Result<LifecycleReport, Box<Problem>>) -> Option<String> {
+    outcome.as_ref().ok().and_then(|report| report.held.clone())
 }
 
 /// Record what the operator asked for about starting on boot.

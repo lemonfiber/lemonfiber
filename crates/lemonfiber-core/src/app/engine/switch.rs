@@ -12,7 +12,7 @@
 use lemonfiber_manifest::Manifest;
 
 use super::{compose, lock, settled_into, Composed};
-use crate::app::{Ctx, Outcome};
+use crate::app::Ctx;
 use crate::docker::{stopping_order, survey, Service, State};
 use crate::error::{Diagnose, Problem};
 use crate::model::{LifecycleReport, Switched};
@@ -47,7 +47,7 @@ const SWITCH: &str = "switch";
 /// Returns the [`Problem`] a surface should render when the stack cannot be read,
 /// the forms cannot be resolved, the engine cannot be reached, or the services that
 /// were started never became usable.
-pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Problem>> {
     // Claimed for the same reason `lifecycle` claims: a switch stops services and
     // starts others, and two of them against one stack interleave a teardown with a
     // start. Given back whether it worked or not — an early return between the two
@@ -63,7 +63,7 @@ pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<P
 }
 
 /// The switch itself, with the stack already claimed for it.
-async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
+async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Problem>> {
     // A switch is two lifecycle commands in a coat, so it owes the same pre-flight
     // they do. It does not go through the one they share, which is exactly how a
     // guard comes to hold everywhere but the path nobody remembered.
@@ -127,7 +127,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
     };
 
     if ctx.dry_run {
-        return Ok(Outcome::Lifecycle(report));
+        return Ok(report);
     }
 
     if let Some(stopping) = stopping {
@@ -139,7 +139,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
             .map_err(|err| Box::new(err.problem()))?;
         report.status = output.status;
         if !output.succeeded() {
-            return Ok(Outcome::Lifecycle(report));
+            return Ok(report);
         }
     }
 
@@ -151,13 +151,13 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
         .map_err(|err| Box::new(err.problem()))?;
     report.status = started.status;
     if !started.succeeded() {
-        return Ok(Outcome::Lifecycle(report));
+        return Ok(report);
     }
 
     // Waited for last rather than inside a branch, because what a switch started is
     // the same thing bringing a form up starts, and it is owed the same wait.
     settled_into(ctx, &manifest, &mut report).await?;
-    Ok(Outcome::Lifecycle(report))
+    Ok(report)
 }
 
 /// What a switch moves, given what is running and what the new closure holds.

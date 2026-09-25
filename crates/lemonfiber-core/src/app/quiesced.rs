@@ -4,9 +4,9 @@
 //! exists to prevent — so this fails closed: only a stack *confirmed* stopped goes
 //! ahead, and an engine that will not answer is refused as firmly as a running one.
 //!
-//! Here rather than in the surface that used to ask, because it is the rule and not
-//! the wording of it. A surface that had to remember to ask would be a surface that
-//! could forget, and the one that forgot would be the one nobody had run yet.
+//! Here rather than in a surface, because it is the rule and not the wording of it. A
+//! surface that had to remember to ask would be a surface that could forget, and the one
+//! that forgot would be the one nobody had run yet.
 
 use crate::error::{Code, Problem, Remedy, Severity, State};
 use crate::ports::docker::Lifecycle;

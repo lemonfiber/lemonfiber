@@ -31,7 +31,7 @@ fn a_setting_nobody_has_decided_about_is_not_displayed() {
 fn a_files_line_is_read_against_the_list_only_where_its_name_is_a_setting() {
     // An environment setting shouts, and the list answers for it — including for
     // the account number no marker word names, which is the case the list exists
-    // for and the case a diff of the same file used to print.
+    // for and the case a diff of the same file would otherwise print.
     assert!(!shown_in_a_file("OPENVPN_USER"));
     assert!(!shown_in_a_file("SONARR_API_KEY"));
     assert!(shown_in_a_file("DATA_ROOT"));

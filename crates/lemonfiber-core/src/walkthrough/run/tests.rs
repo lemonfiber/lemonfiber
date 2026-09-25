@@ -1,6 +1,6 @@
 use super::fixtures::{
     ctx_library_only, ctx_through_a_tunnel, ctx_watching, ctx_with, ctx_with_torrents, Fake,
-    Recording, ADDED, A_RELEASE, HAS_ITEM, HELD, IMPORTED, NOT_HELD, NO_ITEMS, ONE_INDEXER,
+    Listening, ADDED, A_RELEASE, HAS_ITEM, HELD, IMPORTED, NOT_HELD, NO_ITEMS, ONE_INDEXER,
     ONE_WANTED, SIGNED_IN,
 };
 use super::{walkthrough, worth_offering};
@@ -14,7 +14,7 @@ async fn walked(
     crate::model::WalkthroughReport,
     Vec<crate::walkthrough::Line>,
 ) {
-    let heard = Recording::default();
+    let heard = Listening::default();
     // Built before the call, not in a fallback closure: these fixtures always produce
     // a report, so a lazily-built stand-in would be a line nothing ever runs.
     let blank = blank();
@@ -441,7 +441,7 @@ async fn a_walk_asked_for_as_a_command_says_its_steps_where_the_context_says() {
     // The whole of what a surface has to supply: a walk dispatched like every
     // other command narrates to whoever the context is listening with, so a
     // browser hears the steps a terminal would have printed.
-    let heard = std::sync::Arc::new(Recording::default());
+    let heard = std::sync::Arc::new(Listening::default());
     let ctx = ctx_watching(&Fake::default())
         .with_steps(heard.clone() as std::sync::Arc<dyn crate::walkthrough::Narrator>);
     let outcome = crate::app::dispatch(
@@ -502,7 +502,7 @@ async fn a_stack_that_cannot_be_read_at_all_is_a_problem_rather_than_a_report() 
     // is an error, because there is nothing to narrate at all.
     let mut ctx = ctx_with(&Fake::default());
     ctx.stack = crate::stack::Source::External(std::path::Path::new("/not-a-stack"));
-    let heard = Recording::default();
+    let heard = Listening::default();
     assert!(walkthrough(&ctx, None, &heard).await.is_err());
     assert!(worth_offering(&ctx).await.is_err());
     assert!(heard.lines().is_empty(), "nothing was said about nothing");

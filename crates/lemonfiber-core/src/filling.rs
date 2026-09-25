@@ -23,7 +23,7 @@
 /// `Demonstrated`: it is what a declaration is before anything has asked the service,
 /// which is a fact about this moment rather than about the service.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Shown {
     /// A service declares it, and nothing has asked the service yet.
     Claimed,
@@ -94,7 +94,7 @@ impl Claimant {
 /// Carried as one word and its subject rather than as three shapes, so a reader of the
 /// machine-readable form branches on `answer` and finds the rest where the word says.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-#[serde(tag = "answer", rename_all = "lowercase")]
+#[serde(tag = "answer", rename_all = "kebab-case")]
 pub enum Filling {
     /// Exactly one candidate claims it, and it is what a wiring reaches.
     By {

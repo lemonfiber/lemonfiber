@@ -113,7 +113,7 @@ impl Reached {
 
 /// Who produced a credential, which decides what can be done about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Origin {
     /// The operator supplied it, from an account they hold somewhere else.
     Operator,

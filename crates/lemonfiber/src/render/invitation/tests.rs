@@ -222,8 +222,10 @@ fn an_address_too_long_to_draw_still_carries_the_words() {
 /// Reached the way every surface reaches it, not only by calling the renderer.
 #[test]
 fn the_dispatch_draws_an_invitation() {
-    let said =
-        crate::render::shaped(&lemonfiber_core::app::Outcome::Invited(offered(Vec::new()))).text();
+    let said = crate::render::shaped(&lemonfiber_core::app::Outcome::Invitation(offered(
+        Vec::new(),
+    )))
+    .text();
 
     assert!(said.contains("ana"), "{said}");
 }

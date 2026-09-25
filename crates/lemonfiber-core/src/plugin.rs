@@ -112,7 +112,7 @@ pub const POINTS_PATH: &str = "contract/extension-points.json";
 pub enum Ungenerated {
     /// The pinned stack description could not be read.
     #[error("the pinned stack description could not be read: {0}")]
-    Stack(#[from] lemonfiber_manifest::Error),
+    Stack(#[from] lemonfiber_manifest::Failure),
 
     /// The stack and the vocabulary disagree about what is declared.
     #[error("the capability vocabulary cannot be published:{}", each(.0))]

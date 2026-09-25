@@ -65,7 +65,7 @@ fn ctx(up: &[&str]) -> Ctx {
 
 /// Every service a status reading reports, by id.
 async fn reported(up: &[&str]) -> Vec<lemonfiber_core::docker::Service> {
-    match dispatch(Command::Ps { forms: Vec::new() }, &ctx(up)).await {
+    match dispatch(Command::Status { forms: Vec::new() }, &ctx(up)).await {
         Ok(Outcome::Status(report)) => report.services,
         _ => Vec::new(),
     }

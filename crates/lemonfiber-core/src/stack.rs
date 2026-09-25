@@ -237,17 +237,17 @@ impl Source {
 /// their stack was written for a different version of lemonfiber and sent looking
 /// for a build that would read it. The version headline is true of exactly two of
 /// these, and the other two have answers of their own.
-fn refused(err: lemonfiber_manifest::Error) -> Failure {
+fn refused(err: lemonfiber_manifest::Failure) -> Failure {
     let reason = err.to_string();
     match err {
-        lemonfiber_manifest::Error::Syntax(_) => Failure::Malformed { reason },
+        lemonfiber_manifest::Failure::Syntax(_) => Failure::Malformed { reason },
         // Kept whole rather than joined here: the list is the point of this refusal,
         // and the rendering below is what decides how a list is shown.
-        lemonfiber_manifest::Error::Unrecognised(named) => Failure::Unrecognised {
+        lemonfiber_manifest::Failure::Unrecognised(named) => Failure::Unrecognised {
             names: named.iter().map(ToString::to_string).collect(),
         },
-        lemonfiber_manifest::Error::UnsupportedSchema { .. }
-        | lemonfiber_manifest::Error::BinaryTooOld { .. } => Failure::Unusable { reason },
+        lemonfiber_manifest::Failure::UnsupportedSchema { .. }
+        | lemonfiber_manifest::Failure::BinaryTooOld { .. } => Failure::Unusable { reason },
     }
 }
 

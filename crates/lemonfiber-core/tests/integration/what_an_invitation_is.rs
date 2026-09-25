@@ -113,7 +113,7 @@ async fn an_invitation_carries_one_address_and_the_name_to_sign_in_as() {
     )
     .await;
 
-    let Some(Outcome::Invited(report)) = made.ok() else {
+    let Some(Outcome::Invitation(report)) = made.ok() else {
         unreachable!("the invite command answers with an invitation")
     };
     assert_eq!(report.name, "ana");
@@ -159,7 +159,7 @@ async fn the_request_service_is_told_about_everybody_and_not_only_the_new_accoun
     );
     assert!(
         made.is_ok_and(
-            |outcome| matches!(outcome, Outcome::Invited(report) if report.linked == Linked::Made)
+            |outcome| matches!(outcome, Outcome::Invitation(report) if report.linked == Linked::Made)
         ),
         "the link was made but not reported as made"
     );
@@ -186,7 +186,7 @@ async fn an_invitation_stands_when_the_request_service_will_not_answer() {
     )
     .await;
 
-    let Some(Outcome::Invited(report)) = made.ok() else {
+    let Some(Outcome::Invitation(report)) = made.ok() else {
         unreachable!("a request service that is down is not a reason to refuse an invitation")
     };
     assert_eq!(report.name, "ana", "the account was not made");
@@ -291,7 +291,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
     )
     .await;
 
-    let Some(Outcome::Invited(report)) = made.ok() else {
+    let Some(Outcome::Invitation(report)) = made.ok() else {
         unreachable!("a stack with no request service still makes the account")
     };
     assert_eq!(report.name, "ana", "the account was not made");
@@ -330,7 +330,7 @@ async fn a_refused_session_leaves_the_invitation_standing_too() {
     )
     .await;
 
-    let Some(Outcome::Invited(report)) = made.ok() else {
+    let Some(Outcome::Invitation(report)) = made.ok() else {
         unreachable!("a refused session is not a reason to refuse an invitation")
     };
     assert_eq!(report.name, "ana", "the account was not made");
@@ -362,7 +362,7 @@ async fn a_rehearsal_tells_the_request_service_nothing() {
     .await;
 
     assert!(
-        made.is_ok_and(|outcome| matches!(outcome, Outcome::Invited(report) if report.linked == Linked::NotTried)),
+        made.is_ok_and(|outcome| matches!(outcome, Outcome::Invitation(report) if report.linked == Linked::NotTried)),
         "a rehearsal reported a link it did not make"
     );
     assert!(

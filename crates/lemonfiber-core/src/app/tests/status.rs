@@ -12,7 +12,7 @@ async fn a_non_status_outcome_has_no_services_to_report() {
 async fn asking_what_is_running_names_every_service_a_form_declares() {
     let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy);
     let ctx = watching(engine);
-    let command = Command::Ps {
+    let command = Command::Status {
         forms: vec!["library".to_owned()],
     };
 
@@ -33,7 +33,7 @@ async fn asking_what_is_running_names_every_service_a_form_declares() {
 #[tokio::test]
 async fn asking_what_is_running_without_naming_a_form_covers_the_whole_stack() {
     let ctx = watching(Reporting::holding(&[], Lifecycle::Running, Health::None));
-    let seen = stated(dispatch(Command::Ps { forms: Vec::new() }, &ctx).await);
+    let seen = stated(dispatch(Command::Status { forms: Vec::new() }, &ctx).await);
 
     assert_eq!(
         seen.map(|services| services.len() > LIBRARY.len()),
@@ -45,7 +45,7 @@ async fn asking_what_is_running_without_naming_a_form_covers_the_whole_stack() {
 #[tokio::test]
 async fn asking_what_is_running_reports_an_engine_it_cannot_see() {
     let ctx = watching(Reporting::absent());
-    let refusal = dispatch(Command::Ps { forms: Vec::new() }, &ctx)
+    let refusal = dispatch(Command::Status { forms: Vec::new() }, &ctx)
         .await
         .err()
         .map(|problem| problem.code);
@@ -59,7 +59,7 @@ async fn asking_what_is_running_reports_an_engine_it_cannot_see() {
 #[tokio::test]
 async fn asking_about_a_form_this_stack_does_not_have_is_refused() {
     let ctx = watching(Reporting::default());
-    let command = Command::Ps {
+    let command = Command::Status {
         forms: vec!["telly".to_owned()],
     };
     assert_eq!(
@@ -76,7 +76,7 @@ async fn asking_what_is_running_from_a_stack_that_cannot_be_read_is_refused() {
         .over(nowhere)
         .build();
     assert_eq!(
-        dispatch(Command::Ps { forms: Vec::new() }, &ctx)
+        dispatch(Command::Status { forms: Vec::new() }, &ctx)
             .await
             .err()
             .map(|problem| problem.code),
@@ -89,7 +89,7 @@ async fn asking_what_is_running_from_a_stack_that_cannot_be_read_is_refused() {
 async fn a_status_serialises_under_its_own_kind() {
     let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy);
     let ctx = watching(engine);
-    let command = Command::Ps {
+    let command = Command::Status {
         forms: vec!["library".to_owned()],
     };
 

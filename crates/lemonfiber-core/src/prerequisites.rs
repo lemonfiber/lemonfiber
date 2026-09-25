@@ -23,7 +23,7 @@ use crate::config::Protocols;
 /// Bands rather than figures, because a price printed in the binary is wrong
 /// within a year and varies by region — the same reasons vendors are not named.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Cost {
     /// No third-party spend at all.
     Free,

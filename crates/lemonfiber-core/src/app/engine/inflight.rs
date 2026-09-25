@@ -36,9 +36,10 @@ use std::time::Duration;
 use lemonfiber_manifest::Service;
 
 use crate::app::targets::{download_targets, project_directory, protocol_of, read_transfers};
-use crate::app::{Ctx, Outcome};
+use crate::app::Ctx;
 use crate::dashboard::Protocol;
 use crate::error::Problem;
+use crate::model::LifecycleReport;
 use crate::plural::s;
 use crate::ports::service::Download;
 use crate::stack::closure::{everything, resolve};
@@ -165,7 +166,7 @@ pub(crate) async fn teardown(
     ctx: &Ctx,
     forms: &[String],
     wait: Waiting,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<LifecycleReport, Box<Problem>> {
     // A rehearsal does not sit through the wait. What it is being asked is what
     // stopping would come to, and the answer is the same whether it is given now or
     // in an hour — so waiting for downloads that are not going to be interrupted

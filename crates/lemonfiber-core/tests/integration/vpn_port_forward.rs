@@ -297,10 +297,10 @@ async fn address_services_that_contradict_each_other_are_reported_rather_than_re
         "nothing passes on an address nobody agreed"
     );
 
-    // Nor does anything claim the opposite. A disagreement used to be read as no
-    // connectivity, so a gateway whose sources contradicted each other while the
-    // client answered normally was reported as a critical leak — an alarm raised
-    // about the client on the strength of two strangers not agreeing.
+    // Nor does anything claim the opposite. A disagreement is not read as no
+    // connectivity: a gateway whose sources contradict each other while the client
+    // answers normally is no leak, and reporting one would raise an alarm about the
+    // client on the strength of two strangers not agreeing.
     assert!(
         !findings
             .iter()

@@ -42,7 +42,7 @@ pub enum Unreadable {
 
     /// The manifest is there and this build cannot read what it says.
     #[error(transparent)]
-    Refused(#[from] lemonfiber_plugin::Error),
+    Refused(#[from] lemonfiber_plugin::Failure),
 
     /// The stack this build pins could not be read, so nothing could be said about
     /// what a claim would fill.
@@ -61,7 +61,7 @@ pub enum Unreadable {
 /// passes. Naming the axis now is what made the second kind of evidence a change the
 /// compiler walked somebody through rather than one they had to remember.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginEvidence")]
 pub enum Evidence {
     /// The recordings the plugin ships. No service was asked anything.
@@ -78,7 +78,7 @@ pub enum Evidence {
 
 /// What one assertion came to, whatever answered it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-#[serde(tag = "outcome", rename_all = "lowercase")]
+#[serde(tag = "outcome", rename_all = "kebab-case")]
 #[schemars(rename = "PluginVerdict")]
 pub enum Verdict {
     /// The recording answers what the binding declares.

@@ -112,11 +112,11 @@ fn the_fixtures_crate_does_not_depend_on_the_core() {
 }
 /// The core cannot reach the network, and the build is what says so.
 ///
-/// This used to be a scan for the names of six crates in the core's own source, which
-/// could only ever be as good as the list and failed on a comment that mentioned one.
-/// The implementations live in `lemonfiber-adapters` now, which the core does not
-/// depend on, so a run that wanted to open a socket from the core would have to add
-/// the dependency here first — and that is the change this refuses.
+/// A scan of the core's source for crate names could only be as good as its list, and
+/// would fail on a comment that mentioned one. The implementations live in
+/// `lemonfiber-adapters`, which the core does not depend on, so a run that wanted to
+/// open a socket from the core would have to add the dependency here first — and that
+/// is the change this refuses.
 ///
 /// A dev-dependency on the adapters is allowed and is the point: the core's own tests
 /// mean this machine, a scratch directory on a real disk rather than a fake asserting

@@ -121,7 +121,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // does. Unconfirmed is waiting on the operator's say-so, so a script reading
         // success would carry on as though the person were gone; a removal that reached
         // only the media server left an account behind that the next run has to take.
-        Outcome::Removed(report) => removing(report),
+        Outcome::Removal(report) => removing(report),
         // A listing is a question and asking is never a failure. A removal that was
         // not confirmed is waiting on the operator's say-so, and one that could not
         // take a directory left something behind — a script that read either as
@@ -138,7 +138,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // in words and which the commands that would fetch more refuse over. What is
         // a failure is a cleanup that was agreed to and could not finish.
         Outcome::Space(report) => accounting(report),
-        Outcome::Letting(offer) => letting_go(offer),
+        Outcome::StopSeeding(offer) => letting_go(offer),
         // A reading is a question and asking one is never a failure. A removal that
         // could not take everything left something behind, and a script that read
         // that as success would carry on believing the machine was clean.
@@ -212,13 +212,13 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::SelfUpdate(_)
         // An invitation was made or it was not; a refusal already comes back as a
         // problem, so there is nothing for a code to tell apart here.
-        | Outcome::Invited(_)
+        | Outcome::Invitation(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)
         // A substitution was recorded, or worked out and not written; one that
         // could not be made comes back as a problem.
-        | Outcome::Substituted(_)
+        | Outcome::Substitution(_)
         // Putting back what the last repair changed either happened or came back as
         // a problem; there is no third answer for a code to distinguish.
         | Outcome::Undo(_)
@@ -228,7 +228,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Backup(_)
         | Outcome::Watch(_)
         | Outcome::Archives(_)
-        | Outcome::Support(_) => ExitCode::SUCCESS,
+        | Outcome::Bundle(_) => ExitCode::SUCCESS,
     }
 }
 

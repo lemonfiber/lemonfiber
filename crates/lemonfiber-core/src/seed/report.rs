@@ -245,9 +245,9 @@ pub struct Report {
     ///
     /// Not wirings, because nothing was attempted and a wiring says how an attempt
     /// turned out. Not absences either, which is the point: a pass that skipped a
-    /// service declaring an API shape this build does not speak used to say nothing at
-    /// all, and an operator who wrote that declaration had no way to tell it from a
-    /// service lemonfiber had simply forgotten.
+    /// service declaring an API shape this build does not speak and said nothing would
+    /// leave the operator who wrote that declaration no way to tell it from a service
+    /// lemonfiber had simply forgotten.
     #[serde(default)]
     pub unsupported: Vec<crate::model::UnsupportedReport>,
 }

@@ -70,7 +70,7 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
             },
         ),
         ("pull", Command::Pull { forms: Vec::new() }),
-        ("ps", Command::Ps { forms: Vec::new() }),
+        ("ps", Command::Status { forms: Vec::new() }),
         (
             "config",
             Command::ConfigSet(Setting::to("DATA_ROOT", "/srv/library").agreed(true)),

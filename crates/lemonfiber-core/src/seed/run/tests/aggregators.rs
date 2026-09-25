@@ -167,7 +167,7 @@ async fn nothing_is_told_where_a_book_arr_a_key_or_an_aggregator_is_missing() {
 
 /// Which service the book \*arr pulls from is the stack's answer rather than a name
 /// written in this crate, so an ask the stack has not settled is nothing to
-/// register — not the service that used to be named here.
+/// register, and no service is named here to fall back on.
 ///
 /// Three ways it is unsettled, and all of them are the same answer: nothing said
 /// what fills it, several do and none was chosen, and the one chosen is not in

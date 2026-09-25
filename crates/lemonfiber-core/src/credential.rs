@@ -36,7 +36,7 @@ use serde::Serialize;
 /// invalid one is one to replace, and the two rotation states exist so a run
 /// interrupted half-way through a replacement is legible rather than mysterious.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "CredentialState")]
 pub enum State {
     /// Required by what this stack runs, and not supplied.

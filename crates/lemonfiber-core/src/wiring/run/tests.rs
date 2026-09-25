@@ -1,4 +1,4 @@
-use super::{dispatched, listing, substituting, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS};
+use super::{listing, substituting, wiring, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS};
 use crate::app::{Filling, Linking, Outcome};
 use crate::wiring::{Reaches, FILLS_KEY};
 
@@ -218,20 +218,20 @@ fn a_choice_the_settings_file_will_not_take_is_refused_rather_than_reported_made
 /// The read and the verb arrive as one command and come back as two answers.
 #[test]
 fn the_read_and_the_verb_answer_as_the_two_outcomes_they_are() {
-    let (ctx, _at) = ctx("dispatched");
+    let (ctx, _at) = ctx("wiring");
     let rehearsing = ctx.rehearsing();
     assert!(matches!(
-        dispatched(&rehearsing, &Linking::Read),
+        wiring(&rehearsing, &Linking::Read),
         Ok(Outcome::Wiring(_))
     ));
     assert!(matches!(
-        dispatched(
+        wiring(
             &rehearsing,
             &Linking::Fill(Filling {
                 capability: "indexer.search".to_owned(),
                 service: "nzbhydra2".to_owned(),
             })
         ),
-        Ok(Outcome::Substituted(_))
+        Ok(Outcome::Substitution(_))
     ));
 }

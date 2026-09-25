@@ -1,11 +1,11 @@
-use super::Error;
+use super::Failure;
 use crate::conforming::Violation;
 
 #[test]
 fn a_syntax_error_keeps_the_parser_s_own_words() {
     let message = toml::from_str::<toml::Value>("= not toml")
         .err()
-        .map(|parse| Error::Syntax(parse).to_string())
+        .map(|parse| Failure::Syntax(parse).to_string())
         .unwrap_or_default();
     assert!(
         message.starts_with("the plugin manifest could not be parsed:"),
@@ -15,7 +15,7 @@ fn a_syntax_error_keeps_the_parser_s_own_words() {
 
 #[test]
 fn an_unsupported_schema_names_both_sides() {
-    let message = Error::UnsupportedSchema {
+    let message = Failure::UnsupportedSchema {
         found: 7,
         supported: vec![1],
     }
@@ -32,7 +32,7 @@ fn an_unsupported_schema_names_both_sides() {
 
 #[test]
 fn a_nonconforming_manifest_reports_every_fault_in_it() {
-    let message = Error::Nonconforming(vec![
+    let message = Failure::Nonconforming(vec![
         Violation {
             location: "service komga".to_owned(),
             message: "criticality: unknown variant `critical`".to_owned(),

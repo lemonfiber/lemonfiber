@@ -45,9 +45,9 @@ async fn naming_a_setting_reads_that_one_rather_than_all_of_them() {
     );
 }
 
-/// The same rule for a setting, and the answer it used to give was quieter: an
-/// empty name matched no setting and came back as a listing of none, which reads
-/// as "there is no such setting" about a setting nobody named.
+/// The same rule for a setting: an empty name would match no setting and come back
+/// as a listing of none, which reads as "there is no such setting" about a setting
+/// nobody named.
 #[tokio::test]
 async fn a_setting_given_and_left_empty_named_no_setting() {
     assert_eq!(

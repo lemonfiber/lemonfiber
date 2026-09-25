@@ -257,7 +257,7 @@ async fn a_wait_that_has_not_run_out_looks_again() {
     ctx.seams.clock = Arc::new(Ticking::by(Duration::from_secs(1)));
     ctx.patience = Duration::from_secs(90);
 
-    let heard = super::super::fixtures::Recording::default();
+    let heard = super::super::fixtures::Listening::default();
     let report = crate::app::walkthrough(&ctx, Some("Sintel"), &heard).await;
     assert!(
         report.is_ok_and(|report| report.in_background),

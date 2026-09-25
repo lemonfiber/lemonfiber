@@ -378,8 +378,8 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // on the same word.
         FORMS if forms.is_empty() => Ok(Command::Forms),
         FORMS => Ok(Command::Preview { forms }),
-        STATUS => Ok(Command::Ps { forms: Vec::new() }),
-        SERVICES => Ok(Command::Ps { forms }),
+        STATUS => Ok(Command::Status { forms: Vec::new() }),
+        SERVICES => Ok(Command::Status { forms }),
         CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
         REQUESTS => household(member),

@@ -14,7 +14,7 @@ mod schema;
 mod validate;
 
 pub use date::Date;
-pub use error::Error;
+pub use error::Failure;
 pub use schema::{
     Api, ApiKind, Bind, Criticality, Form, Health, HealthKind, KeySource, Manifest, Profile,
     Protocol, Removed, Service, Wiring,

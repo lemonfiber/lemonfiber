@@ -5187,7 +5187,7 @@
       ],
       "$defs": {
         "Code": {
-          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in [`crate::codes`], and a\ncode is never recycled.",
           "type": "string"
         },
         "DoctorCategory": {
@@ -5838,7 +5838,7 @@
       ],
       "$defs": {
         "Code": {
-          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in [`crate::codes`], and a\ncode is never recycled.",
           "type": "string"
         },
         "Problem": {
@@ -9218,7 +9218,7 @@
           ]
         },
         "OutboundReach": {
-          "description": "One of the requests lemonfiber makes on its own account.\n\nSeven, and the closed set is the claim. An eighth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and it is the one\nwhose absence used to be the claim. What it costs to allow is the shortest answer\non the list: it carries nothing at all, so the only thing switching it off keeps\nfrom anybody is the knowledge that a version came out.",
+          "description": "One of the requests lemonfiber makes on its own account.\n\nSeven, and the closed set is the claim. An eighth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.",
           "oneOf": [
             {
               "description": "Fetching the service images the stack runs.",
@@ -9596,7 +9596,7 @@
           ]
         },
         "Code": {
-          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Codes are declared as constants beside the code\nthat raises them, and are never recycled.",
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in [`crate::codes`], and a\ncode is never recycled.",
           "type": "string"
         },
         "Contribution": {
@@ -12799,7 +12799,7 @@
               "type": "boolean"
             },
             "unsupported": {
-              "description": "Services this pass could not wire because it cannot speak to them, each with\nwhy.\n\nNot wirings, because nothing was attempted and a wiring says how an attempt\nturned out. Not absences either, which is the point: a pass that skipped a\nservice declaring an API shape this build does not speak used to say nothing at\nall, and an operator who wrote that declaration had no way to tell it from a\nservice lemonfiber had simply forgotten.",
+              "description": "Services this pass could not wire because it cannot speak to them, each with\nwhy.\n\nNot wirings, because nothing was attempted and a wiring says how an attempt\nturned out. Not absences either, which is the point: a pass that skipped a\nservice declaring an API shape this build does not speak and said nothing would\nleave the operator who wrote that declaration no way to tell it from a service\nlemonfiber had simply forgotten.",
               "type": "array",
               "default": [],
               "items": {

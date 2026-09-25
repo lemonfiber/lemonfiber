@@ -162,7 +162,6 @@ It lives in the binary crate because that crate sits at the top of the graph and
 can see every source file, and because a test crate inside `lemonfiber-core`
 would be checking itself.
 
-
 ## Naming, and why it looks slightly off
 
 Clippy's pedantic set includes `module_name_repetitions`, and suppressions are

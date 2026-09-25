@@ -135,7 +135,7 @@ fn diagnosing() -> Vec<Outcome> {
         Outcome::Seed(lemonfiber_core::seed::Report::default()),
         Outcome::Reset(ResetReport::default()),
         Outcome::Wiring(what_is_wired()),
-        Outcome::Substituted(a_substitution()),
+        Outcome::Substitution(a_substitution()),
         Outcome::Catalogue(CatalogueReport {
             services: vec![CataloguedService {
                 id: "bazarr".to_owned(),
@@ -182,7 +182,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Household(HouseholdReport::default()),
         Outcome::Held(lemonfiber_core::model::HeldReport::default()),
         Outcome::Stuck(StuckReport::default()),
-        Outcome::Invited(lemonfiber_core::model::Invitation {
+        Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
             address: "http://a-machine.local:8096".to_owned(),
             caution: None,
@@ -199,7 +199,7 @@ fn serving() -> Vec<Outcome> {
                 filtering: "These limits are a content filter, not a lock".to_owned(),
             }),
         }),
-        Outcome::Removed(lemonfiber_core::model::HouseholdRemoval {
+        Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
             name: "ana".to_owned(),
             confirmed: false,
             requests: 1,
@@ -240,7 +240,7 @@ fn keeping() -> Vec<Outcome> {
             pace: lemonfiber_core::backup::Pace::of(0),
             rehearsed: false,
         }),
-        Outcome::Support(lemonfiber_core::app::support::Bundle {
+        Outcome::Bundle(lemonfiber_core::app::support::Bundle {
             contents: lemonfiber_core::bundle::Contents::default(),
             bytes: 0,
             path: None,
@@ -275,7 +275,7 @@ fn keeping() -> Vec<Outcome> {
         // optional half of the shape is compared rather than only the reading.
         Outcome::Credentials(a_credential_inventory()),
         Outcome::Space(a_reckoning()),
-        Outcome::Letting(lemonfiber_core::space::letting::offering(
+        Outcome::StopSeeding(lemonfiber_core::space::letting::offering(
             lemonfiber_core::space::Candidate {
                 name: "A.Release".to_owned(),
                 bytes: 90_000_000_000,

@@ -21,7 +21,7 @@ use crate::ports::filesystem::StorageFacts;
 
 /// Which of the two volumes a reading is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Role {
     /// Where the media and the downloads live.
     Data,

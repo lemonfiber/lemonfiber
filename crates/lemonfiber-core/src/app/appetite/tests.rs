@@ -1,11 +1,12 @@
-use super::{hearing, record, recorded};
+use super::{alerts, record, recorded};
 use crate::alert::{Appetite, Wants};
-use crate::app::{AlertAction, Outcome};
+use crate::app::AlertAction;
+use crate::model::AlertReport;
 use crate::test_support::a_context;
 
 /// The whole outcome as text, so a test can assert on the words in it without a
 /// branch for the shape it never has.
-fn said(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> String {
+fn said(outcome: &Result<AlertReport, Box<crate::error::Problem>>) -> String {
     format!("{outcome:?}")
 }
 
@@ -13,11 +14,11 @@ fn said(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> String {
 async fn the_preset_setup_chose_can_be_taken_again_afterwards() {
     // The whole point: setup asks once, and without this there is no second time.
     let ctx = ctx_at("revised");
-    let shown = hearing(&ctx, AlertAction::Show);
+    let shown = alerts(&ctx, AlertAction::Show);
     let text = said(&shown);
     assert!(text.contains("preset: \"problems-only\""), "{text}");
 
-    let set = hearing(&ctx, AlertAction::Set(Appetite::Everything));
+    let set = alerts(&ctx, AlertAction::Set(Appetite::Everything));
     let text = said(&set);
     assert!(text.contains("preset: \"everything\""), "{text}");
 
@@ -37,7 +38,7 @@ async fn taking_a_preset_leaves_the_exceptions_set_apart_from_it() {
     wants.set("storage.space", true);
     assert!(record(&ctx, &wants).is_ok());
 
-    let taken = hearing(&ctx, AlertAction::Set(Appetite::Everything));
+    let taken = alerts(&ctx, AlertAction::Set(Appetite::Everything));
     let text = said(&taken);
     assert!(text.contains("preset: \"everything\""), "{text}");
     let kept = recorded(&ctx);
@@ -48,7 +49,7 @@ async fn taking_a_preset_leaves_the_exceptions_set_apart_from_it() {
 async fn a_rehearsal_reports_the_answer_it_would_keep_without_keeping_it() {
     let mut ctx = ctx_at("rehearsed");
     ctx.dry_run = true;
-    let would = hearing(&ctx, AlertAction::Set(Appetite::Everything));
+    let would = alerts(&ctx, AlertAction::Set(Appetite::Everything));
     let text = said(&would);
     assert!(text.contains("preset: \"everything\""), "{text}");
     // Reported, not written — the next run still reads the quiet default.
@@ -61,10 +62,10 @@ async fn a_rehearsal_reports_the_answer_it_would_keep_without_keeping_it() {
 #[tokio::test]
 async fn with_nowhere_to_keep_it_a_change_says_so_rather_than_seeming_to_work() {
     let ctx = ctx_with(None);
-    assert!(hearing(&ctx, AlertAction::Set(Appetite::Everything)).is_err());
+    assert!(alerts(&ctx, AlertAction::Set(Appetite::Everything)).is_err());
     // Reading still answers: the quiet default is a safe thing to fall back to,
     // where silently losing a change the operator made is not.
-    assert!(hearing(&ctx, AlertAction::Show).is_ok());
+    assert!(alerts(&ctx, AlertAction::Show).is_ok());
 }
 
 /// Where a test's scratch answer lives. Naming it does not touch it.

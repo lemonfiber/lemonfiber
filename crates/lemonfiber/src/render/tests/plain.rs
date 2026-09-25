@@ -153,7 +153,7 @@ fn what_this_stack_wires_to_what_and_one_change_to_it_render_apart() {
     );
 
     let changed = answer(
-        &Outcome::Substituted(lemonfiber_core::model::SubstitutionReport {
+        &Outcome::Substitution(lemonfiber_core::model::SubstitutionReport {
             substitution: lemonfiber_core::wiring::Substitution {
                 capability: "indexer.search".to_owned(),
                 was: Some("prowlarr".to_owned()),

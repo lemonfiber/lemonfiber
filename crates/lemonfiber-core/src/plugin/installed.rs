@@ -50,7 +50,7 @@ use serde::{Deserialize, Serialize};
 /// exactly as it does for a bundled service, so the two-tier policy stays a property
 /// of the system rather than a request a plugin made.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "tier", rename_all = "lowercase", deny_unknown_fields)]
+#[serde(tag = "tier", rename_all = "kebab-case", deny_unknown_fields)]
 #[schemars(rename = "PluginReached")]
 pub enum Reached {
     /// From this machine and nowhere else. No route, and no label to route to.

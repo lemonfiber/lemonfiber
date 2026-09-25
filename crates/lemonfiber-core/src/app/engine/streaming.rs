@@ -14,8 +14,8 @@
 use tokio::sync::mpsc::Receiver;
 
 use super::{compose, readied, settled_into, Ctx};
-use crate::app::Outcome;
 use crate::error::{Diagnose, Problem};
+use crate::model::LifecycleReport;
 use crate::ports::docker::{LogLine, LogQuery};
 use crate::ports::process::Progress;
 use crate::stack::closure::resolve;
@@ -23,7 +23,7 @@ use crate::stack::compose::Action;
 
 /// Stream a project's log lines, tagged by the service that wrote them.
 ///
-/// Streaming has its own entry point rather than an [`Outcome`], because a log
+/// Streaming has its own entry point rather than an [`Outcome`](crate::app::Outcome), because a log
 /// stream is not a value that arrives once. Forcing it into one would mean
 /// either buffering output that has no end or giving each surface its own way
 /// of reading it, and the second is the drift [`dispatch`] exists to prevent —
@@ -189,7 +189,7 @@ pub async fn started(
     forms: &[String],
     services: &[String],
     status: Option<i32>,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<LifecycleReport, Box<Problem>> {
     let action = aimed(services);
     let (manifest, _, mut report) = readied(ctx, forms, &action).await?;
     report.status = status;
@@ -200,7 +200,7 @@ pub async fn started(
     if status == Some(0) {
         settled_into(ctx, &manifest, &mut report).await?;
     }
-    Ok(Outcome::Lifecycle(report))
+    Ok(report)
 }
 
 /// What a start is aimed at: the named services, or everything the plan holds.

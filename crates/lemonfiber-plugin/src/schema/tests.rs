@@ -1,7 +1,7 @@
 use super::{
     Bind, Contribution, Criticality, Expected, ExpectedKind, HealthKind, Manifest, Service,
 };
-use crate::Error;
+use crate::Failure;
 
 /// A manifest declaring every block the contract carries.
 ///
@@ -615,7 +615,7 @@ fn a_newer_generation_is_named_as_such_even_when_it_carries_unknown_fields() {
     );
     assert!(matches!(
         Manifest::from_toml(&text),
-        Err(Error::UnsupportedSchema { found: 99, .. })
+        Err(Failure::UnsupportedSchema { found: 99, .. })
     ));
 }
 
@@ -665,7 +665,7 @@ fn names_every_unrecognised_declaration_in_one_pass() {
 fn a_file_that_is_not_a_manifest_at_all_is_a_syntax_error() {
     assert!(matches!(
         Manifest::from_toml("= not toml"),
-        Err(Error::Syntax(_))
+        Err(Failure::Syntax(_))
     ));
 }
 

@@ -93,9 +93,9 @@ pub(super) fn setting(key: Option<String>) -> Result<Command, &'static str> {
 
 /// What the household asked for, narrowed to one member or taken whole.
 ///
-/// Empty is refused for the reason it is refused of a setting, and the answer it
-/// used to give was worse: a member nobody named matched nobody, and a report of no
-/// requests reads as "nobody has asked for anything" — which is exactly the reading
+/// Empty is refused for the reason it is refused of a setting: a member nobody named
+/// would match nobody, and a report of no requests reads as "nobody has asked for
+/// anything" — which is exactly the reading
 /// [`lemonfiber_core::app`]'s own household reader refuses to produce when it cannot
 /// reach the request service.
 pub(super) fn household(member: Option<String>) -> Result<Command, &'static str> {

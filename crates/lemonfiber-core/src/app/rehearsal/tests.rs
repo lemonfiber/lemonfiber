@@ -191,9 +191,8 @@ fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
 /// word to an operator and two arms here.
 ///
 /// One group below per verdict, and the verdict written once for the group rather
-/// than once per row. A row under the wrong heading used to be a row that still
-/// declared the right answer beside itself, and read correctly while sitting in the
-/// wrong place; now the heading is the answer.
+/// than once per row, so the heading is the answer: a row that declared its own
+/// answer beside itself would read correctly while sitting under the wrong heading.
 fn every_verdict() -> Vec<(Command, Rehearsal)> {
     fn under(commands: Vec<Command>, verdict: Rehearsal) -> Vec<(Command, Rehearsal)> {
         commands
@@ -225,7 +224,7 @@ fn reads() -> Vec<Command> {
         },
         Command::ConfigShow,
         Command::History,
-        Command::Ps { forms: Vec::new() },
+        Command::Status { forms: Vec::new() },
         Command::Stuck,
         Command::FrontDoor,
         Command::Explain {

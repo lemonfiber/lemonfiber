@@ -27,7 +27,7 @@ use crate::app::{Ctx, MigrateAction, Outcome};
 /// Never in practice: a survey that cannot look reports that it could not, rather than
 /// refusing. The result carries the failure so the caller stays uniform with the other
 /// reads.
-pub async fn migrating(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<Problem>> {
+pub async fn migrate(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<Problem>> {
     match action {
         MigrateAction::Survey => Ok(Outcome::Migration(looked(ctx).await.survey)),
         MigrateAction::Act { mode, confirmed } => acting(ctx, mode, confirmed).await,

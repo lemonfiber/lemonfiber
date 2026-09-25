@@ -164,8 +164,8 @@ fn a_download_still_running_promises_that_walking_away_cost_nothing() {
 /// by whoever released it.
 ///
 /// The same quoting as the other trace link and by the same function, so a title with
-/// a quote in it closes nothing: this line used to be spelled out here on its own, and
-/// two spellings of one command drift until the day a title has an apostrophe.
+/// a quote in it closes nothing: two spellings of one command drift until the day a
+/// title has an apostrophe.
 #[test]
 fn a_title_cannot_close_the_quoting_of_the_command_that_follows_it() {
     let going = WalkthroughReport {

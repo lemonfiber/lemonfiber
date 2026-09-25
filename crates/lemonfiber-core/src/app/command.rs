@@ -130,7 +130,7 @@ pub enum Command {
     /// Show every setting, with credentials withheld.
     ConfigShow,
     /// Report what each service is actually doing.
-    Ps {
+    Status {
         /// The forms to report on; empty reports on the whole stack.
         forms: Vec<String>,
     },

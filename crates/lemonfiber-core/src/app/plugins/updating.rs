@@ -21,7 +21,7 @@ use std::path::Path;
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
-use super::super::{Ctx, Outcome};
+use super::super::Ctx;
 use super::{carry_out, nowhere_to_write, proving, verifying};
 use crate::error::codes::plugin::{NOTHING_TO_UPDATE, STUCK};
 
@@ -40,7 +40,7 @@ pub(crate) async fn update(
     ctx: &Ctx,
     held: Register,
     path: &Path,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<Installs, Box<Problem>> {
     let manifest = super::accepted(path)?;
     // The stamp the whole update is journalled under, taken before anything is decided
     // so the record of the new version says it was installed at that moment.
@@ -283,14 +283,14 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 }
 
 /// The report: the listing as the record stands, and this run's one account.
-fn answering(installed: Vec<Installed>, update: Update) -> Outcome {
-    Outcome::Plugins(Installs {
+fn answering(installed: Vec<Installed>, update: Update) -> Installs {
+    Installs {
         installed,
         install: None,
         removal: None,
         update: Some(Box::new(update)),
         substituted: Vec::new(),
-    })
+    }
 }
 
 /// No version of this plugin is installed, so there is nothing to replace.

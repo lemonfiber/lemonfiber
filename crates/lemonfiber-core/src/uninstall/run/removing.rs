@@ -17,7 +17,7 @@
 
 use std::path::Path;
 
-use crate::app::{Ctx, Outcome, Waiting};
+use crate::app::{Ctx, Waiting};
 use crate::error::codes::gone::NOT_BACKED_UP;
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
@@ -157,7 +157,7 @@ async fn stopping(ctx: &Ctx, tier: Tier, went: &mut Went) {
     // files.
     let outcome = match crate::app::engine::lifecycle(ctx, &[], &action).await {
         Err(problem) => Err(problem.summary.clone()),
-        Ok(Outcome::Lifecycle(report)) if report.status.unwrap_or_default() == 0 => Ok(()),
+        Ok(report) if report.status.unwrap_or_default() == 0 => Ok(()),
         Ok(_) => Err(format!(
             "`docker compose {}` did not succeed",
             action.name()

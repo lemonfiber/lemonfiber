@@ -244,7 +244,7 @@ async fn a_rehearsed_way_out_of_a_half_written_apply_leaves_it_half_written() {
 async fn a_way_out_of_an_apply_that_never_stopped_is_refused() {
     let (_scratch, paths) = scratch("nothing-to-recover");
     let context = ctx(&paths);
-    assert!(setting_up(
+    assert!(setup(
         &context,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )
@@ -266,7 +266,7 @@ async fn nowhere_to_keep_configuration_is_said_rather_than_guessed_at() {
     let nowhere = a_context().settings(Settings::default()).build();
 
     assert!(
-        setting_up(&nowhere, SetupAction::Where).await.is_err(),
+        setup(&nowhere, SetupAction::Where).await.is_err(),
         "a run with no configured home has nowhere to gather answers into"
     );
 }
@@ -310,7 +310,7 @@ async fn a_rehearsed_apply_reports_the_plan_and_writes_none_of_it() {
 async fn a_rehearsed_apply_is_refused_before_review_the_way_a_real_one_is() {
     let (_scratch, paths) = scratch("rehearsed-early");
     let rehearsing = ctx(&paths).rehearsing();
-    assert!(setting_up(
+    assert!(setup(
         &rehearsing,
         SetupAction::Answer(Answer::Protocols(Protocols::both()))
     )

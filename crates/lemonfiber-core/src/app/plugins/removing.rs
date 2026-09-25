@@ -27,7 +27,7 @@ use crate::plugin::{Installed, Register, Removal, Unfilled};
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 
-use super::super::{Ctx, Outcome};
+use super::super::Ctx;
 use crate::error::codes::plugin::NOTHING_TO_REMOVE;
 
 /// Take a plugin off the machine, or say what taking it off would come to.
@@ -42,7 +42,7 @@ pub(crate) async fn remove(
     ctx: &Ctx,
     held: Register,
     plugin: &str,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<crate::plugin::Installs, Box<Problem>> {
     let Some(going) = held
         .installed()
         .iter()
@@ -167,14 +167,14 @@ pub(crate) async fn remove(
 }
 
 /// The report, which is the listing as it stands plus what this run came to.
-fn answering(installed: Vec<Installed>, removal: Removal) -> Outcome {
-    Outcome::Plugins(crate::plugin::Installs {
+fn answering(installed: Vec<Installed>, removal: Removal) -> crate::plugin::Installs {
+    crate::plugin::Installs {
         installed,
         install: None,
         removal: Some(removal),
         update: None,
         substituted: Vec::new(),
-    })
+    }
 }
 
 /// Take the plugin's containers back off the machine.

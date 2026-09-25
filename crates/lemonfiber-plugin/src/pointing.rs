@@ -1,11 +1,10 @@
 //! Where in an answer an expectation is looking.
 //!
-//! An expectation's key used to be the name of a top-level member and nothing else,
-//! which is a rule that holds for exactly as long as every service answers with a flat
-//! object. Plex nests every response one level under `MediaContainer`, and the setting
-//! that says whether it has published itself to the internet lives in an array of a
-//! hundred and fifty-one, found by the `id` one of them carries. Neither is reachable
-//! by a name.
+//! A key that could only name a top-level member would hold for exactly as long as every
+//! service answers with a flat object. Plex nests every response one level under
+//! `MediaContainer`, and the setting that says whether it has published itself to the
+//! internet lives in an array of a hundred and fifty-one, found by the `id` one of them
+//! carries. Neither is reachable by a name.
 //!
 //! So a key is a place rather than a name, and the place is written as a **JSON Pointer**
 //! — RFC 6901, unchanged — with one addition of this project's own: a step that picks
@@ -13,10 +12,10 @@
 //! contract rather than here, because a host named in shipped source is a host somebody
 //! has to answer for, and nothing in this file asks anything of anybody.
 //!
-//! **A key that does not begin with `/` is still the name of a top-level member**, which
-//! is what every key written before this generation is, and is why none of them changed
-//! meaning. RFC 6901 gives the empty pointer to the whole document; here the empty string
-//! is the member named `""`, because a key is a name until it says otherwise.
+//! **A key that does not begin with `/` is still the name of a top-level member**,
+//! so a flat key means what it says. RFC 6901 gives the empty pointer to the whole
+//! document; here the empty string is the member named `""`, because a key is a name
+//! until it says otherwise.
 //!
 //! The addition is one step and one comparison. A reference token written `[field=value]`
 //! means *the entry of this array whose `field` holds `value`*, exactly one of them must,

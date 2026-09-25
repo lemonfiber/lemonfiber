@@ -44,7 +44,7 @@ pub use journalled::of_journalled;
 /// true, and neither of which the additive-only surface check would refuse.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "ValueOrigin")]
-#[serde(tag = "origin", rename_all = "lowercase")]
+#[serde(tag = "origin", rename_all = "kebab-case")]
 pub enum Origin {
     /// This build's own, out of what lemonfiber ships rather than out of a choice.
     Bundled,

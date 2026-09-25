@@ -526,7 +526,7 @@ fn each_way_a_source_is_unreadable_says_which_one_it_was() {
     );
     assert!(
         said(Unreadable::Refused(
-            lemonfiber_plugin::Error::UnsupportedSchema {
+            lemonfiber_plugin::Failure::UnsupportedSchema {
                 found: 9,
                 supported: vec![1],
             }

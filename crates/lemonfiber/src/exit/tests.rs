@@ -121,10 +121,10 @@ fn a_diagnosis_exits_on_what_it_found_rather_than_on_having_run() {
 
 #[test]
 fn a_start_that_compose_did_not_carry_out_is_not_a_success() {
-    // The hole this closes: waiting for services to become usable happens only
-    // where Compose exited zero, so a failed start raises no problem at all and
-    // used to leave through the always-success arm. A script could not tell a
-    // stack that came up from one that never started.
+    // Waiting for services to become usable happens only where Compose exited
+    // zero, so a failed start raises no problem at all. Without the status as the
+    // verdict, a script could not tell a stack that came up from one that never
+    // started.
     assert_eq!(
         shown(settled(&Outcome::Lifecycle(lifecycle(Some(0))))),
         success()

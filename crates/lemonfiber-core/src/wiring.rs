@@ -38,7 +38,7 @@ pub(crate) const FILLS_KEY: &str = "LEMONFIBER_FILLS";
 
 /// Who settled a contest between claimants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Whose {
     /// The stack shipped the choice, in the file the operator can read.
     Stack,

@@ -227,9 +227,8 @@ pub enum Knocking {
 
 /// Who a request proved itself to be.
 ///
-/// The guard used to answer whether a caller was admitted and never who, so every
-/// route below it saw one indistinguishable *yes*. A surface that must refuse one
-/// person what it offers another cannot be built on that answer: it would have to
+/// Who, rather than only whether: a surface that must refuse one person what it
+/// offers another cannot be built on an indistinguishable *yes*. It would have to
 /// decide for itself which person is looking, and a control withheld on that basis
 /// is withheld by whoever drew the screen.
 ///

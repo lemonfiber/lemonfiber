@@ -1,11 +1,11 @@
-use super::Error;
+use super::Failure;
 use crate::Violation;
 
 #[test]
 fn a_syntax_error_keeps_the_parser_s_own_words() {
     let message = toml::from_str::<toml::Value>("= not toml")
         .err()
-        .map(|parse| Error::Syntax(parse).to_string())
+        .map(|parse| Failure::Syntax(parse).to_string())
         .unwrap_or_default();
     assert!(
         message.starts_with("the manifest could not be parsed:"),
@@ -15,7 +15,7 @@ fn a_syntax_error_keeps_the_parser_s_own_words() {
 
 #[test]
 fn an_unsupported_schema_names_both_sides() {
-    let message = Error::UnsupportedSchema {
+    let message = Failure::UnsupportedSchema {
         found: 7,
         supported: vec![1],
     }
@@ -32,7 +32,7 @@ fn an_unsupported_schema_names_both_sides() {
 
 #[test]
 fn an_unrecognised_name_reports_every_one_of_them() {
-    let message = Error::Unrecognised(vec![
+    let message = Failure::Unrecognised(vec![
         Violation {
             location: "service jellyfin".to_owned(),
             message: "api.kind: unknown variant `plex`".to_owned(),
@@ -51,7 +51,7 @@ fn an_unrecognised_name_reports_every_one_of_them() {
 
 #[test]
 fn an_old_binary_is_told_which_version_it_needs() {
-    let message = Error::BinaryTooOld {
+    let message = Failure::BinaryTooOld {
         required: "0.4.0".into(),
         running: "0.1.0".into(),
     }

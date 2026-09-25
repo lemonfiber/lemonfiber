@@ -12,7 +12,7 @@ use crate::conforming::Violation;
 /// declarations the published schema refuses each need a different response from
 /// whoever hit it.
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum Failure {
     /// The file is not valid TOML, or does not have the shape of a manifest.
     #[error("the plugin manifest could not be parsed: {0}")]
     Syntax(#[from] toml::de::Error),

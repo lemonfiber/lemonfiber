@@ -172,8 +172,8 @@ fn a_running_version_at_or_past_the_newest_has_nothing_to_move_to() {
 
 #[test]
 fn a_build_cut_ahead_of_a_release_is_offered_that_release() {
-    // This used to answer `Untellable`, and the reason was an accident: the tag
-    // is not a dotted run of numbers, so nothing could order it. Somebody running
+    // The tag is not a dotted run of numbers, and it is still ordered rather than
+    // answered `Untellable`. Somebody running
     // a build cut ahead of 0.13.0 is exactly the person who wants 0.13.0 when it
     // arrives, and telling them the question cannot be answered is a worse reply
     // than the true one.

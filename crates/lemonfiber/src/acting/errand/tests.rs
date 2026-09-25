@@ -366,7 +366,7 @@ fn the_yes_to_letting_a_download_go_is_the_name_the_offer_gave_itself() {
     let stage = super::weighed(
         errand,
         Given::downloaded("A.Show.S01E01".to_owned()),
-        &Outcome::Letting(offer.clone()),
+        &Outcome::StopSeeding(offer.clone()),
         vec!["what it costs".to_owned()],
     );
     // Read out of the stage rather than matched with an arm for the case that
@@ -402,7 +402,7 @@ fn an_answer_that_is_not_an_offer_carries_no_name_to_answer_it_with() {
     // And an errand whose yes is a flag takes no name off one either, however
     // right the shape of the answer looks.
     assert_eq!(
-        sending("space").and_then(|errand| errand.answering(&Outcome::Letting(an_offer()))),
+        sending("space").and_then(|errand| errand.answering(&Outcome::StopSeeding(an_offer()))),
         None
     );
 }

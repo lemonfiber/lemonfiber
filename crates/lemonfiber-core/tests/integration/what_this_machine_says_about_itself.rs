@@ -83,8 +83,7 @@ fn publisher() -> (String, u16) {
 /// settled before anything is spawned, and waiting would only add a minute to it.
 async fn lifecycle(ctx: &Ctx) -> Result<LifecycleReport, String> {
     match started(ctx, &[], &[], Some(1)).await {
-        Ok(Outcome::Lifecycle(report)) => Ok(report),
-        Ok(other) => Err(format!("not a lifecycle report: {other:?}")),
+        Ok(report) => Ok(report),
         Err(problem) => Err(problem.summary.clone()),
     }
 }

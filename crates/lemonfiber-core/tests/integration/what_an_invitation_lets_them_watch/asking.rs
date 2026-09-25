@@ -85,7 +85,7 @@ async fn what_was_applied_travels_back_with_the_invitation() {
     // Flattened rather than unwrapped: an invitation that said nothing about access
     // has to fail the assertions below rather than end the run before them.
     let (limit, unrated, filtering) = match made {
-        Some(Outcome::Invited(invitation)) => {
+        Some(Outcome::Invitation(invitation)) => {
             invitation
                 .applied
                 .map_or_else(<(String, Unrated, String)>::default, |applied| {

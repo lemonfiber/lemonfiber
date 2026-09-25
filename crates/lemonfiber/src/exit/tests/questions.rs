@@ -14,7 +14,7 @@ fn an_offer_nobody_answered_is_not_a_download_that_went() {
         consequence: Some(lemonfiber_core::space::RATIO_CONSEQUENCE.to_owned()),
     });
     assert_ne!(
-        format!("{:?}", settled(&Outcome::Letting(offer.clone()))),
+        format!("{:?}", settled(&Outcome::StopSeeding(offer.clone()))),
         success()
     );
 
@@ -26,7 +26,10 @@ fn an_offer_nobody_answered_is_not_a_download_that_went() {
         }),
         ..offer
     };
-    assert_eq!(format!("{:?}", settled(&Outcome::Letting(gone))), success());
+    assert_eq!(
+        format!("{:?}", settled(&Outcome::StopSeeding(gone))),
+        success()
+    );
 }
 
 /// Listing the credentials is a question; a replacement that was asked for and
@@ -193,7 +196,7 @@ fn removing_somebody_earns_success_only_where_both_accounts_went() {
     assert_eq!(
         format!(
             "{:?}",
-            settled(&Outcome::Removed(removal(
+            settled(&Outcome::Removal(removal(
                 lemonfiber_core::model::Revoked::Everywhere
             )))
         ),
@@ -203,7 +206,7 @@ fn removing_somebody_earns_success_only_where_both_accounts_went() {
     assert_ne!(
         format!(
             "{:?}",
-            settled(&Outcome::Removed(removal(
+            settled(&Outcome::Removal(removal(
                 lemonfiber_core::model::Revoked::Nothing
             )))
         ),
@@ -213,7 +216,7 @@ fn removing_somebody_earns_success_only_where_both_accounts_went() {
     assert_ne!(
         format!(
             "{:?}",
-            settled(&Outcome::Removed(removal(
+            settled(&Outcome::Removal(removal(
                 lemonfiber_core::model::Revoked::MediaServerOnly
             )))
         ),

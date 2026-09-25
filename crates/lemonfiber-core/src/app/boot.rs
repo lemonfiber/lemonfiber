@@ -37,7 +37,7 @@ use crate::ports::machine::Power;
 use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
 
-use super::{Ctx, Outcome};
+use super::Ctx;
 
 /// The check a boot that did not bring the stack back is filed under.
 ///
@@ -107,7 +107,7 @@ const RECORD: &str = "boot.json";
 /// services that never settled. A run that declines to start anything is not an
 /// error: declining is the correct answer to three of the four questions in front of
 /// it, and the report says which.
-pub(crate) async fn at_boot(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn at_boot(ctx: &Ctx) -> Result<LifecycleReport, Box<Problem>> {
     waited(ctx, LOOKS, AGAIN, TRIES, BETWEEN).await
 }
 
@@ -119,10 +119,10 @@ async fn waited(
     again: Duration,
     tries: u32,
     between: Duration,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<LifecycleReport, Box<Problem>> {
     let forms = match asked_for(ctx).await {
         Ok(forms) => forms,
-        Err(held) => return Ok(Outcome::Lifecycle(nothing_started(&held))),
+        Err(held) => return Ok(nothing_started(&held)),
     };
 
     // The engine first, because on two of the four platforms it is a desktop
@@ -131,7 +131,7 @@ async fn waited(
     // again, and the operator running anything at all is when it gets tried.
     if !reachable(ctx, looks, again).await {
         raised(ctx, ENGINE_NEVER_CAME, NOTHING_CAME_BACK);
-        return Ok(Outcome::Lifecycle(nothing_started(ENGINE_NEVER_CAME)));
+        return Ok(nothing_started(ENGINE_NEVER_CAME));
     }
 
     let outcome = tried(ctx, &forms, tries, between).await;
@@ -262,7 +262,7 @@ async fn tried(
     forms: &[String],
     tries: u32,
     between: Duration,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<LifecycleReport, Box<Problem>> {
     let mut outcome = super::engine::lifecycle(ctx, forms, &Action::Up).await;
     for attempt in 1..tries {
         if outcome.as_ref().is_ok_and(came_up) {
@@ -281,8 +281,8 @@ async fn tried(
 }
 
 /// Whether an attempt brought the stack up.
-fn came_up(outcome: &Outcome) -> bool {
-    matches!(outcome, Outcome::Lifecycle(report) if report.status == Some(0))
+fn came_up(report: &LifecycleReport) -> bool {
+    report.status == Some(0)
 }
 
 /// Confirm the stack actually came back, tunnel and forwarded port included.

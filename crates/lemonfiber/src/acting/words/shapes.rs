@@ -97,11 +97,11 @@ pub(super) fn choosing<T: Listed>(
 
 /// Which entry the visible run of them starts at.
 ///
-/// A list longer than the screen used to show its first rows and nothing else, so an
-/// operator pressing down past the last visible one moved a cursor they could not
-/// see, and the entries at the bottom of a long list could not be reached at all on a
-/// short terminal. The window follows the selection instead: it stays at the top
-/// until the selection would leave it, then moves by exactly as much as it must.
+/// A list longer than the screen that showed only its first rows would have the
+/// operator moving a cursor they could not see, and would leave the bottom of a long
+/// list unreachable on a short terminal. The window follows the selection: it stays at
+/// the top until the selection would leave it, then moves by exactly as much as it
+/// must.
 fn from<T: Listed>(chooser: &Chooser<T>, room: usize) -> usize {
     let counted = chooser.listed().count();
     if counted <= room || room == 0 {

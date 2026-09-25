@@ -3,7 +3,7 @@
 use super::*;
 
 /// What the proofs on a report came to, in the order they were declared.
-fn verdicts(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Vec<Option<Verdict>> {
+fn verdicts(outcome: Result<Installs, Box<crate::error::Problem>>) -> Vec<Option<Verdict>> {
     report(outcome)
         .and_then(|one| one.install)
         .map(|one| one.proofs.into_iter().map(|proof| proof.came_to).collect())
@@ -11,7 +11,7 @@ fn verdicts(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Vec<Option<
 }
 
 /// A refusal's own code and the code of whatever it carries underneath it.
-fn beneath(outcome: Result<Outcome, Box<crate::error::Problem>>) -> (String, String) {
+fn beneath(outcome: Result<Installs, Box<crate::error::Problem>>) -> (String, String) {
     outcome
         .err()
         .map(|problem| {

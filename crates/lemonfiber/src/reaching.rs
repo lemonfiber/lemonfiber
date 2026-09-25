@@ -270,11 +270,10 @@ pub const SHOWS: &[&str] = &["ps"];
 /// of its own — the read is `trace`, and one word answering at two doors is the
 /// arrangement every read on this surface is kept out of.
 ///
-/// Putting one run back used to be here too, under the `doctor` row, because
-/// `doctor --undo` was the only way to ask for it. It has a request of its own now and
-/// so an entry of its own in [`ACTS`]: the screen's errand still asks the question it
-/// always asked — the last repair, no run named — and that is one form of a request
-/// rather than a second request, which is exactly what this list exists to keep apart.
+/// Putting one run back is not here: it is a request of its own and so an entry of its
+/// own in [`ACTS`]. The screen's errand asks for the last repair with no run named, and
+/// that is one form of that request rather than a second request, which is exactly
+/// what this list exists to keep apart.
 ///
 /// None of the eight is an entry in [`ACTS`], because each request is already
 /// reached: [`reached`] is what the parity table's terminal column is held against in

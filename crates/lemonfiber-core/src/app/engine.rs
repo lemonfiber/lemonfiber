@@ -3,7 +3,7 @@
 //! version reports a surface renders. The command model and the dispatcher that routes to
 //! these live in the parent module; this is the engine work each command carries out.
 
-use super::{Ctx, Outcome};
+use super::Ctx;
 use crate::docker::{condition, survey, undeclared};
 use crate::error::{Diagnose, Problem};
 use crate::model::{
@@ -104,11 +104,11 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     } else {
         None
     };
-    // The one write on this path, and the one a rehearsal used to make anyway. Every
-    // lifecycle command materialises the stack before it can build an invocation over
-    // it, and the gate against running Compose sits below this — so a rehearsal that
-    // ran nothing had already written the whole stack out and rewritten the record of
-    // what it wrote. The walk is the same walk either way; a rehearsal takes it
+    // The one write on this path, and one a rehearsal must not make. Every lifecycle
+    // command materialises the stack before it can build an invocation over it, and the
+    // gate against running Compose sits below this — so without this a rehearsal that
+    // ran nothing would already have written the whole stack out and rewritten the
+    // record of what it wrote. The walk is the same walk either way; a rehearsal takes it
     // without the writing, which is where the edits it reports come from.
     let written = if ctx.dry_run {
         super::materialise::would_materialise
@@ -297,7 +297,7 @@ pub(crate) async fn lifecycle(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<LifecycleReport, Box<Problem>> {
     // Claimed around the whole operation, and given back whether it worked or not —
     // an early return between the two would leave the stack claimed by a run that has
     // already finished, which is the one way this can be worse than no lock at all.
@@ -312,14 +312,18 @@ pub(crate) async fn lifecycle(
 }
 
 /// The operation itself, with the stack already claimed for it.
-async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome, Box<Problem>> {
+async fn worked(
+    ctx: &Ctx,
+    forms: &[String],
+    action: &Action,
+) -> Result<LifecycleReport, Box<Problem>> {
     let (manifest, command, mut report) = readied(ctx, forms, action).await?;
 
     // A rehearsal stops here deliberately: it has already done everything except
     // the one irreversible step, so what it reports is what would run rather
     // than an approximation of it.
     if ctx.dry_run {
-        return Ok(Outcome::Lifecycle(report));
+        return Ok(report);
     }
 
     // Nothing is spawned over a data location that is not there. Compose would make
@@ -357,7 +361,7 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
         settled_into(ctx, &manifest, &mut report).await?;
     }
 
-    Ok(Outcome::Lifecycle(report))
+    Ok(report)
 }
 
 /// Put the credentials a service adopts at first start where it will read them.

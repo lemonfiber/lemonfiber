@@ -65,7 +65,7 @@ async fn what_the_stack_is_doing_is_the_envelope_the_command_renders() {
     // the bytes a script would have piped, produced by the same three calls.
     let expected = as_the_command_renders_it(
         &world(running(), stack()),
-        Command::Ps { forms: Vec::new() },
+        Command::Status { forms: Vec::new() },
     )
     .await;
 

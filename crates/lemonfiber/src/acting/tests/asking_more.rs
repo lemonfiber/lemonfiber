@@ -126,7 +126,7 @@ fn a_bundle_is_asked_how_much_log_and_what_becomes_of_filenames() {
         })
     );
 
-    acting.came_to(Ok(Outcome::Support(a_bundle())));
+    acting.came_to(Ok(Outcome::Bundle(a_bundle())));
 
     let asked = showing(&acting);
     assert!(asked.contains("the last 50 lines"), "{asked}");

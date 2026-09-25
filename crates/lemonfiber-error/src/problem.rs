@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 /// A stable identifier for a kind of problem.
 ///
 /// Stability is the whole point: an operator who searches for a code should find
-/// the same answer a year later. Every code is declared in [`crate::codes`], and a
-/// code is never recycled.
+/// the same answer a year later. Every code is declared in the error crate's `codes`
+/// module, and a code is never recycled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, schemars::JsonSchema)]
 pub struct Code(&'static str);
 
@@ -52,7 +52,7 @@ impl std::fmt::Display for Code {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "ProblemSeverity")]
 pub enum Severity {
     /// Informational; nothing is required.
@@ -91,7 +91,7 @@ pub enum Amiss {
 
 /// Where a problem stands with respect to being fixed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "ProblemState")]
 pub enum State {
     /// A remedy is available here.

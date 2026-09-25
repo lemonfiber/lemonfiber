@@ -43,7 +43,7 @@ pub struct Change {
 
 /// What a change did, holding what undoing it needs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case")]
+#[serde(tag = "action", rename_all = "kebab-case")]
 pub enum Kind {
     /// A resource was created; undoing removes exactly the one created, named by
     /// the identifier the service returned rather than by a label that could
@@ -208,7 +208,7 @@ pub struct Undo {
 /// Tagged by what it does rather than by the field it sits in, so a reader parsing
 /// one branches on a word rather than on which keys are present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(tag = "does", rename_all = "snake_case")]
+#[serde(tag = "does", rename_all = "kebab-case")]
 pub enum Action {
     /// Remove the resource that was created.
     Remove {

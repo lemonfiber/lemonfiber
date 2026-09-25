@@ -145,9 +145,9 @@ fn half_an_answer_from_the_stack_is_no_answer_at_all() {
     );
 }
 
-/// And a service this binary once carried prose about is still the stack's to
-/// describe: the point of the field is that a fork can correct what shipped with
-/// it, and prowlarr is the case where something used to answer instead.
+/// And prowlarr is still the stack's to describe: the point of the field is that a
+/// fork can correct what shipped with it, so nothing in this binary answers for a
+/// service the stack describes.
 #[test]
 fn a_service_this_binary_once_described_is_still_the_stacks_to_describe() {
     let theirs: Vec<_> = declared()

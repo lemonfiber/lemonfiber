@@ -1,5 +1,5 @@
 use super::{ApiKind, Bind, Criticality, HealthKind, KeySource, Manifest, Protocol, Service};
-use crate::Error;
+use crate::Failure;
 
 const MINIMAL: &str = r#"
 schema_version = 1
@@ -205,7 +205,7 @@ fn refuses_a_field_it_does_not_know() {
     let text = format!("{MINIMAL}\n[[service]]\nunknown_field = true\n");
     let refusal = Manifest::from_toml(&text)
         .err()
-        .map(|err| matches!(err, Error::Syntax(_)));
+        .map(|err| matches!(err, Failure::Syntax(_)));
     assert_eq!(refusal, Some(true));
 }
 
@@ -220,7 +220,7 @@ fn a_newer_generation_is_named_as_such_even_when_it_carries_unknown_fields() {
     );
     assert!(matches!(
         Manifest::from_toml(&text),
-        Err(Error::UnsupportedSchema { found: 99, .. })
+        Err(Failure::UnsupportedSchema { found: 99, .. })
     ));
 }
 

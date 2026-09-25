@@ -218,7 +218,7 @@ pub struct Expect {
 /// contract describes is keyed by its `kind`, so the union of them is a `Kind` too, and
 /// two of them in one module is a definition nothing can be compiled against.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum ExpectedKind {
     /// A true or a false.
     Bool,

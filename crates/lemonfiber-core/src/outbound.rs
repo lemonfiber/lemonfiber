@@ -43,10 +43,10 @@ pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RE
 /// choice, so the list names the two services it can reach and the sender is handed
 /// them rather than holding addresses of its own.
 ///
-/// The seventh is the only one this program makes about *itself*, and it is the one
-/// whose absence used to be the claim. What it costs to allow is the shortest answer
-/// on the list: it carries nothing at all, so the only thing switching it off keeps
-/// from anybody is the knowledge that a version came out.
+/// The seventh is the only one this program makes about *itself*, and the one most easily
+/// left off a list of what this program reaches. What it costs to allow is the shortest
+/// answer on the list: it carries nothing at all, so the only thing switching it off
+/// keeps from anybody is the knowledge that a version came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "OutboundReach")]

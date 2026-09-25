@@ -35,6 +35,26 @@ point. The surfaces ship in the same binary as the core, so adding a command
 wildcard arm would let a new command render as nothing at all, which is the exact
 failure the single entry point exists to prevent.
 
+## The table
+
+`dispatch` routes each `Command` to one handler, and every row reads the same way:
+the handler returns its own report, and the row names the `Outcome` variant it
+becomes.
+
+```rust
+Command::Space { confirm } => space::space(ctx, confirm).await.map(Outcome::Space),
+```
+
+A handler returns `Outcome` itself only where it answers with more than one
+variant — a migration, the wiring.
+
+A handler is named for the command it answers: `Command::Backup` reaches
+`backup::backup`, and `Command::ConfigSet` reaches `configuring::set`. Where
+several commands share one handler it is named for what they share —
+`engine::lifecycle` answers up, start, stop, restart and pull — and a read is
+named for what it reads: `engine::status`, `stored::listing`,
+`self_update::standing`. A command whose row would need more than one line has a
+helper beside the table, named for what it does there.
 
 ## `dry_run` lives on the context
 

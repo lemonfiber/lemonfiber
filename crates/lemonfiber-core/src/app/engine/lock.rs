@@ -170,11 +170,10 @@ fn lockfile(ctx: &Ctx) -> Option<PathBuf> {
 /// What a claim says about the run holding it: which process, since when, and what it
 /// is doing.
 ///
-/// Three lines rather than the two this used to write. The process answers a question
-/// somebody who opens the file has — is that run still there — and the operation
-/// answers the one the next client has, which is what it is waiting for. Neither
-/// stands in for the other, and a claim carrying only the first is why a refusal used
-/// to name a pid.
+/// Three lines. The process answers a question somebody who opens the file has — is
+/// that run still there — and the operation answers the one the next client has,
+/// which is what it is waiting for. Neither stands in for the other: a claim carrying
+/// only the first leaves a refusal naming nothing but a pid.
 fn marker(ctx: &Ctx, doing: &str) -> String {
     format!("{}\n{}\n{doing}", std::process::id(), now(ctx))
 }

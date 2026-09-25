@@ -93,7 +93,7 @@ async fn removing(
     .await;
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     match said.ok() {
-        Some(Outcome::Removed(report)) => Some(report),
+        Some(Outcome::Removal(report)) => Some(report),
         _ => None,
     }
 }
@@ -415,7 +415,7 @@ async fn a_stack_with_no_request_service_counts_nothing_and_asks_nothing() {
     )
     .await;
 
-    let Some(Outcome::Removed(report)) = said.ok() else {
+    let Some(Outcome::Removal(report)) = said.ok() else {
         unreachable!("a stack with no request service still removes the account")
     };
     assert_eq!(
@@ -556,7 +556,7 @@ async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
         )
         .await;
 
-        let Some(Outcome::Removed(report)) = said.ok() else {
+        let Some(Outcome::Removal(report)) = said.ok() else {
             unreachable!("a request service that will not answer does not stop the reading")
         };
         assert!(

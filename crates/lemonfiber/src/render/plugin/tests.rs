@@ -126,10 +126,10 @@ fn a_plugin_that_contributes_nothing_gets_no_heading_for_it() {
 /// What the verdicts were reached against is on the page either way.
 ///
 /// Read here as well as through the binary, because this file is compiled twice
-/// under coverage and a branch taken in only one of the two reads as missed. It
-/// used to be half of the sentence that said the plugin could be installed, which
-/// left the report most likely to send somebody off to look at their own service
-/// as the one that never told them nothing had been asked of it.
+/// under coverage and a branch taken in only one of the two reads as missed. It is
+/// a sentence of its own, not half of the one that says the plugin can be installed,
+/// so the report most likely to send somebody off to look at their own service still
+/// tells them nothing had been asked of it.
 #[test]
 fn the_page_says_what_it_was_against_whichever_answer_it_reaches() {
     let installable = claims(&read(

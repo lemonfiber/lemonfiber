@@ -118,7 +118,7 @@ async fn reissuing(scratch: &str, name: &str, http: Arc<Fake>, rehearsing: bool)
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     Ran {
         invitation: match said.as_ref().ok() {
-            Some(Outcome::Invited(invitation)) => Some(invitation.clone()),
+            Some(Outcome::Invitation(invitation)) => Some(invitation.clone()),
             _ => None,
         },
         refusal: said.err().map(|problem| problem.code.as_str().to_owned()),
@@ -319,7 +319,7 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     let withdrawn = match offered.ok() {
-        Some(Outcome::Invited(invitation)) => invitation.withdrawn,
+        Some(Outcome::Invitation(invitation)) => invitation.withdrawn,
         _ => Vec::new(),
     };
     assert_eq!(
@@ -390,7 +390,7 @@ async fn offering_an_account_to_somebody_reset_says_their_password_went() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     let invitation = match offered.ok() {
-        Some(Outcome::Invited(invitation)) => Some(invitation),
+        Some(Outcome::Invitation(invitation)) => Some(invitation),
         _ => None,
     };
     assert_eq!(

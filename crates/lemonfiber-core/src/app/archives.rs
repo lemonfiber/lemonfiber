@@ -38,7 +38,7 @@ pub struct Listing {
 ///
 /// Returns a [`Problem`] where this run has nowhere it keeps archives, or where
 /// the directory it keeps them in could not be read.
-pub async fn run(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
+pub async fn archives(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
     let archiving = ctx.archives.as_ref().ok_or_else(|| Box::new(nowhere()))?;
     let mut existing = archiving
         .vault

@@ -18,7 +18,7 @@ use crate::config::store;
 use crate::error::{Diagnose, Problem};
 use crate::model::{AlertReport, ExceptionReport};
 
-use super::{AlertAction, Ctx, Outcome};
+use super::{AlertAction, Ctx};
 
 /// What the operator asked to hear about, or the quiet default where they have not
 /// said and where the answer cannot be read.
@@ -55,7 +55,7 @@ pub fn record(ctx: &Ctx, wants: &Wants) -> Result<(), Box<Problem>> {
 /// # Errors
 ///
 /// Where there is nowhere configured to keep the answer, or it cannot be written.
-pub fn hearing(ctx: &Ctx, action: AlertAction) -> Result<Outcome, Box<Problem>> {
+pub fn alerts(ctx: &Ctx, action: AlertAction) -> Result<AlertReport, Box<Problem>> {
     let mut wants = recorded(ctx);
     let changed = match action {
         AlertAction::Show => false,
@@ -70,7 +70,7 @@ pub fn hearing(ctx: &Ctx, action: AlertAction) -> Result<Outcome, Box<Problem>> 
         }
     };
     let preset = Wants::appetite(&wants);
-    Ok(Outcome::Alerts(AlertReport {
+    Ok(AlertReport {
         preset: preset.written().to_owned(),
         means: preset.describe().to_owned(),
         exceptions: wants
@@ -82,7 +82,7 @@ pub fn hearing(ctx: &Ctx, action: AlertAction) -> Result<Outcome, Box<Problem>> 
             .collect(),
         changed,
         rehearsed: ctx.dry_run,
-    }))
+    })
 }
 
 /// Where the answer is kept: beside the environment file, in the configuration

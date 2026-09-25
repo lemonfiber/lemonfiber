@@ -13,11 +13,10 @@
 //! This module is pure — it maps and it rewrites text; it never reaches the tool or
 //! a disk.
 //!
-//! It used to name three templates per service that the tool fetched for itself,
-//! from a registry upstream has since withdrawn — its templates are whole
-//! configurations to be copied now, which is not something a stack can include. So
-//! what each preset asks for is carried in the stack beside the file naming it, and
-//! nothing is fetched while a sync runs. An unpinned repository cloned on every run
+//! Upstream's templates are whole configurations to be copied, which is not something
+//! a stack can include, and the registry that served them is withdrawn. So what each
+//! preset asks for is carried in the stack beside the file naming it, and nothing is
+//! fetched while a sync runs. An unpinned repository cloned on every run
 //! is a pinned image somebody else can break, which is how that went.
 //!
 //! A `- template:` entry, if an operator adds one, is theirs: this touches only the
@@ -30,9 +29,8 @@ use crate::quality::{Preset, Selection};
 /// The file a preset's guidance is shipped in, as `recyclarr.yml` names it.
 ///
 /// One include per preset, holding the quality definition, the profile and the
-/// format groups that preset asks the guides for. It used to be three entries
-/// naming templates the sync tool fetched; upstream withdrew the registry those
-/// were reachable through, so the stack carries them and this names the file.
+/// format groups that preset asks the guides for. The stack carries them, and this
+/// names the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Guidance(&'static str);
 

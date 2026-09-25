@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::{setting_up, SetupAction, ALREADY_SET_UP, NOTHING_TO_RECOVER};
+use super::{setup, SetupAction, ALREADY_SET_UP, NOTHING_TO_RECOVER};
 use crate::alert::Appetite;
 use crate::app::setup::DOES_NOT_APPLY;
 use crate::app::Ctx;
@@ -74,15 +74,12 @@ fn proving(paths: &Paths, validator: Arc<dyn Validator>) -> Ctx {
 
 /// Where a step of the walk left setup, or nothing where it refused.
 async fn walked(ctx: &Ctx, action: SetupAction) -> Option<WizardReport> {
-    setting_up(ctx, action).await.ok()
+    setup(ctx, action).await.ok()
 }
 
 /// Which refusal a step of the walk met, or nothing where it met none.
 async fn refused(ctx: &Ctx, action: SetupAction) -> Option<Code> {
-    setting_up(ctx, action)
-        .await
-        .err()
-        .map(|problem| problem.code)
+    setup(ctx, action).await.err().map(|problem| problem.code)
 }
 
 /// A value that must not be printed back, assembled rather than written out so
@@ -119,7 +116,7 @@ fn all_of_them(root: &Path) -> [Answer; 9] {
 /// Answer every question, one request each, as a surface would.
 async fn answer_everything(ctx: &Ctx, root: &Path) {
     for answer in all_of_them(root) {
-        assert!(setting_up(ctx, SetupAction::Answer(answer)).await.is_ok());
+        assert!(setup(ctx, SetupAction::Answer(answer)).await.is_ok());
     }
 }
 

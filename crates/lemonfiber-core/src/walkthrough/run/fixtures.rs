@@ -160,11 +160,11 @@ impl Fake {
 /// A narrator that keeps what it was told, so a test can read the operator's own view of
 /// the run rather than only its ending.
 #[derive(Default)]
-pub(super) struct Recording {
+pub(super) struct Listening {
     said: std::sync::Mutex<Vec<Line>>,
 }
 
-impl Recording {
+impl Listening {
     /// Every line, in order.
     pub(super) fn lines(&self) -> Vec<Line> {
         self.said
@@ -174,7 +174,7 @@ impl Recording {
     }
 }
 
-impl Narrator for Recording {
+impl Narrator for Listening {
     fn said(&self, line: &Line) {
         if let Ok(mut said) = self.said.lock() {
             said.push(line.clone());

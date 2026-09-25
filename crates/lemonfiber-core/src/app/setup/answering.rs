@@ -66,7 +66,7 @@ pub enum SetupAction {
 /// machine is already set up and nothing is part-way through, where the answer does
 /// not apply on this platform, or where applying failed — the marker left for
 /// recovery in that last case, exactly as a terminal run leaves it.
-pub async fn setting_up(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<Problem>> {
+pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<Problem>> {
     let Some(paths) = layout(ctx) else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };

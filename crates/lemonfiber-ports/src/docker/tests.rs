@@ -87,10 +87,10 @@ fn each_way_of_failing_to_reach_a_remote_engine_keeps_its_own_answer() {
 
 /// A remote host that went quiet is its own answer, not the local engine's.
 ///
-/// The catch-all used to be the local one, and its remedy is to start Docker on
-/// the machine the operator is sitting at — which, for somebody whose laptop is
-/// talking to a server, is running. This is the honest end of the list: it names
-/// the host, quotes the transport, and sends nobody to the wrong machine.
+/// The local answer's remedy is to start Docker on the machine the operator is
+/// sitting at — which, for somebody whose laptop is talking to a server, is running.
+/// This is the end of the list for a remote host: it names the host, quotes the
+/// transport, and sends nobody to the wrong machine.
 #[test]
 fn a_remote_host_that_went_quiet_does_not_borrow_the_local_engines_answer() {
     let problem = Failure::Unanswered {

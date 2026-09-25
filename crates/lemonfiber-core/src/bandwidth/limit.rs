@@ -28,7 +28,7 @@ pub(crate) const UPLOAD_SHARE: u8 = 25;
 
 /// How much of the line something may take.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case", tag = "as", content = "at")]
+#[serde(rename_all = "kebab-case", tag = "as", content = "at")]
 pub enum Limit {
     /// Nothing holds it back.
     Unlimited,
@@ -40,7 +40,7 @@ pub enum Limit {
 
 /// What a limit comes to once it is weighed against a measured line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case", tag = "is", content = "bytes_per_second")]
+#[serde(rename_all = "kebab-case", tag = "is", content = "bytes_per_second")]
 pub enum Resolved {
     /// Nothing holds it back.
     Unlimited,

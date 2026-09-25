@@ -18,8 +18,8 @@ use lemonfiber_fixtures::walking::Walking;
 use lemonfiber_ports::docker::{Health, Lifecycle};
 use lemonfiber_ports::occupancy::Occupant;
 
-use super::uninstalled;
-use crate::app::{Ctx, Outcome, Removing};
+use super::uninstall;
+use crate::app::{Ctx, Removing};
 use crate::config::Settings;
 use crate::ports::filesystem::{Eraser, FsKind, StorageFacts};
 use crate::ports::Runner;
@@ -117,10 +117,7 @@ fn running(lifecycle: Lifecycle, health: Health) -> Ctx {
 
 /// What a run came to, or nothing where it refused.
 async fn answer(ctx: &Ctx, asked: Removing) -> Option<crate::uninstall::Uninstall> {
-    match uninstalled(ctx, asked).await {
-        Ok(Outcome::Uninstall(answered)) => Some(answered),
-        Ok(_) | Err(_) => None,
-    }
+    uninstall(ctx, asked).await.ok()
 }
 
 /// What a reading of one tier found, or nothing where it refused.

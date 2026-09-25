@@ -23,7 +23,7 @@ mod schema;
 pub mod vocabulary;
 
 pub use conforming::Violation;
-pub use error::Error;
+pub use error::Failure;
 pub use refusing::refusals;
 pub use schema::{
     Bind, Capture, Claim, ClaimProbe, Contribution, Criticality, Entry, Expect, Expected,

@@ -23,7 +23,7 @@ use crate::validate::{Credential, Validation};
 
 use proving::Proving;
 
-use super::{Ctx, Outcome, Setting, Waiting};
+use super::{Ctx, Setting, Waiting};
 
 /// What the operator said about this change beyond what the change is.
 ///
@@ -63,7 +63,7 @@ impl Asked {
 ///
 /// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
 /// settings file that could not be read or written.
-pub(crate) async fn configuration(ctx: &Ctx, change: Setting) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn set(ctx: &Ctx, change: Setting) -> Result<ConfigReport, Box<Problem>> {
     // Trimmed on the way in, for the same reason setup trims what is pasted into it:
     // a key copied from a dashboard carries a trailing newline, it authenticates
     // nowhere, and the file format has no way to mean the whitespace deliberately. The
@@ -83,7 +83,7 @@ pub(crate) async fn configuration(ctx: &Ctx, change: Setting) -> Result<Outcome,
 ///
 /// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
 /// settings file that could not be read.
-pub(crate) async fn reading(ctx: &Ctx, key: Option<&str>) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn get(ctx: &Ctx, key: Option<&str>) -> Result<ConfigReport, Box<Problem>> {
     settings(ctx, key, None).await
 }
 
@@ -92,7 +92,7 @@ async fn settings(
     ctx: &Ctx,
     key: Option<&str>,
     change: Option<&Setting>,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<ConfigReport, Box<Problem>> {
     let Some(path) = ctx.settings.env_file.as_deref() else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
@@ -158,13 +158,13 @@ async fn settings(
         })
         .collect();
 
-    Ok(Outcome::Config(ConfigReport {
+    Ok(ConfigReport {
         settings,
         changed,
         rehearsed: ctx.dry_run,
         consequence,
         review,
-    }))
+    })
 }
 
 /// A proposed change, the sentence saying what making it costs, and the settings as

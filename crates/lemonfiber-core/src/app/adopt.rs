@@ -6,7 +6,7 @@
 //! stops nothing, moves nothing, and deletes nothing, so a run that fails or is
 //! abandoned leaves the operator exactly the stack they had.
 //!
-//! The archive comes first, and is the reason this can refuse where it used to only
+//! The archive comes first, and is the reason this can refuse rather than only
 //! write. It covers the existing setup's own host paths, because lemonfiber's layout
 //! holds nothing worth protecting until the takeover has happened — and it is taken
 //! before the project key is recorded, so a capture that fails leaves nothing written

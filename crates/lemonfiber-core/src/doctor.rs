@@ -135,7 +135,7 @@ impl Category {
 /// severity, so a check that could not run can never be mistaken for one that
 /// passed — the dishonesty this whole subsystem exists to prevent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(tag = "outcome", rename_all = "snake_case")]
+#[serde(tag = "outcome", rename_all = "kebab-case")]
 #[schemars(rename = "DoctorVerdict")]
 pub enum Verdict {
     /// Verified working, with the evidence worth showing.
@@ -238,7 +238,7 @@ impl Finding {
 
 /// What a run's findings amount to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Overall {
     /// Everything that ran passed.
     Healthy,

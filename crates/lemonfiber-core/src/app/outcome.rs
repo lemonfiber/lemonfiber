@@ -112,15 +112,15 @@ outcomes! {
     /// Which app to use on which device.
     Clients(crate::clients::Guidance) => CLIENTS,
     /// An account offered to somebody in the house.
-    Invited(crate::model::Invitation) => INVITATION,
+    Invitation(crate::model::Invitation) => INVITATION,
     /// Somebody taken out of the household, or what taking them would cost.
-    Removed(crate::model::HouseholdRemoval) => REMOVAL,
+    Removal(crate::model::HouseholdRemoval) => REMOVAL,
     /// What each service in this stack is for, and what became of the ones that went.
     Catalogue(crate::model::CatalogueReport) => CATALOGUE,
     /// What this stack wires to what, and what nothing fills.
     Wiring(crate::model::WiringReport) => WIRING,
     /// A change of which service fills a capability, and what it costs.
-    Substituted(crate::model::SubstitutionReport) => SUBSTITUTION,
+    Substitution(crate::model::SubstitutionReport) => SUBSTITUTION,
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving) => OUTBOUND,
     /// Every plugin installed on this machine, and what installing one came to.
@@ -136,7 +136,7 @@ outcomes! {
     /// Where the disk stands, where the room went, and what could be got back.
     Space(crate::space::Reckoning) => SPACE,
     /// What letting one completed download go would cost, and what became of it.
-    Letting(crate::space::Letting) => STOP_SEEDING,
+    StopSeeding(crate::space::Letting) => STOP_SEEDING,
     /// How the line is shared, what that costs, and whether the clients keep to it.
     Bandwidth(crate::bandwidth::Sharing) => BANDWIDTH,
     /// What each service is doing.
@@ -160,7 +160,7 @@ outcomes! {
     /// Where a backup archive was written, and what it covers.
     Backup(backup::Report) => BACKUP,
     /// What a support bundle would hold, or where one went.
-    Support(support::Bundle) => BUNDLE,
+    Bundle(support::Bundle) => BUNDLE,
     /// The backup archives this machine has kept.
     Archives(archives::Listing) => ARCHIVES,
     /// What a restore would overwrite, or what it put back.

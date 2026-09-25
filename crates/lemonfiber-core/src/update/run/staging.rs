@@ -210,7 +210,7 @@ async fn moved(
     // The safety net, and a precondition rather than an offer: a capture that will
     // not write is a refusal here, so nothing opens its state on a newer binary
     // without something to go back to.
-    let archive = backup::run(ctx, None)
+    let archive = backup::backup(ctx, None)
         .await
         .map_err(|cause| Box::new(left_down(*cause)))?;
     let (applied, halted) = staged(ctx, manifest, taking).await;

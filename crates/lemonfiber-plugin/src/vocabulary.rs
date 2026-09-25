@@ -93,7 +93,7 @@ pub struct Requirement {
 
 /// Who a probe is asked as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Credential {
     /// Anyone may ask, so it runs against a live service holding nothing.
     None,

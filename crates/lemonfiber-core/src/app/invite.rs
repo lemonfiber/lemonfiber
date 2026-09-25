@@ -31,7 +31,7 @@ mod refusals;
 mod reissuing;
 mod standing;
 
-pub(crate) use reissuing::reissued;
+pub(crate) use reissuing::reissue;
 
 use crate::app::{Allowance, Ctx};
 use crate::invitation::{Offered, HOURS_TO_CLAIM};

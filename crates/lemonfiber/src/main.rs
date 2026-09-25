@@ -270,7 +270,7 @@ async fn main() -> ExitCode {
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
-        Request::Ps { forms } => Command::Ps { forms },
+        Request::Ps { forms } => Command::Status { forms },
         Request::Config { action } => configuration(action),
         Request::Migrate { action } => Command::Migrate(translate::migrating(action.as_ref())),
         Request::Alerts { action } => taken!(translate::alerts(action)),

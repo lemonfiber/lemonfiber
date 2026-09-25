@@ -14,7 +14,7 @@ fn and_theirs() -> Vec<Occupant> {
 #[tokio::test]
 async fn the_media_tier_confirmed_without_its_own_agreement_is_refused() {
     let asked = Removing::surveying(Tier::Media).confirmed(true);
-    let refused = uninstalled(&a_machine(), asked).await;
+    let refused = uninstall(&a_machine(), asked).await;
 
     let problem = refused.err();
     assert_eq!(
@@ -34,7 +34,7 @@ async fn an_agreement_given_for_another_reading_is_refused() {
     let asked = Removing::surveying(Tier::Media)
         .confirmed(true)
         .agreeing(Some("deadbeef".to_owned()));
-    let refused = uninstalled(&a_machine(), asked).await;
+    let refused = uninstall(&a_machine(), asked).await;
 
     assert!(refused.is_err_and(|problem| problem.code == ANOTHER_READING));
 }
@@ -46,7 +46,7 @@ async fn a_stale_agreement_is_refused_on_a_tier_that_did_not_need_one() {
     let asked = Removing::surveying(Tier::Services)
         .confirmed(true)
         .agreeing(Some("deadbeef".to_owned()));
-    let refused = uninstalled(&a_machine(), asked).await;
+    let refused = uninstall(&a_machine(), asked).await;
 
     assert!(refused.is_err_and(|problem| problem.code == ANOTHER_READING));
 }
@@ -436,7 +436,7 @@ async fn the_dispatcher_routes_a_removal_to_the_reading() {
     .await;
 
     assert!(
-        matches!(outcome, Ok(Outcome::Uninstall(_))),
+        matches!(outcome, Ok(crate::app::Outcome::Uninstall(_))),
         "the dispatcher did not answer with a removal"
     );
 }

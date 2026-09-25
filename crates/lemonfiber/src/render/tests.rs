@@ -321,7 +321,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
         }),
         // Nothing gathered, nothing revealed and nothing written: the answer a
         // bare run gives, which is the one with every optional paragraph absent.
-        Outcome::Support(Bundle {
+        Outcome::Bundle(Bundle {
             contents: Contents::default(),
             bytes: 0,
             path: None,
@@ -343,7 +343,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
         Outcome::Archives(Listing {
             archives: vec!["lemonfiber-full-1.tar.gz".to_owned()],
         }),
-        Outcome::Invited(lemonfiber_core::model::Invitation {
+        Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
             address: "http://a-machine.local:8096".to_owned(),
             caution: None,
@@ -354,7 +354,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             linked: lemonfiber_core::model::Linked::Made,
             applied: None,
         }),
-        Outcome::Removed(lemonfiber_core::model::HouseholdRemoval {
+        Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
             name: "ana".to_owned(),
             confirmed: false,
             requests: 1,
@@ -369,7 +369,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
         )),
         // An offer with the cost stated and nothing taken, which is the shape the
         // consequence has to survive being rendered in.
-        Outcome::Letting(lemonfiber_core::space::letting::offering(
+        Outcome::StopSeeding(lemonfiber_core::space::letting::offering(
             lemonfiber_core::space::Candidate {
                 name: "A.Show.S01E01".to_owned(),
                 bytes: 8_000,

@@ -155,7 +155,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::ConfigGet { .. } => reads("config get"),
         Command::ConfigShow => reads("config"),
         Command::History => reads("history"),
-        Command::Ps { .. } => reads("ps"),
+        Command::Status { .. } => reads("ps"),
         Command::Stuck => reads("stuck"),
         Command::FrontDoor => reads("front-door"),
         Command::Explain { .. } => reads("explain"),

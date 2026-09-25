@@ -33,7 +33,7 @@ use crate::error::{Problem, Remedy, Severity, State};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::plugin::{Install, Installed, Installs, Register};
 
-use super::{Ctx, Outcome};
+use super::Ctx;
 
 // Starting what the writing placed, asking it what the manifest said it would
 // answer, and taking it back where it did not. Its own file because the one thing
@@ -127,10 +127,10 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 /// not land, where the plugin's own service would not start, or where the record of
 /// what is installed cannot be written. Every one of those after the first write puts
 /// the install back before it answers.
-pub(crate) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     match action {
-        Asked::Installed => Ok(Outcome::Plugins(Installs {
+        Asked::Installed => Ok(Installs {
             substituted: standing::substituted(
                 held.installed(),
                 &super::targets::chosen_fillers(ctx),
@@ -139,7 +139,7 @@ pub(crate) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Prob
             install: None,
             removal: None,
             update: None,
-        })),
+        }),
         // Boxed, because each carries a whole install's worth of state across its awaits
         // — the stack's checks read twice, a reversal, a record — and every command the
         // dispatcher runs would otherwise be as large as the one that installs.
@@ -181,7 +181,7 @@ pub(crate) async fn asked(ctx: &Ctx, action: &Asked) -> Result<Outcome, Box<Prob
 /// out from under one leaves something Compose will never be asked about again; then
 /// the files go back through the rollback layer, over the journal entries the writing
 /// already made. Nothing here undoes anything itself.
-async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<Problem>> {
+async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Installs, Box<Problem>> {
     let manifest = accepted(path)?;
 
     // One stamp for the run, taken before anything is decided, so the record says it
@@ -271,7 +271,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
     // reader who believes the count over the sentence is the one this is written for.
     let standing = if recorded { after } else { held };
 
-    Ok(Outcome::Plugins(Installs {
+    Ok(Installs {
         removal: None,
         installed: standing.installed().to_vec(),
         install: Some(Box::new(Install {
@@ -287,7 +287,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Outcome, Box<
         })),
         update: None,
         substituted: Vec::new(),
-    }))
+    })
 }
 
 /// The manifest at this path, read and held to everything this build refuses.
@@ -332,7 +332,7 @@ async fn reversing(
     stamp: &str,
 ) -> super::putting_back::Reversal {
     let off = proving::removed(ctx, would, stack).await;
-    let mut back = super::putting_back::reversing(ctx, Some(stamp))
+    let mut back = super::putting_back::undo(ctx, Some(stamp))
         .await
         .unwrap_or_default();
     if !off {

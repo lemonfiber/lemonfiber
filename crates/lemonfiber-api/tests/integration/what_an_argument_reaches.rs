@@ -40,10 +40,10 @@ const CARRIER: &str = "src/actions/asked.rs";
 
 /// What the carrier declares it holds, read off the declaration itself.
 ///
-/// **Read rather than written down here.** This guard used to hold the table below
-/// against a second list typed out beside it, which meant a field added to the carrier
-/// and to neither list was one it stayed green through — the exact failure it is for.
-/// A list compared against another list is a list agreeing with itself.
+/// **Read rather than written down here.** Held against a second list typed out
+/// beside it, a field added to the carrier and to neither list would be one this stays
+/// green through — the exact failure it is for. A list compared against another list
+/// is a list agreeing with itself.
 fn declared() -> Vec<String> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(CARRIER);
     let source = std::fs::read_to_string(&path).unwrap_or_default();

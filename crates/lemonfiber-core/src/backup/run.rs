@@ -32,8 +32,8 @@ const HEADROOM: u64 = 256 * 1024 * 1024;
 
 /// How many backups of each scope are kept before the oldest are pruned.
 ///
-/// Here rather than in the surface that used to say, because it is retention's
-/// policy and not one surface's: a browser and a shell that kept different numbers
+/// Here rather than in a surface, because it is retention's policy and not one
+/// surface's: a browser and a shell that kept different numbers
 /// would prune each other's archives.
 pub(crate) const KEEP: usize = 5;
 
@@ -183,14 +183,14 @@ pub async fn capture(
 ///
 /// Returns a [`Problem`] where the stack is not confirmed stopped, where this run
 /// has nowhere it knows to keep an archive, or for any reason [`capture`] gives.
-pub async fn run(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Problem>> {
+pub async fn backup(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Problem>> {
     quiesced::required(ctx, STILL_RUNNING, "backup").await?;
     behind(ctx, service).await
 }
 
 /// Capture this run's configuration, for a caller that has already stopped the stack.
 ///
-/// The whole of [`run`] except the proving, which is the one part a caller that did the
+/// The whole of [`backup`] except the proving, which is the one part a caller that did the
 /// stopping itself has already done. A removal stops every service as its first step and
 /// then destroys what cannot be made again; asking the engine a second time whether the
 /// stack is down would be asking it about the stop this same run just performed, and on a

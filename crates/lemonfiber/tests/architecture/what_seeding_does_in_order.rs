@@ -27,11 +27,9 @@ use crate::source_tree::{production, sources, workspace_root};
 /// nothing here acts on. Two lists agreeing is what makes either of them mean anything.
 ///
 /// One kind is deferred rather than missing: the book indexer's wiring waits on a live
-/// instance to pin its endpoints against. That exception used to be a constant here,
-/// which made two lists again — this one and the sentence the runtime would have to say
-/// about such a service. It is read from `unsupported.rs` now, which is where the
-/// runtime reads it, so the exception is stated once and a shape that stops being
-/// deferred stops being exempt here by the same edit that makes it speakable.
+/// instance to pin its endpoints against. The exception is read from `unsupported.rs`,
+/// which is where the runtime reads it, so it is stated once and a shape that stops
+/// being deferred stops being exempt here by the same edit that makes it speakable.
 #[test]
 fn every_api_a_service_can_declare_is_acted_on() {
     let deferred_source =

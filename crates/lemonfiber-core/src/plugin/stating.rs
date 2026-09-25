@@ -26,7 +26,7 @@ use super::placing::{Lands, Write};
 
 /// What an install puts at one path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginPuts")]
 pub enum Puts {
     /// A directory brought into being, which is where one service keeps its own

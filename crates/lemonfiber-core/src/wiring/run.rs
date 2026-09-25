@@ -10,11 +10,11 @@
 
 use crate::error::{Problem, Remedy, Severity};
 
+use super::Refused;
 use crate::app::Ctx;
 use crate::error::codes::wire::{CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER};
 use crate::error::Diagnose;
 use crate::model::{SubstitutionReport, WiringReport};
-use crate::wiring::{self, Refused};
 
 /// Read what reaches what, or change one of those links.
 ///
@@ -25,14 +25,14 @@ use crate::wiring::{self, Refused};
 /// # Errors
 ///
 /// Whatever the operation asked for returns.
-pub(crate) fn dispatched(
+pub(crate) fn wiring(
     ctx: &Ctx,
     asked: &crate::app::Linking,
 ) -> Result<crate::app::Outcome, Box<Problem>> {
     match asked {
         crate::app::Linking::Read => listing(ctx).map(crate::app::Outcome::Wiring),
         crate::app::Linking::Fill(filling) => {
-            substituting(ctx, filling).map(crate::app::Outcome::Substituted)
+            substituting(ctx, filling).map(crate::app::Outcome::Substitution)
         }
     }
 }
@@ -55,13 +55,13 @@ fn listing(ctx: &Ctx) -> Result<WiringReport, Box<Problem>> {
     // answer that quietly left a stranger's service out would settle a contest nobody
     // was told about.
     let installed = crate::app::plugins::read(ctx)?;
-    let wired = wiring::settle(
+    let wired = super::settle(
         &manifest,
         installed.installed(),
         &crate::app::targets::chosen_fillers(ctx),
     );
     Ok(WiringReport {
-        unfilled: wiring::unfilled(&wired),
+        unfilled: super::unfilled(&wired),
         wired,
     })
 }
@@ -88,7 +88,7 @@ fn substituting(
 
     let held = crate::app::targets::chosen_fillers(ctx);
     let installed = crate::app::plugins::read(ctx)?;
-    let substitution = wiring::substitute(
+    let substitution = super::substitute(
         &manifest,
         installed.installed(),
         &held,
@@ -117,14 +117,14 @@ fn substituting(
     };
     crate::app::recover::journalled(
         &paths.journal(),
-        &[wiring::recorded(
+        &[super::recorded(
             &substitution,
             previous.as_deref(),
             &ctx.stamp(),
         )],
         ctx.seams.random.as_ref(),
     );
-    if let Err(err) = crate::config::store::set(path, wiring::FILLS_KEY, &substitution.setting) {
+    if let Err(err) = crate::config::store::set(path, super::FILLS_KEY, &substitution.setting) {
         return Err(Box::new(err.problem()));
     }
 

@@ -118,7 +118,7 @@ fn an_invitation_for_nobody_is_refused_by_the_argument_it_lacks() {
 /// checked on the side a browser actually talks to.
 #[test]
 fn an_invitation_reaches_a_browser_under_its_own_name() {
-    let made = Outcome::Invited(Invitation {
+    let made = Outcome::Invitation(Invitation {
         name: "ana".to_owned(),
         address: "http://192.168.1.20:8096".to_owned(),
         caution: None,

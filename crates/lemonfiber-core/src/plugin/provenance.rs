@@ -39,7 +39,7 @@ const P256_POINT: usize = 65;
 
 /// What lemonfiber makes of an image's provenance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(tag = "provenance", rename_all = "lowercase")]
+#[serde(tag = "provenance", rename_all = "kebab-case")]
 pub enum Provenance {
     /// A signature over a payload naming this digest verified against a held key.
     Signed {

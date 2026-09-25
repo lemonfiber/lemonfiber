@@ -1,4 +1,4 @@
-use super::super::fixtures::Recording;
+use super::super::fixtures::Listening;
 use super::Walk;
 use crate::test_support::a_context;
 use crate::walkthrough::Speed;
@@ -20,14 +20,14 @@ const STALLED: Speed = Speed {
 #[test]
 fn a_poll_that_found_the_same_figures_says_them_once() {
     let ctx = a_context().build();
-    let recording = Recording::default();
-    let mut walk = Walk::new(&ctx, &recording);
+    let listening = Listening::default();
+    let mut walk = Walk::new(&ctx, &listening);
 
     for _ in 0..4 {
         walk.say_if_new(STALLED.line());
     }
 
-    let said = recording.lines();
+    let said = listening.lines();
     assert_eq!(said.len(), 1, "four polls that agreed: {said:?}");
 }
 
@@ -38,8 +38,8 @@ fn a_poll_that_found_the_same_figures_says_them_once() {
 #[test]
 fn a_poll_that_found_something_new_says_it() {
     let ctx = a_context().build();
-    let recording = Recording::default();
-    let mut walk = Walk::new(&ctx, &recording);
+    let listening = Listening::default();
+    let mut walk = Walk::new(&ctx, &listening);
 
     walk.say_if_new(STALLED.line());
     walk.say_if_new(
@@ -50,6 +50,6 @@ fn a_poll_that_found_something_new_says_it() {
         .line(),
     );
 
-    let said = recording.lines();
+    let said = listening.lines();
     assert_eq!(said.len(), 2, "a download that started moving: {said:?}");
 }

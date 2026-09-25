@@ -404,10 +404,9 @@ const A_PAGE_RATHER_THAN_AN_ADDRESS: &str = "<html>Sign in to continue</html>";
 
 #[tokio::test]
 async fn a_client_that_reached_a_portal_is_not_a_client_with_no_connectivity() {
-    // The transfer succeeded, so something left the container and a public host
-    // answered it. Read as no connectivity — which is what a non-address answer
-    // used to mean — this is the isolated warning, whose text says "Nothing is
-    // leaking" about a client that has just proven it can reach the internet.
+    // The transfer succeeded, so something left the container and a public host answered
+    // it. Read as no connectivity, this would be the isolated warning, whose text says
+    // "Nothing is leaking" about a client that has just proven it can reach the internet.
     let findings = check(vec![
         Behavior::up("gluetun", Some("185.65.1.1")),
         Behavior::up("qbittorrent", Some(A_PAGE_RATHER_THAN_AN_ADDRESS)),

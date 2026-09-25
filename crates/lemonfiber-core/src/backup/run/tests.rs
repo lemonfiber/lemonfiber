@@ -4,7 +4,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::support::Reporting;
 
 use super::{
-    capture, existing as capture_existing, run, Report, Taking, NOT_MEASURED, NOT_WRITTEN,
+    backup, capture, existing as capture_existing, Report, Taking, NOT_MEASURED, NOT_WRITTEN,
     NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
 };
 use crate::app::fixtures::{keeping, paths, FakeArchive};
@@ -327,7 +327,7 @@ fn a_stopped_run(vault: &Arc<FakeArchive>) -> Ctx {
 
 #[tokio::test]
 async fn a_run_with_nowhere_to_keep_an_archive_refuses_rather_than_guessing_a_path() {
-    let refusal = run(&stopped(), None)
+    let refusal = backup(&stopped(), None)
         .await
         .err()
         .map(|problem| problem.code);
@@ -337,7 +337,7 @@ async fn a_run_with_nowhere_to_keep_an_archive_refuses_rather_than_guessing_a_pa
 #[tokio::test]
 async fn a_capture_of_the_whole_stack_lands_in_the_backups_directory() {
     let vault = Arc::new(FakeArchive::roomy());
-    let report = run(&a_stopped_run(&vault), None)
+    let report = backup(&a_stopped_run(&vault), None)
         .await
         .map_err(|problem| problem.code);
     assert_eq!(report.map(|report| report.scope), Ok(Scope::WholeStack));
@@ -354,7 +354,7 @@ async fn a_capture_of_the_whole_stack_lands_in_the_backups_directory() {
 #[tokio::test]
 async fn a_capture_of_one_service_records_that_scope() {
     let vault = Arc::new(FakeArchive::roomy());
-    let report = run(&a_stopped_run(&vault), Some("sonarr".to_owned()))
+    let report = backup(&a_stopped_run(&vault), Some("sonarr".to_owned()))
         .await
         .map_err(|problem| problem.code);
     assert_eq!(
@@ -367,9 +367,8 @@ async fn a_capture_of_one_service_records_that_scope() {
 
 #[tokio::test]
 async fn a_capture_is_refused_while_the_services_may_be_writing() {
-    // The rule the command line used to keep for itself: a copy of a live
-    // database is the corruption a backup exists to prevent, so a browser
-    // cannot ask for the capture a shell was never allowed either.
+    // A copy of a live database is the corruption a backup exists to prevent, so
+    // a browser cannot ask for the capture a shell is not allowed either.
     let vault = Arc::new(FakeArchive::roomy());
     let running = crate::test_support::a_context()
         .engine(Arc::new(Reporting::holding(
@@ -378,7 +377,7 @@ async fn a_capture_is_refused_while_the_services_may_be_writing() {
             Health::Healthy,
         )))
         .build();
-    let refusal = run(&keeping(running, &vault), None)
+    let refusal = backup(&keeping(running, &vault), None)
         .await
         .err()
         .map(|problem| problem.code);

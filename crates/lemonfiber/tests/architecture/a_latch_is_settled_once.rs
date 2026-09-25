@@ -8,7 +8,7 @@
 //! happens to introduce. Nothing reports it; the feature simply stops working for
 //! that run.
 //!
-//! One of them was written that way once. Only a function that says it settles may.
+//! Only a function that says it settles may.
 
 use crate::source_tree::{production, sources};
 
@@ -21,8 +21,7 @@ use crate::source_tree::{production, sources};
 /// in whatever order some future caller happened to introduce. Nothing reports that;
 /// the feature simply stops working for that run.
 ///
-/// One of them was written that way and this is why it is pinned. Only a function
-/// that says it settles may settle.
+/// Only a function that says it settles may settle.
 #[test]
 fn reading_a_latch_never_settles_it() {
     let mut settling: Vec<String> = Vec::new();

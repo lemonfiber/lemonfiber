@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{run, Listing, NOT_LISTED, NOWHERE_KEPT};
+use super::{archives, Listing, NOT_LISTED, NOWHERE_KEPT};
 use crate::app::fixtures::FakeArchive;
 use crate::test_support::a_context;
 
@@ -13,7 +13,7 @@ fn keeping(vault: &Arc<FakeArchive>) -> crate::app::Ctx {
 async fn a_run_with_nowhere_to_look_says_so_rather_than_listing_none() {
     // Absent archives and an empty listing are different answers: one is "this
     // machine keeps none" and the other is "this run cannot tell".
-    let listed = run(&a_context().build()).await;
+    let listed = archives(&a_context().build()).await;
     assert_eq!(
         listed.err().map(|problem| problem.code),
         Some(NOWHERE_KEPT),
@@ -24,7 +24,7 @@ async fn a_run_with_nowhere_to_look_says_so_rather_than_listing_none() {
 #[tokio::test]
 async fn a_directory_that_will_not_be_read_is_a_refusal_and_not_an_empty_list() {
     let vault = Arc::new(FakeArchive::unlistable());
-    let listed = run(&keeping(&vault)).await;
+    let listed = archives(&keeping(&vault)).await;
     let problem = listed.err();
     assert_eq!(
         problem.as_ref().map(|problem| problem.code),
@@ -44,7 +44,7 @@ async fn the_archives_are_listed_newest_first() {
         ("lemonfiber-full-1.tar.gz", "00000000000000000001"),
         ("lemonfiber-full-3.tar.gz", "00000000000000000003"),
     ]));
-    let listed = run(&keeping(&vault)).await.ok();
+    let listed = archives(&keeping(&vault)).await.ok();
     assert_eq!(
         listed,
         Some(Listing {
@@ -63,7 +63,7 @@ async fn two_archives_taken_in_the_same_second_are_listed_the_same_way_twice() {
         ("lemonfiber-sonarr-1.tar.gz", "00000000000000000001"),
         ("lemonfiber-full-1.tar.gz", "00000000000000000001"),
     ]));
-    let listed = run(&keeping(&vault)).await.ok();
+    let listed = archives(&keeping(&vault)).await.ok();
     assert_eq!(
         listed.map(|listing| listing.archives),
         Some(vec![
@@ -76,7 +76,7 @@ async fn two_archives_taken_in_the_same_second_are_listed_the_same_way_twice() {
 #[tokio::test]
 async fn a_machine_that_has_kept_nothing_says_it_has_kept_nothing() {
     let vault = Arc::new(FakeArchive::roomy());
-    let listed = run(&keeping(&vault)).await.ok();
+    let listed = archives(&keeping(&vault)).await.ok();
     assert_eq!(
         listed,
         Some(Listing {

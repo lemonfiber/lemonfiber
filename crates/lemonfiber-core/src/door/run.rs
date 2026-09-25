@@ -128,11 +128,10 @@ const NOWHERE: &str = "There is no front door. Nothing this stack runs for the h
 /// Where the door stands, from what it is, whether it is answering, and whether
 /// anything here can say where it would be reached.
 ///
-/// The address is part of the answer rather than a caveat appended to it. This
-/// used to report `established` — which the feature defines as running *and*
-/// reachable — for a door that was answering on a machine with no address to
-/// arrive at, and say the rest in prose. Every consumer that reads the state
-/// rather than the sentence was told the door was fine.
+/// The address is part of the answer rather than a caveat appended to it.
+/// `established` means running *and* reachable, so a door answering on a machine
+/// with no address to arrive at is not it: a consumer that reads the state rather
+/// than the sentence would be told the door was fine.
 const fn standing(faces: Facing, answering: bool, addressed: bool) -> Standing {
     if !answering {
         return Standing::Unreachable;

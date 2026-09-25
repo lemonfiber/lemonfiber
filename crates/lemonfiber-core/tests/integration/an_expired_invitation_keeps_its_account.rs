@@ -7,12 +7,10 @@
 //! are indistinguishable in every list either appears in, and only one of them is the
 //! person anything else in the stack is talking about.
 //!
-//! What had to change to make that possible is small and was deliberate the other way:
-//! the sweep withdraws invitations nobody claimed, withdrawing means removing the
-//! account, and the reader that finds "somebody already here" used to skip anybody about
-//! to be swept. Offering again therefore meant deleting and rebuilding. It does not now —
-//! an invitation is dated by the record of a password moving off the account, and there
-//! is one to write whether or not there was a password to take.
+//! The sweep withdraws invitations nobody claimed, and withdrawing means removing the
+//! account; offering again does not mean deleting and rebuilding, because an invitation
+//! is dated by the record of a password moving off the account, and there is one to
+//! write whether or not there was a password to take.
 //!
 //! Driven through `dispatch` as every surface reaches it, because the app layer is
 //! compiled twice — once with its in-crate tests and once as the library these binaries
@@ -52,7 +50,8 @@ const REDATE: &str = "/Users/9/Password";
 /// Where a second account under the same name would be asked for.
 const NEW_ACCOUNT: &str = "/Users/New";
 
-/// A media server holding both expired invitations, answering the re-dating with `redate`.
+/// A media server holding both expired invitations, answering the re-dating with
+/// `redate`.
 fn a_server(redate: Answer) -> Arc<Fake> {
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     Fake::by_path_in_turn(vec![
@@ -156,7 +155,7 @@ async fn offering(scratch: &str, name: &str, http: Arc<Fake>, rehearsing: bool) 
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     Ran {
         invitation: match said.as_ref().ok() {
-            Some(Outcome::Invited(invitation)) => Some(invitation.clone()),
+            Some(Outcome::Invitation(invitation)) => Some(invitation.clone()),
             _ => None,
         },
         refusal: said.err().map(|problem| problem.code.as_str().to_owned()),

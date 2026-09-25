@@ -348,9 +348,9 @@ pub fn stack() -> Manifest {
 /// What the VPN check is asked, with everything a test does not vary already answered.
 ///
 /// The carried stack, both protocols, one IP echo, no port forwarding configured, no
-/// client port, and the disruptive checks off. Three helpers used to cover the three
-/// axes anyone had needed, and every test needing a fourth wrote the whole `Asked` out
-/// again — fourteen of them did, which is fourteen places a new field would land.
+/// client port, and the disruptive checks off. One builder rather than a helper per
+/// axis, so a test that varies something new names it here instead of writing the
+/// whole `Asked` out again.
 pub struct Asking {
     engine: Arc<Fake>,
     manifest: Manifest,

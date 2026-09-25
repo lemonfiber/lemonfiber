@@ -50,7 +50,7 @@ use crate::ports::http::{self, Http, Method};
 ///
 /// Nothing is returned for a plugin that contributes nothing, and nothing at all for no
 /// plugins — which is what makes a run after a plugin is removed the same run as one on
-/// a build that never saw it, rather than one with a gap where it used to be.
+/// a build that never saw it, rather than one with a gap where the plugin was.
 #[must_use]
 pub fn declared(
     installed: &Installed,

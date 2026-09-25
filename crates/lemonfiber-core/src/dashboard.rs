@@ -52,7 +52,7 @@ use crate::health::{Reach, Summary};
 /// a dashboard that simply stopped polling look identical only if the code lets
 /// them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case", tag = "reading", content = "value")]
+#[serde(rename_all = "kebab-case", tag = "reading", content = "value")]
 #[schemars(rename = "DashboardReading")]
 pub enum Reading<T> {
     /// The source answered this refresh with a value — which may legitimately be
@@ -108,7 +108,7 @@ impl<T: Clone> Reading<T> {
 /// in its own words, rather than showing stale data as current or blank data as
 /// zero — and the panels beside it stay live.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case", tag = "panel", content = "data")]
+#[serde(rename_all = "kebab-case", tag = "panel", content = "data")]
 #[schemars(rename = "Panel{T}")]
 pub enum Panel<T> {
     /// The source answered; here is the panel.
@@ -139,7 +139,7 @@ impl<T> Panel<T> {
 /// Which protocol a transfer is moving over, since the same download reads
 /// differently on each — a Usenet download has no peers, a torrent has no server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "DashboardProtocol")]
 pub enum Protocol {
     /// A Usenet download.
@@ -179,7 +179,7 @@ pub struct Queue {
 /// Whether imports are hardlinking or copying — the difference between an import
 /// that is free and one that doubles the disk it uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Hardlink {
     /// Imports hardlink, as they should.
     Linking,

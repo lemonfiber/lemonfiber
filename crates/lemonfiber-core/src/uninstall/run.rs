@@ -28,7 +28,7 @@ use crate::uninstall::{
 };
 
 use crate::app::command::Removing;
-use crate::app::{Ctx, Outcome};
+use crate::app::Ctx;
 
 /// What a removal would come to, or what it came to.
 ///
@@ -38,7 +38,7 @@ use crate::app::{Ctx, Outcome};
 /// an agreement, or where an agreement names a reading that is not the one standing
 /// now. Nothing else here refuses: a machine too broken to read is a machine this
 /// still has to be able to leave.
-pub(crate) async fn uninstalled(ctx: &Ctx, asked: Removing) -> Result<Outcome, Box<Problem>> {
+pub(crate) async fn uninstall(ctx: &Ctx, asked: Removing) -> Result<Uninstall, Box<Problem>> {
     let manifest = survey(ctx, asked.tier).await;
 
     if !asked.goes_ahead() {
@@ -58,8 +58,8 @@ pub(crate) async fn uninstalled(ctx: &Ctx, asked: Removing) -> Result<Outcome, B
 }
 
 /// The manifest and what became of it, as one answer.
-fn answered(manifest: Manifest, removal: Removal) -> Outcome {
-    Outcome::Uninstall(Uninstall { manifest, removal })
+fn answered(manifest: Manifest, removal: Removal) -> Uninstall {
+    Uninstall { manifest, removal }
 }
 
 /// Whether this run holds what it takes to act.
@@ -122,11 +122,10 @@ async fn survey(ctx: &Ctx, tier: Tier) -> Manifest {
 
 /// What is said about the backup taken before anything that cannot be made again goes.
 ///
-/// A statement rather than the advice it used to be. Telling somebody to run `lemonfiber
-/// backup` first put the one step that makes a removal survivable on the far side of a
-/// sentence they had to read, agree with and act on — and the run went ahead either way.
-/// It is taken now, after the stop and before the destruction, and a capture that fails
-/// stops the removal.
+/// A statement rather than advice. Telling somebody to run `lemonfiber backup` first
+/// would put the one step that makes a removal survivable on the far side of a
+/// sentence they had to read, agree with and act on. It is taken after the stop and
+/// before the destruction, and a capture that fails stops the removal.
 const BACKUP: &str = "A backup is taken before any of this goes — after the services stop \
      and before anything is removed — so this machine can be set up like it is now again. \
      `lemonfiber restore` puts it back, which is a great deal less work than answering \

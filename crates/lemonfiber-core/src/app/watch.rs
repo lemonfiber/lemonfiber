@@ -19,7 +19,7 @@ use crate::ports::filesystem::{Presence, Volume};
 use crate::stack::compose::Action;
 
 use super::engine::{invocation, lifecycle};
-use super::{Ctx, Outcome};
+use super::Ctx;
 use crate::error::codes::watch::{ALREADY_GONE, NOTHING_TO_WATCH};
 
 /// How often a watch re-checks that the data root is still there.
@@ -133,7 +133,7 @@ pub async fn supervise(
     // refusing to report the loss at all.
     let stopped = matches!(
         lifecycle(ctx, forms, &Action::Stop(Vec::new())).await,
-        Ok(Outcome::Lifecycle(report)) if report.status == Some(0)
+        Ok(report) if report.status == Some(0)
     );
 
     Ok(SupervisionReport {

@@ -140,8 +140,8 @@ pub(crate) const fn bare_run(interactive: bool) -> Bare {
 /// hold the conversation across.
 pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> ExitCode {
     // Before anything is read, because every branch below this one leads somewhere
-    // that applies answers — including the unfinished-setup branch, which used to be
-    // taken first and walked a rehearsal straight into writing settings.
+    // that applies answers — including the unfinished-setup branch, which would walk
+    // a rehearsal straight into writing settings.
     if ctx.dry_run {
         return nothing_to_rehearse();
     }

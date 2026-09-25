@@ -1,9 +1,8 @@
 //! Everything this product prints, and the one place it decides how.
 //!
-//! Output used to leave through thirty-odd `println!` calls and a report renderer,
-//! which meant a question about *how* something is shown had thirty-odd answers —
-//! or, in practice, none. `NO_COLOR` had to be threaded to the one place that used
-//! colour; the next such question would have been threaded somewhere else again.
+//! Output scattered across `println!` calls would give a question about *how* something
+//! is shown as many answers as there are calls — or, in practice, none. `NO_COLOR` and
+//! every question like it are answered here, once.
 //!
 //! So every line goes out through here, and questions about rendering get asked
 //! once. Today there is one: whether this terminal can show more than ASCII.
