@@ -114,6 +114,7 @@ fn carries_agreement(command: &Command) -> bool {
             | Command::Forget { confirm: true }
             | Command::Space { confirm: true }
             | Command::Remove { confirm: true, .. }
+            | Command::Invite { confirm: true, .. }
             | Command::Restore {
                 consent: RestoreConsent::Given { .. } | RestoreConsent::Standing,
                 ..

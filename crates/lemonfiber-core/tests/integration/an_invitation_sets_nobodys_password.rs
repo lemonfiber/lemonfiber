@@ -157,6 +157,7 @@ fn both_ways_an_account_becomes_claimable() -> Vec<(Command, Arc<Fake>)> {
             Command::Invite {
                 name: "ana".to_owned(),
                 allowance: Allowance::default(),
+                confirm: true,
             },
             a_server_holding_nobody(),
         ),
@@ -198,6 +199,7 @@ async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         a_server_holding_nobody(),
     )
@@ -219,6 +221,7 @@ async fn allowing(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
                 age_limit: Some(12),
                 unrated: None,
             },
+            confirm: true,
         },
         a_server_holding_nobody(),
     )

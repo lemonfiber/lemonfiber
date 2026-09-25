@@ -240,6 +240,7 @@ fn an_invitation_carries_what_was_chosen_as_one_allowance() {
                 age_limit: Some(12),
                 unrated: Some(Unrated::HeldBack),
             },
+            confirm: true,
         }
     );
 }

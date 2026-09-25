@@ -184,6 +184,7 @@ async fn driving(
         Command::Invite {
             name: "ana".to_owned(),
             allowance,
+            confirm: true,
         },
         &ctx,
     )

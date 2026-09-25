@@ -312,6 +312,7 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
         Command::Invite {
             name: "cy".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -383,6 +384,7 @@ async fn offering_an_account_to_somebody_reset_says_their_password_went() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )

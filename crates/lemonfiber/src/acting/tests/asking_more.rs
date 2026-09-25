@@ -73,11 +73,26 @@ fn an_invitation_is_asked_which_libraries_and_how_far_up_the_ratings() {
         "{unrated}"
     );
     assert!(unrated.contains("invisible"), "{unrated}");
-    acting.pressed(&Press::Accept);
+
+    // What it would grant is asked of the core before anything is made: the
+    // offer goes out unconfirmed, and what came back is what the yes is under.
+    let offered = |confirm| Command::Invite {
+        name: "ana".to_owned(),
+        allowance: Allowance {
+            libraries: vec!["Films".to_owned()],
+            age_limit: Some(12),
+            unrated: Some(lemonfiber_core::ports::service::Unrated::HeldBack),
+        },
+        confirm,
+    };
+    assert_eq!(
+        acting.pressed(&Press::Accept),
+        Wanted::Carry(offered(false))
+    );
+    acting.came_to(Ok(Outcome::Invitation(an_offer())));
 
     // The question says all four, in the words a household read says the same
-    // facts in. Nothing has been sent yet: an invitation is one of the errands
-    // whose yes is the whole of the agreement.
+    // facts in, above what the core said the invitation would be.
     let asked = showing(&acting);
     assert!(asked.contains("ana"), "{asked}");
     assert!(asked.contains("Films"), "{asked}");
@@ -85,15 +100,23 @@ fn an_invitation_is_asked_which_libraries_and_how_far_up_the_ratings() {
 
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Invite {
-            name: "ana".to_owned(),
-            allowance: Allowance {
-                libraries: vec!["Films".to_owned()],
-                age_limit: Some(12),
-                unrated: Some(lemonfiber_core::ports::service::Unrated::HeldBack),
-            },
-        })
+        Wanted::Carry(offered(true))
     );
+}
+
+/// What an invitation would be, as the run that makes nothing answers.
+fn an_offer() -> lemonfiber_core::model::Invitation {
+    lemonfiber_core::model::Invitation {
+        name: "ana".to_owned(),
+        address: "http://192.168.1.20:8096".to_owned(),
+        caution: None,
+        hours: 48,
+        withdrawn: Vec::new(),
+        rehearsed: true,
+        standing: lemonfiber_core::model::InvitationStanding::Made,
+        linked: lemonfiber_core::model::Linked::NotTried,
+        applied: None,
+    }
 }
 
 /// A bundle is asked what it is to hold: how much log, on a line, and what becomes

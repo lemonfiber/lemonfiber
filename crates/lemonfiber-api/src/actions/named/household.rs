@@ -107,7 +107,11 @@ fn about_a_person(
         unrated: unrated(allowance.unrated.as_deref())?,
     };
     match action {
-        "invite" => Ok(Command::Invite { name, allowance }),
+        "invite" => Ok(Command::Invite {
+            name,
+            allowance,
+            confirm,
+        }),
         "reissue" => Ok(Command::Reissue { name }),
         _ => Ok(Command::Remove { name, confirm }),
     }

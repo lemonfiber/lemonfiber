@@ -163,6 +163,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             Command::Invite {
                 name: "ana".to_owned(),
                 allowance: lemonfiber_core::app::Allowance::default(),
+                confirm: true,
             },
         ),
         (

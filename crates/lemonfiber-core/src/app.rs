@@ -122,6 +122,24 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcom
         .map(Outcome::Lifecycle)
 }
 
+/// Restart what the forms hold, or the services named within them.
+///
+/// Beside the table because its row, spelled out, is longer than one line.
+async fn restarted(
+    ctx: &Ctx,
+    forms: &[String],
+    services: Vec<String>,
+) -> Result<Outcome, Box<Problem>> {
+    lifecycle(ctx, forms, Action::Restart(services)).await
+}
+
+/// Upgrade existing content to the chosen preset, or state what that would cost.
+///
+/// Beside the table for the reason [`restarted`] is.
+async fn upgraded(ctx: &Ctx, confirm: bool) -> Result<Outcome, Box<Problem>> {
+    upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
+}
+
 /// Take the stack down, having waited for its downloads first where that was asked.
 ///
 /// Beside the table because its row, spelled out, is longer than one line.
@@ -162,8 +180,13 @@ async fn inventoried(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> 
 /// given straight along in one line, and an invitation carries three things. Spelling
 /// them out in the table would make the request this file does least with the longest
 /// arm in it.
-async fn invited(ctx: &Ctx, name: String, allowance: Allowance) -> Result<Outcome, Box<Problem>> {
-    invite::offer(ctx, name, allowance)
+async fn invited(
+    ctx: &Ctx,
+    name: String,
+    allowance: Allowance,
+    confirm: bool,
+) -> Result<Outcome, Box<Problem>> {
+    invite::offer(ctx, name, allowance, confirm)
         .await
         .map(Outcome::Invitation)
 }
@@ -371,9 +394,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Down { forms, wait } => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
-        Command::Restart { forms, services } => {
-            lifecycle(ctx, &forms, Action::Restart(services)).await
-        }
+        Command::Restart { forms, services } => restarted(ctx, &forms, services).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),
@@ -409,16 +430,18 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Clients => Ok(Outcome::Clients(crate::clients::guidance(
             quality::straining(ctx),
         ))),
-        Command::Invite { name, allowance } => invited(ctx, name, allowance).await,
+        Command::Invite {
+            name,
+            allowance: to,
+            confirm,
+        } => invited(ctx, name, to, confirm).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
         Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Wiring(asked) => wiring::wiring(ctx, &asked),
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
-        Command::QualityUpgrade { confirm } => {
-            upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
-        }
+        Command::QualityUpgrade { confirm } => upgraded(ctx, confirm).await,
         Command::Status { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
         Command::Doctor {
             narrowing,

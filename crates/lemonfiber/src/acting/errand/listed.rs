@@ -47,7 +47,9 @@ static AFTER: &[Errand] = &[
         asks: "Invite",
         needs: Needs::Invitation("Who it is for, as they will sign in"),
         accepts: None,
-        going: Going::Once,
+        // Agreed: what the invitation would grant, and for how long, is said before the
+        // account exists, and the yes is what makes it.
+        going: Going::Agreed,
     },
     Errand {
         name: "a password somebody can set again",

@@ -341,6 +341,7 @@ fn always_reported() -> Vec<Command> {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: crate::app::Allowance::default(),
+            confirm: true,
         },
         Command::Reissue {
             name: "ana".to_owned(),

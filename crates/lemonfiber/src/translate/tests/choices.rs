@@ -242,6 +242,7 @@ fn reaching(unrated: Option<Unrated>) -> Command {
             age_limit: Some(12),
             unrated,
         },
+        confirm: true,
     }
 }
 

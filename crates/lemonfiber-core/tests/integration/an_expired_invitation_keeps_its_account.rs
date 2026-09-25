@@ -147,6 +147,7 @@ async fn offering(scratch: &str, name: &str, http: Arc<Fake>, rehearsing: bool) 
         Command::Invite {
             name: name.to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
