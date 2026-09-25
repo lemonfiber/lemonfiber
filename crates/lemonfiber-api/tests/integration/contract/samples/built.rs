@@ -513,6 +513,7 @@ pub(super) fn a_word() -> Term {
         short: "Search engines that find what you are looking for.",
         deep: Some("An indexer keeps track of what has been posted and where."),
         also_called: &["search provider"],
+        forms: &["indexed"],
     }
 }
 

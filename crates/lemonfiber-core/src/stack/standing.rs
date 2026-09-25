@@ -203,7 +203,7 @@ pub(crate) fn needed_by(
 ///
 /// In the stack's order. `running` is a survey of the whole stack.
 #[must_use]
-pub fn brought(
+pub(crate) fn brought(
     manifest: &Manifest,
     protocols: Protocols,
     running: &[Service],
@@ -234,7 +234,7 @@ pub fn brought(
 ///
 /// A profile two of those forms both left out is one answer naming both forms, not two.
 #[must_use]
-pub fn left_out(manifest: &Manifest, brought: &[(String, Plan)]) -> Vec<Filtered> {
+pub(crate) fn left_out(manifest: &Manifest, brought: &[(String, Plan)]) -> Vec<Filtered> {
     let mut dropped: Vec<Dropped> = Vec::new();
     for out in brought.iter().flat_map(|(_, plan)| &plan.dropped) {
         if !dropped.contains(out) {

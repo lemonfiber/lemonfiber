@@ -87,7 +87,11 @@ pub struct Footprint {
 /// `forms` is read against the manifest rather than trusted: a form that asked for a
 /// service is one whose declared closure holds its profile.
 #[must_use]
-pub fn filtered(manifest: &Manifest, dropped: &[Dropped], forms: &[String]) -> Vec<Filtered> {
+pub(crate) fn filtered(
+    manifest: &Manifest,
+    dropped: &[Dropped],
+    forms: &[String],
+) -> Vec<Filtered> {
     manifest
         .services
         .iter()

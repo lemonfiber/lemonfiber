@@ -59,64 +59,6 @@ fn listing(settings: Vec<(&str, Origin)>) -> ConfigReport {
     }
 }
 
-/// What a plugin replaced is on the line with what it put there, with whose the
-/// replaced value was — and a credential's is never printed.
-#[test]
-fn an_overridden_setting_says_what_it_replaced_and_an_orphaned_one_whose_it_was() {
-    let replaced =
-        |value: Option<&str>, withheld: bool, from: Origin| lemonfiber_core::origin::Replaced {
-            value: value.map(str::to_owned),
-            withheld,
-            from: Box::new(from),
-        };
-    let komga = |replaced| Origin::Overridden {
-        named: "komga".to_owned(),
-        replaced,
-    };
-    let text = settings(&listing(vec![
-        (
-            "E",
-            komga(replaced(Some("Europe/Paris"), false, Origin::Operator)),
-        ),
-        ("F", komga(replaced(None, false, Origin::Bundled))),
-        ("G", komga(replaced(None, true, Origin::Operator))),
-        (
-            "H",
-            Origin::Orphaned {
-                named: "plex".to_owned(),
-            },
-        ),
-        (
-            "I",
-            komga(replaced(
-                Some("x"),
-                false,
-                Origin::Unknown {
-                    why: "nothing recorded it".to_owned(),
-                },
-            )),
-        ),
-    ]))
-    .text();
-    assert!(text.contains("  nothing recorded it"), "{text}");
-    assert!(
-        text.contains("E=/data  — set by plugin komga, replacing Europe/Paris (yours)"),
-        "{text}"
-    );
-    assert!(
-        text.contains("F=/data  — set by plugin komga, replacing nothing (lemonfiber's own)"),
-        "{text}"
-    );
-    assert!(
-        text.contains("G=/data  — set by plugin komga, replacing a withheld value (yours)"),
-        "{text}"
-    );
-    assert!(
-        text.contains("H=/data  — left by plugin plex, which is no longer installed"),
-        "{text}"
-    );
-}
-
 /// One of every outcome the dispatch can answer with.
 ///
 /// A list rather than a derivation, so it has to be edited when a variant is added

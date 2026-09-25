@@ -1,8 +1,8 @@
 use lemonfiber_manifest::Manifest;
 
 use super::{
-    distance, everything, nearest, resolve, Diagnose, Dropped, Failure, Footprint, Plan,
-    Protocol, Protocols,
+    distance, everything, nearest, resolve, Diagnose, Dropped, Failure, Footprint, Plan, Protocol,
+    Protocols,
 };
 use crate::error::{Severity, State};
 

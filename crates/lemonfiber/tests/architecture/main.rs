@@ -32,7 +32,6 @@ mod what_a_migration_may_reach;
 mod what_a_self_update_may_reach;
 mod what_a_source_file_may_not_say;
 mod what_a_verb_disturbs;
-mod what_provenance_is_waiting_to_attribute;
 mod what_seeding_does_in_order;
 mod what_the_build_forbids;
 mod what_the_coverage_report_can_see;

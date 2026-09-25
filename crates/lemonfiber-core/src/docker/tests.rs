@@ -231,8 +231,7 @@ fn only_the_states_an_operator_must_act_on_ask_for_attention() {
 #[test]
 fn a_service_that_was_never_started_is_absent_rather_than_missing_from_the_report() {
     let profiles = ["media".to_owned()];
-    let surveyed =
-        manifest().map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()));
+    let surveyed = manifest().map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()));
 
     assert_eq!(
         surveyed.as_ref().map(|services| services
