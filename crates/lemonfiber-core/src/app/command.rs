@@ -308,6 +308,9 @@ pub enum Command {
         name: String,
         /// What the account is to let them watch.
         allowance: Allowance,
+        /// Make the account, having seen what it grants. Unconfirmed, what it would
+        /// grant is said and nothing is made.
+        confirm: bool,
     },
     /// Put somebody's account back to having no password, so they can claim it again.
     ///

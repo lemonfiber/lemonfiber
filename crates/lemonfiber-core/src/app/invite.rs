@@ -49,6 +49,11 @@ use standing::{already_here, has_run_out, held, standing_of, take_back, Held};
 /// long as it takes anybody to remember, and the person most likely to be given a limit
 /// is a child who has been handed the address already.
 ///
+/// Unconfirmed, it is the rehearsal: what the invitation would grant and for how long,
+/// with nothing made and nothing taken back. What is being decided is what the person
+/// will be able to see, so it is shown before the account exists rather than found
+/// out afterwards from what they can see.
+///
 /// # Errors
 ///
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server
@@ -58,6 +63,7 @@ pub(crate) async fn offer(
     ctx: &Ctx,
     name: String,
     allowance: Allowance,
+    confirm: bool,
 ) -> Result<Invitation, Box<crate::error::Problem>> {
     // Trimmed, because the media server keeps the spaces and treats the result as a
     // different person: offering `ana ` beside `ana` makes a second account that
@@ -108,7 +114,7 @@ pub(crate) async fn offer(
     // would happen, because every part of the answer is known before anything is
     // written: who it is for, the address, what has run out, and what is already
     // there under that name.
-    if ctx.dry_run {
+    if ctx.dry_run || !confirm {
         return Ok(Invitation {
             name: already.map_or(name, |member| member.name),
             address: reachable.url,

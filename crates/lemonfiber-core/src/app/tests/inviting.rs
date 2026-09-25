@@ -176,6 +176,7 @@ async fn offering_an_account_hands_back_one_address_and_a_name() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -224,6 +225,7 @@ async fn a_machine_with_no_address_makes_no_account_and_says_so() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -261,6 +263,7 @@ async fn offering(
         Command::Invite {
             name: name.to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -466,6 +469,7 @@ async fn an_invitation_nobody_claimed_is_taken_back_and_named() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -486,7 +490,21 @@ async fn an_invitation_nobody_claimed_is_taken_back_and_named() {
 /// like a rehearsal is exactly what a run that wrote anyway would also print.
 #[tokio::test]
 async fn a_rehearsed_invitation_writes_nothing_to_the_media_server() {
-    let env = recorded_admin("rehearsal");
+    offered_without_writing("rehearsal", true, true).await;
+}
+
+/// An invitation nobody has confirmed is the offer, and makes nothing either: what is
+/// being decided is what the person will be able to see, so it is said before the
+/// account exists.
+#[tokio::test]
+async fn an_unconfirmed_invitation_writes_nothing_to_the_media_server() {
+    offered_without_writing("unconfirmed", false, false).await;
+}
+
+/// An invitation asked for one way or the other that must leave the household as it
+/// was, and still say what it would do.
+async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
+    let env = recorded_admin(named);
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     let http = Fake::by_path_in_turn(vec![
         (
@@ -529,13 +547,14 @@ async fn a_rehearsed_invitation_writes_nothing_to_the_media_server() {
             ..Settings::default()
         })
         .build();
-    context.dry_run = true;
+    context.dry_run = dry_run;
     let ctx = context.with_http(http);
 
     let made = dispatch(
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm,
         },
         &ctx,
     )

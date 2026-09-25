@@ -108,6 +108,7 @@ async fn an_invitation_carries_one_address_and_the_name_to_sign_in_as() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -141,6 +142,7 @@ async fn the_request_service_is_told_about_everybody_and_not_only_the_new_accoun
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -181,6 +183,7 @@ async fn an_invitation_stands_when_the_request_service_will_not_answer() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -218,6 +221,7 @@ async fn somebody_already_here_is_named_once() {
         Command::Invite {
             name: "owner".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -286,6 +290,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -325,6 +330,7 @@ async fn a_refused_session_leaves_the_invitation_standing_too() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -356,6 +362,7 @@ async fn a_rehearsal_tells_the_request_service_nothing() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -385,6 +392,7 @@ async fn an_invitation_serialises_under_its_own_name() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )

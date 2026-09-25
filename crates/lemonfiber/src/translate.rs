@@ -65,6 +65,7 @@ pub(crate) fn bundling(asked: Asked) -> Command {
 pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
     Command::Invite {
         name,
+        confirm: true,
         allowance: Allowance {
             libraries: allowance.libraries,
             age_limit: allowance.age_limit,

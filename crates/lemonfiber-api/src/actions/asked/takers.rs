@@ -120,6 +120,7 @@ pub const TAKES_FORMS: &[&str] = &[
 pub const TAKES_AGREEMENT: &[&str] = &[
     "config-set",
     "forget",
+    "invite",
     "uninstall",
     "remove",
     "quality-set",

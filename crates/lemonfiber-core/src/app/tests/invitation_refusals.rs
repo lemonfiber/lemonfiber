@@ -54,6 +54,7 @@ async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -118,6 +119,7 @@ async fn an_invitation_serialises_under_its_own_kind() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -146,6 +148,7 @@ async fn offering_an_account_over_an_unreadable_stack_says_so() {
             Command::Invite {
                 name: "ana".to_owned(),
                 allowance: Allowance::default(),
+                confirm: true,
             },
             &ctx,
         )
@@ -209,6 +212,7 @@ async fn an_invitation_the_server_will_not_withdraw_is_not_reported_as_withdrawn
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -254,6 +258,7 @@ async fn a_media_server_that_refuses_the_account_is_reported() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -303,6 +308,7 @@ async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -356,6 +362,7 @@ async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_mak
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )
@@ -379,6 +386,7 @@ async fn offering_an_account_before_setup_is_refused_rather_than_attempted() {
         Command::Invite {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
+            confirm: true,
         },
         &ctx,
     )

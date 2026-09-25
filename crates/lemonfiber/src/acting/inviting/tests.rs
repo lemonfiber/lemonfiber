@@ -50,7 +50,9 @@ fn typing(stage: &mut Stage, word: &str) {
 /// errand reached no question, which fails whatever the assertion was.
 fn agreed(stage: &Stage) -> (Arguments, String) {
     match stage {
-        Stage::Agreeing { given, .. } => (given.asked(), given.said().to_owned()),
+        Stage::Agreeing { given, .. } | Stage::Weighing { given, .. } => {
+            (given.asked(), given.said().to_owned())
+        }
         _ => (Arguments::default(), String::new()),
     }
 }
@@ -165,7 +167,7 @@ fn what_happens_to_unrated_content_is_asked_only_where_something_was_narrowed() 
     press(&mut stage, &Press::Accept);
     press(&mut stage, &Press::Accept);
     assert!(
-        matches!(&stage, Stage::Agreeing { .. }),
+        matches!(&stage, Stage::Weighing { .. }),
         "an offer that narrowed nothing was asked about unrated content"
     );
 
@@ -267,8 +269,8 @@ fn a_line_is_corrected_and_a_list_moves_both_ways() {
 
     let (asked, said) = agreed(&stage);
     assert!(
-        matches!(&stage, Stage::Agreeing { .. }),
-        "the errand did not reach its question: {said}"
+        matches!(&stage, Stage::Weighing { .. }),
+        "the errand did not go to the core with what it would grant: {said}"
     );
     assert_eq!(
         asked.age_limit, None,
@@ -313,11 +315,11 @@ fn neither_half_answers_a_press_it_has_no_use_for() {
         "typing at the list of age limits moved it: {said}"
     );
 
-    // The question the errand has reached belongs to the flow next door, so a
-    // press arriving here now is not either half's to answer.
+    // What it would grant is with the core now, which belongs to the flow next
+    // door, so a press arriving here is not either half's to answer.
     press(&mut stage, &Press::Accept);
     assert!(
-        matches!(&stage, Stage::Agreeing { .. }),
+        matches!(&stage, Stage::Weighing { .. }),
         "a press after the errand moved on was answered here"
     );
 }

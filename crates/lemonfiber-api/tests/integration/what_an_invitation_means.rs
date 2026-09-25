@@ -33,8 +33,24 @@ fn an_invitation_carries_the_name_it_is_for() {
 
     assert!(matches!(
         command("invite", with_name),
-        Some(Command::Invite { name, allowance })
-            if name == "ana" && allowance == lemonfiber_core::app::Allowance::default()
+        Some(Command::Invite { name, allowance, confirm })
+            if name == "ana" && allowance == lemonfiber_core::app::Allowance::default() && !confirm
+    ));
+}
+
+/// Unconfirmed, an invitation is the offer: what it would grant and for how long, with
+/// nothing made. The yes is what makes the account.
+#[test]
+fn an_invitation_is_made_only_once_it_is_confirmed() {
+    let confirmed = Arguments {
+        name: Some("ana".to_owned()),
+        confirm: true,
+        ..Arguments::default()
+    };
+
+    assert!(matches!(
+        command("invite", confirmed),
+        Some(Command::Invite { confirm: true, .. })
     ));
 }
 
