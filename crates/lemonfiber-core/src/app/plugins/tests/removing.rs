@@ -319,11 +319,8 @@ async fn a_removal_with_nowhere_to_look_for_the_record_is_refused_by_the_layer_t
 
 /// A register that cannot be rewritten stops a removal the way it stops an
 /// install, and says what the run left.
-#[cfg(unix)]
 #[tokio::test]
 async fn a_register_that_cannot_be_rewritten_stops_the_removal() {
-    use std::os::unix::fs::PermissionsExt as _;
-
     let ctx = proving(
         "unwritable-removal",
         Arc::new(Recording::answering(Ok(spoke("")))),
@@ -334,13 +331,13 @@ async fn a_register_that_cannot_be_rewritten_stops_the_removal() {
         Some(1)
     );
     let register = record_of(&ctx);
-    assert!(std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o400)).is_ok());
+    assert!(unrewritable(&register));
 
     let (code, said) = refused(removing(&ctx, "komga").await);
     assert_eq!(code, "PLUGIN-8");
     assert!(said.contains("was put back"), "{said}");
 
-    let _ = std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o600));
+    let _ = std::fs::remove_dir_all(staging_of(&register));
 }
 
 /// **A removal inherits the rollback layer's refusals rather than restating them.**

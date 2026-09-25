@@ -227,6 +227,23 @@ fn record_of(ctx: &Ctx) -> PathBuf {
         .unwrap_or_default()
 }
 
+/// Make a record impossible to rewrite while it stays readable, answering whether
+/// that held.
+///
+/// A record is written under a staging name beside it and moved into place, so a
+/// directory holding something under that name is what no write gets past — on every
+/// platform, and without changing whether the record itself can be read.
+fn unrewritable(record: &Path) -> bool {
+    std::fs::create_dir_all(staging_of(record).join("held")).is_ok()
+}
+
+/// The name a record is written under before it is moved into place.
+fn staging_of(record: &Path) -> PathBuf {
+    let mut name = record.file_name().unwrap_or_default().to_os_string();
+    name.push(".writing");
+    record.with_file_name(name)
+}
+
 /// A plugin source written to a scratch directory.
 fn source(named: &str, manifest: &str) -> PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("installing-{named}")).kept();
