@@ -95,9 +95,8 @@ build:
 
 # The inner loop: does it still compile, and do the tests still pass.
 #
-# `nextest` rather than `cargo test`, because it runs the test binaries against each
-# other rather than one after another and this workspace has around a hundred of them
-# — 134s against 391s on the machine this was measured on. It runs no doctests, which
+# `nextest` rather than `cargo test`, because it runs every test in a process of its
+# own and in parallel across the workspace's test binaries. It runs no doctests, which
 # costs nothing here: every doctest target in this workspace reports zero.
 test:
     cargo nextest run --workspace
@@ -118,7 +117,7 @@ fmt:
 
 # Rewrite the machine-readable contract from the types that serialise the reply.
 contract:
-    cargo run --quiet --example contract -p lemonfiber-core > contract/web-api.contract.json
+    cargo run --quiet --example contract -p lemonfiber-api
 
 # Rewrite the stable surface the contract is held to between releases.
 #
@@ -128,15 +127,10 @@ contract:
 # the interface moves and stays still when somebody rewrites a doc comment — and it
 # is what a removed or retyped field is caught against.
 #
-# It writes through a temporary file because the program reads the committed surface
-# before it replaces it: a redirect would truncate the thing it is about to compare
-# against. It exits non-zero, leaving the committed surface alone, where the new one
-# drops anything the old one describes under an unchanged `API_VERSION`.
+# It exits non-zero, leaving the committed surface alone, where the new one drops
+# anything the old one describes under an unchanged `API_VERSION`.
 surface:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cargo run --quiet --example surface -p lemonfiber-core > contract/.surface.next
-    mv contract/.surface.next contract/web-api.surface.json
+    cargo run --quiet --example surface -p lemonfiber-api
 
 # Rewrite the schema a plugin author's editor validates `plugin.toml` against.
 #
@@ -145,7 +139,10 @@ surface:
 # disagreement surfaces as a plugin that validates in an author's editor and is refused
 # on an operator's machine.
 plugin-schema:
-    cargo run --quiet --example plugin_schema -p lemonfiber-core > contract/plugin-manifest.schema.json
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo run --quiet --example plugin_schema -p lemonfiber-core > contract/plugin-manifest.schema.json.next
+    mv contract/plugin-manifest.schema.json.next contract/plugin-manifest.schema.json
 
 # Rewrite the capability vocabulary from the types and the stack this build pins.
 #
@@ -155,7 +152,10 @@ plugin-schema:
 # declares, or a name a bundled service declares that the vocabulary does not carry,
 # fails here rather than reaching a plugin author who would trust it.
 capabilities:
-    cargo run --quiet --example capabilities -p lemonfiber-core > contract/capability-vocabulary.json
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo run --quiet --example capabilities -p lemonfiber-core > contract/capability-vocabulary.json.next
+    mv contract/capability-vocabulary.json.next contract/capability-vocabulary.json
 
 # Rewrite the extension points from the registers they name.
 #
@@ -163,7 +163,10 @@ capabilities:
 # so a check that is renamed moves this file rather than leaving a stale name a
 # contribution could take.
 extension-points:
-    cargo run --quiet --example extension_points -p lemonfiber-core > contract/extension-points.json
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo run --quiet --example extension_points -p lemonfiber-core > contract/extension-points.json.next
+    mv contract/extension-points.json.next contract/extension-points.json
 
 # Rewrite the command reference from the declarations the binary parses with.
 reference:
@@ -171,7 +174,10 @@ reference:
 
 # Rewrite the error-code reference from the codes the crates declare.
 codes:
-    cargo run --quiet --example codes -p lemonfiber > reference/error-codes.md
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo run --quiet --example codes -p lemonfiber > reference/error-codes.md.next
+    mv reference/error-codes.md.next reference/error-codes.md
 
 # Rewrite the release record from the commits that made each release.
 #
@@ -194,7 +200,8 @@ changelog SPEC='../spec':
         exit 1
     fi
     git-cliff --config cliff.toml --context \
-        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} > reference/changelog.json
+        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} > reference/changelog.json.next
+    mv reference/changelog.json.next reference/changelog.json
 
 # Read the committed record the way the release page and the binary read it.
 #
@@ -250,6 +257,10 @@ stack-moved:
 # workflow, which runs the self-test as its own first step — true, and invisible
 # to a checker that reads this tree. Proving it here is the better half anyway:
 # it fails on the machine that broke it rather than after a push.
+# IMPLEMENTATION-STATUS.md, written from status.toml — the file the release gates read.
+status:
+    python3 scripts/implementation_status.py --write
+
 scripts:
     uvx ruff@0.16.4 check scripts/
     python3 scripts/every_proof_runs.py
@@ -258,6 +269,8 @@ scripts:
     python3 scripts/the_requirements_an_entry_names.py --self-test
     python3 scripts/no_open_codeql_alert.py --self-test
     python3 scripts/the_gate_a_tag_must_pass.py --self-test
+    python3 scripts/implementation_status.py --self-test
+    python3 scripts/implementation_status.py --check
     python3 scripts/verify_dist_installer.py --self-test
     python3 scripts/the_tag_a_shell_never_sees.py --self-test
     python3 scripts/pin_release_actions.py --self-test
@@ -302,7 +315,7 @@ typos:
 #  - `allow-dirty = ["ci"]` (needed so CI tolerates our patch below) also makes
 #    `dist generate` REFUSE to write release.yml, so we drop it for the regen and
 #    restore it after.
-#  - cargo-dist always ends the release by publishing (`--draft=false`); OPS-R1
+#  - cargo-dist always ends the release by publishing (`--draft=false`); governance
 #    wants a tag to leave a DRAFT a maintainer publishes, and there is no config
 #    for "stay drafted", so we flip that one flag.
 #
@@ -348,8 +361,8 @@ release-workflow:
 # applicable code is instead kept coverable — see .docs/architecture/error-model.md
 # on writing assertions that leave no branch a test cannot reach.
 #
-# NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
-skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-adapters/src/nntp\.rs|crates/.*/examples/.*\.rs)'
+# The pattern lives in `.config/coverage-skipped`, which `sonar.yml` reads too.
+skipped := `cat .config/coverage-skipped`
 
 # `--no-fail-fast` because `sonar.yml` passes it and this has to be the same line.
 # Without it one failing test stops the run and the profile is whatever had been
@@ -364,7 +377,7 @@ skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lem
 #
 # 100% on applicable code, the line `sonar` runs.
 coverage:
-    cargo llvm-cov nextest --workspace --no-fail-fast --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
+    cargo llvm-cov nextest --workspace --no-fail-fast --profile ci --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
         || { just uncovered; exit 1; }
 
 # What the gate counted and could not name, from the profile already gathered.

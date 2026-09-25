@@ -61,7 +61,7 @@ pub async fn instead(
     let mut left = Vec::new();
     for container in theirs {
         let asked = vec!["docker".to_owned(), "stop".to_owned(), container.id.clone()];
-        match ctx.runner.run(&asked).await {
+        match ctx.seams.runner.run(&asked).await {
             Ok(output) if output.status == Some(0) => stopped.push(container.service.clone()),
             _ => left.push(container.service.clone()),
         }
@@ -94,23 +94,4 @@ fn refused(survey: &MigrationReport) -> ReplaceReport {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::refused;
-    use crate::model::MigrationReport;
-
-    /// Having looked and found nothing, and not having looked, are different facts.
-    #[test]
-    fn what_cannot_be_replaced_says_which_of_the_two_it_is() {
-        let looked = refused(&MigrationReport {
-            read: true,
-            ..MigrationReport::default()
-        })
-        .refusal
-        .unwrap_or_default();
-        assert!(looked.contains("no single setup"), "{looked}");
-        let blind = refused(&MigrationReport::default())
-            .refusal
-            .unwrap_or_default();
-        assert!(blind.contains("could not be read"), "{blind}");
-    }
-}
+mod tests;

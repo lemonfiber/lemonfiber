@@ -5,7 +5,8 @@
 
 use crate::bytes::humanize;
 
-use super::{finding, Code, Finding, Problem, Remedy, Severity, State, StorageFacts, Verdict};
+use super::{finding, Finding, Problem, Remedy, Severity, State, StorageFacts, Verdict};
+use crate::error::codes::storage::SPACE_LOW;
 
 /// The free-space finding for the volume the data root sits on.
 ///
@@ -88,9 +89,6 @@ pub(super) fn free_note(facts: &StorageFacts, underway: u64) -> String {
         free_of_total
     }
 }
-
-/// Raised when the volume holding the data root is nearly full.
-pub const SPACE_LOW: Code = Code::new("STORAGE-4");
 
 /// The free space a volume must keep clear once the queue has landed.
 ///

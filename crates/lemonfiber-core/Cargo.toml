@@ -8,48 +8,42 @@ rust-version.workspace = true
 repository.workspace = true
 
 [dependencies]
-lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-error = { workspace = true }
+lemonfiber-manifest = { workspace = true }
 # The plugin manifest types, the capability vocabulary and the extension points —
 # the three things this crate generates a published artefact from. One way only:
 # nothing there reaches back here, which is what lets it be read with no stack.
-lemonfiber-plugin = { path = "../lemonfiber-plugin" }
-lemonfiber-ports = { path = "../lemonfiber-ports" }
+lemonfiber-plugin = { workspace = true }
+lemonfiber-ports = { workspace = true }
 argon2 = { workspace = true }
-# Verifying the signature a registry offers beside an image. Already in the tree —
-# rustls builds on it — so this adds no crate to the graph, and it is the one
-# library this binary already trusts to decide whether bytes were signed.
-ring = "0.17"
-# Decoding the base64 a PEM key and a registry's signature annotation are carried
-# in. Already in the tree through the HTTP stack.
-base64 = "0.23"
+ring = { workspace = true }
+base64 = { workspace = true }
 async-trait = { workspace = true }
 jiff = { workspace = true }
-crc32fast = "1"
+crc32fast = { workspace = true }
 include_dir = { workspace = true }
 form_urlencoded = { workspace = true }
 futures-util = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
-serde_json = "1"
-# Compose files are YAML, and the single-mount rule can only be read from them —
-# it is invisible to every probe, since from the host the data root is one
-# filesystem and hardlinks work perfectly. A parser rather than line-matching,
-# because anchors, merge keys and both volume syntaxes all have to read the way
-# Compose reads them. Confined to `stack/mounts.rs`.
-serde_yaml_ng = "0.10"
+serde_json = { workspace = true }
+# Confined to `stack/mounts.rs`.
+serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+chacha20poly1305 = { workspace = true }
 
 [dev-dependencies]
+lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes both this crate's own tests and its integration tests drive the real code
 # through. It depends on `lemonfiber-ports` alone, so there is no cycle back to here.
-lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
+lemonfiber-fixtures = { workspace = true }
+lemonfiber-testing = { workspace = true }
 # The real seams, for the tests that mean this machine — a scratch directory on a real
 # disk rather than a fake that would be asserting its own behaviour. A dev-dependency
 # only: the whole point of the extraction is that a released `lemonfiber-core` cannot
 # reach the network. It depends on `lemonfiber-ports` alone, so this is not a cycle.
-lemonfiber-adapters = { path = "../lemonfiber-adapters" }
+lemonfiber-adapters = { workspace = true }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
 
 [lints]

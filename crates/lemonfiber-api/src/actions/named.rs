@@ -19,13 +19,13 @@
 //! for at the door changes are asked for, whatever their answers look like. A read
 //! that disturbed something would not be a read.
 
-use lemonfiber_core::app::bundle::{Wanted, LINES};
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::update::Asked;
 use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
+use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::{Tier, TIERS};
+use lemonfiber_core::update::run::Asked;
 
 mod choosing;
 mod household;

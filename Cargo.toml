@@ -12,9 +12,20 @@ rust-version = "1.95"
 repository = "https://github.com/lemonfiber/lemonfiber"
 authors = ["NightWorks.io"]
 
-# Versions are declared once here so the workspace's crates cannot drift onto
-# different minors of the same dependency. See spec 30-repos/lemonfiber.md.
+# Every dependency, the workspace's own crates included, is declared here and
+# nowhere else: a crate names what it uses with `workspace = true` and adds only
+# features. `deny.toml` refuses a second version of any crate, so a declaration
+# here that differs from what the graph already carries fails rather than drifts.
 [workspace.dependencies]
+lemonfiber-adapters = { path = "crates/lemonfiber-adapters" }
+lemonfiber-api = { path = "crates/lemonfiber-api" }
+lemonfiber-core = { path = "crates/lemonfiber-core" }
+lemonfiber-error = { path = "crates/lemonfiber-error" }
+lemonfiber-fixtures = { path = "crates/lemonfiber-fixtures" }
+lemonfiber-manifest = { path = "crates/lemonfiber-manifest" }
+lemonfiber-plugin = { path = "crates/lemonfiber-plugin" }
+lemonfiber-ports = { path = "crates/lemonfiber-ports" }
+lemonfiber-testing = { path = "crates/lemonfiber-testing" }
 schemars = "1.2"
 async-trait = "0.1"
 # Argon2id for the one password lemonfiber verifies rather than reads: the operator's
@@ -42,8 +53,7 @@ jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-zon
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
 etcetera = "0.11"
-# The operating system's CSPRNG, for the one secret lemonfiber generates itself:
-# qBittorrent's WebUI password. 0.2 is already in the tree via rustls.
+# The operating system's CSPRNG, for every secret lemonfiber mints itself.
 getrandom = "0.4"
 include_dir = "0.7"
 # rustls, not the platform's TLS: it keeps the musl static release target free of
@@ -68,8 +78,46 @@ tokio-stream = "0.1"
 # in the tree via axum; only the combinators are taken.
 tower = { version = "0.5", default-features = false }
 toml = "1.1"
+# Decoding the base64 a PEM key and a registry's signature are carried in. The 0.22
+# line is the one reqwest and bollard use.
+base64 = "0.22"
+# Encrypting what the store keeps at rest.
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+crc32fast = "1"
+# A backup archive is a gzip-compressed tar. flate2's default `miniz_oxide` backend
+# is pure Rust, so the static musl release needs no system zlib.
+flate2 = "1"
+# Turning the front door's address into something a phone camera reads. It has no
+# optional dependencies: a QR code is a grid of bits, and drawing it is left to the
+# terminal code that knows the terminal.
+qrcodegen = "1.8"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+# Verifying the signature a registry offers beside an image, with the library rustls
+# already builds on.
+ring = "0.17"
+# Reading a secret without echoing it needs raw-terminal control, which
+# `unsafe_code = "forbid"` rules out doing directly.
+rpassword = "7"
+# Proving a Usenet provider means a real TLS-wrapped NNTP connection. rustls with
+# bundled Mozilla roots, so the static musl release carries its own trust anchors.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-pki-types = "1"
+# rustc's own lexer, for the checks that read comments: what counts as a comment is
+# decided the way the compiler decides it.
+rustc_lexer = { package = "ra-ap-rustc_lexer", version = "0.174" }
+serde_json = "1"
+# Compose files are YAML, and the single-mount rule can only be read from them. A
+# parser rather than line-matching, because anchors, merge keys and both volume
+# syntaxes have to read the way Compose reads them.
+serde_yaml_ng = "0.10"
+# The syntax tree the architecture checks read the code as, on the line the
+# workspace's proc macros already build on.
+syn = { version = "3", default-features = false, features = ["clone-impls", "full", "parsing", "printing", "visit"] }
+tar = "0.4"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+webpki-roots = "1"
 
-# Strict, zero-suppression posture — see spec 40-quality/code-standards.md (Q-R11, Q-R12).
+# Strict, zero-suppression posture — see spec 40-quality/code-standards.md.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"
@@ -82,13 +130,10 @@ indexing_slicing = "deny"
 todo = "deny"
 unimplemented = "deny"
 pedantic = { level = "warn", priority = -1 }
-# The one lint here that is off, and the reason is that its fix cannot be written:
-# it asks for `Duration::from_hours` and its siblings, which are unstable on every
-# stable compiler — `duration_constructors` has not landed. Saying the version this
-# builds on is what switched it on, because clippy withholds a suggestion whose fix
-# would not compile on the floor a crate names, and it believes these are available
-# at ours. Take this line out when the constructors stabilise; the code it wants is
-# better than the code it replaces.
+# The one lint here that is off, because its fix cannot be written: it asks for
+# `Duration::from_hours` and its siblings, which are unstable on every stable
+# compiler (`duration_constructors`). Clippy offers the suggestion because it
+# believes them available at the `rust-version` this workspace names.
 duration_suboptimal_units = "allow"
 
 # Config for 'dist'
@@ -97,18 +142,17 @@ duration_suboptimal_units = "allow"
 cargo-dist-version = "0.32.0"
 # CI backends to support
 ci = "github"
-# Only the shell installer for now. Homebrew (L1-R3) needs a HOMEBREW_TAP_TOKEN
-# to push to the tap; PowerShell (L1-R4) installs the Windows binary, which is
-# deferred (see targets). Both return with Windows and the tap token at 1.0.0.
+# Only the shell installer. Homebrew needs a HOMEBREW_TAP_TOKEN to push to the
+# tap, and PowerShell installs the Windows binary, which is not a target.
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-# Windows is deferred because the native binary does not compile yet. What it is
-# waiting on is a register in `what_windows_is_waiting_on.rs`, held to this list
-# by a test: the target may be added here exactly when that register is empty.
+# Windows is not a target: the native binary does not compile. What it waits on is
+# a register in `what_windows_is_waiting_on.rs`, held to this list by a test: the
+# target may be added here exactly when that register is empty.
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
-# No publish jobs yet — the Homebrew tap publish returns at 1.0.0 (L1-R3).
+# No publish jobs: nothing is published to the Homebrew tap.
 publish-jobs = []
-# cargo-dist creates and PUBLISHES the GitHub Release on a tag. Governance (OPS-R1)
+# cargo-dist creates and PUBLISHES the GitHub Release on a tag. Governance
 # wants a tag to leave a DRAFT a maintainer publishes, and cargo-dist has no config
 # for that, so `just release-workflow` patches the generated `gh release create` to
 # add `--draft`. allow-dirty stops cargo-dist's up-to-date check from failing CI on

@@ -12,7 +12,8 @@ license-file = "../../LICENSE"
 publish = false
 
 [dependencies]
-lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-error = { workspace = true }
+lemonfiber-manifest = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 schemars = { workspace = true }
@@ -22,7 +23,7 @@ tokio = { workspace = true, features = ["sync"] }
 [dev-dependencies]
 # The tests round-trip a stage through its serialised form, which is the only place the
 # `serde` derives above are actually proven.
-serde_json = "1"
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

@@ -71,7 +71,7 @@ so a handler that has not been taught never gets the chance to act. The failure 
 is a refusal with a remedy, never a successful real run.
 
 **A claim of `Reports` is checked against a real disk.**
-[`a_rehearsal_changes_nothing.rs`](../../crates/lemonfiber/tests/a_rehearsal_changes_nothing.rs)
+[`a_rehearsal_changes_nothing.rs`](../../crates/lemonfiber/tests/integration/a_rehearsal_changes_nothing.rs)
 drives every subcommand the command line accepts, as a rehearsal, against a real
 configuration home, stack directory and data root on a real filesystem, and hashes
 the tree before and after. A rehearsal that wrote, changed or removed a byte fails

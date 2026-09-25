@@ -27,7 +27,7 @@ pub mod viewer;
 /// on, and a sixth that only one of them writes would be a level nobody could filter
 /// by across the stack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Level {
     /// Detail a developer asked for.
     Trace,

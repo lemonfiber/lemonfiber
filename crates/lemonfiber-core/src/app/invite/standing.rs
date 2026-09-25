@@ -12,7 +12,7 @@ use crate::model::InvitationStanding;
 use crate::ports::service::{Household as _, Member};
 
 /// What was found where the invitation was going.
-pub(super) fn standing_of(already: Option<&Member>) -> InvitationStanding {
+pub(crate) fn standing_of(already: Option<&Member>) -> InvitationStanding {
     match already {
         Some(member) if member.claimed => InvitationStanding::Joined,
         // Unclaimed, but somebody has been in it: their password was taken off rather
@@ -39,7 +39,7 @@ pub(super) fn standing_of(already: Option<&Member>) -> InvitationStanding {
 /// out, this run would withdraw the account — which is to say delete it — and then make
 /// another under the same name with a different identifier, so anything already linked
 /// to them would be linked to somebody who no longer exists.
-pub(super) fn already_here<'a>(held: &'a Held, name: &str) -> Option<&'a Member> {
+pub(crate) fn already_here<'a>(held: &'a Held, name: &str) -> Option<&'a Member> {
     let asked = name.to_lowercase();
     held.household
         .iter()
@@ -47,16 +47,16 @@ pub(super) fn already_here<'a>(held: &'a Held, name: &str) -> Option<&'a Member>
 }
 
 /// Whether this account is one the sweep was about to take back.
-pub(super) fn has_run_out(held: &Held, member: &Member) -> bool {
+pub(crate) fn has_run_out(held: &Held, member: &Member) -> bool {
     held.spent.iter().any(|gone| gone.member.id == member.id)
 }
 
 /// What the media server holds right now, as this command needs to see it.
-pub(super) struct Held {
+pub(crate) struct Held {
     /// Every account it has, claimed or not.
-    pub(super) household: Vec<Member>,
+    pub(crate) household: Vec<Member>,
     /// The invitations among them that have run out.
-    pub(super) spent: Vec<Offered>,
+    pub(crate) spent: Vec<Offered>,
 }
 
 /// The invitations nobody claimed in time, as the media server holds them now.
@@ -68,7 +68,7 @@ pub(super) struct Held {
 /// the second — the whole of what `--dry-run` promises is that the second does not
 /// happen, and a sweep that removed accounts on the way to saying what it would do
 /// would be the flag doing the damage it exists to prevent.
-pub(super) async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held {
+pub(crate) async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held {
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
     let since = ctx.hours_ago(HOURS_OF_RECORD);
     let (Ok(household), Ok(records)) =
@@ -90,7 +90,7 @@ pub(super) async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held 
 ///
 /// A server that refuses one is not reported as having given it back: the operator
 /// reads this list as what is gone.
-pub(super) async fn take_back(
+pub(crate) async fn take_back(
     server: &crate::jellyfin::Jellyfin,
     spent: &[Offered],
 ) -> Vec<String> {

@@ -14,13 +14,14 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_ports::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
+use crate::error::codes::plugin::ANSWERED;
 
 /// Make what the install decided, journalling each write before it is made.
 ///
@@ -47,7 +48,7 @@ use super::{NOWHERE, UNWRITABLE};
 ///
 /// Where a directory or a document cannot be written. The journal is already carrying
 /// whatever was made before the failure, so what did land is reversible.
-pub(super) fn carry_out(
+pub(crate) fn carry_out(
     ctx: &Ctx,
     plugin: &str,
     stamp: &str,
@@ -79,7 +80,7 @@ pub(super) fn carry_out(
         crate::app::recover::journalled(
             &journal,
             &[bounded(plugin, &write.path, key, owner, body, stamp)],
-            ctx.random.as_ref(),
+            ctx.seams.random.as_ref(),
         );
         let record = ctx
             .settings
@@ -110,7 +111,7 @@ fn made_whole(
         .iter()
         .map(|made_here| made(plugin, made_here, stamp))
         .collect();
-    crate::app::recover::journalled(journal, &changes, ctx.random.as_ref());
+    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref());
 
     match content {
         None => std::fs::create_dir_all(path)
@@ -150,7 +151,7 @@ fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp:
 /// or the operator declared the area it sits in unmanaged, which is the one statement
 /// that lemonfiber writes nothing there and has to hold for a plugin as it does for
 /// everything else.
-pub(super) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
+pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
     planned
         .into_iter()
         .filter(|write| match &write.lands {
@@ -213,17 +214,13 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
     }
 }
 
-/// Raised when a plugin's service would answer on a label another plugin's already does.
-pub(super) const ANSWERED: lemonfiber_ports::error::Code =
-    lemonfiber_ports::error::Code::new("PLUGIN-13");
-
 /// Refuse a plugin one of whose services would answer on a label another installed
 /// plugin's service already answers on, before anything is written.
 ///
 /// # Errors
 ///
 /// Where the label is taken, naming it and whose it is.
-pub(super) fn unanswered(
+pub(crate) fn unanswered(
     would: &crate::plugin::Installed,
     installed: &[crate::plugin::Installed],
 ) -> Result<(), Box<Problem>> {
@@ -249,7 +246,7 @@ pub(super) fn unanswered(
 }
 
 /// There is nowhere on this machine to write what the install decided.
-pub(super) fn nowhere_to_write(plugin: &str) -> Problem {
+pub(crate) fn nowhere_to_write(plugin: &str) -> Problem {
     Problem::new(
         NOWHERE,
         Severity::Error,

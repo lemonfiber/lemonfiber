@@ -1,5 +1,5 @@
 # The maintainer queue flag. Triggers are declared here because a reusable
-# cannot declare its caller's; the behaviour lives in the spec repo. OPS-R26, OPS-R27.
+# cannot declare its caller's; the behaviour lives in the spec repo.
 #
 # The list below is also the wait list. The flag only goes up once every check
 # `main` requires has passed, and the reusable reads this same list back out of

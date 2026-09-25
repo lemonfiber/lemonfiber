@@ -107,7 +107,7 @@ pub async fn claimed(ctx: &Ctx, doing: &str) -> Result<Claim, Box<Problem>> {
         return Ok(Claim(None));
     }
     if ctx.force {
-        ctx.filesystem.remove(&path).await;
+        ctx.seams.filesystem.remove(&path).await;
     }
     queued(ctx, &path, doing).await
 }
@@ -122,7 +122,7 @@ pub async fn claimed(ctx: &Ctx, doing: &str) -> Result<Claim, Box<Problem>> {
 async fn queued(ctx: &Ctx, path: &Path, doing: &str) -> Result<Claim, Box<Problem>> {
     let mut waited = Duration::ZERO;
     loop {
-        if ctx.filesystem.claim(path, &marker(ctx, doing)).await {
+        if ctx.seams.filesystem.claim(path, &marker(ctx, doing)).await {
             // Said only to somebody who was told to wait. Whoever read that line is
             // owed the moment it stopped being true, and whoever never saw one has
             // nothing to be told the end of.
@@ -152,7 +152,7 @@ async fn queued(ctx: &Ctx, path: &Path, doing: &str) -> Result<Claim, Box<Proble
 /// is a `--force` away rather than a second failure to read.
 pub async fn released(ctx: &Ctx, claim: Claim) {
     if let Some(path) = claim.0 {
-        ctx.filesystem.remove(&path).await;
+        ctx.seams.filesystem.remove(&path).await;
     }
 }
 
@@ -170,18 +170,18 @@ fn lockfile(ctx: &Ctx) -> Option<PathBuf> {
 /// What a claim says about the run holding it: which process, since when, and what it
 /// is doing.
 ///
-/// Three lines rather than the two this used to write. The process answers a question
-/// somebody who opens the file has — is that run still there — and the operation
-/// answers the one the next client has, which is what it is waiting for. Neither
-/// stands in for the other, and a claim carrying only the first is why a refusal used
-/// to name a pid.
+/// Three lines. The process answers a question somebody who opens the file has — is
+/// that run still there — and the operation answers the one the next client has,
+/// which is what it is waiting for. Neither stands in for the other: a claim carrying
+/// only the first leaves a refusal naming nothing but a pid.
 fn marker(ctx: &Ctx, doing: &str) -> String {
     format!("{}\n{}\n{doing}", std::process::id(), now(ctx))
 }
 
 /// The wall clock in whole seconds, which is all a claim needs of it.
 fn now(ctx: &Ctx) -> u64 {
-    ctx.clock
+    ctx.seams
+        .clock
         .now()
         .duration_since(UNIX_EPOCH)
         .map(|since| since.as_secs())
@@ -205,7 +205,7 @@ struct Holder {
 
 /// Read back what the claim beside the settings says about whoever holds it.
 async fn holder(ctx: &Ctx, path: &Path) -> Holder {
-    let held = ctx.filesystem.read(path).await.unwrap_or_default();
+    let held = ctx.seams.filesystem.read(path).await.unwrap_or_default();
     let mut lines = held.lines();
     let pid = lines.next().unwrap_or_default().trim().to_owned();
     let since = lines

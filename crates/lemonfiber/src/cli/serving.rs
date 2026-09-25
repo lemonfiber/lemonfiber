@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use clap::Args;
-use lemonfiber_core::app::bundle::LINES;
+use lemonfiber_core::bundle::run::LINES;
 
 /// What the web interface was asked for.
 ///

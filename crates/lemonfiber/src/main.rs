@@ -151,7 +151,7 @@ async fn repairing(ctx: &Ctx, mending: Mending, json: bool) -> ExitCode {
 /// Named because it is the one piece of context-building long enough to push the arm
 /// that needs it onto three lines, and `main` has no room to spare.
 fn narrating(ctx: Ctx, json: bool) -> Ctx {
-    ctx.narrating_steps(walking(json))
+    ctx.with_steps(walking(json))
 }
 
 /// What a bare `lemonfiber` says: where setup stands, or the plain pointer when there is
@@ -270,7 +270,7 @@ async fn main() -> ExitCode {
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
-        Request::Ps { forms } => Command::Ps { forms },
+        Request::Ps { forms } => Command::Status { forms },
         Request::Config { action } => configuration(action),
         Request::Migrate { action } => Command::Migrate(translate::migrating(action.as_ref())),
         Request::Alerts { action } => taken!(translate::alerts(action)),
@@ -302,7 +302,7 @@ async fn main() -> ExitCode {
         // the title as said, and nothing named at all asks to be suggested
         // something.
         Request::Walkthrough { item } => {
-            ctx = ctx.narrating_steps(walking(cli.json));
+            ctx = ctx.with_steps(walking(cli.json));
             Command::Walkthrough {
                 item: translate::named(&item),
             }
@@ -388,7 +388,7 @@ async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCod
 /// place and a test outside this binary can read what it carries. See
 /// `.docs/architecture/embedded-stack.md` for the shape it arrives in.
 pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = Some(
-    lemonfiber_core::frontend::Source::Embedded(&lemonfiber::cli::APP),
+    lemonfiber_core::frontend::Source::Embedded(&lemonfiber::carried::APP),
 );
 
 /// Serve the web interface until the operator stops the process.

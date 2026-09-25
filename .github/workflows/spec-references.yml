@@ -1,5 +1,5 @@
 # Post/update a sticky PR comment linking this PR's cited spec identifiers to
-# their defining files. Reusable lives in the spec repo. GOV-R32.
+# their defining files. Reusable lives in the spec repo.
 name: spec-references
 on:
   pull_request:

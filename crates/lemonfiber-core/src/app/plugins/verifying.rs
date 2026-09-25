@@ -37,7 +37,7 @@ use super::super::Ctx;
 /// Where the stack's own manifest cannot be read, which is the one thing every check
 /// needs before any of them can run. Its one caller asks it before a byte of the
 /// install is written, so a refusal here leaves nothing to put back.
-pub(super) async fn looked(ctx: &Ctx) -> Result<(Stack, Vec<Finding>), Box<Problem>> {
+pub(crate) async fn looked(ctx: &Ctx) -> Result<(Stack, Vec<Finding>), Box<Problem>> {
     let (stack, checks) = super::super::engine::assembled(ctx, false).await?;
     let findings = examined(ctx, &stack, &checks).await;
     Ok((stack, findings))
@@ -49,7 +49,7 @@ pub(super) async fn looked(ctx: &Ctx) -> Result<(Stack, Vec<Finding>), Box<Probl
 /// again: a check holds what it read when it was built, so putting the same instances
 /// a second question would compare the install against the very reading it was meant
 /// to change — and would report every install as having broken nothing.
-pub(super) async fn again(ctx: &Ctx, stack: &Stack) -> Vec<Finding> {
+pub(crate) async fn again(ctx: &Ctx, stack: &Stack) -> Vec<Finding> {
     let checks = super::super::engine::assembling(ctx, stack, false).await;
     examined(ctx, stack, &checks).await
 }

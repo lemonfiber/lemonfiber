@@ -18,17 +18,12 @@
 
 use std::path::Path;
 
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
-use super::super::{Ctx, Outcome};
+use super::super::Ctx;
 use super::{carry_out, nowhere_to_write, proving, verifying};
-
-/// Nothing by that id is installed, so there is no version to replace.
-pub(super) const NOT_INSTALLED: Code = Code::new("PLUGIN-11");
-
-/// The version installed would not come off, so nothing else was touched.
-pub(super) const STUCK: Code = Code::new("PLUGIN-12");
+use crate::error::codes::plugin::{NOTHING_TO_UPDATE, STUCK};
 
 /// Replace the installed version of a plugin with the one at this path, or say what
 /// doing so would come to.
@@ -41,11 +36,11 @@ pub(super) const STUCK: Code = Code::new("PLUGIN-12");
 /// come off. Every one of those is answered before anything is changed. What goes wrong
 /// after that is not an error: it is an update that did not hold, and the report says
 /// which version the machine is on.
-pub(super) async fn update(
+pub(crate) async fn update(
     ctx: &Ctx,
     held: Register,
     path: &Path,
-) -> Result<Outcome, Box<Problem>> {
+) -> Result<Installs, Box<Problem>> {
     let manifest = super::accepted(path)?;
     // The stamp the whole update is journalled under, taken before anything is decided
     // so the record of the new version says it was installed at that moment.
@@ -288,20 +283,20 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 }
 
 /// The report: the listing as the record stands, and this run's one account.
-fn answering(installed: Vec<Installed>, update: Update) -> Outcome {
-    Outcome::Plugins(Installs {
+fn answering(installed: Vec<Installed>, update: Update) -> Installs {
+    Installs {
         installed,
         install: None,
         removal: None,
         update: Some(Box::new(update)),
         substituted: Vec::new(),
-    })
+    }
 }
 
 /// No version of this plugin is installed, so there is nothing to replace.
 fn not_installed(plugin: &str) -> Problem {
     Problem::new(
-        NOT_INSTALLED,
+        NOTHING_TO_UPDATE,
         Severity::Error,
         format!("{plugin} is not installed, so there is nothing to update"),
         "Nothing was changed. An update replaces a version this machine already has.",

@@ -18,16 +18,16 @@ use crate::reconfigure::LibraryPath;
 use super::Ctx;
 
 /// What the services hold, and why it could not be read where it could not.
-pub(super) struct Library {
+pub(crate) struct Library {
     /// What each path the services hold comes to after the move.
-    pub(super) paths: Vec<LibraryPath>,
+    pub(crate) paths: Vec<LibraryPath>,
     /// Why nothing could be read, where a library is here and nothing would say
     /// where it is filed.
-    pub(super) unread: Option<String>,
+    pub(crate) unread: Option<String>,
 }
 
 /// What moving the data location to `to` does to the library already here.
-pub(super) async fn moving(ctx: &Ctx, to: &Path) -> Library {
+pub(crate) async fn moving(ctx: &Ctx, to: &Path) -> Library {
     let Some(from) = ctx.settings.data_root.as_deref() else {
         // Nothing has been chosen yet, so there is no library at a previous location
         // for this to invalidate — this is setup's answer, not a move. A location
@@ -71,7 +71,11 @@ async fn held(ctx: &Ctx, to: &Path) -> Option<Vec<Existing>> {
     let mut found = Vec::new();
     let mut answered = false;
     for arr in &arrs {
-        let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+        let Some(client) = arr
+            .target
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await
+        else {
             continue;
         };
         let Ok(folders) = crate::ports::service::Client::root_folders(&client).await else {
@@ -101,7 +105,11 @@ async fn resolves(ctx: &Ctx, to: &Path, path: &str) -> bool {
     else {
         return false;
     };
-    ctx.filesystem.canonicalize(&to.join(rest)).await.is_ok()
+    ctx.seams
+        .filesystem
+        .canonicalize(&to.join(rest))
+        .await
+        .is_ok()
 }
 
 /// Why a move must not be made when nothing would say where the library is filed.
@@ -111,7 +119,7 @@ async fn resolves(ctx: &Ctx, to: &Path, path: &str) -> bool {
 /// run is moved freely rather than blocked by services that were never up.
 async fn unreachable(ctx: &Ctx, from: &Path) -> Option<String> {
     let media = from.join("media");
-    if ctx.filesystem.canonicalize(&media).await.is_err() {
+    if ctx.seams.filesystem.canonicalize(&media).await.is_err() {
         return None;
     }
     Some(format!(

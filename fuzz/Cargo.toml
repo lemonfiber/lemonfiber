@@ -1,4 +1,5 @@
-# Fuzz targets for the manifest crate.
+# Fuzz targets for what arrives from outside: a stack manifest, a plugin manifest,
+# and the parameters a request to the web API carries.
 #
 # Deliberately its own workspace: the fuzz harness is built with a nightly
 # toolchain and a sanitizer, and it must not inherit the strict lint set the
@@ -18,8 +19,16 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
 
+serde_json = "1"
+
+[dependencies.lemonfiber-api]
+path = "../crates/lemonfiber-api"
+
 [dependencies.lemonfiber-manifest]
 path = "../crates/lemonfiber-manifest"
+
+[dependencies.lemonfiber-plugin]
+path = "../crates/lemonfiber-plugin"
 
 # Fuzzing wants the optimiser on and debug assertions kept, so an overflow or a
 # failed invariant aborts loudly instead of wrapping quietly.
@@ -45,6 +54,27 @@ bench = false
 [[bin]]
 name = "date_parse"
 path = "fuzz_targets/date_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "plugin_from_toml"
+path = "fuzz_targets/plugin_from_toml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "api_read_query"
+path = "fuzz_targets/api_read_query.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "api_action_arguments"
+path = "fuzz_targets/api_action_arguments.rs"
 test = false
 doc = false
 bench = false

@@ -34,7 +34,7 @@ pub(crate) fn jellyfin_reader(
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
     let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
     Some(Jellyfin::authenticated(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         addr.loopback,
         "jellyfin",
         crate::config::JELLYFIN_ADMIN_USER,
@@ -69,7 +69,10 @@ pub(crate) async fn open_servarrs(
         let Some(kind) = Kind::for_section(&target.id) else {
             continue;
         };
-        let Some(service) = target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+        let Some(service) = target
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await
+        else {
             continue;
         };
         open.push(OpenArr {
@@ -95,7 +98,7 @@ pub(crate) async fn open_servarrs(
 /// back nothing would leave the operator with no line at all about work that was
 /// attempted and failed — worse than a failure they can read.
 pub(crate) async fn seerr_as_owner(ctx: &Ctx, base: String) -> Seerr {
-    let seerr = Seerr::new(ctx.http.clone(), base, "seerr");
+    let seerr = Seerr::new(ctx.seams.http.clone(), base, "seerr");
     // **And not on a pass that only says what it would do.** A sign-in is a `POST` that
     // opens a session on somebody else's service — state left behind by a run that
     // promised to leave none — so a rehearsal takes the client unsigned on purpose.
@@ -147,7 +150,7 @@ pub(crate) fn seerr_reader(
     service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
     let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
     Some(HouseholdAccess {
-        seerr: Seerr::new(ctx.http.clone(), seerr.loopback, "seerr"),
+        seerr: Seerr::new(ctx.seams.http.clone(), seerr.loopback, "seerr"),
         password,
     })
 }
@@ -208,9 +211,9 @@ pub(crate) async fn usenet_client(
             DownloadKind::Sabnzbd { config } => Some((target.base, config)),
             DownloadKind::Qbittorrent => None,
         })?;
-    let text = ctx.filesystem.read(&config).await?;
+    let text = ctx.seams.filesystem.read(&config).await?;
     let key = crate::sabnzbd::api_key(&text)?;
-    Some(Sabnzbd::new(ctx.http.clone(), base, key))
+    Some(Sabnzbd::new(ctx.seams.http.clone(), base, key))
 }
 
 /// The Servarr-shape service that files no media of its own — the indexer aggregator,
@@ -247,9 +250,9 @@ pub(crate) async fn indexer_aggregator(
     project: Option<&Path>,
 ) -> Option<Prowlarr> {
     let target = aggregator_target(services, project)?;
-    let key = target.key(ctx.filesystem.as_ref()).await?;
+    let key = target.key(ctx.seams.filesystem.as_ref()).await?;
     Some(Prowlarr::new(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         &target.base,
         key,
         &target.id,
@@ -269,7 +272,7 @@ pub(crate) async fn bazarr_reader(
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bazarr)?;
     let key = bazarr_key(ctx, services, project).await?;
     Some(crate::bazarr::Bazarr::new(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         addr.loopback,
         &addr.id,
         key,
@@ -292,14 +295,14 @@ pub(crate) async fn audiobookshelf_token(
 ) -> Option<(String, Option<String>)> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Audiobookshelf)?;
     let client =
-        crate::audiobookshelf::Audiobookshelf::new(ctx.http.clone(), addr.loopback, &addr.id);
+        crate::audiobookshelf::Audiobookshelf::new(ctx.seams.http.clone(), addr.loopback, &addr.id);
     let recorded = super::recorded_secret(ctx, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY);
 
     let (password, minted) = match (client.has_account().await.ok()?, recorded) {
         (true, Some(known)) => (known, None),
         (true, None) => return None,
         (false, _) => {
-            let fresh = crate::secret::generate(ctx.random.as_ref())?;
+            let fresh = crate::secret::generate(ctx.seams.random.as_ref())?;
             client
                 .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
                 .await
@@ -326,9 +329,9 @@ pub(crate) async fn jellyfin_key(
     services: &[lemonfiber_manifest::Service],
 ) -> Option<String> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
-    let password = crate::app::seed::identity::recorded_jellyfin_password(ctx)?;
+    let password = crate::seed::run::identity::recorded_jellyfin_password(ctx)?;
     let client = crate::jellyfin::Jellyfin::authenticated(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         addr.loopback,
         &addr.id,
         crate::config::JELLYFIN_ADMIN_USER,
@@ -352,7 +355,7 @@ pub(crate) fn bindery_reader(
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bindery)?;
     let key = super::recorded_secret(ctx, crate::config::BINDERY_API_KEY)?;
     Some(crate::bindery::Bindery::new(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         addr.loopback,
         &addr.id,
         key,
@@ -376,7 +379,7 @@ pub(crate) async fn seerr_key(
         service,
         service.api.as_ref().and_then(|api| api.path.as_deref()),
     )?;
-    crate::seerr::api_key(&ctx.filesystem.read(&path).await?)
+    crate::seerr::api_key(&ctx.seams.filesystem.read(&path).await?)
 }
 
 /// The subtitle finder's own key, read from the configuration it writes.
@@ -397,5 +400,5 @@ pub(crate) async fn bazarr_key(
         service,
         service.api.as_ref().and_then(|api| api.path.as_deref()),
     )?;
-    crate::bazarr::api_key(&ctx.filesystem.read(&path).await?)
+    crate::bazarr::api_key(&ctx.seams.filesystem.read(&path).await?)
 }

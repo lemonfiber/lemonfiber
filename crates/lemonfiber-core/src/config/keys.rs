@@ -33,7 +33,7 @@ pub const TORRENT_KEY: &str = "LEMONFIBER_TORRENT";
 /// A plain endpoint that answers with the caller's address and nothing else, so
 /// the check runs `wget` against it from inside the containers rather than
 /// lemonfiber reaching the network on their behalf.
-pub const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
+pub(crate) const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
 
 /// A second, independent source asked alongside the first.
 ///
@@ -42,10 +42,10 @@ pub const DEFAULT_IP_ECHO: &str = "https://ifconfig.me";
 /// proxy, or simply wrong returns a plausible address, and the check says `pass`
 /// while traffic leaves in the clear. Two that disagree cannot both be trusted,
 /// and saying so is the only honest answer available.
-pub const SECOND_IP_ECHO: &str = "https://icanhazip.com";
+pub(crate) const SECOND_IP_ECHO: &str = "https://icanhazip.com";
 
 /// The setting naming the IP-echo service, or switching leak detection off.
-pub const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
+pub(crate) const IP_ECHO_KEY: &str = "LEMONFIBER_IP_ECHO";
 
 /// The setting that switches the plain-language explanations off.
 ///
@@ -70,34 +70,34 @@ pub const AUTOSTART_ON_BATTERY_KEY: &str = "LEMONFIBER_AUTOSTART_ON_BATTERY";
 ///
 /// Read in the zone `TZ` names, which is the same zone the stack hands every container,
 /// so the window lands on the household's own evening rather than on UTC's.
-pub const QUIET_HOURS_KEY: &str = "LEMONFIBER_QUIET_HOURS";
+pub(crate) const QUIET_HOURS_KEY: &str = "LEMONFIBER_QUIET_HOURS";
 
 /// The zone the stack runs in.
 ///
 /// Not lemonfiber's own setting — it is the stack's, handed to every container by the
 /// compose file, and read here so a window means the same hour inside and out.
-pub const ZONE_KEY: &str = "TZ";
+pub(crate) const ZONE_KEY: &str = "TZ";
 
 /// The zone the stack's compose file falls back to when nothing names one.
 ///
 /// Kept the same as `_common.yml`'s `${TZ:-Europe/Amsterdam}` deliberately: a window
 /// read in a different zone from the containers it is about would be quiet at the
 /// wrong hour and agree with nothing.
-pub const DEFAULT_ZONE: &str = "Europe/Amsterdam";
+pub(crate) const DEFAULT_ZONE: &str = "Europe/Amsterdam";
 
 /// A Compose file layered over the stack's own.
 ///
 /// Written by standing lemonfiber beside a setup already here: it maps each service to
 /// a port nothing else is using, so a second copy can be evaluated without moving the
 /// first out of the way.
-pub const OVERLAY_KEY: &str = "LEMONFIBER_OVERLAY";
+pub(crate) const OVERLAY_KEY: &str = "LEMONFIBER_OVERLAY";
 
 /// The Compose project lemonfiber manages.
 ///
 /// Its own by default. Set only by adopting a setup that was already here, which is
 /// what makes lemonfiber a control surface over somebody else's stack rather than a
 /// second stack beside it.
-pub const PROJECT_KEY: &str = "LEMONFIBER_PROJECT";
+pub(crate) const PROJECT_KEY: &str = "LEMONFIBER_PROJECT";
 
 /// The admin services the operator has said out loud they meant to expose.
 ///
@@ -125,7 +125,7 @@ pub const EXPOSED_KEY: &str = "LEMONFIBER_EXPOSED";
 /// [`crate::unmanaged`] — including the one write it deliberately does not reach.
 ///
 /// `config/recyclarr=my own profiles live in here,sonarr=I tune this one by hand`
-pub const UNMANAGED_KEY: &str = "LEMONFIBER_UNMANAGED";
+pub(crate) const UNMANAGED_KEY: &str = "LEMONFIBER_UNMANAGED";
 
 /// The setting naming where downloads and the library are kept.
 ///
@@ -135,30 +135,30 @@ pub const UNMANAGED_KEY: &str = "LEMONFIBER_UNMANAGED";
 pub const DATA_ROOT_KEY: &str = "DATA_ROOT";
 
 /// The user id the service containers run as.
-pub const PUID_KEY: &str = "PUID";
+pub(crate) const PUID_KEY: &str = "PUID";
 
 /// The group id the service containers run as.
-pub const PGID_KEY: &str = "PGID";
+pub(crate) const PGID_KEY: &str = "PGID";
 
 /// The VPN provider the tunnel connects through.
 ///
 /// Read by the port-forward check for one purpose: to name a provider's known
 /// trap when port forwarding was asked for but no port arrived. It never decides
 /// whether the tunnel itself works.
-pub const VPN_PROVIDER_KEY: &str = "VPN_PROVIDER";
+pub(crate) const VPN_PROVIDER_KEY: &str = "VPN_PROVIDER";
 
 /// The setting recording whether server-side port forwarding was asked for.
 ///
 /// Only some providers offer it, so a stack on one that does not leaves this off,
 /// and the port-forward check reads that as "does not apply" rather than a fault.
-pub const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
+pub(crate) const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 
 /// The setting selecting how Jellyfin is served: in a container or on the host.
 ///
 /// A single switch is the whole of the difference between the two modes — the
 /// compose stack drops one service and the URLs change, nothing more. Absent
 /// where the operator runs no media server at all.
-pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
+pub(crate) const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 
 /// The address the household's own links are pointed at.
 ///
@@ -166,7 +166,7 @@ pub const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 /// from another device in the house. It ships pointed at this machine and nowhere
 /// else, which is the right default for a machine nobody has told where it is and
 /// the wrong address to hand anybody.
-pub const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
+pub(crate) const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
 
 /// The service the operator chose to send the household to, by the id the stack
 /// declares it under.
@@ -175,10 +175,10 @@ pub const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
 /// prefix. What a name here may be is [`crate::door`]'s to decide and not this
 /// module's: the question is which tier a service is published on, and the answer
 /// belongs where the rest of that reasoning already lives.
-pub const FRONT_DOOR_KEY: &str = "LEMONFIBER_FRONT_DOOR";
+pub(crate) const FRONT_DOOR_KEY: &str = "LEMONFIBER_FRONT_DOOR";
 
 /// The base URL of the indexer the operator gave at setup.
-pub const INDEXER_URL_KEY: &str = "INDEXER_URL";
+pub(crate) const INDEXER_URL_KEY: &str = "INDEXER_URL";
 
 /// The indexer's API key. A secret, held here the way the stack holds its others.
 pub const INDEXER_APIKEY_KEY: &str = "INDEXER_APIKEY";
@@ -188,26 +188,26 @@ pub const INDEXER_APIKEY_KEY: &str = "INDEXER_APIKEY";
 ///
 /// Off records a credential the operator chose to proceed with unverified, so a
 /// later diagnosis can point at it rather than trusting it silently.
-pub const INDEXER_VALIDATED_KEY: &str = "INDEXER_VALIDATED";
+pub(crate) const INDEXER_VALIDATED_KEY: &str = "INDEXER_VALIDATED";
 
 /// The Usenet provider's hostname.
-pub const PROVIDER_HOST_KEY: &str = "USENET_HOST";
+pub(crate) const PROVIDER_HOST_KEY: &str = "USENET_HOST";
 
 /// The port the Usenet provider answers NNTP on.
 pub const PROVIDER_PORT_KEY: &str = "USENET_PORT";
 
 /// The Usenet account username.
-pub const PROVIDER_USER_KEY: &str = "USENET_USER";
+pub(crate) const PROVIDER_USER_KEY: &str = "USENET_USER";
 
 /// The Usenet account password. A secret, held the way the stack holds its others.
 pub const PROVIDER_PASS_KEY: &str = "USENET_PASS";
 
 /// Whether the Usenet connection uses TLS.
-pub const PROVIDER_TLS_KEY: &str = "USENET_TLS";
+pub(crate) const PROVIDER_TLS_KEY: &str = "USENET_TLS";
 
 /// Whether the Usenet login was proven before it was kept — off records one the
 /// operator chose to proceed with unverified.
-pub const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
+pub(crate) const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
 
 /// The environment key holding qBittorrent's web UI password.
 ///
@@ -232,7 +232,7 @@ pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 /// and keeps it. The token its dashboard panel uses is derived from this on demand
 /// rather than recorded beside it — the service hands back the same one every
 /// sign-in, so a second record would be a second copy of the same secret.
-pub const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
+pub(crate) const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 
 /// The environment key holding the book \*arr's API key.
 ///
@@ -240,16 +240,16 @@ pub const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 /// rather than one it mints and keeps: given this in its environment the service takes
 /// it verbatim instead of generating its own, which is what lets both sides know it
 /// without reading the database it would otherwise keep it in.
-pub const BINDERY_API_KEY: &str = "BINDERY_API_KEY";
+pub(crate) const BINDERY_API_KEY: &str = "BINDERY_API_KEY";
 
 /// The name of the listening server's first account.
-pub const AUDIOBOOKSHELF_USER: &str = "admin";
+pub(crate) const AUDIOBOOKSHELF_USER: &str = "admin";
 
 /// The name of the Jellyfin administrator account lemonfiber creates at setup — the
 /// household's own account, one source of truth for the name so the first-run driver
 /// creates it, the Seerr identity wiring signs in with it, and a trace's library read
 /// authenticates as it, all under the same name.
-pub const JELLYFIN_ADMIN_USER: &str = "admin";
+pub(crate) const JELLYFIN_ADMIN_USER: &str = "admin";
 
 /// The account name qBittorrent's web UI is reached under.
 ///
@@ -257,14 +257,14 @@ pub const JELLYFIN_ADMIN_USER: &str = "admin";
 /// registration that hands it to an \*arr, and the dashboard's own widget all present
 /// the same one. Separate from Jellyfin's although both spell it `admin`: they are two
 /// services, and either may change without the other.
-pub const QBITTORRENT_USER: &str = "admin";
+pub(crate) const QBITTORRENT_USER: &str = "admin";
 
 /// The environment key holding the account name qBittorrent is reached under.
 ///
 /// The dashboard reads both halves of the credential from the environment and has no
 /// default for this one, so a name that is never written leaves its widget unable to
 /// authenticate.
-pub const QBITTORRENT_USERNAME_KEY: &str = "QBITTORRENT_USERNAME";
+pub(crate) const QBITTORRENT_USERNAME_KEY: &str = "QBITTORRENT_USERNAME";
 
 /// Every setting lemonfiber names.
 ///

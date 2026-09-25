@@ -1,4 +1,5 @@
-//! The command line this binary parses, and the reference generated from it.
+//! The command line this binary parses, the reference generated from it, and what
+//! the binary embeds.
 //!
 //! Only the declarations live here. The dispatcher that routes them, the surfaces
 //! that render the answers, and everything they reach are the binary's own, next
@@ -10,6 +11,7 @@
 //! dashboard offers is decided in the binary, and a guard outside it has to be able
 //! to read the answer.
 
+pub mod carried;
 pub mod cli;
 pub mod codes;
 pub mod reaching;

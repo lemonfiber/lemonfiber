@@ -24,14 +24,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::codes::cred::CREDENTIAL_REJECTED;
+use crate::error::{Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{Client, Failure};
 use crate::servarr::{api_key, Servarr};
-
-/// Raised when a service answers and refuses the credential it generated itself.
-pub const CREDENTIAL_REJECTED: Code = Code::new("CRED-1");
 
 /// One service whose credential is to be proven.
 ///

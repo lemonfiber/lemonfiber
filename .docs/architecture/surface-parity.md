@@ -27,7 +27,7 @@ of what that requirement asks for.
 | Terminal, reads | [`acting/question.rs`](../../crates/lemonfiber/src/acting/question.rs) · [`terminal.rs`](../../crates/lemonfiber/src/terminal.rs) | the questions the list holds, and the screens the loop opens |
 
 The table below is checked against all five by
-[`surface_parity.rs`](../../crates/lemonfiber/tests/surface_parity.rs): a request
+[`surface_parity.rs`](../../crates/lemonfiber/tests/architecture/surface_parity.rs): a request
 with no row fails, a row naming an action or a route that does not exist fails,
 and an action or a route the web offers that no row accounts for fails. A route
 that answers no command-line request at all — the stream, the path actions are
@@ -451,7 +451,7 @@ is the one this workspace deliberately does not test.
 
 **The question is the web's read.** A question is held by the path the web serves
 it at, and that name goes through
-[`reads.rs`](../../crates/lemonfiber-api/src/reads.rs) — the same table the
+[`reads.rs`](../../crates/lemonfiber-api/src/read/table.rs) — the same table the
 endpoints themselves go through — so a question asked at this screen reaches the
 command a browser reaches. What a question must be given before it can be asked is
 that table's too: a trace with nothing typed is refused in the sentence a browser is

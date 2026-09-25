@@ -20,14 +20,16 @@ name = "lemonfiber"
 path = "src/main.rs"
 
 [build-dependencies]
-lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-manifest = { workspace = true }
+# Reading the wire version the embedded app and the contract each declare.
+serde_json = { workspace = true }
 
 [dependencies]
-lemonfiber-adapters = { path = "../lemonfiber-adapters" }
-lemonfiber-core = { path = "../lemonfiber-core" }
+lemonfiber-adapters = { workspace = true }
+lemonfiber-core = { workspace = true }
 # The endpoints and the app the web surface serves. Only this crate starts a
 # server; the core cannot, and the api crate does not choose an address.
-lemonfiber-api = { path = "../lemonfiber-api" }
+lemonfiber-api = { workspace = true }
 axum = { workspace = true }
 clap = { workspace = true }
 etcetera = { workspace = true }
@@ -35,38 +37,28 @@ color-eyre = { workspace = true }
 include_dir = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "io-util", "time"] }
 async-trait = { workspace = true }
-# Reading a secret without echoing it needs raw-terminal control, which this
-# workspace forbids doing directly (`unsafe_code = "forbid"`); rpassword wraps it.
-rpassword = "7"
-# Turning the front door's address into something a phone camera reads. Chosen over
-# the alternatives for having no optional dependencies at all — `qrcode` can pull in
-# `image` and `fast_qr` can pull in `resvg`, and a QR code is a grid of bits that
-# needs neither. It hands back exactly that grid, one module at a time, and leaves
-# every decision about how to draw it here where the terminal is known.
-qrcodegen = "1.8"
-# A backup archive is a gzip-compressed tar: `tar` packs and reads the directory
-# trees, `flate2` compresses them. flate2's default `miniz_oxide` backend is pure
-# Rust, so the static musl release stays free of a system zlib the way rustls keeps
-# it free of system TLS. Reading free space before a capture is `sysinfo`, the same
-# crate the storage diagnostic already uses to measure a volume.
-flate2 = "1"
-tar = "0.4"
+rpassword = { workspace = true }
+qrcodegen = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
 sysinfo = { workspace = true }
-# Reading and writing the manifest that rides inside the archive. The type and its
-# derives live in the core; this only turns it to and from the bytes tar stores.
-serde_json = "1"
-ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+# Reading and writing the manifest that rides inside a backup archive. The type and
+# its derives live in the core; this only turns it to and from the bytes tar stores.
+serde_json = { workspace = true }
+ratatui = { workspace = true }
 
 [dev-dependencies]
+lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes the ports are driven through, shared with every other crate's tests
 # rather than written again here.
-lemonfiber-fixtures = { path = "../lemonfiber-fixtures" }
+lemonfiber-fixtures = { workspace = true }
+lemonfiber-testing = { workspace = true }
 # Reading the embedded stack's own declaration of itself. Already a build
 # dependency, and a build dependency is not on a test target's path.
-lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-manifest = { workspace = true }
 # Driving a router without a socket, so what a route answers is checked as a fact
 # rather than by starting a server to ask it.
-tower = { version = "0.5", features = ["util"] }
+tower = { workspace = true, features = ["util"] }
 # Moving the clock a serving surface looks at the policy on, so a test proves the
 # looking rather than waiting for it. The feature is a test one and is declared here
 # rather than beside the runtime, so nothing shipped can reach it.
@@ -76,6 +68,10 @@ tokio = { workspace = true, features = ["test-util"] }
 # TOML, and a hand-rolled reader for either would be a second opinion about what
 # they say. Already in the tree via the manifest parser.
 toml = { workspace = true }
+# The architecture checks: the syntax tree they read the code as, and the lexer the
+# comment rules read comments with.
+syn = { workspace = true }
+rustc_lexer = { workspace = true }
 
 [lints]
 workspace = true

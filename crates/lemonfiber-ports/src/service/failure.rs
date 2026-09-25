@@ -15,7 +15,10 @@
 /// acts on what they type.
 pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
 
-use super::{Code, Diagnose, Problem, Remedy, Severity, State};
+use super::{Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::codes::seed::{
+    SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,
+};
 use thiserror::Error;
 
 /// A service refused, or could not be reached.
@@ -91,15 +94,3 @@ impl Diagnose for Failure {
         }
     }
 }
-
-/// Raised when a service is not answering yet.
-pub const SERVICE_UNAVAILABLE: Code = Code::new("SEED-1");
-
-/// Raised when a service rejects the credential lemonfiber holds.
-pub const SERVICE_UNAUTHORISED: Code = Code::new("SEED-2");
-
-/// Raised when a service answers with something unusable.
-pub const SERVICE_REFUSED: Code = Code::new("SEED-3");
-
-/// Raised when a service does not serve the API version this build speaks.
-pub const SERVICE_UNSUPPORTED: Code = Code::new("SEED-4");

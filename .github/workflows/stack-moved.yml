@@ -16,7 +16,7 @@
 # none of them touching a file read here is a healthy pin, and one commit behind
 # on `spdx_osi.txt` is a manifest validator refusing a licence the stack now
 # permits. `website-docs` draws the same line for the trees it renders, and the
-# shared `pins` job in `spec` for the workflows it calls (Q-R68).
+# shared `pins` job in `spec` for the workflows it calls.
 name: stack-moved
 
 on:

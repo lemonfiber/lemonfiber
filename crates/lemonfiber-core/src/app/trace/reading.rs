@@ -96,7 +96,7 @@ pub(crate) async fn providers(
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
         ctx.today(),
-        ctx.clock.now(),
+        ctx.seams.clock.now(),
     )
     .run()
     .await

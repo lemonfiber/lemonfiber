@@ -5,7 +5,7 @@
 #
 # The pull requests it opens cite nothing — Dependabot composes its own commit
 # message and offers no way to add a `Spec:` trailer. `spec_check.py` supplies
-# `GOV-R12` for a pull request GitHub says `dependabot[bot]` opened (Q-R55).
+# the citation for a pull request GitHub says `dependabot[bot]` opened.
 #
 # Not configured here, deliberately:
 #   - the `assets/media-stack` submodule. That revision is embedded in the
@@ -68,6 +68,11 @@ updates:
       include: scope
     cooldown:
       default-days: 3
+    # base64 stays on the line reqwest and bollard carry, because `deny.toml` refuses
+    # a second copy of a crate and a bump of ours alone would be one.
+    ignore:
+      - dependency-name: base64
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       cargo:
         patterns: ["*"]

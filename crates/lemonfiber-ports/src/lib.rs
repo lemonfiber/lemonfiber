@@ -14,16 +14,16 @@
 //! inside `lemonfiber-core` they were reachable from its own tests or from its integration
 //! tests but never both, so the same port ended up faked twice.
 //!
-//! The value types here are the ones that cross the boundary: a problem an adapter reports,
-//! the stage an item has reached, how long a condition has been standing. They are
-//! vocabulary rather than logic — a port that could not name what it returns would push the
-//! naming into every caller.
+//! The value types here are the ones that cross the boundary: the stage an item has
+//! reached, how long a condition has been standing. They are vocabulary rather than logic —
+//! a port that could not name what it returns would push the naming into every caller. A
+//! problem an adapter reports is in `lemonfiber-error`'s vocabulary, which every crate
+//! shares.
 //!
 //! Module names avoid repeating their trait's name, so call sites read `ports::Engine`
 //! rather than `docker::DockerApi`. See `.docs/architecture/ports-and-adapters.md`.
 
 pub mod docker;
-pub mod error;
 pub mod filesystem;
 pub mod hosting;
 pub mod http;
@@ -33,16 +33,12 @@ pub mod narration;
 pub mod network;
 pub mod nntp;
 pub mod occupancy;
-pub mod plural;
 pub mod process;
 pub mod random;
 pub mod registry;
-pub mod retry;
 pub mod seams;
 pub mod service;
 pub mod time;
-pub mod trace;
-pub mod withheld;
 
 pub use docker::{Engine, Images};
 pub use filesystem::{Eraser, FileSystem, Volume};

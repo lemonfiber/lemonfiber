@@ -99,6 +99,12 @@ jobs:
       # is found at the worst moment available, and this one refuses the tag.
       - name: Nothing passes the release gate quietly
         run: python3 scripts/the_gate_a_tag_must_pass.py --self-test
+      # The release gates read IMPLEMENTATION-STATUS.md; it is written from
+      # status.toml, and a file that says something else is refused here.
+      - name: The status file is what status.toml says
+        run: python3 scripts/implementation_status.py --check
+      - name: And the writer refuses a glyph written by hand
+        run: python3 scripts/implementation_status.py --self-test
 
   msrv:
     runs-on: ubuntu-latest

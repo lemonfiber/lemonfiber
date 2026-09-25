@@ -15,7 +15,7 @@ use super::Ctx;
 /// Nothing at all for a setting that decides neither, and nothing for a change
 /// that leaves them where they are — a report about a protocol nobody touched
 /// would be a warning nobody caused.
-pub(super) async fn opening(ctx: &Ctx, found: &mut Findings, key: &str, value: &str) {
+pub(crate) async fn opening(ctx: &Ctx, found: &mut Findings, key: &str, value: &str) {
     let before = ctx.settings.protocols;
     let Some(after) = changed(before, key, value) else {
         return;
@@ -39,7 +39,7 @@ pub(super) async fn opening(ctx: &Ctx, found: &mut Findings, key: &str, value: &
 /// Read by the write path before it sits down to wait, so `--wait` on a change
 /// that takes nothing away waits for nothing rather than for every download on the
 /// machine.
-pub(in crate::app) fn waits_for_downloads(ctx: &Ctx, key: &str, value: &str) -> bool {
+pub(crate) fn waits_for_downloads(ctx: &Ctx, key: &str, value: &str) -> bool {
     changed(ctx.settings.protocols, key, value)
         .is_some_and(|after| reduces(ctx.settings.protocols, after))
 }

@@ -15,6 +15,8 @@
 //! seam anything crosses; when a channel is actually implemented, the question of what it
 //! is handed can be settled then, and the port can move down with its answer.
 
+pub(crate) mod run;
+
 use async_trait::async_trait;
 
 use crate::alert::Digest;

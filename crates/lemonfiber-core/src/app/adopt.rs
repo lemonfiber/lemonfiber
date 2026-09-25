@@ -6,7 +6,7 @@
 //! stops nothing, moves nothing, and deletes nothing, so a run that fails or is
 //! abandoned leaves the operator exactly the stack they had.
 //!
-//! The archive comes first, and is the reason this can refuse where it used to only
+//! The archive comes first, and is the reason this can refuse rather than only
 //! write. It covers the existing setup's own host paths, because lemonfiber's layout
 //! holds nothing worth protecting until the takeover has happened — and it is taken
 //! before the project key is recorded, so a capture that fails leaves nothing written
@@ -138,29 +138,4 @@ fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::nothing;
-    use crate::model::MigrationReport;
-
-    /// A survey that looked and found nothing it could act on.
-    fn found() -> MigrationReport {
-        MigrationReport {
-            read: true,
-            ..MigrationReport::default()
-        }
-    }
-
-    /// Both refusals, in one place. A survey that looked and found no single setup and
-    /// one that could not look are different facts, and only one of them says anything
-    /// about what is on the machine.
-    #[test]
-    fn what_cannot_be_adopted_says_which_of_the_two_it_is() {
-        let looked = nothing(&found());
-        let said = looked.refusal.unwrap_or_default();
-        assert!(said.contains("no single setup here"), "{said}");
-
-        let blind = nothing(&MigrationReport::default());
-        let said = blind.refusal.unwrap_or_default();
-        assert!(said.contains("could not be read"), "{said}");
-    }
-}
+mod tests;

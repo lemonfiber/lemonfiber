@@ -1,4 +1,4 @@
-//! The thirty-one reads: one endpoint per question a command already answers, plus
+//! The reads: one endpoint per question a command already answers, plus
 //! the two that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
@@ -12,43 +12,22 @@
 //! warning or running the checks that disturb a running system changes something
 //! and belongs where changes are asked for.
 //!
-//! Which command a read reaches is [`crate::reads`]'s, named by the path it is
+//! Which command a read reaches is [`crate::read::table`]'s, named by the path it is
 //! served at, so another surface can ask for the same read by the same name and
 //! reach the same command. What a read takes is named there too, beside the
 //! command, so one place refuses a parameter no read takes — including on the
-//! reads that take nothing at all. What is left here is the carrying out. The
-//! endpoints themselves are grouped beside it by what they are about: the stack,
-//! the diagnosis, one item, where the household begins, the choices in force, the
-//! words, the files lemonfiber keeps of its own, where the disk went, and what this
-//! machine keeps running when nobody is watching, and where this copy of the program
-//! itself stands.
+//! reads that take nothing at all. What is left here is the carrying out: one route
+//! per name in that table, and the two reads that answer with a stream and a file.
 
-mod alerts;
-mod archives;
-mod bandwidth;
-mod catalogue;
-mod chosen;
-mod clients;
-mod credentials;
-mod diagnosis;
-mod door;
-mod glossary;
-mod held;
-mod history;
-mod hosting;
-mod items;
-mod migration;
-mod outbound;
-mod provenance;
-mod space;
-mod stack;
-mod stored;
-mod uninstall;
-mod update;
+mod bundle;
+mod logs;
+pub mod table;
 
 use axum::body::Body;
+use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Response;
+use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::error::{Amiss, Problem};
@@ -56,7 +35,7 @@ use lemonfiber_core::model::{kind, Envelope};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Permitted};
-use crate::reads::{named, wanted};
+use crate::read::table::{named, wanted, OFFERED};
 use crate::router::Serving;
 use crate::serve::{answered, carrying, refused, Refusal, SENTENCE};
 
@@ -69,39 +48,34 @@ const FAILED: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 /// What is said where a payload could not be rendered.
 const UNRENDERABLE: &str = "This answer could not be rendered.";
 
-/// The reads this surface answers.
+/// The reads this surface answers: every read [`OFFERED`] names, each carried out by
+/// [`reading`] under its own name, and the two that answer with something other than
+/// an envelope.
 pub fn routes() -> Router<Serving> {
-    Router::new()
-        .merge(stack::routes())
-        .merge(diagnosis::routes())
-        .merge(items::routes())
-        .merge(door::routes())
-        .merge(chosen::routes())
-        .merge(glossary::routes())
-        .merge(held::routes())
-        .merge(archives::routes())
-        .merge(clients::routes())
-        .merge(outbound::routes())
-        .merge(provenance::routes())
-        .merge(catalogue::routes())
-        .merge(stored::routes())
-        .merge(uninstall::routes())
-        .merge(alerts::routes())
-        .merge(migration::routes())
-        .merge(credentials::routes())
-        .merge(space::routes())
-        .merge(bandwidth::routes())
-        .merge(hosting::routes())
-        .merge(history::routes())
-        .merge(update::routes())
+    OFFERED
+        .iter()
+        .fold(Router::new(), |router, &read| {
+            router.route(
+                read,
+                get(
+                    move |State(serving): State<Serving>,
+                          caller: Caller,
+                          RawQuery(query): RawQuery| async move {
+                        reading(&serving.ctx, &caller, read, query.as_deref()).await
+                    },
+                ),
+            )
+        })
+        .merge(logs::routes())
+        .merge(bundle::routes())
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.
 ///
 /// Every endpoint below arrives here with its own name and the query string as it
 /// arrived, so the name a path is served under, what may be said alongside it and
-/// the command it comes to are one decision made in one place rather than
-/// thirteen made per handler.
+/// the command it comes to are one decision made in one place rather than one
+/// made per route.
 pub(crate) async fn reading(
     ctx: &Ctx,
     caller: &Caller,

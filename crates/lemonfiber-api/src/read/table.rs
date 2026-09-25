@@ -1,0 +1,436 @@
+//! What a read request asks for, and which command answers it.
+//!
+//! A read is named by the path it is served at, and the name is turned into one of
+//! the core's own commands. That translation is the read half of what
+//! [`crate::actions`] does for the writes, and it is here rather than inside each
+//! endpoint for the same reason: a surface that assembled a command of its own
+//! could ask for something no other surface can ask for.
+//!
+//! The endpoints and the commands do not count the same, and the mismatch runs both
+//! ways. `status` and `services` are one reading of what is running, whole and
+//! narrowed; `storage` is the group of checks the narrowing parameter also reaches.
+//! `forms`, `config` and `explain` go the other way and are one name over two
+//! commands each, because the command line spells each of them as one request that
+//! forks on whether something was named. `backups` is the same fork read from the
+//! other side: `lemonfiber restore` with nothing named lists what there is to restore
+//! from, and this is the half of that word a browser asks for on its own, because the
+//! other half is a write and writes are asked for elsewhere. `front-door` counts the
+//! plainest way of all — one name, one command, and no parameter to fork on.
+//!
+//! Only the flags that read are here. Narrowing a diagnosis is a parameter; running
+//! the checks that disturb a running system and accepting a warning both change
+//! something and belong where changes are asked for.
+//!
+//! Two reads have no command below, because they reach none. `/api/logs` opens a
+//! stream and renders a document per line, or hands back a name for a follow that
+//! will not end; `/api/bundle/{name}` answers with a file, which no envelope holds.
+//! Both are named here all the same, because both are asked at a door this table
+//! guards and [`asked`] holds every read to the parameters it takes — including the
+//! ones that take none.
+
+mod asked;
+mod naming;
+
+use naming::{diagnosing, following, household, moving, narrowed, removing, setting, shelf};
+
+/// How much of a shelf a read answers with, and the most it ever will.
+///
+/// Published so the command line takes the same two numbers rather than restating
+/// them: a terminal and a browser looking at one household must not come to show two
+/// different shelves, and a number written down twice drifts the first time one of
+/// them moves.
+pub use naming::{A_SHELF, MOST_AT_ONCE};
+
+use lemonfiber_core::app::{
+    AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction,
+};
+use lemonfiber_core::doctor::{Category, Narrowing};
+use lemonfiber_core::error::Problem;
+
+pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
+
+/// The versions in play: this binary, the stack it operates, and the engine's.
+pub const VERSION: &str = "/api/version";
+
+/// Every form the stack declares, or what naming some of them would come to.
+pub const FORMS: &str = "/api/forms";
+
+/// What the whole stack is doing.
+pub const STATUS: &str = "/api/status";
+
+/// What each service is doing, narrowed to the forms that were named.
+pub const SERVICES: &str = "/api/services";
+
+/// What the diagnostic checks found, or one group of them.
+pub const CHECKS: &str = "/api/checks";
+
+/// What the checks about the disk found.
+pub const STORAGE: &str = "/api/storage";
+
+/// Who is in the household, what each may watch, and what each has asked for.
+///
+/// The path keeps the name it was published under. What it answers with is described
+/// by the contract rather than by the path, and a published path renamed outruns its
+/// own redirect.
+pub const REQUESTS: &str = "/api/requests";
+
+/// What one member can watch, as the media server answers it for them.
+///
+/// Beside the requests read rather than folded into it because they are different
+/// questions — that one is what the household has *asked for*, this is what is already
+/// here. One member at a time, and never all of them: the server applies that account's
+/// age limit, blocked kinds and library access before it answers, so a single shelf for
+/// everybody would be wrong for whoever it was not read as.
+pub const HELD: &str = "/api/held";
+
+/// What this machine keeps running when no terminal is open.
+pub const HOSTING: &str = "/api/hosting";
+
+/// The one address to hand somebody who lives here.
+pub const FRONT_DOOR: &str = "/api/front-door";
+
+/// Where one item is, followed by the words a person would name it with.
+pub const TRACE: &str = "/api/trace";
+
+/// The items whose downloads have stopped.
+pub const STUCK: &str = "/api/stuck";
+
+/// Every setting, or one of them by name, with credentials withheld.
+pub const CONFIG: &str = "/api/config";
+
+/// The quality choice in force, what each preset means, and what it costs.
+pub const QUALITY: &str = "/api/quality";
+
+/// What one of this product's words means, or every word there is to ask about.
+pub(crate) const EXPLAIN: &str = "/api/explain";
+
+/// Everything that leaves this machine, and what refusing each of it costs.
+///
+/// Named for what it lists rather than for the direction of any one request: what
+/// an operator wants from this page is the whole of what goes out, lemonfiber's own
+/// and the stack's, told apart.
+pub const OUTBOUND: &str = "/api/outbound";
+
+/// Where each service in this stack comes from, and under what licence.
+///
+/// The read that turns an assurance into something checkable: a page can say a stack
+/// is open source, and only this can hand somebody the identifier, the project and
+/// the exact image to go and see for themselves.
+pub const PROVENANCE: &str = "/api/provenance";
+/// What each service in this stack is for, and what became of the ones that went.
+///
+/// The read that answers the question a list of nineteen names raises and cannot
+/// settle: a page can print `bazarr` beside `prowlarr`, and only this can say which of
+/// them an operator would miss.
+pub const CATALOGUE: &str = "/api/catalogue";
+
+/// Everything lemonfiber keeps on this machine, where each thing is and why.
+///
+/// The read a browser is least able to answer for itself: a page has no filesystem
+/// in front of it and cannot see the host at all.
+pub const STORED: &str = "/api/stored";
+
+/// Where this copy of lemonfiber stands, and what moving it would come to.
+///
+/// A read and never a replacement: what it answers with is the exact command for
+/// whichever tool owns the copy that is running, which is a thing a browser can put in
+/// front of somebody and never a thing this surface carries out. It takes the version
+/// to move to, which is the one question a downgrade asks.
+pub const UPDATE: &str = "/api/update";
+
+/// Every credential this stack holds, with none of their values.
+///
+/// The reading half of the word and nothing else: the two things that can be asked
+/// of a line of it — replacing one, printing one — are not offered here at all. A
+/// reveal over this door would put a credential through a browser, a proxy log and
+/// whatever is caching in between, which is exactly the disclosure the inventory
+/// itself is shaped to make impossible.
+pub const CREDENTIALS: &str = "/api/credentials";
+
+/// What the operator is told about, and what each preset means.
+///
+/// The reading only. Changing it is an act on what reaches somebody, so it belongs
+/// behind a named action rather than a door a browser opens by asking.
+pub const ALERTS: &str = "/api/alerts";
+
+/// What is already on this machine, before anything is proposed.
+///
+/// The survey only. Adopting, standing beside, or replacing an existing setup are acts
+/// on somebody's own stack, so each belongs behind a named action rather than a door.
+pub const MIGRATION: &str = "/api/migration";
+
+/// Everything lemonfiber changed, and how far each could be put back.
+///
+/// The record only. Putting a change back is an act on a running stack, so it belongs
+/// behind a named action rather than a door a browser opens by asking.
+pub const HISTORY: &str = "/api/history";
+
+/// Where the disk stands, where the room went, and what could be got back.
+///
+/// A read rather than the action of the same name, and the two answer with the same
+/// document: the accounting is what a browser is shown, and what a browser agrees
+/// to afterwards is what the accounting named. A read never removes anything, so
+/// this one reaches the command with nothing confirmed.
+pub const SPACE: &str = "/api/space";
+
+/// What taking lemonfiber off this machine would come to, at one of four removals.
+///
+/// A read rather than the action of the same name, and the two answer with the same
+/// document: the listing is what a browser is shown, and what a browser agrees to
+/// afterwards is what the listing named. A read never removes anything, so this one
+/// reaches the command with nothing confirmed.
+pub const UNINSTALL: &str = "/api/uninstall";
+
+/// How the line is shared, what that costs, and whether the clients keep to it.
+///
+/// A read rather than the action of the same name, and the two answer with the same
+/// document. It takes nothing: a read never declares a limit, so this one reaches
+/// the command with nothing asked of it, and the action beside it is where a
+/// declaration goes.
+pub const BANDWIDTH: &str = "/api/bandwidth";
+
+/// Which app to watch on, for each kind of device somebody in the house has.
+///
+/// The same answer on every machine — the client landscape belongs to the
+/// platforms rather than to this stack — which is why it takes nothing and reads
+/// nothing. A browser wants it because the person deciding is often the one
+/// already looking at a screen.
+pub const CLIENTS: &str = "/api/clients";
+
+/// The backup archives this machine has kept, by the names they were written under.
+///
+/// Named for what it lists rather than for the command it reaches: what these are
+/// to an operator is their backups, and what they are to the core is the archives
+/// it keeps. The listing is the half of a restore that comes before naming one — a
+/// browser has no filesystem to look in, so a name it could not be told is a name
+/// it cannot use.
+pub(crate) const BACKUPS: &str = "/api/backups";
+
+/// What the services are saying, one document a line — or, where it was asked to
+/// keep reading, a name for work that will not end and lines that arrive elsewhere.
+pub const LOGS: &str = "/api/logs";
+
+/// One support bundle this run kept, handed over whole.
+///
+/// The other read with no command below, and for a plainer reason than the logs
+/// have: what it answers with is a file rather than a value, and no envelope holds
+/// one. Which file is the core's to decide, from the name in this path and the
+/// directory it keeps bundles in.
+///
+/// The name is a path segment rather than a parameter, so a browser saving the
+/// answer reads the name off the address it asked at — and this surface never has
+/// to quote a name a request supplied into a header.
+pub const BUNDLE: &str = "/api/bundle/{name}";
+
+/// The reads a name reaches, in the order the endpoints declare them.
+///
+/// What another surface may ask for by name. A surface reaching past this list
+/// would be asking the core something no browser can ask it, which is the whole
+/// arrangement this exists to prevent.
+pub const OFFERED: &[&str] = &[
+    VERSION,
+    FORMS,
+    STATUS,
+    SERVICES,
+    CHECKS,
+    STORAGE,
+    REQUESTS,
+    HELD,
+    HOSTING,
+    FRONT_DOOR,
+    TRACE,
+    STUCK,
+    CONFIG,
+    QUALITY,
+    EXPLAIN,
+    BACKUPS,
+    OUTBOUND,
+    PROVENANCE,
+    CATALOGUE,
+    STORED,
+    UNINSTALL,
+    SPACE,
+    BANDWIDTH,
+    CLIENTS,
+    ALERTS,
+    CREDENTIALS,
+    MIGRATION,
+    HISTORY,
+    UPDATE,
+];
+
+/// What is said to a request that named nothing to follow.
+pub const NO_TERM: &str = "What to follow must be named.";
+
+/// What is said to a request whose season is not a number.
+pub(crate) const NOT_A_SEASON: &str = "Which season to narrow to must be a number.";
+
+/// What is said to a request that named no setting to read.
+pub const NO_SETTING: &str = "Which setting to read must be named.";
+
+/// What is said to a request that named no household member to narrow to.
+pub const NO_MEMBER: &str = "Which member to narrow to must be named.";
+
+/// What is said to a request asking for a shelf and naming nobody whose it is.
+///
+/// Apart from [`NO_MEMBER`] because the two refuse different things: that one is said
+/// where naming nobody would have meant everybody, and this is said where there is no
+/// everybody to fall back to.
+pub(crate) const NO_SHELF_WITHOUT_A_MEMBER: &str = "Whose shelf to read must be named.";
+
+/// What is said to a request asking for a number of holdings that is not one.
+pub(crate) const NOT_A_COUNT: &str = "How many holdings to answer with must be a whole number.";
+
+/// What is said to a request asking for more holdings than this answers in one go.
+///
+/// Refused rather than quietly cut down to the ceiling. A caller that asked for five
+/// thousand and was handed five hundred has been told it has the whole shelf, and a
+/// narrower answer wearing the shape of the answer is the same failure as a wider one.
+pub(crate) const TOO_MANY_AT_ONCE: &str = "That is more holdings than one read answers with.";
+
+/// What is said to a request naming a group of checks that is not one.
+pub(crate) const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
+
+/// What is said where no read goes by the name that was asked for.
+pub const NO_SUCH_READ: &str = "There is no read by that name.";
+
+/// What is said to a request naming a removal that is none of the four.
+pub const NO_SUCH_REMOVAL: &str =
+    "Which removal must be one of stop, services, configuration or media.";
+
+/// What is said to a request that asked to move something forward and named no object.
+///
+/// Refused rather than answered with either. Neither object is the smaller case of the
+/// other — one moves somebody's services and the other moves this program — so a page
+/// that asked about the stack and was handed the binary has been answered a question it
+/// did not ask.
+pub(crate) const NO_UPDATE_OBJECT: &str = "Which of stack or self to move forward must be named.";
+
+/// What a read was given, mirroring the flags its command takes.
+///
+/// One carrier rather than one shape per read, so a caller fills the field the read
+/// names and leaves the rest. Each field is the query parameter of the same
+/// meaning, taken as it was written — the parsing a season needs is done here, so
+/// a request that named one badly is refused in the same words wherever it arrived.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Wanted {
+    /// The forms to narrow to, or to say what starting would come to.
+    pub forms: Vec<String>,
+    /// The household member to narrow to.
+    pub member: Option<String>,
+    /// What to follow, named as a person would say it.
+    pub term: Option<String>,
+    /// The season to narrow a trace to, as it was written.
+    pub season: Option<String>,
+    /// The setting to read, instead of every one of them.
+    pub key: Option<String>,
+    /// The group of checks, or the one check, to narrow a diagnosis to.
+    pub only: Option<String>,
+    /// The word to explain, instead of every word there is to ask about.
+    pub word: Option<String>,
+    /// Which of the four removals to read.
+    pub tier: Option<String>,
+    /// The version to move to, instead of whatever is newest.
+    pub to: Option<String>,
+    /// Which of the two things that can be moved forward is being read.
+    pub what: Option<String>,
+    /// How many holdings a shelf answers with.
+    pub most: Option<String>,
+}
+
+/// What a read was given, or why the request cannot be read as it stands.
+///
+/// The one door a query string goes through. Which parameters a read takes is
+/// [`asked`]'s, named by the path the read is served at, so a read that takes none
+/// refuses a parameter by the same rule as one that takes three.
+///
+/// # Errors
+///
+/// Returns the refusal a caller is answered with: a parameter this read does not
+/// take, or one it takes once and was given twice.
+pub fn wanted(read: &str, query: Option<&str>) -> Result<Wanted, Box<Problem>> {
+    Asked::read(read, query).map(|asked| asked.wanted())
+}
+
+/// The command a read names, or what to say to a request that reaches none.
+///
+/// # Errors
+///
+/// Returns the one line a caller is answered with.
+pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
+    let Wanted {
+        forms,
+        member,
+        term,
+        season,
+        key,
+        only,
+        word,
+        tier,
+        to,
+        what,
+        most,
+    } = given;
+    match read {
+        VERSION => Ok(Command::Version),
+        // Naming none lists what the stack declares and naming some says what
+        // starting those would come to, which is the fork `lemonfiber forms` takes
+        // on the same word.
+        FORMS if forms.is_empty() => Ok(Command::Forms),
+        FORMS => Ok(Command::Preview { forms }),
+        STATUS => Ok(Command::Status { forms: Vec::new() }),
+        SERVICES => Ok(Command::Status { forms }),
+        CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
+        STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
+        REQUESTS => household(member),
+        HELD => shelf(member, most),
+        // Nothing asked of it, because what is hosted is a property of the machine
+        // rather than of the caller: the two words that change it are actions, at the
+        // other door, and a parameter here would let one surface be told a different
+        // answer from another.
+        HOSTING => Ok(Command::Hosting(Keeping::Read)),
+        FRONT_DOOR => Ok(Command::FrontDoor),
+        TRACE => following(term, season.as_deref()),
+        STUCK => Ok(Command::Stuck),
+        CONFIG => setting(key),
+        QUALITY => Ok(Command::Quality(QualityAction::Show)),
+        // Naming an empty word is naming one this product does not explain, and is
+        // refused for that by the command rather than read as having named none.
+        EXPLAIN => Ok(word.map_or(Command::Glossary, |word| Command::Explain { word })),
+        BACKUPS => Ok(Command::Archives),
+        OUTBOUND => Ok(Command::Outbound),
+        PROVENANCE => Ok(Command::Provenance),
+        CATALOGUE => Ok(Command::Catalogue),
+        STORED => Ok(Command::Stored),
+        // Which removal is the one thing this takes, and a name that is none of the
+        // four is refused rather than read as the safest — somebody who typed a word
+        // and meant it must not be given a different removal because of a spelling.
+        UNINSTALL => removing(tier),
+        // The reading and nothing else. What is asked here is fixed rather than taken
+        // from the request, so no caller can turn this door into the one that prints a
+        // credential.
+        ALERTS => Ok(Command::Alerts(AlertAction::Show)),
+        // The survey and nothing else, which is the only part of migration that changes
+        // nothing.
+        MIGRATION => Ok(Command::Migrate(MigrateAction::Survey)),
+        // The record and nothing else. What could be put back is said here; asking for it
+        // to be is an action.
+        HISTORY => Ok(Command::History),
+        CREDENTIALS => Ok(Command::Credentials(Asking::Read)),
+        // The object is the whole of what tells the two apart, and naming none is
+        // refused. This is where it parts company with the removal above: that one has
+        // a reading which takes nothing, and here neither object is the smaller case of
+        // the other.
+        UPDATE => moving(what.as_deref(), to),
+        // Nothing confirmed, because a read never takes anything: what this answers
+        // with is the account and the offer, and the action beside it is where an
+        // answer to that offer goes.
+        SPACE => Ok(Command::Space { confirm: false }),
+        // Nothing asked of it, for the same reason: what this answers with is the
+        // account of the line, and the action beside it is where a limit is
+        // declared.
+        BANDWIDTH => Ok(Command::Bandwidth(BandwidthAsked::default())),
+        CLIENTS => Ok(Command::Clients),
+        _ => Err(NO_SUCH_READ),
+    }
+}

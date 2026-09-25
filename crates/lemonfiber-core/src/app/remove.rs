@@ -18,25 +18,6 @@ use crate::app::Ctx;
 use crate::model::{HouseholdRemoval, Revoked};
 use crate::ports::service::{Household as _, Member, Requests as _};
 
-/// The same, as the answer a surface is handed.
-///
-/// Here rather than in the dispatcher so that what a removal *is* and what it is called
-/// stay together: the dispatcher's job is to route, and a route that also builds the
-/// answer is two jobs in one line.
-///
-/// # Errors
-///
-/// Returns whatever [`remove`] returns.
-pub(super) async fn dispatched(
-    ctx: &Ctx,
-    name: String,
-    confirm: bool,
-) -> Result<super::Outcome, Box<crate::error::Problem>> {
-    remove(ctx, name, confirm)
-        .await
-        .map(super::Outcome::Removed)
-}
-
 /// Remove somebody from the household, or — until `confirm` — say what that would cost.
 ///
 /// # Errors
@@ -44,7 +25,7 @@ pub(super) async fn dispatched(
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
 /// where it will not answer, where nobody is named, where nobody by that name is here,
 /// or where the account named administers the server.
-pub(super) async fn remove(
+pub(crate) async fn remove(
     ctx: &Ctx,
     name: String,
     confirm: bool,
@@ -232,7 +213,7 @@ fn here(household: &[Member], name: &str) -> Option<Member> {
 /// Said where the removal is for nobody: the name is blank, or only spaces.
 fn nobody_named() -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REMOVE-1"),
+        crate::error::codes::remove::NOBODY_NAMED,
         crate::error::Severity::Error,
         "no name was given, so there is nobody to remove",
         "Removing somebody takes the name their account is held under",
@@ -243,7 +224,7 @@ fn nobody_named() -> crate::error::Problem {
 /// Said where the stack holds no media server: there is no account to remove.
 fn no_media_server() -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REMOVE-2"),
+        crate::error::codes::remove::NO_MEDIA_SERVER,
         crate::error::Severity::Error,
         "this stack has no media server, so there is no household to remove anybody from",
         "A household member is an account on the media server; without one there is \
@@ -255,7 +236,7 @@ fn no_media_server() -> crate::error::Problem {
 /// Said where the media server will not say who it holds.
 fn unreadable() -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REMOVE-3"),
+        crate::error::codes::remove::UNREADABLE,
         crate::error::Severity::Error,
         "the media server would not say who holds an account, so nobody was removed",
         "Removing somebody starts by finding their account, and that read did not answer",
@@ -266,7 +247,7 @@ fn unreadable() -> crate::error::Problem {
 /// Said where nobody by that name is in the household.
 fn nobody_here(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REMOVE-4"),
+        crate::error::codes::remove::NOBODY_HERE,
         crate::error::Severity::Error,
         format!("nobody called {name} is in this household"),
         "Nothing was removed. The name has to match an account the media server holds, \
@@ -278,7 +259,7 @@ fn nobody_here(name: &str) -> crate::error::Problem {
 /// Said where the account named administers the server.
 fn runs_the_server(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REMOVE-5"),
+        crate::error::codes::remove::RUNS_THE_SERVER,
         crate::error::Severity::Error,
         format!("{name} administers the media server, so it is not an account to remove"),
         "The media server refuses to be left without an administrator, and this is also \
@@ -294,7 +275,7 @@ fn runs_the_server(name: &str) -> crate::error::Problem {
 /// Said where the media server refused to remove the account.
 fn would_not_remove(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REMOVE-6"),
+        crate::error::codes::remove::WOULD_NOT_REMOVE,
         crate::error::Severity::Error,
         format!("the media server would not remove {name}, so nothing was removed"),
         "Nothing else was touched: the request service is only asked once the media \

@@ -1,9 +1,8 @@
 //! The fakes lemonfiber's tests drive the real code through.
 //!
-//! One home, reachable from both sides of a wall that used to have no door. A crate's own
-//! `#[cfg(test)]` modules and its `tests/` directory are separate compilation units, so a
-//! fake defined in either is invisible to the other — which is how the same port came to be
-//! faked twice, and the filesystem four times.
+//! One home, reachable from both sides of a wall. A crate's own `#[cfg(test)]` modules and
+//! its `tests/` directory are separate compilation units, so a fake defined in either is
+//! invisible to the other, and a port faked in each would be faked twice.
 //!
 //! A crate rather than a module, because that is the only shape both can reach. It depends
 //! on `lemonfiber-ports` alone: depending on `lemonfiber-core` would be a dev-dependency
@@ -39,11 +38,13 @@ pub(crate) fn noted<T>(into: &std::sync::Mutex<Vec<T>>, what: T) {
 pub mod downloads;
 pub mod erasing;
 pub mod files;
+pub mod heard;
 pub mod hosting;
 pub mod http;
 pub mod located;
 pub mod ports;
 pub mod program;
 pub mod pulled;
+pub mod scratch;
 pub mod support;
 pub mod walking;

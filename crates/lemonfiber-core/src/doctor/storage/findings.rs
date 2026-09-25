@@ -4,9 +4,9 @@
 //! single definition rather than being assembled at each site.
 
 use super::{
-    finding, pair, Code, Finding, Ownership, Problem, Remedy, Severity, State, StorageFacts,
-    Verdict,
+    finding, pair, Finding, Ownership, Problem, Remedy, Severity, State, StorageFacts, Verdict,
 };
+use crate::error::codes::storage::{COPY_ONLY, DEGRADED, SERVICE_DENIED};
 use crate::storage;
 
 /// The findings when the link was made and confirmed: a pass naming how many
@@ -195,18 +195,3 @@ pub(super) fn service_unverified() -> Finding {
         },
     )
 }
-
-/// Raised when the data root cannot hardlink, so imports must copy.
-pub const COPY_ONLY: Code = Code::new("STORAGE-1");
-
-/// Raised when the data root exists but cannot be written to.
-pub const ROOT_UNWRITABLE: Code = Code::new("STORAGE-2");
-
-/// Raised when the data root is not there to test.
-pub const ROOT_ABSENT: Code = Code::new("STORAGE-3");
-
-/// Raised when the data root used to hardlink and no longer does.
-pub const DEGRADED: Code = Code::new("STORAGE-5");
-
-/// Raised when the operator owns the data root but the services cannot write it.
-pub const SERVICE_DENIED: Code = Code::new("STORAGE-6");

@@ -17,12 +17,13 @@
 //! nobody has been told about, and the judgement is already available without touching
 //! anything.
 
-use crate::error::{Code, Diagnose as _, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose as _, Problem, Remedy, Severity, State};
 use crate::journal::{Change, Undo};
 use crate::rollback::{standing, together, Reversal as Judgement};
 
 use super::repair::told;
 use super::Ctx;
+use crate::error::codes::undo::{CANNOT_SUCCEED, MORE_THAN_ONE_RUN, NOWHERE_TO_LOOK, NO_SUCH_RUN};
 
 /// What putting a run back came to.
 ///
@@ -86,18 +87,6 @@ pub struct Noted {
     pub because: String,
 }
 
-/// Raised when no run carries the stamp a reversal was asked for.
-pub const NO_SUCH_RUN: Code = Code::new("UNDO-1");
-
-/// Raised when a stamp names more than one run, so which to put back is not settled.
-pub const MORE_THAN_ONE_RUN: Code = Code::new("UNDO-2");
-
-/// Raised when a run cannot be put back, carrying the reason it cannot.
-pub const CANNOT_SUCCEED: Code = Code::new("UNDO-3");
-
-/// Raised when a run cannot say where lemonfiber's own files are.
-pub const NOWHERE_TO_LOOK: Code = Code::new("UNDO-4");
-
 /// The operation a reversal records its own work under, so it can be put back in turn.
 pub const OPERATION: &str = "undo";
 
@@ -112,20 +101,7 @@ const NEEDS_THE_SERVICE: &str = "it goes back through the service that made it, 
 /// Returns a [`Problem`] where the run cannot be found, where the stamp names more than
 /// one, where the judgement says the run cannot be put back, or for any reason the
 /// executor underneath gives.
-pub async fn undo(ctx: &Ctx, run: Option<String>) -> Result<super::Outcome, Box<Problem>> {
-    reversing(ctx, run.as_deref())
-        .await
-        .map(super::Outcome::Undo)
-}
-
-/// Put back the last repair, or the run a stamp names.
-///
-/// # Errors
-///
-/// Returns a [`Problem`] where the run cannot be found, where the stamp names more than
-/// one, where the judgement says the run cannot be put back, or for any reason the
-/// executor underneath gives.
-pub async fn reversing(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>> {
+pub async fn undo(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>> {
     match run {
         None => super::repair::reversing(ctx).await,
         Some(at) => named(ctx, at).await,
@@ -157,7 +133,7 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 /// Where there is nowhere to look for the record, where the judgement says a change
 /// cannot be put back — drift, or a later change that depends on it — or for any reason
 /// the executor underneath gives.
-pub(super) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
+pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal());
     let changes = journal.changes();
@@ -177,7 +153,7 @@ pub(super) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, B
 ///
 /// The ones [`everything`] would give before touching anything: nowhere to look for
 /// the record, or a change the judgement will not put back.
-pub(super) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
+pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal());
     let changes = journal.changes();
@@ -252,7 +228,7 @@ async fn carried_out(
     super::recover::journalled(
         &paths.journal(),
         &recording(run, &reversed, &ctx.stamp()),
-        ctx.random.as_ref(),
+        ctx.seams.random.as_ref(),
     );
 
     Ok(Reversal {
@@ -272,7 +248,7 @@ async fn carried_out(
 /// and setting a field in order to discover that it could — which is the write, done to
 /// describe itself.
 #[must_use]
-pub(super) fn would_reverse(undos: Vec<Undo>) -> Reversal {
+pub(crate) fn would_reverse(undos: Vec<Undo>) -> Reversal {
     let (through_a_service, here): (Vec<Undo>, Vec<Undo>) = undos
         .into_iter()
         .partition(|undo| matches!(undo.action, crate::journal::Action::Reconfigure { .. }));

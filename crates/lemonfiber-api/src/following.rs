@@ -58,7 +58,7 @@ pub(crate) async fn followed(
     services: Vec<String>,
     tail: u32,
 ) -> Response {
-    let Some(job) = Job::mint(serving.ctx.random.as_ref()) else {
+    let Some(job) = Job::mint(serving.ctx.seams.random.as_ref()) else {
         return unnameable();
     };
     let (ctx, live) = (Arc::clone(&serving.ctx), Arc::clone(&serving.live));

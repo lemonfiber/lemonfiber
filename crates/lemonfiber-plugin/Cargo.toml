@@ -11,12 +11,12 @@ repository.workspace = true
 # The stack description, for the one thing the vocabulary cannot state about itself:
 # which bundled services declare each capability. The direction is one-way — nothing
 # in `lemonfiber-manifest` may reach back here, or the two would be a cycle.
-lemonfiber-manifest = { path = "../lemonfiber-manifest" }
+lemonfiber-manifest = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 # The generated schema is a JSON document, and holding a manifest to it means reading
-# that document. Already in the tree through `schemars`, which is itself built on it.
-serde_json = "1"
+# that document.
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 

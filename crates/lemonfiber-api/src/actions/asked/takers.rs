@@ -436,7 +436,7 @@ pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
 /// Only for a name this surface offers — a name it does not offer is absent before
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
-pub fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
+pub(crate) fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
     let carried: [(&str, bool, &[&str]); 43] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),

@@ -22,8 +22,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
+use super::admitted::Admitted;
 use lemonfiber_core::admission::Credential;
-use lemonfiber_core::model::Admitted;
 use lemonfiber_core::ports::random::Random;
 use tokio::sync::Mutex;
 
@@ -38,7 +38,7 @@ const WIDTH: usize = 32;
 /// Twelve hours: a session opened in the morning does not ask again over lunch, and
 /// one opened at midday is gone by the small hours rather than waiting for whoever
 /// is next in the house.
-pub const LASTS: Duration = Duration::from_secs(12 * 60 * 60);
+pub(crate) const LASTS: Duration = Duration::from_secs(12 * 60 * 60);
 
 /// One session: when it ends, and who it was opened for.
 struct Session {

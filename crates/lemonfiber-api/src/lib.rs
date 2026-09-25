@@ -11,6 +11,7 @@
 
 pub mod actions;
 pub mod admission;
+pub mod contract;
 pub mod entitled;
 pub mod events;
 mod following;
@@ -18,7 +19,6 @@ pub mod frontend;
 pub mod guard;
 pub mod jobs;
 pub mod read;
-pub mod reads;
 pub mod router;
 pub mod serve;
 pub mod setup;

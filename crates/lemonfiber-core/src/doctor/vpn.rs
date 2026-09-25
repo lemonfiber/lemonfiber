@@ -47,9 +47,8 @@ pub use port_forward::granted_port;
 use port_forward::{port_forward_offline, Grant};
 use probe::{addresses, exit_country, find, public_address, read_grant};
 
-pub use killswitch::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
-pub use leak::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
-pub use port_forward::NO_FORWARDED_PORT;
+pub use crate::error::codes::vpn::CLIENT_ISOLATED;
+pub use crate::error::codes::vpn::KILLSWITCH_LEAKS;
 pub(crate) use reading::{read_vpn, VpnReading};
 
 /// Gluetun's own record of the port its provider forwarded, written inside the

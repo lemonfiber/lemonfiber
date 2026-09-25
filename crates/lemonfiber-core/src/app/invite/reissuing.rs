@@ -34,7 +34,7 @@ use super::{reaching, Reaching};
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
 /// where it will not answer, where nobody is named, where nobody by that name is here,
 /// or where the account named administers the server.
-pub(crate) async fn reissued(
+pub(crate) async fn reissue(
     ctx: &Ctx,
     name: String,
 ) -> Result<Invitation, Box<crate::error::Problem>> {
@@ -61,14 +61,14 @@ pub(crate) async fn reissued(
     }
 
     if ctx.dry_run {
-        return Ok(reissue(member.name, reachable, true));
+        return Ok(renewed(member.name, reachable, true));
     }
     if server.unclaim(&member.id).await.is_err() {
         return Err(Box::new(would_not_reissue(&member.name)));
     }
-    Ok(reissue(member.name, reachable, false))
+    Ok(renewed(member.name, reachable, false))
 }
-/// The invitation a reissued account is sent with.
+/// The invitation a reissue account is sent with.
 ///
 /// `Reset` rather than `Made`, because what the person needs to hear is different: nobody
 /// is being invited, and the news is that the password they had has stopped working. The
@@ -76,7 +76,7 @@ pub(crate) async fn reissued(
 /// which for an account somebody has watched on is a larger loss than for an offer nobody
 /// took up. That is why the message says what happens at the end of it rather than
 /// leaving the word "lapses" to carry it.
-fn reissue(name: String, reachable: crate::door::Address, rehearsed: bool) -> Invitation {
+fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> Invitation {
     Invitation {
         name,
         address: reachable.url,
@@ -97,7 +97,7 @@ fn reissue(name: String, reachable: crate::door::Address, rehearsed: bool) -> In
 /// Said where the media server will not say who holds an account.
 fn unreadable() -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REISSUE-1"),
+        crate::error::codes::reissue::UNREADABLE,
         crate::error::Severity::Error,
         "the media server would not say who holds an account, so nothing was reset",
         "Making an account claimable again starts by finding it, and that read did not \
@@ -108,7 +108,7 @@ fn unreadable() -> crate::error::Problem {
 /// Said where nobody by that name is in the household.
 fn nobody_here(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REISSUE-2"),
+        crate::error::codes::reissue::NOBODY_HERE,
         crate::error::Severity::Error,
         format!("nobody called {name} is in this household"),
         "Nothing was reset. The name has to match an account the media server holds, \
@@ -119,7 +119,7 @@ fn nobody_here(name: &str) -> crate::error::Problem {
 /// Said where the account named administers the server.
 fn runs_the_server(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REISSUE-3"),
+        crate::error::codes::reissue::RUNS_THE_SERVER,
         crate::error::Severity::Error,
         format!("{name} administers the media server, so its password is not one to reset"),
         "This is the account lemonfiber signs in as, and taking its password away would \
@@ -133,7 +133,7 @@ fn runs_the_server(name: &str) -> crate::error::Problem {
 /// Said where the media server refused to make the account claimable again.
 fn would_not_reissue(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
-        crate::error::Code::new("REISSUE-4"),
+        crate::error::codes::reissue::WOULD_NOT_REISSUE,
         crate::error::Severity::Error,
         format!("the media server would not reset {name}'s password, so nothing changed"),
         "Their existing password still works and the account is untouched",

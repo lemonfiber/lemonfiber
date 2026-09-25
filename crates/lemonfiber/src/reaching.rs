@@ -12,7 +12,7 @@
 //! tests hold every action and every question the screen offers to an entry here, and
 //! every entry here to something the screen offers; the parity table's terminal column
 //! is held to the same list by
-//! [`surface_parity.rs`](../../../crates/lemonfiber/tests/surface_parity.rs). A row
+//! [`surface_parity.rs`](../../../crates/lemonfiber/tests/architecture/surface_parity.rs). A row
 //! claiming this screen reaches a request it does not, and an offer no row accounts
 //! for, each fail — which is what the web column has had since the table was written.
 //!
@@ -270,11 +270,10 @@ pub const SHOWS: &[&str] = &["ps"];
 /// of its own — the read is `trace`, and one word answering at two doors is the
 /// arrangement every read on this surface is kept out of.
 ///
-/// Putting one run back used to be here too, under the `doctor` row, because
-/// `doctor --undo` was the only way to ask for it. It has a request of its own now and
-/// so an entry of its own in [`ACTS`]: the screen's errand still asks the question it
-/// always asked — the last repair, no run named — and that is one form of a request
-/// rather than a second request, which is exactly what this list exists to keep apart.
+/// Putting one run back is not here: it is a request of its own and so an entry of its
+/// own in [`ACTS`]. The screen's errand asks for the last repair with no run named, and
+/// that is one form of that request rather than a second request, which is exactly
+/// what this list exists to keep apart.
 ///
 /// None of the eight is an entry in [`ACTS`], because each request is already
 /// reached: [`reached`] is what the parity table's terminal column is held against in
@@ -340,50 +339,4 @@ pub fn reached() -> Vec<&'static str> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{reached, ACTS, ALSO, ASKS, OPENS, SHOWS};
-
-    /// Every request is reached one way, or a reader of the table has two rows'
-    /// worth of claim to reconcile against one row.
-    #[test]
-    fn no_request_is_reached_twice() {
-        let every = reached();
-
-        for request in &every {
-            let same = every.iter().filter(|other| *other == request).count();
-            assert_eq!(same, 1, "{request} is reached more than one way");
-        }
-        assert_eq!(
-            every.len(),
-            ACTS.len() + ASKS.len() + SHOWS.len() + OPENS.len()
-        );
-    }
-
-    /// A read is named by its path and an action by a bare word, which is what tells
-    /// the two vocabularies apart wherever this list is read.
-    #[test]
-    fn a_question_is_named_by_a_path_and_an_action_by_a_word() {
-        assert!(ASKS.iter().all(|reach| reach.through.starts_with("/api/")));
-        assert!(ACTS.iter().all(|reach| !reach.through.contains('/')));
-        assert!(ALSO.iter().all(|reach| !reach.through.contains('/')));
-    }
-
-    /// A second way is a second way to something already reached.
-    ///
-    /// An entry here naming a request no other list holds would be a write nothing in
-    /// the parity table accounts for — the failure the list beside it exists to catch,
-    /// arriving through the list added to catch it.
-    #[test]
-    fn a_second_way_reaches_something_this_screen_already_reaches() {
-        let every = reached();
-
-        for reach in ALSO {
-            assert!(
-                every.contains(&reach.request),
-                "{} is reached no other way",
-                reach.request
-            );
-        }
-        assert!(!ALSO.is_empty());
-    }
-}
+mod tests;

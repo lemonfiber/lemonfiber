@@ -3,8 +3,8 @@
 # `release-finalize` in the spec repo has always been triggered by a
 # `release-published` dispatch and said in its own header that the binary repo
 # fires one on publish. Nothing did. Publishing 0.5.0 announced it to Discord and
-# otherwise did nothing at all, leaving the manifest at `releasable` — which by
-# OPS-R52 blocks the next version from being staged. So a release nobody
+# otherwise did nothing at all, leaving the manifest at `releasable` — which
+# blocks the next version from being staged. So a release nobody
 # remembered to record by hand did not merely leave the record stale, it stopped
 # the train.
 #
@@ -12,13 +12,13 @@
 # is a thing a person is still deciding about.
 #
 # A pre-release is not one either, and there is nothing here for it to record:
-# OPS-R60 says a pre-release does not move the manifest's status, and the record
+# a pre-release does not move the manifest's status, and the record
 # it does leave is written by the lane that cut it, before the tag.
 #
 # Told apart by its tag rather than by the forge's pre-release flag, which cargo-dist
 # sets on every version below 1.0.0 and which therefore separates nothing here. A
-# guard on the flag would have stopped recording every release — and by OPS-R52 a
-# manifest left unrecorded blocks the next version from being staged, which is the
+# guard on the flag would have stopped recording every release — and a manifest
+# left unrecorded blocks the next version from being staged, which is the
 # failure this whole workflow exists to end.
 #
 # The skip is said out loud, because a skip nobody can see is the same shape as a
@@ -43,7 +43,7 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          echo "::notice title=Pre-release::${TAG} moves no manifest status (OPS-R60); the lane that cut it wrote its record before the tag."
+          echo "::notice title=Pre-release::${TAG} moves no manifest status; the lane that cut it wrote its record before the tag."
 
   record:
     if: ${{ !contains(github.event.release.tag_name, '-') }}

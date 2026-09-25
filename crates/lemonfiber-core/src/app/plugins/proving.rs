@@ -57,7 +57,7 @@ const POLL: Duration = Duration::from_millis(500);
 /// Where the engine could not be run, or ran and refused — and in either case the
 /// install is put back first, so what the refusal says about the machine is what the
 /// reversal left rather than what it was hoped to leave.
-pub(super) async fn started(
+pub(crate) async fn started(
     ctx: &Ctx,
     installed: &Installed,
     stack: &Path,
@@ -69,7 +69,7 @@ pub(super) async fn started(
         .map(|placed| placed.service.clone())
         .collect();
     let command = invocation(ctx, installed, stack, &Action::Start(services));
-    let answered = match ctx.runner.run(&command).await {
+    let answered = match ctx.seams.runner.run(&command).await {
         Ok(output) if output.succeeded() => return Ok(()),
         other => other,
     };
@@ -95,14 +95,14 @@ pub(super) async fn started(
 /// itself, beside putting the old one back — or the old version being put back, where
 /// the only thing worse than it not starting is a reversal that took its files away
 /// again for not starting.
-pub(super) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option<String> {
+pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option<String> {
     let services: Vec<String> = installed
         .services
         .iter()
         .map(|placed| placed.service.clone())
         .collect();
     let command = invocation(ctx, installed, stack, &Action::Start(services));
-    match ctx.runner.run(&command).await {
+    match ctx.seams.runner.run(&command).await {
         Ok(output) if output.succeeded() => None,
         Ok(refused) => Some(format!(
             "the container engine refused to start it: {}",
@@ -117,14 +117,14 @@ pub(super) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
 /// Answers whether it could, rather than failing: this runs inside an install that is
 /// already being put back, and a reversal that stopped at its first difficulty would
 /// leave more behind than one that carried on and said what it could not do.
-pub(super) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> bool {
+pub(crate) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> bool {
     let services: Vec<String> = installed
         .services
         .iter()
         .map(|placed| placed.service.clone())
         .collect();
     let command = invocation(ctx, installed, stack, &Action::Remove(services));
-    matches!(ctx.runner.run(&command).await, Ok(output) if output.succeeded())
+    matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded())
 }
 
 /// The Compose invocation for this plugin's own services.
@@ -154,14 +154,14 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
 const PROXY: (&str, &str) = ("caddy", "proxy");
 
 /// Whether these writes put a route into the proxy's file.
-pub(super) fn routes_written(planned: &[crate::plugin::Write]) -> bool {
+pub(crate) fn routes_written(planned: &[crate::plugin::Write]) -> bool {
     planned.iter().any(|write| {
         matches!(&write.lands, crate::plugin::Lands::Region { key, .. } if key == crate::plugin::PROXY)
     })
 }
 
 /// Whether this reversal took a route back out of the proxy's file.
-pub(super) fn routes_withdrawn(back: &Reversal) -> bool {
+pub(crate) fn routes_withdrawn(back: &Reversal) -> bool {
     back.reversed.iter().any(|undo| {
         matches!(&undo.action, crate::journal::Action::Withdraw { key, .. } if key == crate::plugin::PROXY)
     })
@@ -179,7 +179,7 @@ pub(super) fn routes_withdrawn(back: &Reversal) -> bool {
 ///
 /// Told whether a route changed rather than finding out, because the writes and the
 /// reversal already say so, and a second look at the disk would be a second answer.
-pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
+pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
     if !routed {
         return;
     }
@@ -194,7 +194,7 @@ pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
     };
     let restart = Action::Restart(vec![service.to_owned()]);
     let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);
-    let _ = ctx.runner.run(&command).await;
+    let _ = ctx.seams.runner.run(&command).await;
 }
 
 /// Ask every proof of the service it names, now that there is one to ask.
@@ -207,13 +207,13 @@ pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
 /// waiting out is a service that has not come up, and a plugin with five proofs
 /// against a service that never answers must not wait five times as long as one with
 /// a single proof.
-pub(super) async fn asked(
+pub(crate) async fn asked(
     ctx: &Ctx,
     manifest: &Manifest,
     installed: &Installed,
     stated: &mut [Proving],
 ) {
-    let deadline = ctx.clock.now() + ctx.patience;
+    let deadline = ctx.seams.clock.now() + ctx.patience;
     // Where each of this plugin's services answers, read through the one answer every
     // caller that asks a plugin's service reads: a second way of composing an address
     // is a second port to be wrong about.
@@ -267,7 +267,7 @@ async fn answering(
         body: None,
     };
     loop {
-        match ctx.http.send(&request).await {
+        match ctx.seams.http.send(&request).await {
             Ok(response) => {
                 let faults = judge(&proof.expect, &live(&response));
                 return if faults.is_empty() {
@@ -279,7 +279,7 @@ async fn answering(
             // Checked after the asking rather than before it, so a budget of nothing
             // still reports what the service said rather than reporting that it was
             // never asked.
-            Err(unreachable) if ctx.clock.now() >= deadline => {
+            Err(unreachable) if ctx.seams.clock.now() >= deadline => {
                 return Verdict::Unproven {
                     why: format!("{} did not answer: {}", unreachable.url, unreachable.reason),
                 }
@@ -302,7 +302,7 @@ async fn answering(
 /// Reported as unproven either way. What it is called and what it costs are two
 /// decisions, and a verdict renamed to justify the cost would tell an operator their
 /// service is broken when what happened is that nothing answered.
-pub(super) fn held(proofs: &[Proving]) -> bool {
+pub(crate) fn held(proofs: &[Proving]) -> bool {
     proofs
         .iter()
         .all(|one| matches!(one.came_to, Some(Verdict::Passed)))
@@ -314,7 +314,7 @@ pub(super) fn held(proofs: &[Proving]) -> bool {
 /// field rather than a sentence for the reason the weaker value is one: a consumer
 /// handed a verdict has nothing else in the document to tell a recording that answered
 /// from a service that did.
-pub(super) const AGAINST: Evidence = Evidence::Service;
+pub(crate) const AGAINST: Evidence = Evidence::Service;
 
 /// The plugin's own container would not start.
 fn unstarted(plugin: &str, back: &Reversal) -> Problem {

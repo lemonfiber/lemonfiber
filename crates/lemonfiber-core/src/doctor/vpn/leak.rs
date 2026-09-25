@@ -3,16 +3,8 @@
 
 use super::Pair;
 use crate::doctor::Verdict;
-use crate::error::{Code, Problem, Remedy, Severity};
-
-/// Raised when the download client's egress does not match the tunnel.
-pub const LEAKING: Code = Code::new("VPN-1");
-
-/// Raised when the VPN container that should carry traffic is not running.
-pub const VPN_CONTAINER_DOWN: Code = Code::new("VPN-2");
-
-/// Raised when the client cannot reach the internet through the tunnel.
-pub const CLIENT_ISOLATED: Code = Code::new("VPN-3");
+use crate::error::codes::vpn::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
+use crate::error::{Problem, Remedy, Severity};
 
 /// What a container answered when asked for its public address.
 #[derive(Debug, Clone, PartialEq, Eq)]

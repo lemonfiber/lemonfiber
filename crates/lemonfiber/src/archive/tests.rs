@@ -26,7 +26,7 @@
 //! budget is checked against proven to be the bytes really on the disk.
 
 use std::fs::{self, File};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -37,10 +37,8 @@ use lemonfiber_core::config::paths::Paths;
 use super::{Tar, MANIFEST};
 
 /// A scratch directory unique to this test, cleaned first.
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-tar-{}-{name}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    dir
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name)
 }
 
 fn write_file(path: &Path, contents: &str) {
@@ -420,7 +418,8 @@ async fn an_archive_that_is_not_there_is_a_fault_in_the_platforms_own_words() {
     // The one place a platform error becomes an archive fault, exercised so the
     // words the operator sees are the platform's rather than a paraphrase.
     let tar = Tar;
-    let missing = scratch("no-archive").join("nothing.tar.gz");
+    let missing_dir = scratch("no-archive");
+    let missing = missing_dir.join("nothing.tar.gz");
     let fault = tar.read_manifest(&missing).await.err();
     assert!(fault.is_some_and(|fault| !fault.message.is_empty()));
 }

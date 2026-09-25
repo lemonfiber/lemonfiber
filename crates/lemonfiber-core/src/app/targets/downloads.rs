@@ -70,7 +70,7 @@ pub(crate) fn torrent_client(ctx: &Ctx, targets: &[DownloadTarget]) -> Option<Qb
         .find(|target| matches!(target.kind, DownloadKind::Qbittorrent))?;
     let password = recorded_qbittorrent_password(ctx)?;
     Some(Qbittorrent::authenticated(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         &target.base,
         password,
     ))
@@ -82,19 +82,19 @@ pub(crate) async fn read_transfers(ctx: &Ctx, target: &DownloadTarget) -> Vec<Do
             let Some(password) = recorded_qbittorrent_password(ctx) else {
                 return Vec::new();
             };
-            Qbittorrent::authenticated(ctx.http.clone(), &target.base, password)
+            Qbittorrent::authenticated(ctx.seams.http.clone(), &target.base, password)
                 .transfers()
                 .await
                 .unwrap_or_default()
         }
         DownloadKind::Sabnzbd { config } => {
-            let Some(text) = ctx.filesystem.read(config).await else {
+            let Some(text) = ctx.seams.filesystem.read(config).await else {
                 return Vec::new();
             };
             let Some(key) = crate::sabnzbd::api_key(&text) else {
                 return Vec::new();
             };
-            Sabnzbd::new(ctx.http.clone(), &target.base, key)
+            Sabnzbd::new(ctx.seams.http.clone(), &target.base, key)
                 .transfers()
                 .await
                 .unwrap_or_default()

@@ -21,7 +21,7 @@ impl Ctx {
     /// Seconds since the epoch, read through the clock port rather than from the
     /// system directly, so a test can say what time it is and a record written on
     /// one run can be compared with one written on another.
-    pub(in crate::app) fn stamp(&self) -> String {
+    pub(crate) fn stamp(&self) -> String {
         self.seconds().to_string()
     }
 
@@ -31,8 +31,9 @@ impl Ctx {
     /// whether enough time has passed since the last run, and two strings cannot be
     /// subtracted. A clock that will not answer reads as the epoch, which is a machine
     /// that has waited long enough for anything.
-    pub(in crate::app) fn seconds(&self) -> u64 {
-        self.clock
+    pub(crate) fn seconds(&self) -> u64 {
+        self.seams
+            .clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|elapsed| elapsed.as_secs())
@@ -46,8 +47,9 @@ impl Ctx {
     /// about leap years; only the time of day is arithmetic on what is left over.
     /// Written out rather than reached for from a date library, because this is the
     /// one place in the product that needs an instant rather than a day.
-    pub(in crate::app) fn hours_ago(&self, hours: i64) -> String {
+    pub(crate) fn hours_ago(&self, hours: i64) -> String {
         let now = self
+            .seams
             .clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -70,8 +72,9 @@ impl Ctx {
     /// falls back to the epoch: refusing to do anything because the machine's clock
     /// is absurd would be a worse answer than checking dates against a date that is
     /// merely wrong.
-    pub(in crate::app) fn today(&self) -> lemonfiber_manifest::Date {
+    pub(crate) fn today(&self) -> lemonfiber_manifest::Date {
         let seconds = self
+            .seams
             .clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)

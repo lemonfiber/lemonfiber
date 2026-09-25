@@ -20,14 +20,9 @@ const APP: &str = "assets/web";
 /// What a built app says about itself, beside it.
 const DECLARED: &str = "app.json";
 
-/// The published statement of the wire version this binary speaks.
-///
-/// Compared against rather than the constant behind it, and the difference is the
-/// point: the app declares the version its client took from this artefact, so this
-/// compares like with like. What holds the artefact to the binary is its own test,
-/// which regenerates it and fails on any difference — so a chain of two checks
-/// covers what one could not reach from a build script.
-const CONTRACT: &str = "contract/web-api.contract.json";
+// The contract the web app is held to, read from the file the api crate declares
+// its path in, so the path is written once.
+include!("../lemonfiber-api/src/contract/path.rs");
 
 fn main() {
     let root = workspace_root().join(STACK);
@@ -75,7 +70,7 @@ fn main() {
 fn app_speaks_this_version() {
     let root = workspace_root();
     let declared = root.join(APP).join(DECLARED);
-    let contract = root.join(CONTRACT);
+    let contract = root.join(CONTRACT_PATH);
 
     println!("cargo::rerun-if-changed={}", declared.display());
     println!("cargo::rerun-if-changed={}", contract.display());
@@ -122,22 +117,14 @@ fn app_speaks_this_version() {
     }
 }
 
-/// The wire version a generated document declares.
+/// The wire version a generated document declares: its top-level `api_version`.
 ///
-/// Both documents are written by a serialiser rather than by hand and both put the
-/// field at the top level, so what is read is the first `"api_version"` either
-/// carries. A hand-assembled file that nests one somewhere else is the case the
-/// absence above refuses rather than one to be clever about.
+/// Both documents are written by a serialiser, so they are read by a parser. A
+/// document that is not JSON, or has no whole number there, declares nothing.
 fn version_in(text: &str) -> Option<u32> {
-    let after = text.split_once("\"api_version\"")?.1;
-    let digits: String = after
-        .trim_start()
-        .strip_prefix(':')?
-        .trim_start()
-        .chars()
-        .take_while(char::is_ascii_digit)
-        .collect();
-    digits.parse().ok()
+    let document: serde_json::Value = serde_json::from_str(text).ok()?;
+    let version = document.get("api_version")?.as_u64()?;
+    u32::try_from(version).ok()
 }
 
 /// The workspace root, so paths in messages are the ones a reader recognises

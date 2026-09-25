@@ -1,4 +1,4 @@
-# Keep this repo's labels in sync with the canonical set in the spec (OPS-R12).
+# Keep this repo's labels in sync with the canonical set in the spec.
 name: labels
 on:
   workflow_dispatch:

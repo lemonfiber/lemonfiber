@@ -168,39 +168,37 @@ cargo llvm-cov report --summary-only
 cargo llvm-cov report --lcov --output-path /tmp/cov.info
 ```
 
-## `Code` is a newtype, not an enum
+## Every code is declared in one registry
 
 ```rust
-pub const MISSING_PROGRAM: Code = Code::new("PROC-1");
+codes! {
+    /// The `PROC` codes.
+    proc {
+        /// The program lemonfiber drives is not installed.
+        MISSING_PROGRAM = "PROC-1" => Preflight,
+    }
+}
 ```
 
-Declared as a `const` beside the error that raises it. An enum would centralise
-every code in one file, far from the code that uses it, and turn adding an error
-into editing a shared list — the kind of file that collects merge conflicts and
-stops being read.
+`crates/lemonfiber-error/src/codes/` declares every code, one module per family, in
+two files — `operating.rs` for lemonfiber and the stack it runs, `serving.rs` for
+what the stack does for the household — with what a run that ends on a code leaves
+with where that is not a general failure. `codes.rs` re-exports the families, so a
+code is always `codes::<family>::<NAME>`.
+The code that raises a problem names it through that module, and a module that
+names one often enough brings it in with `use`. `Code` is a newtype rather than an
+enum so it can cross every crate as one `&'static str`, and only the registry can
+make one: `Code::new` exists only in a build with the `testing` feature, which the
+crates take as a development dependency, for tests that need a code no problem
+carries.
 
 Codes are never recycled. An operator who searches for one should find the same
-answer a year later.
+answer a year later, so a published code keeps its spelling even where two prefixes
+name one domain, as `WIRE` and `WIRING` do.
 
-## The inventory is read out of the source
-
-What that decision costs is enumeration: there is no registry, so nothing can list
-the codes at run time. `reference/error-codes.md` is therefore read from the
-declarations themselves, by `lemonfiber::codes` — a lexer over `crates/*/src` that
-tells code from a string from a comment, drops what only the tests compile, and
-sorts what is left by family and number. `just codes` rewrites it; a test compares
-the committed bytes with a fresh read.
-
-The reader refuses to guess. A `Code::new(…)` whose name is not a literal, and a
-file whose braces do not balance by its last line, are both reported by name and
-line rather than left out — a list that is quietly short is the one way the artefact
-could be wrong while still agreeing with itself.
-
-Two things follow from reading it this way. A code is only found where it is written
-as a `const` call, so text that merely looks like a code — a bitrate, an encoding —
-is never mistaken for one. And the architecture test that no two problems share a
-code reads through the same function, so what counts as a declaration is decided
-once rather than twice.
+`reference/error-codes.md` is rendered from `codes::every()`, and a test compares the
+committed bytes with a fresh rendering; `just codes` rewrites it. The binary's exit
+code for a problem is read from the same registry, through `codes::leaves`.
 
 ## Severity is `Ord`
 

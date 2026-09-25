@@ -29,6 +29,7 @@
 //! wrong password. A client that cannot tell them apart cannot know whether
 //! offering a login is worth anything.
 
+pub mod admitted;
 pub mod attempts;
 pub mod sessions;
 
@@ -46,7 +47,7 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
-use lemonfiber_core::admission::{credential, Credential};
+use lemonfiber_core::admission::{self as credential, Credential};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::service::Household;
 use serde::Deserialize;
@@ -226,9 +227,8 @@ pub enum Knocking {
 
 /// Who a request proved itself to be.
 ///
-/// The guard used to answer whether a caller was admitted and never who, so every
-/// route below it saw one indistinguishable *yes*. A surface that must refuse one
-/// person what it offers another cannot be built on that answer: it would have to
+/// Who, rather than only whether: a surface that must refuse one person what it
+/// offers another cannot be built on an indistinguishable *yes*. It would have to
 /// decide for itself which person is looking, and a control withheld on that basis
 /// is withheld by whoever drew the screen.
 ///
@@ -303,7 +303,7 @@ async fn opening(
     let Ok(Json(given)) = given else {
         return said(StatusCode::BAD_REQUEST, NOT_A_PASSWORD);
     };
-    let now = serving.ctx.clock.now();
+    let now = serving.ctx.seams.clock.now();
     if let Some(left) = serving.admitting.attempts.waiting(now).await {
         return waiting(left.as_secs().max(1));
     }
@@ -315,7 +315,7 @@ async fn opening(
     let opened = serving
         .admitting
         .sessions
-        .opened(serving.ctx.random.as_ref(), now, who)
+        .opened(serving.ctx.seams.random.as_ref(), now, who)
         .await;
     enveloped(
         StatusCode::OK,

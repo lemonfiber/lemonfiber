@@ -22,7 +22,8 @@ use async_trait::async_trait;
 use super::credentials::Target;
 use super::{Category, Check, Finding, Mend, Verdict};
 use crate::baseline::Record;
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::codes::wiring::DRIFTED;
+use crate::error::{Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{Client as _, DownloadClient, RegisteredClient};
@@ -31,9 +32,6 @@ use crate::seed::{observe_client, same_endpoint, Observed};
 mod mender;
 
 pub(crate) use mender::WiringMender;
-
-/// Raised when a download client no longer files where lemonfiber wired it.
-pub const DRIFTED: Code = Code::new("WIRING-1");
 
 /// The stem every wiring finding is named from. The service and the client follow it, so
 /// two clients drifting in one \*arr are two findings to answer rather than one.

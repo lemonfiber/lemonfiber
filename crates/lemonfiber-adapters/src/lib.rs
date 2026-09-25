@@ -7,10 +7,9 @@
 //! It depends on `lemonfiber-ports` and on nothing else of this workspace's. A port
 //! is the whole of what an implementation needs to know, and the restraint buys
 //! something the rest of the product could not otherwise have: the core cannot reach
-//! the network, because it does not depend on anything that can. That used to be a
-//! rule a test looked for by reading source text; it is now a fact about the crate
-//! graph, and the core's own manifest no longer carries a container runtime, an HTTP
-//! client or a TLS stack.
+//! the network, because it does not depend on anything that can. That is a fact about
+//! the crate graph: the core's own manifest carries no container runtime, HTTP client
+//! or TLS stack.
 //!
 //! The core holds these as trait objects it is handed rather than ones it builds, so
 //! nothing above this line can manufacture a socket.
@@ -74,6 +73,11 @@ pub fn live() -> Seams {
 #[must_use]
 pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
     Seams {
+        runner: Arc::new(Local),
+        // The engine is built from the one resolved target, as the image listing and
+        // the location seam below are, so reads and writes reach the same machine.
+        engine: Arc::new(Daemon::reaching(target.clone())),
+        clock: Arc::new(System),
         filesystem: Arc::new(Disk),
         // Wrapped so a service that is merely still starting is tried again rather than
         // reported. Applied here rather than at each caller: a retry policy written into

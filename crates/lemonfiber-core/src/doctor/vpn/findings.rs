@@ -11,7 +11,8 @@ use super::port_forward::port_forward_offline;
 use super::Pair;
 use super::{Category, Finding, Verdict};
 use crate::config::PortForward;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::codes::vpn::{NO_TUNNEL, PORT_MISMATCH};
+use crate::error::{Problem, Remedy, Severity, State};
 
 pub(super) fn assemble(
     pair: &Pair,
@@ -161,12 +162,6 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
 /// raises it cannot drift apart on a rename.
 pub(super) const PORT_MISMATCH_CHECK: &str = "vpn.port-forward-client";
 
-/// Raised when the client is listening somewhere other than the forwarded port.
-pub const PORT_MISMATCH: Code = Code::new("VPN-7");
-
-/// Raised when torrents are configured with nothing containing them.
-pub const NO_TUNNEL: Code = Code::new("VPN-8");
-
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.
 pub(super) fn unreachable_engine(
@@ -205,65 +200,4 @@ pub(super) fn unreachable_engine(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{unprotected, NO_TUNNEL, PORT_MISMATCH};
-    use crate::doctor::Verdict;
-
-    #[test]
-    fn every_vpn_problem_has_its_own_code() {
-        // A code is what an operator searches for. Two different problems sharing
-        // one sends them to the wrong explanation — which is what happened here:
-        // the port mismatch and the killswitch leak were both VPN-5.
-        let codes = [
-            crate::doctor::vpn::NO_FORWARDED_PORT,
-            PORT_MISMATCH,
-            NO_TUNNEL,
-            super::super::killswitch::KILLSWITCH_LEAKS,
-            super::super::killswitch::TUNNEL_NOT_RESTORED,
-            super::super::leak::LEAKING,
-            super::super::leak::VPN_CONTAINER_DOWN,
-            super::super::leak::CLIENT_ISOLATED,
-        ];
-        let mut distinct: Vec<&str> = codes.iter().map(|code| code.as_str()).collect();
-        distinct.sort_unstable();
-        let counted = distinct.len();
-        distinct.dedup();
-        assert_eq!(distinct.len(), counted, "{distinct:?}");
-    }
-
-    /// The problem a finding carries, where it carries one. Total rather than a
-    /// match with a fallback, so the other arm is exercised by the skip below
-    /// rather than left as a branch nothing reaches.
-    fn problem_of(finding: &crate::doctor::Finding) -> Option<&crate::error::Problem> {
-        match &finding.verdict {
-            Verdict::Warn(problem) | Verdict::Fail(problem) => Some(problem),
-            Verdict::Pass { .. } | Verdict::Unverified { .. } | Verdict::Skipped { .. } => None,
-        }
-    }
-
-    #[test]
-    fn the_uncontained_warning_says_what_it_costs_and_how_to_answer_it() {
-        // Both halves matter: a warning that cannot be answered is one an operator
-        // has to keep reading for ever, and a warning that says only "no VPN"
-        // leaves them guessing whether it matters.
-        let finding = unprotected();
-        assert!(
-            matches!(finding.verdict, Verdict::Warn(_)),
-            "never a failure"
-        );
-        let meaning = problem_of(&finding).map(|problem| problem.meaning.clone());
-        assert!(
-            meaning.is_some_and(|meaning| meaning.contains("visible")),
-            "it says what running this way costs"
-        );
-        let detail = problem_of(&finding)
-            .and_then(|problem| problem.remedies.first())
-            .and_then(|remedy| remedy.detail.clone())
-            .unwrap_or_default();
-        assert!(detail.contains("--accept vpn.unprotected"), "{detail}");
-
-        // And a skip carries nothing to say, which is what makes the reading above
-        // a total one rather than a match with somewhere to hide.
-        assert!(problem_of(&super::skipped("nothing to contain".to_owned())).is_none());
-    }
-}
+mod tests;
