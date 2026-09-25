@@ -72,8 +72,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: fuzz
+      # A version named here and the lockfile it was published with, so what this
+      # job builds and runs is the same tool on every run. Cargo checks the crate
+      # against the registry index's checksum before it builds it.
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        run: cargo install cargo-fuzz --version =0.13.2 --locked
 
       # Restoring the corpus is best-effort: the first ever run has none, and a
       # week's findings are worth carrying forward but not worth failing over.
