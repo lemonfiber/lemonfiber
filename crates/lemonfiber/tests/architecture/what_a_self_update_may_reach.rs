@@ -12,7 +12,7 @@
 
 use std::path::Path;
 
-use crate::source_tree::{production, sources};
+use crate::source_tree::{production, sources, test_only, unseamed};
 
 /// The seams the self-update family may reach, by the name they carry on a context.
 ///
@@ -127,7 +127,7 @@ fn family(matching: fn(&Path) -> bool, fewest: usize) -> Vec<(std::path::PathBuf
         .into_iter()
         .filter(|(path, _)| matching(path))
         .map(|(path, text)| {
-            let shipped = production(&text).to_owned();
+            let shipped = unseamed(production(&text));
             (path, shipped)
         })
         .collect();
@@ -143,14 +143,15 @@ fn family(matching: fn(&Path) -> bool, fewest: usize) -> Vec<(std::path::PathBuf
 /// Whether this file is part of the self-update family rather than a test about it.
 fn updates(path: &Path) -> bool {
     let named = path.to_string_lossy().replace('\\', "/");
-    named.contains("self_update") && !named.contains("/tests/")
+    named.contains("self_update") && !test_only(path)
 }
 
 /// Whether this file is the half of the family that reaches the network.
 fn asks(path: &Path) -> bool {
     path.to_string_lossy()
         .replace('\\', "/")
-        .contains("/app/self_update")
+        .contains("lemonfiber-core/src/self_update/run")
+        && !test_only(path)
 }
 
 /// Every `ctx.` seam one line names, each with whatever follows it.

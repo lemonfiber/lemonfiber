@@ -1,52 +1,25 @@
 //! The coverage gate and the copy of it that runs locally measure the same tree.
 //!
-//! The 100% gate skips a handful of files, and the list of what it skips is
-//! written **twice**: once as `skipped` in the justfile, once as `SKIPPED` in
-//! `sonar.yml`. Two answers to what is being measured, and nothing asked whether
-//! they agree.
-//!
-//! One direction of a disagreement is loud — a local run that skips more than CI
-//! passes here and fails there, which is annoying and safe. The other is silent:
-//! widen the list CI uses and uncovered code ships with the gate green, because
-//! the run that would have caught it was never measuring that file. Nobody would
-//! do that deliberately; they would edit one copy and not know about the other,
-//! which is what having two copies is for.
+//! The 100% gate skips a handful of files, and what it skips is written once, in
+//! `.config/coverage-skipped`. The justfile's `skipped` and the workflow's `SKIPPED`
+//! both read that file, so a local run and CI answer the same question — and the
+//! silent direction of a disagreement, CI skipping a file a local run measures,
+//! cannot be written.
 //!
 //! What this cannot do is decide whether an exclusion is *justified* — that is a
-//! judgement, and the justfile records the reason for each beside the list. It
-//! can say the two lists are one list, and that the list still describes this
-//! workspace rather than an earlier one.
+//! judgement, and the justfile records the reason for each beside the recipe. It can
+//! say both readers read the one list, and that the list still describes this
+//! workspace.
 //!
-//! The list is not the only thing written twice. What a *failing* gate is asked is
-//! written twice as well — as `just uncovered` and as the step `sonar.yml` runs on
-//! failure — and that pair had already drifted before anything here was watching it.
+//! What a *failing* gate is asked is written in two places — as `just uncovered` and
+//! as the step `sonar.yml` runs on failure — and those are held to each other below.
 
 use std::fs;
 
 use crate::source_tree::workspace_root;
 
-/// The value of `skipped :=` in the justfile.
-fn in_the_recipe(text: &str) -> Option<&str> {
-    let line = text.lines().find(|line| line.starts_with("skipped :="))?;
-    let (_, after) = line.split_once(":=")?;
-    quoted(after)
-}
-
-/// The value of `SKIPPED:` in the coverage workflow.
-fn in_the_workflow(text: &str) -> Option<&str> {
-    let line = text
-        .lines()
-        .find(|line| line.trim_start().starts_with("SKIPPED:"))?;
-    let (_, after) = line.split_once(':')?;
-    quoted(after)
-}
-
-/// What sits between the first pair of single quotes.
-fn quoted(text: &str) -> Option<&str> {
-    let (_, after) = text.split_once('\'')?;
-    let (inside, _) = after.split_once('\'')?;
-    Some(inside)
-}
+/// Where the list of what the gate skips is written.
+const LIST: &str = ".config/coverage-skipped";
 
 /// The justfile and the coverage workflow, as they are written.
 fn files() -> (String, String) {
@@ -57,48 +30,50 @@ fn files() -> (String, String) {
     )
 }
 
-/// Both lists, read from the files that carry them.
-fn both() -> (String, String) {
+/// The list itself, as the file holds it.
+fn list() -> String {
+    fs::read_to_string(workspace_root().join(LIST))
+        .unwrap_or_default()
+        .trim()
+        .to_owned()
+}
+
+/// Both the recipe and the workflow read the one list.
+#[test]
+fn the_gate_and_the_recipe_read_the_one_list() {
     let (recipe, workflow) = files();
 
-    let Some(one) = in_the_recipe(&recipe) else {
-        unreachable!("the justfile declares no `skipped :=`, so the gate's own list is unreadable")
-    };
-    let Some(other) = in_the_workflow(&workflow) else {
-        unreachable!("sonar.yml declares no `SKIPPED:`, so what CI measures is unreadable")
-    };
-    (one.to_owned(), other.to_owned())
+    assert!(
+        recipe
+            .lines()
+            .any(|line| line.starts_with("skipped :=") && line.contains(LIST)),
+        "the justfile's `skipped` is not read from {LIST}, so a local run can measure a \
+         different tree from CI"
+    );
+    assert!(
+        workflow
+            .lines()
+            .any(|line| line.contains("SKIPPED=") && line.contains(LIST)),
+        "sonar.yml's `SKIPPED` is not read from {LIST}, so CI can skip what a local run \
+         measures — the direction where the gate passes on code it never read"
+    );
 }
 
-/// Both lists were read, before anything is said about them.
+/// The list was read, before anything is said about it.
 ///
-/// Two empty strings are equal, so a parser that quietly found nothing would make
-/// the comparison below pass and mean nothing — which is the defect this file
-/// exists to catch, one level down.
+/// An empty list skips nothing and names nothing, so a list that quietly went missing
+/// would pass every check below while meaning nothing.
 #[test]
-fn the_two_lists_were_actually_read() {
-    let (recipe, workflow) = both();
+fn the_list_was_actually_read() {
+    let skipped = list();
 
     assert!(
-        recipe.contains("crates/"),
-        "the justfile's list does not name a path in this workspace: {recipe:?}"
+        skipped.contains("crates/"),
+        "{LIST} does not name a path in this workspace: {skipped:?}"
     );
     assert!(
-        workflow.contains("crates/"),
-        "the workflow's list does not name a path in this workspace: {workflow:?}"
-    );
-}
-
-/// The claim: one list, written twice.
-#[test]
-fn the_gate_and_the_recipe_skip_the_same_files() {
-    let (recipe, workflow) = both();
-
-    assert_eq!(
-        recipe, workflow,
-        "the justfile and sonar.yml disagree about what the coverage gate measures, so a \
-         local run and CI are answering different questions — and the direction where CI \
-         skips more is silent, because the gate passes on code it never read"
+        !skipped.contains('\n'),
+        "{LIST} holds more than one line, and both readers take it as one pattern"
     );
 }
 
@@ -106,14 +81,14 @@ fn the_gate_and_the_recipe_skip_the_same_files() {
 ///
 /// An exclusion for a crate that has been renamed skips nothing, which is the
 /// harmless direction — but it also reads as a live decision about this workspace
-/// when it is a leftover from an older one, and the next person to widen the list
-/// starts from a list that is already wrong.
+/// when it describes another one, and the next person to widen the list starts from
+/// a list that is already wrong.
 #[test]
 fn the_list_names_only_crates_this_workspace_has() {
-    let (recipe, _) = both();
+    let skipped = list();
     let root = workspace_root();
 
-    let named: Vec<&str> = recipe
+    let named: Vec<&str> = skipped
         .split(|character: char| !matches!(character, 'a'..='z' | '0'..='9' | '-' | '/' | '.'))
         .filter(|piece| piece.starts_with("crates/"))
         .filter_map(|piece| piece.split('/').nth(1))
@@ -122,7 +97,7 @@ fn the_list_names_only_crates_this_workspace_has() {
 
     assert!(
         !named.is_empty(),
-        "no crate was read out of the list, so this test is checking nothing: {recipe:?}"
+        "no crate was read out of the list, so this test is checking nothing: {skipped:?}"
     );
 
     let missing: Vec<&&str> = named
@@ -133,7 +108,7 @@ fn the_list_names_only_crates_this_workspace_has() {
     assert!(
         missing.is_empty(),
         "the coverage gate excludes paths in crates this workspace does not have, so those \
-         exclusions describe an older tree: {missing:?}"
+         exclusions describe another tree: {missing:?}"
     );
 }
 
@@ -146,11 +121,9 @@ const ASKED: [&str; 2] = ["--show-missing-lines", "counted_but_not_named.py"];
 
 /// A failing gate is asked the same questions from a shell and from CI.
 ///
-/// This pair had drifted, and in the direction that matters: the recipe asked both
-/// questions and the workflow asked one — the segments half, which comes back empty
-/// on exactly the failure the other half exists for. So a run from a shell named the
-/// line and CI did not, which is the wrong way round, because CI is where the gate
-/// fails and a shell is where somebody has to reproduce it.
+/// The direction that matters is CI asking less: the segments half comes back empty
+/// on exactly the failure the regions half exists for, and CI is where the gate fails
+/// while a shell is where somebody has to reproduce it.
 #[test]
 fn a_failing_gate_is_asked_the_same_questions_in_both_places() {
     let (recipe, workflow) = files();

@@ -263,7 +263,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/media-stack"
         ));
-        let to = lemonfiber_fixtures::scratch::Scratch::named("no-asking");
+        let to = lemonfiber_fixtures::scratch::Scratch::named("no-asking").kept();
         let _ = std::fs::create_dir_all(&to);
         let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
         // Every block but the request service's, kept in order — and the links that
@@ -271,7 +271,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
         // it, and one that kept them would be refused before this test asked
         // anything.
         let _ = std::fs::write(to.join("stack.toml"), without(&read, "seerr"));
-        to.to_path_buf()
+        to
     });
 
     let env = recorded_admin("no-asking");

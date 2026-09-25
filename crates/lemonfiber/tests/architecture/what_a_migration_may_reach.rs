@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use crate::source_tree::{production, sources};
+use crate::source_tree::{production, sources, test_only, unseamed};
 
 /// A migration reads. Nothing in it may reach what could change what it found.
 ///
@@ -32,7 +32,7 @@ fn nothing_in_a_migration_reaches_what_could_change_what_it_found() {
         .iter()
         .filter(|(path, _)| surveys(path))
         .flat_map(|(path, text)| {
-            reached(production(text))
+            reached(&unseamed(production(text)))
                 .into_iter()
                 .map(move |seam| format!("{} reaches ctx.{seam}", path.display()))
         })
@@ -56,7 +56,7 @@ const ALLOWED: [&str; 6] = ["images", "stack", "engine", "settings", "today", "s
 /// Whether this file is part of the survey rather than a test about it.
 fn surveys(path: &Path) -> bool {
     let named = path.to_string_lossy().replace('\\', "/");
-    named.contains("migration") && !named.contains("/tests/")
+    named.contains("migration") && !test_only(path)
 }
 
 /// Every seam on a context this text reaches that it is not allowed to.
@@ -94,9 +94,9 @@ fn permitted(rest: &str) -> bool {
 /// of its own rather than left to review. It may write lemonfiber's own configuration —
 /// that is the whole of what adopting and standing beside *are* — but it may not reach
 /// the seams that stop a container, delete a directory, or run a program against
-/// somebody\'s stack. A migration that failed or was
-/// abandoned has to leave the operator exactly the setup they had, and the only way to
-/// guarantee that is for the code to have no way of touching it.
+/// somebody's stack. A migration that failed or was abandoned has to leave the operator
+/// exactly the setup they had, and the only way to guarantee that is for the code to
+/// have no way of touching it.
 #[test]
 fn acting_on_a_migration_cannot_stop_delete_or_run_anything() {
     /// The seams that reach the operator's running stack.
@@ -111,9 +111,11 @@ fn acting_on_a_migration_cannot_stop_delete_or_run_anything() {
                 || named.ends_with("app/import.rs")
         })
         .flat_map(|(path, text)| {
-            production(text)
+            unseamed(production(text))
                 .lines()
                 .flat_map(seams)
+                .collect::<Vec<_>>()
+                .into_iter()
                 .filter(|rest| UNTOUCHABLE.contains(&named(rest).as_str()))
                 .map(move |rest| format!("{} reaches ctx.{rest}", path.display()))
         })
@@ -146,9 +148,11 @@ fn standing_in_place_of_a_setup_may_stop_it_and_never_delete_it() {
                 .ends_with("app/replace.rs")
         })
         .flat_map(|(path, text)| {
-            production(text)
+            unseamed(production(text))
                 .lines()
                 .flat_map(seams)
+                .collect::<Vec<_>>()
+                .into_iter()
                 .filter(|rest| DESTRUCTIVE.contains(&named(rest).as_str()))
                 .map(move |rest| format!("{} reaches ctx.{rest}", path.display()))
         })

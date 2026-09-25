@@ -14,7 +14,7 @@ use std::path::Path;
 
 use syn::visit::Visit;
 
-use crate::source_tree::parsed;
+use crate::source_tree::{parsed, test_only};
 
 /// Every path a file names — in a `use`, a type or an expression — as its segments
 /// joined with `::`, and whether anything in it asks which operating system this is.
@@ -152,6 +152,7 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
     let read: Vec<(std::path::PathBuf, Named)> = parsed("crates/lemonfiber-core")
         .into_iter()
         .chain(parsed("crates/lemonfiber-adapters"))
+        .filter(|(path, _)| !test_only(path))
         .map(|(path, file)| (path, Named::of(&file)))
         .collect();
     assert!(

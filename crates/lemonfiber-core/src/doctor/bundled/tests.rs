@@ -45,6 +45,14 @@ fn shipped() -> Vec<(PathBuf, String)> {
     while let Some(at) = looking.pop() {
         for entry in fs::read_dir(&at).into_iter().flatten().flatten() {
             let path = entry.path();
+            // A file's own tests sit beside it in `tests.rs` or under `tests/`, and a
+            // test names identities to prove what the doctor does with them.
+            let testing = path
+                .file_name()
+                .is_some_and(|named| named == "tests" || named == "tests.rs");
+            if testing {
+                continue;
+            }
             if path.is_dir() {
                 looking.push(path);
             } else if path.extension().is_some_and(|extension| extension == "rs")

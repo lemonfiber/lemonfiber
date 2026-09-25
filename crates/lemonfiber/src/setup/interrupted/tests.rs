@@ -72,8 +72,8 @@ fn each_way_out_says_what_it_is_about_to_do_before_it_does_it() {
 ///
 /// Its answers are complete, because that is the only state an apply can be
 /// interrupted in: apply persists every answer before it writes the first one.
-fn interrupted(name: &str) -> Paths {
-    let (_scratch, paths) = scratch(name);
+fn interrupted(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
+    let (scratch, paths) = scratch(name);
     let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(
         paths.setup_progress(),
@@ -96,7 +96,7 @@ fn interrupted(name: &str) -> Paths {
         serde_json::to_string(&written).unwrap_or_default(),
     );
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv/media\n");
-    paths
+    (scratch, paths)
 }
 
 /// A wizard in the state a stopped apply leaves behind: every question
@@ -126,7 +126,7 @@ fn halfway(paths: &Paths) -> Wizard {
 async fn an_interrupted_apply_with_nobody_there_is_left_recoverable() {
     // Deciding is not done on an operator's behalf for a run that cannot answer:
     // the state stays as it is, still recoverable, rather than acted on unasked.
-    let paths = interrupted("piped");
+    let (_scratch, paths) = interrupted("piped");
     let code = recover_setup(
         keeping(ctx(), &paths),
         &paths,
@@ -142,7 +142,7 @@ async fn an_interrupted_apply_with_nobody_there_is_left_recoverable() {
 async fn an_apply_that_wrote_nothing_says_so_rather_than_showing_an_empty_list() {
     // "It had written:" followed by nothing reads as a list that failed to
     // render. The two states are different and are said differently.
-    let paths = interrupted("wrote-nothing");
+    let (_scratch, paths) = interrupted("wrote-nothing");
     let _ = std::fs::remove_file(paths.journal());
 
     let code = recover_setup(
@@ -158,7 +158,7 @@ async fn an_apply_that_wrote_nothing_says_so_rather_than_showing_an_empty_list()
 
 #[tokio::test(start_paused = true)]
 async fn resuming_finishes_applying_from_where_it_stopped() {
-    let paths = interrupted("resume");
+    let (_scratch, paths) = interrupted("resume");
     let code = recover_setup(
         keeping(working_ctx(), &paths),
         &paths,
@@ -182,7 +182,7 @@ async fn resuming_finishes_applying_from_where_it_stopped() {
 
 #[tokio::test(start_paused = true)]
 async fn rolling_back_undoes_what_was_written_and_applies_again() {
-    let paths = interrupted("rollback");
+    let (_scratch, paths) = interrupted("rollback");
     let code = recover_setup(
         keeping(working_ctx(), &paths),
         &paths,
@@ -202,7 +202,7 @@ async fn rolling_back_undoes_what_was_written_and_applies_again() {
 
 #[tokio::test(start_paused = true)]
 async fn starting_over_undoes_it_and_forgets_the_answers() {
-    let paths = interrupted("startover");
+    let (_scratch, paths) = interrupted("startover");
     let code = recover_setup(
         keeping(ctx(), &paths),
         &paths,
@@ -220,7 +220,7 @@ async fn an_apply_that_cannot_be_carried_forward_says_why() {
     // Answers that no longer make a whole setup — a progress file from an older
     // run, or one edited by hand — cannot be applied, and the operator is told
     // rather than left with a run that reported success and wrote nothing.
-    let paths = interrupted("unfinishable");
+    let (_scratch, paths) = interrupted("unfinishable");
     let _ = std::fs::write(
         paths.setup_progress(),
         r#"{"at":"review","answers":{},"phase":"applying"}"#,
@@ -267,7 +267,7 @@ async fn an_undo_that_cannot_be_written_is_reported_rather_than_assumed() {
     // that cannot happen the operator is told, rather than being left believing
     // a roll-back landed that did not.
     for answer in ["2", "3"] {
-        let paths = interrupted(&format!("undo-blocked-{answer}"));
+        let (_scratch, paths) = interrupted(&format!("undo-blocked-{answer}"));
         // A directory where the environment file belongs: nothing can write it.
         let _ = std::fs::remove_file(paths.env_file());
         let _ = std::fs::create_dir_all(paths.env_file());

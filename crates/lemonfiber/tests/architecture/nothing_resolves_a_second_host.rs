@@ -15,7 +15,7 @@
 //! else takes the answer. A guard of this shape is what `nothing_is_carried_through`
 //! holds for the migration, and for the same reason.
 
-use crate::source_tree::{production, sources};
+use crate::source_tree::{production, sources, test_only};
 
 /// The one file allowed to read which engine this machine is pointed at.
 const RESOLVER: &str = "lemonfiber-adapters/src/docker/context.rs";
@@ -32,7 +32,7 @@ fn only_one_place_works_out_which_engine_this_run_operates() {
     let mut elsewhere: Vec<String> = Vec::new();
     for (path, text) in sources() {
         let where_it_lives = path.to_string_lossy().replace('\\', "/");
-        if !where_it_lives.contains("/src/") || where_it_lives.ends_with(RESOLVER) {
+        if test_only(&path) || where_it_lives.ends_with(RESOLVER) {
             continue;
         }
         let shipped = production(&text);

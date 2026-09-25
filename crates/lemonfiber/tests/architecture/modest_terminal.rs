@@ -25,7 +25,7 @@ use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::str::Chars;
 
-use crate::source_tree::{production, sources};
+use crate::source_tree::{production, sources, test_only};
 
 /// The colours a terminal has before anything is negotiated.
 ///
@@ -87,7 +87,7 @@ fn drawing() -> BTreeMap<PathBuf, String> {
         "nothing in this workspace draws, which means this is looking for the wrong name"
     );
     all.into_iter()
-        .filter(|(path, _)| trees.iter().any(|tree| within(path, tree)))
+        .filter(|(path, _)| !test_only(path) && trees.iter().any(|tree| within(path, tree)))
         .collect()
 }
 

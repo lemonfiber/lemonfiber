@@ -103,6 +103,50 @@ pub(crate) fn production(text: &str) -> &str {
     text.get(..taken).unwrap_or(text)
 }
 
+/// Whether a file is built only for tests: outside `src/`, or inside a module tree
+/// declared behind `#[cfg(test)]` — which is where every file's own tests live.
+///
+/// The per-file guards read `production` of each file they are handed, which cuts a
+/// file's tests off its bottom; a file that is nothing but tests has no bottom to cut,
+/// so it is refused here instead.
+pub(crate) fn test_only(path: &Path) -> bool {
+    let path = path.to_string_lossy().replace('\\', "/");
+    !path.contains("/src/") || unshipped().iter().any(|tree| within(&path, tree))
+}
+
+/// The test-only module trees of every `src/` file, found the first time anything asks.
+fn unshipped() -> &'static BTreeSet<String> {
+    static UNSHIPPED: OnceLock<BTreeSet<String>> = OnceLock::new();
+    UNSHIPPED.get_or_init(|| {
+        let all: BTreeMap<String, String> = crawled()
+            .iter()
+            .map(|(path, text)| (path.to_string_lossy().replace('\\', "/"), text.clone()))
+            .filter(|(path, _)| path.contains("/src/"))
+            .collect();
+        only_for_tests(&all)
+    })
+}
+
+/// A file's text with every reach through `ctx.seams.` written as the `ctx.` reach
+/// it is.
+///
+/// A context carries its ports in one `seams` field, so `ctx.seams.http` is how the
+/// transport is reached. The guards that name what a family may reach name the seam,
+/// and read through this so a chain broken across lines still names it.
+pub(crate) fn unseamed(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find("ctx.seams") {
+        let (before, after) = rest.split_at(at);
+        out.push_str(before);
+        out.push_str("ctx.");
+        let after = after.get("ctx.seams".len()..).unwrap_or_default();
+        rest = after.trim_start().strip_prefix('.').unwrap_or(after);
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The half of every `src/` file that ships, keyed by its path in the workspace.
 pub(crate) fn shipped() -> BTreeMap<String, String> {
     let all: BTreeMap<String, String> = sources()

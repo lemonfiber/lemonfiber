@@ -1,15 +1,14 @@
 //! The surface's rendering, kept apart from the CLI wiring and orchestration.
 //!
-//! `main` decides what to run and hands the outcome here; this module decides
-//! only how it reads. One renderer per answer, for a person or for a script,
-//! with nothing about parsing input or dispatching commands mixed in — so the
-//! shape of an operator's report and the shape of the command line stay two
-//! separate things to change.
+//! `main` decides what to run and hands the outcome here; this module decides only how it
+//! reads. One renderer per answer, for a person or for a script, with nothing about
+//! parsing input or dispatching commands mixed in — so the shape of an operator's report
+//! and the shape of the command line stay two separate things to change.
 //!
-//! Every renderer *builds* its lines and hands them back; one printer at the edge
-//! puts them on the terminal. Rendering is then a value a test can assert on
-//! rather than a side effect it can only watch happen, which is what lets the
-//! words an operator actually reads be held to the same standard as the rest.
+//! Every renderer *builds* its lines and hands them back; one printer at the edge puts
+//! them on the terminal. Rendering is then a value a test can assert on rather than a
+//! side effect it can only watch happen, which is what lets the words an operator
+//! actually reads be held to the same standard as the rest.
 
 #[cfg(test)]
 pub(crate) mod fixtures;
@@ -92,13 +91,12 @@ impl Lines {
     /// is not a character but the end of it, so a release name containing one would
     /// arrive as something that will not parse at all.
     ///
-    /// What made it safe was said to be the serialising, on the grounds that JSON
-    /// escapes every control character. It escapes the ones below a space. The C1
-    /// controls, the line separators, the bidirectional overrides and the zero-widths
-    /// are carried raw, and each of those is an instruction to the terminal these
-    /// lines are commonly printed to — so [`say::emitted`](crate::say) writes them
-    /// out on the way through, which changes what a terminal reads and not what a
-    /// parser does.
+    /// What made it safe was said to be the serialising, on the grounds that JSON escapes
+    /// every control character. It escapes the ones below a space. The C1 controls, the
+    /// line separators, the bidirectional overrides and the zero-widths are carried raw,
+    /// and each of those is an instruction to the terminal these lines are commonly
+    /// printed to — so [`say::emitted`](crate::say) writes them out on the way through,
+    /// which changes what a terminal reads and not what a parser does.
     pub(crate) fn for_a_parser() -> Self {
         Self {
             said: Vec::new(),

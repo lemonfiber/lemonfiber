@@ -10,7 +10,7 @@
 //!
 //! Only a function that says it settles may.
 
-use crate::source_tree::{production, sources};
+use crate::source_tree::{production, sources, test_only};
 
 /// Reading a latch never settles it.
 ///
@@ -27,7 +27,7 @@ fn reading_a_latch_never_settles_it() {
     let mut settling: Vec<String> = Vec::new();
     for (path, text) in sources() {
         let where_it_lives = path.to_string_lossy().replace('\\', "/");
-        if !where_it_lives.contains("/src/") {
+        if test_only(&path) {
             continue;
         }
         let mut whose = String::new();

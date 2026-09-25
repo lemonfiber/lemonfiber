@@ -15,7 +15,7 @@
 //! complaint is matched against. They are held to the same rules as the messages,
 //! which costs nothing while no service says anything these rules refuse.
 
-use crate::source_tree::{production, sources};
+use crate::source_tree::{production, sources, test_only};
 
 /// The text inside double quotes on one line, which is where an operator's words are.
 ///
@@ -49,7 +49,7 @@ fn shipped_prose() -> Vec<(String, usize, String)> {
         let where_it_lives = path.to_string_lossy().replace('\\', "/");
         // The glossary is where the other names are written down, so it is the one
         // file allowed to write them.
-        if !where_it_lives.contains("/src/") || where_it_lives.ends_with("glossary.rs") {
+        if test_only(&path) || where_it_lives.ends_with("glossary.rs") {
             continue;
         }
         for (number, said) in written_in(production(&text)) {

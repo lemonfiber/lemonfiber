@@ -328,7 +328,7 @@ async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_mak
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/media-stack"
         ));
-        let to = lemonfiber_fixtures::scratch::Scratch::named("no-server");
+        let to = lemonfiber_fixtures::scratch::Scratch::named("no-server").kept();
         let _ = std::fs::create_dir_all(&to);
         let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
         // Every block but the media server's, kept in order — and the links that
@@ -345,7 +345,7 @@ async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_mak
             .collect::<Vec<_>>()
             .join("[[wiring]]");
         let _ = std::fs::write(to.join("stack.toml"), kept);
-        to.to_path_buf()
+        to
     });
     let ctx = a_context()
         .over(Source::External(Box::leak(dir.clone().into_boxed_path())))

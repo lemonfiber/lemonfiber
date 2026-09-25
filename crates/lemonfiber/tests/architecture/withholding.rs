@@ -231,6 +231,9 @@ fn nothing_that_draws_a_screen_reads_a_setting_for_itself() {
     let mut watched: Vec<&str> = Vec::new();
     for (path, text) in source_tree::sources() {
         let where_it_lives = path.to_string_lossy().replace('\\', "/");
+        if source_tree::test_only(&path) {
+            continue;
+        }
         let Some(tree) = DRAWING
             .iter()
             .find(|tree| where_it_lives.contains(&format!("/src/{tree}")))

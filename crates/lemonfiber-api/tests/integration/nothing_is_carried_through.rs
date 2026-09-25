@@ -109,13 +109,14 @@ fn this_surface_never_reaches_the_layer_that_talks_to_them() {
 /// of something a caller sent, which is reading an address rather than reaching
 /// one, and the origin check does exactly that.
 ///
-/// Only the part of each file before its tests is read. A test that names
-/// `http://evil.example` to prove it is refused is the rule working, not
-/// breaking it.
+/// Only what ships is read: a file's own tests, in `tests.rs` beside it or under a
+/// `tests/` directory, are left out. A test that names `http://evil.example` to prove
+/// it is refused is the rule working, not breaking it.
 #[test]
 fn no_route_carries_a_request_onward() {
     let carrying: Vec<String> = source()
         .into_iter()
+        .filter(|(path, _)| !testing(path))
         .filter(|(_, text)| shipped(text).lines().any(reaches_out))
         .map(|(path, _)| path.display().to_string())
         .collect();
@@ -125,6 +126,12 @@ fn no_route_carries_a_request_onward() {
         "{carrying:?} name somewhere to connect to. This surface is reached at an \
          address and reaches none."
     );
+}
+
+/// Whether a file under `src/` holds tests rather than what ships.
+fn testing(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| name == "tests.rs")
+        || path.components().any(|part| part.as_os_str() == "tests")
 }
 
 /// The part of a file that ships, which is everything before its tests.

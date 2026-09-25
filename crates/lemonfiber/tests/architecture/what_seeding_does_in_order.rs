@@ -112,7 +112,7 @@ fn every_api_a_service_can_declare_is_acted_on() {
 /// types or the data would notice them being swapped back.
 #[test]
 fn the_request_service_is_set_up_before_anything_is_registered_into_it() {
-    let seed = fs::read_to_string(workspace_root().join("crates/lemonfiber-core/src/app/seed.rs"))
+    let seed = fs::read_to_string(workspace_root().join("crates/lemonfiber-core/src/seed/run.rs"))
         .unwrap_or_default();
     let shipped = production(&seed);
 

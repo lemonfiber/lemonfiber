@@ -5187,7 +5187,7 @@
       ],
       "$defs": {
         "Code": {
-          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in [`crate::codes`], and a\ncode is never recycled.",
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in the error crate's `codes`\nmodule, and a code is never recycled.",
           "type": "string"
         },
         "DoctorCategory": {
@@ -5838,7 +5838,7 @@
       ],
       "$defs": {
         "Code": {
-          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in [`crate::codes`], and a\ncode is never recycled.",
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in the error crate's `codes`\nmodule, and a code is never recycled.",
           "type": "string"
         },
         "Problem": {
@@ -9596,7 +9596,7 @@
           ]
         },
         "Code": {
-          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in [`crate::codes`], and a\ncode is never recycled.",
+          "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in the error crate's `codes`\nmodule, and a code is never recycled.",
           "type": "string"
         },
         "Contribution": {

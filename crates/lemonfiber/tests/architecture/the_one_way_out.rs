@@ -15,6 +15,8 @@
 
 use std::path::PathBuf;
 
+use syn::visit::Visit;
+
 use crate::shape::{function, Reached};
 use crate::source_tree::parsed;
 
@@ -110,8 +112,7 @@ fn nothing_reaches_a_terminal_except_through_the_one_way_out() {
         .filter(|(path, _)| !path.ends_with("src/say.rs"))
         .filter(|(_, file)| {
             let reached = Reached::in_file(file);
-            DOORS.iter().any(|door| !reached.invoked(door).is_empty())
-                || reached.calls("prompt_password") && !reached.invoked("format").is_empty()
+            DOORS.iter().any(|door| !reached.invoked(door).is_empty()) || prompts_unrendered(file)
         })
         .map(|(path, _)| path.display().to_string())
         .collect();
@@ -120,6 +121,42 @@ fn nothing_reaches_a_terminal_except_through_the_one_way_out() {
         "these reach a terminal without passing the funnel, so nothing decides how \
          they are rendered: {leaks:?}"
     );
+}
+
+/// Whether a file hands the password prompt text it formatted itself.
+///
+/// The password crate writes its prompt itself, so the text has to arrive already
+/// rendered; a `format!` handed straight to it arrives raw.
+fn prompts_unrendered(file: &syn::File) -> bool {
+    #[derive(Default)]
+    struct Prompts(bool);
+    impl<'ast> Visit<'ast> for Prompts {
+        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+            let prompting = matches!(&*call.func, syn::Expr::Path(called)
+                if called.path.segments.last().is_some_and(|last| last.ident == "prompt_password"));
+            if prompting && call.args.iter().any(formatted) {
+                self.0 = true;
+            }
+            syn::visit::visit_expr_call(self, call);
+        }
+    }
+    let mut prompts = Prompts::default();
+    prompts.visit_file(file);
+    prompts.0
+}
+
+/// Whether an argument is text formatted on the spot.
+fn formatted(argument: &syn::Expr) -> bool {
+    match argument {
+        syn::Expr::Macro(invoked) => invoked
+            .mac
+            .path
+            .segments
+            .last()
+            .is_some_and(|last| last.ident == "format"),
+        syn::Expr::Reference(borrowed) => formatted(&borrowed.expr),
+        _ => false,
+    }
 }
 
 /// Every door of the funnel treats the text before it puts it out.

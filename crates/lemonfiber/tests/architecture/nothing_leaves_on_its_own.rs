@@ -41,7 +41,8 @@ const PRODUCING: &[(&str, &str)] = &[
     ),
     (
         "lemonfiber-core/src/backup",
-        "what a capture holds, how many are kept, and whether one can be read by this build",
+        "what a capture holds, how many are kept, whether one can be read by this build, and \
+         the errand that captures the configuration",
     ),
     (
         "lemonfiber-core/src/bundle",
@@ -55,10 +56,6 @@ const PRODUCING: &[(&str, &str)] = &[
     (
         "lemonfiber-core/src/app/support",
         "the errand: describe what a bundle would hold, or write one",
-    ),
-    (
-        "lemonfiber-core/src/app/backup",
-        "the errand that captures the configuration",
     ),
     (
         "lemonfiber-core/src/app/archives",
