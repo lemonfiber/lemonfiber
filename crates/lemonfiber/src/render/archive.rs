@@ -14,9 +14,9 @@
 use std::path::Path;
 
 use lemonfiber_core::app::archives::Listing;
-use lemonfiber_core::app::backup::Report as Capture;
 use lemonfiber_core::app::restore::{Preview, Restoration};
 use lemonfiber_core::app::support::Bundle;
+use lemonfiber_core::backup::run::Report as Capture;
 use lemonfiber_core::backup::Scope;
 use lemonfiber_core::bytes::humanize;
 

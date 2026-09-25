@@ -6,6 +6,7 @@
 use super::{
     finding, pair, Finding, Ownership, Problem, Remedy, Severity, State, StorageFacts, Verdict,
 };
+use crate::error::codes::storage::{COPY_ONLY, DEGRADED, SERVICE_DENIED};
 use crate::storage;
 
 /// The findings when the link was made and confirmed: a pass naming how many
@@ -194,13 +195,3 @@ pub(super) fn service_unverified() -> Finding {
         },
     )
 }
-
-pub use crate::error::codes::storage::COPY_ONLY;
-
-pub use crate::error::codes::storage::ROOT_UNWRITABLE;
-
-pub use crate::error::codes::storage::ROOT_ABSENT;
-
-pub use crate::error::codes::storage::DEGRADED;
-
-pub use crate::error::codes::storage::SERVICE_DENIED;

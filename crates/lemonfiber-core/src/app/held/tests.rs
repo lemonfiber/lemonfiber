@@ -54,7 +54,7 @@ impl Server {
 /// `jellyfin_reader` resolves a client. Tagged so each case keeps its own env file
 /// rather than racing on a shared one.
 fn ctx_with(server: &Server, tag: &str) -> Ctx {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-held-{tag}-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("held-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let mut context = a_context()

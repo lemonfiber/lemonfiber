@@ -52,6 +52,7 @@ lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes the ports are driven through, shared with every other crate's tests
 # rather than written again here.
 lemonfiber-fixtures = { workspace = true }
+lemonfiber-testing = { workspace = true }
 # Reading the embedded stack's own declaration of itself. Already a build
 # dependency, and a build dependency is not on a test target's path.
 lemonfiber-manifest = { workspace = true }

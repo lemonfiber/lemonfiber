@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure as DockerFailure, LogLine, LogQuery, Stats, Stream,
 };
@@ -101,25 +100,21 @@ fn down() -> DockerFailure {
 fn ctx(status: i32, stdout: &'static str) -> Ctx {
     // A scratch directory to materialise the embedded stack into, so a pull has
     // a compose file to be run against rather than failing before it starts.
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-engine-{}-{status}{}",
-        std::process::id(),
-        stdout.len()
-    ));
+    let dir =
+        lemonfiber_fixtures::scratch::Scratch::named(&format!("engine-{status}{}", stdout.len()))
+            .kept();
     let _ = std::fs::create_dir_all(&dir);
     let settings = Settings {
         stack_dir: Some(dir),
         ..Settings::default()
     };
-    Ctx::new(
-        Arc::new(Answering { status, stdout }),
-        Arc::new(Absent),
-        Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
-        Source::Embedded(&lemonfiber::carried::STACK),
-        settings,
-        Environment::MacOs,
-    )
+    lemonfiber_testing::a_context()
+        .runner(Arc::new(Answering { status, stdout }))
+        .engine(Arc::new(Absent))
+        .clock(Arc::new(lemonfiber_adapters::System))
+        .over(Source::Embedded(&lemonfiber::carried::STACK))
+        .settings(settings)
+        .build()
 }
 
 /// A clean exit, as it reads.
@@ -131,7 +126,7 @@ fn ctx(status: i32, stdout: &'static str) -> Ctx {
 #[tokio::test(start_paused = true)]
 async fn a_pull_waits_for_the_stack_and_is_refused_when_the_wait_runs_out() {
     let mut ctx = ctx(0, "pulled");
-    let dir = std::env::temp_dir().join(format!("lemonfiber-pull-lock-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("pull-lock").kept();
     let _ = std::fs::create_dir_all(&dir);
     ctx.settings.env_file = Some(dir.join(".env"));
 
@@ -195,7 +190,7 @@ fn both_shapes_a_pull_line_takes_are_reachable() {
 /// A context whose engine answers, for the paths that need one to.
 fn answering() -> Ctx {
     let mut ctx = ctx(0, "");
-    ctx.engine = Arc::new(Talking);
+    ctx.seams.engine = Arc::new(Talking);
     ctx
 }
 
@@ -249,7 +244,7 @@ impl Engine for Quiet {
 #[tokio::test]
 async fn a_stack_that_said_nothing_says_so_rather_than_printing_emptiness() {
     let mut ctx = ctx(0, "");
-    ctx.engine = Arc::new(Quiet);
+    ctx.seams.engine = Arc::new(Quiet);
     assert_eq!(
         format!("{:?}", stream(&ctx, &[], &[], false, 10, false).await),
         success()

@@ -17,12 +17,12 @@ publish = false
 # one copy's trait is not the other copy's. That cycle is why these fakes existed twice.
 lemonfiber-ports = { workspace = true }
 async-trait = { workspace = true }
-tokio = { workspace = true, features = ["sync"] }
+tokio = { workspace = true, features = ["sync", "time"] }
 
 [dev-dependencies]
 # The stub half of the filesystem fake is asserted rather than assumed, and those
 # assertions are async because the port is.
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 
 [lints]
 workspace = true

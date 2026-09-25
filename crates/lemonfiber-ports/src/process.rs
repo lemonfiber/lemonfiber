@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::{channel, Receiver};
 
+use lemonfiber_error::codes::proc::{MISSING_PROGRAM, UNUSABLE_PROGRAM};
 use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// What a finished process left behind.
@@ -48,10 +49,6 @@ pub enum Failure {
         reason: String,
     },
 }
-
-pub use lemonfiber_error::codes::proc::MISSING_PROGRAM;
-
-pub(crate) use lemonfiber_error::codes::proc::UNUSABLE_PROGRAM;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

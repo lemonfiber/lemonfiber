@@ -333,10 +333,8 @@ static A_MACHINE: lemonfiber_fixtures::ports::Chance =
     lemonfiber_fixtures::ports::Chance::cycling();
 
 /// A scratch directory unique to this process and case, cleared first.
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-setup-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name)
 }
 
 fn layout(dir: &Path) -> Paths {

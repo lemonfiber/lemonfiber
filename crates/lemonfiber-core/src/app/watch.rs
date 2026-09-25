@@ -20,6 +20,7 @@ use crate::stack::compose::Action;
 
 use super::engine::{invocation, lifecycle};
 use super::{Ctx, Outcome};
+use crate::error::codes::watch::{ALREADY_GONE, NOTHING_TO_WATCH};
 
 /// How often a watch re-checks that the data root is still there.
 ///
@@ -27,10 +28,6 @@ use super::{Ctx, Outcome};
 /// mount, and no more, because the check is a stat and doing it in a tight loop
 /// would spin a core to catch an event that arrives in seconds at worst.
 pub const WATCH: Duration = Duration::from_secs(5);
-
-pub use crate::error::codes::watch::NOTHING_TO_WATCH;
-
-pub use crate::error::codes::watch::ALREADY_GONE;
 
 /// What a run that only said what a watch would do puts where the ending goes.
 ///

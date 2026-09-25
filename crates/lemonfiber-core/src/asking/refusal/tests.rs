@@ -1,7 +1,7 @@
 use super::{
-    never_asked_here, no_limit_named, no_reason_given, no_such_policy, nobody_called,
-    nothing_agreed, nothing_to_decide, sooner_than_the_reminder, unreachable, NEVER_HERE, NOBODY,
-    NOTHING_AGREED, NOT_WAITING, NO_LIMIT, NO_REASON, NO_SUCH_POLICY, TOO_SOON, UNREACHABLE,
+    never_asked_here, no_limit_named, no_reason_given, nobody_called, nothing_agreed,
+    nothing_to_decide, sooner_than_the_reminder, unreachable, NEVER_HERE, NOBODY, NOTHING_AGREED,
+    NOT_WAITING, NO_LIMIT, NO_REASON, TOO_SOON, UNREACHABLE,
 };
 use crate::error::{Amiss, Severity};
 
@@ -25,23 +25,6 @@ fn the_policy_that_is_a_limit_refuses_to_be_chosen_without_one() {
     assert!(problem.remedies.first().is_some_and(|remedy| {
         remedy.action.contains("how many") && remedy.action.contains("how long")
     }));
-}
-
-/// A word nobody offers is refused with the ones there are named beside it.
-#[test]
-fn a_word_nobody_offers_is_refused_with_the_ones_there_are() {
-    let problem = no_such_policy("generous");
-
-    assert_eq!(problem.code, NO_SUCH_POLICY);
-    assert_eq!(problem.amiss, Amiss::Naming);
-    assert!(problem.summary.contains("generous"));
-    let offered = problem
-        .remedies
-        .first()
-        .and_then(|remedy| remedy.detail.clone())
-        .unwrap_or_default();
-    assert!(offered.contains("trusted"), "{offered}");
-    assert!(offered.contains("everything-waits"), "{offered}");
 }
 
 /// A request already ruled on is named rather than decided a second time.

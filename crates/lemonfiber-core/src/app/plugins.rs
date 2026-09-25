@@ -110,13 +110,8 @@ use crate::error::codes::plugin::UNRECORDED;
 
 use crate::error::codes::plugin::ALREADY;
 
-pub(crate) use crate::error::codes::plugin::NOWHERE;
-
-pub(crate) use crate::error::codes::plugin::UNWRITABLE;
-
 use crate::error::codes::plugin::UNRECORDABLE;
-
-pub(crate) use crate::error::codes::plugin::UNPROVED;
+use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 
 /// What is installed, and what installing one came to.
 ///

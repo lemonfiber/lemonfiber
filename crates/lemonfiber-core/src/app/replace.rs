@@ -61,7 +61,7 @@ pub async fn instead(
     let mut left = Vec::new();
     for container in theirs {
         let asked = vec!["docker".to_owned(), "stop".to_owned(), container.id.clone()];
-        match ctx.runner.run(&asked).await {
+        match ctx.seams.runner.run(&asked).await {
             Ok(output) if output.status == Some(0) => stopped.push(container.service.clone()),
             _ => left.push(container.service.clone()),
         }

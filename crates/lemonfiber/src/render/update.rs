@@ -10,8 +10,8 @@
 //! the versions you have is a position this product supports rather than one it
 //! argues with.
 
-use lemonfiber_core::app::update::Report;
 use lemonfiber_core::migration::version::Jump;
+use lemonfiber_core::update::run::Report;
 use lemonfiber_core::update::{Applied, Change, Ending, Reversal, State};
 
 use super::Lines;

@@ -96,7 +96,11 @@ pub(super) async fn seed_arr(
     // The service's key is read once, opening the client for both its root folders
     // and its download clients rather than once each. Without it the service has not
     // finished starting, so both are skipped for a re-run and nothing is recorded.
-    let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+    let Some(client) = arr
+        .target
+        .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+        .await
+    else {
         let mut wirings: Vec<_> = wanted
             .iter()
             .map(|folder| {
@@ -170,7 +174,7 @@ pub(super) async fn seed_arr(
     // on: one the \*arr files into that resolves to nothing on the host is a root
     // folder pointing where nothing exists — a drift that breaks the stack.
     escalate_broken_roots(
-        ctx.filesystem.as_ref(),
+        ctx.seams.filesystem.as_ref(),
         seeding.data_root,
         &wanted,
         &mut wirings,
@@ -215,6 +219,6 @@ pub(super) fn arr_download_clients(
 /// A Servarr application's API key, read from the configuration file it wrote it
 /// to, or nothing where it has not written one yet.
 pub(super) async fn read_servarr_key(ctx: &Ctx, config: &Path) -> Option<String> {
-    let text = ctx.filesystem.read(config).await?;
+    let text = ctx.seams.filesystem.read(config).await?;
     crate::servarr::api_key(&text)
 }

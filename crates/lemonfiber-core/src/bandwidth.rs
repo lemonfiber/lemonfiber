@@ -35,6 +35,7 @@
 //! touches anybody watching from the library, because that traffic does not go out
 //! over the line at all.
 
+use crate::error::codes::rate::{NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE, UNREADABLE};
 use serde::{Deserialize, Serialize};
 
 pub mod cap;
@@ -51,14 +52,6 @@ pub use holding::{Answer, Held, Holding, Pulling, Verdict};
 pub use limit::{Limit, Resolved};
 pub use respite::Respite;
 pub use rhythm::{Period, Rhythm, Wall};
-
-pub(crate) use crate::error::codes::rate::NOTHING_MEASURED;
-
-pub(crate) use crate::error::codes::rate::NO_ZONE;
-
-pub(crate) use crate::error::codes::rate::UNREADABLE;
-
-pub use crate::error::codes::rate::NOTHING_TO_LIMIT;
 
 /// What throttling the upload costs, said the same way wherever it is said.
 ///

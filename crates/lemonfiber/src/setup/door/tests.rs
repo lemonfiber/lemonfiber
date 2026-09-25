@@ -69,13 +69,13 @@ fn a_stack_with_no_door_at_all_is_told_that_rather_than_shown_a_blank() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_working_stack_is_asked_and_answers() {
     // Nothing of this stack is up yet, which is an answer about the door rather
     // than a failure to reach one — and it is the core's answer, arrived at
     // through the command every other surface asks.
     let mut ctx = working_ctx();
-    ctx.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
     let lines = handed(&ctx).await;
     assert!(
         lines.iter().any(|line| line.contains("front door")),
@@ -83,7 +83,7 @@ async fn a_working_stack_is_asked_and_answers() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_that_cannot_be_read_adds_nothing_rather_than_complaining_twice() {
     assert_eq!(handed(&ctx()).await, Vec::<String>::new());
 }

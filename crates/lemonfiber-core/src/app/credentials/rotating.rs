@@ -165,7 +165,7 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
     if ctx.dry_run {
         return would_rotate(held, MINTING);
     }
-    let Some(replacement) = crate::secret::generate(ctx.random.as_ref()) else {
+    let Some(replacement) = crate::secret::generate(ctx.seams.random.as_ref()) else {
         return unproven(
             held,
             "no randomness was available to generate a replacement, and a guessable password \
@@ -173,7 +173,7 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
         );
     };
 
-    let client = crate::qbittorrent::Qbittorrent::new(ctx.http.clone(), &addr.loopback);
+    let client = crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), &addr.loopback);
     match client.replace_password(&current, &replacement).await {
         Ok(()) => {
             record_secret(ctx, &held.setting, &replacement);
@@ -238,14 +238,14 @@ async fn republished(
     if ctx.dry_run {
         return would_rotate(held, REPUBLISHING);
     }
-    let Some(key) = target.key(ctx.filesystem.as_ref()).await else {
+    let Some(key) = target.key(ctx.seams.filesystem.as_ref()).await else {
         return unproven(
             held,
             "the service has not written an API key yet, so there is none to hand out",
         );
     };
     let service = crate::servarr::Servarr::new(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         &target.base,
         key.clone(),
         &target.id,

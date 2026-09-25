@@ -235,7 +235,7 @@ async fn an_install_or_update_on_an_unreadable_stack_is_refused_first() {
         .over(crate::test_support::nowhere())
         .settings(ctx.settings.clone())
         .build();
-    let refused = crate::stack::STACK_UNREADABLE.to_string();
+    let refused = crate::error::codes::stack::STACK_UNREADABLE.to_string();
     assert_eq!(
         refusal(updating(&blind, &source("contest-blind-next", &next())).await),
         refused

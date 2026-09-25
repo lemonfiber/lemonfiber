@@ -124,26 +124,30 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
 /// export cannot proceed without real randomness. Saying so beats writing a file whose
 /// redaction is only as good as a fixed salt.
 async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
-    let Some(marks) = Marks::new(ctx.random.as_ref()) else {
+    let Some(marks) = Marks::new(ctx.seams.random.as_ref()) else {
         viewer.remarked("this machine would not provide the randomness an export needs");
         return;
     };
     // Stamped from the clock port rather than a date, so two runs on the same day
     // cannot write over each other's export.
     let stamp = ctx
+        .seams
         .clock
         .now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs())
         .unwrap_or_default();
     let path = std::path::PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
-    ctx.filesystem.write(&path, &viewer.exported(&marks)).await;
+    ctx.seams
+        .filesystem
+        .write(&path, &viewer.exported(&marks))
+        .await;
 
     // Writing is best effort and says nothing about whether it worked, so the file is
     // read back before the screen claims it is there. An operator told their export
     // landed, on a directory they cannot write to, would find out when they went
     // looking for it — which is the moment they were relying on it.
-    if ctx.filesystem.read(&path).await.is_some() {
+    if ctx.seams.filesystem.read(&path).await.is_some() {
         viewer.remarked(&format!("written to {}", path.display()));
     } else {
         viewer.remarked(&format!("could not write {}", path.display()));
@@ -157,7 +161,7 @@ async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
 /// and throw away what it knew — so a hiccup leaves its account of the stack intact
 /// and the next answer is compared against the last real one.
 async fn states(ctx: &Ctx) -> Option<Vec<(String, Lifecycle)>> {
-    let containers = ctx.engine.list(&ctx.settings.project).await.ok()?;
+    let containers = ctx.seams.engine.list(&ctx.settings.project).await.ok()?;
     Some(
         containers
             .into_iter()

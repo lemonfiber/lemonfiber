@@ -148,10 +148,7 @@ fn the_answer_survives_setup_being_run_a_second_time() {
 fn a_record_that_cannot_be_read_is_a_machine_that_was_never_asked() {
     // The safe direction, the same one a missing answer falls in: a truncated
     // file must not be the reason a metered line starts saturating at boot.
-    let nowhere = std::env::temp_dir().join(format!(
-        "lemonfiber-returning-{}-absent.json",
-        std::process::id()
-    ));
+    let nowhere = lemonfiber_fixtures::scratch::Scratch::named("returning-absent.json");
     let _ = std::fs::remove_file(&nowhere);
     assert_eq!(Returning::at(&nowhere), Returning::default());
 

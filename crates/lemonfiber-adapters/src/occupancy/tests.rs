@@ -15,7 +15,7 @@ async fn a_tree_that_is_not_there_holds_nothing_rather_than_failing() {
 
 #[tokio::test]
 async fn every_file_beneath_a_real_tree_is_found_with_its_size_and_identity() {
-    let root = std::env::temp_dir().join(format!("lemonfiber-walk-{}", std::process::id()));
+    let root = lemonfiber_fixtures::scratch::Scratch::named("walk");
     let nested = root.join("under");
     let _ = std::fs::create_dir_all(&nested);
     let _ = std::fs::write(root.join("top.txt"), "0123456789");
@@ -56,7 +56,7 @@ async fn every_file_beneath_a_real_tree_is_found_with_its_size_and_identity() {
 
 #[tokio::test]
 async fn a_file_named_as_the_root_is_a_root_with_nothing_beneath_it() {
-    let root = std::env::temp_dir().join(format!("lemonfiber-file-{}", std::process::id()));
+    let root = lemonfiber_fixtures::scratch::Scratch::named("file");
     let _ = std::fs::write(&root, "x");
     // Reading a file as a directory is not a "not there", so it reaches the
     // operator as the platform's own words rather than as an empty answer.

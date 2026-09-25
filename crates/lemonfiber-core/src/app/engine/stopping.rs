@@ -40,6 +40,7 @@ pub(crate) async fn permitted(
         .map(|profile| profile.id.clone())
         .collect();
     let containers = ctx
+        .seams
         .engine
         .list(&ctx.settings.project)
         .await

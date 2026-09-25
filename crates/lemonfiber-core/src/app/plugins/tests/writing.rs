@@ -90,7 +90,7 @@ async fn a_plugin_s_changes_are_in_the_history_named_as_the_plugin() {
         Some(1)
     );
 
-    let shown = super::super::super::super::history::history(&ctx);
+    let shown = crate::app::history::history(&ctx);
     assert!(!shown.changes.is_empty());
     assert!(shown.changes.iter().all(|one| one.operation == "komga"));
     assert!(shown
@@ -188,7 +188,11 @@ async fn a_machine_that_cannot_say_where_its_own_files_are_refuses_the_install()
     let ctx = a_context()
         .settings(crate::config::Settings {
             env_file: None,
-            stack_dir: Some(std::env::temp_dir().join("lemonfiber-unrooted/stack")),
+            stack_dir: Some(
+                lemonfiber_fixtures::scratch::Scratch::named("unrooted")
+                    .kept()
+                    .join("stack"),
+            ),
             ..crate::config::Settings::default()
         })
         .build();

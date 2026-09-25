@@ -32,7 +32,8 @@ impl Ctx {
     /// subtracted. A clock that will not answer reads as the epoch, which is a machine
     /// that has waited long enough for anything.
     pub(crate) fn seconds(&self) -> u64 {
-        self.clock
+        self.seams
+            .clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|elapsed| elapsed.as_secs())
@@ -48,6 +49,7 @@ impl Ctx {
     /// one place in the product that needs an instant rather than a day.
     pub(crate) fn hours_ago(&self, hours: i64) -> String {
         let now = self
+            .seams
             .clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -72,6 +74,7 @@ impl Ctx {
     /// merely wrong.
     pub(crate) fn today(&self) -> lemonfiber_manifest::Date {
         let seconds = self
+            .seams
             .clock
             .now()
             .duration_since(std::time::UNIX_EPOCH)

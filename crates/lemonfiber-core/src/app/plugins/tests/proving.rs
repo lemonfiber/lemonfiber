@@ -47,7 +47,7 @@ async fn a_plugin_whose_proof_holds_is_started_asked_and_then_recorded() {
 
 impl LostToTheInstall {
     /// One of them, before anything has started.
-    fn losing(once_up: &'static str) -> Arc<Self> {
+    pub(super) fn losing(once_up: &'static str) -> Arc<Self> {
         Arc::new(Self {
             once_up,
             started: std::sync::atomic::AtomicBool::new(false),

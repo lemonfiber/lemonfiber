@@ -338,12 +338,12 @@ async fn drive(
         paths,
         source: ctx.stack,
         stamp: &at,
-        random: ctx.random.as_ref(),
+        random: ctx.seams.random.as_ref(),
     };
     match core_setup::run(
         &mut wizard,
         prompt.as_ref(),
-        ctx.filesystem.as_ref(),
+        ctx.seams.filesystem.as_ref(),
         validator.as_ref(),
         &applying,
     )

@@ -248,8 +248,7 @@ async fn a_dispatched_offer_serialises_under_its_own_kind() {
 
 #[tokio::test]
 async fn a_dispatched_reversal_serialises_under_its_own_kind() {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-dispatched-undo-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("dispatched-undo").kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let _ = std::fs::create_dir_all(dir.join("data"));
@@ -408,7 +407,11 @@ async fn choosing_and_deciding_refuse_rather_than_claim_a_change() {
 
     for refused in [chosen, decided] {
         let code = refused.err().map(|problem| problem.code);
-        assert_eq!(code, Some(crate::asking::UNREACHABLE), "{code:?}");
+        assert_eq!(
+            code,
+            Some(crate::error::codes::quota::UNREACHABLE),
+            "{code:?}"
+        );
     }
 }
 
@@ -432,7 +435,7 @@ async fn a_decline_with_a_blank_reason_never_reaches_the_service() {
 
     assert_eq!(
         refused.err().map(|problem| problem.code),
-        Some(crate::asking::NO_REASON)
+        Some(crate::error::codes::quota::NO_REASON)
     );
 }
 
@@ -654,7 +657,7 @@ async fn a_dispatched_setup_serialises_under_its_own_kind() {
     let env_file = config_scratch("setup-kind");
     let settings = Settings {
         stack_dir: env_file.parent().map(|dir| dir.join("stack")),
-        env_file: Some(env_file),
+        env_file: Some(env_file.to_path_buf()),
         ..Settings::default()
     };
     let json = dispatch(
@@ -736,7 +739,10 @@ async fn a_dispatched_accounting_of_the_disk_serialises_under_its_own_kind() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refused, Some(crate::space::NOWHERE_TO_MEASURE));
+    assert_eq!(
+        refused,
+        Some(crate::error::codes::space::NOWHERE_TO_MEASURE)
+    );
 }
 
 #[tokio::test]
@@ -755,7 +761,10 @@ async fn a_dispatched_request_to_stop_seeding_reaches_its_own_arm() {
     .await
     .err()
     .map(|problem| problem.code);
-    assert_eq!(refused, Some(crate::space::NOWHERE_TO_MEASURE));
+    assert_eq!(
+        refused,
+        Some(crate::error::codes::space::NOWHERE_TO_MEASURE)
+    );
 }
 
 #[tokio::test]

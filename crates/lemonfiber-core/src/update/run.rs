@@ -30,14 +30,9 @@ use crate::update::{self, Applied, Change, State as Standing};
 
 use crate::app::engine::{in_flight, Interrupted};
 use crate::app::{Ctx, Waiting};
-
-pub(crate) use crate::error::codes::update::NOT_CHECKED;
-
-pub(crate) use crate::error::codes::update::NO_SUCH_SERVICE;
-
-pub(crate) use crate::error::codes::update::STILL_TRANSFERRING;
-
-pub(crate) use crate::error::codes::update::CAPTURE_LEFT_IT_DOWN;
+use crate::error::codes::update::{
+    CAPTURE_LEFT_IT_DOWN, NOT_CHECKED, NO_SUCH_SERVICE, STILL_TRANSFERRING,
+};
 
 /// What was asked of an update.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,6 +130,7 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
     let moving = narrowed(&manifest, asked.service.as_deref())?;
 
     let images = ctx
+        .seams
         .images
         .images()
         .await

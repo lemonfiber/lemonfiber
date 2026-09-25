@@ -168,7 +168,7 @@ impl Reader for FakeArchive {
 /// it over — so what a test drives is the run holding an adapter, not a function
 /// taking one.
 pub(crate) fn keeping(ctx: crate::app::Ctx, vault: &Arc<FakeArchive>) -> crate::app::Ctx {
-    ctx.keeping(Archiving {
+    ctx.with_archives(Archiving {
         paths: paths(),
         vault: Arc::clone(vault) as Arc<dyn crate::archive::Vault>,
     })
@@ -178,8 +178,8 @@ pub(crate) fn keeping(ctx: crate::app::Ctx, vault: &Arc<FakeArchive>) -> crate::
 ///
 /// Unique per test and per process because these records land beside the environment file,
 /// and two tests sharing one directory would each be reading what the other wrote.
-pub(crate) fn scratch(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("lemonfiber-app-{}-{name}", std::process::id()))
+pub(crate) fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::named(name)
 }
 
 /// A context whose environment file is in that scratch directory, so every record a test
@@ -189,7 +189,7 @@ pub(crate) fn scratch(name: &str) -> PathBuf {
 /// builder are three places for a test to be set up subtly differently from the code it is
 /// meant to be proving.
 pub(crate) fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name);
+    let dir = scratch(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let settings = crate::config::Settings {
         env_file: Some(dir.join(".env")),

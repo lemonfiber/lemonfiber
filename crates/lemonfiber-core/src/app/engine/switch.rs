@@ -86,6 +86,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
         .map(|profile| profile.id.clone())
         .collect();
     let containers = ctx
+        .seams
         .engine
         .list(&ctx.settings.project)
         .await
@@ -131,6 +132,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
 
     if let Some(stopping) = stopping {
         let output = ctx
+            .seams
             .runner
             .run(&stopping)
             .await
@@ -142,6 +144,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
     }
 
     let started = ctx
+        .seams
         .runner
         .run(&command)
         .await

@@ -322,7 +322,8 @@ fn zone(ctx: &Ctx) -> Option<String> {
 
 /// The moment this reading was taken, in seconds since the epoch.
 fn now(ctx: &Ctx) -> u64 {
-    ctx.clock
+    ctx.seams
+        .clock
         .now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs())

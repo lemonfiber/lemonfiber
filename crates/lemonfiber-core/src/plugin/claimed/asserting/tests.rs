@@ -97,7 +97,7 @@ fn changed(edits: &[(&str, &str)]) -> String {
 /// service answering something other than what its author declared — and a case
 /// that edited the declaration instead would be about a different manifest.
 fn source(named: &str, answered: u16) -> PathBuf {
-    let at = std::env::temp_dir().join(format!("lemonfiber-asserting-{named}"));
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("asserting-{named}")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(at.join("fixtures"));
     let _ = std::fs::write(

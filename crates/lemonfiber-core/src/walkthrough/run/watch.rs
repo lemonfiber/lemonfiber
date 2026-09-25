@@ -40,7 +40,7 @@ pub(super) async fn watch(walk: &mut Walk<'_>, chosen: &Chosen<'_>, item: &Added
     // The operator's patience, which is one thing and already a knob: a run told to wait
     // less waits less here too, and a walkthrough is exactly the kind of run someone
     // scripting would want to bound.
-    let deadline = walk.ctx.clock.now() + walk.ctx.patience;
+    let deadline = walk.ctx.seams.clock.now() + walk.ctx.patience;
 
     loop {
         let events = arr
@@ -61,7 +61,7 @@ pub(super) async fn watch(walk: &mut Walk<'_>, chosen: &Chosen<'_>, item: &Added
 
         // Checked after the reading, so a walk with no patience at all still reports what
         // it saw rather than reporting nothing.
-        if walk.ctx.clock.now() >= deadline {
+        if walk.ctx.seams.clock.now() >= deadline {
             return past_patience(walk.furthest());
         }
         tokio::time::sleep(POLL).await;
@@ -215,7 +215,12 @@ pub(super) async fn what_was_said(
         return Vec::new();
     }
     let query = LogQuery::last_words();
-    let Ok(mut lines) = ctx.engine.logs(&ctx.settings.project, &named, query).await else {
+    let Ok(mut lines) = ctx
+        .seams
+        .engine
+        .logs(&ctx.settings.project, &named, query)
+        .await
+    else {
         return Vec::new();
     };
 

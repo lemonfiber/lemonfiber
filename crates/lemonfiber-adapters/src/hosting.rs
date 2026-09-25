@@ -119,11 +119,8 @@ fn after(text: &str, key: &str) -> Option<String> {
 /// below that layer and reaching up into it would be the dependency this seam
 /// exists to prevent — and the fixture is private to it in any case.
 #[cfg(test)]
-pub(super) fn scratch(name: &str) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-hosting-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+pub(super) fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name)
 }
 
 #[cfg(test)]

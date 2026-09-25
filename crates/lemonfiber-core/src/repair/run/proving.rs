@@ -49,7 +49,7 @@ pub(super) async fn carried(
     // changed is the operator's way back, and a way back that depends on the rest of the
     // run going well is one they find missing exactly when they need it.
     if let Some(journal) = crate::app::targets::beside_env(ctx, JOURNAL) {
-        crate::app::recover::journalled(&journal, attempt.changes(), ctx.random.as_ref());
+        crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref());
     }
     if matches!(attempt, Attempt::Stopped { .. }) {
         // Nothing changed, or something changed half way. Either way the state it was left

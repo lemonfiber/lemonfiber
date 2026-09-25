@@ -35,8 +35,8 @@ async fn identity_leaves_an_already_set_up_household_alone() {
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx =
-        seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(household(true, true));
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
+        .with_http(household(true, true));
 
     let (wirings, _records) = super::super::seed_jellyfin_identity(
         &ctx,
@@ -65,7 +65,7 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         true,
         Vec::new(),
         Some(vec![0x11; 24]),
-        Some(env.clone()),
+        Some(env.to_path_buf()),
     )
     .with_http(household(false, false));
 
@@ -133,7 +133,8 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(http.clone());
+    let ctx =
+        seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
 
     let (wirings, records) = super::super::seed_jellyfin_identity(
         &ctx,
@@ -187,7 +188,8 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_http(http.clone());
+    let ctx =
+        seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
 
     // lemonfiber recorded that it set the telling on; the service now says off.
     let mut baseline = crate::baseline::Baseline::new();

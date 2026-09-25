@@ -21,15 +21,12 @@ mod outside;
 pub(crate) mod run;
 mod tier;
 
+use crate::error::codes::gone::{ANOTHER_READING, NEEDS_AGREEING};
 use serde::Serialize;
 
 pub use foreign::{beside, ours, Foreign};
 pub use outside::{against, looked_for, Beside, Outside, EVERY as BESIDE};
 pub use tier::{Tier, EVERY as TIERS};
-
-pub use crate::error::codes::gone::NEEDS_AGREEING;
-
-pub(crate) use crate::error::codes::gone::ANOTHER_READING;
 
 /// What sort of thing one line of a manifest is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]

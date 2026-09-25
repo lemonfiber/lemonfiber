@@ -1,14 +1,10 @@
-use std::path::PathBuf;
-
 use lemonfiber_fixtures::ports::Chance;
 
 use super::{beside, is_sealed, store, unhex, Change, Kind, Seal, MARKER};
 
 /// A scratch directory unique to this process and case, cleared first.
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-seal-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join("journal.jsonl")
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name).within("journal.jsonl")
 }
 
 /// The randomness a real machine supplies.
@@ -137,7 +133,8 @@ fn randomness_of_the_wrong_length_makes_no_key() {
 /// alternative is a run that seals against a key the next run cannot find.
 #[test]
 fn a_key_that_cannot_be_written_down_seals_nothing() {
-    let blocker = scratch("unwritable").with_file_name("blocker");
+    let blocker_dir = scratch("unwritable");
+    let blocker = blocker_dir.with_file_name("blocker");
     // Written through the store, which makes the directory it needs — so there is no
     // branch here on a parent that is always there.
     assert!(store::write(&blocker, "a file where a directory would go").is_ok());

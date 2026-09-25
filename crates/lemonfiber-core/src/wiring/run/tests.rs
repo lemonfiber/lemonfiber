@@ -5,7 +5,7 @@ use crate::wiring::{Reaches, FILLS_KEY};
 /// A scratch layout with somewhere to keep a setting and somewhere to keep a
 /// journal, which is what a substitution needs and a listing does not.
 fn dir(named: &str) -> std::path::PathBuf {
-    let at = std::env::temp_dir().join(format!("lemonfiber-wiring-{}-{named}", std::process::id()));
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("wiring-{named}")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(at.join("config"));
     let _ = std::fs::create_dir_all(at.join("data"));
@@ -132,7 +132,7 @@ fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
     assert_eq!(refused("media.serve", "jellyfin"), Some(NOTHING_ASKS));
     assert_eq!(refused("identity.source", "jellyfin"), Some(CANNOT_FILL));
     assert_eq!(
-        refused("indexer.search", "plex").map(super::Code::as_str),
+        refused("indexer.search", "plex").map(lemonfiber_error::Code::as_str),
         Some("WIRE-1")
     );
 }

@@ -24,13 +24,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
+use crate::error::codes::cred::CREDENTIAL_REJECTED;
 use crate::error::{Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{Client, Failure};
 use crate::servarr::{api_key, Servarr};
-
-pub use crate::error::codes::cred::CREDENTIAL_REJECTED;
 
 /// One service whose credential is to be proven.
 ///

@@ -131,7 +131,7 @@ async fn a_stack_that_cannot_be_read_changes_nothing() {
 /// An environment file recording a qBittorrent password, at a scratch path
 /// unique to the test so concurrent tests do not share one.
 fn env_at(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-fwd-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("fwd-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let path = dir.join(".env");
     assert!(

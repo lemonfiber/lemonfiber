@@ -163,7 +163,7 @@ fn a_record_the_previous_major_version_wrote_still_proves_its_password() {
 
 #[test]
 fn a_credential_is_kept_read_back_and_forgotten() {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-admission-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("admission");
     let path = dir.join("admission.json");
     let _ = std::fs::remove_dir_all(&dir);
 
@@ -180,7 +180,7 @@ fn a_credential_is_kept_read_back_and_forgotten() {
 
 #[test]
 fn a_credential_that_cannot_be_written_or_removed_says_so() {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-admission-x-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("admission-x");
     let _ = std::fs::remove_dir_all(&dir);
     assert!(std::fs::create_dir_all(&dir).is_ok());
     // A directory where the file should be: it can neither be written over nor

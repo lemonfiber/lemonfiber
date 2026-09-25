@@ -6,7 +6,7 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{diagnose, dispatch, seeding, Command, Ctx, Outcome};
+use lemonfiber_core::app::{diagnose, dispatch, unforwarded, Command, Ctx, Outcome};
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{autostart, overall, Category, Finding, Narrowing, Overall};
 use lemonfiber_core::model::DoctorReport;
@@ -115,7 +115,7 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
 /// next room, and the last thing on the screen is the thing that gets read.
 async fn afterwards(ctx: &Ctx) -> Vec<String> {
     let mut lines = Vec::new();
-    if let Some(cost) = seeding::at_setup(ctx.settings.protocols, &ctx.settings.port_forward) {
+    if let Some(cost) = unforwarded::at_setup(ctx.settings.protocols, &ctx.settings.port_forward) {
         lines.push(format!("\n{cost}"));
     }
     lines.extend(door::handed(ctx).await);

@@ -120,7 +120,12 @@ pub mod storage;
 pub mod stored;
 pub mod telling;
 #[cfg(test)]
-mod test_support;
+pub mod test_support;
+
+// So the context builder the core's tests share with every other crate's can name this
+// crate the way the others do.
+#[cfg(test)]
+extern crate self as lemonfiber_core;
 pub mod text;
 pub mod transcoding;
 pub mod uninstall;

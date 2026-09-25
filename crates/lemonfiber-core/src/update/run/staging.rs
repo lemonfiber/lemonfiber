@@ -96,7 +96,7 @@ pub(super) async fn apply(
         crate::app::recover::journalled(
             &paths.journal(),
             &recorded(&applied, &backup, &ctx.stamp()),
-            ctx.random.as_ref(),
+            ctx.seams.random.as_ref(),
         );
     }
 
@@ -245,7 +245,8 @@ async fn moved(
 /// on the versions it was already running.
 async fn whole(ctx: &Ctx, action: &Action) -> Result<Vec<crate::model::StackEdit>, Box<Problem>> {
     let (argv, edits) = engine::invocation(ctx, &[], action)?;
-    ctx.runner
+    ctx.seams
+        .runner
         .run(&argv)
         .await
         .map_err(|err| Box::new(err.problem()))?;
@@ -306,7 +307,7 @@ async fn staged(ctx: &Ctx, manifest: &Manifest, taking: &[Step]) -> (Vec<Applied
 
 /// Move one service onto its pin, and find out whether it came back.
 async fn one(ctx: &Ctx, manifest: &Manifest, step: &Step) -> (Ending, Option<String>) {
-    match ctx.runner.run(&step.argv).await {
+    match ctx.seams.runner.run(&step.argv).await {
         Err(failure) => (Ending::NotFetched, Some(failure.to_string())),
         Ok(output) if !output.succeeded() => (Ending::NotFetched, Some(refusal(&output))),
         Ok(_) => answering(ctx, manifest, &step.change.service).await,
@@ -338,9 +339,9 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
         .filter(|one| one.id == service)
         .map(|one| one.profile.clone())
         .collect();
-    let deadline = ctx.clock.now() + ctx.patience;
+    let deadline = ctx.seams.clock.now() + ctx.patience;
     loop {
-        let Ok(containers) = ctx.engine.list(&ctx.settings.project).await else {
+        let Ok(containers) = ctx.seams.engine.list(&ctx.settings.project).await else {
             return (
                 Ending::NotStarted,
                 Some("the container engine stopped answering".to_owned()),
@@ -363,7 +364,7 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
             }
             _ => {}
         }
-        if ctx.clock.now() >= deadline {
+        if ctx.seams.clock.now() >= deadline {
             return (
                 Ending::NotStarted,
                 Some("it did not finish starting".to_owned()),

@@ -23,12 +23,7 @@ use crate::ports::hosting::{Held, Hosted, Manager, Standing};
 
 use super::command::{Hostable, Keeping, HOSTABLE};
 use super::Ctx;
-
-pub(crate) use crate::error::codes::host::NOWHERE_TO_WRITE;
-
-pub(crate) use crate::error::codes::host::NO_PROGRAM;
-
-pub(crate) use crate::error::codes::host::NOTHING_NAMED_TO_GUARD;
+use crate::error::codes::host::{NOTHING_NAMED_TO_GUARD, NOWHERE_TO_WRITE, NO_PROGRAM};
 
 /// What a systemd user session does not do, said before it is relied on.
 const UNTIL_LOGOUT: &str = "A user service runs while you are logged in. Surviving a logout \
@@ -62,7 +57,7 @@ pub(crate) async fn hosting(ctx: &Ctx, asked: Keeping) -> Result<HostingReport, 
 
 /// What this machine keeps running, as it stands now.
 async fn reading(ctx: &Ctx, changed: Option<Changed>) -> HostingReport {
-    let manager = ctx.hosting.manager();
+    let manager = ctx.seams.hosting.manager();
     let mut commands = Vec::with_capacity(HOSTABLE.len());
     for what in HOSTABLE {
         commands.push(described(ctx, what).await);
@@ -80,7 +75,7 @@ async fn reading(ctx: &Ctx, changed: Option<Changed>) -> HostingReport {
 async fn described(ctx: &Ctx, what: Hostable) -> HostedCommand {
     // The one thing a manager refuses to answer about is a platform it is not on,
     // which is a state of the machine rather than of this command.
-    let (standing, held) = match ctx.hosting.standing(what.name()).await {
+    let (standing, held) = match ctx.seams.hosting.standing(what.name()).await {
         Err(_) => (Hosting::Unsupported, Held::absent()),
         Ok(held) => (settled(&held), held),
     };
@@ -107,7 +102,8 @@ async fn described(ctx: &Ctx, what: Hostable) -> HostedCommand {
 /// keeps none of it. A manager that will not say is not one to promise on either,
 /// so anything short of a confirmed run reads as nothing running it.
 pub(crate) async fn keeping(ctx: &Ctx, what: Hostable) -> bool {
-    ctx.hosting
+    ctx.seams
+        .hosting
         .standing(what.name())
         .await
         .is_ok_and(|held| held.standing == Standing::Running)
@@ -142,6 +138,7 @@ async fn install(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Changed,
         });
     }
     let placed = ctx
+        .seams
         .hosting
         .place(&wanted)
         .await
@@ -160,6 +157,7 @@ async fn install(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Changed,
 async fn remove(ctx: &Ctx, what: Hostable) -> Result<Changed, Box<Problem>> {
     if ctx.dry_run {
         let held = ctx
+            .seams
             .hosting
             .standing(what.name())
             .await
@@ -173,6 +171,7 @@ async fn remove(ctx: &Ctx, what: Hostable) -> Result<Changed, Box<Problem>> {
         });
     }
     let taken = ctx
+        .seams
         .hosting
         .withdraw(what.name())
         .await

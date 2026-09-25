@@ -41,7 +41,7 @@ async fn seed_replaces_and_records_the_qbittorrent_password() {
         true,
         exchange(),
         Some(vec![0x11; 24]),
-        Some(env.clone()),
+        Some(env.to_path_buf()),
     );
 
     let outcome = dispatch(Command::Seed, &ctx).await;
@@ -85,7 +85,7 @@ async fn a_rehearsed_seed_names_what_it_would_do_and_records_none_of_it() {
         true,
         exchange(),
         Some(vec![0x11; 24]),
-        Some(env.clone()),
+        Some(env.to_path_buf()),
     )
     .rehearsing();
 
@@ -139,9 +139,9 @@ async fn the_baseline_persists_across_runs() {
         r#"{"services":{"sonarr":{"downloadclient:sabnzbd:8080":{"value":"tv","at":"1"}}}}"#;
     let _ = crate::config::store::write(&baseline, recorded);
 
-    let first = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+    let first = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
     let _ = dispatch(Command::Seed, &first).await;
-    let second = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+    let second = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
     let _ = dispatch(Command::Seed, &second).await;
 
     let read_back = std::fs::read_to_string(&baseline).unwrap_or_default();
@@ -162,7 +162,7 @@ async fn seed_reports_an_unreadable_stack_rather_than_guessing() {
     let outcome = dispatch(Command::Seed, &ctx).await;
     assert_eq!(
         outcome.err().map(|problem| problem.code),
-        Some(crate::stack::STACK_UNREADABLE)
+        Some(crate::error::codes::stack::STACK_UNREADABLE)
     );
 }
 
@@ -246,7 +246,14 @@ async fn a_password_already_set_is_reported_rather_than_set_again() {
         "minted-earlier",
     );
     let http = Fake::always(Answer::reply(200, "Ok."));
-    let ctx = seed_ctx(Some(ANNOUNCED), true, Vec::new(), None, Some(path)).with_http(http.clone());
+    let ctx = seed_ctx(
+        Some(ANNOUNCED),
+        true,
+        Vec::new(),
+        None,
+        Some(path.to_path_buf()),
+    )
+    .with_http(http.clone());
 
     let (wiring, recorded) = super::super::seed_qbittorrent_password(
         &ctx,
@@ -298,7 +305,7 @@ async fn a_recorded_password_the_client_refuses_falls_through_to_the_temporary()
         true,
         Vec::new(),
         Some(vec![7; 32]),
-        Some(path),
+        Some(path.to_path_buf()),
     )
     .with_http(http.clone());
 
@@ -337,9 +344,15 @@ async fn a_rehearsed_pass_will_not_sign_in_to_test_the_password_it_recorded() {
         "minted-earlier",
     );
     let http = Fake::always(Answer::reply(200, "Ok."));
-    let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), None, Some(path))
-        .with_http(http.clone())
-        .rehearsing();
+    let ctx = seed_ctx(
+        Some(TEMP_LOG),
+        true,
+        Vec::new(),
+        None,
+        Some(path.to_path_buf()),
+    )
+    .with_http(http.clone())
+    .rehearsing();
 
     let (wiring, recorded) = super::super::seed_qbittorrent_password(
         &ctx,
@@ -379,7 +392,7 @@ async fn a_later_seed_offers_qbittorrent_from_its_recorded_password() {
         crate::config::QBITTORRENT_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path))
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()))
         .with_http(seeding())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 

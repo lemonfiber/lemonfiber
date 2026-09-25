@@ -188,7 +188,7 @@ pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
 fn indexer_still_answers(ctx: &Ctx) -> IndexerCheck {
     IndexerCheck::new(
         Arc::new(crate::validate::Allowed::new(
-            Arc::new(crate::validate::Live::new(ctx.http.clone())),
+            Arc::new(crate::validate::Live::new(ctx.seams.http.clone())),
             ctx.settings.reaching.clone(),
         )),
         ctx.settings.indexer.clone(),
@@ -221,7 +221,7 @@ async fn tunnelled(
     disruptive: bool,
 ) -> VpnCheck {
     VpnCheck::new(
-        ctx.engine.clone(),
+        ctx.seams.engine.clone(),
         ctx.settings.project.clone(),
         manifest,
         crate::doctor::vpn::Asked {
@@ -294,7 +294,8 @@ pub(crate) struct Stack {
 /// a machine against the very reading the work was meant to change.
 pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<dyn Check>> {
     let manifest = &stack.manifest;
-    let environment = EnvironmentCheck::reaching(ctx.runner.clone(), ctx.settings.docker.clone());
+    let environment =
+        EnvironmentCheck::reaching(ctx.seams.runner.clone(), ctx.settings.docker.clone());
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     // What the download clients still have to write, so the free-space finding
     // projects exhaustion from the queue rather than only warning on a floor.
@@ -309,7 +310,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // of the hardlink question its probe cannot see — a fork that splits the data
     // location between two mounts, where imports copy however well the host links.
     let storage = StorageCheck::new(
-        ctx.filesystem.clone(),
+        ctx.seams.filesystem.clone(),
         ctx.settings.data_root.clone(),
         ctx.settings.storage_state.clone(),
         ctx.environment,
@@ -319,8 +320,8 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     );
     let vpn = tunnelled(ctx, manifest, project.as_deref(), disruptive).await;
     let credentials = CredentialsCheck::new(
-        ctx.http.clone(),
-        ctx.filesystem.clone(),
+        ctx.seams.http.clone(),
+        ctx.seams.filesystem.clone(),
         servarr_targets(&manifest.services, project.as_deref()),
     );
     let indexer = indexer_still_answers(ctx);
@@ -328,7 +329,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // back empty — leaving the profiles in place stale rather than unconfigured — is
     // reported rather than silently missed.
     let guides = GuidesCheck::new(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         ctx.settings
             .reaching
             .allows(crate::config::REACH_GUIDES_KEY),
@@ -339,7 +340,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // disk most. An unreadable or unset choice falls back to the default rather than
     // failing the run.
     let headroom = HeadroomCheck::new(
-        ctx.filesystem.clone(),
+        ctx.seams.filesystem.clone(),
         ctx.settings.data_root.clone(),
         crate::quality::run::most_demanding_or_default(ctx),
     );
@@ -348,8 +349,8 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // are told apart. It searches for wanted content live, so it only does so on a
     // disruptive run; otherwise it reports skipped.
     let releases = ReleasesCheck::new(
-        ctx.http.clone(),
-        ctx.filesystem.clone(),
+        ctx.seams.http.clone(),
+        ctx.seams.filesystem.clone(),
         servarr_targets(&manifest.services, project.as_deref()),
         disruptive,
     );
@@ -359,8 +360,8 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // somebody's own change. Read-only here: it says which side of the field moved, and
     // the repair it hands back refuses to move the operator's.
     let wiring = WiringCheck::new(
-        ctx.http.clone(),
-        ctx.filesystem.clone(),
+        ctx.seams.http.clone(),
+        ctx.seams.filesystem.clone(),
         crate::seed::run::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
         ctx.stamp(),
     );
@@ -369,7 +370,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // applied, or an image whose defaults changed under an upgrade, is a service
     // answering somewhere nothing on disk says it does.
     let bindings = BindingsCheck::new(
-        ctx.engine.clone(),
+        ctx.seams.engine.clone(),
         ctx.settings.project.clone(),
         &manifest.services,
         ctx.environment,
@@ -380,7 +381,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // guessed path, and skipped where it resolved none — a check with nothing to look
     // at must not report that it looked.
     let permissions = crate::doctor::permissions::PermissionsCheck::new(
-        ctx.filesystem.clone(),
+        ctx.seams.filesystem.clone(),
         crate::app::targets::layout(ctx)
             .as_ref()
             .map(crate::doctor::permissions::guarded)
@@ -393,8 +394,8 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     // holds the seam it looks through, and lemonfiber's own records are not reached
     // through one.
     let autostart = AutostartCheck::new(
-        ctx.filesystem.clone(),
-        ctx.runner.clone(),
+        ctx.seams.filesystem.clone(),
+        ctx.seams.runner.clone(),
         ctx.environment,
         crate::autostart::run::load(ctx).wanted().on_boot(),
         ctx.settings.home.clone(),
@@ -426,7 +427,9 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     let answering = crate::plugin::answering(&stack.installed);
     for installed in &stack.installed {
         checks.extend(crate::doctor::contributed::declared(
-            installed, &answering, &ctx.http,
+            installed,
+            &answering,
+            &ctx.seams.http,
         ));
     }
     checks
@@ -452,6 +455,6 @@ async fn provider_accounts(
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
         ctx.today(),
-        ctx.clock.now(),
+        ctx.seams.clock.now(),
     )
 }

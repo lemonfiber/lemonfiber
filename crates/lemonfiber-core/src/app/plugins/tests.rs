@@ -170,7 +170,7 @@ fn proving(name: &str, runner: Arc<dyn crate::ports::Runner>, http: Arc<dyn Http
         })
         .build()
         .with_http(http)
-        .waiting(std::time::Duration::ZERO)
+        .with_patience(std::time::Duration::ZERO)
 }
 
 /// A transport that answers the one path the proof above asks at.
@@ -229,7 +229,7 @@ fn record_of(ctx: &Ctx) -> PathBuf {
 
 /// A plugin source written to a scratch directory.
 fn source(named: &str, manifest: &str) -> PathBuf {
-    let at = std::env::temp_dir().join(format!("lemonfiber-installing-{named}"));
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("installing-{named}")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
@@ -265,7 +265,7 @@ fn journal_a_set(ctx: &Ctx, operation: &str, key: &str, wrote: &str) {
         },
     };
     let _ = crate::app::targets::layout(ctx).map(|paths| {
-        crate::app::recover::journalled(&paths.journal(), &[change], ctx.random.as_ref());
+        crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref());
     });
 }
 

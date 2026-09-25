@@ -11,6 +11,7 @@ use super::port_forward::port_forward_offline;
 use super::Pair;
 use super::{Category, Finding, Verdict};
 use crate::config::PortForward;
+use crate::error::codes::vpn::{NO_TUNNEL, PORT_MISMATCH};
 use crate::error::{Problem, Remedy, Severity, State};
 
 pub(super) fn assemble(
@@ -160,10 +161,6 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
 /// What this finding is called, named once so the repair that answers it and the check that
 /// raises it cannot drift apart on a rename.
 pub(super) const PORT_MISMATCH_CHECK: &str = "vpn.port-forward-client";
-
-pub(crate) use crate::error::codes::vpn::PORT_MISMATCH;
-
-pub(crate) use crate::error::codes::vpn::NO_TUNNEL;
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.

@@ -124,10 +124,10 @@ enum Verdict {
 /// there, from the same daemon, in the same breath. A no needs no such proof: an
 /// answer that told one path from another is the proof.
 async fn asked(ctx: &Ctx, root: &Path) -> Result<Verdict, Failure> {
-    match ctx.locations.located(root).await? {
+    match ctx.seams.locations.located(root).await? {
         Presence::Absent => Ok(Verdict::Absent),
         Presence::Unknown => Ok(Verdict::Unreadable),
-        Presence::There => Ok(match ctx.locations.located(&control(root)).await? {
+        Presence::There => Ok(match ctx.seams.locations.located(&control(root)).await? {
             Presence::Absent => Verdict::There,
             Presence::There | Presence::Unknown => Verdict::Unmeasured,
         }),

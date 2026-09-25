@@ -89,7 +89,7 @@ fn a_machine() -> Ctx {
                 400,
                 &["lemonfiber"],
             )]))
-            .erasing(Erasing::willing()),
+            .with_eraser(Erasing::willing()),
     )
 }
 
@@ -111,8 +111,8 @@ fn running(lifecycle: Lifecycle, health: Health) -> Ctx {
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing())
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing())
 }
 
 /// What a run came to, or nothing where it refused.

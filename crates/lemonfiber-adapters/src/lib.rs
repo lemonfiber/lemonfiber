@@ -74,6 +74,11 @@ pub fn live() -> Seams {
 #[must_use]
 pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
     Seams {
+        runner: Arc::new(Local),
+        // The engine is built from the one resolved target, as the image listing and
+        // the location seam below are, so reads and writes reach the same machine.
+        engine: Arc::new(Daemon::reaching(target.clone())),
+        clock: Arc::new(System),
         filesystem: Arc::new(Disk),
         // Wrapped so a service that is merely still starting is tried again rather than
         // reported. Applied here rather than at each caller: a retry policy written into

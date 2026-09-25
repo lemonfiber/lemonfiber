@@ -93,7 +93,7 @@ fn agreeing(ctx: &Ctx, arranged: Arranged) -> Result<Expiry, Box<Problem>> {
             if Expiry::too_soon(days) {
                 return Err(Box::new(crate::asking::sooner_than_the_reminder(days)));
             }
-            let agreed = Expiry::agreed_to(days, crate::instant::written(ctx.clock.now()));
+            let agreed = Expiry::agreed_to(days, crate::instant::written(ctx.seams.clock.now()));
             if !ctx.dry_run {
                 arrangement::keep(ctx, &agreed)?;
             }
@@ -246,7 +246,7 @@ async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
             "the request service's own record could not be read, so nothing was looked at",
         );
     };
-    for request in overdue(&asked, after, ctx.clock.now()) {
+    for request in overdue(&asked, after, ctx.seams.clock.now()) {
         close(ctx, &access, request, after, &asked, came_to).await;
     }
 }

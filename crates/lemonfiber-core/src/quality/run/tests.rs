@@ -14,11 +14,8 @@ static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stac
 
 /// A scratch env-file path unique to this process and test, its directory
 /// cleared so a run starts from nothing.
-fn scratch(name: &str) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-quality-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join(".env")
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name).within(".env")
 }
 
 /// A context whose only wired-up parts are the environment file and platform;
@@ -68,7 +65,7 @@ fn showing_with_nothing_chosen_offers_the_default() {
 #[test]
 fn a_chosen_preset_is_recorded_and_reads_back() {
     let env = scratch("recorded");
-    let context = ctx(Some(env), Environment::LinuxNative);
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
     let report = run(&context, set(Preset::HighQuality, None, false));
     assert_eq!(report.disposition, Disposition::Recorded);
@@ -82,7 +79,7 @@ fn a_chosen_preset_is_recorded_and_reads_back() {
 #[test]
 fn a_per_type_choice_is_recorded_apart_from_the_global() {
     let env = scratch("per-type");
-    let context = ctx(Some(env), Environment::LinuxNative);
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
     let report = run(&context, set(Preset::HighQuality, Some("movies"), false));
     assert_eq!(report.disposition, Disposition::Recorded);
@@ -112,7 +109,7 @@ fn a_chosen_music_format_is_shown_apart_from_the_resolution_presets() {
     );
 
     let report = run(
-        &ctx(Some(env), Environment::LinuxNative),
+        &ctx(Some(env.to_path_buf()), Environment::LinuxNative),
         QualityAction::Show,
     );
     let music = report.music.unwrap_or_default();
@@ -135,7 +132,7 @@ fn a_transcoding_choice_is_held_on_a_software_only_host() {
     let env = scratch("held");
     // A Docker Jellyfin on macOS cannot hardware-transcode.
     let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
-    let context = ctx(Some(env), Environment::MacOs);
+    let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
     let report = run(&context, set(Preset::Maximum, None, false));
     assert_eq!(report.disposition, Disposition::Held);
@@ -149,7 +146,7 @@ fn a_transcoding_choice_is_held_on_a_software_only_host() {
 fn a_confirmed_transcoding_choice_is_recorded() {
     let env = scratch("confirmed");
     let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
-    let context = ctx(Some(env), Environment::MacOs);
+    let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
     let report = run(&context, set(Preset::Maximum, None, true));
     assert_eq!(report.disposition, Disposition::Recorded);
@@ -165,7 +162,7 @@ fn a_confirmed_transcoding_choice_is_recorded() {
 fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
     let env = scratch("straining");
     let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
-    let context = ctx(Some(env), Environment::MacOs);
+    let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
     assert!(
         straining(&context).is_none(),
         "nothing is chosen yet, so nothing is strained"
@@ -186,7 +183,7 @@ fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
 fn a_host_that_transcodes_in_hardware_is_never_strained() {
     let env = scratch("unstrained");
     let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
-    let context = ctx(Some(env), Environment::LinuxNative);
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
     let recorded = run(&context, set(Preset::Maximum, None, false));
     assert_eq!(recorded.disposition, Disposition::Recorded);
@@ -203,7 +200,7 @@ fn a_machine_with_no_choice_and_no_stack_is_strained_by_nothing() {
 fn native_jellyfin_lets_a_transcoding_choice_through_unheld() {
     let env = scratch("native");
     let _ = store::set(&env, JELLYFIN_MODE_KEY, "native");
-    let context = ctx(Some(env), Environment::MacOs);
+    let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
     let report = run(&context, set(Preset::Maximum, None, false));
     assert_eq!(report.disposition, Disposition::Recorded);
@@ -213,13 +210,13 @@ fn native_jellyfin_lets_a_transcoding_choice_through_unheld() {
 #[test]
 fn a_rehearsed_set_reports_what_it_would_do_and_writes_nothing() {
     let env = scratch("rehearsed");
-    let context = ctx(Some(env.clone()), Environment::LinuxNative).rehearsing();
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative).rehearsing();
 
     let report = run(&context, set(Preset::SpaceSaving, None, false));
     assert_eq!(report.disposition, Disposition::Rehearsed);
     // Nothing was written: a real show sees the default.
     let shown = run(
-        &ctx(Some(env), Environment::LinuxNative),
+        &ctx(Some(env.to_path_buf()), Environment::LinuxNative),
         QualityAction::Show,
     );
     assert_eq!(global(&shown).preset, Preset::default_preset().label());
@@ -232,7 +229,7 @@ fn an_unparsable_choice_is_surfaced_and_never_overwritten() {
     // guess past.
     let corrupt = env.with_file_name("quality.json");
     let _ = store::write(&corrupt, "this is not json");
-    let context = ctx(Some(env), Environment::LinuxNative);
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
     // Both showing and setting refuse rather than reading it as the default.
     assert!(quality(&context, QualityAction::Show).is_err());
@@ -251,7 +248,7 @@ fn a_choice_file_that_cannot_be_read_is_surfaced() {
     let _ = std::fs::create_dir_all(&as_dir);
 
     assert!(quality(
-        &ctx(Some(env), Environment::LinuxNative),
+        &ctx(Some(env.to_path_buf()), Environment::LinuxNative),
         QualityAction::Show
     )
     .is_err());
@@ -260,7 +257,7 @@ fn a_choice_file_that_cannot_be_read_is_surfaced() {
 #[test]
 fn the_projection_reads_the_recorded_choice() {
     let env = scratch("projection-recorded");
-    let context = ctx(Some(env), Environment::LinuxNative);
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
     let _ = quality(&context, set(Preset::Maximum, None, true));
     assert_eq!(super::most_demanding_or_default(&context), Preset::Maximum);
 }
@@ -271,7 +268,7 @@ fn the_projection_falls_back_to_the_default_on_an_unreadable_choice() {
     // uses the default rather than surfacing, since it writes nothing.
     let env = scratch("projection-corrupt");
     let _ = store::write(&env.with_file_name("quality.json"), "not json");
-    let context = ctx(Some(env), Environment::LinuxNative);
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
     assert_eq!(
         super::most_demanding_or_default(&context),
         Preset::default_preset()
@@ -295,7 +292,7 @@ fn a_set_that_cannot_be_written_is_reported() {
     // A directory that can be read (so an absent choice loads as the default)
     // but not written (so recording the choice fails). The write is surfaced,
     // not swallowed — this is the operator's explicit action.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-quality-ro-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("quality-ro");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500));
@@ -343,7 +340,7 @@ fn a_rehearsed_reapply_reports_it_would_reapply() {
 fn reapply_overwrites_a_customised_config_through_the_command() {
     let env = scratch("reapply-overwrite");
     let into = env.with_file_name("stack");
-    let context = embedded_ctx(Some(env), Some(into.clone()));
+    let context = embedded_ctx(Some(env.to_path_buf()), Some(into.clone()));
 
     // Choose a preset and bring it onto disk, then hand-edit the config.
     let _ = quality(&context, set(Preset::Maximum, None, true));
@@ -376,7 +373,7 @@ fn reapply_overwrites_a_customised_config_through_the_command() {
 fn a_reapply_over_a_config_nobody_edited_shows_no_diff() {
     let env = scratch("reapply-unedited");
     let into = env.with_file_name("stack");
-    let context = embedded_ctx(Some(env), Some(into));
+    let context = embedded_ctx(Some(env.to_path_buf()), Some(into));
 
     let _ = quality(&context, set(Preset::Maximum, None, true));
     let _ = quality(&context, QualityAction::Reapply);
@@ -391,7 +388,7 @@ fn a_reapply_with_nowhere_to_write_is_reported() {
     // The embedded stack has a Recyclarr config to re-assert, but no directory it
     // is materialised into, so the reapply is refused rather than guessing.
     let refused = quality(
-        &embedded_ctx(scratch("reapply-nowhere").into(), None),
+        &embedded_ctx(Some(scratch("reapply-nowhere").to_path_buf()), None),
         QualityAction::Reapply,
     );
     assert!(

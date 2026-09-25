@@ -186,7 +186,7 @@ async fn a_switch_that_cannot_run_the_stop_says_so() {
     .err()
     .map(|problem| problem.code);
 
-    assert_eq!(refusal, Some(crate::ports::process::MISSING_PROGRAM));
+    assert_eq!(refusal, Some(crate::error::codes::proc::MISSING_PROGRAM));
 }
 
 #[tokio::test]
@@ -202,7 +202,7 @@ async fn a_switch_that_cannot_run_the_start_says_so() {
     .err()
     .map(|problem| problem.code);
 
-    assert_eq!(refusal, Some(crate::ports::process::MISSING_PROGRAM));
+    assert_eq!(refusal, Some(crate::error::codes::proc::MISSING_PROGRAM));
 }
 
 /// A start that Compose refuses is reported as it stands rather than waited on:
@@ -304,7 +304,7 @@ async fn a_switch_that_cannot_reach_the_engine_refuses_rather_than_guessing() {
 
     assert_eq!(
         refusal,
-        Some(crate::ports::docker::ENGINE_UNREACHABLE),
+        Some(crate::error::codes::docker::ENGINE_UNREACHABLE),
         "an engine that will not answer stops the switch rather than shrinking it"
     );
 }

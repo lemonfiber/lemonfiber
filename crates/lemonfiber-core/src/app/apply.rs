@@ -27,6 +27,7 @@ use crate::autostart::Returning;
 use crate::baseline::Baseline;
 use crate::config::paths::Paths;
 use crate::config::store::{self, is_secret};
+use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind, Seal};
 use crate::ports::random::Random;
@@ -346,10 +347,6 @@ fn lines(journal: &Journal, seal: &Seal, random: &dyn Random) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
-
-pub(crate) use crate::error::codes::setup::NOT_REVIEWED;
-
-pub(crate) use crate::error::codes::setup::DIR_NOT_MADE;
 
 /// The problem of applying before review — nothing is settled to write.
 ///

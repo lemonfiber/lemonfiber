@@ -16,11 +16,14 @@ use crate::archive::{Archive, Fault, Space};
 use crate::bundle::{self, Contents, Filenames, Marks, Piece, Residual, Taken, Terms};
 use crate::bytes::humanize;
 use crate::doctor::Verdict;
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::instant;
 use crate::ports::docker::LogQuery;
 
 use crate::app::Ctx;
+use crate::error::codes::bundle::{
+    BUNDLE_LEAK, BUNDLE_NO_MARKS, BUNDLE_NO_ROOM, BUNDLE_UNCONFIRMED, BUNDLE_UNWRITTEN,
+};
 
 /// What a bundle says for a version it could not read, rather than leaving a blank a
 /// reader would take for a version of nothing.
@@ -101,7 +104,7 @@ impl Wanted {
 /// reproduce is a way back to the value it stands for, and a bundle is a thing people
 /// post in public.
 pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Contents> {
-    let marks = &Marks::new(ctx.random.as_ref())?;
+    let marks = &Marks::new(ctx.seams.random.as_ref())?;
     let terms = wanted.terms();
     let mut pieces = Vec::new();
     let mut missing = Vec::new();
@@ -126,7 +129,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         }),
     }
 
-    match ctx.engine.list(&ctx.settings.project).await {
+    match ctx.seams.engine.list(&ctx.settings.project).await {
         Err(_) => missing.push("the container engine could not be reached".to_owned()),
         Ok(containers) => pieces.push(Piece {
             name: "services.txt".to_owned(),
@@ -168,7 +171,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         taken: Taken {
             lemonfiber: lemonfiber.to_owned(),
             stack,
-            at: instant::written(ctx.clock.now()).unwrap_or_default(),
+            at: instant::written(ctx.seams.clock.now()).unwrap_or_default(),
         },
         terms,
     })
@@ -235,22 +238,12 @@ fn platform(ctx: &Ctx, lemonfiber: &str) -> String {
 /// The operator's own configuration, where one has been written.
 async fn configuration(ctx: &Ctx) -> Option<String> {
     let path = ctx.settings.env_file.as_deref()?;
-    ctx.filesystem.read(path).await
+    ctx.seams.filesystem.read(path).await
 }
 
 /// Bytes kept free beyond the bundle itself, so writing one never spends the last of the
 /// disk the operator is already asking for help about.
 const HEADROOM: u64 = 64 * 1024 * 1024;
-
-pub use crate::error::codes::bundle::BUNDLE_LEAK;
-
-pub use crate::error::codes::bundle::BUNDLE_NO_ROOM;
-
-pub use crate::error::codes::bundle::BUNDLE_UNWRITTEN;
-
-pub use crate::error::codes::bundle::BUNDLE_UNCONFIRMED;
-
-pub use crate::error::codes::bundle::BUNDLE_NO_MARKS;
 
 /// Refuse to show a setting nobody confirmed showing.
 ///

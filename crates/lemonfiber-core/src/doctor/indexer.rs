@@ -27,12 +27,9 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::config::Indexer;
+use crate::error::codes::cred::{INDEXER_LIMITED, INDEXER_REJECTED};
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::validate::{Credential, Validation, Validator};
-
-pub(crate) use crate::error::codes::cred::INDEXER_REJECTED;
-
-pub(crate) use crate::error::codes::cred::INDEXER_LIMITED;
 
 /// Re-proves the configured indexer against its live service.
 pub struct IndexerCheck {

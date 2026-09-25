@@ -35,14 +35,14 @@ pub(super) async fn seed_jellyfin_identity(
     };
 
     let jellyfin_client =
-        crate::jellyfin::Jellyfin::new(ctx.http.clone(), &jellyfin.loopback, "jellyfin");
-    let seerr_client = crate::seerr::Seerr::new(ctx.http.clone(), &seerr_base, "seerr");
+        crate::jellyfin::Jellyfin::new(ctx.seams.http.clone(), &jellyfin.loopback, "jellyfin");
+    let seerr_client = crate::seerr::Seerr::new(ctx.seams.http.clone(), &seerr_base, "seerr");
     let recorded = recorded_jellyfin_password(ctx);
 
     let (wiring, minted) = crate::seed::wire_jellyfin_identity(
         &jellyfin_client,
         &seerr_client,
-        ctx.random.as_ref(),
+        ctx.seams.random.as_ref(),
         recorded.as_deref(),
         &jellyfin.network_url,
         ctx.dry_run,

@@ -249,7 +249,7 @@ pub(crate) async fn run(
 fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
     match password::set(
         answers,
-        ctx.random.as_ref(),
+        ctx.seams.random.as_ref(),
         ctx.settings.admission.as_deref(),
     ) {
         Ok(lines) => {
@@ -296,21 +296,21 @@ async fn serving(
     mut until: Until,
     look: Duration,
 ) -> ExitCode {
-    let Some(token) = Token::mint(ctx.random.as_ref()) else {
+    let Some(token) = Token::mint(ctx.seams.random.as_ref()) else {
         return complain(&tokenless());
     };
     // The one gather every listener hears, made before the context so that the
     // waits a command runs into have somewhere to say what they are waiting for:
     // a browser is told the name of the work and nothing else, and everything it
     // learns after that arrives here.
-    let live = Arc::new(Live::opening(ctx.clock.as_ref()));
+    let live = Arc::new(Live::opening(ctx.seams.clock.as_ref()));
     // A walk's steps go down the same stream, whole rather than rendered: the words
     // are the core's, and a second rendering of them here would be a second copy of
     // the walk's own prose beside the one the terminal draws.
     let (steps, carrying) = Stepping::onto(Arc::clone(&live));
     let ctx = ctx
-        .narrating(Arc::new(Saying::onto(Arc::clone(&live))))
-        .narrating_steps(Arc::new(steps));
+        .with_narrator(Arc::new(Saying::onto(Arc::clone(&live))))
+        .with_steps(Arc::new(steps));
     let (ctx, token) = (Arc::new(ctx), Arc::new(token));
     tokio::spawn(carrying.carrying());
     // Started before anything can ask to hear it, so a client that connects at
@@ -350,7 +350,9 @@ async fn serving(
             beyond: offered == Offered::Network,
         };
         let browser = match (browsing, at.first()) {
-            (true, Some(first)) => opening(ctx.runner.as_ref(), HOST_OS, &address(*first)).await,
+            (true, Some(first)) => {
+                opening(ctx.seams.runner.as_ref(), HOST_OS, &address(*first)).await
+            }
             _ => Browser::Unasked,
         };
         // Only ever the first time round: an operator whose binding reverted is
@@ -373,7 +375,7 @@ async fn serving(
             bound,
             admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
-            clock: Arc::clone(&ctx.clock),
+            clock: Arc::clone(&ctx.seams.clock),
         });
         let surface = surface(serving, streaming, app);
         match holding(sockets, surface, &admitting, offered, &mut until, look).await {

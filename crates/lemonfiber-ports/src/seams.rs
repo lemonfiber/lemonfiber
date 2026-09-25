@@ -15,17 +15,25 @@
 
 use std::sync::Arc;
 
-use crate::docker::{Images, Locations};
+use crate::docker::{Engine, Images, Locations};
 use crate::filesystem::{Eraser, Volume};
 use crate::hosting::Host;
 use crate::http::Http;
 use crate::nntp::Nntp;
 use crate::occupancy::Occupancy;
+use crate::process::Runner;
 use crate::random::Random;
+use crate::time::Clock;
 use crate::FileSystem;
 
 /// The seams a run reaches the outside world through.
 pub struct Seams {
+    /// How programs are run.
+    pub runner: Arc<dyn Runner>,
+    /// How the engine is observed.
+    pub engine: Arc<dyn Engine>,
+    /// What time it is.
+    pub clock: Arc<dyn Clock>,
     /// How files are read, written and removed.
     pub filesystem: Arc<dyn FileSystem>,
     /// How requests leave this machine.

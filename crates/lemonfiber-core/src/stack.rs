@@ -32,6 +32,10 @@ use include_dir::{Dir, DirEntry};
 use lemonfiber_manifest::{validate, Date, Manifest};
 use thiserror::Error;
 
+use crate::error::codes::stack::{
+    STACK_INVALID, STACK_MALFORMED, STACK_NOT_EMBEDDED, STACK_NOT_SET_UP, STACK_NOT_WRITTEN,
+    STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
+};
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// The manifest's filename, at the root of any stack directory.
@@ -356,22 +360,6 @@ pub enum Failure {
         reason: String,
     },
 }
-
-pub use crate::error::codes::stack::STACK_UNREADABLE;
-
-pub(crate) use crate::error::codes::stack::STACK_UNUSABLE;
-
-pub(crate) use crate::error::codes::stack::STACK_NOT_EMBEDDED;
-
-pub use crate::error::codes::stack::STACK_INVALID;
-
-pub use crate::error::codes::stack::STACK_MALFORMED;
-
-pub use crate::error::codes::stack::STACK_UNRECOGNISED;
-
-pub(crate) use crate::error::codes::stack::STACK_NOT_SET_UP;
-
-pub(crate) use crate::error::codes::stack::STACK_NOT_WRITTEN;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

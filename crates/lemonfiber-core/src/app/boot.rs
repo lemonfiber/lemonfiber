@@ -236,7 +236,7 @@ async fn on_battery(ctx: &Ctx) -> bool {
 /// this needs to know is whether the thing every later step talks to is talking, and
 /// a second way of asking would be a second answer to disagree with.
 async fn reachable(ctx: &Ctx, looks: u32, again: Duration) -> bool {
-    if ctx.engine.list(&ctx.settings.project).await.is_ok() {
+    if ctx.seams.engine.list(&ctx.settings.project).await.is_ok() {
         return true;
     }
     ctx.narrator
@@ -244,7 +244,7 @@ async fn reachable(ctx: &Ctx, looks: u32, again: Duration) -> bool {
         .await;
     for _ in 0..looks {
         tokio::time::sleep(again).await;
-        if ctx.engine.list(&ctx.settings.project).await.is_ok() {
+        if ctx.seams.engine.list(&ctx.settings.project).await.is_ok() {
             return true;
         }
     }

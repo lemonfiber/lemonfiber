@@ -21,11 +21,10 @@ use async_trait::async_trait;
 
 use super::storage::LOW_SPACE_FLOOR;
 use super::{Category, Check, Finding, Verdict};
+use crate::error::codes::qual::HEADROOM_LOW;
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::filesystem::FileSystem;
 use crate::quality::Preset;
-
-pub(crate) use crate::error::codes::qual::HEADROOM_LOW;
 
 /// The hours of content a projection takes as a starter-library floor — roughly a
 /// dozen films and a couple of seasons. A heuristic, deliberately modest: the check

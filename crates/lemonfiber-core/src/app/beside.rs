@@ -49,7 +49,10 @@ pub async fn stand(
     // that takes one takes the other.
     let path = recorded.with_file_name(FILE);
 
-    ctx.filesystem.write(&path, &layered(&survey.beside)).await;
+    ctx.seams
+        .filesystem
+        .write(&path, &layered(&survey.beside))
+        .await;
     store::set(&recorded, OVERLAY_KEY, &path.display().to_string())
         .map_err(|failure| Box::new(failure.problem()))?;
 

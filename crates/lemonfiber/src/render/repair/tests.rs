@@ -1,10 +1,10 @@
-use lemonfiber_core::app::repair::{Beyond, Mended, Report};
 use lemonfiber_core::error::Remedy;
+use lemonfiber_core::repair::run::{Beyond, Mended, Report};
 use lemonfiber_core::repair::{agreement, Outcome, Repair};
 
 use super::{mended, reversed, Reversal};
-use lemonfiber_core::app::repair::Left;
 use lemonfiber_core::journal::{Action, Undo};
+use lemonfiber_core::repair::run::Left;
 
 fn repair() -> Repair {
     Repair {

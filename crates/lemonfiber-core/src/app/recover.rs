@@ -20,6 +20,9 @@ use crate::ports::service::Client as _;
 use crate::repair;
 
 use super::Ctx;
+use crate::error::codes::setup::{
+    NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_WITHDRAWN, STILL_HOLDING,
+};
 
 /// The change journal saved at `path`, empty where none is there or it does not
 /// read.
@@ -119,7 +122,11 @@ pub(crate) async fn reconfigured(
             continue;
         };
         let open = match super::targets::target_named(services, project, &undo.target) {
-            Some(target) => target.open(&ctx.http, ctx.filesystem.as_ref()).await,
+            Some(target) => {
+                target
+                    .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+                    .await
+            }
             None => None,
         };
         let put_back = match open {
@@ -483,12 +490,6 @@ fn not_put_back(settings: &[String]) -> Problem {
     .with_detail(settings.join(", "))
 }
 
-pub(crate) use crate::error::codes::setup::NOT_REMOVED;
-
-pub(crate) use crate::error::codes::setup::NOT_WITHDRAWN;
-
-pub(crate) use crate::error::codes::setup::NEEDS_SERVICE;
-
 /// The problem naming the credentials a reversal could not read back.
 ///
 /// Named one by one, for the reason [`not_put_back`] names its settings: an operator told
@@ -511,10 +512,6 @@ fn not_opened(settings: &[String]) -> Problem {
     )
     .with_detail(settings.join(", "))
 }
-
-pub(crate) use crate::error::codes::setup::NOT_PUT_BACK;
-
-pub use crate::error::codes::setup::NOT_OPENED;
 
 /// The problem naming the directories a reversal left because something this run did not
 /// put there is inside them.
@@ -539,8 +536,6 @@ fn left_holding(paths: &[String]) -> Problem {
     )
     .with_detail(paths.join(", "))
 }
-
-pub(crate) use crate::error::codes::setup::STILL_HOLDING;
 
 #[cfg(test)]
 mod tests;

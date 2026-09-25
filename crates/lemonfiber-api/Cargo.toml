@@ -40,6 +40,7 @@ lemonfiber-adapters = { workspace = true }
 # gather that answers the terminal dashboard is the one these tests watch produce
 # an event.
 lemonfiber-fixtures = { workspace = true }
+lemonfiber-testing = { workspace = true }
 # Reading a response body back is asynchronous, and the tests that check what a
 # request is answered with are the reason this is a crate rather than a module.
 # `test-util` moves the clock rather than waiting on it: a fifteen-second heartbeat

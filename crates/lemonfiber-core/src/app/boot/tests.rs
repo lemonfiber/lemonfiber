@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -14,6 +14,7 @@ use crate::ports::machine::{Power, Started, Supply};
 use crate::ports::process::Output;
 use crate::ports::Narrator;
 use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripted};
+use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::http::Fake;
 
 /// A machine that says when it started and where its power comes from, or will
@@ -81,39 +82,14 @@ fn holding_the_library() -> Arc<Reporting> {
     ))
 }
 
-/// A narrator that keeps what it was told, so a test can read it back.
-#[derive(Default)]
-struct Heard {
-    lines: Mutex<Vec<String>>,
-}
-
-impl Heard {
-    /// Everything said through it, in order.
-    fn lines(&self) -> Vec<String> {
-        self.lines
-            .lock()
-            .map(|held| held.clone())
-            .unwrap_or_default()
-    }
-}
-
-#[async_trait]
-impl Narrator for Heard {
-    async fn say(&self, said: &str) {
-        if let Ok(mut held) = self.lines.lock() {
-            held.push(said.to_owned());
-        }
-    }
-}
-
 /// Where a test's scratch records live. Naming it does not touch it.
-fn scratch(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("lemonfiber-boot-{}-{name}", std::process::id()))
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::named(name)
 }
 
 /// Settings keeping their records in an emptied scratch directory.
 fn settings_at(name: &str) -> Settings {
-    let dir = scratch(name);
+    let dir = scratch(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     Settings {
         env_file: Some(dir.join(".env")),
@@ -139,7 +115,7 @@ fn ctx_answering(
         .engine(engine)
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO)
+        .with_patience(Duration::ZERO)
         .with_http(Fake::scripted(Vec::new()))
         .with_started(Arc::clone(&machine) as Arc<dyn Started>)
         .with_power(machine as Arc<dyn Supply>)
@@ -238,7 +214,7 @@ fn standing(ctx: &Ctx) -> Option<String> {
 /// The same context, with somewhere for its words to go.
 fn listening(ctx: Ctx) -> (Ctx, Arc<Heard>) {
     let heard = Arc::new(Heard::default());
-    let ctx = ctx.narrating(Arc::clone(&heard) as Arc<dyn Narrator>);
+    let ctx = ctx.with_narrator(Arc::clone(&heard) as Arc<dyn Narrator>);
     (ctx, heard)
 }
 
@@ -428,7 +404,7 @@ async fn a_stack_that_came_back_is_not_started_twice_and_leaves_nothing_to_repor
         None,
         "a stack that came back whole has nothing to file against it"
     );
-    let said = heard.lines().join("\n");
+    let said = heard.said().join("\n");
     assert!(
         !said.contains("trying again"),
         "and a start that worked is not tried a second time: {said}"
@@ -594,7 +570,7 @@ async fn what_the_last_restart_left_is_said_once_and_not_again() {
     reported(&ctx).await;
     reported(&ctx).await;
 
-    let said = heard.lines();
+    let said = heard.said();
     assert_eq!(said.len(), 1, "told once: {said:?}");
     assert!(
         said.first()
@@ -609,7 +585,7 @@ async fn a_machine_that_came_back_has_nothing_to_report() {
 
     reported(&ctx).await;
 
-    assert!(heard.lines().is_empty());
+    assert!(heard.said().is_empty());
 }
 
 #[tokio::test]
@@ -618,5 +594,5 @@ async fn a_rehearsal_is_told_nothing_because_being_told_is_a_change() {
 
     reported(&ctx).await;
 
-    assert!(heard.lines().is_empty(), "marking one delivered is a write");
+    assert!(heard.said().is_empty(), "marking one delivered is a write");
 }

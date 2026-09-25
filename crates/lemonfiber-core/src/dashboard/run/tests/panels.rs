@@ -299,7 +299,7 @@ fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> 
         )))
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO)
+        .with_patience(Duration::ZERO)
         .with_filesystem(Arc::new(fs))
         .with_http(http)
 }

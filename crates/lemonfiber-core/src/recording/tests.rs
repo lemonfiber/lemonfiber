@@ -180,7 +180,7 @@ fn the_record_keeps_what_is_recent_rather_than_growing_for_ever() {
 /// take everyone else's out from under them.
 #[tokio::test]
 async fn a_request_that_went_somewhere_is_written_down_there() {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-recorded-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("recorded");
     let _ = std::fs::remove_dir_all(&dir);
     let at = dir.join("outbound.log");
 

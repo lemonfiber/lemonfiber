@@ -75,7 +75,7 @@ pub(super) async fn settle(
 /// already correct, which is worse than not being told.
 async fn linked(ctx: &Ctx) -> Option<Link> {
     let root = data_root(ctx)?;
-    link_of(&crate::storage::test_link(ctx.filesystem.as_ref(), &root).await)
+    link_of(&crate::storage::test_link(ctx.seams.filesystem.as_ref(), &root).await)
 }
 
 /// What to say about the file that just landed, where anything is known about it.

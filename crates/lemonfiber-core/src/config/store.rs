@@ -32,6 +32,9 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use super::env::{is_one_line, EnvFile};
+use crate::error::codes::config::{
+    CONFIG_NOT_WRITTEN, CONFIG_NOWHERE, CONFIG_SPANS_LINES, CONFIG_TOO_NEW, CONFIG_UNREADABLE,
+};
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// Withholding a credential from text that has no field names to read.
@@ -358,16 +361,6 @@ pub enum Failure {
         running: String,
     },
 }
-
-pub use crate::error::codes::config::CONFIG_UNREADABLE;
-
-pub use crate::error::codes::config::CONFIG_NOT_WRITTEN;
-
-pub(crate) use crate::error::codes::config::CONFIG_NOWHERE;
-
-pub(crate) use crate::error::codes::config::CONFIG_TOO_NEW;
-
-pub(crate) use crate::error::codes::config::CONFIG_SPANS_LINES;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

@@ -66,7 +66,7 @@ async fn one_service_failing_to_start_never_takes_down_the_rest() {
         .settings(settings)
         .build()
         .with_http(Fake::scripted(Vec::new()))
-        .waiting(Duration::ZERO);
+        .with_patience(Duration::ZERO);
 
     let refused = dispatch(
         Command::Up {
@@ -102,7 +102,7 @@ async fn a_service_that_will_not_start_says_what_its_absence_costs() {
         Command::Up {
             forms: vec!["library".to_owned()],
         },
-        &watching(engine).waiting(Duration::ZERO),
+        &watching(engine).with_patience(Duration::ZERO),
     )
     .await
     .err();
@@ -129,7 +129,7 @@ async fn a_service_that_never_becomes_usable_stops_the_start_and_says_which() {
     // exactly the case a process check would have called success.
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting)
         .saying("jellyfin", "Cannot open database, disk is full");
-    let ctx = watching(engine).waiting(Duration::ZERO);
+    let ctx = watching(engine).with_patience(Duration::ZERO);
     let command = Command::Up {
         forms: vec!["library".to_owned()],
     };
@@ -158,7 +158,7 @@ async fn a_service_that_never_becomes_usable_stops_the_start_and_says_which() {
 #[tokio::test]
 async fn a_service_that_will_not_start_and_says_nothing_still_reports_which() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);
-    let ctx = watching(engine).waiting(Duration::ZERO);
+    let ctx = watching(engine).with_patience(Duration::ZERO);
     let command = Command::Up {
         forms: vec!["library".to_owned()],
     };
@@ -174,7 +174,7 @@ async fn a_service_that_will_not_start_and_says_nothing_still_reports_which() {
 #[tokio::test]
 async fn a_crash_loop_is_not_something_starting_waits_out() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Restarting, Health::None);
-    let ctx = watching(engine).waiting(Duration::from_secs(3600));
+    let ctx = watching(engine).with_patience(Duration::from_secs(3600));
     let command = Command::Up {
         forms: vec!["library".to_owned()],
     };
@@ -249,7 +249,10 @@ async fn stopping_reports_an_engine_it_cannot_see() {
     .err()
     .map(|problem| problem.code);
 
-    assert_eq!(refusal, Some(crate::ports::docker::ENGINE_UNREACHABLE));
+    assert_eq!(
+        refusal,
+        Some(crate::error::codes::docker::ENGINE_UNREACHABLE)
+    );
 }
 
 /// The ordinary case, and the one that must not be made harder: one form up, that
@@ -287,7 +290,7 @@ async fn stopping_the_only_form_that_is_up_is_not_refused() {
 #[tokio::test]
 async fn stopping_does_not_wait_for_anything() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);
-    let ctx = watching(engine).waiting(Duration::ZERO);
+    let ctx = watching(engine).with_patience(Duration::ZERO);
     let command = Command::Down {
         forms: vec!["library".to_owned()],
         wait: Waiting::Never,
@@ -307,7 +310,7 @@ async fn stopping_does_not_wait_for_anything() {
 #[tokio::test]
 async fn stopping_named_services_stops_only_those() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let ctx = watching(engine).waiting(Duration::ZERO);
+    let ctx = watching(engine).with_patience(Duration::ZERO);
     let command = Command::Halt {
         forms: vec!["library".to_owned()],
         services: vec!["sonarr".to_owned()],
@@ -346,7 +349,7 @@ async fn a_compose_invocation_that_failed_is_not_then_waited_on() {
         )))
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO);
+        .with_patience(Duration::ZERO);
 
     let command = Command::Up {
         forms: vec!["library".to_owned()],
@@ -367,6 +370,6 @@ async fn starting_reports_an_engine_it_cannot_see() {
     };
     assert_eq!(
         dispatch(command, &ctx).await.err().map(|p| p.code),
-        Some(crate::ports::docker::ENGINE_UNREACHABLE)
+        Some(crate::error::codes::docker::ENGINE_UNREACHABLE)
     );
 }

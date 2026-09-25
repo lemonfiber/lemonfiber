@@ -12,25 +12,10 @@
 //! limits, which is exactly the distinction that matters: an operator who read a full
 //! disk as somebody's quota would go and raise a quota and watch it happen again.
 
+use crate::error::codes::quota::{
+    NEVER_HERE, NOBODY, NOTHING_AGREED, NOT_WAITING, NO_LIMIT, NO_REASON, TOO_SOON, UNREACHABLE,
+};
 use crate::error::{Amiss, Problem, Remedy, Severity};
-
-pub use crate::error::codes::quota::UNREACHABLE;
-
-pub use crate::error::codes::quota::NO_LIMIT;
-
-pub(crate) use crate::error::codes::quota::NO_SUCH_POLICY;
-
-pub(crate) use crate::error::codes::quota::NOT_WAITING;
-
-pub(crate) use crate::error::codes::quota::NO_REASON;
-
-pub(crate) use crate::error::codes::quota::NOBODY;
-
-pub(crate) use crate::error::codes::quota::NEVER_HERE;
-
-pub(crate) use crate::error::codes::quota::NOTHING_AGREED;
-
-pub(crate) use crate::error::codes::quota::TOO_SOON;
 
 /// Said where the request service could not be asked or would not answer.
 ///
@@ -66,20 +51,6 @@ pub(crate) fn no_limit_named() -> Problem {
         Remedy::new("Say how many requests a period allows, and how long the period is"),
     )
     .lies_in(Amiss::Asking)
-}
-
-/// Said where no policy goes by the word that was given, with the ones there are named.
-#[must_use]
-pub(crate) fn no_such_policy(written: &str) -> Problem {
-    Problem::new(
-        NO_SUCH_POLICY,
-        Severity::Error,
-        format!("`{written}` is not one of the ways a household may be trusted"),
-        "What happens to a request is one of three things: it arrives, it arrives \
-         within a limit, or it waits for you",
-        Remedy::new("Choose one of the three").with_detail(super::Policy::labels()),
-    )
-    .lies_in(Amiss::Naming)
 }
 
 /// Said where the request named is not one anybody is waiting on.

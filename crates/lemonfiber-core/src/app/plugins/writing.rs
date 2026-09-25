@@ -21,6 +21,7 @@ use crate::journal::{Change, Kind};
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
+use crate::error::codes::plugin::ANSWERED;
 
 /// Make what the install decided, journalling each write before it is made.
 ///
@@ -79,7 +80,7 @@ pub(crate) fn carry_out(
         crate::app::recover::journalled(
             &journal,
             &[bounded(plugin, &write.path, key, owner, body, stamp)],
-            ctx.random.as_ref(),
+            ctx.seams.random.as_ref(),
         );
         let record = ctx
             .settings
@@ -110,7 +111,7 @@ fn made_whole(
         .iter()
         .map(|made_here| made(plugin, made_here, stamp))
         .collect();
-    crate::app::recover::journalled(journal, &changes, ctx.random.as_ref());
+    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref());
 
     match content {
         None => std::fs::create_dir_all(path)
@@ -212,8 +213,6 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
         kind: Kind::Made { path },
     }
 }
-
-pub(crate) use crate::error::codes::plugin::ANSWERED;
 
 /// Refuse a plugin one of whose services would answer on a label another installed
 /// plugin's service already answers on, before anything is written.

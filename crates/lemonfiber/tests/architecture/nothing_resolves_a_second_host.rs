@@ -54,33 +54,37 @@ fn only_one_place_works_out_which_engine_this_run_operates() {
 
 /// The surface builds every engine seam from the one answer it was given.
 ///
-/// Both of them, which is the part that was quietly wrong: the image listing is an
-/// engine read like any other and went through a client of its own, so on a remote
-/// context one more reader stayed behind on the laptop.
+/// All three — the engine, the image listing and the location seam — come out of
+/// `live_reaching`, which builds each from the target it is handed; a seam built from
+/// this machine's defaults would stay behind on the laptop on a remote context.
 #[test]
-fn the_surface_builds_both_engine_seams_from_the_one_answer() {
+fn the_surface_builds_every_engine_seam_from_the_one_answer() {
     let sources = sources();
-    let wiring = sources.iter().find(|(path, _)| {
-        path.to_string_lossy()
-            .replace('\\', "/")
-            .ends_with("lemonfiber/src/context.rs")
-    });
-    let Some(context) = wiring.map(|(_, text)| production(text)) else {
-        unreachable!("the binary has a context module");
+    let read = |ending: &str| {
+        sources
+            .iter()
+            .find(|(path, _)| path.to_string_lossy().replace('\\', "/").ends_with(ending))
+            .map(|(_, text)| production(text))
+    };
+    let (Some(context), Some(adapters)) = (
+        read("lemonfiber/src/context.rs"),
+        read("lemonfiber-adapters/src/lib.rs"),
+    ) else {
+        unreachable!("the binary has a context module and the adapters a root");
     };
 
-    for built in [
-        "Daemon::reaching(settings.docker.clone())",
-        "live_reaching(&settings.docker)",
-    ] {
-        assert!(
-            context.contains(built),
-            "the surface no longer builds its engine seams from the resolved target: \
-             `{built}` is not in context.rs"
-        );
-    }
+    assert!(
+        context.contains("live_reaching(&settings.docker)"),
+        "the surface no longer builds its seams from the resolved target"
+    );
     assert!(
         !context.contains("Daemon::local()"),
         "a seam built from this machine's defaults is a seam that ignores the context"
+    );
+    assert_eq!(
+        adapters.matches("Daemon::reaching(target.clone())").count(),
+        3,
+        "the engine, the image listing and the location seam are each built from the \
+         target `live_reaching` is handed"
     );
 }

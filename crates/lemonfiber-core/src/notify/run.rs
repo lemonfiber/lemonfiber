@@ -62,7 +62,7 @@ fn held(ctx: &Ctx, digest: &Digest) -> bool {
     let Some(window) = &ctx.settings.quiet else {
         return false;
     };
-    !digest.overrides_quiet() && window.holds(ctx.clock.now())
+    !digest.overrides_quiet() && window.holds(ctx.seams.clock.now())
 }
 
 /// Say whatever the conditions now warrant, through every channel given.

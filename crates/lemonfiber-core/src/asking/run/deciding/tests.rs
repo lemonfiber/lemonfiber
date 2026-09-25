@@ -39,7 +39,7 @@ async fn a_stack_that_cannot_be_read_rules_on_nothing() {
     );
     assert_ne!(
         refused.err().map(|problem| problem.code),
-        Some(crate::asking::UNREACHABLE),
+        Some(crate::error::codes::quota::UNREACHABLE),
         "a stack that would not read was reported as a service that would not answer"
     );
 }
@@ -93,7 +93,7 @@ fn a_reason_that_says_nothing_is_refused() {
         let refused = reason_given(&empty);
         assert_eq!(
             refused.err().map(|problem| problem.code),
-            Some(crate::asking::NO_REASON),
+            Some(crate::error::codes::quota::NO_REASON),
             "{blank:?} was accepted"
         );
     }

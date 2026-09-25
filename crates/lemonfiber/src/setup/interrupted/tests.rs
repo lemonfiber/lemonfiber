@@ -11,11 +11,10 @@ use super::{about_to, ask_recovery_choice, recover_setup};
 use crate::setup::tests::{ctx, working_ctx, Scripted};
 
 /// A scratch install unique to this test.
-fn scratch(name: &str) -> Paths {
-    let root =
-        std::env::temp_dir().join(format!("lemonfiber-recover-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
-    Paths::rooted(&root.join("config"), &root.join("data"))
+fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(name);
+    let paths = Paths::rooted(&dir.join("config"), &dir.join("data"));
+    (dir, paths)
 }
 
 /// The same context, keeping lemonfiber's files where this test put them.
@@ -74,7 +73,7 @@ fn each_way_out_says_what_it_is_about_to_do_before_it_does_it() {
 /// Its answers are complete, because that is the only state an apply can be
 /// interrupted in: apply persists every answer before it writes the first one.
 fn interrupted(name: &str) -> Paths {
-    let paths = scratch(name);
+    let (_scratch, paths) = scratch(name);
     let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(
         paths.setup_progress(),
@@ -123,7 +122,7 @@ fn halfway(paths: &Paths) -> Wizard {
     wizard
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_interrupted_apply_with_nobody_there_is_left_recoverable() {
     // Deciding is not done on an operator's behalf for a run that cannot answer:
     // the state stays as it is, still recoverable, rather than acted on unasked.
@@ -139,7 +138,7 @@ async fn an_interrupted_apply_with_nobody_there_is_left_recoverable() {
     assert!(paths.setup_progress().exists(), "nothing was discarded");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_apply_that_wrote_nothing_says_so_rather_than_showing_an_empty_list() {
     // "It had written:" followed by nothing reads as a list that failed to
     // render. The two states are different and are said differently.
@@ -157,7 +156,7 @@ async fn an_apply_that_wrote_nothing_says_so_rather_than_showing_an_empty_list()
     assert_ne!(shown(code), success(), "and nobody was there to choose");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn resuming_finishes_applying_from_where_it_stopped() {
     let paths = interrupted("resume");
     let code = recover_setup(
@@ -181,7 +180,7 @@ async fn resuming_finishes_applying_from_where_it_stopped() {
     let _ = code;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn rolling_back_undoes_what_was_written_and_applies_again() {
     let paths = interrupted("rollback");
     let code = recover_setup(
@@ -201,7 +200,7 @@ async fn rolling_back_undoes_what_was_written_and_applies_again() {
     let _ = code;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn starting_over_undoes_it_and_forgets_the_answers() {
     let paths = interrupted("startover");
     let code = recover_setup(
@@ -216,7 +215,7 @@ async fn starting_over_undoes_it_and_forgets_the_answers() {
     assert!(!paths.journal().exists());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_apply_that_cannot_be_carried_forward_says_why() {
     // Answers that no longer make a whole setup — a progress file from an older
     // run, or one edited by hand — cannot be applied, and the operator is told
@@ -236,11 +235,11 @@ async fn an_apply_that_cannot_be_carried_forward_says_why() {
     assert_ne!(shown(code), success());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_apply_that_left_no_answers_begins_afresh() {
     // A stopped apply always leaves its answers; if they are somehow gone there
     // is nothing to resume from, so a fresh run is the honest fallback.
-    let paths = scratch("no-answers");
+    let (_scratch, paths) = scratch("no-answers");
     let code = recover_setup(
         keeping(ctx(), &paths),
         &paths,
@@ -262,7 +261,7 @@ fn progress_at(paths: &Paths) -> Option<lemonfiber_core::wizard::Progress> {
     lemonfiber_core::app::setup::progress_at(&paths.setup_progress())
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_undo_that_cannot_be_written_is_reported_rather_than_assumed() {
     // Rolling back means writing the environment file back to what it was; if
     // that cannot happen the operator is told, rather than being left believing

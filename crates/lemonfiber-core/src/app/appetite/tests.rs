@@ -68,14 +68,14 @@ async fn with_nowhere_to_keep_it_a_change_says_so_rather_than_seeming_to_work() 
 }
 
 /// Where a test's scratch answer lives. Naming it does not touch it.
-fn scratch(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("lemonfiber-appetite-{}-{name}", std::process::id()))
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::named(name)
 }
 
 /// A context whose environment file is in an emptied scratch directory, so the
 /// answer lands beside it and concurrent tests do not share one.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name);
+    let dir = scratch(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     ctx_with(Some(dir.join(".env")))
 }
@@ -114,7 +114,8 @@ fn an_unreadable_answer_falls_back_rather_than_refusing_the_command() {
     // a command over a corrupt preferences file is not.
     let ctx = ctx_at("corrupt");
     assert!(record(&ctx, &Wants::preset(Appetite::Everything)).is_ok());
-    let written = scratch("corrupt").join("notifications.json");
+    let written_dir = scratch("corrupt");
+    let written = written_dir.join("notifications.json");
     assert!(
         written.exists(),
         "the answer was written in the first place"
@@ -131,7 +132,8 @@ fn an_answer_that_cannot_be_written_is_reported_rather_than_swallowed() {
     // Somewhere to keep it, and still no way to write it — a directory sits
     // where the file must go.
     let ctx = ctx_at("blocked");
-    let blocked = scratch("blocked").join("notifications.json");
+    let blocked_dir = scratch("blocked");
+    let blocked = blocked_dir.join("notifications.json");
     assert!(
         std::fs::create_dir_all(&blocked).is_ok(),
         "the blocking directory"

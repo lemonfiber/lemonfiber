@@ -15,7 +15,7 @@
 
 use std::path::Path;
 
-use lemonfiber_core::admission::{credential, Credential};
+use lemonfiber_core::admission::{self as credential, Credential};
 use lemonfiber_core::config::store::Failure;
 use lemonfiber_core::error::{Diagnose as _, Problem, Remedy, Severity, State};
 use lemonfiber_core::ports::random::Random;

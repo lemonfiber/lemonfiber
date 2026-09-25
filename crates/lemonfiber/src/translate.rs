@@ -6,21 +6,22 @@
 //! everything that happens to it afterwards.
 
 use lemonfiber_core::alert::Appetite;
-use lemonfiber_core::app::bundle::Wanted;
+use lemonfiber_core::app::plugins;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{plugins, update};
 use lemonfiber_core::app::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::audio::Format;
+use lemonfiber_core::bundle::run::Wanted;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::uninstall::Tier;
+use lemonfiber_core::update::run as update;
 
 use crate::exit::USAGE;
 use crate::say::complain;

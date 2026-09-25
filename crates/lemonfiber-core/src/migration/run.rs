@@ -94,7 +94,7 @@ pub(crate) struct Looked {
 
 /// What the engine and the manifest together say is here.
 pub(crate) async fn looked(ctx: &Ctx) -> Looked {
-    let Ok(images) = ctx.images.images().await else {
+    let Ok(images) = ctx.seams.images.images().await else {
         return Looked::nothing();
     };
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {

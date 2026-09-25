@@ -9,7 +9,8 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{dashboard::gather, dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::dashboard::run::gather;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::stack::Source;
@@ -140,7 +141,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     // that says them here. The sending end lives in that context for as long as the
     // loop holds it, so the receiving end never closes under the loop.
     let (steps, mut said) = tokio::sync::mpsc::unbounded_channel();
-    let ctx = Arc::new(ctx.narrating_steps(Arc::new(Stepping(steps))));
+    let ctx = Arc::new(ctx.with_steps(Arc::new(Stepping(steps))));
     let (keys, mut typed) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 

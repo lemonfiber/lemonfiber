@@ -34,7 +34,8 @@ async fn a_platform_with_no_manager_refuses_every_operation_the_same_way() {
 
 #[test]
 fn a_definition_is_written_read_back_and_taken_away_again() {
-    let at = super::scratch("round-trip").join("nested/one.service");
+    let at_dir = super::scratch("round-trip");
+    let at = at_dir.join("nested/one.service");
     assert_eq!(definition(&at), None);
     assert_eq!(put(&at, "[Service]\n"), Ok(()));
     assert_eq!(definition(&at).as_deref(), Some("[Service]\n"));
@@ -44,7 +45,8 @@ fn a_definition_is_written_read_back_and_taken_away_again() {
 
 #[test]
 fn a_definition_that_will_not_be_written_carries_the_platforms_words() {
-    let at = super::scratch("unwritable").join("one.service");
+    let at_dir = super::scratch("unwritable");
+    let at = at_dir.join("one.service");
     assert!(put(&at, "[Service]\n").is_ok());
     // A directory cannot be written over as a file, which is the shape of every
     // refusal here: the platform says why, and its words travel unchanged.

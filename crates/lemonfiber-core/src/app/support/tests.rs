@@ -11,7 +11,7 @@ use crate::test_support::a_context;
 /// A run keeping its own files under `dir`, which is a real directory.
 fn keeping_at(dir: &Path) -> Ctx {
     let vault: Arc<dyn crate::archive::Vault> = Arc::new(FakeArchive::roomy());
-    a_context().build().keeping(Archiving {
+    a_context().build().with_archives(Archiving {
         paths: Paths::at(dir, dir),
         vault,
     })
@@ -19,7 +19,7 @@ fn keeping_at(dir: &Path) -> Ctx {
 
 /// A bundles directory holding one file of the given name and contents.
 fn holding(test: &str, name: &str, contents: &str) -> Ctx {
-    let dir = scratch(test);
+    let dir = scratch(test).kept();
     let bundles = dir.join("support");
     assert!(
         std::fs::create_dir_all(&bundles).is_ok(),

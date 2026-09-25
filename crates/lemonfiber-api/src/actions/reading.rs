@@ -12,13 +12,13 @@
 //! instead. They are gathered here so that the shape of a refusal is settled in one
 //! place and the mapping beside them stays a mapping.
 
-use lemonfiber_core::app::repair::Consent;
 use lemonfiber_core::app::restore;
 use lemonfiber_core::app::{Command, QualityAction};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
+use lemonfiber_core::repair::run::Consent;
 
 use super::asked::Disturbing;
 use super::Refused;

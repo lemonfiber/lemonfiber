@@ -5,11 +5,8 @@ const SHIPPED: &str = "watch {\n}\n";
 
 /// A scratch directory unique to the named test, holding the proxy's file as it
 /// ships and a record saying lemonfiber wrote it that way.
-fn scratch(name: &str, recorded: bool) -> std::path::PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-bounded-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
+fn scratch(name: &str, recorded: bool) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(name);
     let _ = std::fs::write(dir.join("Caddyfile"), SHIPPED);
     if recorded {
         let mut record = Materialised::new();

@@ -4,7 +4,7 @@ use crate::test_support::a_context;
 
 /// A context whose environment file is in an emptied scratch directory.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-outbox-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("outbox-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     a_context()
         .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(

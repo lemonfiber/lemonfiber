@@ -109,7 +109,7 @@ fn a_recorded_qbittorrent_password_is_read_back_or_read_as_absent() {
     assert!(recorded_qbittorrent_password(&ctx).is_none());
 
     let path = config_scratch("qbt-readback");
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.clone()));
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
     let _ = store::set(&path, "SOMETHING_ELSE", "x");
     assert!(

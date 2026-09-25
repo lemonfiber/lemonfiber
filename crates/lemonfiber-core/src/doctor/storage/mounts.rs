@@ -27,10 +27,9 @@
 //! it stops leading afterwards, the way running torrents with no tunnel does.
 
 use super::{finding, Finding, Problem, Remedy, Severity, State, Verdict};
+use crate::error::codes::storage::SPLIT_MOUNTS;
 use crate::stack::mounts::Crowded;
 use crate::storage::COPY_CONSEQUENCE;
-
-pub use crate::error::codes::storage::SPLIT_MOUNTS;
 
 /// The name these findings are given.
 const CHECK: &str = "storage.single-mount";

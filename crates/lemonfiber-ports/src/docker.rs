@@ -13,6 +13,10 @@ use serde::Serialize;
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 
+use lemonfiber_error::codes::docker::{
+    ENDPOINT_UNSUPPORTED, ENGINE_UNREACHABLE, HOST_REFUSED, HOST_SILENT, HOST_UNRESOLVED,
+    LOGIN_REJECTED, NO_SUCH_CONTAINER, UNKNOWN_CONTEXT,
+};
 use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 mod locations;
@@ -275,22 +279,6 @@ pub enum Failure {
         reason: String,
     },
 }
-
-pub use lemonfiber_error::codes::docker::ENGINE_UNREACHABLE;
-
-pub(crate) use lemonfiber_error::codes::docker::NO_SUCH_CONTAINER;
-
-pub(crate) use lemonfiber_error::codes::docker::HOST_UNRESOLVED;
-
-pub(crate) use lemonfiber_error::codes::docker::HOST_REFUSED;
-
-pub(crate) use lemonfiber_error::codes::docker::LOGIN_REJECTED;
-
-pub(crate) use lemonfiber_error::codes::docker::ENDPOINT_UNSUPPORTED;
-
-pub(crate) use lemonfiber_error::codes::docker::UNKNOWN_CONTEXT;
-
-pub(crate) use lemonfiber_error::codes::docker::HOST_SILENT;
 
 /// What to tell an operator whose engine is not answering at all.
 ///

@@ -62,8 +62,8 @@ fn a_restore_that_overwrote_nothing_is_not_reported_as_a_restore() {
 
 #[test]
 fn a_capture_and_a_bundle_succeed_by_having_arrived() {
-    use lemonfiber_core::app::backup::Report as Capture;
     use lemonfiber_core::app::support::Bundle;
+    use lemonfiber_core::backup::run::Report as Capture;
     use lemonfiber_core::backup::Scope;
     use lemonfiber_core::bundle::Contents;
 
@@ -93,7 +93,7 @@ fn a_capture_and_a_bundle_succeed_by_having_arrived() {
 /// exactly the case a script must not read as done.
 #[test]
 fn only_an_update_that_stopped_part_way_is_a_failure() {
-    use lemonfiber_core::app::update::Report as Moving;
+    use lemonfiber_core::update::run::Report as Moving;
     use lemonfiber_core::update::State;
 
     let moving = |state| {
@@ -126,7 +126,7 @@ fn only_an_update_that_stopped_part_way_is_a_failure() {
 /// answering.
 #[test]
 fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
-    use lemonfiber_core::app::update::Report as Moving;
+    use lemonfiber_core::update::run::Report as Moving;
     use lemonfiber_core::update::State;
 
     let left_down = shown(settled(&Outcome::Update(Moving {

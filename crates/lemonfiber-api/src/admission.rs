@@ -304,7 +304,7 @@ async fn opening(
     let Ok(Json(given)) = given else {
         return said(StatusCode::BAD_REQUEST, NOT_A_PASSWORD);
     };
-    let now = serving.ctx.clock.now();
+    let now = serving.ctx.seams.clock.now();
     if let Some(left) = serving.admitting.attempts.waiting(now).await {
         return waiting(left.as_secs().max(1));
     }
@@ -316,7 +316,7 @@ async fn opening(
     let opened = serving
         .admitting
         .sessions
-        .opened(serving.ctx.random.as_ref(), now, who)
+        .opened(serving.ctx.seams.random.as_ref(), now, who)
         .await;
     enveloped(
         StatusCode::OK,

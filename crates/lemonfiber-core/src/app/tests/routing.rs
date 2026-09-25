@@ -115,7 +115,7 @@ async fn a_stack_that_cannot_be_read_is_reported_rather_than_left_out() {
         .map(|problem| problem.code);
     assert_eq!(
         refusal,
-        Some(crate::stack::STACK_UNREADABLE),
+        Some(crate::error::codes::stack::STACK_UNREADABLE),
         "an operator's own --stack-dir mistake reaches them"
     );
 }

@@ -99,7 +99,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
 
 /// Let a request through, or turn it away before a handler runs.
 async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -> Response {
-    let now = serving.ctx.clock.now();
+    let now = serving.ctx.seams.clock.now();
     // The one path that opens without a token, because a caller holding a password
     // and nothing else carries none by definition. The other half of the guard still
     // applies to it below, which is what stops a page the operator happens to be

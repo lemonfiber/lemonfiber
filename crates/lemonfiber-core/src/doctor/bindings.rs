@@ -30,15 +30,10 @@ use async_trait::async_trait;
 use lemonfiber_manifest::{Bind, Service};
 
 use super::{Category, Check, Finding, Verdict};
+use crate::error::codes::bind::{AROUND_THE_FIREWALL, BEYOND_LOOPBACK, DELIBERATE};
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::ports::docker::{Container, Engine};
-
-pub(crate) use crate::error::codes::bind::BEYOND_LOOPBACK;
-
-pub(crate) use crate::error::codes::bind::AROUND_THE_FIREWALL;
-
-pub(crate) use crate::error::codes::bind::DELIBERATE;
 
 /// The name this check's findings are given.
 const CHECK: &str = "network.bindings";

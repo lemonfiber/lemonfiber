@@ -11,8 +11,7 @@ struct Recorded(PathBuf);
 
 impl Recorded {
     fn new(label: &str) -> Self {
-        let root =
-            std::env::temp_dir().join(format!("lemonfiber-context-{label}-{}", std::process::id()));
+        let root = lemonfiber_fixtures::scratch::Scratch::named(&format!("context-{label}")).kept();
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::create_dir_all(root.join("contexts").join("meta"));
         Self(root)

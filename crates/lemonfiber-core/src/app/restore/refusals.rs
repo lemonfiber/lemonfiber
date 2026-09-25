@@ -12,29 +12,11 @@
 
 use crate::archive::Fault;
 use crate::backup::Relocation;
+use crate::error::codes::restore::{
+    CORRUPT, INCOMPATIBLE, NEEDS_REPOINT, NOT_KEPT_HERE, NOT_OURS, NOT_REPOINTED, NOT_RESTORED,
+    NOWHERE_KEPT, TOO_NEW, UNSAFE,
+};
 use crate::error::{Problem, Remedy, Severity, State};
-
-pub(crate) use crate::error::codes::restore::CORRUPT;
-
-pub(crate) use crate::error::codes::restore::TOO_NEW;
-
-pub(crate) use crate::error::codes::restore::INCOMPATIBLE;
-
-pub(crate) use crate::error::codes::restore::UNSAFE;
-
-pub(crate) use crate::error::codes::restore::NEEDS_REPOINT;
-
-pub(crate) use crate::error::codes::restore::NOT_RESTORED;
-
-pub(crate) use crate::error::codes::restore::STILL_RUNNING;
-
-pub(crate) use crate::error::codes::restore::NOT_KEPT_HERE;
-
-pub(crate) use crate::error::codes::restore::NOWHERE_KEPT;
-
-pub(crate) use crate::error::codes::restore::NOT_REPOINTED;
-
-pub(crate) use crate::error::codes::restore::NOT_OURS;
 
 /// The refusal for a run that cannot say where its own files go.
 pub(crate) fn nowhere() -> Problem {

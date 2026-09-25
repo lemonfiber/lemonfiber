@@ -117,7 +117,7 @@ async fn an_update_that_will_not_start_says_what_the_old_version_came_back_as() 
         counted(installing(&ctx, &source("update-unstarted", PROVING)).await),
         Some(1)
     );
-    ctx.runner = Keyed::answering(vec![("up", Ok(engine_refused("no")))], Ok(spoke("")));
+    ctx.seams.runner = Keyed::answering(vec![("up", Ok(engine_refused("no")))], Ok(spoke("")));
 
     let failed = update(updating(&ctx, &source("update-unstarted-next", &next())).await);
 
@@ -189,7 +189,7 @@ async fn an_update_whose_old_version_will_not_stop_changes_nothing() {
         counted(installing(&ctx, &source("update-stuck", PROVING)).await),
         Some(1)
     );
-    ctx.runner = Keyed::answering(vec![("rm", Ok(engine_refused("no")))], Ok(spoke("")));
+    ctx.seams.runner = Keyed::answering(vec![("rm", Ok(engine_refused("no")))], Ok(spoke("")));
 
     let (code, said) = refused(updating(&ctx, &source("update-stuck-next", &next())).await);
 
@@ -315,7 +315,7 @@ async fn an_update_with_no_engine_to_start_it_says_so() {
         counted(installing(&ctx, &source("update-no-engine", PROVING)).await),
         Some(1)
     );
-    ctx.runner = Keyed::answering(
+    ctx.seams.runner = Keyed::answering(
         vec![(
             "up",
             Err(lemonfiber_ports::process::Failure::NotFound {
@@ -346,7 +346,7 @@ async fn an_update_that_breaks_the_stack_puts_the_old_version_back() {
         counted(installing(&ctx, &source("update-collateral", PROVING)).await),
         Some(1)
     );
-    ctx.runner = LostToTheInstall::losing("version");
+    ctx.seams.runner = LostToTheInstall::losing("version");
 
     let failed = update(updating(&ctx, &source("update-collateral-next", &next())).await);
 
@@ -403,8 +403,7 @@ async fn an_update_refuses_before_anything_moves_for_what_it_cannot_read() {
     );
     let before = runner.seen().len();
 
-    let empty =
-        std::env::temp_dir().join(format!("lemonfiber-update-empty-{}", std::process::id()));
+    let empty = lemonfiber_fixtures::scratch::Scratch::named("update-empty").kept();
     let _ = std::fs::create_dir_all(&empty);
     assert_eq!(refusal(updating(&ctx, &empty).await), "PLUGIN-2");
 
@@ -414,7 +413,7 @@ async fn an_update_refuses_before_anything_moves_for_what_it_cannot_read() {
         .build();
     assert_eq!(
         refusal(updating(&blind, &source("update-refusals-next", &next())).await),
-        crate::stack::STACK_UNREADABLE.to_string()
+        crate::error::codes::stack::STACK_UNREADABLE.to_string()
     );
 
     let mut stackless = ctx;

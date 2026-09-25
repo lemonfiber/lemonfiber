@@ -29,13 +29,12 @@ use lemonfiber_plugin::extension;
 use lemonfiber_plugin::{Contribution, Expect};
 
 use super::{Category, Check, Finding, Reported, Verdict};
+use crate::error::codes::plugin::CONTRIBUTED_FAILED;
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::recorded::Answer;
 use crate::plugin::Installed;
 use crate::ports::http::{self, Http, Method};
-
-pub(crate) use crate::error::codes::plugin::CONTRIBUTED_FAILED;
 
 /// Every check an installed plugin adds to the register, ready to be run with the rest.
 ///

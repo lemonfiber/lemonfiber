@@ -32,7 +32,7 @@ fn a_provider(validated: bool) -> Answer {
 
 #[tokio::test]
 async fn a_fresh_machine_is_offered_setup_and_stands_at_its_first_step() {
-    let paths = scratch("fresh");
+    let (_scratch, paths) = scratch("fresh");
     let report = walked(&ctx(&paths), SetupAction::Where).await;
 
     assert_eq!(report.as_ref().map(|report| report.at), Some(Step::Welcome));
@@ -64,7 +64,7 @@ async fn a_fresh_machine_is_offered_setup_and_stands_at_its_first_step() {
 
 #[tokio::test]
 async fn a_step_that_only_informs_is_passed_without_an_answer() {
-    let paths = scratch("informing");
+    let (_scratch, paths) = scratch("informing");
     let report = walked(&ctx(&paths), SetupAction::Next).await;
 
     assert_eq!(report.map(|report| report.at), Some(Step::Preflight));
@@ -76,7 +76,7 @@ async fn a_step_that_only_informs_is_passed_without_an_answer() {
 
 #[tokio::test]
 async fn an_answer_is_recorded_and_the_walk_moves_on() {
-    let paths = scratch("recorded");
+    let (_scratch, paths) = scratch("recorded");
     let context = ctx(&paths);
     let report = walked(
         &context,
@@ -113,7 +113,7 @@ async fn an_answer_is_recorded_and_the_walk_moves_on() {
 
 #[tokio::test]
 async fn going_back_returns_to_the_previous_step_that_applies() {
-    let paths = scratch("back");
+    let (_scratch, paths) = scratch("back");
     let context = ctx(&paths);
 
     assert_eq!(
@@ -128,7 +128,7 @@ async fn going_back_returns_to_the_previous_step_that_applies() {
 
 #[tokio::test]
 async fn an_answer_this_platform_does_not_offer_is_refused_and_nothing_is_kept() {
-    let paths = scratch("rejected");
+    let (_scratch, paths) = scratch("rejected");
     // Ownership is mapped away on this platform, so a container user would have
     // no observable effect and the wizard refuses to record one.
     let met = refused(
@@ -146,7 +146,7 @@ async fn an_answer_this_platform_does_not_offer_is_refused_and_nothing_is_kept()
 
 #[tokio::test]
 async fn a_credential_records_what_the_service_said_and_says_what_that_was() {
-    let paths = scratch("proven");
+    let (_scratch, paths) = scratch("proven");
     let context = ctx(&paths);
     assert!(setting_up(
         &context,
@@ -175,7 +175,7 @@ async fn a_credential_records_what_the_service_said_and_says_what_that_was() {
 
 #[tokio::test]
 async fn a_credential_the_service_will_not_take_is_kept_unproven_and_said_so() {
-    let paths = scratch("unproven");
+    let (_scratch, paths) = scratch("unproven");
     let context = proving(&paths, turned_away());
     assert!(setting_up(
         &context,
@@ -211,7 +211,7 @@ async fn a_credential_the_service_will_not_take_is_kept_unproven_and_said_so() {
 
 #[tokio::test]
 async fn entering_no_credential_at_all_asks_nothing_of_any_service() {
-    let paths = scratch("none-entered");
+    let (_scratch, paths) = scratch("none-entered");
     let context = ctx(&paths);
     assert!(setting_up(
         &context,
@@ -231,7 +231,7 @@ async fn entering_no_credential_at_all_asks_nothing_of_any_service() {
 
 #[tokio::test]
 async fn what_was_entered_is_never_repeated_back() {
-    let paths = scratch("withholding");
+    let (_scratch, paths) = scratch("withholding");
     let context = ctx(&paths);
     assert!(setting_up(
         &context,
@@ -274,7 +274,7 @@ async fn what_a_service_said_about_a_credential_is_reported_without_the_credenti
     // An indexer refuses with the key it was given in hand, and setup is where that
     // key is being entered. What the service said is reported back, and the report
     // is serialised to a caller that may log it.
-    let paths = scratch("proof");
+    let (_scratch, paths) = scratch("proof");
     let said = format!(
         "the indexer refused the key: apikey={} has expired",
         withheld_value("indexer")
@@ -316,7 +316,7 @@ async fn what_a_service_said_about_a_credential_is_reported_without_the_credenti
 async fn the_walk_settles_on_what_the_wizard_itself_would() {
     // The whole claim of this module: it drives the wizard rather than deciding
     // anything of its own, so what it comes to is what the wizard comes to.
-    let paths = scratch("agrees");
+    let (_scratch, paths) = scratch("agrees");
     let context = ctx(&paths);
     let root = paths.data_dir().join("media");
     answer_everything(&context, &root).await;
@@ -347,7 +347,7 @@ async fn the_walk_settles_on_what_the_wizard_itself_would() {
 async fn a_rehearsed_answer_moves_the_walk_on_and_records_nothing() {
     // The progress file is the state and nothing else is, so a rehearsal that
     // wrote it would have answered the question on the operator's behalf.
-    let paths = scratch("rehearsed-answer");
+    let (_scratch, paths) = scratch("rehearsed-answer");
     let rehearsing = ctx(&paths).rehearsing();
 
     let before = walked(&rehearsing, SetupAction::Where)

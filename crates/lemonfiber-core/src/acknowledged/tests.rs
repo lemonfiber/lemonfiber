@@ -67,10 +67,7 @@ fn what_was_written_reads_back_the_same() {
 fn a_record_that_is_not_there_is_an_empty_one() {
     // Stamped with the process, the way this repo's other temp fixtures are:
     // tests run in parallel and two of them sharing a path is a flake.
-    let nowhere = std::env::temp_dir().join(format!(
-        "lemonfiber-known-absent-{}.json",
-        std::process::id()
-    ));
+    let nowhere = lemonfiber_fixtures::scratch::Scratch::named("known-absent-.json");
     let _ = std::fs::remove_file(&nowhere);
 
     assert!(super::at(&nowhere).is_empty());
@@ -78,7 +75,7 @@ fn a_record_that_is_not_there_is_an_empty_one() {
 
 #[test]
 fn what_was_stored_is_read_back_from_where_it_was_put() {
-    let path = std::env::temp_dir().join(format!("lemonfiber-known-{}.json", std::process::id()));
+    let path = lemonfiber_fixtures::scratch::Scratch::named("known-.json");
     let mut held = Acknowledged::default();
     held.take("indexer");
     let _ = std::fs::write(&path, held.to_json().unwrap_or_default());

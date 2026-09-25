@@ -289,24 +289,6 @@ fn every_state_names_itself_the_way_it_is_reported() {
     }
 }
 
-/// A provider that publishes nothing is the ordinary case, not a fault — a check
-/// that flagged every one of them would be noise the operator learns to skip.
-#[test]
-fn only_the_states_with_something_to_do_want_attention() {
-    assert!(!Health::Healthy.wants_attention());
-    assert!(!Health::Unknown.wants_attention());
-    for health in [
-        Health::Depleting,
-        Health::Exhausted,
-        Health::Capped,
-        Health::Invalid,
-        Health::Unreachable,
-        Health::Expiring,
-    ] {
-        assert!(health.wants_attention());
-    }
-}
-
 #[test]
 fn a_renewal_survives_a_round_trip_through_its_name() {
     for renewal in [Renewal::Bought, Renewal::Refills] {

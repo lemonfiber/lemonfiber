@@ -9,13 +9,13 @@ use lemonfiber_core::walkthrough::Line as Step;
 // repair one is bare and the restore one is said with its module, which is the
 // way `named.rs` tells the same pair apart — a file holding both cannot leave a
 // reader to guess which `Consent::Given` a line means.
-use lemonfiber_core::app::bundle::Wanted as Bundled;
-use lemonfiber_core::app::repair::{Consent, Report as RepairReport};
 use lemonfiber_core::app::restore::{self, Kept, Preview, Restoration};
 use lemonfiber_core::app::support::{Bundle, Destination};
-use lemonfiber_core::app::{backup, Allowance, Command, Outcome, QualityAction, Waiting};
+use lemonfiber_core::app::{Allowance, Command, Outcome, QualityAction, Waiting};
 use lemonfiber_core::audio::Format;
+use lemonfiber_core::backup::run as backup;
 use lemonfiber_core::backup::{Manifest, Relocation, Scope, SCHEMA};
+use lemonfiber_core::bundle::run::Wanted as Bundled;
 use lemonfiber_core::bundle::{Contents, Filenames};
 use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
@@ -25,6 +25,7 @@ use lemonfiber_core::model::{
     VersionReport,
 };
 use lemonfiber_core::quality::Preset;
+use lemonfiber_core::repair::run::{Consent, Report as RepairReport};
 use lemonfiber_core::repair::{agreement, Repair};
 use lemonfiber_core::trace::Stage as TraceStage;
 use lemonfiber_core::walkthrough::Step as WalkStep;
@@ -242,9 +243,9 @@ fn starting(action: &str) -> Acting {
 mod asking_more;
 mod choosing;
 mod errands;
-mod lasting;
-mod quality;
+mod quality_choice;
 mod questions;
 mod repairing;
 mod services;
+mod walks;
 mod widening;

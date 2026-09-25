@@ -91,7 +91,7 @@ async fn starting_named_services_is_the_start_compose_spells_that_way() {
         )))
         .settings(settings)
         .build()
-        .waiting(std::time::Duration::ZERO);
+        .with_patience(std::time::Duration::ZERO);
     let command = Command::Start {
         forms: vec!["dl".to_owned()],
         services: vec!["qbittorrent".to_owned()],
@@ -160,7 +160,7 @@ async fn an_engine_that_will_not_start_is_reported_to_the_operator() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refusal, Some(crate::ports::process::MISSING_PROGRAM));
+    assert_eq!(refusal, Some(crate::error::codes::proc::MISSING_PROGRAM));
 }
 
 #[tokio::test]
@@ -218,7 +218,7 @@ async fn a_pull_that_cannot_spawn_compose_is_a_problem_not_a_stream() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refusal, Some(crate::ports::process::MISSING_PROGRAM));
+    assert_eq!(refusal, Some(crate::error::codes::proc::MISSING_PROGRAM));
 }
 
 #[tokio::test]
@@ -245,7 +245,7 @@ async fn a_form_this_stack_does_not_have_never_reaches_the_engine() {
     let outcome = dispatch(command, &ctx).await;
     assert_eq!(
         outcome.as_ref().err().map(|problem| problem.code),
-        Some(crate::stack::closure::NO_SUCH_FORM)
+        Some(crate::error::codes::form::NO_SUCH_FORM)
     );
     assert_eq!(report(outcome), None, "nothing ran, so there is no report");
 }
@@ -262,7 +262,7 @@ async fn an_unreadable_stack_is_reported_before_anything_is_started() {
     };
     assert_eq!(
         dispatch(command, &ctx).await.err().map(|p| p.code),
-        Some(crate::stack::STACK_UNREADABLE)
+        Some(crate::error::codes::stack::STACK_UNREADABLE)
     );
 }
 
@@ -286,7 +286,7 @@ async fn an_embedded_stack_with_nowhere_to_go_stops_before_starting_anything() {
     };
     assert_eq!(
         dispatch(command, &ctx).await.err().map(|p| p.code),
-        Some(crate::stack::STACK_NOT_SET_UP),
+        Some(crate::error::codes::stack::STACK_NOT_SET_UP),
         "an operator who has not run setup is told to, not shown a path error"
     );
 }
@@ -308,7 +308,7 @@ async fn a_stack_that_contradicts_itself_is_refused_with_every_fault_at_once() {
     let problem = dispatch(command, &ctx).await.err();
     assert_eq!(
         problem.as_ref().map(|problem| problem.code),
-        Some(crate::stack::STACK_INVALID)
+        Some(crate::error::codes::stack::STACK_INVALID)
     );
 
     let detail = problem

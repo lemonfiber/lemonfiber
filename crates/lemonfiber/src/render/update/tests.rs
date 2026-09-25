@@ -1,7 +1,7 @@
 use super::{back, size, update};
-use lemonfiber_core::app::update::Report;
 use lemonfiber_core::migration::version::Jump;
 use lemonfiber_core::model::StackEdit;
+use lemonfiber_core::update::run::Report;
 use lemonfiber_core::update::{Applied, Change, Ending, Reversal};
 
 /// One step, from `current` onto `target`.

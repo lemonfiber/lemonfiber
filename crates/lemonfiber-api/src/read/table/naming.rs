@@ -10,9 +10,10 @@
 //! The reads that take nothing have no function here, which is the shape of the file
 //! rather than an omission: there is nothing for them to mean.
 
-use lemonfiber_core::app::{update, Command, Removing, Waiting};
+use lemonfiber_core::app::{Command, Removing, Waiting};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
+use lemonfiber_core::update::run as update;
 
 use super::{
     NOT_A_COUNT, NOT_A_SEASON, NO_MEMBER, NO_SETTING, NO_SHELF_WITHOUT_A_MEMBER, NO_SUCH_REMOVAL,

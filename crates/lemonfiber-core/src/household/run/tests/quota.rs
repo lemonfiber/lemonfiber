@@ -2,67 +2,6 @@
 
 use super::*;
 
-impl Default for Fake {
-    fn default() -> Self {
-        Self {
-            accounts: r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                "Policy":{"EnableAllFolders":true},
-                "LastActivityDate":"2026-08-30T10:00:00Z"}]"#,
-            folders: r#"{"Items":[{"Id":"lib-1","Name":"Films"}]}"#,
-            // As the pinned image answers, including the row that carries no age
-            // at all — its name for content it has no rating for.
-            ratings: r#"[{"Name":"Unrated"},{"Name":"U","Value":0},
-                {"Name":"12A","Value":12},{"Name":"15","Value":15}]"#,
-            sign_in: "",
-            requests: "",
-            library: "[]",
-            refuse: false,
-            account: None,
-            permissions: (200, r#"{"permissions":32}"#),
-        }
-    }
-}
-
-/// What one member's period has counted, as the request service works it out.
-const COUNTS: &str = r#"{"movie":{"days":7,"limit":2,"used":0},"tv":{}}"#;
-
-impl Fake {
-    /// The scripted answers as a transport, routed by what each call asks for.
-    fn transport(&self) -> Arc<Transport> {
-        let mut routes = vec![
-            // Ahead of `/Users`, whose text it contains: the media server signs
-            // this program in before it will answer anything about accounts, and
-            // a route matched by prefix would answer the sign-in with the list.
-            (
-                "/Users/AuthenticateByName",
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
-            ),
-            ("/Library/MediaFolders", Answer::reply(200, self.folders)),
-            (
-                "/Localization/ParentalRatings",
-                Answer::reply(200, self.ratings),
-            ),
-            ("/Users", Answer::reply(200, self.accounts)),
-            (
-                "/auth/jellyfin",
-                Answer::reply(if self.refuse { 500 } else { 200 }, self.sign_in),
-            ),
-        ];
-        if let Some(account) = self.account {
-            // Ahead of the catch-all, which would answer an account with a library.
-            routes.push(("/user/jellyfin/", Answer::reply(200, account)));
-            routes.push(("/quota", Answer::reply(200, COUNTS)));
-            routes.push((
-                "/settings/permissions",
-                Answer::reply(self.permissions.0, self.permissions.1),
-            ));
-        }
-        routes.push(("/api/v1/request", Answer::reply(200, self.requests)));
-        routes.push(("", Answer::reply(200, self.library)));
-        Transport::by_path(routes)
-    }
-}
-
 /// The same, on a volume with no room left, keeping the transport so what was
 /// written to the request service can be read back off it.
 fn no_room_with(fake: &Fake, tag: &str) -> (Ctx, Arc<Transport>) {

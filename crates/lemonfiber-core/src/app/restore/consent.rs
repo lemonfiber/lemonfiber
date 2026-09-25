@@ -21,8 +21,7 @@
 use crate::error::{Problem, Remedy, Severity, State};
 
 use super::Preview;
-
-pub use crate::error::codes::restore::MOVED_ON;
+use crate::error::codes::restore::MOVED_ON;
 
 /// How much of a restore this run was given consent for.
 ///

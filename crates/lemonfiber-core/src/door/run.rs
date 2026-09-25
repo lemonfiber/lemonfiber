@@ -18,6 +18,7 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
     let containers = ctx
+        .seams
         .engine
         .list(&ctx.settings.project)
         .await

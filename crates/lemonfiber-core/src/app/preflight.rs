@@ -68,7 +68,7 @@ pub(crate) async fn conflicting_ports(
         return Vec::new();
     }
 
-    let Ok(images) = ctx.images.images().await else {
+    let Ok(images) = ctx.seams.images.images().await else {
         return Vec::new();
     };
     let Some(seen) = every_container(ctx, &images).await else {
@@ -155,7 +155,7 @@ pub(crate) async fn every_container(ctx: &Ctx, images: &[Image]) -> Option<Vec<C
 
     let mut seen: Vec<Container> = Vec::new();
     for project in projects {
-        seen.extend(ctx.engine.list(project).await.ok()?);
+        seen.extend(ctx.seams.engine.list(project).await.ok()?);
     }
     Some(seen)
 }

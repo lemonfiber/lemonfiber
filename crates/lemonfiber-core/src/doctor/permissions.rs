@@ -25,10 +25,9 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::config::paths::Paths;
+use crate::error::codes::config::CREDENTIALS_EXPOSED;
 use crate::error::{Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
-
-pub(crate) use crate::error::codes::config::CREDENTIALS_EXPOSED;
 
 /// The permission bits that grant anyone but the owner anything at all.
 const BEYOND_THE_OWNER: u32 = 0o077;

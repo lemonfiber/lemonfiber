@@ -45,7 +45,7 @@ pub(super) async fn read_sabnzbd_key(
     project: Option<&Path>,
 ) -> Option<String> {
     let path = sabnzbd_config_path(services, project?)?;
-    let text = ctx.filesystem.read(&path).await?;
+    let text = ctx.seams.filesystem.read(&path).await?;
     crate::sabnzbd::api_key(&text)
 }
 
@@ -122,7 +122,7 @@ pub(super) async fn seed_qbittorrent_password(
 ) -> (crate::seed::Wiring, Option<String>) {
     let (id, base) = target;
     let connection = "qBittorrent web UI password".to_owned();
-    let client = crate::qbittorrent::Qbittorrent::new(ctx.http.clone(), base);
+    let client = crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), base);
 
     // A password lemonfiber has already set is the one in force, and asking again
     // is how a healthy stack gets reported as refused. The temporary one is still
@@ -167,7 +167,7 @@ pub(super) async fn seed_qbittorrent_password(
 
     let (wiring, recorded) = crate::seed::wire_qbittorrent_password(
         &client,
-        ctx.random.as_ref(),
+        ctx.seams.random.as_ref(),
         &temporary,
         ctx.dry_run,
     )

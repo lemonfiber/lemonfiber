@@ -29,11 +29,8 @@ use super::{quiesced, Ctx};
 mod consent;
 mod refusals;
 
-pub use consent::{Consent, MOVED_ON};
-pub use refusals::{
-    CORRUPT, INCOMPATIBLE, NEEDS_REPOINT, NOT_KEPT_HERE, NOT_OURS, NOT_REPOINTED, NOT_RESTORED,
-    NOWHERE_KEPT, STILL_RUNNING, TOO_NEW, UNSAFE,
-};
+use crate::error::codes::restore::STILL_RUNNING;
+pub use consent::Consent;
 
 use refusals::{
     corrupt, incompatible, needs_repoint, not_kept_here, not_ours, not_repointed, not_restored,

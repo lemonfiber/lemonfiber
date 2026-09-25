@@ -71,7 +71,11 @@ async fn held(ctx: &Ctx, to: &Path) -> Option<Vec<Existing>> {
     let mut found = Vec::new();
     let mut answered = false;
     for arr in &arrs {
-        let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+        let Some(client) = arr
+            .target
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await
+        else {
             continue;
         };
         let Ok(folders) = crate::ports::service::Client::root_folders(&client).await else {
@@ -101,7 +105,11 @@ async fn resolves(ctx: &Ctx, to: &Path, path: &str) -> bool {
     else {
         return false;
     };
-    ctx.filesystem.canonicalize(&to.join(rest)).await.is_ok()
+    ctx.seams
+        .filesystem
+        .canonicalize(&to.join(rest))
+        .await
+        .is_ok()
 }
 
 /// Why a move must not be made when nothing would say where the library is filed.
@@ -111,7 +119,7 @@ async fn resolves(ctx: &Ctx, to: &Path, path: &str) -> bool {
 /// run is moved freely rather than blocked by services that were never up.
 async fn unreachable(ctx: &Ctx, from: &Path) -> Option<String> {
     let media = from.join("media");
-    if ctx.filesystem.canonicalize(&media).await.is_err() {
+    if ctx.seams.filesystem.canonicalize(&media).await.is_err() {
         return None;
     }
     Some(format!(

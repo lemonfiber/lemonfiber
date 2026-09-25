@@ -43,12 +43,6 @@ impl Standing {
         }
     }
 
-    /// Whether this is a state an operator has to do something about.
-    #[must_use]
-    pub(crate) const fn wants_attention(self) -> bool {
-        matches!(self, Self::Degraded | Self::Broken | Self::Critical)
-    }
-
     /// The word an operator reads.
     #[must_use]
     pub const fn word(self) -> &'static str {

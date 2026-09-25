@@ -185,6 +185,7 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
     };
 
     let containers = ctx
+        .seams
         .engine
         .list(&ctx.settings.project)
         .await
@@ -337,6 +338,7 @@ async fn worked(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Outcome,
     }
 
     let output = ctx
+        .seams
         .runner
         .run(&command)
         .await
@@ -381,7 +383,7 @@ pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Ma
     {
         return;
     }
-    if let Some(key) = crate::secret::generate(ctx.random.as_ref()) {
+    if let Some(key) = crate::secret::generate(ctx.seams.random.as_ref()) {
         super::targets::record_secret(ctx, crate::config::BINDERY_API_KEY, &key);
     }
 }
@@ -513,7 +515,7 @@ pub(crate) fn catalogue(ctx: &Ctx) -> Result<CatalogueReport, Box<Problem>> {
 /// wrong, so it must still answer when the engine is down.
 pub(crate) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
     let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
-    let compose = match ctx.runner.run(&argv).await {
+    let compose = match ctx.seams.runner.run(&argv).await {
         Ok(output) if output.succeeded() => Some(output.stdout.trim().to_owned()),
         Ok(_) | Err(_) => None,
     };

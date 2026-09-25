@@ -1,10 +1,6 @@
-use lemonfiber_core::app::repair::{Mended, Report};
+use lemonfiber_core::repair::run::{Mended, Report};
 use lemonfiber_core::repair::{Outcome, Repair};
 
-use std::sync::Arc;
-
-use lemonfiber_core::config::Settings;
-use lemonfiber_core::platform::Environment;
 use lemonfiber_core::stack::Source;
 
 use crate::exit::{repairing, shown, success};
@@ -16,10 +12,7 @@ use lemonfiber::cli::Fixing;
 /// Where a test's records live, in a scratch directory of its own — named, because a
 /// test that undoes a journal must not be reading one another test wrote.
 fn paths(name: &str) -> Paths {
-    let root = std::env::temp_dir().join(format!(
-        "lemonfiber-repair-cli-{}-{name}",
-        std::process::id()
-    ));
+    let root = lemonfiber_fixtures::scratch::Scratch::named(&format!("repair-cli-{name}")).kept();
     let _ = std::fs::remove_dir_all(&root);
     Paths::rooted(&root.join("config"), &root.join("data"))
 }
@@ -27,15 +20,9 @@ fn paths(name: &str) -> Paths {
 /// A context over the stack this binary ships, with nothing configured — so nothing is
 /// wrong that lemonfiber could put right, which is the state a healthy machine is in.
 fn ctx() -> Ctx {
-    Ctx::new(
-        Arc::new(lemonfiber_adapters::Local),
-        Arc::new(lemonfiber_adapters::Daemon::local()),
-        Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
-        Source::Embedded(&lemonfiber::carried::STACK),
-        Settings::default(),
-        Environment::MacOs,
-    )
+    lemonfiber_testing::a_live_context()
+        .over(Source::Embedded(&lemonfiber::carried::STACK))
+        .build()
 }
 
 /// Answers whatever it was built with, however often it is asked.
@@ -248,15 +235,9 @@ async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
 /// put right — which would be true of a machine lemonfiber cannot see at all.
 #[tokio::test]
 async fn a_stack_that_cannot_be_read_is_refused_rather_than_called_healthy() {
-    let nowhere = Ctx::new(
-        Arc::new(lemonfiber_adapters::Local),
-        Arc::new(lemonfiber_adapters::Daemon::local()),
-        Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
-        Source::External(std::path::Path::new("/no/such/stack")),
-        Settings::default(),
-        Environment::MacOs,
-    );
+    let nowhere = lemonfiber_testing::a_live_context()
+        .over(Source::External(std::path::Path::new("/no/such/stack")))
+        .build();
 
     let code = run(
         &nowhere,

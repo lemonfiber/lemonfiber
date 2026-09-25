@@ -48,7 +48,7 @@ fn both_kinds_have_something_to_suggest() {
     // least one thing to try.
     for kind in [Kind::Sonarr, Kind::Radarr] {
         assert!(
-            !Suggestion::for_kind(kind).is_empty(),
+            !Suggestion::for_kinds(&[kind]).is_empty(),
             "nothing to suggest for {kind:?}"
         );
     }
@@ -61,7 +61,9 @@ fn every_kind_has_something_safe_to_be_asked_for_without_a_maybe() {
     for kind in [Kind::Sonarr, Kind::Radarr] {
         let safe = Suggestion::safe_for(kind);
         assert!(
-            Suggestion::for_kind(kind).iter().any(|s| s.title == safe),
+            Suggestion::for_kinds(&[kind])
+                .iter()
+                .any(|s| s.title == safe),
             "{safe} is not among the suggestions for {kind:?}"
         );
     }

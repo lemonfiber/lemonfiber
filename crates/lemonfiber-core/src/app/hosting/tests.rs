@@ -23,7 +23,7 @@ fn machine(settings: Settings, manager: Arc<Fake>) -> Ctx {
     crate::test_support::a_context()
         .settings(settings)
         .build()
-        .hosting_with(manager as Arc<dyn Host>)
+        .with_hosting(manager as Arc<dyn Host>)
 }
 
 /// A machine that knows where it is, with this manager.
@@ -39,8 +39,7 @@ fn a_machine(manager: Arc<Fake>) -> Ctx {
 /// beside an install rather than reported by one, and a machine with nowhere to
 /// keep it would read back the default whatever had been asked for.
 fn recording(name: &str, manager: Arc<Fake>) -> Ctx {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-hosting-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("hosting-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     machine(
         Settings {

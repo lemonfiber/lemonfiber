@@ -18,6 +18,7 @@
 use std::path::Path;
 
 use crate::app::{Ctx, Outcome, Waiting};
+use crate::error::codes::gone::NOT_BACKED_UP;
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::stack::compose::Action;
@@ -92,8 +93,6 @@ pub(super) async fn remove(
         left: went.left,
     })
 }
-
-pub(crate) use crate::error::codes::gone::NOT_BACKED_UP;
 
 /// The refusal for a removal whose backup would not be taken.
 ///
@@ -202,7 +201,7 @@ async fn pulled(ctx: &Ctx, manifest: &Manifest, went: &mut Went) {
 /// A non-zero exit keeps whatever the program wrote, because that sentence is what
 /// the operator needs in order to finish the step by hand.
 async fn ran(ctx: &Ctx, argv: &[String]) -> Result<(), String> {
-    match ctx.runner.run(argv).await {
+    match ctx.seams.runner.run(argv).await {
         Ok(output) if output.status == Some(0) => Ok(()),
         Ok(output) => Err(said(&output)),
         Err(failure) => Err(failure.to_string()),
@@ -242,6 +241,7 @@ async fn paths(ctx: &Ctx, manifest: &Manifest, went: &mut Went) {
         }
         attempted.push(at.to_path_buf());
         let outcome = ctx
+            .seams
             .eraser
             .erase(at)
             .await

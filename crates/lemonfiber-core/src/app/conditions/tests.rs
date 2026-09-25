@@ -48,7 +48,8 @@ fn a_store_that_will_not_parse_is_an_empty_one_rather_than_a_failure() {
     // Worse answers for a run, never a refusal to run.
     let ctx = ctx_at("corrupt");
     save(&ctx, &stalled());
-    let written = scratch("corrupt").join("conditions.json");
+    let written_dir = scratch("corrupt");
+    let written = written_dir.join("conditions.json");
     assert!(written.exists(), "the store was written in the first place");
     assert!(
         crate::config::store::write(&written, "not json at all").is_ok(),

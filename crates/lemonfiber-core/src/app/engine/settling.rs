@@ -37,7 +37,7 @@ async fn settle(
     manifest: &lemonfiber_manifest::Manifest,
     profiles: &[String],
 ) -> Result<Vec<Service>, Box<Problem>> {
-    let began = ctx.clock.now();
+    let began = ctx.seams.clock.now();
     let deadline = began + ctx.patience;
     // How much of the wait has already been spoken for, which is what keeps the
     // narration on its own interval rather than on the poll's.
@@ -45,6 +45,7 @@ async fn settle(
 
     loop {
         let containers = ctx
+            .seams
             .engine
             .list(&ctx.settings.project)
             .await
@@ -61,7 +62,7 @@ async fn settle(
 
         // Checked after the survey rather than before it, so a patience of zero
         // still reports what it saw rather than reporting nothing at all.
-        let now = ctx.clock.now();
+        let now = ctx.seams.clock.now();
         if now >= deadline {
             return Err(Box::new(never_settled(ctx, manifest, &waiting).await));
         }
@@ -173,6 +174,7 @@ pub(crate) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
 
     let query = LogQuery::last_words();
     let mut lines = ctx
+        .seams
         .engine
         .logs(&ctx.settings.project, services, query)
         .await

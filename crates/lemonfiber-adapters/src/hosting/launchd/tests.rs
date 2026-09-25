@@ -24,7 +24,7 @@ fn a_command(output: PathBuf) -> Hosted {
     }
 }
 
-fn agents(name: &str) -> PathBuf {
+fn agents(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     super::super::scratch(name)
 }
 

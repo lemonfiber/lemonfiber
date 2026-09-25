@@ -10,8 +10,8 @@ fn no_engine() -> Ctx {
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::unreachable("no daemon here"))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing())
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing())
 }
 
 /// The credentials a removal reported destroying.
@@ -166,7 +166,7 @@ async fn a_data_location_on_a_drive_that_unplugs_is_said() {
 #[tokio::test]
 async fn removing_configuration_destroys_the_credentials_and_names_them() {
     let eraser = Erasing::willing();
-    let ctx = a_machine().erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
+    let ctx = a_machine().with_eraser(Arc::clone(&eraser) as Arc<dyn Eraser>);
 
     let removal = confirmed(&ctx, Tier::Configuration).await;
     let named = removal.as_ref().map(credentials).unwrap_or_default();
@@ -280,8 +280,8 @@ async fn a_stack_description_that_cannot_be_read_still_produces_a_manifest() {
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing());
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing());
 
     let manifest = read(&ctx, Tier::Configuration).await;
 
@@ -311,8 +311,8 @@ async fn a_run_that_cannot_say_where_its_files_go_names_the_usual_places_and_tak
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Arc::clone(&eraser) as Arc<dyn Eraser>);
 
     // The reading, which is what names the usual places. A confirmed run on this
     // machine is refused below: with nowhere it can say its files are, there is
@@ -356,7 +356,7 @@ async fn a_run_that_cannot_say_where_its_files_go_names_the_usual_places_and_tak
 /// way to finish it.
 #[tokio::test]
 async fn a_path_the_platform_refused_is_named_with_what_it_said_and_how_to_finish_it() {
-    let ctx = a_machine().erasing(Erasing::refusing("permission denied"));
+    let ctx = a_machine().with_eraser(Erasing::refusing("permission denied"));
 
     let removal = confirmed(&ctx, Tier::Configuration).await;
     let stuck = removal.as_ref().map(left).unwrap_or_default();
@@ -377,7 +377,7 @@ async fn a_path_the_platform_refused_is_named_with_what_it_said_and_how_to_finis
 /// refusal, and the gap names the directory it is about.
 #[tokio::test]
 async fn a_directory_that_will_not_be_walked_is_named_and_the_reading_says_so() {
-    let ctx = a_machine().surveying(Walking::refusing("permission denied"));
+    let ctx = a_machine().with_occupancy(Walking::refusing("permission denied"));
 
     let manifest = read(&ctx, Tier::Configuration).await;
     let unread = manifest
@@ -404,7 +404,7 @@ async fn a_directory_that_will_not_be_walked_is_named_and_the_reading_says_so() 
 /// what beneath it is not the stack's.
 #[tokio::test]
 async fn a_data_location_that_will_not_be_walked_says_what_that_costs() {
-    let ctx = a_machine().surveying(Walking::refusing("permission denied"));
+    let ctx = a_machine().with_occupancy(Walking::refusing("permission denied"));
 
     let manifest = read(&ctx, Tier::Media).await;
 
@@ -432,8 +432,8 @@ async fn a_machine_with_no_data_location_has_nothing_of_the_operators_to_list() 
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing());
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing());
 
     let manifest = read(&ctx, Tier::Media).await;
 
@@ -471,8 +471,8 @@ async fn a_program_that_is_not_installed_is_reported_in_its_own_words() {
             400,
             &["lemonfiber"],
         )]))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing());
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing());
 
     let removal = confirmed(&ctx, Tier::Services).await;
     let stuck = removal.as_ref().map(left).unwrap_or_default();
@@ -490,7 +490,7 @@ async fn a_program_that_is_not_installed_is_reported_in_its_own_words() {
 /// on their disk.
 #[tokio::test]
 async fn what_lemonfiber_keeps_is_sized_from_a_walk_of_where_it_keeps_it() {
-    let ctx = a_machine().surveying(Walking::holding(vec![
+    let ctx = a_machine().with_occupancy(Walking::holding(vec![
         file("/cfg/lemonfiber/.env", 400),
         file("/data/lemonfiber/config/sonarr/config.xml", 1_600),
     ]));
@@ -531,8 +531,8 @@ async fn the_layout_a_surface_resolved_is_the_one_a_removal_names() {
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing());
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing());
     let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
     let ctx = crate::app::fixtures::keeping(elsewhere, &vault);
 

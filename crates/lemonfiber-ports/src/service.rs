@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use lemonfiber_error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 mod addressing;
 mod aggregators;
@@ -42,10 +42,7 @@ pub use clients::{
     QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient, RegisteredFolder,
     RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
-pub use failure::{
-    Failure, ASK_FOR_REPAIRS, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
-    SERVICE_UNSUPPORTED,
-};
+pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use household::{
     Access, Allowed, Certificate, Held, Household, Invited, Medium, Member, NamedLibrary, Unrated,

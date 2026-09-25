@@ -58,7 +58,7 @@ fn measuring_a_volume(available: u64) -> crate::app::Ctx {
         .with_filesystem(Arc::new(
             SeedFs::keyed(None, None).with_facts(facts(available)),
         ))
-        .surveying(Walking::holding(a_tree()))
+        .with_occupancy(Walking::holding(a_tree()))
 }
 
 #[tokio::test]
@@ -76,7 +76,7 @@ async fn a_data_location_that_will_not_be_read_is_a_refusal_rather_than_an_empty
         .settings(measuring())
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(500))))
-        .surveying(Walking::refusing("permission denied"));
+        .with_occupancy(Walking::refusing("permission denied"));
     let refused = space(&ctx, false).await;
     assert!(
         refused.is_err_and(|problem| problem.code == crate::space::WALK_REFUSED
@@ -161,7 +161,7 @@ fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
         .with_filesystem(Arc::new(
             SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
         ))
-        .surveying(Walking::holding(a_tree()))
+        .with_occupancy(Walking::holding(a_tree()))
 }
 
 #[tokio::test]
@@ -179,7 +179,8 @@ async fn a_download_nothing_ever_linked_is_named_as_costing_nothing() {
 #[tokio::test]
 async fn nothing_is_removed_until_an_answer_arrives_and_then_only_what_was_offered() {
     let erasing = Erasing::willing();
-    let ctx = holding_one("Never.Taken", "space-offered").erasing(Arc::clone(&erasing) as Arc<_>);
+    let ctx =
+        holding_one("Never.Taken", "space-offered").with_eraser(Arc::clone(&erasing) as Arc<_>);
 
     assert!(space(&ctx, false).await.is_ok());
     assert!(
@@ -201,7 +202,8 @@ async fn nothing_is_removed_until_an_answer_arrives_and_then_only_what_was_offer
 #[tokio::test]
 async fn what_could_not_be_removed_is_reported_rather_than_counted_as_freed() {
     let erasing = Erasing::refusing("permission denied");
-    let ctx = holding_one("Never.Taken", "space-refused").erasing(Arc::clone(&erasing) as Arc<_>);
+    let ctx =
+        holding_one("Never.Taken", "space-refused").with_eraser(Arc::clone(&erasing) as Arc<_>);
     let taken = space(&ctx, true).await;
     assert!(taken.is_ok_and(
         |taken| taken.reclaimed.is_some_and(|reclaimed| reclaimed.bytes == 0
@@ -217,7 +219,7 @@ async fn what_could_not_be_removed_is_reported_rather_than_counted_as_freed() {
 async fn a_rehearsal_says_what_would_go_and_takes_nothing() {
     let erasing = Erasing::willing();
     let ctx = holding_one("Never.Taken", "space-rehearsed")
-        .erasing(Arc::clone(&erasing) as Arc<_>)
+        .with_eraser(Arc::clone(&erasing) as Arc<_>)
         .rehearsing();
     let taken = space(&ctx, true).await;
     assert!(erasing.asked().is_empty(), "a rehearsal removes nothing");
@@ -288,7 +290,7 @@ async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED), None).with_facts(facts(900_000_000_000)),
         ))
-        .surveying(Walking::holding(a_tree()));
+        .with_occupancy(Walking::holding(a_tree()));
 
     // A service still waiting for it is also what stops it being called waste,
     // whatever the filesystem says about how many names point at its file — so
@@ -318,7 +320,7 @@ async fn a_stack_that_cannot_be_read_at_all_is_a_refusal_rather_than_an_empty_on
         .with_filesystem(Arc::new(
             SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
         ))
-        .surveying(Walking::holding(a_tree()));
+        .with_occupancy(Walking::holding(a_tree()));
     assert!(space(&ctx, false).await.is_err());
 }
 
@@ -337,7 +339,7 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
         .with_filesystem(Arc::new(
             SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
         ))
-        .surveying(Walking::holding(a_tree()));
+        .with_occupancy(Walking::holding(a_tree()));
     let reckoned = space(&ctx, false).await;
     assert!(
         reckoned.is_ok_and(|reckoned| reckoned.volumes.len() == 1

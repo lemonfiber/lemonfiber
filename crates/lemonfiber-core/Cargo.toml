@@ -38,6 +38,7 @@ lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes both this crate's own tests and its integration tests drive the real code
 # through. It depends on `lemonfiber-ports` alone, so there is no cycle back to here.
 lemonfiber-fixtures = { workspace = true }
+lemonfiber-testing = { workspace = true }
 # The real seams, for the tests that mean this machine — a scratch directory on a real
 # disk rather than a fake that would be asserting its own behaviour. A dev-dependency
 # only: the whole point of the extraction is that a released `lemonfiber-core` cannot

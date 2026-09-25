@@ -32,7 +32,7 @@ fn ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
 /// sharing one directory would race on it when run in parallel — the tag keeps each
 /// test's `.env` to itself.
 fn recording_ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>, tag: &str) -> Ctx {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-music-{tag}-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("music-{tag}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let mut context = ctx(fs, replies);
     context.settings.env_file = Some(dir.join(".env"));
@@ -97,7 +97,7 @@ async fn a_service_that_refuses_the_change_is_reported_failed() {
 
 #[tokio::test]
 async fn an_unreadable_stack_records_the_choice_and_reports_not_started() {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-music-bad-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("music-bad");
     let _ = std::fs::create_dir_all(&dir);
     let mut context = a_context()
         .over(nowhere())

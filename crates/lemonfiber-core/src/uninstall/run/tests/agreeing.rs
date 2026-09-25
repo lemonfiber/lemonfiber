@@ -55,7 +55,7 @@ async fn a_stale_agreement_is_refused_on_a_tier_that_did_not_need_one() {
 #[tokio::test]
 async fn the_media_tier_answered_by_the_name_it_printed_removes_the_library() {
     let eraser = Erasing::willing();
-    let ctx = a_machine().erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
+    let ctx = a_machine().with_eraser(Arc::clone(&eraser) as Arc<dyn Eraser>);
 
     let removal = confirmed(&ctx, Tier::Media).await;
 
@@ -86,7 +86,7 @@ async fn a_data_location_holding_only_the_stacks_own_files_is_offered_whole() {
 /// and the stack's own directories are offered one at a time instead.
 #[tokio::test]
 async fn something_of_the_operators_beside_the_library_prevents_a_blanket_removal() {
-    let ctx = a_machine().surveying(Walking::holding(and_theirs()));
+    let ctx = a_machine().with_occupancy(Walking::holding(and_theirs()));
     let manifest = read(&ctx, Tier::Media).await;
 
     assert_eq!(
@@ -122,8 +122,8 @@ async fn something_of_the_operators_beside_the_library_prevents_a_blanket_remova
 async fn a_removal_beside_the_operators_files_takes_only_the_stacks_own_directories() {
     let eraser = Erasing::willing();
     let ctx = a_machine()
-        .surveying(Walking::holding(and_theirs()))
-        .erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
+        .with_occupancy(Walking::holding(and_theirs()))
+        .with_eraser(Arc::clone(&eraser) as Arc<dyn Eraser>);
 
     let removal = confirmed(&ctx, Tier::Media).await;
 
@@ -149,7 +149,7 @@ async fn a_backup_is_taken_before_configuration_is_destroyed() {
                 400,
                 &["lemonfiber"],
             )]))
-            .erasing(Erasing::willing()),
+            .with_eraser(Erasing::willing()),
         &vault,
     );
     let said = read(&ctx, Tier::Configuration)
@@ -262,8 +262,8 @@ fn watching(runner: &Arc<Recording>) -> Ctx {
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing())
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing())
 }
 
 /// An engine that refuses to remove an image keeps its own words,
@@ -339,7 +339,7 @@ async fn nothing_it_runs_or_hands_back_about_its_own_files_escalates() {
                 400,
                 &["lemonfiber"],
             )]))
-            .erasing(Erasing::refusing("permission denied")),
+            .with_eraser(Erasing::refusing("permission denied")),
     );
 
     let mut instructions = Vec::new();
@@ -397,8 +397,8 @@ async fn what_is_still_coming_down_is_reported_before_anything_stops() {
             lemonfiber_fixtures::downloads::SAB_QUEUE,
         ))
         .with_images(Pulled::holding(Vec::new()))
-        .surveying(Walking::holding(only_ours()))
-        .erasing(Erasing::willing());
+        .with_occupancy(Walking::holding(only_ours()))
+        .with_eraser(Erasing::willing());
 
     let manifest = read(&ctx, Tier::Services).await;
 
@@ -414,7 +414,7 @@ async fn what_is_still_coming_down_is_reported_before_anything_stops() {
 #[tokio::test]
 async fn a_reading_removes_nothing() {
     let eraser = Erasing::willing();
-    let ctx = a_machine().erasing(Arc::clone(&eraser) as Arc<dyn Eraser>);
+    let ctx = a_machine().with_eraser(Arc::clone(&eraser) as Arc<dyn Eraser>);
 
     let answered = answer(&ctx, Removing::surveying(Tier::Configuration)).await;
 
@@ -447,7 +447,7 @@ async fn the_dispatcher_routes_a_removal_to_the_reading() {
 async fn a_rehearsal_takes_the_agreement_and_touches_nothing() {
     let eraser = Erasing::willing();
     let ctx = a_machine()
-        .erasing(Arc::clone(&eraser) as Arc<dyn Eraser>)
+        .with_eraser(Arc::clone(&eraser) as Arc<dyn Eraser>)
         .rehearsing();
 
     let removal = confirmed(&ctx, Tier::Media).await;

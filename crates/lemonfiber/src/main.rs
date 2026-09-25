@@ -151,7 +151,7 @@ async fn repairing(ctx: &Ctx, mending: Mending, json: bool) -> ExitCode {
 /// Named because it is the one piece of context-building long enough to push the arm
 /// that needs it onto three lines, and `main` has no room to spare.
 fn narrating(ctx: Ctx, json: bool) -> Ctx {
-    ctx.narrating_steps(walking(json))
+    ctx.with_steps(walking(json))
 }
 
 /// What a bare `lemonfiber` says: where setup stands, or the plain pointer when there is
@@ -302,7 +302,7 @@ async fn main() -> ExitCode {
         // the title as said, and nothing named at all asks to be suggested
         // something.
         Request::Walkthrough { item } => {
-            ctx = ctx.narrating_steps(walking(cli.json));
+            ctx = ctx.with_steps(walking(cli.json));
             Command::Walkthrough {
                 item: translate::named(&item),
             }

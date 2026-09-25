@@ -34,7 +34,7 @@ fn interrupted(paths: &Paths) {
 
 #[tokio::test]
 async fn applying_before_every_question_is_answered_is_refused() {
-    let paths = scratch("early");
+    let (_scratch, paths) = scratch("early");
 
     assert_eq!(
         refused(&ctx(&paths), SetupAction::Apply).await,
@@ -45,7 +45,7 @@ async fn applying_before_every_question_is_answered_is_refused() {
 
 #[tokio::test]
 async fn a_complete_set_of_answers_is_written_and_setup_stops_being_offered() {
-    let paths = scratch("applied");
+    let (_scratch, paths) = scratch("applied");
     let context = ctx(&paths);
     let root = paths.data_dir().join("media");
     answer_everything(&context, &root).await;
@@ -71,7 +71,7 @@ async fn a_complete_set_of_answers_is_written_and_setup_stops_being_offered() {
 
 #[tokio::test]
 async fn a_machine_already_set_up_is_told_so_rather_than_asked_again() {
-    let paths = scratch("configured");
+    let (_scratch, paths) = scratch("configured");
     let context = ctx(&paths);
     assert!(store::write(&paths.env_file(), "DATA_ROOT=/srv\n").is_ok());
 
@@ -95,7 +95,7 @@ async fn a_machine_already_set_up_is_told_so_rather_than_asked_again() {
 
 #[tokio::test]
 async fn an_apply_that_stopped_part_way_is_picked_up_rather_than_read_as_finished() {
-    let paths = scratch("interrupted");
+    let (_scratch, paths) = scratch("interrupted");
     interrupted(&paths);
 
     let report = walked(&ctx(&paths), SetupAction::Where).await;
@@ -119,7 +119,7 @@ async fn an_apply_that_stopped_part_way_is_picked_up_rather_than_read_as_finishe
 
 #[tokio::test]
 async fn starting_over_undoes_what_was_written_and_forgets_the_answers() {
-    let paths = scratch("start-over");
+    let (_scratch, paths) = scratch("start-over");
     interrupted(&paths);
 
     let report = walked(&ctx(&paths), SetupAction::Recover(Choice::StartOver)).await;
@@ -150,13 +150,13 @@ async fn starting_over_undoes_what_was_written_and_forgets_the_answers() {
 
 #[tokio::test]
 async fn rolling_back_undoes_what_was_written_and_applies_the_answers_again() {
-    let paths = scratch("roll-back");
+    let (_scratch, paths) = scratch("roll-back");
     let context = ctx(&paths);
     let root = paths.data_dir().join("media");
     answer_everything(&context, &root).await;
     // An apply that stopped after writing one setting, over the answers just
     // gathered — which is the only state a roll back is offered from.
-    let saved = super::super::super::super::progress_at(&paths.setup_progress());
+    let saved = crate::app::setup::progress_at(&paths.setup_progress());
     let mut progress = saved.unwrap_or_default();
     progress.phase = Phase::Applying;
     assert!(store::write(
@@ -177,11 +177,11 @@ async fn rolling_back_undoes_what_was_written_and_applies_the_answers_again() {
 
 #[tokio::test]
 async fn resuming_carries_the_apply_forward_from_the_answers_it_kept() {
-    let paths = scratch("resume-recovery");
+    let (_scratch, paths) = scratch("resume-recovery");
     let context = ctx(&paths);
     let root = paths.data_dir().join("media");
     answer_everything(&context, &root).await;
-    let saved = super::super::super::super::progress_at(&paths.setup_progress());
+    let saved = crate::app::setup::progress_at(&paths.setup_progress());
     let mut progress = saved.unwrap_or_default();
     progress.phase = Phase::Applying;
     assert!(store::write(
@@ -208,7 +208,7 @@ async fn resuming_carries_the_apply_forward_from_the_answers_it_kept() {
 /// shown is the same list the real choice will be made from.
 #[tokio::test]
 async fn a_rehearsed_way_out_of_a_half_written_apply_leaves_it_half_written() {
-    let paths = scratch("rehearsed-recover");
+    let (_scratch, paths) = scratch("rehearsed-recover");
     interrupted(&paths);
 
     let report = walked(
@@ -242,7 +242,7 @@ async fn a_rehearsed_way_out_of_a_half_written_apply_leaves_it_half_written() {
 
 #[tokio::test]
 async fn a_way_out_of_an_apply_that_never_stopped_is_refused() {
-    let paths = scratch("nothing-to-recover");
+    let (_scratch, paths) = scratch("nothing-to-recover");
     let context = ctx(&paths);
     assert!(setting_up(
         &context,
@@ -275,7 +275,7 @@ async fn nowhere_to_keep_configuration_is_said_rather_than_guessed_at() {
 async fn a_rehearsed_apply_reports_the_plan_and_writes_none_of_it() {
     // The report is the review: every setting an apply would write, in the words
     // it would write them in, and no file of it on disk.
-    let paths = scratch("rehearsed-apply");
+    let (_scratch, paths) = scratch("rehearsed-apply");
     let context = ctx(&paths);
     let root = paths.data_dir().join("media");
     answer_everything(&context, &root).await;
@@ -308,7 +308,7 @@ async fn a_rehearsed_apply_reports_the_plan_and_writes_none_of_it() {
 
 #[tokio::test]
 async fn a_rehearsed_apply_is_refused_before_review_the_way_a_real_one_is() {
-    let paths = scratch("rehearsed-early");
+    let (_scratch, paths) = scratch("rehearsed-early");
     let rehearsing = ctx(&paths).rehearsing();
     assert!(setting_up(
         &rehearsing,

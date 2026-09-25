@@ -6,11 +6,11 @@ use crate::acting::chooser::Chooser;
 use crate::acting::reading::Reading;
 use crate::acting::{Press, Stage, Wanted};
 use lemonfiber_api::actions::{OFFERED as WEB, TAKES_CONSENT, TAKES_DISRUPTION};
-use lemonfiber_core::app::repair::{Confirm as _, Consent, Report};
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::model::DoctorReport;
+use lemonfiber_core::repair::run::{Confirm as _, Consent, Report};
 use lemonfiber_core::repair::{agreement, Repair};
 
 /// The one on the list with that action, which is how each test below reaches one.

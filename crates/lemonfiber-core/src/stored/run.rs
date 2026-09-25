@@ -15,8 +15,7 @@ use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::stored::{stored, Left, Removal, Stored};
 
 use crate::app::Ctx;
-
-pub(crate) use crate::error::codes::kept::NOWHERE_KNOWN;
+use crate::error::codes::kept::NOWHERE_KNOWN;
 
 /// What lemonfiber keeps on this machine, listed and not touched.
 ///
@@ -41,7 +40,7 @@ pub(crate) async fn forgetting(ctx: &Ctx, confirm: bool) -> Result<Stored, Box<P
     let mut gone = Vec::new();
     let mut left = Vec::new();
     for root in [paths.config_dir(), paths.data_dir()] {
-        match ctx.eraser.erase(root).await {
+        match ctx.seams.eraser.erase(root).await {
             Ok(()) => gone.push(root.display().to_string()),
             Err(fault) => left.push(Left {
                 at: root.display().to_string(),

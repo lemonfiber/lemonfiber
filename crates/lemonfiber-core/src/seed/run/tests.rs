@@ -113,10 +113,8 @@ fn seed_ctx(
 /// The line qBittorrent logs its temporary password on.
 const TEMP_LOG: &str = "A temporary password is provided for this session: read-from-log";
 
-fn config_scratch(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-app-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join(".env")
+fn config_scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name).within(".env")
 }
 
 /// A wanted root folder for a media type — the container path `wanted_roots` builds.
@@ -295,7 +293,7 @@ fn bindery_svc() -> lemonfiber_manifest::Service {
 /// A scratch settings file holding the media server's recorded password, so a
 /// client built from it can sign in.
 fn recorded_admin(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-seed-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("seed-{name}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     let _ = crate::config::store::set(

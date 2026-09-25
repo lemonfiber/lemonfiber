@@ -30,15 +30,12 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::doctor::credentials::Target;
+use crate::error::codes::qual::{NONE_AVAILABLE, PRESET_UNMET};
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{QualityReleases, ReleaseProbe};
 use crate::recyclarr::Kind;
-
-pub use crate::error::codes::qual::PRESET_UNMET;
-
-pub use crate::error::codes::qual::NONE_AVAILABLE;
 
 /// The id under which the check reports where there is nothing to run it against.
 const NONE: &str = "services.releases";

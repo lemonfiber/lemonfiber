@@ -76,16 +76,6 @@ pub const SUGGESTIONS: &[Suggestion] = &[
 ];
 
 impl Suggestion {
-    /// The suggestions a service of this kind could act on.
-    #[must_use]
-    pub(crate) fn for_kind(kind: Kind) -> Vec<Self> {
-        SUGGESTIONS
-            .iter()
-            .filter(|suggestion| suggestion.kind == kind)
-            .copied()
-            .collect()
-    }
-
     /// Everything the running stack could handle, safest first.
     #[must_use]
     pub(crate) fn for_kinds(kinds: &[Kind]) -> Vec<Self> {

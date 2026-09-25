@@ -33,11 +33,8 @@ use crate::error::Remedy;
 use super::leak::Reach;
 use super::probe::running;
 use super::Verdict;
+use crate::error::codes::vpn::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
 use crate::ports::docker::Container;
-
-pub use crate::error::codes::vpn::KILLSWITCH_LEAKS;
-
-pub use crate::error::codes::vpn::TUNNEL_NOT_RESTORED;
 
 /// Seconds the download client is given to answer while the tunnel is down.
 const PROBE_SECONDS: u64 = 5;

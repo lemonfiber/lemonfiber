@@ -207,7 +207,7 @@ fn no_page_carries_an_escape_sequence() {
 /// the renderer's rather than the recipe's.
 #[test]
 fn writing_the_reference_removes_a_page_it_no_longer_has() {
-    let root = std::env::temp_dir().join(format!("lemonfiber-reference-{}", std::process::id()));
+    let root = lemonfiber_fixtures::scratch::Scratch::named("reference");
     let _ = std::fs::remove_dir_all(&root);
     let at = root.join(REFERENCE_DIR);
     let _ = std::fs::create_dir_all(&at);

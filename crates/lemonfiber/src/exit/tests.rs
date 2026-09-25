@@ -70,24 +70,33 @@ fn a_problem_the_operator_wrote_is_told_apart_from_one_they_can_only_report() {
         it.code = code;
         exit_code(&it)
     };
-    assert_eq!(coded(lemonfiber_core::stack::STACK_INVALID), VALIDATION);
+    assert_eq!(
+        coded(lemonfiber_core::error::codes::stack::STACK_INVALID),
+        VALIDATION
+    );
     // A file that will not parse and a name this build does not know are both
     // things the operator wrote, and a script that has to fix its own input
     // learns nothing from the same code it gets for a service being down.
-    assert_eq!(coded(lemonfiber_core::stack::STACK_MALFORMED), VALIDATION);
     assert_eq!(
-        coded(lemonfiber_core::stack::STACK_UNRECOGNISED),
+        coded(lemonfiber_core::error::codes::stack::STACK_MALFORMED),
         VALIDATION
     );
     assert_eq!(
-        coded(lemonfiber_core::config::store::CONFIG_UNREADABLE),
+        coded(lemonfiber_core::error::codes::stack::STACK_UNRECOGNISED),
         VALIDATION
     );
     assert_eq!(
-        coded(lemonfiber_core::ports::docker::ENGINE_UNREACHABLE),
+        coded(lemonfiber_core::error::codes::config::CONFIG_UNREADABLE),
+        VALIDATION
+    );
+    assert_eq!(
+        coded(lemonfiber_core::error::codes::docker::ENGINE_UNREACHABLE),
         super::PREFLIGHT
     );
-    assert_eq!(coded(lemonfiber_core::app::NEVER_SETTLED), NEVER_SETTLED);
+    assert_eq!(
+        coded(lemonfiber_core::error::codes::life::NEVER_SETTLED),
+        NEVER_SETTLED
+    );
     assert_eq!(coded(Code::new("SOMETHING-ELSE")), FAILURE);
 }
 

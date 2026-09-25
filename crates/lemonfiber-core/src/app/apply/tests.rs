@@ -1,5 +1,5 @@
 use crate::test_support::a_fresh_write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lemonfiber_fixtures::ports::Chance;
 
@@ -51,10 +51,8 @@ fn journal_text(changes: &[Change]) -> String {
 
 /// A scratch directory unique to this process and case, cleared first so a
 /// previous run never leaks into this one.
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-apply-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name)
 }
 
 /// The install layout under a scratch directory: configuration and data kept

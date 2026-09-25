@@ -46,10 +46,7 @@ fn unpinned() -> String {
 
 /// A plugin source written to a scratch directory.
 fn source(named: &str, manifest: &str) -> PathBuf {
-    let at = std::env::temp_dir().join(format!(
-        "lemonfiber-authoring-{}-{named}",
-        std::process::id()
-    ));
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("authoring-{named}")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
@@ -58,20 +55,14 @@ fn source(named: &str, manifest: &str) -> PathBuf {
 
 /// A file at a scratch path, holding whatever a case needs it to.
 fn written(named: &str, text: &str) -> PathBuf {
-    let at = std::env::temp_dir().join(format!(
-        "lemonfiber-authoring-{}-{named}",
-        std::process::id()
-    ));
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("authoring-{named}")).kept();
     let _ = std::fs::write(&at, text);
     at
 }
 
 /// A path nothing has ever been written to.
 fn nowhere() -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "lemonfiber-authoring-{}-absent",
-        std::process::id()
-    ))
+    lemonfiber_fixtures::scratch::Scratch::named("authoring-absent").kept()
 }
 
 /// A registry that answers every question the same way, over no network.

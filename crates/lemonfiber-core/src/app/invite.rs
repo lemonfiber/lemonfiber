@@ -364,7 +364,7 @@ async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::P
     };
     Ok(Reaching {
         server: crate::jellyfin::Jellyfin::authenticated(
-            ctx.http.clone(),
+            ctx.seams.http.clone(),
             &jellyfin.loopback,
             "jellyfin",
             crate::config::JELLYFIN_ADMIN_USER,

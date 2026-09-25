@@ -24,7 +24,7 @@ fn imported_with_nowhere_to_play_it_is_its_own_ending() {
 async fn a_location_that_links_is_reported_as_linking_and_one_that_cannot_is_not() {
     // The empirical probe, not a guess from the filesystem's name — the same test
     // setup runs when it accepts a data location.
-    let root = std::env::temp_dir().join(format!("lemonfiber-walk-link-{}", std::process::id()));
+    let root = lemonfiber_fixtures::scratch::Scratch::named("walk-link");
     let _ = std::fs::create_dir_all(&root);
     let mut ctx = rooted_at(&root);
     assert_eq!(linked(&ctx).await, Some(Link::Hardlinked));
@@ -45,11 +45,11 @@ async fn a_location_that_cannot_be_written_says_nothing_about_linking() {
 /// A stack whose recorded data location is `root`, over the real filesystem — the
 /// link probe is empirical, so a fake one would prove nothing about linking.
 fn rooted_at(root: &std::path::Path) -> crate::app::Ctx {
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-walk-rooted-{}-{}",
-        std::process::id(),
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!(
+        "walk-rooted-{}",
         root.display().to_string().len()
-    ));
+    ))
+    .kept();
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     let _ = std::fs::write(
@@ -58,7 +58,7 @@ fn rooted_at(root: &std::path::Path) -> crate::app::Ctx {
     );
     let mut ctx = super::super::fixtures::ctx_with(&super::super::fixtures::Fake::default());
     ctx.settings.env_file = Some(env);
-    ctx.filesystem = std::sync::Arc::new(lemonfiber_adapters::Disk);
+    ctx.seams.filesystem = std::sync::Arc::new(lemonfiber_adapters::Disk);
     ctx
 }
 

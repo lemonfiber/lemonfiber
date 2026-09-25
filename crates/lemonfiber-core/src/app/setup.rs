@@ -12,7 +12,7 @@
 mod answering;
 mod proving;
 
-pub use answering::{setting_up, SetupAction, ALREADY_SET_UP};
+pub use answering::{setting_up, SetupAction};
 use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_vpn};
 
 use std::path::{Path, PathBuf};
@@ -21,6 +21,7 @@ use crate::alert::Appetite;
 use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
+use crate::error::codes::setup::{ALREADY_UNDERWAY, DOES_NOT_APPLY};
 use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
@@ -445,8 +446,6 @@ fn does_not_apply(rejected: Rejected) -> Problem {
     .with_detail(format!("{rejected:?}"))
 }
 
-pub(crate) use crate::error::codes::setup::DOES_NOT_APPLY;
-
 /// The problem of running setup on a wizard that is no longer gathering answers.
 fn already_underway() -> Problem {
     Problem::new(
@@ -457,8 +456,6 @@ fn already_underway() -> Problem {
         Remedy::new("Resume or recover the setup in progress, or reconfigure a finished one"),
     )
 }
-
-pub(crate) use crate::error::codes::setup::ALREADY_UNDERWAY;
 
 #[cfg(test)]
 mod tests;

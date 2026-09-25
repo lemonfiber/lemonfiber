@@ -3,13 +3,8 @@
 
 use super::Pair;
 use crate::doctor::Verdict;
+use crate::error::codes::vpn::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
 use crate::error::{Problem, Remedy, Severity};
-
-pub use crate::error::codes::vpn::LEAKING;
-
-pub use crate::error::codes::vpn::VPN_CONTAINER_DOWN;
-
-pub use crate::error::codes::vpn::CLIENT_ISOLATED;
 
 /// What a container answered when asked for its public address.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -63,7 +63,7 @@ pub(super) async fn seed_applications(
     }
 
     let client = crate::prowlarr::Prowlarr::new(
-        ctx.http.clone(),
+        ctx.seams.http.clone(),
         &source.target.base,
         prowlarr_key,
         &source.target.id,

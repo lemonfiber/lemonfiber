@@ -69,7 +69,10 @@ async fn apply(ctx: &Ctx, format: Format) -> Triggered {
     let Some(target) = target else {
         return Triggered::NotStarted;
     };
-    match target.open(&ctx.http, ctx.filesystem.as_ref()).await {
+    match target
+        .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+        .await
+    {
         None => Triggered::NotStarted,
         Some(service) => match service.apply_music_format(format).await {
             Ok(()) => Triggered::Started,

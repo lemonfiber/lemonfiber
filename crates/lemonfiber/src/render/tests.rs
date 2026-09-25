@@ -4,11 +4,10 @@ use super::fixtures::{
 };
 use super::{answer, forms, logged, machine_readable, render, settings, standing, versions, Lines};
 use lemonfiber_core::app::archives::Listing;
-use lemonfiber_core::app::backup::Report as Capture;
-use lemonfiber_core::app::repair::{Report as Mending, Reversal};
 use lemonfiber_core::app::restore::{Preview, Restoration};
 use lemonfiber_core::app::support::Bundle;
 use lemonfiber_core::app::Outcome;
+use lemonfiber_core::backup::run::Report as Capture;
 use lemonfiber_core::backup::{Manifest, Scope, SCHEMA};
 use lemonfiber_core::bundle::Contents;
 use lemonfiber_core::docker::Condition;
@@ -25,6 +24,7 @@ use lemonfiber_core::model::{
 };
 use lemonfiber_core::origin::Origin;
 use lemonfiber_core::reconfigure::{Change, Cost, Findings, Review, Stance};
+use lemonfiber_core::repair::run::{Report as Mending, Reversal};
 use lemonfiber_core::wizard::{Phase, Step};
 
 /// An archive's own account of itself, holding nothing.

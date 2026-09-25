@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use lemonfiber_core::app::archives::Listing;
-use lemonfiber_core::app::backup::Report as Capture;
 use lemonfiber_core::app::restore::{Preview, Report as Restored, Restoration};
 use lemonfiber_core::app::support::Bundle;
+use lemonfiber_core::backup::run::Report as Capture;
 use lemonfiber_core::backup::{Manifest, Member, Relocation, Scope, SCHEMA};
 use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms};
 

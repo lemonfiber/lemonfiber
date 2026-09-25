@@ -158,7 +158,7 @@ pub(crate) async fn after_start(
     manifest: &lemonfiber_manifest::Manifest,
 ) -> Option<String> {
     let granted = crate::doctor::vpn::granted_port(
-        ctx.engine.as_ref(),
+        ctx.seams.engine.as_ref(),
         &ctx.settings.project,
         manifest,
         ctx.settings.port_forward.enabled,

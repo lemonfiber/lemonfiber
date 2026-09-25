@@ -215,7 +215,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
 #[tokio::test]
 async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
     let env = config_scratch("publish-rehearsed");
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
         .rehearsing();
 

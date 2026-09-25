@@ -108,7 +108,7 @@ fn written(ctx: &Ctx, reasons: &Reasons) -> Option<String> {
 fn held(ctx: &Ctx, request: i64, said: Said<'_>, asked: &[HouseholdRequest]) -> Reasons {
     let still_held: BTreeSet<i64> = asked.iter().map(|filed| filed.id).collect();
     let mut reasons = crate::app::refusals::load(ctx);
-    let at = crate::instant::written(ctx.clock.now());
+    let at = crate::instant::written(ctx.seams.clock.now());
     match said {
         Said::Operators(reason) => reasons.keep(request, reason, at),
         Said::RanOut(reason) => reasons.closed(request, reason, at),
@@ -138,11 +138,11 @@ async fn passed_on(
             "where they are reached could not be read from the request service, {YOURS}"
         ));
     };
-    let told = tell(&ctx.http, &addresses, &reason).await;
+    let told = tell(&ctx.seams.http, &addresses, &reason).await;
     reasons.passed_on(
         request,
         told.reached.clone(),
-        crate::instant::written(ctx.clock.now()),
+        crate::instant::written(ctx.seams.clock.now()),
     );
     Some(became_of(&told))
 }

@@ -22,20 +22,13 @@ use crate::config::paths::Paths;
 use crate::error::{Problem, Remedy, Severity, State};
 
 use crate::app::{quiesced, Ctx};
+use crate::error::codes::backup::{
+    NOT_MEASURED, NOT_WRITTEN, NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
+};
 
 /// Bytes kept free beyond the estimate, so a capture never spends the last of the
 /// disk it exists to protect.
 const HEADROOM: u64 = 256 * 1024 * 1024;
-
-pub(crate) use crate::error::codes::backup::NO_ROOM;
-
-pub(crate) use crate::error::codes::backup::NOT_WRITTEN;
-
-pub(crate) use crate::error::codes::backup::NOT_MEASURED;
-
-pub(crate) use crate::error::codes::backup::STILL_RUNNING;
-
-pub use crate::error::codes::backup::NOWHERE_TO_KEEP;
 
 /// How many backups of each scope are kept before the oldest are pruned.
 ///

@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use serde::Serialize;
 use thiserror::Error;
 
+use lemonfiber_error::codes::host::{DEFINITION_UNWRITABLE, MANAGER_REFUSED, NOTHING_TO_HOST_WITH};
 use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// The service manager a machine has, or the absence of one lemonfiber configures.
@@ -180,12 +181,6 @@ pub enum Failure {
         reason: String,
     },
 }
-
-pub(crate) use lemonfiber_error::codes::host::NOTHING_TO_HOST_WITH;
-
-pub(crate) use lemonfiber_error::codes::host::DEFINITION_UNWRITABLE;
-
-pub(crate) use lemonfiber_error::codes::host::MANAGER_REFUSED;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

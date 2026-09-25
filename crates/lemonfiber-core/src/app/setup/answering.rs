@@ -24,7 +24,8 @@ use crate::app::targets::layout;
 use crate::app::Ctx;
 use crate::config::paths::Paths;
 use crate::config::store;
-use crate::error::{Amiss, Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::codes::setup::{ALREADY_SET_UP, NOTHING_TO_RECOVER};
+use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
 use crate::model::{SettingReport, WizardReport};
 use crate::validate::{Credential, Validation, Validator};
 use crate::wizard::{
@@ -170,7 +171,7 @@ fn applying<'a>(ctx: &'a Ctx, paths: &'a Paths, stamp: &'a str) -> Applying<'a> 
         paths,
         source: ctx.stack,
         stamp,
-        random: ctx.random.as_ref(),
+        random: ctx.seams.random.as_ref(),
     }
 }
 
@@ -295,8 +296,6 @@ fn nothing_to_recover() -> Problem {
     .lies_in(Amiss::Asking)
 }
 
-pub(crate) use crate::error::codes::setup::NOTHING_TO_RECOVER;
-
 /// The problem of answering setup on a machine that already holds configuration.
 fn already_set_up() -> Problem {
     Problem::new(
@@ -310,8 +309,6 @@ fn already_set_up() -> Problem {
     .in_state(State::Guided)
     .lies_in(Amiss::Asking)
 }
-
-pub use crate::error::codes::setup::ALREADY_SET_UP;
 
 #[cfg(test)]
 mod tests;

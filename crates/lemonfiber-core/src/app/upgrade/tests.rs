@@ -71,7 +71,7 @@ async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_arr() {
 async fn a_per_type_choice_states_each_types_own_preset() {
     // The report speaks per media type: a maximum-for-film, space-saving-for-tv
     // split is not flattened to one figure.
-    let env = std::env::temp_dir().join(format!("lemonfiber-upgrade-split-{}", std::process::id()));
+    let env = lemonfiber_fixtures::scratch::Scratch::named("upgrade-split");
     let _ = std::fs::remove_dir_all(&env);
     let env = env.join(".env");
     let mut selection = crate::quality::Selection::everywhere(Preset::Balanced);

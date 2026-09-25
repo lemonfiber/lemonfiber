@@ -72,6 +72,34 @@ impl Clock for Stopped {
     }
 }
 
+/// A clock that moves with the runtime's own time, from the same day [`Stopped`] is.
+///
+/// Under a runtime started paused, time moves only when every task is waiting, and
+/// then straight to the next thing due — so a wait whose deadline is read from this
+/// clock and whose polls are the runtime's sleeps runs its whole budget in no time
+/// at all, and says what it would have said at each point along the way.
+pub struct Following {
+    from: SystemTime,
+    since: tokio::time::Instant,
+}
+
+impl Following {
+    /// Started now, on the day [`Stopped::today`] is.
+    #[must_use]
+    pub fn started() -> Arc<Self> {
+        Arc::new(Self {
+            from: SystemTime::UNIX_EPOCH + Duration::from_secs(TODAY),
+            since: tokio::time::Instant::now(),
+        })
+    }
+}
+
+impl Clock for Following {
+    fn now(&self) -> SystemTime {
+        self.from + self.since.elapsed()
+    }
+}
+
 /// How a test scripts the randomness it is given.
 enum Given {
     /// Exactly these bytes, however many were asked for — or nothing at all.

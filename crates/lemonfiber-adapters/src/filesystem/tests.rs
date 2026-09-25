@@ -1,6 +1,5 @@
 use lemonfiber_ports::filesystem::Storage;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::Path;
 
 use super::{gone, Disk, Eraser, FileSystem, Volume};
 
@@ -41,16 +40,8 @@ fn a_removal_that_did_not_happen_is_read_by_why() {
 /// A fresh, empty directory of its own, so tests cannot collide over a file
 /// name. Built from the process id and a counter rather than a random name,
 /// which the workspace has no dependency for.
-fn scratch() -> PathBuf {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-fs-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir
+fn scratch() -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::new("fs")
 }
 
 #[tokio::test]
@@ -267,7 +258,8 @@ async fn a_real_directory_sits_on_a_filesystem_the_platform_can_name() {
 /// rather than quietly writing over what the first one put there.
 #[tokio::test]
 async fn only_the_first_claim_of_a_path_succeeds() {
-    let path = scratch().join("lifecycle.lock");
+    let path_dir = scratch();
+    let path = path_dir.join("lifecycle.lock");
 
     assert!(
         Disk.claim(&path, "first").await,
@@ -288,7 +280,8 @@ async fn only_the_first_claim_of_a_path_succeeds() {
 /// machine claims before anything else has had cause to make one.
 #[tokio::test]
 async fn a_claim_makes_the_directory_it_needs() {
-    let path = scratch().join("nested").join("lifecycle.lock");
+    let path_dir = scratch();
+    let path = path_dir.join("nested").join("lifecycle.lock");
 
     assert!(Disk.claim(&path, "held").await);
     assert_eq!(Disk.read(&path).await.as_deref(), Some("held"));

@@ -1,6 +1,6 @@
 use crate::test_support::a_fresh_write;
 use lemonfiber_fixtures::ports::Chance;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::undo;
 use crate::config::store;
@@ -13,11 +13,8 @@ fn a_machine() -> Chance {
 }
 
 /// A scratch directory unique to this process and case, cleared first.
-fn scratch(name: &str) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-recover-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name)
 }
 
 /// An undo that restores a setting to `value`, or removes it where `value` is
@@ -124,7 +121,8 @@ fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
 /// empty file where a reversal would then find a journal that says nothing.
 #[test]
 fn a_repair_that_changed_nothing_writes_no_journal() {
-    let path = scratch("journal-none").join("journal.jsonl");
+    let path_dir = scratch("journal-none");
+    let path = path_dir.join("journal.jsonl");
 
     super::journalled(&path, &[], &a_machine());
 
@@ -135,7 +133,8 @@ fn a_repair_that_changed_nothing_writes_no_journal() {
 /// configuration directory nobody has written to is still a repair worth recording.
 #[test]
 fn a_journal_is_written_where_no_directory_has_been_made_yet() {
-    let path = scratch("journal-fresh").join("journal.jsonl");
+    let path_dir = scratch("journal-fresh");
+    let path = path_dir.join("journal.jsonl");
 
     super::journalled(&path, &[a_fresh_write("USENET", "on")], &a_machine());
 
@@ -270,7 +269,8 @@ fn a_full_rollback_restores_the_settings_and_removes_the_directory() {
 /// operator their stack is on a release it is not.
 #[test]
 fn a_version_move_is_left_standing_and_reported() {
-    let env = scratch("repin").join(".env");
+    let env_dir = scratch("repin");
+    let env = env_dir.join(".env");
     let carried = super::carrying_out(
         &[Undo {
             target: "sonarr".to_owned(),

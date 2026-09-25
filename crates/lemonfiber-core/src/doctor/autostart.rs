@@ -33,11 +33,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
+use crate::error::codes::env::ENGINE_NOT_AT_BOOT;
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::ports::{FileSystem, Runner};
-
-pub(crate) use crate::error::codes::env::ENGINE_NOT_AT_BOOT;
 
 /// The check this reports under, named once so a finding and an answer to it cannot
 /// drift apart on a rename.

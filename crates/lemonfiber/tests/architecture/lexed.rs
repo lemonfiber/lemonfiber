@@ -287,6 +287,11 @@ fn runs(text: &str) -> Vec<(usize, usize)> {
     found
 }
 
+/// Whether a character can stand inside a name.
+fn named(letter: char) -> bool {
+    letter.is_alphanumeric() || letter == '_'
+}
+
 /// Whether a word stands in this text as a word rather than inside another.
 fn holds(said: &str, word: &str) -> bool {
     let letters: Vec<char> = said.chars().collect();

@@ -68,7 +68,7 @@ fn withdrawing_it_leaves_the_household_closing_nothing() {
         agreeing(&ctx, Arranged::AsAgreed)
             .err()
             .map(|problem| problem.code),
-        Some(crate::asking::NOTHING_AGREED),
+        Some(crate::error::codes::quota::NOTHING_AGREED),
         "a withdrawn arrangement was run on anyway"
     );
 }
@@ -80,7 +80,7 @@ fn beginning_against_no_arrangement_is_refused() {
 
     assert_eq!(
         refused.map(|problem| problem.code),
-        Some(crate::asking::NOTHING_AGREED)
+        Some(crate::error::codes::quota::NOTHING_AGREED)
     );
 }
 
@@ -93,7 +93,7 @@ fn a_period_sooner_than_the_reminder_arranges_nothing() {
 
     assert_eq!(
         refused.map(|problem| problem.code),
-        Some(crate::asking::TOO_SOON)
+        Some(crate::error::codes::quota::TOO_SOON)
     );
     assert_eq!(
         crate::app::arrangement::load(&ctx).after(),
@@ -532,7 +532,7 @@ async fn beginning_against_nothing_is_refused_as_a_command_too() {
 
     assert_eq!(
         refused.map(|problem| problem.code),
-        Some(crate::asking::NOTHING_AGREED)
+        Some(crate::error::codes::quota::NOTHING_AGREED)
     );
 }
 

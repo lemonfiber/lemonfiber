@@ -8,17 +8,13 @@
 //! for the same reason: an operator told afterwards that something stopped being
 //! filled has been told about a thing they can no longer choose.
 
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy, Severity};
 
 use crate::app::Ctx;
+use crate::error::codes::wire::{CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER};
 use crate::error::Diagnose;
 use crate::model::{SubstitutionReport, WiringReport};
 use crate::wiring::{self, Refused};
-
-pub(crate) use crate::error::codes::wire::CANNOT_FILL;
-pub(crate) use crate::error::codes::wire::CHOICE_UNWRITABLE;
-pub(crate) use crate::error::codes::wire::NOTHING_ASKS;
-pub(crate) use crate::error::codes::wire::NO_SUCH_FILLER;
 
 /// Read what reaches what, or change one of those links.
 ///
@@ -126,7 +122,7 @@ fn substituting(
             previous.as_deref(),
             &ctx.stamp(),
         )],
-        ctx.random.as_ref(),
+        ctx.seams.random.as_ref(),
     );
     if let Err(err) = crate::config::store::set(path, wiring::FILLS_KEY, &substitution.setting) {
         return Err(Box::new(err.problem()));

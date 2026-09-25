@@ -3,17 +3,24 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::support::Reporting;
 
-use super::{
-    inspect, restore, run, Consent, Kept, CORRUPT, INCOMPATIBLE, MOVED_ON, NEEDS_REPOINT,
-    NOT_KEPT_HERE, NOT_OURS, NOT_REPOINTED, NOT_RESTORED, NOWHERE_KEPT, STILL_RUNNING, TOO_NEW,
-    UNSAFE,
-};
+use super::{inspect, restore, run, Consent, Kept, STILL_RUNNING};
 use crate::app::fixtures::{keeping, paths, scratch, FakeArchive, CURRENT};
 use crate::app::Ctx;
 use crate::archive::{Archiving, Fault};
 use crate::backup::{Member, Scope, SCHEMA};
 use crate::config::paths::Paths;
 use crate::config::Settings;
+use crate::error::codes::restore::CORRUPT;
+use crate::error::codes::restore::INCOMPATIBLE;
+use crate::error::codes::restore::MOVED_ON;
+use crate::error::codes::restore::NEEDS_REPOINT;
+use crate::error::codes::restore::NOT_KEPT_HERE;
+use crate::error::codes::restore::NOT_OURS;
+use crate::error::codes::restore::NOT_REPOINTED;
+use crate::error::codes::restore::NOT_RESTORED;
+use crate::error::codes::restore::NOWHERE_KEPT;
+use crate::error::codes::restore::TOO_NEW;
+use crate::error::codes::restore::UNSAFE;
 use crate::ports::docker::{Health, Lifecycle};
 
 fn archive() -> PathBuf {
@@ -379,7 +386,7 @@ fn rooted_at(dir: &Path, root: &str, vault: &Arc<FakeArchive>) -> Ctx {
             ..Settings::default()
         })
         .build()
-        .keeping(Archiving {
+        .with_archives(Archiving {
             paths: Paths::at(dir, dir),
             vault: Arc::clone(vault) as Arc<dyn crate::archive::Vault>,
         })

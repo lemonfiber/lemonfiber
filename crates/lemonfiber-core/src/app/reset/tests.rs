@@ -12,11 +12,10 @@ use crate::test_support::a_context;
 static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 /// A directory of this test's own, and the env-file path within it.
-fn scratch(name: &str) -> (PathBuf, PathBuf) {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-reset-{name}"));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    (dir.join("stack"), dir.join(".env"))
+fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, PathBuf) {
+    let into = lemonfiber_fixtures::scratch::Scratch::new(name).within("stack");
+    let env = into.with_file_name(".env");
+    (into, env)
 }
 
 /// A context operating the embedded fixture stack, materialised under `into`.
@@ -36,11 +35,11 @@ fn ctx(into: Option<PathBuf>, env: Option<PathBuf>) -> Ctx {
 async fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
     let (into, env) = scratch("confirm");
     // Materialise, then the operator edits a file.
-    let _ = reset(&ctx(Some(into.clone()), Some(env.clone())), true).await;
+    let _ = reset(&ctx(Some(into.to_path_buf()), Some(env.clone())), true).await;
     let edited = "services:\n  sonarr:\n    image: my-own\n";
     let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-    let report = reset(&ctx(Some(into.clone()), Some(env)), true)
+    let report = reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
         .await
         .unwrap_or_default();
     assert!(report.confirmed);
@@ -61,11 +60,11 @@ async fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
 #[tokio::test]
 async fn an_unconfirmed_reset_previews_and_writes_nothing() {
     let (into, env) = scratch("preview");
-    let _ = reset(&ctx(Some(into.clone()), Some(env.clone())), true).await;
+    let _ = reset(&ctx(Some(into.to_path_buf()), Some(env.clone())), true).await;
     let edited = "services:\n  sonarr:\n    image: my-own\n";
     let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-    let report = reset(&ctx(Some(into.clone()), Some(env)), false)
+    let report = reset(&ctx(Some(into.to_path_buf()), Some(env)), false)
         .await
         .unwrap_or_default();
     assert!(!report.confirmed);
@@ -92,5 +91,7 @@ async fn a_reset_over_an_unreadable_choice_is_an_error() {
     // A present-but-corrupt recorded choice cannot be read, so the reset stops rather
     // than guessing the state it would restore.
     let _ = std::fs::write(Path::new(&env).with_file_name("quality.json"), "not json");
-    assert!(reset(&ctx(Some(into), Some(env)), true).await.is_err());
+    assert!(reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
+        .await
+        .is_err());
 }

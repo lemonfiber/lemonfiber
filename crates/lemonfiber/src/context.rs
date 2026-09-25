@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use lemonfiber_adapters::{Daemon, Disk, Launchd, Local, System, Systemd, Unhosted};
+use lemonfiber_adapters::{Launchd, Systemd, Unhosted};
 use lemonfiber_core::acknowledged::{self, Acknowledged};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::archive::Archiving;
@@ -60,33 +60,24 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // here, and nothing yet depends on the difference.
     let environment = Environment::resolve(HOST_OS, false);
 
-    let runner: Arc<dyn Runner> = Arc::new(Local);
-    let ctx = Ctx::new(
-        Arc::clone(&runner),
-        // Both engine seams are built from the one resolved target the settings
-        // carry, which is the same field the Compose invocation is built from. That
-        // is the whole of what stops the reads and the writes reaching different
-        // machines: there is no second place to resolve one.
-        Arc::new(Daemon::reaching(settings.docker.clone())),
-        Arc::new(System),
-        lemonfiber_core::ports::seams::Seams {
-            filesystem: Arc::new(Disk),
-            ..lemonfiber_adapters::live_reaching(&settings.docker)
-        },
-        stack,
-        settings,
-        environment,
-    )
-    // Which service manager this machine has is decided from the target it was built
-    // for and handed in, so the core asks a port rather than the operating system —
-    // and a machine whose home directory cannot be found hosts nothing rather than
-    // writing a definition into a directory nothing could later find to remove.
-    .hosting_with(manager(&runner))
-    // A wait says what it is waiting for, and this is where those words go on a
-    // terminal. The web surface replaces it with one that says them on the stream a
-    // browser holds open, which is the only reason this is a value rather than a
-    // call from inside the wait.
-    .narrating(Arc::new(crate::engine::Narrating));
+    // Every engine seam is built from the one resolved target the settings carry,
+    // which is the same field the Compose invocation is built from. That is the whole
+    // of what stops the reads and the writes reaching different machines: there is no
+    // second place to resolve one.
+    let seams = lemonfiber_adapters::live_reaching(&settings.docker);
+    let runner: Arc<dyn Runner> = Arc::clone(&seams.runner);
+    let ctx = Ctx::new(seams, stack, settings, environment)
+        // Which service manager this machine has is decided from the target it was
+        // built for and handed in, so the core asks a port rather than the operating
+        // system — and a machine whose home directory cannot be found hosts nothing
+        // rather than writing a definition into a directory nothing could later find
+        // to remove.
+        .with_hosting(manager(&runner))
+        // A wait says what it is waiting for, and this is where those words go on a
+        // terminal. The web surface replaces it with one that says them on the stream
+        // a browser holds open, which is the only reason this is a value rather than
+        // a call from inside the wait.
+        .with_narrator(Arc::new(crate::engine::Narrating));
 
     // Where archives are kept, and what packs them. The packing lives in this
     // crate because the crate that reasons about backups keeps no dependency on
@@ -100,7 +91,7 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
             // files, which only the edge knows. A run that cannot be told where
             // that is records nothing rather than guessing at a directory.
             .recording_at(paths.outbound())
-            .keeping(Archiving {
+            .with_archives(Archiving {
                 paths,
                 vault: Arc::new(crate::archive::Tar),
             }),

@@ -23,6 +23,7 @@ use crate::rollback::{standing, together, Reversal as Judgement};
 
 use super::repair::told;
 use super::Ctx;
+use crate::error::codes::undo::{CANNOT_SUCCEED, MORE_THAN_ONE_RUN, NOWHERE_TO_LOOK, NO_SUCH_RUN};
 
 /// What putting a run back came to.
 ///
@@ -85,14 +86,6 @@ pub struct Noted {
     /// What goes back, what does not go with it, and what to do instead.
     pub because: String,
 }
-
-pub(crate) use crate::error::codes::undo::NO_SUCH_RUN;
-
-pub(crate) use crate::error::codes::undo::MORE_THAN_ONE_RUN;
-
-pub(crate) use crate::error::codes::undo::CANNOT_SUCCEED;
-
-pub(crate) use crate::error::codes::undo::NOWHERE_TO_LOOK;
 
 /// The operation a reversal records its own work under, so it can be put back in turn.
 pub const OPERATION: &str = "undo";
@@ -248,7 +241,7 @@ async fn carried_out(
     super::recover::journalled(
         &paths.journal(),
         &recording(run, &reversed, &ctx.stamp()),
-        ctx.random.as_ref(),
+        ctx.seams.random.as_ref(),
     );
 
     Ok(Reversal {

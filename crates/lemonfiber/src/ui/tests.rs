@@ -15,7 +15,7 @@ use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::platform::{Environment, HostOs};
+use lemonfiber_core::platform::HostOs;
 use lemonfiber_core::ports::process::Runner;
 use lemonfiber_fixtures::ports::{Chance, Idle};
 
@@ -194,16 +194,14 @@ fn asking_for_nothing_in_particular_asks_for_nothing_in_particular() {
 /// A context over the stack this binary ships, with the randomness a test
 /// chose and the runner it wants every program answered by.
 fn running(runner: Arc<dyn Runner>, bytes: Option<Vec<u8>>, settings: Settings) -> Ctx {
-    Ctx::new(
-        runner,
-        Arc::new(lemonfiber_adapters::Daemon::local()),
-        Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
-        lemonfiber_core::stack::Source::Embedded(&lemonfiber::carried::STACK),
-        settings,
-        Environment::MacOs,
-    )
-    .with_random(Arc::new(Chance::exactly(bytes)))
+    lemonfiber_testing::a_live_context()
+        .runner(runner)
+        .over(lemonfiber_core::stack::Source::Embedded(
+            &lemonfiber::carried::STACK,
+        ))
+        .settings(settings)
+        .build()
+        .with_random(Arc::new(Chance::exactly(bytes)))
 }
 
 /// The same, over a runner that spawns nothing.
@@ -225,7 +223,7 @@ fn keeping(admission: Option<PathBuf>) -> Ctx {
 
 /// A directory of this test's own, emptied first so a rerun starts fresh.
 fn a_directory(named: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-ui-{named}-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("ui-{named}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }
@@ -366,7 +364,7 @@ fn as_served(random: &Chance) -> Option<Router> {
         bound: Binding::here(bound().port()),
         admitting,
         live,
-        clock: Arc::clone(&serving.ctx.clock),
+        clock: Arc::clone(&serving.ctx.seams.clock),
     });
     Some(surface(serving, streaming, None))
 }

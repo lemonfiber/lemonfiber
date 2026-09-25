@@ -146,7 +146,7 @@ async fn taken(
     match answering(&command) {
         Answering::Now => carried_out(&serving.ctx, command).await,
         Answering::Later => {
-            let Some(job) = Job::mint(serving.ctx.random.as_ref()) else {
+            let Some(job) = Job::mint(serving.ctx.seams.random.as_ref()) else {
                 return unnameable();
             };
             serving

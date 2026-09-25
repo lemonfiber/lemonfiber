@@ -18,7 +18,7 @@ mod proving;
 mod remembering;
 mod telling;
 
-pub use consent::{Consent, STALE};
+pub use consent::Consent;
 use proving::{carried, looked};
 use remembering::{beyond, declined, recorded, remembered};
 pub(crate) use telling::told;
@@ -30,6 +30,7 @@ use crate::journal::Undo;
 use crate::repair::{self, Outcome, Repair, Stance, Writing};
 
 use crate::app::Ctx;
+use crate::error::codes::repair::{NOWHERE_TO_LOOK, OFFER_CANNOT_DISTURB};
 
 /// Whoever decides, for this run, whether a repair goes ahead.
 ///
@@ -273,10 +274,6 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
     crate::app::recover::undo(&reached.left, &paths.env_file(), reached.unreached)?;
     Ok(undos.into_iter().map(told).collect())
 }
-
-pub(crate) use crate::error::codes::repair::NOWHERE_TO_LOOK;
-
-pub use crate::error::codes::repair::OFFER_CANNOT_DISTURB;
 
 pub use crate::app::putting_back::{Left, Reversal};
 

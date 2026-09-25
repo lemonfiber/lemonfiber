@@ -34,6 +34,7 @@ pub(crate) struct Scripted {
 }
 
 impl Scripted {
+    /// Which files in a corpus name one of these words, and which of them they name.
     pub(crate) fn saying(interactive: bool, lines: &[&str]) -> Self {
         Self {
             interactive,
@@ -214,34 +215,28 @@ impl Runner for WorkingRunner {
 /// A context whose engine is absent but whose client answers — enough for the
 /// environment check to pass, which is all setup asks of it before the walk.
 pub(crate) fn working_ctx() -> Ctx {
-    Ctx::new(
-        Arc::new(WorkingRunner),
-        Arc::new(FakeEngine::down()),
-        Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
-        Source::Embedded(&lemonfiber::carried::STACK),
-        Settings::default(),
-        Environment::MacOs,
-    )
+    lemonfiber_testing::a_context()
+        .runner(Arc::new(WorkingRunner))
+        .engine(Arc::new(FakeEngine::down()))
+        .clock(lemonfiber_fixtures::ports::Following::started())
+        .over(Source::Embedded(&lemonfiber::carried::STACK))
+        .build()
 }
 
 /// A scratch install unique to this test.
-fn scratch(name: &str) -> Paths {
-    let root = std::env::temp_dir().join(format!("lemonfiber-setup-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
-    Paths::rooted(&root.join("config"), &root.join("data"))
+fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(name);
+    let paths = Paths::rooted(&dir.join("config"), &dir.join("data"));
+    (dir, paths)
 }
 
 pub(crate) fn ctx() -> Ctx {
-    Ctx::new(
-        Arc::new(DeadRunner),
-        Arc::new(FakeEngine::down()),
-        Arc::new(lemonfiber_adapters::System),
-        lemonfiber_adapters::live(),
-        Source::Embedded(&lemonfiber::carried::STACK),
-        Settings::default(),
-        Environment::MacOs,
-    )
+    lemonfiber_testing::a_context()
+        .runner(Arc::new(DeadRunner))
+        .engine(Arc::new(FakeEngine::down()))
+        .clock(lemonfiber_fixtures::ports::Following::started())
+        .over(Source::Embedded(&lemonfiber::carried::STACK))
+        .build()
 }
 
 #[test]
@@ -264,7 +259,7 @@ fn a_first_run_is_begun_unless_it_is_clearly_declined() {
 
 #[test]
 fn the_proposed_data_location_sits_under_this_machines_data_directory() {
-    let paths = scratch("default-location");
+    let (_scratch, paths) = scratch("default-location");
     assert_eq!(
         default_data_location(&paths),
         paths.data_dir().join("media")
@@ -276,25 +271,25 @@ fn a_stamp_is_a_sortable_number_of_seconds() {
     assert!(stamp().chars().all(|c| c.is_ascii_digit()));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_configured_machine_nobody_is_watching_is_pointed_at_its_settings() {
     // A pipe, a cron line or a CI step: the dashboard would draw to nothing and
     // never return, so what a bare run can still usefully do is say where to go.
-    let paths = scratch("configured");
+    let (_scratch, paths) = scratch("configured");
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
     let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
     assert_eq!(shown(code), success());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_bare_run_asks_the_screen_rather_than_the_keyboard() {
     // `lemonfiber > out.txt` leaves a keyboard attached and no screen. The
     // dashboard would draw escape sequences into the file and hold the run open
     // waiting for a keypress nobody would see the prompt for, so what decides is
     // the stream it would draw to.
     let piped = Scripted::piped();
-    let paths = scratch("piped");
+    let (_scratch, paths) = scratch("piped");
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
 
@@ -347,25 +342,25 @@ fn a_bare_run_in_front_of_a_person_opens_the_dashboard() {
     assert_eq!(bare_run(false), Bare::Guidance);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_unconfigured_machine_with_nobody_there_is_told_what_to_run() {
     // Stated rather than asked: never left waiting on input that will not come.
-    let paths = scratch("piped");
+    let (_scratch, paths) = scratch("piped");
     let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
     assert_eq!(shown(code), success());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_declined_offer_writes_nothing() {
-    let paths = scratch("declined");
+    let (_scratch, paths) = scratch("declined");
     let code = greeting(ctx(), &paths, &Scripted::saying(true, &["n"])).await;
     assert_eq!(shown(code), success());
     assert!(!paths.env_file().exists());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_rehearsed_greeting_says_there_is_nothing_to_rehearse() {
-    let paths = scratch("rehearsed");
+    let (_scratch, paths) = scratch("rehearsed");
     let mut rehearsing = ctx();
     rehearsing.dry_run = true;
     let code = greeting(rehearsing, &paths, &Scripted::saying(true, &[])).await;
@@ -375,9 +370,9 @@ async fn a_rehearsed_greeting_says_there_is_nothing_to_rehearse() {
 /// A run given flags never passes the greeting, so the refusal that lived there
 /// was no refusal at all for `lemonfiber setup --data-root … --dry-run`, nor for
 /// a rehearsal picking up a setup somebody had stopped part-way.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_rehearsed_setup_given_flags_applies_none_of_them() {
-    let paths = scratch("rehearsed-flags");
+    let (_scratch, paths) = scratch("rehearsed-flags");
     let mut rehearsing = ctx();
     rehearsing.dry_run = true;
     let code = setting_up(
@@ -398,23 +393,23 @@ async fn a_rehearsed_setup_given_flags_applies_none_of_them() {
     assert!(!env.exists(), "{wrote}");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_accepted_offer_is_stopped_by_an_environment_that_cannot_work() {
     // Nothing setup does works without a container engine, so it is checked
     // before the first question rather than after eleven answers.
-    let paths = scratch("preflight");
+    let (_scratch, paths) = scratch("preflight");
     let code = greeting(ctx(), &paths, &Scripted::saying(true, &["y"])).await;
     assert_ne!(shown(code), success());
     // Nothing was asked and nothing was written.
     assert!(!paths.env_file().exists());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_non_interactive_run_missing_a_flag_is_told_which() {
     // Rather than left waiting on input that never comes — and told **which**,
     // since a run that failed without naming a flag leaves the operator to guess
     // at the very thing the refusal exists to supply.
-    let paths = scratch("missing-flags");
+    let (_scratch, paths) = scratch("missing-flags");
     let code = setting_up(
         ctx(),
         &paths,
@@ -446,9 +441,9 @@ async fn a_non_interactive_run_missing_a_flag_is_told_which() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovering_an_interrupted_apply_needs_someone_to_choose() {
-    let paths = scratch("recover-piped");
+    let (_scratch, paths) = scratch("recover-piped");
     let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
     // A progress file that reads as a stopped apply.
     let _ = std::fs::write(
@@ -465,12 +460,12 @@ async fn recovering_an_interrupted_apply_needs_someone_to_choose() {
     assert_ne!(shown(code), success());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_walk_declined_at_the_review_writes_nothing_and_says_so() {
     // The review is the last point at which nothing has been written, and an
     // operator who says no there must be left with a machine exactly as they
     // found it — not a half-configured one.
-    let paths = scratch("declined");
+    let (_scratch, paths) = scratch("declined");
     let code = setting_up(
         working_ctx(),
         &paths,
@@ -482,11 +477,11 @@ async fn a_walk_declined_at_the_review_writes_nothing_and_says_so() {
     assert!(!paths.env_file().exists(), "nothing was written");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_answered_walk_applies_and_brings_the_stack_up() {
     // Every question taking its default, which is what a person pressing enter
     // through the whole walk gives — the path a first run actually takes.
-    let paths = scratch("applied");
+    let (_scratch, paths) = scratch("applied");
     let code = setting_up(
         working_ctx(),
         &paths,
@@ -500,9 +495,9 @@ async fn an_answered_walk_applies_and_brings_the_stack_up() {
     let _ = code;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_saved_run_is_picked_up_where_it_was_left() {
-    let paths = scratch("resumed");
+    let (_scratch, paths) = scratch("resumed");
     let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
     // A run that quit mid-question rather than mid-apply.
     let _ = std::fs::write(
@@ -534,7 +529,7 @@ async fn a_saved_run_is_picked_up_where_it_was_left() {
 fn the_scratch_paths_are_where_this_machine_would_keep_things() {
     // Guards the fixture itself: a scratch install has to look like a real one
     // or every test above is proving something about the wrong shape.
-    let paths = scratch("shape");
+    let (_scratch, paths) = scratch("shape");
     assert!(paths.env_file().starts_with(paths.config_dir()));
     assert!(paths.journal().starts_with(paths.config_dir()));
 }
@@ -545,12 +540,12 @@ fn a_path_is_a_path() {
     assert!(Path::new("/srv").is_absolute());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_bare_run_on_a_machine_mid_setup_picks_it_up_rather_than_greeting() {
     // Unfinished setup is neither a fresh machine nor a finished one, and must be
     // caught before the configured-yet check — an interrupted apply leaves
     // half-written settings that check would read as done.
-    let paths = scratch("greet-resumes");
+    let (_scratch, paths) = scratch("greet-resumes");
     let _ = paths.setup_progress().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(
         paths.setup_progress(),
@@ -566,11 +561,11 @@ async fn a_bare_run_on_a_machine_mid_setup_picks_it_up_rather_than_greeting() {
     let _ = code;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn setup_on_a_configured_machine_points_at_its_settings() {
     // Setup would walk a done machine back to its first question; changing a
     // setting is what it actually wants.
-    let paths = scratch("already-set-up");
+    let (_scratch, paths) = scratch("already-set-up");
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
     let code = setting_up(
@@ -583,11 +578,11 @@ async fn setup_on_a_configured_machine_points_at_its_settings() {
     assert_ne!(shown(code), success());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_saved_run_whose_answers_are_gone_begins_afresh() {
     // In-progress means a saved run; if it is somehow gone there is nothing to
     // resume, so a fresh run is the honest fallback.
-    let paths = scratch("answers-gone");
+    let (_scratch, paths) = scratch("answers-gone");
     let code = super::resume_gather(
         working_ctx(),
         &paths,
@@ -602,11 +597,11 @@ async fn a_saved_run_whose_answers_are_gone_begins_afresh() {
     let _ = code;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_run_with_nobody_there_and_no_flags_is_told_which_it_needs() {
     // Rather than left waiting on input that never comes. The environment has to
     // pass first, or it would stop before the questions are even considered.
-    let paths = scratch("needs-flags");
+    let (_scratch, paths) = scratch("needs-flags");
     let code = setting_up(
         working_ctx(),
         &paths,
@@ -629,9 +624,9 @@ async fn a_run_with_nobody_there_and_no_flags_is_told_which_it_needs() {
 /// needs and gathers nothing. With them the walk is answered and reaches the
 /// apply — which is as far as a machine with no stack to bring up can go, so what
 /// it leaves is a run to resume rather than a list of flags to supply.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn flags_answer_the_questions_a_run_with_nobody_there_cannot_ask() {
-    let paths = scratch("flagged");
+    let (_scratch, paths) = scratch("flagged");
     let flags = crate::prompt::SetupFlags::parse(crate::prompt::fixtures::workable())
         .unwrap_or(SetupFlags::none());
     let code = setting_up(working_ctx(), &paths, &Scripted::saying(false, &[]), flags).await;
@@ -653,7 +648,7 @@ fn the_answers_a_script_gives_are_empty_whichever_way_they_are_asked_for() {
     assert_eq!(declining.ask("Apply it? [Y/n]:"), "n");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn the_capabilities_setup_never_asks_the_engine_for_answer_plainly() {
     use lemonfiber_core::ports::docker::LogQuery;
     let engine = FakeEngine::down();

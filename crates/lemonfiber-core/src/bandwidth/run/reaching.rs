@@ -99,7 +99,7 @@ pub(super) async fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client>
             DownloadKind::Qbittorrent => {
                 if let Some(password) = crate::app::targets::recorded_qbittorrent_password(ctx) {
                     clients.push(Client::Torrent(Box::new(Qbittorrent::authenticated(
-                        ctx.http.clone(),
+                        ctx.seams.http.clone(),
                         &target.base,
                         password,
                     ))));
@@ -107,6 +107,7 @@ pub(super) async fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client>
             }
             DownloadKind::Sabnzbd { config } => {
                 if let Some(key) = ctx
+                    .seams
                     .filesystem
                     .read(config)
                     .await
@@ -114,7 +115,7 @@ pub(super) async fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client>
                     .and_then(crate::sabnzbd::api_key)
                 {
                     clients.push(Client::Usenet(Box::new(Sabnzbd::new(
-                        ctx.http.clone(),
+                        ctx.seams.http.clone(),
                         &target.base,
                         key,
                     ))));

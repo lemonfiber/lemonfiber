@@ -10,8 +10,8 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::repair::{mend, putting_right, retracting, Confirm, Consent};
 use lemonfiber_core::app::{Ctx, Outcome};
+use lemonfiber_core::repair::run::{mend, putting_right, retracting, Confirm, Consent};
 use lemonfiber_core::repair::{Repair, Stance};
 
 use lemonfiber_core::config::paths::Paths;

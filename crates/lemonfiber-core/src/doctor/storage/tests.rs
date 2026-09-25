@@ -5,9 +5,12 @@ use async_trait::async_trait;
 
 use super::findings::writable;
 use super::{
-    Check, Crowded, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, DEGRADED, ROOT_ABSENT,
-    ROOT_UNWRITABLE, SERVICE_DENIED, SPACE_LOW,
+    Check, Crowded, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, ROOT_ABSENT,
+    ROOT_UNWRITABLE,
 };
+use crate::error::codes::storage::DEGRADED;
+use crate::error::codes::storage::SERVICE_DENIED;
+use crate::error::codes::storage::SPACE_LOW;
 use crate::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
 };
@@ -665,17 +668,14 @@ async fn a_leftover_probe_link_does_not_read_as_an_inability_to_hardlink() {
     // A previous run interrupted between the link and its cleanup leaves the
     // link behind. Against a real filesystem that hardlinks fine, the check
     // must clear it and still pass, not conclude the volume cannot link.
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-storage-{}-leftover",
-        std::process::id()
-    ));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("storage-leftover");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let _ = std::fs::write(dir.join(".lemonfiber-hardlink-probe.link"), "stale");
 
     let findings = StorageCheck::new(
         Arc::new(lemonfiber_adapters::Disk),
-        Some(dir.clone()),
+        Some(dir.to_path_buf()),
         None,
         Environment::MacOs,
         None,

@@ -141,7 +141,7 @@ async fn a_failure_is_quoted_with_the_lines_about_the_item_first() {
     // An operator who has to go and find the explanation has been handed a fault
     // report rather than a diagnosis.
     let mut ctx = ctx_with(&Fake::default());
-    ctx.engine = Arc::new(
+    ctx.seams.engine = Arc::new(
         Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
             .saying("sonarr", "something else entirely")
             .saying("sonarr", "Sintel: no files are eligible for import"),
@@ -164,7 +164,7 @@ async fn what_a_service_was_saying_is_quoted_with_no_credential_in_it() {
     // Assembled rather than written out, so no value that reads as one sits here.
     let secret = ["abcdef", "1234", "567890"].concat();
     let mut ctx = ctx_with(&Fake::default());
-    ctx.engine = Arc::new(
+    ctx.seams.engine = Arc::new(
         Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy).saying(
             "sonarr",
             &format!("Sintel: import refused, api_key={secret} was rejected"),
@@ -195,7 +195,7 @@ async fn a_failure_with_nothing_said_about_the_item_quotes_what_there_is() {
     // Something is better than a silent failure: the recent output is where the
     // explanation usually is even when it does not name the item.
     let mut ctx = ctx_with(&Fake::default());
-    ctx.engine = Arc::new(
+    ctx.seams.engine = Arc::new(
         Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
             .saying("sonarr", "permission denied writing /data/media"),
     );
@@ -254,7 +254,7 @@ async fn a_wait_that_has_not_run_out_looks_again() {
         queue: r#"{"records":[{"seriesId":7,"movieId":7,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}],"totalRecords":1}"#,
         ..Fake::default()
     });
-    ctx.clock = Arc::new(Ticking::by(Duration::from_secs(1)));
+    ctx.seams.clock = Arc::new(Ticking::by(Duration::from_secs(1)));
     ctx.patience = Duration::from_secs(90);
 
     let heard = super::super::fixtures::Recording::default();

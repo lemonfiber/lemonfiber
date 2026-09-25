@@ -56,7 +56,7 @@ pub(super) async fn wanted_targets(
         // Built from the key just read rather than opened again. Opening re-reads the
         // same file, so a second failure there could only happen if the first had.
         let client = crate::servarr::Servarr::new(
-            ctx.http.clone(),
+            ctx.seams.http.clone(),
             &arr.target.base,
             key.clone(),
             &arr.target.id,

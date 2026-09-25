@@ -16,10 +16,14 @@
 //! name, and no other command reaches it. The account beside it takes what costs
 //! nothing and has no argument that could name one of these.
 
+use crate::error::codes::space::ANOTHER_OFFER;
+use crate::error::codes::space::NOTHING_TO_ASK;
+use crate::error::codes::space::NOT_HELD;
+use crate::error::codes::space::STILL_HELD;
 use crate::error::{Amiss, Problem, Remedy, Severity, State};
 use crate::ports::service::Failure;
 use crate::space::letting::{offering, standing_of, Letting};
-use crate::space::{waste, ANOTHER_OFFER, NOTHING_TO_ASK, NOT_HELD, STILL_HELD};
+use crate::space::waste;
 
 use super::Ctx;
 

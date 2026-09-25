@@ -443,7 +443,7 @@ async fn a_walk_asked_for_as_a_command_says_its_steps_where_the_context_says() {
     // browser hears the steps a terminal would have printed.
     let heard = std::sync::Arc::new(Recording::default());
     let ctx = ctx_watching(&Fake::default())
-        .narrating_steps(heard.clone() as std::sync::Arc<dyn crate::walkthrough::Narrator>);
+        .with_steps(heard.clone() as std::sync::Arc<dyn crate::walkthrough::Narrator>);
     let outcome = crate::app::dispatch(
         crate::app::Command::Walkthrough {
             item: Some("Sintel".to_owned()),

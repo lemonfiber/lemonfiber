@@ -76,7 +76,8 @@ fn a_rehearsed_repair_reads_the_store_and_writes_nothing_to_it() {
         .get("vpn.port-forward-client")
         .is_some_and(crate::condition::Condition::is_raised));
     // Against the real file, not against what the function said it did.
-    let kept = crate::app::fixtures::scratch("repair-rehearsed").join("conditions.json");
+    let kept_dir = crate::app::fixtures::scratch("repair-rehearsed");
+    let kept = kept_dir.join("conditions.json");
     assert!(!kept.exists(), "a rehearsal wrote {}", kept.display());
     assert!(crate::app::conditions::load(&ctx)
         .get("vpn.port-forward-client")
@@ -254,7 +255,7 @@ async fn consent_given_for_an_offer_that_has_moved_on_is_refused() {
         .err()
         .map(|problem| problem.code);
 
-    assert_eq!(refused, Some(super::STALE));
+    assert_eq!(refused, Some(crate::error::codes::repair::STALE));
 }
 
 /// A run that cannot say where lemonfiber keeps its own files has nothing to
@@ -274,11 +275,7 @@ async fn an_undo_with_nowhere_to_look_says_so_rather_than_finding_nothing() {
 /// the report an envelope carries.
 #[tokio::test]
 async fn an_undo_that_knows_where_to_look_answers_with_what_went_back() {
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-reversing-{}-{}",
-        std::process::id(),
-        "layout"
-    ));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reversing-layout");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let _ = std::fs::create_dir_all(dir.join("data"));

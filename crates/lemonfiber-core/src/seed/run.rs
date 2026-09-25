@@ -328,8 +328,11 @@ pub(crate) fn managed_telling(
     Option<crate::baseline::Record>,
 ) {
     let seerr = identity::seerr_service(services).map(|base| {
-        std::sync::Arc::new(crate::seerr::Seerr::new(ctx.http.clone(), &base, "seerr"))
-            as std::sync::Arc<dyn crate::ports::service::Requests>
+        std::sync::Arc::new(crate::seerr::Seerr::new(
+            ctx.seams.http.clone(),
+            &base,
+            "seerr",
+        )) as std::sync::Arc<dyn crate::ports::service::Requests>
     });
     let recorded = match load_baseline(ctx) {
         Loaded::Formed(baseline) => baseline.entry("seerr", crate::seed::TELLING).cloned(),
@@ -375,6 +378,7 @@ pub(crate) async fn managed_wirings(
 /// The temporary password qBittorrent announced in its log, if it has.
 async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
     let mut lines = ctx
+        .seams
         .engine
         .logs(
             &ctx.settings.project,

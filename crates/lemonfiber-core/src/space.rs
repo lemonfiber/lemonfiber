@@ -50,22 +50,9 @@ pub use tally::{Counting, Tally};
 pub use volume::{Freshness, Role, Volume};
 pub use waste::{ratio_reads, Candidate, Standing, RATIO_CONSEQUENCE};
 
+use crate::error::codes::space::{HALTED, NOWHERE_TO_MEASURE, WALK_REFUSED};
 use crate::ports::occupancy::Occupant;
 use crate::ports::service::Seeded;
-
-pub(crate) use crate::error::codes::space::HALTED;
-
-pub(crate) use crate::error::codes::space::NOWHERE_TO_MEASURE;
-
-pub(crate) use crate::error::codes::space::WALK_REFUSED;
-
-pub(crate) use crate::error::codes::space::NOTHING_TO_ASK;
-
-pub(crate) use crate::error::codes::space::NOT_HELD;
-
-pub(crate) use crate::error::codes::space::ANOTHER_OFFER;
-
-pub use crate::error::codes::space::STILL_HELD;
 
 /// An import that stopped part-way, in the words of whatever stopped it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]

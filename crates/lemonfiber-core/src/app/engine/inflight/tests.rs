@@ -29,7 +29,7 @@ fn reaching(http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
     a_context()
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO)
+        .with_patience(Duration::ZERO)
         .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SAB_KEY_INI))))
         .with_http(http)
 }

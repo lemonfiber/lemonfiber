@@ -91,10 +91,8 @@ fn a_directory_with_no_manifest_shows_the_path_it_looked_for() {
 }
 
 /// A directory of our own under the system temporary directory.
-fn scratch(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name)
 }
 
 #[test]
@@ -102,7 +100,7 @@ fn an_embedded_stack_is_written_where_compose_can_read_it() {
     let dir = scratch("materialise");
     let written = Source::Embedded(&EMBEDDED).materialise(Some(&dir));
 
-    assert_eq!(written.ok().as_deref(), Some(dir.as_path()));
+    assert_eq!(written.ok().as_deref(), Some(dir.path()));
     assert!(dir.join("stack.toml").is_file(), "the manifest is written");
     assert!(
         dir.join("compose.yml").is_file(),
@@ -270,7 +268,7 @@ fn headline(source: Source) -> String {
 
 /// A stack directory holding one `stack.toml`, written for a single test.
 fn written(named: &str, toml: &str) -> &'static Path {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-{named}-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(named).kept();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(std::fs::create_dir_all(&dir).is_ok());
     assert!(std::fs::write(dir.join("stack.toml"), toml).is_ok());
@@ -400,7 +398,7 @@ fn a_link_back_to_an_ancestor_is_not_walked_into() {
     // A stack directory is the operator's own, and a link inside it is theirs
     // to make. Following one back to an ancestor would walk for ever, on every
     // command — so the entry's own type decides, and a link is not a directory.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-loop-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("loop");
     let _ = std::fs::remove_dir_all(&dir);
     let inner = dir.join("compose");
     assert!(std::fs::create_dir_all(&inner).is_ok());

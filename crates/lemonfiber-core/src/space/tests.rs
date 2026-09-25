@@ -337,10 +337,10 @@ fn every_reclaim_code_this_module_raises_belongs_to_it() {
         super::HALTED,
         super::NOWHERE_TO_MEASURE,
         super::WALK_REFUSED,
-        super::NOTHING_TO_ASK,
-        super::NOT_HELD,
-        super::ANOTHER_OFFER,
-        super::STILL_HELD,
+        crate::error::codes::space::NOTHING_TO_ASK,
+        crate::error::codes::space::NOT_HELD,
+        crate::error::codes::space::ANOTHER_OFFER,
+        crate::error::codes::space::STILL_HELD,
     ] {
         // Bound rather than called inside the message: an argument to a
         // passing assertion is never evaluated, and a line nothing evaluates

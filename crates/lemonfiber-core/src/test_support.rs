@@ -1,130 +1,19 @@
 //! The fixtures that name a type from this crate.
 //!
-//! Everything a test stands in for lives in `lemonfiber-fixtures`, where the crate's own
-//! tests and its integration tests reach the same one. These two stayed because they name
-//! `Source`, `Settings` and `Ctx` — all above the boundary that crate depends on.
-
-use crate::stack::Source;
+//! Everything a test stands in for lives in `lemonfiber-fixtures`, and the context a test
+//! drives a command through lives in `lemonfiber-testing`; both are reached from here.
+//! What is written here names a type of this crate that neither of those can.
 
 pub(crate) use lemonfiber_fixtures::support::*;
 
-/// The stack this repository carries, read from disk.
-pub(crate) fn stack() -> Source {
-    Source::External(std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    )))
-}
+// The same file the testing crate is built from, compiled here as a module of this
+// crate: the core's own tests cannot depend on a crate that depends on the core
+// without the core being built twice, and a context from the other copy would not be
+// a context this copy's `dispatch` accepts.
+#[path = "../../lemonfiber-testing/src/context.rs"]
+pub mod context;
 
-/// A stack source pointing nowhere, for the tests about what happens when it does.
-pub(crate) fn nowhere() -> Source {
-    Source::External(std::path::Path::new("/lemonfiber/no/such/stack"))
-}
-
-/// The context a test drives the application through.
-///
-/// `Ctx::new` takes seven arguments, of which a test usually varies one. Spelling all
-/// seven out at every call meant the one that mattered was the hardest thing to see, and
-/// that adding an eighth would be a change in sixty-odd places. So the six a test does not
-/// care about are settled here: programs succeed and say nothing, no containers are
-/// running, the clock and the filesystem are the real ones, the stack is the one this
-/// repository carries, and the settings are the defaults.
-///
-/// What a test does vary, it names. The transport, the filesystem and the randomness are
-/// not here because [`Ctx`] already takes those by name — `with_http`, `with_filesystem`,
-/// `with_random` — and this builds a real one to chain from.
-pub(crate) struct Context {
-    runner: std::sync::Arc<dyn crate::ports::process::Runner>,
-    engine: std::sync::Arc<dyn crate::ports::docker::Engine>,
-    clock: std::sync::Arc<dyn crate::ports::Clock>,
-    stack: Source,
-    settings: crate::config::Settings,
-    environment: crate::platform::Environment,
-}
-
-impl Default for Context {
-    fn default() -> Self {
-        Self {
-            runner: std::sync::Arc::new(Scripted(Ok(spoke("")))),
-            engine: std::sync::Arc::new(Reporting::absent()),
-            clock: lemonfiber_fixtures::ports::Stopped::today(),
-            stack: stack(),
-            settings: crate::config::Settings::default(),
-            environment: crate::platform::Environment::MacOs,
-        }
-    }
-}
-
-impl Context {
-    /// The engine this context reports containers through.
-    pub(crate) fn engine(
-        mut self,
-        engine: std::sync::Arc<dyn crate::ports::docker::Engine>,
-    ) -> Self {
-        self.engine = engine;
-        self
-    }
-
-    /// The runner its programs are spawned through — for the tests about a program that
-    /// says something in particular, or is not installed at all.
-    pub(crate) fn runner(
-        mut self,
-        runner: std::sync::Arc<dyn crate::ports::process::Runner>,
-    ) -> Self {
-        self.runner = runner;
-        self
-    }
-
-    /// The stack it reads, where the test is about a different one.
-    pub(crate) fn over(mut self, stack: Source) -> Self {
-        self.stack = stack;
-        self
-    }
-
-    /// The settings it runs under.
-    pub(crate) fn settings(mut self, settings: crate::config::Settings) -> Self {
-        self.settings = settings;
-        self
-    }
-
-    /// The platform it believes it is on — for the handful of tests whose subject is
-    /// what differs between them.
-    pub(crate) fn environment(mut self, environment: crate::platform::Environment) -> Self {
-        self.environment = environment;
-        self
-    }
-
-    /// The context itself, ready for [`Ctx`]'s own `with_*` chain.
-    /// The same context, stopped at a named instant.
-    ///
-    /// For the one rule that depends on the time of day rather than on an ordering: a
-    /// window an operator asked not to be woken in is only testable against a clock a
-    /// test chose.
-    pub(crate) fn clock(mut self, clock: std::sync::Arc<dyn crate::ports::Clock>) -> Self {
-        self.clock = clock;
-        self
-    }
-
-    pub(crate) fn build(self) -> crate::app::Ctx {
-        crate::app::Ctx::new(
-            self.runner,
-            self.engine,
-            self.clock,
-            lemonfiber_ports::seams::Seams {
-                filesystem: std::sync::Arc::new(lemonfiber_adapters::Disk),
-                ..lemonfiber_adapters::live()
-            },
-            self.stack,
-            self.settings,
-            self.environment,
-        )
-    }
-}
-
-/// A context with every seam settled, to vary by name from there.
-pub(crate) fn a_context() -> Context {
-    Context::default()
-}
+pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
 /// A journal line for a setting written over nothing — a fresh file, so the prior value
 /// is absent.
@@ -174,7 +63,7 @@ pub(crate) fn env_at(name: &str, password: &str) -> std::path::PathBuf {
 /// says so instead of writing a blank one — which reads to a secret scanner as a
 /// hard-coded credential and to a reader as a password that happens to be empty.
 fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-env-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("env-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let path = dir.join(".env");
     assert!(

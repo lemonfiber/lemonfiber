@@ -220,7 +220,7 @@ async fn asking_a_non_configuration_outcome_for_settings_gets_none() {
 async fn settings_that_cannot_be_saved_reach_the_operator() {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let dir = std::env::temp_dir().join(format!("lemonfiber-app-{}-ro", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("app-ro");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500));
@@ -230,7 +230,10 @@ async fn settings_that_cannot_be_saved_reach_the_operator() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refusal, Some(crate::config::store::CONFIG_NOT_WRITTEN));
+    assert_eq!(
+        refusal,
+        Some(crate::error::codes::config::CONFIG_NOT_WRITTEN)
+    );
 
     let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
     let _ = std::fs::remove_dir_all(&dir);
@@ -239,8 +242,7 @@ async fn settings_that_cannot_be_saved_reach_the_operator() {
 #[tokio::test]
 async fn settings_that_cannot_be_read_reach_the_operator() {
     // A file where the directory holding settings should be.
-    let blocker =
-        std::env::temp_dir().join(format!("lemonfiber-app-{}-blocked", std::process::id()));
+    let blocker = lemonfiber_fixtures::scratch::Scratch::named("app-blocked").kept();
     let _ = std::fs::remove_dir_all(&blocker);
     let _ = std::fs::write(&blocker, "in the way");
 
@@ -249,7 +251,10 @@ async fn settings_that_cannot_be_read_reach_the_operator() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refusal, Some(crate::config::store::CONFIG_UNREADABLE));
+    assert_eq!(
+        refusal,
+        Some(crate::error::codes::config::CONFIG_UNREADABLE)
+    );
 
     let _ = std::fs::remove_file(&blocker);
 }
@@ -262,7 +267,7 @@ async fn settings_with_nowhere_to_live_say_setup_has_not_run() {
             .await
             .err()
             .map(|p| p.code),
-        Some(crate::config::store::CONFIG_NOWHERE)
+        Some(crate::error::codes::config::CONFIG_NOWHERE)
     );
 }
 

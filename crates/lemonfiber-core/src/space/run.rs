@@ -138,7 +138,7 @@ async fn watched(ctx: &Ctx, projecting: bool) -> Result<Watched, Box<Problem>> {
     let mut volumes = vec![Volume::measured(
         Role::Data,
         &root,
-        &ctx.filesystem.describe(&root).await,
+        &ctx.seams.filesystem.describe(&root).await,
         landing,
         taken,
     )];
@@ -146,7 +146,7 @@ async fn watched(ctx: &Ctx, projecting: bool) -> Result<Watched, Box<Problem>> {
         volumes.push(Volume::measured(
             Role::Services,
             at,
-            &ctx.filesystem.describe(at).await,
+            &ctx.seams.filesystem.describe(at).await,
             0,
             taken,
         ));
@@ -182,6 +182,7 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
     let project = watched.project.as_deref();
 
     let data = ctx
+        .seams
         .occupancy
         .beneath(&watched.root)
         .await
@@ -190,7 +191,7 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
     // line for them is absent rather than the whole reckoning being refused: what an
     // operator came here for is where the media went.
     let services = match watched.services.as_deref() {
-        Some(at) => ctx.occupancy.beneath(at).await.unwrap_or_default(),
+        Some(at) => ctx.seams.occupancy.beneath(at).await.unwrap_or_default(),
         None => Vec::new(),
     };
 
@@ -216,7 +217,8 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
 
 /// The moment this reading was taken, in seconds since the epoch.
 fn now(ctx: &Ctx) -> u64 {
-    ctx.clock
+    ctx.seams
+        .clock
         .now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs())
@@ -247,7 +249,9 @@ async fn queued(
 ) -> (BTreeSet<String>, Vec<Stalled>) {
     let targets = servarr_targets(services, project);
     let read = futures_util::future::join_all(targets.iter().map(|target| async move {
-        let service = target.open(&ctx.http, ctx.filesystem.as_ref()).await?;
+        let service = target
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await?;
         service.queue().await.ok()
     }))
     .await;
@@ -301,7 +305,7 @@ async fn reclaim(ctx: &Ctx, reckoned: &Reckoning, measured: &Measured) -> Reclai
             taken.bytes = taken.bytes.saturating_add(occupant.bytes);
             continue;
         }
-        match ctx.eraser.erase(&occupant.path).await {
+        match ctx.seams.eraser.erase(&occupant.path).await {
             Ok(()) => {
                 taken.gone.push(occupant.path.display().to_string());
                 taken.bytes = taken.bytes.saturating_add(occupant.bytes);

@@ -61,8 +61,8 @@
 //! carry.
 
 use lemonfiber_api::actions::{named, Arguments};
-use lemonfiber_core::app::bundle::LINES;
 use lemonfiber_core::app::{Command, Outcome};
+use lemonfiber_core::bundle::run::LINES;
 
 mod given;
 mod listed;

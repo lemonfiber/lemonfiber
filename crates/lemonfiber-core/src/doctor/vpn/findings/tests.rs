@@ -7,14 +7,14 @@ fn every_vpn_problem_has_its_own_code() {
     // one sends them to the wrong explanation — which is what happened here:
     // the port mismatch and the killswitch leak were both VPN-5.
     let codes = [
-        crate::doctor::vpn::NO_FORWARDED_PORT,
+        crate::error::codes::vpn::NO_FORWARDED_PORT,
         PORT_MISMATCH,
         NO_TUNNEL,
-        super::super::killswitch::KILLSWITCH_LEAKS,
-        super::super::killswitch::TUNNEL_NOT_RESTORED,
-        super::super::leak::LEAKING,
-        super::super::leak::VPN_CONTAINER_DOWN,
-        super::super::leak::CLIENT_ISOLATED,
+        crate::error::codes::vpn::KILLSWITCH_LEAKS,
+        crate::error::codes::vpn::TUNNEL_NOT_RESTORED,
+        crate::error::codes::vpn::LEAKING,
+        crate::error::codes::vpn::VPN_CONTAINER_DOWN,
+        crate::error::codes::vpn::CLIENT_ISOLATED,
     ];
     let mut distinct: Vec<&str> = codes.iter().map(|code| code.as_str()).collect();
     distinct.sort_unstable();

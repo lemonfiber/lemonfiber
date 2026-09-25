@@ -69,7 +69,7 @@ fn recording(from: &str, method: &str, path: &str, response: &str) -> String {
 
 /// A plugin source written to a scratch directory, with whatever recordings.
 fn source(named: &str, manifest: &str, fixtures: &[(&str, String)]) -> PathBuf {
-    let at = std::env::temp_dir().join(format!("lemonfiber-claimed-{named}"));
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("claimed-{named}")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(at.join("fixtures"));
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
@@ -396,7 +396,7 @@ fn a_core_name_the_vocabulary_does_not_carry_fills_nothing_and_is_not_inert() {
 
 #[test]
 fn a_path_with_no_manifest_says_that_rather_than_anything_about_a_plugin() {
-    let at = std::env::temp_dir().join("lemonfiber-claimed-nothing-here");
+    let at = lemonfiber_fixtures::scratch::Scratch::named("claimed-nothing-here");
     let _ = std::fs::remove_dir_all(&at);
     assert!(matches!(claimed(&at), Err(Unreadable::NoManifest(_))));
 }

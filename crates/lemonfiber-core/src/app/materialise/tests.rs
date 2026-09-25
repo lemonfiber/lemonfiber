@@ -9,10 +9,10 @@ use crate::stack::{Failure, Source};
 static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 /// A clean scratch directory for one test, and the record path beside it.
-fn scratch(name: &str) -> (PathBuf, PathBuf) {
-    let root = std::env::temp_dir().join(format!("lemonfiber-mat-{name}"));
-    let _ = std::fs::remove_dir_all(&root);
-    (root.join("stack"), root.join("materialised.json"))
+fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, PathBuf) {
+    let into = lemonfiber_fixtures::scratch::Scratch::unmade(name).within("stack");
+    let record = into.with_file_name("materialised.json");
+    (into, record)
 }
 
 fn read(path: &Path) -> String {
@@ -32,7 +32,7 @@ fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
 
     let first = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
     let (path, edits) = first.unwrap_or((PathBuf::new(), Vec::new()));
-    assert_eq!(path, into);
+    assert_eq!(path, into.path());
     assert!(edits.is_empty(), "a fresh materialise reports no edits");
     // Every file, including the nested one, is written with the embedded content.
     assert!(read(&into.join("compose.yaml")).contains("image: sonarr"));

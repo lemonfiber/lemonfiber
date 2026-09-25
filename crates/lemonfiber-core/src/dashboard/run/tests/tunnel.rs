@@ -274,7 +274,6 @@ async fn a_healthy_stack_leaking_outside_the_tunnel_is_summarised_as_critical() 
     );
     let snapshot = gather(&ctx, None).await;
     assert_eq!(snapshot.health.standing, Standing::Critical);
-    assert!(snapshot.health.standing.wants_attention());
     // And the screen itself is fine, which is a separate matter entirely.
     assert_eq!(snapshot.telemetry, Telemetry::Live);
 }

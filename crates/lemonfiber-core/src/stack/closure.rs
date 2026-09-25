@@ -20,6 +20,7 @@ pub use lemonfiber_manifest::Protocol;
 use thiserror::Error;
 
 use crate::config::Protocols;
+use crate::error::codes::form::{FORMS_CONFLICT, NOTHING_TO_RUN, NO_FORM_NAMED, NO_SUCH_FORM};
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
 
 /// What will be run, and what was left out.
@@ -362,14 +363,6 @@ fn distance(one: &str, other: &str) -> usize {
     // that count is exactly what the first column has been counting.
     row.last().copied().unwrap_or(edge)
 }
-
-pub(crate) use crate::error::codes::form::NO_FORM_NAMED;
-
-pub(crate) use crate::error::codes::form::NO_SUCH_FORM;
-
-pub(crate) use crate::error::codes::form::FORMS_CONFLICT;
-
-pub(crate) use crate::error::codes::form::NOTHING_TO_RUN;
 
 impl Diagnose for Failure {
     fn problem(&self) -> Problem {

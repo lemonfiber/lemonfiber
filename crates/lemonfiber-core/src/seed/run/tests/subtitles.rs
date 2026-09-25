@@ -356,7 +356,6 @@ const WATCHING_ELSEWHERE: &str = r#"{
 /// never existed. The key is named too, because a finder pointed at the right
 /// \*arr with no key is exactly the case this connection exists to fix, and two
 /// addresses on their own would read as a change to nothing.
-
 #[tokio::test]
 async fn a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere() {
     let http = Fake::by_path(vec![(

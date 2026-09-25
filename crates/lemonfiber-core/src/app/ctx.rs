@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::archive::Archiving;
 use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
-use crate::ports::docker::{Engine, Images, Locations};
+use crate::ports::docker::{Images, Locations};
 use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
@@ -24,7 +24,7 @@ use crate::ports::nntp::Nntp;
 use crate::ports::occupancy::Occupancy;
 use crate::ports::random::Random;
 use crate::ports::seams::Seams;
-use crate::ports::{Clock, FileSystem, Narrator, Runner};
+use crate::ports::{FileSystem, Narrator};
 use crate::stack::Source;
 use crate::validate::{Live, Validator};
 use crate::walkthrough::{Narrator as Stepwise, Unheard};
@@ -37,58 +37,12 @@ pub struct Ctx {
     pub dry_run: bool,
     /// Whether this run takes the stack from whatever already claimed it.
     pub force: bool,
-    /// How programs are run.
-    pub runner: Arc<dyn Runner>,
-    /// How the engine is observed.
-    pub engine: Arc<dyn Engine>,
-    /// How the engine is asked what it has pulled, and who is standing on each of
-    /// them.
+    /// Every port the run reaches the world through, as the surface handed them.
     ///
-    /// Apart from the engine because the question is apart: one command asks it, and
-    /// every other reading of the engine asks the rest and never this.
-    pub images: Arc<dyn Images>,
-    /// How the engine is asked whether a path is on the machine it runs on.
-    ///
-    /// Apart from the engine for the reason the image listing is, and asked of the
-    /// engine rather than of a shell for a reason of its own: the engine is what
-    /// resolves a bind mount, and a login on the same host can be looking at a
-    /// different filesystem than the daemon is.
-    pub locations: Arc<dyn Locations>,
-    /// What time it is, for the one rule that depends on it.
-    pub clock: Arc<dyn Clock>,
-    /// How the filesystem is reached, for the checks that prove what it can do.
-    pub filesystem: Arc<dyn FileSystem>,
-    /// How a path is asked whether it is still there, and still the same volume.
-    ///
-    /// Apart from the filesystem because the question is apart: a guard asks this
-    /// and nothing else, and every other check asks the rest and never this.
-    pub volume: Arc<dyn Volume>,
-    /// How a directory and everything beneath it is removed.
-    ///
-    /// Apart from the filesystem for the reason the volume is: the one command that
-    /// asks needs nothing else of a filesystem, and this is the one operation here
-    /// that cannot be undone.
-    pub eraser: Arc<dyn Eraser>,
-    /// How a tree is walked to find out what is actually in it.
-    ///
-    /// Apart from the filesystem for the reason the other two are: the reckoning
-    /// that asks needs nothing else of a filesystem, and every other implementation
-    /// of the wider trait would gain a method it never calls.
-    pub occupancy: Arc<dyn Occupancy>,
-    /// How this machine is asked to keep a long-running command running.
-    ///
-    /// A port because which service manager a platform has, and what it says when
-    /// asked to load something, are the two facts a test can never settle for
-    /// itself — and because a run that decided them by asking the operating system
-    /// directly would have exactly one of its three answers reachable from any one
-    /// machine.
-    pub hosting: Arc<dyn Host>,
-    /// How services are reached over HTTP, for the checks and seeding that ask
-    /// one what it is or wire it to another.
-    pub http: Arc<dyn Http>,
-    /// Where unpredictable bytes come from, for the one credential seeding mints
-    /// itself.
-    pub random: Arc<dyn Random>,
+    /// One bundle rather than a field each: a command reaches the port it needs as
+    /// `ctx.seams.http`, and a context holds the world apart from what the operator
+    /// chose and how the run behaves.
+    pub seams: Seams,
     /// How this machine is asked where it is, for the one answer that is an
     /// address rather than a state: what to hand somebody who lives here.
     ///
@@ -149,12 +103,6 @@ pub struct Ctx {
     /// silently — so the surface answers, and today it answers with what it can
     /// see until the engine adapter can tell it the rest.
     pub environment: Environment,
-    /// How a Usenet provider is reached, which is a connection rather than a request.
-    ///
-    /// Kept because replacing the transport rebuilds the validator, and a validator
-    /// rebuilt without this would prove an indexer key and report a Usenet login
-    /// unreachable — which reads as a broken provider rather than as a missing seam.
-    pub nntp: Arc<dyn Nntp>,
     /// Where this run keeps archives, and what writes them.
     ///
     /// Optional because where lemonfiber's own files live is the surface's answer
@@ -188,62 +136,30 @@ impl Ctx {
     /// costs without being able to rearrange it.
     #[must_use]
     pub fn storage(&self) -> Arc<dyn Storage> {
-        Arc::clone(&self.filesystem) as Arc<dyn Storage>
+        Arc::clone(&self.seams.filesystem) as Arc<dyn Storage>
     }
-    /// A context that runs programs for real, against a given stack.
+
+    /// A context over the seams a surface handed it, against a given stack.
     #[must_use]
-    pub fn new(
-        runner: Arc<dyn Runner>,
-        engine: Arc<dyn Engine>,
-        clock: Arc<dyn Clock>,
-        seams: Seams,
-        stack: Source,
-        settings: Settings,
-        environment: Environment,
-    ) -> Self {
-        // Handed over rather than built here. The implementations live in a crate this
-        // one does not depend on, so a context cannot manufacture a socket and a caller
-        // that means a fake says so by name.
-        let Seams {
-            filesystem,
-            http,
-            images,
-            locations,
-            volume,
-            eraser,
-            occupancy,
-            hosting,
-            random,
-            nntp,
-        } = seams;
+    pub fn new(seams: Seams, stack: Source, settings: Settings, environment: Environment) -> Self {
         // Built here rather than handed over, because it is written over the runner
         // rather than over the machine: asking this machine its name means running a
         // program, and which program runner that is, is this context's answer already.
-        let site: Arc<dyn Site> = Arc::new(crate::network::Here::over(Arc::clone(&runner)));
+        let site: Arc<dyn Site> = Arc::new(crate::network::Here::over(Arc::clone(&seams.runner)));
         // One object answering both questions about this machine's state, held as the
-        // two seams that ask them. Built here rather than handed over for the reason
-        // the site is: asking means running a program, and which program runner that
-        // is, is this context's answer already.
-        let asking = Arc::new(crate::machine::Asking::over(Arc::clone(&runner)));
+        // two seams that ask them, for the reason the site is built here.
+        let asking = Arc::new(crate::machine::Asking::over(Arc::clone(&seams.runner)));
         let started: Arc<dyn Started> = Arc::clone(&asking) as Arc<dyn Started>;
         let power: Arc<dyn Supply> = asking as Arc<dyn Supply>;
         Self {
             dry_run: false,
             force: false,
-            runner,
-            engine,
-            images,
-            locations,
-            clock,
-            filesystem,
-            volume,
-            eraser,
-            occupancy,
-            hosting,
-            validator: live(&http, Arc::clone(&nntp), settings.reaching.clone()),
-            nntp,
-            http,
-            random,
+            validator: live(
+                &seams.http,
+                Arc::clone(&seams.nntp),
+                settings.reaching.clone(),
+            ),
+            seams,
             site,
             started,
             power,
@@ -272,7 +188,7 @@ impl Ctx {
     /// packing lives in the binary, and a core that took it as a required argument
     /// would be a core every test had to hand an archiver it never uses.
     #[must_use]
-    pub fn keeping(mut self, archives: Archiving) -> Self {
+    pub fn with_archives(mut self, archives: Archiving) -> Self {
         self.archives = Some(archives);
         self
     }
@@ -284,7 +200,7 @@ impl Ctx {
     /// daemon and no second project.
     #[must_use]
     pub fn with_images(mut self, images: Arc<dyn Images>) -> Self {
-        self.images = images;
+        self.seams.images = images;
         self
     }
 
@@ -294,8 +210,8 @@ impl Ctx {
     /// driven against answers a test wrote down, including the one where the check
     /// itself has stopped working — which no real daemon will produce on demand.
     #[must_use]
-    pub fn locating_with(mut self, locations: Arc<dyn Locations>) -> Self {
-        self.locations = locations;
+    pub fn with_locations(mut self, locations: Arc<dyn Locations>) -> Self {
+        self.seams.locations = locations;
         self
     }
 
@@ -304,8 +220,8 @@ impl Ctx {
     /// The one seam a test cannot let out into a real filesystem and still be a
     /// test: what it removes does not come back.
     #[must_use]
-    pub fn erasing(mut self, eraser: Arc<dyn Eraser>) -> Self {
-        self.eraser = eraser;
+    pub fn with_eraser(mut self, eraser: Arc<dyn Eraser>) -> Self {
+        self.seams.eraser = eraser;
         self
     }
 
@@ -323,10 +239,10 @@ impl Ctx {
     pub fn with_http(mut self, http: Arc<dyn Http>) -> Self {
         self.validator = live(
             &http,
-            Arc::clone(&self.nntp),
+            Arc::clone(&self.seams.nntp),
             self.settings.reaching.clone(),
         );
-        self.http = http;
+        self.seams.http = http;
         self
     }
 
@@ -336,16 +252,11 @@ impl Ctx {
     /// produces one: a test naming what a rejected key comes to says so here
     /// instead of scripting the answer an indexer would have given.
     #[must_use]
-    pub fn proving(mut self, validator: Arc<dyn Validator>) -> Self {
+    pub fn with_validator(mut self, validator: Arc<dyn Validator>) -> Self {
         self.validator = validator;
         self
     }
 
-    /// The same context, drawing randomness from the given source.
-    ///
-    /// Lets a test script the bytes a generated secret is rendered from, so the
-    /// value it produces is known rather than unpredictable.
-    #[must_use]
     /// The same context, writing down what leaves this machine.
     ///
     /// Given a path rather than finding one: where this machine keeps its files is
@@ -356,11 +267,12 @@ impl Ctx {
     /// what actually left rather than what a caller asked for — three attempts at
     /// one request are three things that went, and an operator checking what was
     /// sent is owed all three.
+    #[must_use]
     pub fn recording_at(self, at: std::path::PathBuf) -> Self {
         let http: Arc<dyn Http> = Arc::new(crate::recording::Recording::around(
-            Arc::clone(&self.http),
+            Arc::clone(&self.seams.http),
             Some(at),
-            Arc::clone(&self.clock),
+            Arc::clone(&self.seams.clock),
         ));
         self.with_http(http)
     }
@@ -368,7 +280,7 @@ impl Ctx {
     /// The same context, taking its randomness from the given seam.
     #[must_use]
     pub fn with_random(mut self, random: Arc<dyn Random>) -> Self {
-        self.random = random;
+        self.seams.random = random;
         self
     }
 
@@ -389,7 +301,7 @@ impl Ctx {
     /// configuration without a service ever having written one.
     #[must_use]
     pub fn with_filesystem(mut self, filesystem: Arc<dyn FileSystem>) -> Self {
-        self.filesystem = filesystem;
+        self.seams.filesystem = filesystem;
         self
     }
 
@@ -399,7 +311,7 @@ impl Ctx {
     /// it is running, and the web surface says them on the stream a browser already
     /// holds open. Neither reaches into the wait, and the wait knows about neither.
     #[must_use]
-    pub fn narrating(mut self, narrator: Arc<dyn Narrator>) -> Self {
+    pub fn with_narrator(mut self, narrator: Arc<dyn Narrator>) -> Self {
         self.narrator = narrator;
         self
     }
@@ -409,8 +321,8 @@ impl Ctx {
     /// Lets a reckoning be driven over a tree a test described, so what a full disk
     /// comes to is exercised without one.
     #[must_use]
-    pub fn surveying(mut self, occupancy: Arc<dyn Occupancy>) -> Self {
-        self.occupancy = occupancy;
+    pub fn with_occupancy(mut self, occupancy: Arc<dyn Occupancy>) -> Self {
+        self.seams.occupancy = occupancy;
         self
     }
 
@@ -421,7 +333,7 @@ impl Ctx {
     /// unplugged.
     #[must_use]
     pub fn with_volume(mut self, volume: Arc<dyn Volume>) -> Self {
-        self.volume = volume;
+        self.seams.volume = volume;
         self
     }
 
@@ -453,8 +365,8 @@ impl Ctx {
     /// a context nobody told answering honestly that it hosts nothing rather than
     /// guessing at a manager.
     #[must_use]
-    pub fn hosting_with(mut self, hosting: Arc<dyn Host>) -> Self {
-        self.hosting = hosting;
+    pub fn with_hosting(mut self, hosting: Arc<dyn Host>) -> Self {
+        self.seams.hosting = hosting;
         self
     }
 
@@ -464,14 +376,14 @@ impl Ctx {
     /// command it is running, and the web surface says it on the stream a browser
     /// already holds open.
     #[must_use]
-    pub fn narrating_steps(mut self, steps: Arc<dyn Stepwise>) -> Self {
+    pub fn with_steps(mut self, steps: Arc<dyn Stepwise>) -> Self {
         self.steps = steps;
         self
     }
 
     /// The same context, willing to wait a different length of time.
     #[must_use]
-    pub const fn waiting(mut self, patience: Duration) -> Self {
+    pub const fn with_patience(mut self, patience: Duration) -> Self {
         self.patience = patience;
         self
     }

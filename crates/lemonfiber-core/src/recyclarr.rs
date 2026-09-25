@@ -51,8 +51,6 @@ impl Guidance {
 /// same television guidance — a series in Bluray remux is impractical, and
 /// presenting a distinction the upstream guides do not draw would be dishonest.
 /// Film has the full range, from a streaming-sized profile through Bluray to 4K.
-/// Where two presets land on the same file for a service, [`same_profile`] lets a
-/// surface collapse them rather than present a choice that changes nothing.
 #[must_use]
 pub const fn guidance(kind: Kind, preset: Preset) -> Guidance {
     match (kind, preset) {
@@ -73,14 +71,6 @@ pub const fn guidance(kind: Kind, preset: Preset) -> Guidance {
         }
         (Kind::Radarr, Preset::Maximum) => Guidance("/config/includes/radarr-uhd-bluray-web.yml"),
     }
-}
-
-/// Whether two presets ask for the same guidance for a service, so a surface
-/// can collapse a distinction without a difference rather than offer both — the
-/// three 1080p television presets being the case that arises in practice.
-#[must_use]
-pub(crate) fn same_profile(kind: Kind, first: Preset, second: Preset) -> bool {
-    guidance(kind, first) == guidance(kind, second)
 }
 
 /// The indent two levels below a service — where `- template:` entries sit —

@@ -140,7 +140,7 @@ async fn engine(ctx: &Ctx, tier: Tier, confidence: &mut Confidence) -> Engine {
         };
     }
 
-    let (containers, containers_read) = match ctx.engine.list(&ctx.settings.project).await {
+    let (containers, containers_read) = match ctx.seams.engine.list(&ctx.settings.project).await {
         Ok(held) => (
             held.into_iter()
                 .map(|container| format!("{}-{}", container.project, container.service))
@@ -169,7 +169,7 @@ async fn engine(ctx: &Ctx, tier: Tier, confidence: &mut Confidence) -> Engine {
         };
     }
 
-    let (images, images_read) = match ctx.images.images().await {
+    let (images, images_read) = match ctx.seams.images.images().await {
         Ok(pulled) => (pulled, true),
         Err(failure) => {
             *confidence = confidence.clone().short(format!(
@@ -205,7 +205,7 @@ async fn ours(
 
     let mut held = Vec::new();
     for root in [paths.config_dir(), paths.data_dir()] {
-        match ctx.occupancy.beneath(root).await {
+        match ctx.seams.occupancy.beneath(root).await {
             Ok(found) => held.extend(found),
             Err(fault) => {
                 *confidence = confidence.clone().short(format!(
@@ -256,7 +256,7 @@ async fn disk(
         return (Vec::new(), None);
     };
 
-    let walked = match ctx.occupancy.beneath(root).await {
+    let walked = match ctx.seams.occupancy.beneath(root).await {
         Ok(found) => found,
         Err(fault) => {
             *confidence = confidence.clone().short(format!(
@@ -279,7 +279,7 @@ async fn disk(
 /// they pointed the stack at, and removing across either reaches somewhere they were
 /// not thinking about. An ordinary local disk needs no sentence.
 async fn mounted(ctx: &Ctx, root: &std::path::Path) -> Option<String> {
-    let facts = ctx.filesystem.describe(root).await;
+    let facts = ctx.seams.filesystem.describe(root).await;
     if facts.kind.is_network() {
         return Some(format!(
             "the data location is on a network share ({}), so removing reaches \
@@ -308,6 +308,7 @@ async fn beside(ctx: &Ctx) -> Vec<bool> {
         let looked = crate::uninstall::looked_for(entry, ctx.environment);
         let there = match looked {
             Some(at) => ctx
+                .seams
                 .filesystem
                 .canonicalize(std::path::Path::new(at))
                 .await

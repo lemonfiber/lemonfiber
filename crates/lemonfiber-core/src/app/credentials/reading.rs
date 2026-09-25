@@ -52,6 +52,7 @@ pub(crate) async fn taken(
         };
         let setting = published_as(&service.id);
         let held = ctx
+            .seams
             .filesystem
             .read(&config)
             .await

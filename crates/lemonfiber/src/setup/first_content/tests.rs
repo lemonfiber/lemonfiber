@@ -11,7 +11,7 @@ fn already_settled() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_that_is_not_fully_up_is_left_alone() {
     // Setup has already reported it, and a walk over a half-started stack fails in a
     // way that says nothing about the operator's machine.
@@ -27,7 +27,7 @@ async fn a_stack_that_is_not_fully_up_is_left_alone() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_with_nothing_to_search_is_told_rather_than_asked() {
     // Being asked "shall I fetch something?" by a product that then cannot is worse
     // than being told what is missing.
@@ -43,7 +43,7 @@ async fn a_stack_with_nothing_to_search_is_told_rather_than_asked() {
     assert_eq!(shown(ended), shown(already_settled()));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn nobody_at_the_terminal_is_told_where_to_find_it_rather_than_walked() {
     // An unattended run should not start fetching content on its own.
     let ended = offer(
@@ -56,7 +56,7 @@ async fn nobody_at_the_terminal_is_told_where_to_find_it_rather_than_walked() {
     assert_eq!(shown(ended), shown(already_settled()));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn declining_leaves_setup_exactly_as_it_was() {
     // Declining carries no penalty. That is the whole promise, and the exit code is
     // where it is either kept or quietly broken.
@@ -70,7 +70,7 @@ async fn declining_leaves_setup_exactly_as_it_was() {
     assert_eq!(shown(ended), shown(already_settled()));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn accepting_runs_the_walk_and_reports_what_it_found() {
     // This stack has no media server to prove anything against, so the walk stops —
     // which is the point: the answer comes from the walk rather than from the offer.
@@ -84,7 +84,7 @@ async fn accepting_runs_the_walk_and_reports_what_it_found() {
     assert_ne!(shown(ended), shown(already_settled()));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_that_cannot_be_read_simply_does_not_offer() {
     // The offer is the last and least important thing setup does; everything above it
     // has already reported on a stack this broken.
@@ -111,7 +111,7 @@ fn silence_takes_the_walk_and_a_clear_no_declines_it() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_that_cannot_be_read_is_complained_about_rather_than_reported() {
     // Everything a walk meets is a walk that stopped, which is a report; only
     // the stack itself failing to read is a problem, and a problem is said in

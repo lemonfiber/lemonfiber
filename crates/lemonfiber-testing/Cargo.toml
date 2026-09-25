@@ -1,0 +1,19 @@
+[package]
+name = "lemonfiber-testing"
+description = "The context lemonfiber's tests drive a command through."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+# Never published: it exists so every test outside the core builds a context one way.
+publish = false
+
+[dependencies]
+lemonfiber-adapters = { workspace = true }
+lemonfiber-core = { workspace = true }
+lemonfiber-fixtures = { workspace = true }
+
+[lints]
+workspace = true

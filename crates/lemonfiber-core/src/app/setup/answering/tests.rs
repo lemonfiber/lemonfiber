@@ -5,13 +5,13 @@ use async_trait::async_trait;
 
 use super::{setting_up, SetupAction, ALREADY_SET_UP, NOTHING_TO_RECOVER};
 use crate::alert::Appetite;
-use crate::app::apply::NOT_REVIEWED;
 use crate::app::setup::DOES_NOT_APPLY;
 use crate::app::Ctx;
 use crate::config::paths::Paths;
 use crate::config::{
     store, Protocols, Settings, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, PROVIDER_PASS_KEY,
 };
+use crate::error::codes::setup::NOT_REVIEWED;
 use crate::error::Code;
 use crate::journal::{Change, Kind};
 use crate::model::WizardReport;
@@ -23,10 +23,10 @@ use crate::wizard::{
 };
 
 /// A scratch layout unique to this process and case, cleared first.
-fn scratch(name: &str) -> Paths {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-walk-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    Paths::rooted(&dir.join("config"), &dir.join("data"))
+fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(name);
+    let paths = Paths::rooted(&dir.join("config"), &dir.join("data"));
+    (dir, paths)
 }
 
 /// A validator that answers what it was built with, whatever it is asked.
@@ -69,7 +69,7 @@ fn proving(paths: &Paths, validator: Arc<dyn Validator>) -> Ctx {
             ..Settings::default()
         })
         .build()
-        .proving(validator)
+        .with_validator(validator)
 }
 
 /// Where a step of the walk left setup, or nothing where it refused.

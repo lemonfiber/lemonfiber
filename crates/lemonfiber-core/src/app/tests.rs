@@ -53,7 +53,7 @@ fn removed(said: &Result<Outcome, Box<super::Problem>>) -> Option<&crate::model:
 
 /// A scratch environment file holding the media server's recorded password.
 fn recorded_admin(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-invite-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("invite-{name}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     let _ = crate::config::store::set(
@@ -182,10 +182,8 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
     }
 }
 
-fn config_scratch(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-app-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join(".env")
+fn config_scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name).within(".env")
 }
 
 /// A real run against an engine reporting whatever the test put in it.
@@ -283,7 +281,7 @@ fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, 
 
 #[tokio::test]
 async fn a_context_can_be_told_how_long_to_wait() {
-    let ctx = watching(Reporting::default()).waiting(Duration::from_secs(7));
+    let ctx = watching(Reporting::default()).with_patience(Duration::from_secs(7));
     assert_eq!(ctx.patience, Duration::from_secs(7));
 }
 

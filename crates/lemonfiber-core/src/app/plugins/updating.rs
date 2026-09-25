@@ -23,10 +23,7 @@ use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
 use super::super::{Ctx, Outcome};
 use super::{carry_out, nowhere_to_write, proving, verifying};
-
-pub(crate) use crate::error::codes::plugin::NOTHING_TO_UPDATE;
-
-pub(crate) use crate::error::codes::plugin::STUCK;
+use crate::error::codes::plugin::{NOTHING_TO_UPDATE, STUCK};
 
 /// Replace the installed version of a plugin with the one at this path, or say what
 /// doing so would come to.

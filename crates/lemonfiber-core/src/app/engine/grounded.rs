@@ -31,6 +31,7 @@ use crate::ports::filesystem::Presence;
 use crate::stack::compose::Action;
 
 use super::super::Ctx;
+use crate::error::codes::life::NO_DATA_LOCATION;
 
 /// How many times a start looks again for a location that is not there yet.
 ///
@@ -48,8 +49,6 @@ const LOOKS: u32 = 60;
 /// stat, and taking it in a tight loop would spin a core to catch an event that
 /// arrives in seconds at worst.
 const AGAIN: Duration = Duration::from_secs(2);
-
-pub(crate) use crate::error::codes::life::NO_DATA_LOCATION;
 
 /// Refuse to start over a data location that is not present, waiting first.
 ///
@@ -109,7 +108,7 @@ async fn waited(
 /// Whether the location is there now, or at least readable enough not to be an
 /// absence.
 async fn present(ctx: &Ctx, root: &Path) -> bool {
-    !matches!(ctx.volume.presence(root).await, Presence::Gone)
+    !matches!(ctx.seams.volume.presence(root).await, Presence::Gone)
 }
 
 /// What to tell an operator whose data location never turned up.

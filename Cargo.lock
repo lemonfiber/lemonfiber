@@ -1318,6 +1318,7 @@ dependencies = [
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
+ "lemonfiber-testing",
  "qrcodegen",
  "ra-ap-rustc_lexer",
  "ratatui",
@@ -1366,6 +1367,7 @@ dependencies = [
  "lemonfiber-core",
  "lemonfiber-error",
  "lemonfiber-fixtures",
+ "lemonfiber-testing",
  "schemars",
  "serde",
  "serde_json",
@@ -1392,6 +1394,7 @@ dependencies = [
  "lemonfiber-manifest",
  "lemonfiber-plugin",
  "lemonfiber-ports",
+ "lemonfiber-testing",
  "ring",
  "schemars",
  "serde",
@@ -1453,6 +1456,15 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "lemonfiber-testing"
+version = "0.16.0"
+dependencies = [
+ "lemonfiber-adapters",
+ "lemonfiber-core",
+ "lemonfiber-fixtures",
 ]
 
 [[package]]

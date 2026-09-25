@@ -136,7 +136,10 @@ async fn reading_logs_reports_an_engine_it_cannot_see() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refusal, Some(crate::ports::docker::ENGINE_UNREACHABLE));
+    assert_eq!(
+        refusal,
+        Some(crate::error::codes::docker::ENGINE_UNREACHABLE)
+    );
 }
 
 #[tokio::test]
@@ -147,7 +150,7 @@ async fn reading_logs_for_a_form_this_stack_does_not_have_is_refused() {
         .await
         .err()
         .map(|problem| problem.code);
-    assert_eq!(refusal, Some(crate::stack::closure::NO_SUCH_FORM));
+    assert_eq!(refusal, Some(crate::error::codes::form::NO_SUCH_FORM));
 }
 
 #[tokio::test]
@@ -163,6 +166,6 @@ async fn reading_logs_from_a_stack_that_cannot_be_read_is_refused() {
             .await
             .err()
             .map(|problem| problem.code),
-        Some(crate::stack::STACK_UNREADABLE)
+        Some(crate::error::codes::stack::STACK_UNREADABLE)
     );
 }

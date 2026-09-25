@@ -88,7 +88,7 @@ pub(super) async fn read(ctx: &Ctx) -> Read {
 /// answered, and it has answered with nothing a version can be read out of, which is
 /// the same thing to a caller as nothing answering at all.
 async fn asked(ctx: &Ctx, noticed: &mut Noticed, now: u64) {
-    match ctx.http.send(&asking(RELEASE_LIST)).await {
+    match ctx.seams.http.send(&asking(RELEASE_LIST)).await {
         Ok(answer) if answer.is_success() => {
             let offered = newest(&answer.body);
             let notes = offered
@@ -120,7 +120,8 @@ async fn remembered(ctx: &Ctx, at: Option<&Path>) -> Noticed {
     let Some(at) = at else {
         return Noticed::default();
     };
-    ctx.filesystem
+    ctx.seams
+        .filesystem
         .read(at)
         .await
         .and_then(|held| serde_json::from_str(&held).ok())
@@ -136,5 +137,5 @@ async fn keep(ctx: &Ctx, at: Option<&Path>, noticed: &Noticed) {
     let (Some(at), Ok(written)) = (at, serde_json::to_string(noticed)) else {
         return;
     };
-    ctx.filesystem.write(at, &written).await;
+    ctx.seams.filesystem.write(at, &written).await;
 }

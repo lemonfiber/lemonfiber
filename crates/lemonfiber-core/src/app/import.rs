@@ -133,8 +133,11 @@ async fn gather(
 ) {
     let (theirs, ours) = pair;
     let (Some(from), Some(to)) = (
-        theirs.open(&ctx.http, ctx.filesystem.as_ref()).await,
-        ours.open(&ctx.http, ctx.filesystem.as_ref()).await,
+        theirs
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await,
+        ours.open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await,
     ) else {
         found.refused.push(unreachable(
             &ours.id,

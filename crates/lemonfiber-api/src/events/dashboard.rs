@@ -13,8 +13,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::dashboard::gather;
 use lemonfiber_core::app::Ctx;
+use lemonfiber_core::dashboard::run::gather;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::model::{kind, Envelope};
 use tokio::sync::Mutex;

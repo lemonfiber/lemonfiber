@@ -6,16 +6,13 @@ use crate::stack::compose::Action;
 use crate::test_support::a_context;
 
 /// Where a test's scratch record lives. Naming it does not touch it.
-fn scratch(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!(
-        "lemonfiber-returning-{}-{name}",
-        std::process::id()
-    ))
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::named(name)
 }
 
 /// A context whose environment file is in an emptied scratch directory.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name);
+    let dir = scratch(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     a_context()
         .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(

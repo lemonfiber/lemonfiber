@@ -245,16 +245,6 @@ impl Health {
             Self::Expiring => "expiring",
         }
     }
-
-    /// Whether the state is one the operator has to do something about.
-    ///
-    /// `unknown` is deliberately not: a provider that publishes nothing about its
-    /// capacity is the ordinary case, not a fault, and treating it as one would make
-    /// the whole check noise the operator learns to skip past.
-    #[must_use]
-    pub(crate) const fn wants_attention(self) -> bool {
-        !matches!(self, Self::Healthy | Self::Unknown)
-    }
 }
 
 /// Everything observed about one provider, and the verdict it comes to.

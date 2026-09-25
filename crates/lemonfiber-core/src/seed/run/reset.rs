@@ -34,7 +34,11 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
         if wanted.is_empty() {
             continue;
         }
-        let Some(client) = arr.target.open(&ctx.http, ctx.filesystem.as_ref()).await else {
+        let Some(client) = arr
+            .target
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await
+        else {
             continue;
         };
         wirings.extend(

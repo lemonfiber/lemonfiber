@@ -193,7 +193,7 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
         .with_http(fake.transport())
         // No waiting: every test would otherwise sit through the real poll, and what the wait
         // does at its bound is exactly what the tests are about.
-        .waiting(std::time::Duration::ZERO)
+        .with_patience(std::time::Duration::ZERO)
 }
 
 /// The same, reachable media server and all — the admin password recorded under a scratch
@@ -208,10 +208,7 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
 pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-walkthrough-{}-{nth}",
-        std::process::id()
-    ));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("walkthrough-{nth}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = ctx_with(fake);
     ctx.settings.env_file = Some(dir.join(".env"));
@@ -302,7 +299,7 @@ pub(super) fn ctx_through_a_tunnel(fake: &Fake) -> Ctx {
         enabled: true,
         provider: Some("proton".to_owned()),
     };
-    ctx.engine = Arc::new(
+    ctx.seams.engine = Arc::new(
         Reporting::holding(
             &["gluetun", "qbittorrent"],
             crate::ports::docker::Lifecycle::Running,

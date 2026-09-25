@@ -8,14 +8,14 @@ use lemonfiber_core::stack::Source;
 
 use crate::setup::tests::{ctx, working_ctx, FakeEngine, Scripted};
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_environment_that_cannot_work_stops_setup_before_a_question() {
     // Nothing setup does works without a container engine, so it is checked
     // before the first question rather than after eleven answers.
     assert!(preflight(&ctx()).await.is_err());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_that_cannot_be_read_stops_setup_with_its_own_words() {
     // The checks need the stack before any of them can run, so a stack that
     // will not read is reported as itself rather than as a failed environment.
@@ -24,7 +24,7 @@ async fn a_stack_that_cannot_be_read_stops_setup_with_its_own_words() {
     assert!(preflight(&ctx).await.is_err());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn an_environment_that_works_passes_without_a_word() {
     assert!(preflight(&working_ctx()).await.is_ok());
 }
@@ -61,7 +61,7 @@ fn a_prerequisite_nobody_could_confirm_does_not_stop_setup() {
     assert_eq!(overall(&kept), Overall::Healthy, "so setup goes on");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_pull_that_failed_stops_before_starting_against_images_that_never_came() {
     // Starting against images that never arrived is worse than not starting.
     let code = start(&ctx(), &Scripted::saying(false, &[])).await;
@@ -87,13 +87,13 @@ fn only_a_lifecycle_says_what_the_stack_settled_to() {
     assert_eq!(condition(&Outcome::Version(report)), None);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_first_run_ends_by_saying_what_to_send_the_people_who_live_here() {
     // The whole of what setup adds once the stack is up, read back as one value:
     // the cost this stack was decided at, and then the address, which is the
     // question setup is about to be asked and the one nothing above it answers.
     let mut ctx = working_ctx();
-    ctx.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
     ctx.settings.protocols = Protocols::both();
 
     let said = afterwards(&ctx).await.join("\n");
@@ -108,16 +108,15 @@ async fn a_first_run_ends_by_saying_what_to_send_the_people_who_live_here() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_stack_that_came_up_reports_how_it_settled() {
     // The far end of a first run: images down, stack up, and how it settled put
     // on screen. It needs somewhere to write the stack Docker reads and an
     // engine that answers, which is what an applied setup leaves behind.
-    let stack_dir =
-        std::env::temp_dir().join(format!("lemonfiber-boot-{}-started", std::process::id()));
+    let stack_dir = lemonfiber_fixtures::scratch::Scratch::named("boot-started").kept();
     let _ = std::fs::remove_dir_all(&stack_dir);
     let mut ctx = working_ctx();
-    ctx.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
     ctx.stack = Source::Embedded(&QUIET);
     ctx.settings.protocols = Protocols::both();
     ctx.settings.stack_dir = Some(stack_dir.clone());

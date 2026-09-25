@@ -24,12 +24,7 @@ use crate::error::{Problem, Remedy, Severity, State};
 
 use super::bundle::{collect, measure, unconfirmed, without_marks, write, Wanted};
 use super::Ctx;
-
-pub use crate::error::codes::bundle::NOWHERE_TO_KEEP;
-
-pub(crate) use crate::error::codes::bundle::NOWHERE_HELD;
-
-pub(crate) use crate::error::codes::bundle::NOT_HELD;
+use crate::error::codes::bundle::{NOT_HELD, NOWHERE_HELD, NOWHERE_TO_KEEP};
 
 /// Where a bundle is written.
 ///

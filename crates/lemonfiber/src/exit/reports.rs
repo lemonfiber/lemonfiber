@@ -13,10 +13,10 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::repair::Report as RepairReport;
 use lemonfiber_core::model::{
     AdoptReport, LifecycleReport, ResetReport, Revoked, Triggered, UpgradeReport, WizardReport,
 };
+use lemonfiber_core::repair::run::Report as RepairReport;
 use lemonfiber_core::wizard::Phase;
 
 use super::{FAILURE, VALIDATION};
@@ -84,7 +84,7 @@ pub(super) fn installing(report: &lemonfiber_core::plugin::Installs) -> ExitCode
 /// A run where every step succeeded and the stack then would not come back is the
 /// third case, and it is `Updated` — the update did work. The code still reports the
 /// failure, because what a script does next is run against the stack.
-pub(super) fn moving(report: &lemonfiber_core::app::update::Report) -> ExitCode {
+pub(super) fn moving(report: &lemonfiber_core::update::run::Report) -> ExitCode {
     use lemonfiber_core::update::State;
 
     match report.state {

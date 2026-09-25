@@ -39,7 +39,7 @@ pub async fn stack(ctx: &Ctx) -> Stack {
 /// running under a name nothing uses would answer `Stopped` every time — a proof
 /// that always passes, which is no proof at all.
 pub async fn of(ctx: &Ctx, project: &str) -> Stack {
-    match ctx.engine.list(project).await {
+    match ctx.seams.engine.list(project).await {
         Err(_) => Stack::Unknown,
         Ok(containers) => {
             if containers

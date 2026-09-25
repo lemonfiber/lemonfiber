@@ -48,7 +48,6 @@ fn a_running_stack_with_nothing_wrong_is_healthy_and_says_so() {
     let summary = Summary::of(Reach::Running, &[], SETTLED);
     assert_eq!(summary.standing, Standing::Healthy);
     assert_eq!(summary.said(), "healthy");
-    assert!(!summary.standing.wants_attention());
     assert!(summary.affected.is_empty());
 }
 
@@ -63,7 +62,6 @@ fn everything_running_with_a_critical_finding_is_not_healthy() {
     );
     let summary = Summary::of(Reach::Running, &[&leak], SETTLED);
     assert_eq!(summary.standing, Standing::Critical);
-    assert!(summary.standing.wants_attention());
     assert_eq!(summary.said(), "critical — traffic is leaving the tunnel");
 }
 
@@ -130,7 +128,6 @@ fn a_leak_while_starting_is_still_a_leak() {
 fn a_stack_stopped_on_purpose_is_not_a_failure() {
     let summary = Summary::of(Reach::Stopped, &[], SETTLED);
     assert_eq!(summary.standing, Standing::Stopped);
-    assert!(!summary.standing.wants_attention());
     assert_eq!(summary.said(), "stopped");
 }
 

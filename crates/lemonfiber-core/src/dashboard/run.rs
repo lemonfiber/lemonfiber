@@ -356,7 +356,7 @@ async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Option<Panel<Vp
         Err(reason) => return Some(Panel::unavailable(reason.clone())),
     };
     let reading = read_vpn(
-        ctx.engine.as_ref(),
+        ctx.seams.engine.as_ref(),
         &ctx.settings.project,
         manifest,
         ctx.settings.protocols,
@@ -405,7 +405,9 @@ async fn queues(
     // do. `join_all` keeps the order, so the panel and the answers below read the
     // same as when they were gathered one at a time.
     let read = futures_util::future::join_all(targets.iter().map(|target| async move {
-        let service = target.open(&ctx.http, ctx.filesystem.as_ref()).await?;
+        let service = target
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await?;
         Some((target.name.clone(), service.queue().await))
     }))
     .await;
@@ -448,7 +450,7 @@ async fn storage(ctx: &Ctx, download_rate: u64, previous: Option<&Snapshot>) -> 
     let Some(root) = ctx.settings.data_root.as_deref() else {
         return Panel::unavailable("no data location is configured");
     };
-    let facts = ctx.filesystem.describe(root).await;
+    let facts = ctx.seams.filesystem.describe(root).await;
     let free = if facts.total == 0 {
         Reading::Unknown
     } else {
@@ -458,7 +460,7 @@ async fn storage(ctx: &Ctx, download_rate: u64, previous: Option<&Snapshot>) -> 
     // The hardlink test writes — it creates a file, links it, and inspects the two
     // names — unlike the cheap free-space read. Cheap once, but a per-refresh write;
     // the refresh loop will run it far less often, and until then it runs each time.
-    let hardlink = hardlink_of(&test_link(ctx.filesystem.as_ref(), root).await);
+    let hardlink = hardlink_of(&test_link(ctx.seams.filesystem.as_ref(), root).await);
     // Exhaustion is the free space divided by the rate it is draining at: a rate of
     // zero divides to no estimate rather than an infinite one, and a volume that
     // could not be read projects nothing rather than a wrong time.
@@ -497,6 +499,7 @@ async fn observe(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Result<Vec<
         .map(|profile| profile.id.clone())
         .collect();
     let containers = ctx
+        .seams
         .engine
         .list(&ctx.settings.project)
         .await

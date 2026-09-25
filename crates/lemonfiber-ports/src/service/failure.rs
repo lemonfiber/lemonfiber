@@ -16,6 +16,9 @@
 pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
 
 use super::{Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::codes::seed::{
+    SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,
+};
 use thiserror::Error;
 
 /// A service refused, or could not be reached.
@@ -91,11 +94,3 @@ impl Diagnose for Failure {
         }
     }
 }
-
-pub(crate) use lemonfiber_error::codes::seed::SERVICE_UNAVAILABLE;
-
-pub(crate) use lemonfiber_error::codes::seed::SERVICE_UNAUTHORISED;
-
-pub(crate) use lemonfiber_error::codes::seed::SERVICE_REFUSED;
-
-pub(crate) use lemonfiber_error::codes::seed::SERVICE_UNSUPPORTED;

@@ -157,7 +157,7 @@ pub(crate) async fn household(
             certificates: &certificates,
             asked: &asked,
             quality: &quality,
-            now: ctx.clock.now(),
+            now: ctx.seams.clock.now(),
             reasons: &crate::app::refusals::load(ctx),
             expiring: crate::app::arrangement::load(ctx).after(),
             no_room,

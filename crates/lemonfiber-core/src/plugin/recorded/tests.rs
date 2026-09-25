@@ -22,11 +22,8 @@ const WHOLE: &str = r#"{
   }
 }"#;
 
-fn scratch(name: &str) -> std::path::PathBuf {
-    let at = std::env::temp_dir().join(format!("lemonfiber-recorded-{name}"));
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
-    at
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::new(name)
 }
 
 #[test]

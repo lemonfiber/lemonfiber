@@ -28,8 +28,7 @@ use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 
 use super::super::{Ctx, Outcome};
-
-pub(crate) use crate::error::codes::plugin::NOTHING_TO_REMOVE;
+use crate::error::codes::plugin::NOTHING_TO_REMOVE;
 
 /// Take a plugin off the machine, or say what taking it off would come to.
 ///
@@ -206,7 +205,7 @@ async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
         &Action::Remove(services.to_vec()),
         ctx.environment,
     );
-    matches!(ctx.runner.run(&command).await, Ok(output) if output.succeeded())
+    matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded())
 }
 
 /// The sentence said before a removal stops anything.

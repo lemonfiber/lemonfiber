@@ -3,13 +3,13 @@ use crate::doctor::acknowledged::Accepted;
 use crate::test_support::a_context;
 
 /// Where a test's scratch record lives. Naming it does not touch it.
-fn scratch(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("lemonfiber-accepted-{}-{name}", std::process::id()))
+fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::named(name)
 }
 
 /// A context whose environment file is in an emptied scratch directory.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name);
+    let dir = scratch(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     ctx_with(Some(dir.join(".env")))
 }
@@ -53,7 +53,8 @@ fn a_record_that_will_not_parse_puts_the_question_again() {
     let mut accepted = Accepted::new();
     accepted.accept("vpn.tunnel");
     assert!(save(&ctx, &accepted).is_ok());
-    let written = scratch("corrupt").join("accepted.json");
+    let written_dir = scratch("corrupt");
+    let written = written_dir.join("accepted.json");
     assert!(
         written.exists(),
         "the record was written in the first place"
@@ -71,7 +72,8 @@ fn a_record_that_cannot_be_written_is_reported_rather_than_swallowed() {
     // where the file must go. Telling the operator a choice was settled when
     // it was not is the failure worth avoiding here.
     let ctx = ctx_at("blocked");
-    let blocked = scratch("blocked").join("accepted.json");
+    let blocked_dir = scratch("blocked");
+    let blocked = blocked_dir.join("accepted.json");
     assert!(
         std::fs::create_dir_all(&blocked).is_ok(),
         "the blocking directory"

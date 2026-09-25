@@ -86,7 +86,7 @@ async fn a_root_folder_not_wired_is_not_warned_even_where_the_path_is_missing() 
 #[tokio::test]
 async fn a_reset_previews_then_reverts_a_drifted_connection() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let dir = std::env::temp_dir().join(format!("lemonfiber-reset-conn-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-conn");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
@@ -198,7 +198,7 @@ async fn a_schema_change_re_baselines_rather_than_reporting_mass_drift() {
     // reads a different category — every managed value moved at once. That is the
     // upgrade renaming fields, not the operator editing each, so the current shape
     // is adopted as the new baseline and the wiring reads adopted, not drifted.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-schema-adopt-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("schema-adopt");
     let _ = std::fs::remove_dir_all(&dir);
     let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"},"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#;
     let ctx = schema_ctx(&dir, baseline, versioned("5"));
@@ -223,8 +223,7 @@ async fn a_version_change_with_only_some_drift_is_left_as_the_operators_edits() 
     // The version changed, but Sonarr never recorded this client — so it reads as
     // the operator's own, unmanaged, not as drift. Not every managed value moved,
     // so it is not a schema change: it is left as it is rather than re-baselined.
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-schema-partial-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("schema-partial").kept();
     let _ = std::fs::remove_dir_all(&dir);
     let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"}}}}"#;
     let ctx = schema_ctx(&dir, baseline, versioned("5"));
@@ -243,7 +242,7 @@ async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
     // Sonarr is on the version lemonfiber last recorded, so nothing upgraded — the
     // client that differs is the operator's edit, reported as drift and preserved,
     // not re-baselined.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-schema-same-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("schema-same");
     let _ = std::fs::remove_dir_all(&dir);
     let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"5","at":"1"},"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#;
     let ctx = schema_ctx(&dir, baseline, versioned("5"));
@@ -284,7 +283,7 @@ fn reset_ctx(
 async fn a_reset_skips_an_arr_that_has_not_written_its_key() {
     // A client is wanted, but the \*arr's key is not readable — it has not finished
     // starting — so there is nothing to open and it is passed over rather than reset.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-reset-noopen-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-noopen");
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(None, None)), seeding());
     assert!(super::super::reset_connections(&ctx, false)
@@ -298,7 +297,7 @@ async fn a_reset_preview_passes_over_a_client_the_service_does_not_hold() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     // The service holds none of the wanted clients, so there is nothing whose drift
     // to preview — each wanted one is passed over rather than reported.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-reset-absent-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-absent");
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,
@@ -317,7 +316,7 @@ async fn a_reset_preview_names_a_client_whose_category_the_operator_changed() {
     // The service holds the wanted client under a category the operator changed from
     // lemonfiber's recorded one — a drift the preview names as one a reset would
     // revert, reading the category the service now holds to judge it.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-reset-drift-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-drift");
     let _ = std::fs::remove_dir_all(&dir);
     let held = r#"[{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#;
     let ctx = reset_ctx(
@@ -344,7 +343,7 @@ async fn a_reset_preview_reads_nothing_where_the_client_list_cannot_be_read() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     // The service will not answer its client list, so the preview has nothing to
     // compare against and reports nothing rather than guessing.
-    let dir = std::env::temp_dir().join(format!("lemonfiber-reset-unread-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-unread");
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,
@@ -368,7 +367,7 @@ async fn a_lost_baseline_is_reported_and_left_for_a_deliberate_re_baseline() {
     let corrupt = "this is not the baseline you are looking for";
     let _ = crate::config::store::write(&baseline, corrupt);
 
-    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
 
@@ -389,7 +388,7 @@ async fn an_adopt_pass_re_baselines_over_a_lost_record() {
     let baseline = env.with_file_name("baseline.json");
     let _ = crate::config::store::write(&baseline, "not parseable");
 
-    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Assessed);
 
@@ -410,7 +409,7 @@ async fn a_baseline_whose_file_cannot_be_read_is_a_loss() {
     let baseline = env.with_file_name("baseline.json");
     let _ = std::fs::create_dir_all(&baseline);
 
-    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.clone()));
+    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));

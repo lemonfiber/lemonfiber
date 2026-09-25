@@ -14,7 +14,7 @@ fn said(waiting: &[&str]) -> Option<String> {
 /// A key the service adopts at first start is minted where none is recorded.
 #[tokio::test]
 async fn a_key_the_service_adopts_is_minted_before_it_starts() {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-mint-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("mint");
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/tmp\n");

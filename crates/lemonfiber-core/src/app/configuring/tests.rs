@@ -16,10 +16,7 @@ const ANSWERED: &str = "<rss><channel><item/></channel></rss>";
 
 /// A scratch environment file holding the given settings.
 fn env_at(name: &str, contents: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "lemonfiber-configuring-{}-{name}",
-        std::process::id()
-    ));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("configuring-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let path = dir.join(".env");
     let _ = crate::config::store::write(&path, contents);

@@ -516,7 +516,7 @@ async fn doctor_reports_an_unreadable_stack_rather_than_guessing() {
     .await;
     assert_eq!(
         outcome.as_ref().err().map(|problem| problem.code),
-        Some(crate::stack::STACK_UNREADABLE)
+        Some(crate::error::codes::stack::STACK_UNREADABLE)
     );
     assert!(diagnosis(outcome).is_none());
 }

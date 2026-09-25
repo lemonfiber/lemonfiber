@@ -17,18 +17,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
+use crate::error::codes::env::{API_MISMATCH, COMPOSE_UNUSABLE, DAEMON_DOWN, DOCKER_ABSENT};
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::ports::docker::Target;
 use crate::ports::process::Failure;
 use crate::ports::Runner;
-
-pub(crate) use crate::error::codes::env::DOCKER_ABSENT;
-
-pub(crate) use crate::error::codes::env::DAEMON_DOWN;
-
-pub(crate) use crate::error::codes::env::COMPOSE_UNUSABLE;
-
-pub(crate) use crate::error::codes::env::API_MISMATCH;
 
 /// The oldest Compose the driver is willing to build against.
 ///

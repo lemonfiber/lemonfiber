@@ -16,8 +16,7 @@ use crate::error::{Problem, Remedy, Severity};
 use crate::repair::{self, Repair, Stance};
 
 use super::{Confirm, Report};
-
-pub use crate::error::codes::repair::STALE;
+use crate::error::codes::repair::STALE;
 
 /// How much of the putting-right this run was given consent for.
 ///

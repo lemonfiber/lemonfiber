@@ -63,6 +63,7 @@ pub async fn logs(
     }
 
     let opened = ctx
+        .seams
         .engine
         .logs(&ctx.settings.project, &wanted, query)
         .await
@@ -123,7 +124,8 @@ pub async fn pull_progress(
     forms: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
     let command = compose(ctx, forms, &Action::Pull)?.command;
-    ctx.runner
+    ctx.seams
+        .runner
         .stream(&command)
         .await
         .map_err(|err| Box::new(err.problem()))
@@ -161,7 +163,8 @@ pub async fn start_progress(
     // a start that went one way and not the other would leave that service holding a
     // key nothing else can present.
     super::mint_adopted_secrets(ctx, &manifest);
-    ctx.runner
+    ctx.seams
+        .runner
         .stream(&command)
         .await
         .map_err(|err| Box::new(err.problem()))

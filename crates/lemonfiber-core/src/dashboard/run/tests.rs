@@ -41,7 +41,7 @@ fn ctx(engine: Reporting) -> Ctx {
         .engine(Arc::new(engine))
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO)
+        .with_patience(Duration::ZERO)
 }
 
 /// Every service the `library` form declares.
@@ -121,7 +121,7 @@ fn vpn_ctx(
         .engine(Arc::new(engine))
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO)
+        .with_patience(Duration::ZERO)
 }
 
 /// The VPN panel the way `gather` reads it — the manifest resolved from the

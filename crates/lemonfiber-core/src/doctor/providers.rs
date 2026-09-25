@@ -21,26 +21,12 @@ use async_trait::async_trait;
 use lemonfiber_manifest::Date;
 
 use super::{Category, Check, Finding, Verdict};
+use crate::error::codes::provider::{
+    INDEXERS_ALL_FAILING, INDEXER_CAPPED, INDEXER_RESTED, PROVIDER_CROWDED, PROVIDER_EMPTY,
+    PROVIDER_ENDING, PROVIDER_LOW, PROVIDER_REFUSED, PROVIDER_SILENT,
+};
 use crate::error::Remedy;
 use crate::ports::service::{Failure, Indexers, UsenetAccounts};
-
-pub(crate) use crate::error::codes::provider::PROVIDER_EMPTY;
-
-pub(crate) use crate::error::codes::provider::PROVIDER_LOW;
-
-pub(crate) use crate::error::codes::provider::PROVIDER_ENDING;
-
-pub(crate) use crate::error::codes::provider::PROVIDER_REFUSED;
-
-pub(crate) use crate::error::codes::provider::PROVIDER_SILENT;
-
-pub(crate) use crate::error::codes::provider::PROVIDER_CROWDED;
-
-pub(crate) use crate::error::codes::provider::INDEXER_RESTED;
-
-pub(crate) use crate::error::codes::provider::INDEXERS_ALL_FAILING;
-
-pub(crate) use crate::error::codes::provider::INDEXER_CAPPED;
 
 /// Reports on the accounts behind the stack: what they have left, and whether they
 /// are still serving it.

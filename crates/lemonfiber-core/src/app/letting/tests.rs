@@ -6,12 +6,14 @@ use lemonfiber_fixtures::walking::Walking;
 
 use super::stop_seeding;
 use crate::config::Settings;
+use crate::error::codes::space::ANOTHER_OFFER;
+use crate::error::codes::space::NOTHING_TO_ASK;
+use crate::error::codes::space::NOT_HELD;
+use crate::error::codes::space::STILL_HELD;
 use crate::ports::filesystem::{FsKind, Identity, StorageFacts};
 use crate::ports::occupancy::Occupant;
 use crate::space::letting::agreement;
-use crate::space::{
-    Candidate, Standing, ANOTHER_OFFER, NOTHING_TO_ASK, NOT_HELD, RATIO_CONSEQUENCE, STILL_HELD,
-};
+use crate::space::{Candidate, Standing, RATIO_CONSEQUENCE};
 use crate::test_support::{a_context, a_password, env_at, SeedFs};
 
 /// The download every case here names, and what it is called on both sides.
@@ -80,7 +82,7 @@ fn over(scratch: &str, routes: Arc<Fake>) -> crate::app::Ctx {
         .build()
         .with_http(routes)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts())))
-        .surveying(Walking::holding(a_tree()))
+        .with_occupancy(Walking::holding(a_tree()))
 }
 
 /// The client's answer about what is still arriving, which is a different
@@ -111,7 +113,7 @@ async fn a_stack_with_no_torrent_client_has_nothing_to_ask() {
         })
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts())))
-        .surveying(Walking::holding(a_tree()));
+        .with_occupancy(Walking::holding(a_tree()));
     let refused = stop_seeding(&ctx, HELD.to_owned(), None).await;
     assert!(refused.is_err_and(|problem| problem.code == NOTHING_TO_ASK));
 }

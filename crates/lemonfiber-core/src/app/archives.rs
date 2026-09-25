@@ -19,10 +19,7 @@ use crate::archive::Fault;
 use crate::error::{Problem, Remedy, Severity, State};
 
 use super::Ctx;
-
-pub(crate) use crate::error::codes::backup::NOWHERE_KEPT;
-
-pub(crate) use crate::error::codes::backup::NOT_LISTED;
+use crate::error::codes::backup::{NOT_LISTED, NOWHERE_KEPT};
 
 /// The archives this machine has kept.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]

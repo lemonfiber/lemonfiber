@@ -69,7 +69,7 @@ pub(crate) async fn started(
         .map(|placed| placed.service.clone())
         .collect();
     let command = invocation(ctx, installed, stack, &Action::Start(services));
-    let answered = match ctx.runner.run(&command).await {
+    let answered = match ctx.seams.runner.run(&command).await {
         Ok(output) if output.succeeded() => return Ok(()),
         other => other,
     };
@@ -102,7 +102,7 @@ pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
         .map(|placed| placed.service.clone())
         .collect();
     let command = invocation(ctx, installed, stack, &Action::Start(services));
-    match ctx.runner.run(&command).await {
+    match ctx.seams.runner.run(&command).await {
         Ok(output) if output.succeeded() => None,
         Ok(refused) => Some(format!(
             "the container engine refused to start it: {}",
@@ -124,7 +124,7 @@ pub(crate) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> b
         .map(|placed| placed.service.clone())
         .collect();
     let command = invocation(ctx, installed, stack, &Action::Remove(services));
-    matches!(ctx.runner.run(&command).await, Ok(output) if output.succeeded())
+    matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded())
 }
 
 /// The Compose invocation for this plugin's own services.
@@ -194,7 +194,7 @@ pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
     };
     let restart = Action::Restart(vec![service.to_owned()]);
     let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);
-    let _ = ctx.runner.run(&command).await;
+    let _ = ctx.seams.runner.run(&command).await;
 }
 
 /// Ask every proof of the service it names, now that there is one to ask.
@@ -213,7 +213,7 @@ pub(crate) async fn asked(
     installed: &Installed,
     stated: &mut [Proving],
 ) {
-    let deadline = ctx.clock.now() + ctx.patience;
+    let deadline = ctx.seams.clock.now() + ctx.patience;
     // Where each of this plugin's services answers, read through the one answer every
     // caller that asks a plugin's service reads: a second way of composing an address
     // is a second port to be wrong about.
@@ -267,7 +267,7 @@ async fn answering(
         body: None,
     };
     loop {
-        match ctx.http.send(&request).await {
+        match ctx.seams.http.send(&request).await {
             Ok(response) => {
                 let faults = judge(&proof.expect, &live(&response));
                 return if faults.is_empty() {
@@ -279,7 +279,7 @@ async fn answering(
             // Checked after the asking rather than before it, so a budget of nothing
             // still reports what the service said rather than reporting that it was
             // never asked.
-            Err(unreachable) if ctx.clock.now() >= deadline => {
+            Err(unreachable) if ctx.seams.clock.now() >= deadline => {
                 return Verdict::Unproven {
                     why: format!("{} did not answer: {}", unreachable.url, unreachable.reason),
                 }

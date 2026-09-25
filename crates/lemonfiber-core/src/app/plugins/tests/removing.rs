@@ -44,7 +44,7 @@ async fn a_removal_the_disk_refuses_partway_leaves_the_plugin_recorded() {
 
     let _ = std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o700));
     assert!(locked.is_ok());
-    assert_eq!(stopped, crate::app::recover::NOT_REMOVED.to_string());
+    assert_eq!(stopped, crate::error::codes::setup::NOT_REMOVED.to_string());
     assert_eq!(
         counted(reading(&ctx).await),
         Some(1),
@@ -199,7 +199,7 @@ async fn a_removal_on_an_unreadable_stack_is_refused_before_it_takes_anything() 
         .build();
     assert_eq!(
         refusal(removing(&blind, "komga").await),
-        crate::stack::STACK_UNREADABLE.to_string()
+        crate::error::codes::stack::STACK_UNREADABLE.to_string()
     );
     assert!(document.is_file(), "and nothing of its was taken");
 }

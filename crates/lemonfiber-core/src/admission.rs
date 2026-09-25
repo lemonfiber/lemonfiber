@@ -47,6 +47,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::store::{self, Failure};
+use crate::error::codes::admit::{NO_SALT, TOO_SHORT};
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::ports::random::Random;
 use crate::PRODUCT;
@@ -64,10 +65,6 @@ const SALT_BYTES: usize = 16;
 /// this stands in front of everything the stack can do and the thing on the other
 /// side of it is a machine that never gets bored, not a person who gives up.
 pub const LEAST: usize = 12;
-
-pub(crate) use crate::error::codes::admit::TOO_SHORT;
-
-pub(crate) use crate::error::codes::admit::NO_SALT;
 
 /// The operator's password, as it is kept: something that proves an answer right
 /// and holds no answer.

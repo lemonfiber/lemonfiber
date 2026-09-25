@@ -27,7 +27,7 @@ use crate::app::Ctx;
 /// where nothing was named — would come to.
 pub(crate) async fn standing(ctx: &Ctx, named: Option<&str>) -> UpdateReport {
     let running = env!("CARGO_PKG_VERSION");
-    let files = ctx.filesystem.as_ref();
+    let files = ctx.seams.filesystem.as_ref();
     let at = reading::at(files, ctx.settings.program.as_ref()).await;
     let installed = reading::installed(files, at.as_deref(), ctx.settings.home.as_ref()).await;
     let read = checking::read(ctx).await;
@@ -112,5 +112,5 @@ async fn replaceable(
     if installed.defers() {
         return None;
     }
-    reading::replaceable(ctx.filesystem.as_ref(), at).await
+    reading::replaceable(ctx.seams.filesystem.as_ref(), at).await
 }

@@ -126,8 +126,7 @@ fn a_download_carries_its_last_speed_across_a_refresh_that_did_not_report_one() 
 /// A context whose records land in an emptied scratch directory, so a refresh
 /// can be run twice and the second one read what the first left.
 fn ctx_remembering(name: &str, engine: Reporting) -> Ctx {
-    let dir =
-        std::env::temp_dir().join(format!("lemonfiber-refresh-{}-{name}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("refresh-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let settings = Settings {
         protocols: Protocols::both(),
@@ -139,7 +138,7 @@ fn ctx_remembering(name: &str, engine: Reporting) -> Ctx {
         .engine(Arc::new(engine))
         .settings(settings)
         .build()
-        .waiting(Duration::ZERO)
+        .with_patience(Duration::ZERO)
 }
 
 #[tokio::test]

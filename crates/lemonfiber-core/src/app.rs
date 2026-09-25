@@ -16,7 +16,7 @@ use crate::bandwidth::run as bandwidth;
 use crate::bundle::run as bundle;
 use crate::doctor::Narrowing;
 use crate::door::run as door;
-use crate::error::{Code, Diagnose, Problem};
+use crate::error::{Diagnose, Problem};
 use crate::household::run as household;
 use crate::migration::run as migration;
 use crate::notify::run as notify;
@@ -107,21 +107,14 @@ pub use walkthrough::{walkthrough, worth_offering};
 // Named at the import rather than at the arm: every other command in the dispatch
 // below is one line, and the module and the variant behind this one are together long
 // enough that spelling it out there is three.
+use crate::error::codes::life::{
+    ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
+};
 use self_update::standing as stands;
 
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.
-pub use watch::{supervise, ALREADY_GONE, NOTHING_TO_WATCH, WATCH};
-
-pub use crate::error::codes::life::NEVER_SETTLED;
-
-pub use crate::error::codes::life::STILL_NEEDED;
-
-pub use crate::error::codes::life::ALREADY_WORKING;
-
-pub use crate::error::codes::life::REGISTRY_REFUSED;
-
-pub use crate::error::codes::life::ABSENT_THERE;
+pub use watch::{supervise, WATCH};
 
 /// Ask the engine to act on a set of services, which three commands do identically.
 ///
@@ -308,7 +301,7 @@ fn worded(word: Option<&str>) -> Result<Outcome, Box<Problem>> {
 /// are this command's own: a surface that could choose either could choose one that
 /// misses the moment the command exists for.
 async fn watching(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
-    watch::supervise(ctx, ctx.volume.as_ref(), forms, WATCH)
+    watch::supervise(ctx, ctx.seams.volume.as_ref(), forms, WATCH)
         .await
         .map(Outcome::Watch)
 }

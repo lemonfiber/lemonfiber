@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use super::{guidance, rewrite, same_profile, Kind};
+use super::{guidance, rewrite, Kind};
 use crate::quality::{Preset, Selection};
 
 /// The `recyclarr.yml` that ships in the stack — its defaults are the Balanced
@@ -93,22 +93,19 @@ fn each_service_names_its_own_search_and_history_endpoints() {
 
 #[test]
 fn the_three_1080p_presets_collapse_for_television() {
-    assert!(same_profile(
-        Kind::Sonarr,
-        Preset::SpaceSaving,
-        Preset::Balanced
-    ));
-    assert!(same_profile(
-        Kind::Sonarr,
-        Preset::Balanced,
-        Preset::HighQuality
-    ));
+    assert_eq!(
+        guidance(Kind::Sonarr, Preset::SpaceSaving),
+        guidance(Kind::Sonarr, Preset::Balanced)
+    );
+    assert_eq!(
+        guidance(Kind::Sonarr, Preset::Balanced),
+        guidance(Kind::Sonarr, Preset::HighQuality)
+    );
     // Only 4K stands apart for television.
-    assert!(!same_profile(
-        Kind::Sonarr,
-        Preset::HighQuality,
-        Preset::Maximum
-    ));
+    assert_ne!(
+        guidance(Kind::Sonarr, Preset::HighQuality),
+        guidance(Kind::Sonarr, Preset::Maximum)
+    );
 }
 
 #[test]
@@ -118,8 +115,9 @@ fn film_keeps_all_four_presets_distinct() {
         (Preset::Balanced, Preset::HighQuality),
         (Preset::HighQuality, Preset::Maximum),
     ] {
-        assert!(
-            !same_profile(Kind::Radarr, first, second),
+        assert_ne!(
+            guidance(Kind::Radarr, first),
+            guidance(Kind::Radarr, second),
             "{first:?} and {second:?} should differ for film",
         );
     }

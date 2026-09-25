@@ -33,7 +33,7 @@ const REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
     "pushbulletAccessToken":"the-access-token",
     "notificationTypes":{"pushover":64,"pushbullet":64}}"#;
 
-/// The same member, with one of the two agents left switched off.
+/// One request nobody has ruled on, as the request service records it.
 const WAITING: &str = r#"{"pageInfo":{"results":1},"results":[{"id":7,
     "createdAt":"2026-08-17T21:04:09.000Z","status":1,"type":"movie",
     "media":{"status":2,"externalServiceId":3},
@@ -131,7 +131,7 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
         (None, "", Answer::reply(200, "[]")),
     ]);
     let transport = Fake::by_rules(routes);
-    let dir = std::env::temp_dir().join(format!("lemonfiber-asking-{tag}-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("asking-{tag}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let mut context = a_context()
         .build()
@@ -146,5 +146,5 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
     context
 }
 
-mod allowing;
-mod deciding;
+mod allowances;
+mod decisions;

@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::platform::Environment;
 use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
 use crate::stack::mounts::Crowded;
@@ -35,9 +35,10 @@ mod findings;
 mod mounts;
 mod space;
 
-pub use findings::{COPY_ONLY, DEGRADED, ROOT_ABSENT, ROOT_UNWRITABLE, SERVICE_DENIED};
-pub use mounts::SPLIT_MOUNTS;
-pub use space::{LOW_SPACE_FLOOR, SPACE_LOW};
+pub use crate::error::codes::storage::COPY_ONLY;
+use crate::error::codes::storage::ROOT_ABSENT;
+use crate::error::codes::storage::ROOT_UNWRITABLE;
+pub use space::LOW_SPACE_FLOOR;
 
 use findings::{
     copying, linked, service_skipped, service_unverified, service_verdict, unconfirmed,

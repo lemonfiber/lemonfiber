@@ -50,13 +50,4 @@ fn every_standing_has_a_word_and_only_the_bad_ones_want_attention() {
     for standing in all {
         assert!(!standing.word().is_empty(), "{standing:?}");
     }
-    let wanting: Vec<Standing> = all
-        .into_iter()
-        .filter(|standing| standing.wants_attention())
-        .collect();
-    assert_eq!(
-        wanting,
-        vec![Standing::Degraded, Standing::Broken, Standing::Critical],
-        "an advisory is worth knowing and not worth acting on"
-    );
 }

@@ -20,7 +20,7 @@ fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx
 /// env file, so the trace's `jellyfin_reader` resolves a reading client. Tagged so
 /// each test keeps its own env file rather than racing on a shared one.
 fn ctx_with_jellyfin(fake: &Fake, tag: &str) -> Ctx {
-    let dir = std::env::temp_dir().join(format!("lemonfiber-trace-{tag}-{}", std::process::id()));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{tag}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let mut context = ctx_with(fake);
     context.settings.env_file = Some(dir.join(".env"));

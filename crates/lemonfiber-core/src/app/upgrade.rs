@@ -72,7 +72,10 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
 /// what it said. The \*arr searches against its own current cutoff — whatever the last
 /// applied preset set — so what actually upgrades is what sits below that bar.
 async fn trigger(ctx: &Ctx, kind: Kind, target: &Target) -> Triggered {
-    match target.open(&ctx.http, ctx.filesystem.as_ref()).await {
+    match target
+        .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+        .await
+    {
         None => Triggered::NotStarted,
         Some(service) => match service.run_command(kind.upgrade_command()).await {
             Ok(()) => Triggered::Started,

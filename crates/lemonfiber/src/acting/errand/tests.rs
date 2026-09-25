@@ -219,7 +219,7 @@ fn no_bundle_this_screen_can_send_names_a_setting_to_reveal() {
             sending("support").map(|errand| errand.sent(given)),
             Some(Ok(Command::Support {
                 write: true,
-                wanted: lemonfiber_core::app::bundle::Wanted {
+                wanted: lemonfiber_core::bundle::run::Wanted {
                     lines: *lines,
                     filenames: *filenames,
                     reveal: Vec::new(),
@@ -248,7 +248,7 @@ fn an_answer_that_is_not_a_restoration_calls_for_no_re_point() {
 
 /// An update's own account of itself, with `coming` still on the way down.
 fn an_update(coming: &[&str]) -> Outcome {
-    Outcome::Update(lemonfiber_core::app::update::Report {
+    Outcome::Update(lemonfiber_core::update::run::Report {
         state: lemonfiber_core::update::State::UpdatesAvailable,
         changes: Vec::new(),
         in_flight: coming.iter().map(|one| (*one).to_owned()).collect(),
@@ -432,9 +432,9 @@ fn the_bundle_this_screen_asks_for_replaces_filenames_and_carries_the_agreement(
         bundle,
         Some(Ok(Command::Support {
             write: true,
-            wanted: lemonfiber_core::app::bundle::Wanted {
+            wanted: lemonfiber_core::bundle::run::Wanted {
                 confirmed: true,
-                ..lemonfiber_core::app::bundle::Wanted::default()
+                ..lemonfiber_core::bundle::run::Wanted::default()
             },
             dest: lemonfiber_core::app::support::Destination::Kept,
         }))
@@ -454,7 +454,7 @@ fn a_bundle_is_asked_for_with_the_window_and_the_filenames_that_were_chosen() {
         bundle,
         Some(Ok(Command::Support {
             write: true,
-            wanted: lemonfiber_core::app::bundle::Wanted {
+            wanted: lemonfiber_core::bundle::run::Wanted {
                 lines: 20,
                 filenames: Filenames::Shown,
                 reveal: Vec::new(),
