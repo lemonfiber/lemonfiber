@@ -138,17 +138,14 @@ jobs:
     # its own right. `!cancelled()` rather than `always()`, because a cancelled run
     # is somebody pressing stop.
     #
-    # On a merge group the shared gate's `gate` job is `if: github.event_name ==
-    # 'pull_request'`, and its `not-a-pull-request` job runs in its place and says in
-    # its log that nothing was gated. It wants a SonarCloud summary about a pull
-    # request and an allowance to compare against a base branch, and a merge group has
-    # neither. `Q-R64` is enforced on the pull request, which cannot be queued while
-    # this gate is red there.
+    # On a merge group the shared gate re-reads the new-issue count of every pull
+    # request in the batch and the open count against the project, and refuses what
+    # it cannot read, since in a queue a pass is a merge.
     if: ${{ !cancelled() }}
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
     with:
       # What this repository carries, declared here so it can be read without a
       # SonarCloud login. A ceiling rather than an allowance: it may not rise past

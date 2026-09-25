@@ -35,38 +35,36 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/spec-check.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/spec-check.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   # Reads the tree it is given, so on a merge group it reads the merged tree.
   hygiene:
-    uses: lemonfiber/spec/.github/workflows/hygiene.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/hygiene.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   # Every pin this repository holds on a shared workflow, against what the spec's
   # default branch holds now. It fails naming the commits a pin has not taken; a
   # run that could not ask which they are says so rather than reporting clean.
   workflow-pins:
-    uses: lemonfiber/spec/.github/workflows/workflow-pins.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/workflow-pins.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   # Scans the tree it is given, so on a merge group it scans the merged tree.
   security:
-    uses: lemonfiber/spec/.github/workflows/security.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
-  # `dco`, `attribution` and `commitlint` read a base..head range off the pull request,
-  # find none on a merge group, and say `no PR range; skipping` in their own log before
-  # passing. What they judge is each commit message and the pull request body, which a
-  # merge group does not rewrite: they were judged on the pull request, which cannot be
-  # queued while any of them is red. They run here all the same because a required
-  # context from a called workflow is named after the caller job, so a caller that
-  # skipped would report nothing at all, which the queue reads as a wait.
+    uses: lemonfiber/spec/.github/workflows/security.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
+  # `dco`, `attribution` and `commitlint` read a merge group's own base..head range,
+  # which is one squash per queued pull request, so on a queue they judge exactly the
+  # commits `main` is about to hold. A merge group arriving without both ends fails
+  # rather than skipping, since a skip reports success and a queue reads success as
+  # leave to merge.
   dco:
-    uses: lemonfiber/spec/.github/workflows/dco.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/dco.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   attribution:
-    uses: lemonfiber/spec/.github/workflows/attribution.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/attribution.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   commitlint:
-    uses: lemonfiber/spec/.github/workflows/commitlint.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/commitlint.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   # Labels a pull request, and a merge group has none to label.
   labeler:
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/labeler.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/labeler.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
   # Labels a PR that advances the staged version, puts it in that version's
   # milestone, comments which goals it moves, and routes one that cites only
   # out-of-scope requirements to the next version.
@@ -81,4 +79,4 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/goal-automations.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
