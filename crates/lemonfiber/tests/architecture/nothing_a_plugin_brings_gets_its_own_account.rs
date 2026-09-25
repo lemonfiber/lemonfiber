@@ -219,18 +219,18 @@ fn nothing_declares_a_second_account_for_what_a_plugin_brings() {
 fn every_account_this_names_is_one_this_workspace_still_keeps() {
     let root = workspace_root();
     assert!(!ACCOUNTS.is_empty(), "there is nothing to hold anything to");
-    for account in ACCOUNTS {
+    for listing in ACCOUNTS {
         assert!(
-            root.join(account.kept).is_file(),
+            root.join(listing.kept).is_file(),
             "the rule sends a second account of {} to {}, which this workspace no \
              longer carries — point it at wherever that listing went",
-            account.named,
-            account.kept
+            listing.named,
+            listing.kept
         );
         assert!(
-            !account.spelled.is_empty(),
+            !listing.spelled.is_empty(),
             "{} is watched for no spelling at all, so nothing can ever match it",
-            account.named
+            listing.named
         );
     }
 }

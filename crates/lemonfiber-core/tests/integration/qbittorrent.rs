@@ -7,6 +7,7 @@
 //! where async-trait code is compiled twice and its coverage counted wrong.
 
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_testing::a_word;
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::Http;
@@ -67,11 +68,11 @@ fn a_log_without_the_announcement_has_no_password() {
 
 #[tokio::test]
 async fn replacing_the_password_authenticates_sets_and_confirms() {
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
-    let outcome = qbittorrent(&fake)
-        .replace_password("tempword", "freshword")
-        .await;
-    assert!(outcome.is_ok(), "{outcome:?}");
+    let outcome = qbittorrent(&fake).replace_password(&current, &fresh).await;
+    assert!(outcome.is_ok(), "the password was not replaced");
 
     let requests = fake.requests();
     assert_eq!(
@@ -86,7 +87,7 @@ async fn replacing_the_password_authenticates_sets_and_confirms() {
             && request
                 .body
                 .as_deref()
-                .is_some_and(|body| body.contains("tempword"))));
+                .is_some_and(|body| body.contains(&current))));
     // Set the new password.
     assert!(requests.get(1).is_some_and(|request| request
         .url
@@ -94,7 +95,7 @@ async fn replacing_the_password_authenticates_sets_and_confirms() {
         && request
             .body
             .as_deref()
-            .is_some_and(|body| body.contains("web_ui_password") && body.contains("freshword"))));
+            .is_some_and(|body| body.contains("web_ui_password") && body.contains(&fresh))));
     // Confirm by authenticating with the new password.
     assert!(requests
         .get(2)
@@ -102,27 +103,27 @@ async fn replacing_the_password_authenticates_sets_and_confirms() {
             && request
                 .body
                 .as_deref()
-                .is_some_and(|body| body.contains("freshword"))));
+                .is_some_and(|body| body.contains(&fresh))));
 }
 
 #[tokio::test]
 async fn a_wrong_current_password_is_unauthorised() {
+    let fresh = a_word();
+    let wrong = a_word();
     let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
     assert!(matches!(
-        qbittorrent(&fake)
-            .replace_password("wrongword", "freshword")
-            .await,
+        qbittorrent(&fake).replace_password(&wrong, &fresh).await,
         Err(Failure::Unauthorised { .. })
     ));
 }
 
 #[tokio::test]
 async fn a_login_ban_is_unauthorised() {
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![Answer::reply(403, "")]);
     assert!(matches!(
-        qbittorrent(&fake)
-            .replace_password("tempword", "freshword")
-            .await,
+        qbittorrent(&fake).replace_password(&current, &fresh).await,
         Err(Failure::Unauthorised { .. })
     ));
 }
@@ -131,11 +132,10 @@ async fn a_login_ban_is_unauthorised() {
 async fn a_login_that_answers_unexpectedly_is_refused() {
     // Not a wrong password and not a ban — an answer lemonfiber does not
     // recognise, carried through with its status rather than guessed at.
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![Answer::reply(500, "")]);
-    let detail = match qbittorrent(&fake)
-        .replace_password("tempword", "freshword")
-        .await
-    {
+    let detail = match qbittorrent(&fake).replace_password(&current, &fresh).await {
         Err(Failure::Refused { detail, .. }) => Some(detail),
         _ => None,
     };
@@ -146,22 +146,21 @@ async fn a_login_that_answers_unexpectedly_is_refused() {
 async fn a_change_refused_as_unauthorised_is_unauthorised() {
     // The set itself can be refused for want of authorisation — a 403 there is a
     // rejected credential, not an unrecognised answer.
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![ok(), Answer::reply(403, "")]);
     assert!(matches!(
-        qbittorrent(&fake)
-            .replace_password("tempword", "freshword")
-            .await,
+        qbittorrent(&fake).replace_password(&current, &fresh).await,
         Err(Failure::Unauthorised { .. })
     ));
 }
 
 #[tokio::test]
 async fn a_refused_change_carries_the_services_own_words() {
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![ok(), Answer::reply(500, "internal error")]);
-    let detail = match qbittorrent(&fake)
-        .replace_password("tempword", "freshword")
-        .await
-    {
+    let detail = match qbittorrent(&fake).replace_password(&current, &fresh).await {
         Err(Failure::Refused { detail, .. }) => Some(detail),
         _ => None,
     };
@@ -175,26 +174,26 @@ async fn a_refused_change_carries_the_services_own_words() {
 async fn a_change_that_does_not_take_is_caught_by_the_confirming_login() {
     // The set was accepted but the new password does not authenticate, so it did
     // not land — caught by the confirming login rather than called done.
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![
         ok(),
         Answer::reply(200, ""),
         Answer::reply(200, "Fails."),
     ]);
     assert!(matches!(
-        qbittorrent(&fake)
-            .replace_password("tempword", "freshword")
-            .await,
+        qbittorrent(&fake).replace_password(&current, &fresh).await,
         Err(Failure::Unauthorised { .. })
     ));
 }
 
 #[tokio::test]
 async fn a_qbittorrent_that_is_not_answering_is_unavailable() {
+    let current = a_word();
+    let fresh = a_word();
     let fake = Fake::in_turn(vec![Answer::Silent]);
     assert!(matches!(
-        qbittorrent(&fake)
-            .replace_password("tempword", "freshword")
-            .await,
+        qbittorrent(&fake).replace_password(&current, &fresh).await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -225,11 +224,12 @@ fn minting() -> lemonfiber_fixtures::ports::Chance {
 #[tokio::test]
 async fn a_generated_password_is_set_confirmed_and_handed_back() {
     // Login, set, and the confirming login all succeed.
+    let current = a_word();
     let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
     let random = minting();
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", false).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false).await;
 
     assert!(matches!(wiring.state, State::Wired));
     // The value handed back for recording is the one that was set: it appears in
@@ -254,11 +254,12 @@ async fn a_rehearsed_pass_generates_no_password_and_asks_the_client_nothing() {
     // or throw away, and the client is never signed in to — a login is a write on
     // somebody else's service, and a run that promised to leave nothing behind leaves
     // no session either.
+    let current = a_word();
     let fake = Fake::in_turn(Vec::new());
     let random = minting();
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", true).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, true).await;
 
     assert_eq!(
         wiring.state,
@@ -280,11 +281,12 @@ async fn a_rehearsed_pass_generates_no_password_and_asks_the_client_nothing() {
 async fn without_randomness_the_password_is_not_set() {
     // Nothing to set, so the client is never even called — and nothing is handed
     // back to record.
+    let current = a_word();
     let fake = Fake::in_turn(Vec::new());
     let random = lemonfiber_fixtures::ports::Chance::exactly(None);
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "tempword", false).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false).await;
 
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);
@@ -296,11 +298,12 @@ async fn without_randomness_the_password_is_not_set() {
 
 #[tokio::test]
 async fn a_rejected_current_password_fails_and_records_nothing() {
+    let wrong = a_word();
     let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
     let random = minting();
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, "wrongword", false).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &wrong, false).await;
 
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);

@@ -158,7 +158,10 @@ fn no_credential_lemonfiber_writes_is_ever_displayed() {
     ] {
         let seen = showing(name, &supplied);
         assert!(seen.secret, "{name} is not marked withheld");
-        assert!(!seen.value.contains(&supplied), "{name} -> {}", seen.value);
+        assert!(
+            !seen.value.contains(&supplied),
+            "{name} is shown with its value"
+        );
     }
 }
 

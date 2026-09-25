@@ -5,6 +5,7 @@ use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::Failure;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::MediaServer;
+use lemonfiber_testing::a_word;
 
 #[tokio::test]
 async fn a_completed_wizard_is_reported() {
@@ -68,13 +69,14 @@ async fn an_unreachable_jellyfin_is_unavailable() {
 /// write are the same path and only the method tells them apart.
 #[tokio::test]
 async fn the_account_is_read_into_being_before_it_is_written() {
+    let password = a_word();
     let fake = Fake::in_turn(vec![
         Answer::reply(200, r#"{"Name":"root"}"#),
         Answer::reply(204, ""),
         Answer::reply(204, ""),
     ]);
     assert!(jellyfin(&fake)
-        .create_admin("admin", "secret")
+        .create_admin("admin", &password)
         .await
         .is_ok());
 
@@ -107,18 +109,25 @@ async fn the_account_is_read_into_being_before_it_is_written() {
         .get(1)
         .and_then(|request| request.body.clone())
         .unwrap_or_default();
-    assert!(written.contains(r#""Name":"admin""#), "{written}");
-    assert!(written.contains(r#""Password":"secret""#), "{written}");
+    assert!(
+        written.contains(r#""Name":"admin""#),
+        "the account written is not the one asked for"
+    );
+    assert!(
+        written.contains(&format!(r#""Password":"{password}""#)),
+        "the password written is not the one asked for"
+    );
 }
 
 #[tokio::test]
 async fn a_rejected_admin_creation_is_refused_and_setup_is_not_finished() {
+    let password = a_word();
     let fake = Fake::in_turn(vec![
         Answer::reply(200, r#"{"Name":"root"}"#),
         Answer::reply(400, "user already exists"),
     ]);
     assert!(matches!(
-        jellyfin(&fake).create_admin("admin", "secret").await,
+        jellyfin(&fake).create_admin("admin", &password).await,
         Err(Failure::Refused { .. })
     ));
     // The read and the failed write; completion was never reached.
@@ -127,22 +136,24 @@ async fn a_rejected_admin_creation_is_refused_and_setup_is_not_finished() {
 
 #[tokio::test]
 async fn a_rejected_completion_is_refused() {
+    let password = a_word();
     let fake = Fake::in_turn(vec![
         Answer::reply(200, r#"{"Name":"root"}"#),
         Answer::reply(204, ""),
         Answer::reply(500, "boom"),
     ]);
     assert!(matches!(
-        jellyfin(&fake).create_admin("admin", "secret").await,
+        jellyfin(&fake).create_admin("admin", &password).await,
         Err(Failure::Refused { .. })
     ));
 }
 
 #[tokio::test]
 async fn creating_the_admin_on_an_unreachable_jellyfin_is_unavailable() {
+    let password = a_word();
     let fake = Fake::silent();
     assert!(matches!(
-        jellyfin(&fake).create_admin("admin", "secret").await,
+        jellyfin(&fake).create_admin("admin", &password).await,
         Err(Failure::Unavailable { .. })
     ));
 }

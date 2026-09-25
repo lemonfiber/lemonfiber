@@ -56,13 +56,13 @@ pub(crate) enum Offered {
     Refused,
 }
 
-/// What may be reached, given what was asked for and whether a password is set.
+/// What may be reached, given what was asked for and whether a password guards it.
 ///
 /// The whole of the policy, in one place, so the moment before a socket exists and
 /// the moment after it does are reading the same rule rather than two that agree
 /// today.
-pub(crate) const fn permitted(asked: Reach, password: bool) -> Offered {
-    match (asked, password) {
+pub(crate) const fn permitted(asked: Reach, guarded: bool) -> Offered {
+    match (asked, guarded) {
         (Reach::Machine, _) => Offered::Machine,
         (Reach::Network, true) => Offered::Network,
         (Reach::Network, false) => Offered::Refused,
