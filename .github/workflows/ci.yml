@@ -1,6 +1,20 @@
 # Calls the reusable workflows defined once in lemonfiber/spec.
 name: ci
-on: [pull_request]
+on:
+  pull_request:
+  # What a merge queue asks, and the only event it asks it on.
+  #
+  # A queued pull request is merged with `main`'s tip, and with everything ahead of
+  # it in the queue, onto a temporary `gh-readonly-queue/main/...` branch, and this
+  # event asks for checks on that branch. Every context `main` requires has to report
+  # there: one that does not is read as a wait, and the pull request is dropped when
+  # the status-check timeout expires, with nothing naming the cause.
+  #
+  # It carries no pull request. `github.event.pull_request` is null here and
+  # `github.head_ref` and `github.base_ref` are empty, so a job reading them is handed
+  # nothing rather than an error, and a job that then skips reports success. Every
+  # condition below that names an event says what it does on this one.
+  merge_group:
 permissions:
   contents: read
 
@@ -10,11 +24,19 @@ jobs:
   # only going red at it. The workflow-level `contents: read` above is the
   # default for a job that declares nothing; a job-level block replaces that
   # default outright, so `contents: read` is restated here rather than inherited.
+  #
+  # On a merge group it asks `GOV-R3`: every identifier the batch cites resolves
+  # against spec@main as it stands now, which is the one answer that can change while
+  # a pull request waits. `GOV-R2` is not asked again, because a citation may live in
+  # the pull request body and a merge group carries none; presence was settled before
+  # the queue took the pull request. Nothing is closed there: the batch is the
+  # queue's, not any one author's.
   spec-check:
     permissions:
       contents: read
       pull-requests: write
     uses: lemonfiber/spec/.github/workflows/spec-check.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+  # Reads the tree it is given, so on a merge group it reads the merged tree.
   hygiene:
     uses: lemonfiber/spec/.github/workflows/hygiene.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
   # Every pin this repository holds on a shared workflow, against what the spec's
@@ -22,15 +44,25 @@ jobs:
   # run that could not ask which they are says so rather than reporting clean.
   workflow-pins:
     uses: lemonfiber/spec/.github/workflows/workflow-pins.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+  # Scans the tree it is given, so on a merge group it scans the merged tree.
   security:
     uses: lemonfiber/spec/.github/workflows/security.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+  # `dco`, `attribution` and `commitlint` read a base..head range off the pull request,
+  # find none on a merge group, and say `no PR range; skipping` in their own log before
+  # passing. What they judge is each commit message and the pull request body, which a
+  # merge group does not rewrite: they were judged on the pull request, which cannot be
+  # queued while any of them is red. They run here all the same because a required
+  # context from a called workflow is named after the caller job, so a caller that
+  # skipped would report nothing at all, which the queue reads as a wait.
   dco:
     uses: lemonfiber/spec/.github/workflows/dco.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
   attribution:
     uses: lemonfiber/spec/.github/workflows/attribution.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
   commitlint:
     uses: lemonfiber/spec/.github/workflows/commitlint.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+  # Labels a pull request, and a merge group has none to label.
   labeler:
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
@@ -43,6 +75,8 @@ jobs:
   # issues-API object even when it sits on a pull request, and granting less
   # gets the label and a warning instead.
   goals:
+    # Comments on and labels a pull request, and a merge group has none.
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write

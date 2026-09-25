@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # `alerts / alerts` is required, so it has to report on the queue's branch too. The
+  # shared gate asks about `github.ref` wherever there is no pull request, which on a
+  # merge group is the queue's own branch, and `analyze` has just uploaded an analysis
+  # under exactly that ref.
+  merge_group:
   schedule:
     - cron: "0 6 * * 2"
 permissions:

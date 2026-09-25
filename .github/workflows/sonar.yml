@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # `sonar` and `gate / gate` are required, so both have to report on the queue's
+  # branch. The tests and the coverage gate run over the merged tree exactly as on a
+  # pull request. The scan runs too, and SonarCloud records it against the queue's
+  # short-lived branch, since there is no pull request to decorate.
+  merge_group:
 # Read-only for the workflow. The one job that writes — the gate, which posts its
 # verdict on the pull request — asks for that itself.
 permissions:
@@ -77,8 +82,9 @@ jobs:
       #
       # Keyed on who opened the pull request, which is what selects the secret store,
       # and not on `github.triggering_actor`, which becomes whoever pressed re-run. The
-      # event is named too: a push to main carries no pull request, and main's analysis
-      # is what every pull request is measured against.
+      # event is named too: a push to main and a merge group carry no pull request, so
+      # the scan runs on both, and main's analysis is what every pull request is
+      # measured against.
       - name: SonarQube Cloud scan
         id: scan
         if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
@@ -131,6 +137,13 @@ jobs:
     # line saying why. A failed scan still leaves `sonar` red, which is required in
     # its own right. `!cancelled()` rather than `always()`, because a cancelled run
     # is somebody pressing stop.
+    #
+    # On a merge group the shared gate's `gate` job is `if: github.event_name ==
+    # 'pull_request'`, and its `not-a-pull-request` job runs in its place and says in
+    # its log that nothing was gated. It wants a SonarCloud summary about a pull
+    # request and an allowance to compare against a base branch, and a merge group has
+    # neither. `Q-R64` is enforced on the pull request, which cannot be queued while
+    # this gate is red there.
     if: ${{ !cancelled() }}
     permissions:
       contents: read
