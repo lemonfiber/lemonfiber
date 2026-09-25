@@ -1205,6 +1205,12 @@
           ],
           "required": false
         },
+        "fires_on": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "fixture": {
           "type": [
             "null|string"

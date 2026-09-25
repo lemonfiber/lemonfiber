@@ -279,3 +279,87 @@ fn a_proof_naming_a_service_the_plugin_does_not_declare_settles_nothing() {
         "got: {asserted:?}"
     );
 }
+
+/// The check with `fires_on` naming the one recording it has.
+fn firing_on_its_fixture() -> String {
+    changed(&[(
+        "fixture   = \"fixtures/guarded.json\"\n",
+        "fixture   = \"fixtures/guarded.json\"\nfires_on  = \"fixtures/guarded.json\"\n",
+    )])
+}
+
+/// A check whose passing state cannot be recorded is proved by failing on the state
+/// it exists to find, and that is reported as the check holding.
+#[test]
+fn a_check_that_fails_on_the_recording_it_fires_on_holds() {
+    let at = source("fires", 200);
+    assert_eq!(
+        checks(&firing_on_its_fixture(), &at)
+            .first()
+            .map(|one| one.verdict.clone()),
+        Some(Verdict::Passed)
+    );
+}
+
+/// A check that passes on the recording it says it fires on finds nothing.
+#[test]
+fn a_check_that_passes_on_the_recording_it_fires_on_is_refuted() {
+    let at = source("does-not-fire", 401);
+    assert_eq!(
+        checks(&firing_on_its_fixture(), &at)
+            .first()
+            .map(|one| one.verdict.clone()),
+        Some(Verdict::Failed {
+            faults: vec![
+                "passes on fixtures/guarded.json, the recording it says it fires on, so it \
+                 finds nothing"
+                    .to_owned()
+            ],
+        })
+    );
+}
+
+/// With a recording of each state, the check has to hold on one and fire on the other.
+#[test]
+fn a_check_with_a_recording_of_each_state_holds_on_one_and_fires_on_the_other() {
+    let at = source("each-state", 401);
+    let _ = std::fs::write(
+        at.join("fixtures/open.json"),
+        format!(
+            r#"{{"recorded_from": "{PINNED}", "note": "The same read, answered.",
+                    "request": {{"method": "GET", "path": "/api/series"}},
+                    "response": {{"status": 200}}}}"#
+        ),
+    );
+    let both = changed(&[(
+        "fixture   = \"fixtures/guarded.json\"\n",
+        "fixture   = \"fixtures/guarded.json\"\nfires_on  = \"fixtures/open.json\"\n",
+    )]);
+    assert_eq!(
+        checks(&both, &at).first().map(|one| one.verdict.clone()),
+        Some(Verdict::Passed)
+    );
+
+    let neither = changed(&[(
+        "fixture   = \"fixtures/guarded.json\"\n",
+        "fixture   = \"fixtures/open.json\"\nfires_on  = \"fixtures/guarded.json\"\n",
+    )]);
+    assert!(
+        checks(&neither, &at).first().is_some_and(|one| matches!(
+            &one.verdict,
+            Verdict::Failed { faults } if faults.len() == 2
+        )),
+        "held on neither, and both are said"
+    );
+
+    let missing = changed(&[(
+        "fixture   = \"fixtures/guarded.json\"\n",
+        "fixture   = \"fixtures/guarded.json\"\nfires_on  = \"fixtures/nowhere.json\"\n",
+    )]);
+    assert!(
+        checks(&missing, &at)
+            .first()
+            .is_some_and(|one| matches!(one.verdict, Verdict::Unproven { .. })),
+        "a recording that is not there establishes nothing"
+    );
+}
