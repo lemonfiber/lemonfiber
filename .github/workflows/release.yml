@@ -319,6 +319,9 @@ jobs:
   host:
     permissions:
       "contents": "write"
+    # The release App's key is held by the `release` environment, which only
+    # `main` and `v*` tags may deploy to.
+    environment: release
     needs:
       - plan
       - build-local-artifacts

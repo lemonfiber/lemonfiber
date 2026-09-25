@@ -84,7 +84,65 @@ impl Register {
         let read: Self =
             serde_json::from_str(text).map_err(|why| Unreadable::Damaged(why.to_string()))?;
         read.once_each()?;
+        read.as_written()?;
         Ok(read)
+    }
+
+    /// Whether every value the record carries is one this build would have written.
+    ///
+    /// Each of them is written again, into a Compose document, a proxy stanza and a
+    /// dashboard entry, every time the plugin's files are derived — and the reader
+    /// that held them to the format ran once, on a manifest, long before. So a record
+    /// is held on the way in to the same definitions the reader used: a service name
+    /// that is one label, a registry path, a digest, a directory written in its own
+    /// alphabet, a hostname that is one label, and prose nothing downstream expands.
+    /// A record that fails is one this build did not write, and it is refused rather
+    /// than acted on.
+    fn as_written(&self) -> Result<(), Unreadable> {
+        use lemonfiber_plugin::refusing::carried::{
+            is_digest, is_directory, is_label, is_plugin_id, is_reference, substituted,
+        };
+        let refused = |what: String| {
+            Err(Unreadable::Damaged(format!(
+                "it holds {what} this build would not have written"
+            )))
+        };
+        for one in &self.installed {
+            let plugin = one.plugin.as_str();
+            if !is_plugin_id(plugin) {
+                return refused(format!("a plugin id, {plugin:?},"));
+            }
+            for placed in &one.services {
+                let directory = &placed.config_path;
+                let hostname = placed
+                    .reached
+                    .as_ref()
+                    .and_then(|reached| reached.hostname());
+                let group = placed.reached.as_ref().and_then(|reached| reached.group());
+                let written = is_label(&placed.service)
+                    && is_reference(&placed.image)
+                    && is_digest(&placed.digest)
+                    && directory.starts_with('/')
+                    && !directory.contains("..")
+                    && is_directory(directory)
+                    && hostname.is_none_or(is_label)
+                    && [
+                        Some(placed.name.as_str()),
+                        Some(placed.description.as_str()),
+                        group,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .all(|prose| substituted(prose).is_none());
+                if !written {
+                    return refused(format!(
+                        "{plugin}'s service {:?} with a value",
+                        placed.service
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Whether any plugin appears twice.

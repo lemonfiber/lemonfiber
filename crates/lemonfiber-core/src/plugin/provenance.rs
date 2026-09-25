@@ -19,6 +19,12 @@
 //! digest. A verification that passed over an empty answer would be the worst
 //! instance of the cheapest mistake in this repository, so the empty answer is
 //! written out as its own arm rather than falling through anything.
+//!
+//! **Asked by `lemonfiber plugin provenance`, and not by an install.** An install's
+//! context carries no registry port and this build holds no trust root, so the keys
+//! a verdict is reached against are the ones an operator names on the command line —
+//! which is a read an operator runs before installing, not a gate an install can
+//! apply on its own.
 
 use lemonfiber_ports::registry::{Image, Offered, Unanswerable};
 use ring::signature::{UnparsedPublicKey, ECDSA_P256_SHA256_ASN1};

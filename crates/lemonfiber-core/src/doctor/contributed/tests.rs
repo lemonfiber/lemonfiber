@@ -397,6 +397,10 @@ async fn a_row_that_cannot_be_turned_into_a_question_is_still_a_row() {
             DECLARING.replace(r#"method = "GET""#, r#"method = "TRACE""#),
         ),
         (
+            "names a path that is not a route on its service",
+            DECLARING.replace(r#"path = "/api/v1/claim""#, r#"path = "@elsewhere:9/x""#),
+        ),
+        (
             "names a service the plugin does not declare",
             DECLARING.replace(
                 r#"fixture   = "fixtures/claim.json""#,

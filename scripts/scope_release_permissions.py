@@ -87,6 +87,9 @@ CREATES_WITH_TOKEN = """      - name: Create GitHub Release
 HOST_SCOPED = """  host:
     permissions:
       "contents": "write"
+    # The release App's key is held by the `release` environment, which only
+    # `main` and `v*` tags may deploy to.
+    environment: release
 """
 
 

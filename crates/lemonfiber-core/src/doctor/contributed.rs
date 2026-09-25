@@ -158,6 +158,14 @@ fn asked(entry: &Contribution, answering: &BTreeMap<String, String>) -> Asks {
             request.method
         ));
     };
+    // A route on the service's own address and nothing that could name another host
+    // once joined to it: asked here as well as by the reader, because this is the join.
+    if !lemonfiber_plugin::refusing::carried::is_route(&request.path) {
+        return Asks::Nothing(format!(
+            "{} is not a route on {service}, so it was never asked",
+            request.path
+        ));
+    }
     Asks::Service {
         address: address.clone(),
         method,

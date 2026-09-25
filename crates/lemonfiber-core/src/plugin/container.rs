@@ -39,7 +39,7 @@
 //! image is, so writing `rootless` for it would be this build asserting something
 //! about a stranger's image that nobody checked.
 
-use std::fmt::Write as _;
+use serde::Serialize;
 
 use super::installed::{Installed, Placed, Reached};
 
@@ -98,13 +98,71 @@ const OPERATOR: &str = "127.0.0.1";
 /// A function of the record alone. Everything it needs was settled when the plugin
 /// was installed, so this answers the same on a machine whose plugin source is long
 /// gone as on the one that installed it.
+///
+/// **Serialised, never formatted.** The document is built as values and handed to a
+/// YAML writer, so a value holds its place whatever it carries: a line break is
+/// escaped inside its scalar rather than starting a key of its own. The reader has
+/// already refused every value that would need that, and this is the second wall
+/// rather than the first — a record is read back from disk, and what is on disk is
+/// not always what this build wrote.
 #[must_use]
 pub fn written(installed: &Installed) -> String {
-    let mut document = String::from("services:\n");
-    for placed in &installed.services {
-        document.push_str(&entry(&installed.plugin, placed));
+    let document = Document {
+        services: Services(
+            installed
+                .services
+                .iter()
+                .map(|placed| (placed.service.as_str(), entry(&installed.plugin, placed)))
+                .collect(),
+        ),
+    };
+    // Maps of strings and lists of strings, which a YAML writer cannot fail to write.
+    serde_yaml_ng::to_string(&document).unwrap_or_default()
+}
+
+/// The document an overlay is: services, and nothing else at the top.
+#[derive(Serialize)]
+struct Document<'a> {
+    /// Every one of the plugin's services, by name.
+    services: Services<'a>,
+}
+
+/// Services in the order the record keeps them, so the file reads the same twice.
+struct Services<'a>(Vec<(&'a str, Entry)>);
+
+impl Serialize for Services<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_map(self.0.iter().map(|(name, entry)| (name, entry)))
     }
-    document
+}
+
+/// One service's entry, and the whole of what one can carry.
+///
+/// A key is a field here, so a key a plugin may not have — a mount of its own, a
+/// device, a kernel grant, a network mode, a user, an entrypoint, a command, an
+/// environment — is one there is no field for.
+#[derive(Serialize)]
+struct Entry {
+    /// The template it extends.
+    extends: Extends,
+    /// The registry path joined to the digest that pins it.
+    image: String,
+    /// The plugin's own profile.
+    profiles: Vec<String>,
+    /// Where it is published, where it listens.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    ports: Vec<String>,
+    /// The library where it asked for it, and its own configuration directory.
+    volumes: Vec<String>,
+}
+
+/// The template reference an entry extends.
+#[derive(Serialize)]
+struct Extends {
+    /// The file the template is in.
+    file: &'static str,
+    /// The service inside it.
+    service: &'static str,
 }
 
 /// One service's entry, in the shape the bundled fragments are written in.
@@ -113,34 +171,44 @@ pub fn written(installed: &Installed) -> String {
 /// the tag is a name its publisher can repoint, so an entry written from one could
 /// run something other than what was reviewed with nothing in the manifest having
 /// changed.
-fn entry(plugin: &str, placed: &Placed) -> String {
+///
+/// Every value the plugin supplied is written as a literal: Compose substitutes
+/// `${…}` from the stack's environment file in any value, quoted or not, and `$$` is
+/// how a Compose file says a dollar that is only a dollar. The two variables this
+/// build writes itself — the interface and the library — are the only substitutions
+/// an entry carries.
+fn entry(plugin: &str, placed: &Placed) -> Entry {
     let (file, service) = TEMPLATE;
-    let mut written = String::new();
-    let _ = write!(
-        written,
-        "  {}:\n    extends:\n      file: {file}\n      service: {service}\n",
-        placed.service
-    );
-    let _ = writeln!(written, "    image: {}@{}", placed.image, placed.digest);
-    let _ = writeln!(written, "    profiles: [{}]", profile(plugin));
-    if let Some(reached) = &placed.reached {
-        let port = reached.port();
-        let _ = writeln!(
-            written,
-            "    ports: [\"{}:{port}:{port}\"]",
-            published(reached)
-        );
-    }
-    written.push_str("    volumes:\n");
+    let ports = placed
+        .reached
+        .as_ref()
+        .map(|reached| {
+            let port = reached.port();
+            format!("{}:{port}:{port}", published(reached))
+        })
+        .into_iter()
+        .collect();
+    let mut volumes = Vec::new();
     if placed.takes_data {
-        let _ = writeln!(written, "      - {LIBRARY}");
+        volumes.push(LIBRARY.to_owned());
     }
-    let _ = writeln!(
-        written,
-        "      - {CONFIGURATION}/{}:{}",
-        placed.service, placed.config_path
-    );
-    written
+    volumes.push(format!(
+        "{CONFIGURATION}/{}:{}",
+        literal(&placed.service),
+        literal(&placed.config_path)
+    ));
+    Entry {
+        extends: Extends { file, service },
+        image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
+        profiles: vec![profile(plugin)],
+        ports,
+        volumes,
+    }
+}
+
+/// A value Compose reads back as exactly itself, substitution included.
+fn literal(text: &str) -> String {
+    text.replace('$', "$$")
 }
 
 /// Which interface a tier publishes on.
