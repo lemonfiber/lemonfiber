@@ -47,6 +47,14 @@ pub struct Term {
     /// Sonarr and `SABnzbd` do not agree on words, and an operator moving between
     /// their screens should not have to work out that two of them are one.
     pub also_called: &'static [&'static str],
+    /// The other forms this product itself writes the word in, where a state or a
+    /// stage is named by one — `grabbed` for `grab`, `seeding` for `seed`.
+    ///
+    /// Apart from [`Self::also_called`], which is another service's word and one this
+    /// product must never write as its own. These are this product's own words, and a
+    /// surface explaining a word it was sent looks for the word it was sent here, so
+    /// that nothing on the far side has to guess which term an inflection belongs to.
+    pub forms: &'static [&'static str],
 }
 
 impl Term {
@@ -62,12 +70,19 @@ impl Term {
             short,
             deep: None,
             also_called: &[],
+            forms: &[],
         }
     }
 
     /// With more, for somebody who asks. Never needed in order to act.
     const fn explained(mut self, deep: &'static str) -> Self {
         self.deep = Some(deep);
+        self
+    }
+
+    /// With the other forms this product writes the word in.
+    const fn forms(mut self, forms: &'static [&'static str]) -> Self {
+        self.forms = forms;
         self
     }
 
@@ -109,7 +124,8 @@ pub const TERMS: &[Term] = &[
              This is why the download folder and the library should sit on one volume: \
              across two, the file has to be copied instead, which takes time and twice \
              the room.",
-    ),
+    )
+    .forms(&["hardlinked"]),
     Term::new(
         "retention",
         "How far back your Usenet provider keeps things. Longer retention means \
@@ -184,13 +200,15 @@ pub const TERMS: &[Term] = &[
         "seed",
         "To keep sharing a finished torrent so others can take it. Stopping too \
                 early is what a ratio requirement is about.",
-    ),
+    )
+    .forms(&["seeding"]),
     Term::new(
         "grab",
         "To send a release to the download client. It is the moment something \
                 stops being a search result and starts being a download.",
     )
-    .also(&["snatch"]),
+    .also(&["snatch"])
+    .forms(&["grabbed", "grabbing"]),
     Term::new(
         "monitored",
         "Whether a service is still looking for something. Unmonitored means it \
@@ -268,12 +286,18 @@ pub struct Vocabulary {
 /// What this product says a word means, where it explains it.
 ///
 /// Matched without regard to case, because a word at the start of a sentence is the
-/// same word.
+/// same word — and on the other forms this product writes it in, because `grabbed`
+/// is asked about as often as `grab`.
 #[must_use]
 pub fn explain(word: &str) -> Option<&'static Term> {
-    TERMS
-        .iter()
-        .find(|term| term.word.eq_ignore_ascii_case(word.trim()))
+    let word = word.trim();
+    TERMS.iter().find(|term| {
+        term.word.eq_ignore_ascii_case(word)
+            || term
+                .forms
+                .iter()
+                .any(|form| form.eq_ignore_ascii_case(word))
+    })
 }
 
 /// Every word there is to ask about, whole.
@@ -413,6 +437,82 @@ fn same(said: &str, wanted: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{borrowed, explain, mentioned, unrecognised, vocabulary, Term, TERMS};
+
+    /// Every word the published contract sends that is a form of a word explained
+    /// here — a stage, a standing, an outcome — is one of that word's forms, so a
+    /// surface looking the sent word up finds it without keeping a mapping of its own.
+    ///
+    /// Read off the committed contract rather than a list kept here, so a new stage
+    /// named `grabbing` or a standing named `seeded` goes red on the day it is added.
+    /// A form is a single word that begins with the term and carries more letters; a
+    /// plain plural is already the same word, and a joined name like
+    /// `indexers-failed` is the name of a state rather than a form of a word.
+    #[test]
+    fn every_form_of_an_explained_word_the_contract_sends_is_found() {
+        let contract: serde_json::Value =
+            serde_json::from_str(include_str!("../../../contract/web-api.contract.json"))
+                .unwrap_or_default();
+        let mut sent = std::collections::BTreeSet::new();
+        let mut open = vec![&contract];
+        while let Some(value) = open.pop() {
+            match value {
+                serde_json::Value::Object(fields) => {
+                    if let Some(serde_json::Value::String(one)) = fields.get("const") {
+                        sent.insert(one.clone());
+                    }
+                    let listed = fields.get("enum").and_then(serde_json::Value::as_array);
+                    sent.extend(
+                        listed
+                            .into_iter()
+                            .flatten()
+                            .filter_map(serde_json::Value::as_str)
+                            .map(str::to_owned),
+                    );
+                    open.extend(fields.values());
+                }
+                serde_json::Value::Array(items) => open.extend(items),
+                _ => {}
+            }
+        }
+        assert!(sent.contains("grabbed"), "the contract was read");
+
+        let forms: Vec<(&String, &str)> = sent
+            .iter()
+            .filter(|one| one.chars().all(|letter| letter.is_ascii_lowercase()))
+            .flat_map(|one| {
+                TERMS
+                    .iter()
+                    .filter(move |term| {
+                        let word = term.word.to_ascii_lowercase();
+                        one.len() > word.len() + 1 && one.starts_with(&word)
+                    })
+                    .map(move |term| (one, term.word))
+            })
+            .collect();
+        assert!(
+            !forms.is_empty(),
+            "the contract sends forms of explained words"
+        );
+        let unexplained: Vec<&(&String, &str)> = forms
+            .iter()
+            .filter(|(one, word)| explain(one).is_none_or(|found| found.word != *word))
+            .collect();
+        assert!(unexplained.is_empty(), "{unexplained:?}");
+    }
+
+    #[test]
+    fn a_form_this_product_writes_finds_its_word_and_another_services_word_does_not() {
+        assert_eq!(explain("grabbed").map(|term| term.word), Some("grab"));
+        assert_eq!(explain("Seeding").map(|term| term.word), Some("seed"));
+        assert_eq!(
+            explain("hardlinked").map(|term| term.word),
+            Some("hardlink")
+        );
+        assert!(
+            explain("snatch").is_none(),
+            "another service's word is not a form"
+        );
+    }
 
     /// Every surface asks for the words rather than carrying its own copy, so the
     /// list handed out is the table itself.
@@ -575,9 +675,12 @@ mod tests {
 
         let full = Term::new("word", "short.")
             .explained("longer.")
-            .also(&["other"]);
+            .also(&["other"])
+            .forms(&["worded"]);
         assert_eq!(full.deep, Some("longer."));
         assert_eq!(full.also_called, ["other"]);
+        assert_eq!(full.forms, ["worded"]);
+        assert!(plain.forms.is_empty());
     }
 
     /// Worth reading the first time, noise every time after.

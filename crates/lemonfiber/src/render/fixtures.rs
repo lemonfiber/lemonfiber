@@ -178,6 +178,7 @@ pub(super) fn a_term() -> Term {
         short: "what it is for.",
         deep: None,
         also_called: &[],
+        forms: &[],
     })
 }
 
