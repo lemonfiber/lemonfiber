@@ -1,7 +1,7 @@
 /// A title with more room than anything here is testing the edge of.
 const WIDE: usize = 200;
 
-use super::{colours, sampled, wanted, Asked, Press, Shown, Viewer, BATCH};
+use super::{cleared, colours, sampled, wanted, Asked, Press, Shown, Viewer, BATCH};
 use lemonfiber_core::bundle::Marks;
 use lemonfiber_core::logs::Level;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
@@ -126,7 +126,7 @@ impl lemonfiber_core::ports::random::Random for Chosen {
 /// every caller rules out by asserting on what it got back.
 fn exported(viewer: &Viewer) -> String {
     Marks::new(&Chosen)
-        .map(|marks| viewer.exported(&marks))
+        .and_then(|marks| viewer.exported(&marks).ok())
         .unwrap_or_default()
 }
 
@@ -739,4 +739,19 @@ fn any_value_at_all_refuses_colour() {
 fn a_viewer_may_be_asked_to_add_no_colour() {
     assert!(Viewer::opened().colours(), "colour by default");
     assert!(!Viewer::opened().without_colour().colours());
+}
+
+/// An export whose text still reads as a credential after redaction is refused, naming
+/// the line, and one that does not is handed over as it is.
+#[test]
+fn an_export_that_still_reads_as_a_credential_is_refused() {
+    let terms = lemonfiber_core::bundle::Terms::default();
+    let key: String = ('a'..='f').chain('0'..='9').cycle().take(32).collect();
+    let still = format!("sonarr | fine\nsonarr | the key {key}\n");
+    assert_eq!(
+        cleared(still, &terms).err().map(|found| found.line),
+        Some(2)
+    );
+    let clean = "sonarr | fine\n".to_owned();
+    assert_eq!(cleared(clean.clone(), &terms).ok(), Some(clean));
 }

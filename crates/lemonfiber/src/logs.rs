@@ -19,7 +19,18 @@
 //! then be able to say "detached" while scrolled to the tail. So the offset is the
 //! only truth and the scrollback is told, in one place, every time it changes.
 
-use lemonfiber_core::bundle::{prose, Marks, Terms};
+use lemonfiber_core::bundle::{prose, residual, Marks, Residual, Terms};
+
+/// What an export is called when the scan behind the redactor names where it stopped.
+const EXPORT: &str = "the export";
+
+/// Redacted text as it may be written out, or where it still reads as a credential.
+fn cleared(said: String, terms: &Terms) -> Result<String, Residual> {
+    match residual(&[(EXPORT.to_owned(), said.clone())], terms) {
+        Some(found) => Err(found),
+        None => Ok(said),
+    }
+}
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
 use lemonfiber_core::logs::{declared, Level};
 use lemonfiber_core::plural::s;
@@ -296,12 +307,17 @@ impl Viewer {
     /// On the bundle's default terms, which are its most careful ones: the viewer has
     /// no record of what the operator agreed to reveal, and an export is read by
     /// whoever it was sent to.
-    pub(crate) fn exported(&self, marks: &Marks) -> String {
+    ///
+    /// And read back by the bundle's own scan before it is handed over, which is the
+    /// check behind the redactor: a line that still reads as a credential refuses the
+    /// export, naming the line, rather than writing it for somebody to send on.
+    pub(crate) fn exported(&self, marks: &Marks) -> Result<String, Residual> {
+        let terms = Terms::default();
         // `prose` rejoins the lines it split, which leaves the last one bare. A file
         // that does not end in a newline is one that reads as truncated.
-        let mut said = prose(&self.as_text(), marks, &Terms::default());
+        let mut said = prose(&self.as_text(), marks, &terms);
         said.push('\n');
-        said
+        cleared(said, &terms)
     }
 
     /// The view as text, before redaction.

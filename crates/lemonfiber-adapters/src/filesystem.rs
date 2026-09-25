@@ -105,9 +105,36 @@ async fn claimed(path: &Path, contents: &str) -> bool {
 }
 
 /// Write the file, making its directory first where it has one.
+///
+/// Owner-only where the platform tracks a file mode, set as the file is created and
+/// again on one that was there: what lands here is lemonfiber's own record or an export
+/// of the stack's logs, and neither is for another user on the same machine to read.
 async fn written(path: &Path, contents: &str) {
     made_room_for(path).await;
-    let _ = tokio::fs::write(path, contents).await;
+    let _ = private(path, contents).await;
+}
+
+/// Write `contents` to a file readable by its owner alone.
+#[cfg(unix)]
+async fn private(path: &Path, contents: &str) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    use tokio::io::AsyncWriteExt as _;
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+        .await?;
+    file.write_all(contents.as_bytes()).await?;
+    file.flush().await?;
+    tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
+}
+
+/// Where the platform tracks no file mode, an ordinary write.
+#[cfg(not(unix))]
+async fn private(path: &Path, contents: &str) -> std::io::Result<()> {
+    tokio::fs::write(path, contents).await
 }
 
 /// The directory a file is about to go in, where the path names one.

@@ -138,10 +138,17 @@ async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
         .map(|since| since.as_secs())
         .unwrap_or_default();
     let path = std::path::PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
-    ctx.seams
-        .filesystem
-        .write(&path, &viewer.exported(&marks))
-        .await;
+    let text = match viewer.exported(&marks) {
+        Ok(text) => text,
+        Err(found) => {
+            viewer.remarked(&format!(
+                "not written: line {} still reads like a credential after redaction",
+                found.line
+            ));
+            return;
+        }
+    };
+    ctx.seams.filesystem.write(&path, &text).await;
 
     // Writing is best effort and says nothing about whether it worked, so the file is
     // read back before the screen claims it is there. An operator told their export
