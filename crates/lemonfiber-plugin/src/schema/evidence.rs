@@ -106,6 +106,13 @@ pub struct Contribution {
     /// The recorded response the check is proved against.
     #[serde(default)]
     pub fixture: Option<String>,
+    /// A recorded response the check must fail on.
+    ///
+    /// For a check whose passing state cannot be recorded, such as one that needs an
+    /// account nobody holds: the state it exists to find can be, and proving the check
+    /// holds it to firing there. It may name the same file as `fixture`.
+    #[serde(default)]
+    pub fires_on: Option<String>,
     /// How long a check may run, within the bounds the point declares.
     #[serde(default)]
     pub timeout_s: Option<u32>,

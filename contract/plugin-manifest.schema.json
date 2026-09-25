@@ -207,6 +207,14 @@
           ],
           "default": null
         },
+        "fires_on": {
+          "description": "A recorded response the check must fail on.\n\nFor a check whose passing state cannot be recorded, such as one that needs an\naccount nobody holds: the state it exists to find can be, and proving the check\nholds it to firing there. It may name the same file as `fixture`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "fixture": {
           "description": "The recorded response the check is proved against.",
           "type": [

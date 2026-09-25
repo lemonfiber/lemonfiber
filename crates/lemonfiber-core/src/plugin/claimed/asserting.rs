@@ -106,22 +106,64 @@ pub(super) fn checked(
                     },
                 };
             };
+            let mut answered = |named: Option<&str>| {
+                recorded_answer(named, request, expect, service, root, refusals)
+            };
+            let verdict = match entry.fires_on.as_deref() {
+                None => answered(entry.fixture.as_deref()),
+                Some(fires_on) if entry.fixture.as_deref().is_none_or(|one| one == fires_on) => {
+                    fired(answered(Some(fires_on)), fires_on)
+                }
+                Some(fires_on) => {
+                    let held = answered(entry.fixture.as_deref());
+                    both(held, fired(answered(Some(fires_on)), fires_on))
+                }
+            };
             Asserted {
                 kind: Assertion::Check,
                 id: entry.id.clone(),
                 says: entry.title.clone().unwrap_or_default(),
                 service: service.map_or_else(String::new, |service| service.id.clone()),
-                verdict: recorded_answer(
-                    entry.fixture.as_deref(),
-                    request,
-                    expect,
-                    service,
-                    root,
-                    refusals,
-                ),
+                verdict,
             }
         })
         .collect()
+}
+
+/// What a check came to on the recording it says it fires on.
+///
+/// Turned over, because firing is what that recording is for: failing there is the
+/// check finding what it exists to find, and passing there is a check that finds
+/// nothing. A recording that could not be run establishes nothing either way.
+fn fired(verdict: Verdict, fires_on: &str) -> Verdict {
+    match verdict {
+        Verdict::Failed { .. } => Verdict::Passed,
+        Verdict::Passed => Verdict::Failed {
+            faults: vec![format!(
+                "passes on {fires_on}, the recording it says it fires on, so it finds nothing"
+            )],
+        },
+        unproven @ Verdict::Unproven { .. } => unproven,
+    }
+}
+
+/// Two verdicts about one check, which holds only where both do.
+///
+/// Unproven wins over failed: a check whose recording could not be run has not been
+/// shown to be wrong, and saying it failed would send its author to the wrong file.
+fn both(first: Verdict, second: Verdict) -> Verdict {
+    match (first, second) {
+        (unproven @ Verdict::Unproven { .. }, _) | (_, unproven @ Verdict::Unproven { .. }) => {
+            unproven
+        }
+        (Verdict::Failed { faults: mut all }, Verdict::Failed { faults }) => {
+            all.extend(faults);
+            Verdict::Failed { faults: all }
+        }
+        (failed @ Verdict::Failed { .. }, Verdict::Passed)
+        | (Verdict::Passed, failed @ Verdict::Failed { .. }) => failed,
+        (Verdict::Passed, Verdict::Passed) => Verdict::Passed,
+    }
 }
 
 /// One assertion, against the recording it names.
