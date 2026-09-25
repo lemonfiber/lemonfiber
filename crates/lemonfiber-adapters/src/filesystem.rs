@@ -99,9 +99,8 @@ async fn claimed(path: &Path, contents: &str) -> bool {
     let Ok(mut file) = opened else {
         return false;
     };
-    if file.write_all(contents.as_bytes()).await.is_ok() {
-        let _ = file.flush().await;
-    }
+    let _ = file.write_all(contents.as_bytes()).await;
+    let _ = file.flush().await;
     true
 }
 
