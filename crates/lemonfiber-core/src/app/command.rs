@@ -297,19 +297,15 @@ pub enum Command {
     /// below. Both are read best-effort, so a machine with nothing set up is
     /// answered in full and simply warned about nothing.
     Clients,
-    /// Offer somebody in the house an account they can claim.
-    ///
-    /// Makes an account on the media server with no password on it, which is the
-    /// whole of what an invitation is: whoever sets the first password claims it.
-    /// Takes back any nobody claimed in time on the way past, because nothing runs
-    /// between commands to do it on a clock.
+    /// Offer somebody in the house an account they can claim: one on the media server
+    /// with no password, which whoever sets the first password claims. Takes back any
+    /// nobody claimed in time on the way past, since nothing runs between commands to.
     Invite {
         /// What they will sign in as.
         name: String,
         /// What the account is to let them watch.
         allowance: Allowance,
-        /// Make the account, having seen what it grants. Unconfirmed, what it would
-        /// grant is said and nothing is made.
+        /// Make the account; unconfirmed, what it would grant is said and none is made.
         confirm: bool,
     },
     /// Put somebody's account back to having no password, so they can claim it again.

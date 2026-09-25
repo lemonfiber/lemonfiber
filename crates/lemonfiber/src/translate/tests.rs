@@ -6,8 +6,7 @@ use lemonfiber_core::quality::Preset;
 use super::{alerts, diagnosing, moving, named, narrowed, Authoring};
 use super::{
     bundling, configuration, credentials, hosting, household, invitation, letting, quality,
-    restarting, sharing, traced, Answer, Arranged, Asking, Chosen, Decision, Destination, Hostable,
-    Keeping, Policy, Quota, Wanted,
+    restarting, sharing, traced, Asking, Destination, Hostable, Keeping, Wanted,
 };
 use crate::exit::USAGE;
 use lemonfiber::cli::{
@@ -16,9 +15,11 @@ use lemonfiber::cli::{
 };
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::{AlertAction, BandwidthAsked};
+use lemonfiber_core::app::{Answer, Arranged, Chosen, Decision};
+use lemonfiber_core::asking::Policy;
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
-use lemonfiber_core::ports::service::Unrated;
+use lemonfiber_core::ports::service::{Quota, Unrated};
 
 mod choices;
 mod household;
