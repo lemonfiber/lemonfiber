@@ -213,7 +213,7 @@ fn what_is_written_is_the_container_the_record_derives_and_not_a_copy_of_it() {
     let planned = writes(&one, stack());
     let written = document(&planned).unwrap_or_default();
     assert!(written.starts_with("services:\n"));
-    assert!(written.contains("profiles: [plugin-komga]"));
+    assert!(written.contains("profiles:\n    - plugin-komga\n"));
 }
 
 /// Two plugins never write the same document. The name is the plugin's id, which

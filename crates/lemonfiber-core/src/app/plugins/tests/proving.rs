@@ -598,3 +598,36 @@ async fn a_rehearsal_is_refused_wherever_the_install_would_be() {
         "PLUGIN-6"
     );
 }
+
+/// A proof is put only where its path is a route on the service it asks.
+///
+/// The reader refuses any other path, so an install never reaches here with one;
+/// this is the join itself, asked directly. The transport would answer the path
+/// with what the proof expects, so a proof that had been put would have held.
+#[tokio::test]
+async fn a_proof_whose_path_is_not_a_route_on_its_service_is_never_put() {
+    let ctx = proving(
+        "unrouted",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    for path in ["@elsewhere:9000/api/v1/libraries", "api/v1/libraries"] {
+        let text = PROVING.replace("/api/v1/libraries", path);
+        let read = lemonfiber_plugin::Manifest::from_toml(&text);
+        assert!(read.is_ok(), "the fixture reads: {read:?}");
+        let Some(proof) = read
+            .ok()
+            .and_then(|manifest| manifest.proofs.into_iter().next())
+        else {
+            continue;
+        };
+        let now = ctx.seams.clock.now();
+        let verdict =
+            super::super::proving::answering(&ctx, &proof, "http://komga:25600", now).await;
+        assert_eq!(came_to(Some(&verdict)), "unproven", "{path}");
+        assert!(
+            why(Some(&verdict)).contains("not a route"),
+            "{path}: {verdict:?}"
+        );
+    }
+}

@@ -240,7 +240,7 @@ pub(crate) async fn asked(
 /// image that takes a moment to open its socket. A service that answers something is
 /// never asked twice: what it said is the evidence, and asking again until it says
 /// something else is not proving, it is waiting for luck.
-async fn answering(
+pub(super) async fn answering(
     ctx: &Ctx,
     proof: &Proof,
     address: &str,
@@ -257,6 +257,17 @@ async fn answering(
             ),
         };
     };
+    // A route on the service lemonfiber resolved, and nothing that could name another
+    // host once it is joined to that address. The reader refused any other path when
+    // the manifest was read; this is where the join happens, so it is asked again here.
+    if !lemonfiber_plugin::refusing::carried::is_route(&proof.request.path) {
+        return Verdict::Unproven {
+            why: format!(
+                "{} is not a route on {address}, so the proof was never put",
+                proof.request.path
+            ),
+        };
+    }
     // No headers. A proof cannot present a credential, because there is nowhere in the
     // block to write one — which is what keeps *this asks as nobody* a property of the
     // format rather than a convention somebody has to hold.

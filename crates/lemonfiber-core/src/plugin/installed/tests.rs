@@ -424,3 +424,86 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
     assert!(read.install.is_none());
     assert_eq!(done.install.map(|one| one.recorded), Some(true));
 }
+
+/// A record whose values this build would not have written is refused on the way in.
+///
+/// Each value is written into a Compose document, a proxy stanza or a dashboard entry
+/// again every time the plugin's files are derived, long after the reader held the
+/// manifest to the format. So each one is shown refused here, altered on a record
+/// that otherwise reads back whole.
+#[test]
+fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
+    let altered: [(&str, Alter); 13] = [
+        ("an empty plugin id", |one| one.plugin = String::new()),
+        ("a plugin id with a separator", |one| {
+            one.plugin = "../x".to_owned();
+        }),
+        ("a service that is a parent link", |one| {
+            each(one, |placed| placed.service = "..".to_owned());
+        }),
+        ("an image with a line break", |one| {
+            each(one, |placed| {
+                placed.image = "a/b\n    privileged: true".to_owned();
+            });
+        }),
+        ("a digest that is not one", |one| {
+            each(one, |placed| placed.digest = "latest".to_owned());
+        }),
+        ("a relative directory", |one| {
+            each(one, |placed| placed.config_path = "config".to_owned());
+        }),
+        ("a directory leaving itself", |one| {
+            each(one, |placed| placed.config_path = "/a/../..".to_owned());
+        }),
+        ("a directory outside its alphabet", |one| {
+            each(one, |placed| placed.config_path = "/a:ro".to_owned());
+        }),
+        ("a hostname that is two labels", |one| {
+            each(one, |placed| {
+                if let Some(Reached::Household { hostname, .. }) = &mut placed.reached {
+                    *hostname = "a.b".to_owned();
+                }
+            });
+        }),
+        ("a name the dashboard expands", |one| {
+            each(one, |placed| placed.name = "{{KEY}}".to_owned());
+        }),
+        ("a description Compose expands", |one| {
+            each(one, |placed| placed.description = "${KEY}".to_owned());
+        }),
+        ("a group the dashboard expands", |one| {
+            each(one, |placed| {
+                if let Some(Reached::Household { group, .. }) = &mut placed.reached {
+                    *group = Some("{{KEY}}".to_owned());
+                }
+            });
+        }),
+        ("nothing altered", |_| ()),
+    ];
+    assert!(whole().is_some(), "the fixture reads");
+    for (what, alter) in altered {
+        let Some(mut one) = whole() else {
+            continue;
+        };
+        alter(&mut one);
+        let mut register = Register::empty();
+        assert_eq!(register.record(one), Ok(()), "{what}");
+        let read = Register::parse(&register.to_json().unwrap_or_default());
+        if what == "nothing altered" {
+            assert_eq!(read, Ok(register), "the fixture itself reads back");
+        } else {
+            assert!(
+                matches!(&read, Err(Unreadable::Damaged(why)) if why.contains("would not have written")),
+                "{what}: {read:?}"
+            );
+        }
+    }
+}
+
+/// One change made to a record, for the case above.
+type Alter = fn(&mut Installed);
+
+/// Every service of a record, changed the same way.
+fn each(one: &mut Installed, change: impl Fn(&mut Placed)) {
+    one.services.iter_mut().for_each(change);
+}

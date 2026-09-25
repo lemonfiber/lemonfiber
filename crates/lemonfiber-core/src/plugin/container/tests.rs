@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use lemonfiber_plugin::Manifest;
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{entry, published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, OPERATOR, PROFILE};
+use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, OPERATOR, PROFILE};
 
 /// The template the generated entries extend, as the stack ships it.
 ///
@@ -24,10 +24,12 @@ const HOUSEHOLD_ENTRY: &str = "services:\n  \
          service: defaults\n    \
          image: ghcr.io/gotson/komga@sha256:\
          4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945\n    \
-         profiles: [plugin-komga]\n    \
-         ports: [\"${LAN_BIND:-0.0.0.0}:25600:25600\"]\n    \
-         volumes:\n      \
-         - ${DATA_ROOT:-./data}:/data\n      \
+         profiles:\n    \
+         - plugin-komga\n    \
+         ports:\n    \
+         - ${LAN_BIND:-0.0.0.0}:25600:25600\n    \
+         volumes:\n    \
+         - ${DATA_ROOT:-./data}:/data\n    \
          - ./config/komga:/config\n";
 
 /// One service, as installing a plugin settles it.
@@ -210,14 +212,17 @@ fn a_declared_configuration_directory_moves_the_target_and_nothing_else() {
 /// The profile is the plugin's own, so what `up` starts stays describable.
 #[test]
 fn the_service_sits_in_a_profile_named_for_the_plugin() {
-    assert!(document(placed()).contains(&format!("profiles: [{PROFILE}komga]")));
+    assert_eq!(
+        list(&document(placed()), "komga", "profiles"),
+        vec![format!("{PROFILE}komga")]
+    );
 }
 
 /// A plugin that places nothing writes a document with nothing in it, rather
 /// than a document that is not one.
 #[test]
 fn a_plugin_that_places_nothing_writes_a_document_with_nothing_in_it() {
-    assert_eq!(written(&installed(Vec::new())), "services:\n");
+    assert_eq!(written(&installed(Vec::new())), "services: {}\n");
 }
 
 /// Several services are several entries under one heading.
@@ -239,26 +244,32 @@ fn a_plugin_placing_two_services_writes_both_under_one_heading() {
     assert!(both.contains("  komga:\n"), "got: {both}");
     assert!(both.contains("  komga-sync:\n"), "got: {both}");
     assert!(
-        both.contains("      - ./config/komga-sync:/config"),
+        list(&both, "komga-sync", "volumes").contains(&"./config/komga-sync:/config".to_owned()),
         "each gets its own directory: {both}"
     );
-    assert_eq!(
-        both.matches("profiles: [plugin-komga]").count(),
-        2,
-        "and both sit in the plugin's one profile: {both}"
-    );
+    for service in ["komga", "komga-sync"] {
+        assert_eq!(
+            list(&both, service, "profiles"),
+            vec!["plugin-komga".to_owned()],
+            "and both sit in the plugin's one profile: {both}"
+        );
+    }
 }
 
-/// One entry is the document without the heading, so the two cannot drift.
+/// Services are written in the order the record keeps them, so the file reads the
+/// same twice and a diff of it says what changed rather than what was reordered.
 #[test]
-fn the_document_is_its_entries_under_one_heading() {
-    let record = installed(vec![placed()]);
-    let each: String = record
-        .services
-        .iter()
-        .map(|one| entry(&record.plugin, one))
-        .collect();
-    assert_eq!(written(&record), format!("services:\n{each}"));
+fn services_are_written_in_the_order_the_record_keeps_them() {
+    let named = |service: &str| Placed {
+        service: service.to_owned(),
+        ..placed()
+    };
+    let both = written(&installed(vec![named("zeta"), named("alpha")]));
+    let at = |service: &str| both.find(&format!("  {service}:\n"));
+    assert!(
+        at("zeta").is_some() && at("zeta") < at("alpha"),
+        "got: {both}"
+    );
 }
 
 /// The keys an entry may carry, and the whole of what it can ever carry.
@@ -279,6 +290,7 @@ fn keys(document: &str) -> BTreeSet<String> {
     document
         .lines()
         .filter(|line| line.starts_with("    ") && !line.starts_with("     "))
+        .filter(|line| !line.trim_start().starts_with('-'))
         .map(|line| {
             let line = line.trim();
             line.split(':').next().unwrap_or(line).to_owned()
@@ -288,10 +300,30 @@ fn keys(document: &str) -> BTreeSet<String> {
 
 /// Every mount one generated entry carries.
 fn mounts(document: &str) -> Vec<String> {
-    document
-        .lines()
-        .filter_map(|line| line.trim().strip_prefix("- ").map(str::to_owned))
-        .collect()
+    list(document, "komga", "volumes")
+}
+
+/// One list-valued key of one service, as a YAML reader reads the document back.
+///
+/// Parsed rather than read off the text, because what is asked here is what a
+/// container engine would make of the document; which keys are *written* is asked
+/// of the text itself, by [`keys`].
+fn list(document: &str, service: &str, key: &str) -> Vec<String> {
+    serde_yaml_ng::from_str::<serde_yaml_ng::Value>(document)
+        .ok()
+        .and_then(|read| {
+            read.get("services")?
+                .get(service)?
+                .get(key)?
+                .as_sequence()
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(str::to_owned))
+                        .collect()
+                })
+        })
+        .unwrap_or_default()
 }
 
 /// Every shape an entry can be written in, so a key written only for one of them
@@ -398,8 +430,8 @@ fn a_generated_entry_sees_one_mount_beneath_the_library() {
 #[test]
 fn a_second_mount_beneath_the_library_is_found_by_that_reader() {
     let planted = document(placed()).replace(
-        "      - ./config/komga:/config\n",
-        "      - ${DATA_ROOT:-./data}/comics:/comics\n      - ./config/komga:/config\n",
+        "    - ./config/komga:/config\n",
+        "    - ${DATA_ROOT:-./data}/comics:/comics\n    - ./config/komga:/config\n",
     );
     assert_eq!(crowded(&planted), vec!["komga".to_owned()]);
 }
@@ -427,4 +459,60 @@ fn each_tier_renders_to_its_own_interface() {
         HOUSEHOLD
     );
     assert_ne!(OPERATOR, HOUSEHOLD);
+}
+
+/// A value holds its place in the document whatever it carries.
+///
+/// The reader refuses every one of these, and a record read back from disk is held
+/// to the same rules; this is the writer's own half, asked of records built by hand
+/// so the reader is not what makes it pass. A line break stays inside the value it
+/// was written in, and the entry still carries only the permitted keys.
+#[test]
+fn a_value_carrying_a_line_break_stays_one_value() {
+    let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
+    let entry = document(Placed {
+        image: "a/b\n    privileged: true".to_owned(),
+        config_path: "/config\n    - /:/host".to_owned(),
+        ..placed()
+    });
+    assert!(keys(&entry).is_subset(&permitted), "got: {entry}");
+    assert_eq!(
+        mounts(&entry),
+        vec![
+            LIBRARY.to_owned(),
+            "./config/komga:/config\n    - /:/host".to_owned()
+        ],
+        "got: {entry}"
+    );
+    let read = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&entry).ok();
+    let image = read
+        .as_ref()
+        .and_then(|read| read.get("services")?.get("komga")?.get("image")?.as_str());
+    assert_eq!(
+        image.map(str::to_owned),
+        Some(format!("a/b\n    privileged: true@{DIGEST}"))
+    );
+}
+
+/// A dollar a plugin supplied is written as the dollar Compose reads literally.
+///
+/// Compose substitutes `${…}` from the stack's environment file in any value, so a
+/// value from a record is doubled where it is written. The two substitutions this
+/// build writes itself are left as they are.
+#[test]
+fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
+    let entry = document(Placed {
+        image: "a/${KEY}".to_owned(),
+        config_path: "/c$x".to_owned(),
+        ..placed()
+    });
+    assert!(entry.contains("image: a/$${KEY}@"), "got: {entry}");
+    assert!(
+        mounts(&entry).contains(&"./config/komga:/c$$x".to_owned()),
+        "got: {entry}"
+    );
+    assert!(
+        entry.contains(HOUSEHOLD) && entry.contains(LIBRARY),
+        "got: {entry}"
+    );
 }
