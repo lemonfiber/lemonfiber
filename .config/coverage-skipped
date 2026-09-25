@@ -1,0 +1,1 @@
+(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-adapters/src/nntp\.rs|crates/.*/examples/.*\.rs)

@@ -4,29 +4,26 @@ on:
     branches: [main]
   pull_request:
 # Read-only for the workflow. The one job that writes — the gate, which posts its
-# verdict on the pull request — asks for that itself, so the scan job that has no
-# reason to write does not hold the token that could.
+# verdict on the pull request — asks for that itself.
 permissions:
   contents: read
 jobs:
   sonar:
     runs-on: ubuntu-latest
-    env:
-      # The outermost edge only, where a test cannot follow — see the justfile's `coverage`
-      # recipe for what each exclusion is and why. Named once here so the gate and the step
-      # that explains the gate cannot disagree about what is being measured.
-      SKIPPED: '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-adapters/src/nntp\.rs|crates/.*/examples/.*\.rs)'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
           submodules: recursive
+      # The outermost edge only, where a test cannot follow — the justfile's
+      # `coverage` recipe says what each exclusion is and why. Read from the file the
+      # recipe reads, so the gate and a local run measure the same thing.
+      - name: What the gate does not measure
+        run: echo "SKIPPED=$(cat .config/coverage-skipped)" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
-      # This job builds the whole workspace and had no cache at all, so every run of the
-      # slowest gate here started from an empty target directory. Its own key, because
-      # instrumented artifacts are not the ones `check` builds and sharing a key would
-      # have each job evicting the other's work.
+      # Its own key: instrumented artifacts are not the ones `check` builds, and a
+      # shared key would have each job evicting the other's work.
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: llvm-cov
@@ -35,31 +32,25 @@ jobs:
       - uses: taiki-e/install-action@75a348306ce8f67c0b06fc62c32a8546140ba955 # nextest
         with:
           tool: cargo-nextest
-      # Through `nextest`, which runs the test binaries against each other rather than
-      # one after another. The instrumented build is unchanged and so is what the gate
-      # reads — 97,154 lines, none missed, either way — so this is the same measurement
-      # taken in less time.
+      # One instrumented run, read by two steps, so a failing test and a line nothing
+      # reached are told apart rather than both reading as a red gate.
       #
-      # `--no-fail-fast` because without it a single failing test stops the run and the
-      # profile is whatever had been reached by then. That is not reported as a stopped
-      # run: it is reported as the coverage figure, and one architecture test tripping on
-      # line 63 of 6,002 came back as ninety-seven thousand missed lines spread across
-      # every crate in the workspace. Whoever read that went looking for a coverage
-      # problem that did not exist, which is the most expensive way a green-or-red gate
-      # can be wrong. Running the rest costs minutes; reading the wrong cause costs an
-      # afternoon, and the failing test is still reported as a failing test.
-      - name: Coverage (100% on applicable code — Q-R61)
-        run: cargo llvm-cov nextest --workspace --no-fail-fast --ignore-filename-regex "$SKIPPED" --fail-under-lines 100 --lcov --output-path lcov.info
-      # A gate that says only "below the threshold" sends whoever tripped it looking for a
-      # line the run already knew. `report` re-reads the profile just gathered — no build,
-      # no tests, seconds — and names them.
+      # `--no-fail-fast` because a run stopped at its first failure leaves a profile of
+      # whatever had been reached, and the coverage step would report that partial
+      # profile as missed lines across every crate.
+      - name: Tests
+        run: cargo llvm-cov nextest --workspace --no-fail-fast --profile ci --no-report
+      - name: Coverage (100% on applicable code)
+        if: success() || failure()
+        run: cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --fail-under-lines 100 --lcov --output-path lcov.info
+      # A gate that says only "below the threshold" sends whoever tripped it looking
+      # for a line the run already knew. `report` re-reads the profile just gathered.
       #
-      # Two questions, because the first one has been asked here and come back empty
-      # while the gate above counted twelve missed lines. `--show-missing-lines` reads
-      # the export's merged segments; `--fail-under-lines` reads a summary that counts
-      # each instantiation, so a line one instantiation missed and another took is a
-      # miss this half can never show. The second reads the regions, which do not
-      # merge. `just uncovered` asks both from a shell — change both or they drift.
+      # Two questions. `--show-missing-lines` reads the export's merged segments, while
+      # `--fail-under-lines` counts each instantiation, so a line one instantiation
+      # missed and another took is a miss the line list cannot show; the second
+      # question reads the regions, which do not merge. `just uncovered` asks the same
+      # two from a shell.
       - name: The reader names a miss the line list cannot
         if: failure()
         run: python3 scripts/counted_but_not_named.py --self-test
@@ -71,9 +62,8 @@ jobs:
           cargo llvm-cov report --ignore-filename-regex "$SKIPPED" --json --output-path report.json
           echo "── the lines behind the count, and which kind each is ──"
           python3 scripts/counted_but_not_named.py < report.json
-      # The profile is gone with the runner, and rebuilding it to ask one more question
-      # costs the ten minutes above. The report is a few megabytes and answers every
-      # question the two steps did not think to ask.
+      # The profile is gone with the runner, and rebuilding it costs the whole run; the
+      # report is a few megabytes and answers what the two steps above did not ask.
       - name: Keep the report the gate read
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -81,48 +71,23 @@ jobs:
           name: coverage-report
           path: report.json
           retention-days: 7
-      # A Dependabot run reads secrets from the Dependabot store rather than the
-      # Actions store, and `SONAR_TOKEN` is only in the second. The scanner was
-      # handed an empty string, died with "Not authorized or project not found",
-      # and failed a required check on a step with nothing to do with the bump —
-      # so no dependency update in this repository has ever been able to merge.
+      # A Dependabot run reads secrets from the Dependabot store, and `SONAR_TOKEN` is
+      # only in the Actions store, so the scan is skipped there rather than failing on
+      # an empty token. Coverage above needs no token and runs either way.
       #
-      # Skipped rather than allowed to fail: a scan that cannot authenticate has
-      # no verdict to give, and a red tick that means "the runner had no
-      # credential" is worth less than a step that says so. The coverage gate
-      # above needs no token and still runs, so what `Q-R61` measures is
-      # unchanged on these pull requests.
-      #
-      # Keyed on who opened the pull request, which is what selects the secret
-      # store, and which `spec_check.py` already keys `Q-R55` on because it is the
-      # one identifier the opener cannot write. Not `github.triggering_actor`,
-      # which becomes whoever pressed re-run — this step would come back on the
-      # re-run of a Dependabot pull request and fail it again.
-      #
-      # The event is named as well as the author. A push to main carries no pull
-      # request, so the author field is null there, and what a null compares equal
-      # to is a rule this workflow should not be resting on: SonarCloud's analysis
-      # of main is what every pull request is measured against, and a comparison
-      # that quietly went the other way would turn it off with nothing to notice.
+      # Keyed on who opened the pull request, which is what selects the secret store,
+      # and not on `github.triggering_actor`, which becomes whoever pressed re-run. The
+      # event is named too: a push to main carries no pull request, and main's analysis
+      # is what every pull request is measured against.
       - name: SonarQube Cloud scan
         id: scan
         if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      # Runs when the scan failed, and asks the one question its output does not
-      # answer: was that this repository or the host?
-      #
-      # A scanner that cannot reach SonarCloud fails with a Spring
-      # bean-creation trace forty lines deep and `Error 503` somewhere in the
-      # middle, and the required check beside it goes red exactly as it does for
-      # a real finding. On 2026-09-13 SonarCloud answered 503 for over an hour
-      # and fourteen pull requests across the organisation sat blocked behind a
-      # stack trace nobody had read to the middle of.
-      #
-      # It reports and changes nothing: the scan still failed, the check is
-      # still red, and `Q-R64` was still not enforced on this run. What it adds
-      # is the sentence that says which of those two things happened.
+      # Runs when the scan failed, and says whether the host was answering: a scanner
+      # that cannot reach SonarCloud fails with a trace that reads like a finding.
+      # It changes nothing about the run; the scan still failed and the check is red.
       - name: Whether SonarCloud was answering
         if: always() && steps.scan.outcome == 'failure'
         run: |
@@ -130,89 +95,51 @@ jobs:
           code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
             https://sonarcloud.io/api/system/status 2>/dev/null || echo "000")
 
-          # 000 is curl reaching nothing at all, which is the same news as a 5xx
-          # for the purpose of this sentence.
+          # 000 is curl reaching nothing at all, which is the same news as a 5xx.
           case "$code" in
           5?? | 000)
-            said="The scan failed and SonarCloud answered ${code} to a plain status request, so the host was unavailable rather than this pull request being at fault. Coverage ran above and had to reach 100% either way (Q-R61). Re-run this job once sonarcloud.io is answering — nothing on this run enforced Q-R64."
+            said="The scan failed and SonarCloud answered ${code} to a plain status request, so the host was unavailable rather than this pull request being at fault. Coverage ran above and had to reach 100% either way. Re-run this job once sonarcloud.io is answering — no analysis gated this run."
             ;;
           *)
-            said="The scan failed and SonarCloud answered ${code} to a plain status request, so the host was reachable and the failure is in this run rather than an outage. Read the scanner output above. Nothing on this run enforced Q-R64."
+            said="The scan failed and SonarCloud answered ${code} to a plain status request, so the host was reachable and the failure is in this run rather than an outage. Read the scanner output above. No analysis gated this run."
             ;;
           esac
 
           echo "::notice::${said}"
           printf '### Why the SonarCloud scan failed\n\n%s\n' "$said" >> "$GITHUB_STEP_SUMMARY"
-      # Runs in exactly the case the scan does not. A step missing from a log
-      # reads the same as a step that ran and found nothing, and this repository
-      # has been caught by that reading more than once, so the skip appears under
-      # its own name with its reason and the identifier it was decided on.
+      # A skipped step is missing from the log, which reads the same as one that ran
+      # and found nothing, so the skip is said under its own name.
       - name: Why the scan was skipped
         if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
         env:
           AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
-          said="The SonarCloud scan was skipped: ${AUTHOR} opened this pull request, and a Dependabot run reads secrets from the Dependabot store rather than the Actions store, so SONAR_TOKEN is empty here and the scanner could only fail on it. Coverage ran above and still had to reach 100% (Q-R61). No analysis was produced, so nothing on this run enforced Q-R64."
+          said="The SonarCloud scan was skipped: ${AUTHOR} opened this pull request, and a Dependabot run reads secrets from the Dependabot store rather than the Actions store, so SONAR_TOKEN is empty here and the scanner could only fail on it. Coverage ran above and still had to reach 100%. No analysis was produced, so none gated this run."
           echo "::notice::${said}"
           printf '### SonarCloud scan skipped\n\n%s\n' "$said" >> "$GITHUB_STEP_SUMMARY"
 
-  # Open SonarCloud issues must be zero (Q-R64), and the free plan's own quality
-  # gate cannot be configured to that standard (Q-R63). The shared reusable in spec
-  # holds the count there instead, so all repos gate identically: it reads the
-  # scan's summary and fails on any new issue, posting a sticky verdict on the PR.
-  # A required check: it blocks on a counted issue and on nothing else, so a summary
-  # that never arrived or one it cannot read warns rather than holding the pull
-  # request hostage.
+  # Open SonarCloud issues must be zero, and the free plan's own quality gate cannot
+  # be configured to that standard. The shared reusable in spec holds the count
+  # instead, so every repository gates identically: it reads the scan's summary,
+  # fails on any new issue, and posts a sticky verdict on the pull request. A summary
+  # that never arrived, or one it cannot read, warns rather than blocks.
   gate:
     needs: sonar
-    # `needs` alone makes this job disappear when the scan fails, and a required
-    # check that does not report is not a check that says nothing — it is a pull
-    # request blocked with no line anywhere saying by what. That is the outcome
-    # the gate itself is written to avoid: it warns and passes on a summary that
-    # never arrived, precisely so a SonarCloud outage cannot hold somebody's work
-    # hostage. `needs` was quietly overruling that, and on 2026-09-13 it did:
-    # every pull request in this organisation sat on `MISSING: gate / gate` while
-    # the job that would have explained why was never scheduled.
-    #
-    # So it runs whatever the scan did. Nothing is loosened by that — a failed
-    # scan leaves `sonar` red, and `sonar` is a required check in its own right,
-    # so the pull request stays blocked for the reason it should be. What changes
-    # is that the reason is now written down.
-    #
-    # `!cancelled()` rather than `always()`: a cancelled run is somebody pressing
-    # stop, and finishing the job they stopped is not a service to anyone.
+    # Runs whatever the scan did: `needs` alone would drop this job when the scan
+    # fails, and a required check that never reports blocks a pull request with no
+    # line saying why. A failed scan still leaves `sonar` red, which is required in
+    # its own right. `!cancelled()` rather than `always()`, because a cancelled run
+    # is somebody pressing stop.
     if: ${{ !cancelled() }}
     permissions:
       contents: read
       pull-requests: write
     uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
     with:
-      # What this repository is carrying, declared here so it can be read without a
-      # SonarCloud login (Q-R67). It was twenty-eight: an analyser enabled
-      # `rust:S7493` and backdated every finding to the commit that introduced the
-      # line. Twenty-seven of them were blocking calls inside `async fn` bodies and
-      # they were real; what was not real was the zero this file declared while they
-      # stood.
-      #
-      # It is a ceiling and not an allowance: it may not rise past what actually
-      # stands against `main`, so it falls as they are fixed and cannot go back
-      # up. At zero the gate refuses the first issue rather than the first issue
-      # past a tolerance, which is what `Q-R64` asks for and what every other
-      # repository in the organisation already declares.
-      #
-      # It has been off zero twice, both times the same way: an analyser enabled a
-      # rule and backdated every finding to the commit that wrote the line. First
-      # `rust:S7493`, twenty-seven blocking calls inside `async fn` bodies, all of
-      # them real and none of them new; then `githubactions:S8541`, three `pip`
-      # installs that could take a source distribution and run its `setup.py`.
-      #
-      # Both times the ceiling named what stood, the findings were fixed, and it
-      # came back here. That is the whole cycle this number is for, and the
-      # sentence worth keeping from the second pass is about the count rather than
-      # the rule: the analyser reports a file at a time, so three findings arrived
-      # as two and then as one, and a sweep that trusted the count stopped a step
-      # early. Read the tree, not the tally.
+      # What this repository carries, declared here so it can be read without a
+      # SonarCloud login. A ceiling rather than an allowance: it may not rise past
+      # what stands against `main`, and at zero the gate refuses the first issue.
       allowed-open: 0
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}

@@ -1,6 +1,6 @@
 # CodeQL static analysis: the Rust crates and the Actions workflows. Rust
 # catches memory/logic classes the linters don't; actions catches workflow
-# injection and supply-chain flaws. Q-R53.
+# injection and supply-chain flaws.
 name: codeql
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
   # branch proposes.
   #
   # Called rather than written out, because it is one judgement for the whole
-  # organisation (GOV-R12), and because the sixty lines of shell around the gate
+  # organisation, and because the sixty lines of shell around the gate
   # were the part with no guard on them — the gate script itself is already held
   # to the canonical copy, byte for byte, by `check_shared_files.py`. What stays
   # here is what is about this repository: the matrix the gate reads the expected

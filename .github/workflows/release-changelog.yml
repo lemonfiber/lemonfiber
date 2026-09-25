@@ -153,13 +153,13 @@ jobs:
       # What a pre-release publishes instead of a changelog. The verdict is not
       # recomputed here — it is read from the record the pre-release lane wrote on
       # the version's manifest before the tag, so the artefact and the record
-      # cannot disagree about which goals were unmet when it went out (OPS-R62).
+      # cannot disagree about which goals were unmet when it went out.
       #
       # A record that is absent fails the run rather than leaving the body as
       # cargo-dist wrote it. A pre-release whose artefact does not carry its
-      # verdict is the thing OPS-R62 refuses, and a red check before a maintainer
+      # verdict is refused, and a red check before a maintainer
       # clicks Publish is where that refusal has to land.
-      - name: Write the verdict a pre-release goes out carrying (OPS-R62)
+      - name: Write the verdict a pre-release goes out carrying
         if: steps.tag.outputs.prerelease == 'true'
         env:
           TAG: ${{ steps.tag.outputs.tag }}
@@ -179,7 +179,7 @@ jobs:
           if record is None:
               sys.exit(
                   f"::error::the spec's {line} manifest holds no record of {tag}; "
-                  "a pre-release that cannot carry its verdict is refused (OPS-R62)"
+                  "a pre-release that cannot carry its verdict is refused"
               )
 
           unmet = record.get("unmet", [])

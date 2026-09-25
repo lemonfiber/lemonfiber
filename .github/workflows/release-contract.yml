@@ -1,8 +1,8 @@
 # Publish the machine-readable contract with the release that produced it.
 #
 # Every SDK generates its types from this artefact rather than transcribing the
-# shapes (ARCH-R58). Reaching it should not mean cloning a Rust repo, so each
-# release carries it as an asset (ARCH-R64) and an SDK vendors the copy from the
+# shapes. Reaching it should not mean cloning a Rust repo, so each
+# release carries it as an asset and an SDK vendors the copy from the
 # release it was generated against.
 #
 # Separate from `release.yml`, which dist autogenerates and would overwrite.
@@ -72,7 +72,7 @@ jobs:
       # same reason. An editor validating `plugin.toml`, and a catalogue checking a
       # claim against the vocabulary it was written for, both want the copy generated
       # against the release they are targeting rather than whatever is on the trunk
-      # today (ARCH-R108). The names are unversioned so a consumer can ask a release
+      # today. The names are unversioned so a consumer can ask a release
       # for a fixed name and get that release's copy.
       - name: Attach what a plugin is authored against
         env:

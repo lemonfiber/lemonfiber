@@ -1,15 +1,15 @@
 # Announce a published release to the public #releases channel, mentioning the
 # opt-in role when DISCORD_RELEASE_ROLE_ID is set — never @everyone. Fires on
-# publish (not draft), so nothing is announced until the release is real. OPS-R23.
+# publish (not draft), so nothing is announced until the release is real.
 #
-# A pre-release is not a published release and does not go there (OPS-R63).
+# A pre-release is not a published release and does not go there.
 #
 # **It is told apart by its tag, not by the forge's pre-release flag**, and that is
 # not a preference. cargo-dist marks every version below 1.0.0 as a pre-release, so
 # all fourteen releases this project has shipped carry that flag and it separates
 # nothing. A guard written on it would have announced no release at all — and the
 # failure would have been silent, because a channel that stays quiet looks exactly
-# like a channel nobody posted to yet. The tag is the thing OPS-R61 makes carry the
+# like a channel nobody posted to yet. The tag is the thing the release rules make carry the
 # distinction, so the tag is what is read: `v0.15.0` announces, `v0.15.0-pre.1`
 # does not.
 #

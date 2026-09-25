@@ -1,4 +1,4 @@
-# Link checking, for the hygiene gate the spec repo defines (Q-R54).
+# Link checking, for the hygiene gate the spec repo defines.
 #
 # The gate runs `lychee .` over this tree, and lychee skips hidden directories
 # unless told otherwise — so the links in `.docs/` were not being checked, and

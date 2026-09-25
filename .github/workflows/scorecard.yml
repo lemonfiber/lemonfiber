@@ -1,14 +1,13 @@
 # When this repository asks for its supply-chain posture check.
 #
-# The check itself is lemonfiber/spec's, called rather than copied — `Q-R56`
-# asks for that, and six byte-identical copies of a 29-line file were what it
-# had instead. Only the triggers live here, because only they are about this
+# The check itself is lemonfiber/spec's, called rather than copied, so every
+# repository runs the one file. Only the triggers live here, because only they are about this
 # repository: `branch_protection_rule` and `push` are events that arrive at a
 # repository, and a reusable workflow is not a place events arrive.
 #
 # `secrets: inherit` passes `SCORECARD_TOKEN`, which is an org secret with no
 # write scope. Scorecard publishes its result so somebody outside the org can
-# read it without being trusted with anything, which is the point of `Q-R59`.
+# read it without being trusted with anything.
 name: scorecard
 
 on:

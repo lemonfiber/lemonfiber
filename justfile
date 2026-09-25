@@ -95,9 +95,8 @@ build:
 
 # The inner loop: does it still compile, and do the tests still pass.
 #
-# `nextest` rather than `cargo test`, because it runs the test binaries against each
-# other rather than one after another and this workspace has around a hundred of them
-# — 134s against 391s on the machine this was measured on. It runs no doctests, which
+# `nextest` rather than `cargo test`, because it runs every test in a process of its
+# own and in parallel across the workspace's test binaries. It runs no doctests, which
 # costs nothing here: every doctest target in this workspace reports zero.
 test:
     cargo nextest run --workspace
@@ -258,6 +257,10 @@ stack-moved:
 # workflow, which runs the self-test as its own first step — true, and invisible
 # to a checker that reads this tree. Proving it here is the better half anyway:
 # it fails on the machine that broke it rather than after a push.
+# IMPLEMENTATION-STATUS.md, written from status.toml — the file the release gates read.
+status:
+    python3 scripts/implementation_status.py --write
+
 scripts:
     uvx ruff@0.16.4 check scripts/
     python3 scripts/every_proof_runs.py
@@ -266,6 +269,8 @@ scripts:
     python3 scripts/the_requirements_an_entry_names.py --self-test
     python3 scripts/no_open_codeql_alert.py --self-test
     python3 scripts/the_gate_a_tag_must_pass.py --self-test
+    python3 scripts/implementation_status.py --self-test
+    python3 scripts/implementation_status.py --check
     python3 scripts/verify_dist_installer.py --self-test
     python3 scripts/the_tag_a_shell_never_sees.py --self-test
     python3 scripts/pin_release_actions.py --self-test
@@ -310,7 +315,7 @@ typos:
 #  - `allow-dirty = ["ci"]` (needed so CI tolerates our patch below) also makes
 #    `dist generate` REFUSE to write release.yml, so we drop it for the regen and
 #    restore it after.
-#  - cargo-dist always ends the release by publishing (`--draft=false`); OPS-R1
+#  - cargo-dist always ends the release by publishing (`--draft=false`); governance
 #    wants a tag to leave a DRAFT a maintainer publishes, and there is no config
 #    for "stay drafted", so we flip that one flag.
 #
@@ -356,8 +361,8 @@ release-workflow:
 # applicable code is instead kept coverable — see .docs/architecture/error-model.md
 # on writing assertions that leave no branch a test cannot reach.
 #
-# NOTE: this regex is duplicated in .github/workflows/sonar.yml — change both.
-skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lemonfiber/src/terminal(\.rs|/.*\.rs)|crates/lemonfiber-adapters/src/nntp\.rs|crates/.*/examples/.*\.rs)'
+# The pattern lives in `.config/coverage-skipped`, which `sonar.yml` reads too.
+skipped := `cat .config/coverage-skipped`
 
 # `--no-fail-fast` because `sonar.yml` passes it and this has to be the same line.
 # Without it one failing test stops the run and the profile is whatever had been
@@ -372,7 +377,7 @@ skipped := '(crates/lemonfiber/src/(main|keyboard|context|engine)\.rs|crates/lem
 #
 # 100% on applicable code, the line `sonar` runs.
 coverage:
-    cargo llvm-cov nextest --workspace --no-fail-fast --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
+    cargo llvm-cov nextest --workspace --no-fail-fast --profile ci --ignore-filename-regex '{{ skipped }}' --fail-under-lines 100 --lcov --output-path lcov.info \
         || { just uncovered; exit 1; }
 
 # What the gate counted and could not name, from the profile already gathered.
