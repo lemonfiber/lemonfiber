@@ -1899,6 +1899,41 @@
       "fields": {},
       "variants": []
     },
+    "Filtered": {
+      "fields": {
+        "forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "needs": {
+          "type": [
+            "ref:StackProtocol"
+          ],
+          "required": true
+        },
+        "profile": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "Finding": {
       "fields": {
         "category": {
@@ -1985,6 +2020,23 @@
           "required": true
         },
         "stops": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Footprint": {
+      "fields": {
+        "estimated_mib": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "unestimated": {
           "type": [
             "array[string]"
           ],
@@ -4156,6 +4208,18 @@
           ],
           "required": true
         },
+        "filtered": {
+          "type": [
+            "array[ref:Filtered]"
+          ],
+          "required": true
+        },
+        "footprint": {
+          "type": [
+            "ref:Footprint"
+          ],
+          "required": true
+        },
         "forms": {
           "type": [
             "array[string]"
@@ -6219,6 +6283,12 @@
           ],
           "required": false
         },
+        "forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
         "id": {
           "type": [
             "string"
@@ -6830,6 +6900,12 @@
     },
     "StatusReport": {
       "fields": {
+        "active_forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
         "condition": {
           "type": [
             "ref:Condition"
@@ -6839,6 +6915,12 @@
         "disturbs": {
           "type": [
             "ref:Disturbances"
+          ],
+          "required": true
+        },
+        "filtered": {
+          "type": [
+            "array[ref:Filtered]"
           ],
           "required": true
         },

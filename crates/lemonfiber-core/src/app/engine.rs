@@ -12,6 +12,7 @@ use crate::model::{
 };
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
+use crate::stack::standing::{brought, left_out};
 
 mod diagnosis;
 mod fetching;
@@ -167,14 +168,16 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
+    let protocols = ctx.settings.protocols;
+    let whole: Vec<String> = manifest
+        .profiles
+        .iter()
+        .map(|profile| profile.id.clone())
+        .collect();
     let profiles: Vec<String> = if forms.is_empty() {
-        manifest
-            .profiles
-            .iter()
-            .map(|profile| profile.id.clone())
-            .collect()
+        whole.clone()
     } else {
-        resolve(&manifest, forms, ctx.settings.protocols)
+        resolve(&manifest, forms, protocols)
             .map_err(|err| Box::new(err.problem()))?
             .profiles
             .into_iter()
@@ -186,7 +189,14 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let services = survey(&manifest, &profiles, &containers);
+    // Surveyed whole and narrowed after, because which forms are up is a question
+    // about every service they hold rather than about the ones asked after.
+    let everything = survey(&manifest, &whole, &containers, protocols);
+    let brought = brought(&manifest, protocols, &everything);
+    let services: Vec<_> = everything
+        .into_iter()
+        .filter(|service| profiles.contains(&service.profile))
+        .collect();
 
     // Read from the manifest rather than from what is running, because a declaration
     // this build cannot reach is unreachable whether or not the container is up — and
@@ -197,6 +207,8 @@ pub(super) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
 
     Ok(StatusReport {
         forms: forms.to_vec(),
+        active_forms: brought.iter().map(|(form, _)| form.clone()).collect(),
+        filtered: left_out(&manifest, &brought),
         condition: condition(&services),
         undeclared: undeclared(&manifest, &containers),
         services,

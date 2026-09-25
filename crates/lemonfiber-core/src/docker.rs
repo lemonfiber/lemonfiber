@@ -110,6 +110,12 @@ pub struct Service {
     pub describes: String,
     /// The profile that declared it.
     pub profile: String,
+    /// Every form it is running for, in the order the stack declares them.
+    ///
+    /// All of them rather than one, because a service two forms share is there for
+    /// both, and stopping one of them leaves it running for the other. Empty where no
+    /// form it belongs to is up: a service nobody's form holds is not missing from one.
+    pub forms: Vec<String>,
     /// What it is doing.
     pub state: State,
     /// How much its absence costs, so a summary can weigh it.
@@ -170,14 +176,38 @@ fn read(container: &Container) -> State {
     }
 }
 
-/// What every service in the named profiles is doing.
+/// What every service in the named profiles is doing, and which forms it is up for.
 ///
 /// Services are taken from the manifest rather than from the listing, so a
 /// service that was never started is reported as absent rather than omitted —
 /// which is the difference between a dashboard saying nothing is wrong and one
 /// saying nothing is there.
+///
+/// Which forms a service is up for is read from the whole stack whatever profiles
+/// were asked about, since whether a form is up is a question about all of its
+/// services. `protocols` decides what each form resolves to.
 #[must_use]
-pub fn survey(manifest: &Manifest, profiles: &[String], containers: &[Container]) -> Vec<Service> {
+pub fn survey(
+    manifest: &Manifest,
+    profiles: &[String],
+    containers: &[Container],
+    protocols: crate::config::Protocols,
+) -> Vec<Service> {
+    let mut whole = surveyed(manifest, containers);
+    let brought = crate::stack::standing::brought(manifest, protocols, &whole);
+    whole.retain(|service| profiles.iter().any(|profile| profile == &service.profile));
+    for service in &mut whole {
+        service.forms = brought
+            .iter()
+            .filter(|(_, plan)| plan.services.contains(&service.id))
+            .map(|(form, _)| form.clone())
+            .collect();
+    }
+    whole
+}
+
+/// What every service the stack declares is doing, worst first.
+fn surveyed(manifest: &Manifest, containers: &[Container]) -> Vec<Service> {
     let found: BTreeMap<&str, &Container> = containers
         .iter()
         .map(|container| (container.service.as_str(), container))
@@ -186,12 +216,12 @@ pub fn survey(manifest: &Manifest, profiles: &[String], containers: &[Container]
     let mut services: Vec<Service> = manifest
         .services
         .iter()
-        .filter(|service| profiles.iter().any(|profile| profile == &service.profile))
         .map(|service| Service {
             id: service.id.clone(),
             name: service.name.clone(),
             describes: service.describes.clone(),
             profile: service.profile.clone(),
+            forms: Vec::new(),
             state: if service.host_managed {
                 State::HostManaged
             } else {
@@ -377,6 +407,7 @@ mod tests {
         condition, read, stopping_order, survey, undeclared, unsettled, Condition, Service, State,
         UNDESCRIBED,
     };
+    use crate::config::Protocols;
     use crate::ports::docker::{Container, Health, Lifecycle};
 
     const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
@@ -419,6 +450,7 @@ mod tests {
             name: id.to_owned(),
             describes: format!("what {id} is for"),
             profile: "torrent".to_owned(),
+            forms: Vec::new(),
             state: State::Healthy,
             criticality: Criticality::Core,
             depends_on: on.iter().map(|id| (*id).to_owned()).collect(),
@@ -602,7 +634,8 @@ mod tests {
     #[test]
     fn a_service_that_was_never_started_is_absent_rather_than_missing_from_the_report() {
         let profiles = ["media".to_owned()];
-        let surveyed = manifest().map(|manifest| survey(&manifest, &profiles, &[]));
+        let surveyed =
+            manifest().map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()));
 
         assert_eq!(
             surveyed.as_ref().map(|services| services
@@ -622,7 +655,7 @@ mod tests {
     fn a_survey_covers_the_named_profiles_and_nothing_else() {
         let profiles = ["media".to_owned()];
         let surveyed = manifest()
-            .map(|manifest| survey(&manifest, &profiles, &[]))
+            .map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()))
             .unwrap_or_default();
 
         assert!(!surveyed.is_empty());
@@ -649,13 +682,37 @@ mod tests {
             .collect();
 
         let surveyed = manifest()
-            .map(|manifest| survey(&manifest, &profiles, &containers))
+            .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
             .unwrap_or_default();
         assert_eq!(
             surveyed.first().map(|service| service.id.clone()),
             Some(broken.to_owned()),
             "the thing that needs the operator comes before the things that do not"
         );
+    }
+
+    /// Every service `library` holds is up, so each says `library` brought it, and a
+    /// service outside it says nothing brought it rather than guessing.
+    #[test]
+    fn a_surveyed_service_names_the_form_it_is_running_for() {
+        let containers: Vec<Container> = MEDIA
+            .iter()
+            .map(|id| container(id, Lifecycle::Running, Health::Healthy))
+            .collect();
+        let profiles = ["media".to_owned(), "search".to_owned()];
+        let surveyed = manifest()
+            .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
+            .unwrap_or_default();
+
+        assert!(!surveyed.is_empty());
+        for service in &surveyed {
+            let expected: &[&str] = if service.profile == "media" {
+                &["library"]
+            } else {
+                &[]
+            };
+            assert_eq!(service.forms, expected, "{}", service.id);
+        }
     }
 
     /// Everything the `media` profile declares.
@@ -723,7 +780,7 @@ profiles = ["media"]
         // mean absent — and absent is an invitation to start it.
         let surveyed = Manifest::from_toml(NATIVE)
             .ok()
-            .map(|manifest| survey(&manifest, &profiles, &[]))
+            .map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()))
             .unwrap_or_default();
 
         assert_eq!(
@@ -753,7 +810,7 @@ profiles = ["media"]
             .map(|id| container(id, state, health))
             .collect();
         manifest()
-            .map(|manifest| survey(&manifest, &profiles, &containers))
+            .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
             .unwrap_or_default()
     }
 
@@ -785,7 +842,7 @@ profiles = ["media"]
 
         let profiles = ["media".to_owned()];
         let absent = manifest()
-            .map(|manifest| survey(&manifest, &profiles, &[]))
+            .map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()))
             .unwrap_or_default();
         assert_eq!(condition(&absent), Condition::Inactive);
 
@@ -947,7 +1004,7 @@ profiles = ["media"]
             Health::None,
         )];
         let surveyed = manifest()
-            .map(|manifest| survey(&manifest, &profiles, &containers))
+            .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
             .unwrap_or_default();
 
         assert!(

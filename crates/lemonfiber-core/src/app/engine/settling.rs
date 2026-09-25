@@ -49,7 +49,7 @@ async fn settle(
             .list(&ctx.settings.project)
             .await
             .map_err(|err| Box::new(err.problem()))?;
-        let services = survey(manifest, profiles, &containers);
+        let services = survey(manifest, profiles, &containers, ctx.settings.protocols);
 
         let waiting: Vec<String> = unsettled(&services)
             .into_iter()

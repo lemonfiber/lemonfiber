@@ -4762,6 +4762,13 @@
               ],
               "format": "int32"
             },
+            "forms": {
+              "description": "Every form it is running for, in the order the stack declares them.\n\nAll of them rather than one, because a service two forms share is there for\nboth, and stopping one of them leaves it running for the other. Empty where no\nform it belongs to is up: a service nobody's form holds is not missing from one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "id": {
               "description": "The service's identifier, which is also its Compose service name.",
               "type": "string"
@@ -4784,6 +4791,7 @@
             "name",
             "describes",
             "profile",
+            "forms",
             "state",
             "criticality",
             "depends_on"
@@ -8047,6 +8055,65 @@
             "needs"
           ]
         },
+        "Filtered": {
+          "description": "A service a closure asked for that the configuration leaves out, and why.",
+          "type": "object",
+          "properties": {
+            "forms": {
+              "description": "The forms that asked for it, in the order the stack declares them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "The service's identifier.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "needs": {
+              "description": "The provider it cannot run without.",
+              "$ref": "#/$defs/StackProtocol"
+            },
+            "profile": {
+              "description": "The profile it belongs to, which is what the configuration leaves out.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "profile",
+            "needs",
+            "forms"
+          ]
+        },
+        "Footprint": {
+          "description": "The memory the stack estimates a set of services needs.\n\nAn estimate by name as well as by description, because a figure read as a\nmeasurement is one an operator believes and acts on. It is the sum of what each\nservice declares; nothing here has looked at anything running.",
+          "type": "object",
+          "properties": {
+            "estimated_mib": {
+              "description": "The sum of the estimates the services declare, in MiB.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "unestimated": {
+              "description": "The services that declare no estimate, and so are not in the sum.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "estimated_mib",
+            "unestimated"
+          ]
+        },
         "LifecycleReport": {
           "description": "What a lifecycle command did, or would have done.",
           "type": "object",
@@ -8157,6 +8224,17 @@
                 "$ref": "#/$defs/Dropped"
               }
             },
+            "filtered": {
+              "description": "The services those profiles hold, each with what it needed and who asked.\n\nThe same answer as [`Self::dropped`], a service at a time. A surface showing what\ndid not start shows services, and one holding its own copy of which service sits\nin which profile would be a second copy of the stack's vocabulary.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Filtered"
+              }
+            },
+            "footprint": {
+              "description": "What the stack estimates the services that would start need.",
+              "$ref": "#/$defs/Footprint"
+            },
             "forms": {
               "description": "The forms the operator named, in the order they named them.",
               "type": "array",
@@ -8184,7 +8262,9 @@
             "forms",
             "profiles",
             "services",
-            "dropped"
+            "dropped",
+            "filtered",
+            "footprint"
           ]
         },
         "Service": {
@@ -8214,6 +8294,13 @@
               ],
               "format": "int32"
             },
+            "forms": {
+              "description": "Every form it is running for, in the order the stack declares them.\n\nAll of them rather than one, because a service two forms share is there for\nboth, and stopping one of them leaves it running for the other. Empty where no\nform it belongs to is up: a service nobody's form holds is not missing from one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "id": {
               "description": "The service's identifier, which is also its Compose service name.",
               "type": "string"
@@ -8236,6 +8323,7 @@
             "name",
             "describes",
             "profile",
+            "forms",
             "state",
             "criticality",
             "depends_on"
@@ -11343,6 +11431,65 @@
             "needs"
           ]
         },
+        "Filtered": {
+          "description": "A service a closure asked for that the configuration leaves out, and why.",
+          "type": "object",
+          "properties": {
+            "forms": {
+              "description": "The forms that asked for it, in the order the stack declares them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "The service's identifier.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "needs": {
+              "description": "The provider it cannot run without.",
+              "$ref": "#/$defs/StackProtocol"
+            },
+            "profile": {
+              "description": "The profile it belongs to, which is what the configuration leaves out.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "profile",
+            "needs",
+            "forms"
+          ]
+        },
+        "Footprint": {
+          "description": "The memory the stack estimates a set of services needs.\n\nAn estimate by name as well as by description, because a figure read as a\nmeasurement is one an operator believes and acts on. It is the sum of what each\nservice declares; nothing here has looked at anything running.",
+          "type": "object",
+          "properties": {
+            "estimated_mib": {
+              "description": "The sum of the estimates the services declare, in MiB.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "unestimated": {
+              "description": "The services that declare no estimate, and so are not in the sum.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "estimated_mib",
+            "unestimated"
+          ]
+        },
         "Plan": {
           "description": "What will be run, and what was left out.\n\nSerialisable because it is an answer in its own right: asking what a form\nwould do is a question a script asks as readily as a person, and the plan a\nlifecycle report carries is this same value rather than a retelling of it.",
           "type": "object",
@@ -11353,6 +11500,17 @@
               "items": {
                 "$ref": "#/$defs/Dropped"
               }
+            },
+            "filtered": {
+              "description": "The services those profiles hold, each with what it needed and who asked.\n\nThe same answer as [`Self::dropped`], a service at a time. A surface showing what\ndid not start shows services, and one holding its own copy of which service sits\nin which profile would be a second copy of the stack's vocabulary.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Filtered"
+              }
+            },
+            "footprint": {
+              "description": "What the stack estimates the services that would start need.",
+              "$ref": "#/$defs/Footprint"
             },
             "forms": {
               "description": "The forms the operator named, in the order they named them.",
@@ -11381,7 +11539,9 @@
             "forms",
             "profiles",
             "services",
-            "dropped"
+            "dropped",
+            "filtered",
+            "footprint"
           ]
         },
         "StackProtocol": {
@@ -14100,6 +14260,42 @@
             "switching"
           ]
         },
+        "Filtered": {
+          "description": "A service a closure asked for that the configuration leaves out, and why.",
+          "type": "object",
+          "properties": {
+            "forms": {
+              "description": "The forms that asked for it, in the order the stack declares them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "The service's identifier.",
+              "type": "string"
+            },
+            "name": {
+              "description": "What it is called in front of an operator.",
+              "type": "string"
+            },
+            "needs": {
+              "description": "The provider it cannot run without.",
+              "$ref": "#/$defs/StackProtocol"
+            },
+            "profile": {
+              "description": "The profile it belongs to, which is what the configuration leaves out.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "profile",
+            "needs",
+            "forms"
+          ]
+        },
         "Service": {
           "description": "One service, as it stands.",
           "type": "object",
@@ -14127,6 +14323,13 @@
               ],
               "format": "int32"
             },
+            "forms": {
+              "description": "Every form it is running for, in the order the stack declares them.\n\nAll of them rather than one, because a service two forms share is there for\nboth, and stopping one of them leaves it running for the other. Empty where no\nform it belongs to is up: a service nobody's form holds is not missing from one.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "id": {
               "description": "The service's identifier, which is also its Compose service name.",
               "type": "string"
@@ -14149,6 +14352,7 @@
             "name",
             "describes",
             "profile",
+            "forms",
             "state",
             "criticality",
             "depends_on"
@@ -14204,10 +14408,32 @@
             }
           ]
         },
+        "StackProtocol": {
+          "description": "A download provider a profile can depend on.\n\nSerialisable as well as readable, for the same reason [`Criticality`] is: it\nreaches an operator. A profile left out of a closure is only half reported\nwithout the provider it wanted.",
+          "oneOf": [
+            {
+              "description": "Needs a Usenet provider.",
+              "type": "string",
+              "const": "usenet"
+            },
+            {
+              "description": "Needs a VPN and a torrent client.",
+              "type": "string",
+              "const": "torrent"
+            }
+          ]
+        },
         "StatusReport": {
           "description": "What each service is doing, and what that adds up to.",
           "type": "object",
           "properties": {
+            "active_forms": {
+              "description": "The forms the running services are up for, in the order the stack declares them.\n\nRead from the whole stack whichever forms were asked about. A form counts while\nevery service it holds has been started and none has been stopped, and one\nwholly inside a broader form that counts is left out. Each service names the ones\nit is running for.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "condition": {
               "description": "What the services amount to, as one word.",
               "$ref": "#/$defs/Condition"
@@ -14215,6 +14441,13 @@
             "disturbs": {
               "description": "How long each way of acting on these services takes them away for.\n\nHere so that a surface can say it before it asks the operator to confirm,\nwhich is the only moment saying it is any use.",
               "$ref": "#/$defs/Disturbances"
+            },
+            "filtered": {
+              "description": "What those forms left out for want of a configured provider, service by service.\n\nBeside the services rather than among them: a service filtered out is the\nconfiguration being honoured, not a service that did not start.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Filtered"
+              }
             },
             "forms": {
               "description": "The forms asked about; empty means the whole stack was.",
@@ -14248,6 +14481,8 @@
           },
           "required": [
             "forms",
+            "active_forms",
+            "filtered",
             "condition",
             "services",
             "undeclared",

@@ -378,6 +378,8 @@ fn nothing_started(reason: &str) -> LifecycleReport {
             profiles: BTreeSet::new(),
             services: Vec::new(),
             dropped: Vec::new(),
+            filtered: Vec::new(),
+            footprint: crate::stack::closure::Footprint::default(),
         },
         command: Vec::new(),
         rehearsed: false,

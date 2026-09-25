@@ -247,6 +247,7 @@ mod tests {
             name: id.to_owned(),
             describes: format!("what {id} is for"),
             profile: "media".to_owned(),
+            forms: Vec::new(),
             state,
             criticality,
             exit: None,

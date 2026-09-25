@@ -42,6 +42,88 @@ pub struct Plan {
     pub services: Vec<String>,
     /// Profiles the closure asked for that the configuration does not support.
     pub dropped: Vec<Dropped>,
+    /// The services those profiles hold, each with what it needed and who asked.
+    ///
+    /// The same answer as [`Self::dropped`], a service at a time. A surface showing what
+    /// did not start shows services, and one holding its own copy of which service sits
+    /// in which profile would be a second copy of the stack's vocabulary.
+    pub filtered: Vec<Filtered>,
+    /// What the stack estimates the services that would start need.
+    pub footprint: Footprint,
+}
+
+/// A service a closure asked for that the configuration leaves out, and why.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Filtered {
+    /// The service's identifier.
+    pub id: String,
+    /// What it is called in front of an operator.
+    pub name: String,
+    /// The profile it belongs to, which is what the configuration leaves out.
+    pub profile: String,
+    /// The provider it cannot run without.
+    pub needs: Protocol,
+    /// The forms that asked for it, in the order the stack declares them.
+    pub forms: Vec<String>,
+}
+
+/// The memory the stack estimates a set of services needs.
+///
+/// An estimate by name as well as by description, because a figure read as a
+/// measurement is one an operator believes and acts on. It is the sum of what each
+/// service declares; nothing here has looked at anything running.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Footprint {
+    /// The sum of the estimates the services declare, in MiB.
+    pub estimated_mib: u64,
+    /// The services that declare no estimate, and so are not in the sum.
+    pub unestimated: Vec<String>,
+}
+
+/// The services these profiles leave out, each named with what it needed and which
+/// of `forms` asked for it.
+///
+/// `forms` is read against the manifest rather than trusted: a form that asked for a
+/// service is one whose declared closure holds its profile.
+#[must_use]
+pub fn filtered(manifest: &Manifest, dropped: &[Dropped], forms: &[String]) -> Vec<Filtered> {
+    manifest
+        .services
+        .iter()
+        .filter_map(|service| {
+            let out = dropped.iter().find(|out| out.profile == service.profile)?;
+            let asked = manifest
+                .forms
+                .iter()
+                .filter(|form| forms.contains(&form.id))
+                .filter(|form| form.profiles.contains(&service.profile))
+                .map(|form| form.id.clone())
+                .collect();
+            Some(Filtered {
+                id: service.id.clone(),
+                name: service.name.clone(),
+                profile: service.profile.clone(),
+                needs: out.needs,
+                forms: asked,
+            })
+        })
+        .collect()
+}
+
+/// What the stack estimates these services need.
+fn footprint(manifest: &Manifest, services: &[String]) -> Footprint {
+    let mut estimate = Footprint::default();
+    for service in manifest
+        .services
+        .iter()
+        .filter(|service| services.contains(&service.id))
+    {
+        match service.memory_mib {
+            Some(mib) => estimate.estimated_mib += u64::from(mib),
+            None => estimate.unestimated.push(service.id.clone()),
+        }
+    }
+    estimate
 }
 
 /// A profile left out of a closure, and what it would have needed.
@@ -191,6 +273,8 @@ fn planned(
     Ok(Plan {
         forms: forms.to_vec(),
         profiles,
+        filtered: filtered(manifest, &dropped, forms),
+        footprint: footprint(manifest, &services),
         services,
         dropped,
     })
@@ -357,8 +441,8 @@ mod tests {
     use lemonfiber_manifest::Manifest;
 
     use super::{
-        distance, everything, nearest, resolve, Diagnose, Dropped, Failure, Plan, Protocol,
-        Protocols,
+        distance, everything, nearest, resolve, Diagnose, Dropped, Failure, Footprint, Plan,
+        Protocol, Protocols,
     };
     use crate::error::{Severity, State};
 
@@ -817,5 +901,56 @@ composable = false
             .and_then(|manifest| everything(&manifest, Protocols::both()).ok());
 
         assert_eq!(plan.map(|plan| plan.forms), Some(Vec::new()));
+    }
+
+    /// A plan for `dl` against a stack where every service estimates 100 MiB but one.
+    fn estimated(silent: &str, protocols: Protocols) -> Option<Plan> {
+        let mut manifest = Manifest::from_toml(STACK).ok()?;
+        for service in &mut manifest.services {
+            service.memory_mib = (service.id != silent).then_some(100);
+        }
+        resolve(&manifest, &named(&["dl"]), protocols).ok()
+    }
+
+    #[test]
+    fn a_footprint_is_the_sum_of_what_the_services_would_start_declare() {
+        let plan = estimated("sabnzbd", Protocols::both());
+        assert_eq!(
+            plan.map(|plan| plan.footprint),
+            Some(Footprint {
+                estimated_mib: 200,
+                unestimated: named(&["sabnzbd"]),
+            }),
+            "the tunnel and the torrent client are counted, and the one that is silent is named"
+        );
+    }
+
+    #[test]
+    fn a_footprint_counts_nothing_the_configuration_leaves_out() {
+        let usenet_only = Protocols {
+            usenet: true,
+            torrent: false,
+        };
+        let plan = estimated("", usenet_only);
+        assert_eq!(plan.map(|plan| plan.footprint.estimated_mib), Some(100));
+    }
+
+    /// The same answer as the dropped profiles, a service at a time, naming the form
+    /// that asked for each.
+    #[test]
+    fn a_filtered_service_is_named_with_what_it_needed_and_who_asked() {
+        let usenet_only = Protocols {
+            usenet: true,
+            torrent: false,
+        };
+        let filtered = plan(&["search", "dl"], usenet_only)
+            .map(|plan| plan.filtered)
+            .unwrap_or_default();
+        let ids: Vec<&str> = filtered.iter().map(|out| out.id.as_str()).collect();
+        assert_eq!(ids, vec!["gluetun", "qbittorrent"]);
+        assert!(filtered.iter().all(|out| out.needs == Protocol::Torrent
+            && out.profile == "torrent"
+            && out.forms == named(&["dl"])
+            && !out.name.is_empty()));
     }
 }

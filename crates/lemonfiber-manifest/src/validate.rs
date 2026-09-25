@@ -180,6 +180,7 @@ fn check_services(
             .chain(placed(service, profiles))
             .chain(pinned(service))
             .chain(published(service))
+            .chain(estimated(service))
             .chain(licensed(service, &osi))
             .chain(released(service, today))
             .chain(permitted(service))
@@ -349,6 +350,12 @@ fn pinned(service: &Service) -> Option<String> {
 fn published(service: &Service) -> Option<String> {
     (service.port.is_some() && service.bind.is_none())
         .then(|| "publishes a port and does not say which interface".to_owned())
+}
+
+/// A memory estimate, where one is declared, is some memory.
+fn estimated(service: &Service) -> Option<String> {
+    (service.memory_mib == Some(0))
+        .then(|| "estimates it needs no memory at all, which is not an estimate".to_owned())
 }
 
 /// A service declares a licence anyone can look up.
@@ -602,6 +609,14 @@ mod tests {
         assert!(messages(&text)
             .iter()
             .any(|m| m.contains("does not say which interface")));
+    }
+
+    #[test]
+    fn a_memory_estimate_of_nothing_is_caught() {
+        let text = edited("memory_mib = 600\n", "memory_mib = 0\n");
+        assert!(messages(&text)
+            .iter()
+            .any(|m| m.contains("needs no memory at all")));
     }
 
     #[test]

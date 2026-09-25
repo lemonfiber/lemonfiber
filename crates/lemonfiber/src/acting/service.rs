@@ -279,6 +279,7 @@ pub(crate) mod tests {
             name: name.to_owned(),
             describes: format!("what {id} is for"),
             profile: "tv".to_owned(),
+            forms: Vec::new(),
             state,
             criticality: Criticality::Core,
             depends_on: Vec::new(),

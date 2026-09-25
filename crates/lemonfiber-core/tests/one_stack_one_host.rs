@@ -166,6 +166,8 @@ fn a_compose_invocation_names_one_project() {
             profiles: ["media".to_owned()].into_iter().collect(),
             services: vec!["sonarr".to_owned()],
             dropped: Vec::new(),
+            filtered: Vec::new(),
+            footprint: lemonfiber_core::stack::closure::Footprint::default(),
         },
         &Settings::default(),
         Path::new("/tmp/lemonfiber-one-host"),

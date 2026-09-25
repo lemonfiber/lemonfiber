@@ -144,6 +144,8 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
             .map(|placed| placed.service.clone())
             .collect(),
         dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
     };
     build(&plan, &settings, stack, action, ctx.environment)
 }
@@ -187,6 +189,8 @@ pub(super) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
         profiles: std::iter::once(profile.to_owned()).collect(),
         services: vec![service.to_owned()],
         dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
     };
     let restart = Action::Restart(vec![service.to_owned()]);
     let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);

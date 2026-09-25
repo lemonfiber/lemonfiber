@@ -917,6 +917,8 @@ mod tests {
             }),
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
+                active_forms: Vec::new(),
+                filtered: Vec::new(),
                 condition: lemonfiber_core::docker::Condition::Inactive,
                 undeclared: Vec::new(),
                 services: Vec::new(),
