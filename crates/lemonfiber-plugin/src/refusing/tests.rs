@@ -384,7 +384,7 @@ fn a_value_a_diff_cannot_show_is_refused() {
 fn every_string_the_whole_manifest_declares_is_swept() {
     let read = Manifest::from_toml(crate::schema::tests::WHOLE).ok();
     let swept = read.as_ref().map(|manifest| declared(manifest).len());
-    assert_eq!(swept, Some(22));
+    assert_eq!(swept, Some(30));
 }
 
 /// A recipe that takes a value out of an answer and says nothing about holding

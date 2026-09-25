@@ -138,10 +138,11 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
             ],
         ),
         ("webpki_roots", &["lemonfiber-adapters/src/nntp.rs"]),
-        // Not an adapter — YAML is a format, and reading one is pure. Confined
-        // for the same reason the rest are: the day something else wants to read
-        // a compose file, it asks the module that already knows how.
-        ("serde_yaml_ng", &["stack/mounts.rs"]),
+        // Not an adapter — YAML is a format, and reading or writing one is pure.
+        // Confined for the same reason the rest are: the stack's compose files are
+        // read in one module and a plugin's is written in one, and the day something
+        // else wants either, it asks the module that already knows how.
+        ("serde_yaml_ng", &["stack/mounts.rs", "plugin/container"]),
         // Nor is this one. Hashing a password is pure, and it is confined for a
         // sharper reason than the rest: a second place that hashed one its own way
         // would be a second set of parameters, and the weaker of the two would be

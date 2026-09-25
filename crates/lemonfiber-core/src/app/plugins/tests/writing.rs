@@ -33,7 +33,7 @@ async fn the_document_on_disk_is_the_container_the_record_derives() {
     let written = std::fs::read_to_string(stack_of(&ctx).join("compose/plugins/komga.yml"))
         .unwrap_or_default();
     assert_eq!(written, recorded);
-    assert!(written.contains("profiles: [plugin-komga]"));
+    assert!(written.contains("profiles:\n    - plugin-komga\n"));
 }
 
 /// The whole of what makes a plugin's changes ordinary: they are in the record
@@ -280,7 +280,7 @@ async fn a_leftover_document_is_overwritten_and_not_recorded_as_made() {
     );
     assert!(std::fs::read_to_string(&document)
         .unwrap_or_default()
-        .contains("profiles: [plugin-komga]"));
+        .contains("profiles:\n    - plugin-komga\n"));
     assert!(
         !made_paths(&ctx)
             .iter()

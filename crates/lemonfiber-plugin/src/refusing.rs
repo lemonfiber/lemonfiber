@@ -27,6 +27,7 @@
 //! contribution was judged.
 
 mod bundled;
+pub mod carried;
 mod colliding;
 mod evidence;
 mod naming;
@@ -61,6 +62,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     reaching::beyond(manifest, &mut found);
     naming::wired(manifest, &mut found);
     naming::about(manifest, &mut found);
+    carried::carried(manifest, &mut found);
     evidence::asking(manifest, &mut found);
     evidence::looking(manifest, &mut found);
     requiring(manifest, &mut found);
@@ -87,12 +89,7 @@ fn declaring(plugin: &Plugin, found: &mut Vec<Violation>) {
                 .to_owned(),
         });
     }
-    if !plugin
-        .id
-        .chars()
-        .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '-')
-        || plugin.id.is_empty()
-    {
+    if !carried::is_plugin_id(&plugin.id) {
         found.push(Violation {
             location: format!("{at}.id"),
             message: format!(
@@ -177,11 +174,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
 fn pinned(service: &Service, found: &mut Vec<Violation>) {
     let at = format!("service {}", service.id);
     let (prefix, length) = DIGEST;
-    let hex = service.digest.strip_prefix(prefix);
-    let good = hex.is_some_and(|after| {
-        after.len() == length && after.chars().all(|letter| letter.is_ascii_hexdigit())
-    });
-    if !good {
+    if !carried::is_digest(&service.digest) {
         found.push(Violation {
             location: format!("{at}.digest"),
             message: format!(
@@ -239,12 +232,14 @@ fn placed(service: &Service, found: &mut Vec<Violation>) {
     };
     let at = format!("service {}.config_path", service.id);
     let inside_data = path == DATA || path.starts_with(&format!("{DATA}/"));
-    if !path.starts_with('/') || path == "/" || path.contains("..") || path.contains('$') {
+    if !path.starts_with('/') || path == "/" || path.contains("..") || !carried::is_directory(path)
+    {
         found.push(Violation {
             location: at,
             message: format!(
                 "{path} is not one plain absolute directory; what is permitted is a single \
-                 absolute path that is not the root, with no `..` and nothing interpolated"
+                 absolute path that is not the root, with no `..`, written in letters, digits \
+                 and `._/-` alone"
             ),
         });
         return;
@@ -326,13 +321,40 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
     ];
     for service in &manifest.services {
         let at = format!("service {}", service.id);
+        every.push((format!("{at}.id"), service.id.as_str()));
         every.push((format!("{at}.name"), service.name.as_str()));
         every.push((format!("{at}.image"), service.image.as_str()));
         every.push((format!("{at}.tag"), service.tag.as_str()));
+        if let Some(path) = &service.config_path {
+            every.push((format!("{at}.config_path"), path.as_str()));
+        }
+    }
+    for (at, wiring) in manifest.wirings.iter().enumerate() {
+        let at = wiring.service.as_deref().map_or_else(
+            || format!("wiring #{}", at + 1),
+            |id| format!("wiring {id}"),
+        );
+        for (field, text) in [
+            ("hostname", wiring.hostname.as_deref()),
+            ("dashboard_group", wiring.dashboard_group.as_deref()),
+        ] {
+            if let Some(text) = text {
+                every.push((format!("{at}.{field}"), text));
+            }
+        }
+    }
+    for claim in &manifest.claims {
+        for probe in &claim.probes {
+            every.push((
+                format!("claim {} probe {}.request.path", claim.capability, probe.id),
+                probe.request.path.as_str(),
+            ));
+        }
     }
     for proof in &manifest.proofs {
         let at = format!("proof {}", proof.id);
         every.push((format!("{at}.title"), proof.title.as_str()));
+        every.push((format!("{at}.request.path"), proof.request.path.as_str()));
         every.push((format!("{at}.why"), proof.why.as_str()));
     }
     for entry in &manifest.contributions {
@@ -342,6 +364,10 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
             ("why", entry.why.as_deref()),
             ("action", entry.action.as_deref()),
             ("detail", entry.detail.as_deref()),
+            (
+                "request.path",
+                entry.request.as_ref().map(|request| request.path.as_str()),
+            ),
         ] {
             if let Some(text) = text {
                 every.push((format!("{at}.{field}"), text));
