@@ -54,6 +54,7 @@ pub(super) fn service(id: &str, state: State, exit: Option<i32>) -> Service {
         name: format!("{id} service"),
         describes: format!("what {id} is for"),
         profile: "media".to_owned(),
+        forms: Vec::new(),
         state,
         criticality: Criticality::Core,
         exit,
@@ -224,6 +225,8 @@ pub(crate) fn a_plan(name: &str, dropped: Vec<Dropped>) -> Plan {
         profiles: [name.to_owned()].into_iter().collect(),
         services: vec!["sonarr".to_owned()],
         dropped,
+        filtered: Vec::new(),
+        footprint: lemonfiber_core::stack::closure::Footprint::default(),
     }
 }
 

@@ -501,6 +501,7 @@ pub(crate) mod tests {
             name: "Sonarr".to_owned(),
             describes: "Watches for new episodes and fetches them".to_owned(),
             profile: "tv".to_owned(),
+            forms: Vec::new(),
             state: lemonfiber_core::docker::State::Running,
             criticality: lemonfiber_core::docker::Criticality::Core,
             depends_on: Vec::new(),

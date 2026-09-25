@@ -342,7 +342,7 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
                 Some("the container engine stopped answering".to_owned()),
             );
         };
-        let seen = survey(manifest, &profiles, &containers);
+        let seen = survey(manifest, &profiles, &containers, ctx.settings.protocols);
         let state = seen
             .iter()
             .find(|one| one.id == service)

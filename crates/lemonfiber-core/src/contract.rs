@@ -387,6 +387,8 @@ mod tests {
             Outcome::Stuck(StuckReport::default()),
             Outcome::Status(StatusReport {
                 forms: Vec::new(),
+                active_forms: Vec::new(),
+                filtered: Vec::new(),
                 condition: crate::docker::Condition::Inactive,
                 undeclared: Vec::new(),
                 services: Vec::new(),
@@ -1102,6 +1104,8 @@ mod tests {
             profiles: std::collections::BTreeSet::new(),
             services: Vec::new(),
             dropped: Vec::new(),
+            filtered: Vec::new(),
+            footprint: crate::stack::closure::Footprint::default(),
         }
     }
 

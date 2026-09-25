@@ -44,7 +44,7 @@ pub(crate) async fn permitted(
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let running = survey(manifest, &declared, &containers);
+    let running = survey(manifest, &declared, &containers, ctx.settings.protocols);
 
     let needed = needed_by(manifest, ctx.settings.protocols, &running, forms);
     if needed.is_empty() {

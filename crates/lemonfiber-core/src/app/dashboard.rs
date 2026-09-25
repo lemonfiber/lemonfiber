@@ -500,7 +500,12 @@ async fn observe(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Result<Vec<
         .list(&ctx.settings.project)
         .await
         .map_err(|err| err.problem().summary)?;
-    Ok(survey(manifest, &profiles, &containers))
+    Ok(survey(
+        manifest,
+        &profiles,
+        &containers,
+        ctx.settings.protocols,
+    ))
 }
 
 #[cfg(test)]

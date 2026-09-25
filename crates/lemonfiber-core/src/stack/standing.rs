@@ -14,9 +14,9 @@ use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
 use crate::config::Protocols;
-use crate::docker::{condition, Condition, Service};
+use crate::docker::{condition, Condition, Service, State};
 
-use super::closure::{resolve, Dropped, Plan};
+use super::closure::{filtered, resolve, Dropped, Filtered, Plan};
 
 /// Where one form stands.
 ///
@@ -192,9 +192,72 @@ pub fn needed_by(
         .collect()
 }
 
+/// The forms the services up now are there for, each with what it resolves to.
+///
+/// Looser than [`Standing::Active`], and on purpose. Active asks whether a form is
+/// working; this asks why its services are there, and a service that failed is still
+/// part of the form somebody started. So a form counts here while every service it
+/// holds has been started and none of them has been stopped, whatever state each is
+/// in. A form wholly inside a broader one that counts is left out, for the reason a
+/// superseded form is: its services are there because of the broader one.
+///
+/// In the stack's order. `running` is a survey of the whole stack.
+#[must_use]
+pub fn brought(
+    manifest: &Manifest,
+    protocols: Protocols,
+    running: &[Service],
+) -> Vec<(String, Plan)> {
+    let started: Vec<(String, Plan)> = manifest
+        .forms
+        .iter()
+        .filter_map(|form| {
+            let plan = resolve(manifest, std::slice::from_ref(&form.id), protocols).ok()?;
+            held(running, &plan.services).then(|| (form.id.clone(), plan))
+        })
+        .collect();
+
+    started
+        .iter()
+        .filter(|(form, plan)| {
+            !started.iter().any(|(other, theirs)| {
+                other != form
+                    && theirs.services.len() > plan.services.len()
+                    && plan.services.iter().all(|id| theirs.services.contains(id))
+            })
+        })
+        .cloned()
+        .collect()
+}
+
+/// What the forms that brought the running services left out, service by service.
+///
+/// A profile two of those forms both left out is one answer naming both forms, not two.
+#[must_use]
+pub fn left_out(manifest: &Manifest, brought: &[(String, Plan)]) -> Vec<Filtered> {
+    let mut dropped: Vec<Dropped> = Vec::new();
+    for out in brought.iter().flat_map(|(_, plan)| &plan.dropped) {
+        if !dropped.contains(out) {
+            dropped.push(out.clone());
+        }
+    }
+    let forms: Vec<String> = brought.iter().map(|(form, _)| form.clone()).collect();
+    filtered(manifest, &dropped, &forms)
+}
+
+/// Whether every one of those services has been started and not stopped.
+fn held(running: &[Service], services: &[String]) -> bool {
+    !services.is_empty()
+        && services.iter().all(|id| {
+            running.iter().any(|service| {
+                &service.id == id && !matches!(service.state, State::Absent | State::Stopped)
+            })
+        })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{needed_by, standings, Standing};
+    use super::{brought, left_out, needed_by, standings, Standing};
     use crate::config::Protocols;
     use crate::docker::{Criticality, Service, State};
     use crate::stack::closure::{Dropped, Protocol};
@@ -214,6 +277,7 @@ mod tests {
             name: id.to_owned(),
             describes: format!("what {id} is for"),
             profile: "search".to_owned(),
+            forms: Vec::new(),
             state: State::Healthy,
             criticality: Criticality::Core,
             depends_on: Vec::new(),
@@ -442,5 +506,73 @@ mod tests {
         });
 
         assert_eq!(told, Some(Vec::new()), "{told:?}");
+    }
+
+    /// The forms counted as bringing what is running, by name.
+    fn brought_by(protocols: Protocols, running: &[Service]) -> Vec<String> {
+        stack()
+            .map(|manifest| brought(&manifest, protocols, running))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(form, _)| form)
+            .collect()
+    }
+
+    const USENET_ONLY: Protocols = Protocols {
+        usenet: true,
+        torrent: false,
+    };
+
+    #[test]
+    fn nothing_running_was_brought_by_anything() {
+        assert!(brought_by(Protocols::both(), &[]).is_empty());
+    }
+
+    /// Two forms sharing their indexers and downloaders are both named, and the
+    /// forms inside them are not: `hunt` is up because `tv` and `movies` are.
+    #[test]
+    fn every_form_up_in_its_own_right_is_named_and_none_inside_one() {
+        let mut running = services_of("tv", Protocols::both());
+        running.extend(services_of("movies", Protocols::both()));
+        assert_eq!(
+            brought_by(Protocols::both(), &running),
+            vec!["tv", "movies"]
+        );
+    }
+
+    /// A service that fell over is still part of the form somebody started; its
+    /// failure is its state, not a reason to forget why it is there.
+    #[test]
+    fn a_form_with_a_failed_service_still_brought_the_rest() {
+        let mut running = services_of("library", Protocols::none());
+        if let Some(first) = running.first_mut() {
+            first.state = State::Failed;
+        }
+        assert_eq!(brought_by(Protocols::none(), &running), vec!["library"]);
+    }
+
+    #[test]
+    fn a_form_with_a_stopped_service_brought_nothing() {
+        let mut running = services_of("library", Protocols::none());
+        if let Some(first) = running.first_mut() {
+            first.state = State::Stopped;
+        }
+        assert!(brought_by(Protocols::none(), &running).is_empty());
+    }
+
+    /// What a Usenet-only machine running `tv` and `movies` left out: the tunnel and
+    /// the torrent client, each once, each naming both forms and what it needed.
+    #[test]
+    fn what_the_forms_left_out_is_named_once_with_every_form_that_asked() {
+        let mut running = services_of("tv", USENET_ONLY);
+        running.extend(services_of("movies", USENET_ONLY));
+        let filtered = stack()
+            .map(|manifest| left_out(&manifest, &brought(&manifest, USENET_ONLY, &running)))
+            .unwrap_or_default();
+        let ids: Vec<&str> = filtered.iter().map(|out| out.id.as_str()).collect();
+        assert_eq!(ids, vec!["gluetun", "qbittorrent"]);
+        assert!(filtered.iter().all(|out| out.needs == Protocol::Torrent
+            && out.profile == "torrent"
+            && out.forms == ["tv", "movies"]));
     }
 }

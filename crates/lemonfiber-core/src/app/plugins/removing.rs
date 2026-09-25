@@ -197,6 +197,8 @@ async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
         profiles: std::iter::once(crate::plugin::profile(plugin)).collect(),
         services: services.to_vec(),
         dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
     };
     let command = build(
         &plan,
@@ -327,6 +329,7 @@ mod tests {
             depends_on: Vec::new(),
             grants: Vec::new(),
             host_managed: false,
+            memory_mib: None,
             asks_for: None,
             reaches: None,
         }

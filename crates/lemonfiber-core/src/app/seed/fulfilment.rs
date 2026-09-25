@@ -173,6 +173,7 @@ mod tests {
             depends_on: Vec::new(),
             grants: Vec::new(),
             host_managed: false,
+            memory_mib: None,
             asks_for: None,
             reaches: None,
         }

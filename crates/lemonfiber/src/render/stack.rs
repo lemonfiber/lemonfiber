@@ -9,7 +9,7 @@ use lemonfiber_core::model::{
     UnsupportedReport, Vigil,
 };
 use lemonfiber_core::plural::s;
-use lemonfiber_core::stack::closure::{Plan, Protocol};
+use lemonfiber_core::stack::closure::{Filtered, Footprint, Plan, Protocol};
 use lemonfiber_core::text::plain;
 
 use super::Lines;
@@ -50,7 +50,29 @@ pub(super) fn reset(report: &ResetReport) -> Lines {
 /// every other report — and the count, so a form that quietly grew is visible as a
 /// number before it is a screenful.
 pub(super) fn preview(plan: &Plan) -> Lines {
-    affects(plan, Doing::Starting)
+    let mut lines = affects(plan, Doing::Starting);
+    lines.extend(estimate(&plan.footprint));
+    lines
+}
+
+/// The memory the stack estimates a plan needs, said as the stack's estimate.
+///
+/// Worded as an estimate every time, because a figure read as a measurement is one an
+/// operator believes, and nothing here has measured anything. The services that state
+/// no estimate are named, so a sum that leaves them out says so.
+fn estimate(footprint: &Footprint) -> Lines {
+    let mut lines = Lines::default();
+    let silent = footprint.unestimated.join(", ");
+    match (footprint.estimated_mib, silent.is_empty()) {
+        (0, true) => {}
+        (0, false) => lines.put(format!("the stack states no memory estimate for {silent}")),
+        (mib, true) => lines.put(format!("the stack estimates about {mib} MiB of memory")),
+        (mib, false) => lines.put(format!(
+            "the stack estimates about {mib} MiB of memory, leaving out {silent}, \
+             which state no estimate"
+        )),
+    }
+    lines
 }
 
 /// Which way round an operation is about to move things.
@@ -272,9 +294,26 @@ fn clashes(conflicts: &[ConflictReport]) -> Lines {
 pub(super) fn status(report: &StatusReport) -> Lines {
     let mut lines = Lines::default();
     lines.put(describe(report.condition));
+    if !report.active_forms.is_empty() {
+        lines.put(format!("running for: {}", report.active_forms.join(", ")));
+    }
     lines.extend(show(&report.services));
+    lines.extend(filtered(&report.filtered));
     lines.extend(strangers(&report.undeclared));
     lines.extend(unsupported(&report.unsupported));
+    lines
+}
+
+/// What the running forms left out, a service at a time, with what each one wanted.
+fn filtered(services: &[Filtered]) -> Lines {
+    let mut lines = Lines::default();
+    for out in services {
+        lines.put(format!(
+            "left out: {} — {}",
+            plain(&out.name),
+            wanting(out.needs)
+        ));
+    }
     lines
 }
 
@@ -482,7 +521,7 @@ mod tests {
     use lemonfiber_core::model::{
         LifecycleReport, ResetReport, StackEdit, StatusReport, SupervisionReport,
     };
-    use lemonfiber_core::stack::closure::Dropped;
+    use lemonfiber_core::stack::closure::{Dropped, Filtered, Footprint};
 
     #[test]
     fn a_reset_names_every_change_it_would_revert() {
@@ -856,6 +895,8 @@ mod tests {
     fn a_status_report_leads_with_the_condition() {
         let report = StatusReport {
             forms: vec!["media".to_owned()],
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
             condition: Condition::Degraded,
             undeclared: Vec::new(),
             services: vec![service("sonarr", State::Unhealthy, None)],
@@ -926,6 +967,8 @@ mod tests {
     fn a_container_the_stack_never_declared_is_shown_with_an_unknown_description() {
         let report = StatusReport {
             forms: Vec::new(),
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
             condition: Condition::Inactive,
             undeclared: vec![Undeclared {
                 id: "something-of-their-own".to_owned(),
@@ -959,6 +1002,8 @@ mod tests {
     fn a_stranger_that_failed_is_worded_without_an_exit_code_to_quote() {
         let report = StatusReport {
             forms: Vec::new(),
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
             condition: Condition::Inactive,
             undeclared: vec![Undeclared {
                 id: "something-that-fell-over".to_owned(),
@@ -985,6 +1030,8 @@ mod tests {
     fn a_stack_with_nothing_strange_running_says_nothing_about_strangers() {
         let report = StatusReport {
             forms: Vec::new(),
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
             condition: Condition::Inactive,
             undeclared: Vec::new(),
             services: vec![service("sonarr", State::Absent, None)],
@@ -1000,6 +1047,8 @@ mod tests {
     fn a_service_lemonfiber_cannot_speak_to_is_named_with_why_and_is_not_a_fault() {
         let report = StatusReport {
             forms: Vec::new(),
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
             condition: Condition::Active,
             services: vec![service("theirs", State::Healthy, None)],
             unsupported: vec![UnsupportedReport {
@@ -1024,6 +1073,8 @@ mod tests {
     fn a_stack_with_nothing_unsupported_says_nothing_about_it() {
         let report = StatusReport {
             forms: Vec::new(),
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
             condition: Condition::Active,
             services: vec![service("sonarr", State::Healthy, None)],
             unsupported: Vec::new(),
@@ -1106,5 +1157,57 @@ mod tests {
                 .text();
         assert!(json.contains(r#""kind":"watch""#), "{json}");
         assert!(json.contains(r#""stopped":true"#), "{json}");
+    }
+
+    /// Each way a footprint can stand, said as the stack's estimate every time.
+    #[test]
+    fn a_preview_states_the_memory_the_stack_estimates() {
+        let said = |estimated_mib, unestimated: &[&str]| {
+            let plan = Plan {
+                footprint: Footprint {
+                    estimated_mib,
+                    unestimated: unestimated.iter().map(|id| (*id).to_owned()).collect(),
+                },
+                ..a_plan("tv", Vec::new())
+            };
+            preview(&plan).text()
+        };
+        assert!(!said(0, &[]).contains("memory"));
+        assert!(said(0, &["sonarr"]).contains("the stack states no memory estimate for sonarr"));
+        assert!(said(900, &[]).contains("the stack estimates about 900 MiB of memory"));
+        let partial = said(900, &["sonarr", "bazarr"]);
+        assert!(
+            partial.contains(
+                "about 900 MiB of memory, leaving out sonarr, bazarr, which state no estimate"
+            ),
+            "{partial}"
+        );
+    }
+
+    /// Status says which forms are running and what they left out, beside the services.
+    #[test]
+    fn a_status_report_names_the_running_forms_and_what_they_left_out() {
+        let report = StatusReport {
+            forms: Vec::new(),
+            active_forms: vec!["tv".to_owned(), "movies".to_owned()],
+            filtered: vec![Filtered {
+                id: "gluetun".to_owned(),
+                name: "Gluetun".to_owned(),
+                profile: "torrent".to_owned(),
+                needs: Protocol::Torrent,
+                forms: vec!["tv".to_owned(), "movies".to_owned()],
+            }],
+            condition: Condition::Active,
+            undeclared: Vec::new(),
+            services: vec![service("sonarr", State::Healthy, None)],
+            disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            unsupported: Vec::new(),
+        };
+        let text = status(&report).text();
+        assert!(text.contains("running for: tv, movies"), "{text}");
+        assert!(
+            text.contains("left out: Gluetun — no VPN and torrent client are configured"),
+            "{text}"
+        );
     }
 }

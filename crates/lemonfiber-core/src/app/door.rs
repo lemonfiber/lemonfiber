@@ -27,7 +27,7 @@ pub(super) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         .iter()
         .map(|profile| profile.id.clone())
         .collect();
-    let running = crate::docker::survey(&manifest, &profiles, &containers);
+    let running = crate::docker::survey(&manifest, &profiles, &containers, ctx.settings.protocols);
     // Asked now rather than remembered: a machine renamed since the last look
     // answers as it is, which is the whole of how a changed address is noticed.
     let named = ctx.site.name().await;
@@ -495,6 +495,7 @@ mod tests {
             name: id.to_owned(),
             describes: format!("what {id} is for"),
             profile: "media".to_owned(),
+            forms: Vec::new(),
             state,
             criticality: lemonfiber_manifest::Criticality::Important,
             depends_on: Vec::new(),

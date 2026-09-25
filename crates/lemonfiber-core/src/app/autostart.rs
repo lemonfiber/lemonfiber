@@ -144,6 +144,8 @@ mod tests {
                 profiles: std::collections::BTreeSet::new(),
                 services: Vec::new(),
                 dropped: Vec::new(),
+                filtered: Vec::new(),
+                footprint: crate::stack::closure::Footprint::default(),
             },
             command: Vec::new(),
             rehearsed,

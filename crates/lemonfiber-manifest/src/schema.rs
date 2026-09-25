@@ -250,6 +250,15 @@ pub struct Service {
     /// True where the OS owns the lifecycle rather than Compose.
     #[serde(default)]
     pub host_managed: bool,
+    /// The memory it expects to need, in MiB.
+    ///
+    /// The stack's estimate, and only ever shown as one: a form's footprint is the sum
+    /// of these over the services it would start, and a figure read as a measurement
+    /// is one an operator believes and acts on. Optional because a stack that says
+    /// nothing has not said zero, and the services that are silent are named beside
+    /// the sum rather than counted as costing nothing.
+    #[serde(default)]
+    pub memory_mib: Option<u32>,
 }
 
 /// A service this stack used to carry, and what became of it.

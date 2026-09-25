@@ -90,7 +90,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> {
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let running = survey(&manifest, &declared, &containers);
+    let running = survey(&manifest, &declared, &containers, ctx.settings.protocols);
 
     let mut switched = moved(&running, &plan.services);
     if !switched.stopped.is_empty() {
@@ -229,6 +229,8 @@ fn leaving(manifest: &Manifest, stopping: &[String]) -> Plan {
             .collect(),
         services: stopping.to_vec(),
         dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
     }
 }
 
@@ -246,6 +248,7 @@ mod tests {
             name: id.to_owned(),
             describes: format!("what {id} is for"),
             profile: "media".to_owned(),
+            forms: Vec::new(),
             state,
             criticality: Criticality::Core,
             depends_on: Vec::new(),

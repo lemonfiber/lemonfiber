@@ -146,6 +146,18 @@ impl Disturbances {
 pub struct StatusReport {
     /// The forms asked about; empty means the whole stack was.
     pub forms: Vec<String>,
+    /// The forms the running services are up for, in the order the stack declares them.
+    ///
+    /// Read from the whole stack whichever forms were asked about. A form counts while
+    /// every service it holds has been started and none has been stopped, and one
+    /// wholly inside a broader form that counts is left out. Each service names the ones
+    /// it is running for.
+    pub active_forms: Vec<String>,
+    /// What those forms left out for want of a configured provider, service by service.
+    ///
+    /// Beside the services rather than among them: a service filtered out is the
+    /// configuration being honoured, not a service that did not start.
+    pub filtered: Vec<crate::stack::closure::Filtered>,
     /// What the services amount to, as one word.
     pub condition: crate::docker::Condition,
     /// Each service, worst first.
