@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_plugin::Manifest;
 
-use super::{checked, proved, Asserted, Assertion, Verdict};
+use super::{both, checked, proved, Asserted, Assertion, Verdict};
 
 /// A plugin whose evidence is a proof and a contributed check rather than a claim.
 ///
@@ -362,4 +362,27 @@ fn a_check_with_a_recording_of_each_state_holds_on_one_and_fires_on_the_other() 
             .is_some_and(|one| matches!(one.verdict, Verdict::Unproven { .. })),
         "a recording that is not there establishes nothing"
     );
+}
+
+/// A check with a recording of each state holds only where both verdicts do, and one
+/// it could not run leaves it unproven rather than failed, whichever side that was.
+#[test]
+fn two_verdicts_about_one_check_hold_only_together() {
+    let failed = |fault: &str| Verdict::Failed {
+        faults: vec![fault.to_owned()],
+    };
+    let unproven = || Verdict::Unproven {
+        why: "no recording".to_owned(),
+    };
+    assert_eq!(both(Verdict::Passed, failed("fires")), failed("fires"));
+    assert_eq!(both(failed("holds"), Verdict::Passed), failed("holds"));
+    assert_eq!(both(unproven(), failed("fires")), unproven());
+    assert_eq!(both(failed("holds"), unproven()), unproven());
+    assert_eq!(
+        both(failed("holds"), failed("fires")),
+        Verdict::Failed {
+            faults: vec!["holds".to_owned(), "fires".to_owned()],
+        }
+    );
+    assert_eq!(both(Verdict::Passed, Verdict::Passed), Verdict::Passed);
 }
