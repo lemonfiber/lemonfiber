@@ -1,8 +1,8 @@
 use lemonfiber_manifest::{Criticality, Manifest};
 
 use super::{
-    condition, read, stopping_order, survey, undeclared, unsettled, Condition, Service, State,
-    UNDESCRIBED,
+    condition, condition_of_the_stack, read, stopping_order, survey, undeclared, unsettled,
+    Condition, Service, State, UNDESCRIBED,
 };
 use crate::config::Protocols;
 use crate::ports::docker::{Container, Health, Lifecycle};
@@ -636,5 +636,54 @@ fn two_containers_of_one_strange_service_are_named_once_and_in_order() {
             .map(|one| one.id.as_str())
             .collect::<Vec<_>>(),
         vec!["alpha", "zeta"]
+    );
+}
+
+/// The whole stack, with `library` up and the rest of it never started.
+fn the_library_and_nothing_else() -> Vec<Service> {
+    let whole: Vec<String> = manifest()
+        .map(|manifest| {
+            manifest
+                .profiles
+                .iter()
+                .map(|profile| profile.id.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    let containers: Vec<Container> = MEDIA
+        .iter()
+        .map(|id| container(id, Lifecycle::Running, Health::Healthy))
+        .collect();
+    manifest()
+        .map(|manifest| survey(&manifest, &whole, &containers, Protocols::both()))
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_stack_is_counted_over_what_its_active_forms_asked_for() {
+    let services = the_library_and_nothing_else();
+    let active = ["library".to_owned()];
+    assert_eq!(condition(&services), Condition::Partial);
+    assert_eq!(
+        condition_of_the_stack(&services, &active),
+        Condition::Active,
+        "what no form asked for is not a shortfall"
+    );
+    assert_eq!(
+        condition_of_the_stack(&services, &[]),
+        Condition::Partial,
+        "with no form up, every service is what there is to count"
+    );
+}
+
+#[test]
+fn a_service_no_form_asked_for_still_counts_while_it_is_there() {
+    let mut services = the_library_and_nothing_else();
+    if let Some(stray) = services.iter_mut().find(|service| service.id == "sonarr") {
+        stray.state = State::Failed;
+    }
+    assert_eq!(
+        condition_of_the_stack(&services, &["library".to_owned()]),
+        Condition::Degraded
     );
 }

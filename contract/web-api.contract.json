@@ -14435,7 +14435,7 @@
               }
             },
             "condition": {
-              "description": "What the services amount to, as one word.",
+              "description": "What the services amount to, as one word.\n\nFor the whole stack, counted over what the active forms hold and whatever else\nis there, so a stack running part of itself on purpose reads as active. With no\nform up, and for the forms asked about, counted over every service listed.",
               "$ref": "#/$defs/Condition"
             },
             "disturbs": {
@@ -14457,7 +14457,7 @@
               }
             },
             "services": {
-              "description": "Each service, worst first.",
+              "description": "Each service, worst first.\n\nA service the active forms filtered out is listed only while it is there; one\nthat is not is in `filtered` and nowhere else.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/Service"

@@ -108,3 +108,56 @@ async fn a_status_serialises_under_its_own_kind() {
         Some((crate::model::kind::STATUS, true, true))
     );
 }
+
+#[tokio::test]
+async fn a_stack_running_the_form_it_was_asked_for_is_active_however_little_of_it_that_is() {
+    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+    let ctx = watching(engine);
+    let answered = dispatch(Command::Status { forms: Vec::new() }, &ctx).await;
+    let Ok(Outcome::Status(report)) = answered else {
+        unreachable!("a status answers with a status");
+    };
+    assert_eq!(report.active_forms, vec!["library".to_owned()]);
+    assert_eq!(
+        report.condition,
+        crate::docker::Condition::Active,
+        "the services no form asked for are not a shortfall"
+    );
+}
+
+#[tokio::test]
+async fn a_service_a_form_filtered_out_is_listed_as_filtered_and_not_as_absent() {
+    let settings = Settings {
+        protocols: crate::config::Protocols {
+            usenet: true,
+            torrent: false,
+        },
+        ..Settings::default()
+    };
+    let ctx = a_context()
+        .engine(Arc::new(Reporting::holding(
+            &["sabnzbd"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .settings(settings)
+        .build();
+    let answered = dispatch(Command::Status { forms: Vec::new() }, &ctx).await;
+    let Ok(Outcome::Status(report)) = answered else {
+        unreachable!("a status answers with a status");
+    };
+    let filtered: Vec<&str> = report.filtered.iter().map(|out| out.id.as_str()).collect();
+    let listed: Vec<&str> = report
+        .services
+        .iter()
+        .map(|service| service.id.as_str())
+        .collect();
+    assert_eq!(report.active_forms, vec!["dl".to_owned()]);
+    assert_eq!(filtered, vec!["gluetun", "qbittorrent"]);
+    assert!(
+        !listed.contains(&"gluetun") && !listed.contains(&"qbittorrent"),
+        "{listed:?}"
+    );
+    assert!(listed.contains(&"sabnzbd"), "{listed:?}");
+    assert_eq!(report.condition, crate::docker::Condition::Active);
+}
