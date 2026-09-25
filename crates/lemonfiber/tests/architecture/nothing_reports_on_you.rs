@@ -26,7 +26,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::refused::{banned, belongs, family, resolved, COLLECTING, RUNNING};
-use crate::source_tree::shipped;
+use crate::source_tree::{crates_that_ship, in_a_crate_that_ships, shipped};
 
 /// Whether lemonfiber itself sends a request to a host it names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -364,6 +364,8 @@ fn what_the_source_asks_for_is_what_the_operator_is_told_about() {
 /// port, which is what makes the question answerable at all: every value that could
 /// become an identifier passes through one call, and this holds every reach of that
 /// call to an entry saying what the bytes become and whether they outlive the run.
+/// A crate only tests depend on is built into no release, so what it draws is not
+/// held here.
 ///
 /// A reach arriving without an entry is red. That is the whole mechanism — nothing
 /// here can tell an identifier from a password by looking at it, and pretending
@@ -371,8 +373,10 @@ fn what_the_source_asks_for_is_what_the_operator_is_told_about() {
 #[test]
 fn nothing_mints_a_value_this_installation_would_be_known_by() {
     let (port, call) = MINTED_BY;
+    let crates = crates_that_ship();
     let reaching: BTreeSet<String> = shipped()
         .into_iter()
+        .filter(|(file, _)| in_a_crate_that_ships(file, &crates))
         .filter(|(_, ships)| ships.contains(port) && ships.contains(call))
         .map(|(file, _)| file)
         .collect();

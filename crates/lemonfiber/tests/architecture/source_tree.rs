@@ -173,6 +173,53 @@ pub(crate) fn shipped() -> BTreeMap<String, String> {
     found
 }
 
+/// The workspace crates a release is built from: the binary's own and every one it
+/// depends on, followed through each of theirs.
+///
+/// A crate only a `[dev-dependencies]` table names is built for tests and nothing
+/// else, so a check about what a release does asks this before holding a file to it.
+pub(crate) fn crates_that_ship() -> BTreeSet<String> {
+    let root = workspace_root();
+    let mut ships = BTreeSet::new();
+    let mut open = vec!["lemonfiber".to_owned()];
+    while let Some(name) = open.pop() {
+        let Ok(manifest) = fs::read_to_string(root.join("crates").join(&name).join("Cargo.toml"))
+        else {
+            continue;
+        };
+        if !ships.insert(name) {
+            continue;
+        }
+        let Ok(read) = manifest.parse::<toml::Table>() else {
+            unreachable!("every crate manifest in the workspace parses");
+        };
+        let targets = read
+            .get("target")
+            .and_then(toml::Value::as_table)
+            .into_iter()
+            .flat_map(toml::Table::values)
+            .filter_map(toml::Value::as_table);
+        let tables = std::iter::once(&read)
+            .chain(targets)
+            .filter_map(|table| table.get("dependencies"))
+            .filter_map(toml::Value::as_table);
+        open.extend(tables.flat_map(toml::Table::keys).cloned());
+    }
+    assert!(
+        ships.len() > 2,
+        "the binary was found to be built from {ships:?}, which means this is reading the \
+         wrong manifests"
+    );
+    ships
+}
+
+/// Whether the file at this workspace path is built into a release.
+pub(crate) fn in_a_crate_that_ships(path: &str, ships: &BTreeSet<String>) -> bool {
+    path.strip_prefix("crates/")
+        .and_then(|rest| rest.split('/').next())
+        .is_some_and(|name| ships.contains(name))
+}
+
 /// The module trees the compiler only builds for tests.
 ///
 /// `production` cuts a file's own tests off the bottom. This is the other shape: a
