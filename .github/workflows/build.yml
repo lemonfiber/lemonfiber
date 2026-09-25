@@ -153,6 +153,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      # The fuzz harness is its own workspace with its own lockfile, so the check
+      # above does not reach it. Held to the same `deny.toml`.
+      - name: The fuzz harness's dependencies
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: fuzz/Cargo.toml
 
   # The record the binary carries is generated, and a generated file that is
   # committed is a file somebody can edit. This is what makes that visible: the

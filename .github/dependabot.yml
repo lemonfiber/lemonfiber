@@ -77,3 +77,23 @@ updates:
       cargo:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+
+  # The fuzz harness is a workspace of its own, with a lockfile the entry above
+  # does not read.
+  - package-ecosystem: cargo
+    directory: "/fuzz"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Amsterdam
+    labels: ["dependencies"]
+    commit-message:
+      prefix: chore
+      include: scope
+    cooldown:
+      default-days: 3
+    groups:
+      fuzz:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

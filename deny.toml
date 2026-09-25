@@ -85,6 +85,13 @@ allow = [
   "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.9
+# The fuzz harness is its own workspace (`fuzz/`), checked against this file by
+# the `deny` job. libfuzzer-sys carries LLVM's libFuzzer under NCSA, a permissive
+# licence; it is allowed for that crate alone, which links into the fuzz targets
+# and into nothing that ships.
+exceptions = [
+  { crate = "libfuzzer-sys", allow = ["NCSA"] },
+]
 # Our own workspace crates are Hippocratic (license-file); cargo-deny's
 # licence gate is for third-party deps, not first-party code.
 private = { ignore = true }
