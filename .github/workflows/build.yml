@@ -1,5 +1,10 @@
 name: build
-on: [pull_request]
+on:
+  pull_request:
+  # A required context comes from this file, and a merge queue asks for it on the
+  # queue's own branch. Nothing here reads the pull request, so it runs unchanged
+  # over the merged tree.
+  merge_group:
 permissions:
   contents: read
 jobs:

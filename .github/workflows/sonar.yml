@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # `sonar` and `gate / gate` are required, so both have to report on the queue's
+  # branch. The tests and the coverage gate run over the merged tree exactly as on a
+  # pull request. The scan runs too, and SonarCloud records it against the queue's
+  # short-lived branch, since there is no pull request to decorate.
+  merge_group:
 # Read-only for the workflow. The one job that writes — the gate, which posts its
 # verdict on the pull request — asks for that itself.
 permissions:
@@ -77,8 +82,9 @@ jobs:
       #
       # Keyed on who opened the pull request, which is what selects the secret store,
       # and not on `github.triggering_actor`, which becomes whoever pressed re-run. The
-      # event is named too: a push to main carries no pull request, and main's analysis
-      # is what every pull request is measured against.
+      # event is named too: a push to main and a merge group carry no pull request, so
+      # the scan runs on both, and main's analysis is what every pull request is
+      # measured against.
       - name: SonarQube Cloud scan
         id: scan
         if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
@@ -131,11 +137,15 @@ jobs:
     # line saying why. A failed scan still leaves `sonar` red, which is required in
     # its own right. `!cancelled()` rather than `always()`, because a cancelled run
     # is somebody pressing stop.
+    #
+    # On a merge group the shared gate re-reads the new-issue count of every pull
+    # request in the batch and the open count against the project, and refuses what
+    # it cannot read, since in a queue a pass is a merge.
     if: ${{ !cancelled() }}
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
     with:
       # What this repository carries, declared here so it can be read without a
       # SonarCloud login. A ceiling rather than an allowance: it may not rise past

@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # `alerts / alerts` is required, so it has to report on the queue's branch too. The
+  # shared gate asks about `github.ref` wherever there is no pull request, which on a
+  # merge group is the queue's own branch, and `analyze` has just uploaded an analysis
+  # under exactly that ref.
+  merge_group:
   schedule:
     - cron: "0 6 * * 2"
 permissions:
@@ -68,7 +73,7 @@ jobs:
     permissions:
       contents: read
       security-events: read
-    uses: lemonfiber/spec/.github/workflows/codeql-alerts.yml@719d8380ff919dccc74d056cd4e1b32153ca08a0 # v1.0.14
+    uses: lemonfiber/spec/.github/workflows/codeql-alerts.yml@f7ef911f4276d09240148d0c5ff5a18d9534497d # v1.0.15
     with:
       # A matrix's aggregate: not `success` if either language's analysis failed,
       # which is the right reading — an alert list missing one language's findings
