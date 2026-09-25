@@ -104,6 +104,9 @@ jobs:
   tag:
     needs: gate
     runs-on: ubuntu-latest
+    # The release App's key is held by the `release` environment, which only
+    # `main` and `v*` tags may deploy to.
+    environment: release
     permissions:
       contents: read
     steps:
