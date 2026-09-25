@@ -7352,6 +7352,12 @@
           ],
           "required": false
         },
+        "forms": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
         "short": {
           "type": [
             "string"

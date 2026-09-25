@@ -6386,6 +6386,13 @@
                 "null"
               ]
             },
+            "forms": {
+              "description": "The other forms this product itself writes the word in, where a state or a\nstage is named by one — `grabbed` for `grab`, `seeding` for `seed`.\n\nApart from [`Self::also_called`], which is another service's word and one this\nproduct must never write as its own. These are this product's own words, and a\nsurface explaining a word it was sent looks for the word it was sent here, so\nthat nothing on the far side has to guess which term an inflection belongs to.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "short": {
               "description": "One sentence: what it is for and what it costs or gains.\n\nEnough to act on. Somebody who reads only this should not be stuck.",
               "type": "string"
@@ -6398,7 +6405,8 @@
           "required": [
             "word",
             "short",
-            "also_called"
+            "also_called",
+            "forms"
           ]
         },
         "Vocabulary": {
@@ -18636,6 +18644,13 @@
                 "null"
               ]
             },
+            "forms": {
+              "description": "The other forms this product itself writes the word in, where a state or a\nstage is named by one — `grabbed` for `grab`, `seeding` for `seed`.\n\nApart from [`Self::also_called`], which is another service's word and one this\nproduct must never write as its own. These are this product's own words, and a\nsurface explaining a word it was sent looks for the word it was sent here, so\nthat nothing on the far side has to guess which term an inflection belongs to.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "short": {
               "description": "One sentence: what it is for and what it costs or gains.\n\nEnough to act on. Somebody who reads only this should not be stuck.",
               "type": "string"
@@ -18648,7 +18663,8 @@
           "required": [
             "word",
             "short",
-            "also_called"
+            "also_called",
+            "forms"
           ]
         }
       }

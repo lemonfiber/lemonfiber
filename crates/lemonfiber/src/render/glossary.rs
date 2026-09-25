@@ -231,6 +231,7 @@ mod tests {
             short: "",
             deep: None,
             also_called: &[],
+            forms: &[],
         })
     }
 
