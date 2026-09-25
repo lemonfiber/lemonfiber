@@ -6,6 +6,11 @@
 # clicks Publish, which is what fires the #releases announcement (releasing.md
 # step 3). Restricted to maintainers; every input is validated before any write.
 #
+# Two jobs, because what decides and what writes are held apart. `gate` runs the
+# spec's gate scripts, read at spec@main, with a read-only token that is never
+# written to disk. `tag` runs nothing from any checkout: it creates the tag the
+# gate approved, on the commit the gate read, through the API.
+#
 # This used to run git-cliff and draft the release itself. Two workflows drafting
 # one release is one release too many — cargo-dist's `gh release create` would
 # find the tag already taken — and the changelog now has a place of its own.
@@ -16,17 +21,18 @@ on:
       version:
         description: "Version to release, e.g. 0.1.0 — must already be set in Cargo.toml on main."
         required: true
-# The write grant belongs to the job that tags and drafts the release, not to
-# the workflow: a top-level grant applies to every job added later, including
-# ones that only need to read. Scorecard's Token-Permissions check scores the
-# whole repository on this, and these two files were the only ones failing it.
+# The write grant belongs to no job here: the tag is created with the release
+# App's token, minted in the one step that uses it. A top-level grant would apply
+# to every job added later, including ones that only need to read.
 permissions:
   contents: read
 jobs:
-  release:
+  gate:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      commit: ${{ steps.main.outputs.commit }}
     steps:
       - name: Gate to maintainers
         env:
@@ -39,10 +45,28 @@ jobs:
             admin|maintain) echo "${ACTOR} is a maintainer (${perm})." ;;
             *) echo "::error::${ACTOR} lacks maintainer permission (${perm}); release refused."; exit 1 ;;
           esac
+      # A dispatch runs the workflow file on the branch it was dispatched from, and
+      # tags the commit at that branch's tip. A release is cut from main.
+      - name: Dispatched from main
+        env:
+          DISPATCHED_FROM: ${{ github.ref }}
+        run: |
+          [ "$DISPATCHED_FROM" = "refs/heads/main" ] \
+            || { echo "::error::dispatched from ${DISPATCHED_FROM}; a release is dispatched from refs/heads/main."; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
           submodules: recursive
+      # The commit the gate reads is the commit the tag names, and it is on main.
+      - name: The commit to tag is on main
+        id: main
+        run: |
+          set -euo pipefail
+          commit=$(git rev-parse HEAD)
+          git merge-base --is-ancestor "$commit" refs/remotes/origin/main \
+            || { echo "::error::${commit} is not on main; a release is cut from main."; exit 1; }
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
       - name: Validate version against main
         env:
           VERSION: ${{ inputs.version }}
@@ -59,6 +83,9 @@ jobs:
       # release to the goal set as it was, which is the failure mode of every
       # stand-in: right about a moment that has passed. Same path the contract
       # page gate already uses, so there is one answer to where the spec is.
+      #
+      # Its scripts run in this job, and this job holds nothing that can write:
+      # the token is read-only and neither checkout keeps it.
       - name: Check out the canonical spec
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,11 +93,6 @@ jobs:
           ref: main
           path: .spec-canonical
           persist-credentials: false
-      # The step this lane did not have. It validated that the version was on
-      # `main` and matched `Cargo.toml` and checked nothing else, which is how
-      # v0.15.0 went out with a goal unmet while the spec's own release workflow
-      # — where the gate lives — had not run for three days.
-      #
       # Before the tag and after the checkout, so the verdict is about this tree
       # rather than about whatever was gated last. Anything it cannot do is a
       # refusal: a gate that quietly does not run reads as one that passed.
@@ -78,17 +100,49 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: python3 scripts/the_gate_a_tag_must_pass.py --version "$VERSION"
+
+  tag:
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # The release App rather than the workflow's own token, because a tag the
+      # workflow token creates starts no workflow, and release.yml is what this
+      # tag exists to start. Scoped to this repository and to contents.
+      - name: Mint a token that may create the tag
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: lemonfiber
+          permission-contents: write
       # Annotated but unsigned: a runner has no key. `just release-tag` cuts a
       # signed one from a machine that does, and is the path to use where the tag
       # itself should be verifiable.
       - name: Tag the release
         env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPO: ${{ github.repository }}
           VERSION: ${{ inputs.version }}
+          COMMIT: ${{ needs.gate.outputs.commit }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${VERSION}" -m "lemonfiber v${VERSION}"
-          git push origin "v${VERSION}"
+          set -euo pipefail
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "::error::version must be X.Y.Z, got '${VERSION}'."; exit 1; }
+          echo "$COMMIT" | grep -Eq '^[0-9a-f]{40}$' \
+            || { echo "::error::the gate named no commit to tag."; exit 1; }
+          object=$(gh api "repos/${REPO}/git/tags" \
+            -f tag="v${VERSION}" \
+            -f message="lemonfiber v${VERSION}" \
+            -f object="$COMMIT" \
+            -f type=commit \
+            --jq .sha)
+          gh api "repos/${REPO}/git/refs" \
+            -f ref="refs/tags/v${VERSION}" \
+            -f sha="$object" > /dev/null
       - name: Tagged — the pipeline takes it from here
         env:
           VERSION: ${{ inputs.version }}
