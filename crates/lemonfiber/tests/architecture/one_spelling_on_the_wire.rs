@@ -1,8 +1,8 @@
 //! A value on the wire is spelled one way.
 //!
-//! Field names are `snake_case` and values are `kebab-case`, so a reader of any
-//! answer can tell a key from a value by its shape and never has to learn which
-//! enum chose which. A new enum that serialises its variants is held to that here.
+//! An enum's variants reach the wire as `kebab-case`, so a reader of any answer never
+//! has to learn which enum chose which spelling. A new enum that serialises its
+//! variants is held to that here.
 //!
 //! [`FROZEN`] is what is published already under another spelling. Each entry is a
 //! value somebody outside this repository reads today — a plugin author's manifest,
@@ -12,7 +12,7 @@
 
 use syn::visit::Visit;
 
-use crate::source_tree::parsed;
+use crate::source_tree::{parsed, test_only};
 
 /// The one spelling an enum's variants take on the wire.
 const SPELLING: &str = "kebab-case";
@@ -57,10 +57,10 @@ fn spelled() -> Vec<(String, String, String)> {
     }
     let mut found = Vec::new();
     for (path, file) in parsed("crates") {
-        let path = path.to_string_lossy().replace('\\', "/");
-        if !path.contains("/src/") {
+        if test_only(&path) {
             continue;
         }
+        let path = path.to_string_lossy().replace('\\', "/");
         let mut enums = Enums {
             path,
             found: Vec::new(),

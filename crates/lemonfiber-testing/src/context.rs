@@ -1,9 +1,10 @@
 //! The context a test drives a command through.
 //!
-//! A context is built from every seam, a stack, settings and a platform, of which a
-//! test usually varies one or two. This settles the rest, from one of two starting points: [`a_context`], a world that
-//! answers from scripts, and [`a_live_context`], one that runs programs and reads the
-//! disk for real. What a test varies, it names; what it leaves, it gets from here.
+//! A context is built from every seam, a stack, settings and a platform, of which a test
+//! usually varies one or two. This settles the rest, from one of two starting points:
+//! [`a_context`], a world that answers from scripts, and [`a_live_context`], one that
+//! runs programs and reads the disk for real. What a test varies, it names; what it
+//! leaves, it gets from here.
 //!
 //! The transport, the randomness and the other seams a context holds are not here,
 //! because `Ctx` already takes those by name — `with_http`, `with_random` — and this

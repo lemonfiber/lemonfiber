@@ -77,3 +77,5 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     );
     path
 }
+
+mod tests;

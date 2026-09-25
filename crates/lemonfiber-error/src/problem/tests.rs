@@ -16,6 +16,9 @@ fn a_problem() -> Problem {
 fn a_code_shows_as_the_string_it_was_declared_with() {
     assert_eq!(TEST.as_str(), "TEST-1");
     assert_eq!(TEST.to_string(), "TEST-1");
+    // The registry's own declarations are constants, so the one way it declares a
+    // code is reached at run time only here.
+    assert_eq!(Code::declared("TEST-1"), TEST);
 }
 
 #[test]
