@@ -78,21 +78,31 @@ impl FileSystem for Disk {
 }
 
 /// Create the file and write it, or say somebody else got there first.
+///
+/// The file existing is the claim, and what is written in it only names the holder to
+/// whoever is refused. So a claim whose contents would not write is still held: giving
+/// it up would leave a file nobody holds in the way of every run, or a window for a
+/// second one, and a holder that says nothing is a case the reader already handles.
+///
+/// Flushed before it is reported won. A tokio file hands each write to a blocking
+/// task and returns, so an unflushed claim can be read back empty by the next run.
+/// Not synced to disk: after a crash the claim stands until `--force` whatever it
+/// says, and all its contents decide is the wording of a refusal.
 async fn claimed(path: &Path, contents: &str) -> bool {
+    use tokio::io::AsyncWriteExt as _;
     made_room_for(path).await;
     let opened = tokio::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(path)
         .await;
-    match opened {
-        Ok(mut file) => {
-            use tokio::io::AsyncWriteExt as _;
-            let _ = file.write_all(contents.as_bytes()).await;
-            true
-        }
-        Err(_) => false,
+    let Ok(mut file) = opened else {
+        return false;
+    };
+    if file.write_all(contents.as_bytes()).await.is_ok() {
+        let _ = file.flush().await;
     }
+    true
 }
 
 /// Write the file, making its directory first where it has one.
