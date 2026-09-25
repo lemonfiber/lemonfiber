@@ -528,3 +528,82 @@ fn the_refusal_names_the_version_that_wrote_it_and_the_one_refusing() {
 
     let _ = std::fs::remove_dir_all(path.parent().unwrap_or(Path::new("/")));
 }
+
+/// A record is replaced whole and never written in place.
+///
+/// Asked through a handle opened on the record before the write: a record truncated
+/// and rewritten in place would show that handle the new bytes or none, and one
+/// moved into place leaves it the record it opened. A stop part-way through the
+/// write is the case this stands in for — whatever a reader holds is a whole record.
+#[cfg(unix)]
+#[test]
+fn a_record_is_replaced_whole_and_never_written_in_place() {
+    use std::io::Read as _;
+
+    let path = scratch("replaced");
+    assert!(crate::config::store::write(&path, "before\n").is_ok());
+    let held = std::fs::File::open(&*path);
+    assert!(held.is_ok(), "the record opens: {held:?}");
+
+    assert!(crate::config::store::write(&path, "after\n").is_ok());
+
+    let mut seen = String::new();
+    let read = held.and_then(|mut file| file.read_to_string(&mut seen));
+    assert!(read.is_ok(), "{read:?}");
+    assert_eq!(seen, "before\n", "what a reader held was left whole");
+    assert_eq!(
+        std::fs::read_to_string(&*path).ok().as_deref(),
+        Some("after\n")
+    );
+    let staging = path.with_file_name(".env.writing");
+    assert!(!staging.exists(), "nothing is left beside it");
+}
+
+/// A write that cannot be moved into place leaves what was there, and nothing beside it.
+#[test]
+fn a_write_that_cannot_be_moved_into_place_leaves_no_staging_file() {
+    let path = scratch("unmoved");
+    // A directory with something in it where the record would go, which no rename
+    // replaces on any platform.
+    assert!(std::fs::create_dir_all(path.join("occupied")).is_ok());
+
+    let refused = crate::config::store::write(&path, "A=1\n");
+    assert!(
+        matches!(refused, Err(Failure::NotWritten { .. })),
+        "got: {refused:?}"
+    );
+    assert!(
+        path.join("occupied").is_dir(),
+        "what was there is still there"
+    );
+    assert!(
+        !path.with_file_name(".env.writing").exists(),
+        "and the staging file went with the failure"
+    );
+}
+
+/// A link where a record goes is replaced by the record rather than written through.
+#[cfg(unix)]
+#[test]
+fn a_link_where_a_record_goes_is_replaced_rather_than_followed() {
+    let path = scratch("linked");
+    let elsewhere = path.with_file_name("elsewhere");
+    assert!(crate::config::store::write(&elsewhere, "theirs\n").is_ok());
+    assert!(std::os::unix::fs::symlink(&elsewhere, &*path).is_ok());
+
+    assert!(crate::config::store::write(&path, "ours\n").is_ok());
+
+    assert_eq!(
+        std::fs::read_to_string(&elsewhere).ok().as_deref(),
+        Some("theirs\n"),
+        "what the link pointed at is untouched"
+    );
+    assert!(
+        std::fs::symlink_metadata(&*path).is_ok_and(|meta| meta.is_file()),
+        "the record is a file of its own"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&*path).ok().as_deref(),
+        Some("ours\n")
+    );
+}

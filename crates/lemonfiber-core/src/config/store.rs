@@ -206,31 +206,82 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
     if let Err(err) = write_owner_only(path, text).and_then(|()| make_private(path)) {
         return Err(unwritable(path, &err));
     }
+    settled(parent);
     Ok(())
 }
 
-/// Write `text`, creating the file owner-only from the outset where the platform
-/// tracks a file mode, so a secret is never even briefly world-readable in the gap
-/// between creation and tightening. `mode` applies only to a file this creates; an
-/// existing one keeps its mode until the [`make_private`] that follows corrects it.
-#[cfg(unix)]
+/// Write `text` whole beside `path` and move it into place, or leave `path` as it was.
+///
+/// Never written in place. Every record here is read back as the only copy of what
+/// it holds — the settings, the journal, the credential, the register of plugins —
+/// and a file truncated and then refused the rest of its bytes by a full disk or a
+/// stop part-way is that record gone. So the text goes to a staging name beside the
+/// file, is flushed to the disk, and only then renamed over the file, which the
+/// filesystem does in one step: a reader sees the old record or the new one and
+/// never a part of either. A write that fails removes its staging file and leaves the
+/// record untouched, which is what the refusal says happened.
+///
+/// The staging file is created owner-only where the platform tracks a file mode, so a
+/// secret is never even briefly world-readable, and the rename carries that mode onto
+/// the record. What was at `path` is replaced rather than written through, so a link
+/// there is replaced by the record rather than followed to wherever it pointed.
 fn write_owner_only(path: &Path, text: &str) -> std::io::Result<()> {
     use std::io::Write as _;
+    let staging = staging(path);
+    let written = staged(&staging).and_then(|mut file| {
+        file.write_all(text.as_bytes())?;
+        file.sync_all()
+    });
+    let moved = written.and_then(|()| std::fs::rename(&staging, path));
+    if moved.is_err() {
+        let _ = std::fs::remove_file(&staging);
+    }
+    moved
+}
+
+/// The name a record is written under before it is moved into place.
+///
+/// Beside the record rather than in a temporary directory, because a rename is one
+/// step only within one filesystem.
+fn staging(path: &Path) -> PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".writing");
+    path.with_file_name(name)
+}
+
+/// The staging file, created owner-only where the platform tracks a file mode, and
+/// emptied where a stop part-way left one behind.
+#[cfg(unix)]
+fn staged(path: &Path) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt as _;
-    let mut file = std::fs::OpenOptions::new()
+    std::fs::OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
         .mode(0o600)
-        .open(path)?;
-    file.write_all(text.as_bytes())
+        .open(path)
 }
 
-/// Where the platform has no owner-only mode to set at creation, an ordinary write.
+/// Where the platform has no owner-only mode to set at creation, an ordinary create.
 #[cfg(not(unix))]
-fn write_owner_only(path: &Path, text: &str) -> std::io::Result<()> {
-    std::fs::write(path, text)
+fn staged(path: &Path) -> std::io::Result<std::fs::File> {
+    std::fs::File::create(path)
 }
+
+/// Flush the directory a record was just renamed into, so the rename itself survives
+/// a power cut and not only the bytes it moved.
+///
+/// Its failure is not the write's: the record is in place and reads back whole, and
+/// reporting it as unsaved would send an operator to repeat a change that was made.
+#[cfg(unix)]
+fn settled(parent: &Path) {
+    let _ = std::fs::File::open(parent).and_then(|directory| directory.sync_all());
+}
+
+/// Where a directory cannot be opened to be flushed, the platform's own rename is what
+/// there is.
+#[cfg(not(unix))]
+fn settled(_parent: &Path) {}
 
 /// Create the configuration directory, private to its owner where the platform
 /// tracks ownership. The mode is set as the directory is created, so an existing

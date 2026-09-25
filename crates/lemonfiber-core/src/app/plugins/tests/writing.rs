@@ -295,14 +295,10 @@ async fn a_leftover_document_is_overwritten_and_not_recorded_as_made() {
 /// a container running with nothing recording it is the state the order exists to
 /// avoid, not one to leave somebody to find.
 ///
-/// Driven through a register this user may read and may not rewrite, because
-/// that is the one arrangement in which everything ahead of the last write
-/// succeeds.
-#[cfg(unix)]
+/// Driven through a register that can be read and not rewritten, because that is
+/// the one arrangement in which everything ahead of the last write succeeds.
 #[tokio::test]
 async fn a_register_that_cannot_be_written_puts_the_whole_install_back() {
-    use std::os::unix::fs::PermissionsExt as _;
-
     let ctx = ctx("unrecordable");
     let register = ctx
         .settings
@@ -311,7 +307,7 @@ async fn a_register_that_cannot_be_written_puts_the_whole_install_back() {
         .map(|env| env.with_file_name(PLUGINS))
         .unwrap_or_default();
     assert!(std::fs::write(&register, "{}").is_ok());
-    assert!(std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o400)).is_ok());
+    assert!(unrewritable(&register));
 
     let (code, said) = refused(installing(&ctx, &source("unrecordable", MANIFEST)).await);
     assert_eq!(code, "PLUGIN-8");
@@ -330,5 +326,5 @@ async fn a_register_that_cannot_be_written_puts_the_whole_install_back() {
         "and the change record still says it was there, so the run can be read"
     );
 
-    let _ = std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o600));
+    let _ = std::fs::remove_dir_all(staging_of(&register));
 }

@@ -365,8 +365,6 @@ async fn an_update_that_breaks_the_stack_puts_the_old_version_back() {
 /// it with the new one running.
 #[tokio::test]
 async fn an_update_whose_record_cannot_be_written_puts_the_old_version_back() {
-    use std::os::unix::fs::PermissionsExt as _;
-
     let ctx = proving(
         "update-unrecordable",
         Arc::new(Recording::answering(Ok(spoke("")))),
@@ -377,12 +375,12 @@ async fn an_update_whose_record_cannot_be_written_puts_the_old_version_back() {
         Some(1)
     );
     let register = record_of(&ctx);
-    let locked = std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o400));
+    let locked = unrewritable(&register);
 
     let failed = update(updating(&ctx, &source("update-unrecordable-next", &next())).await);
 
-    let _ = std::fs::set_permissions(&register, std::fs::Permissions::from_mode(0o600));
-    assert!(locked.is_ok());
+    let _ = std::fs::remove_dir_all(staging_of(&register));
+    assert!(locked);
     assert!(failed.as_ref().is_some_and(|one| one
         .stopped
         .as_deref()
