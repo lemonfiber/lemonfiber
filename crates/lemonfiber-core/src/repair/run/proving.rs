@@ -48,8 +48,21 @@ pub(super) async fn carried(
     // Recorded before the proof, and before anything else can go wrong. What a repair
     // changed is the operator's way back, and a way back that depends on the rest of the
     // run going well is one they find missing exactly when they need it.
+    //
+    // A record that cannot be written leaves the repair stopped rather than judged: what
+    // it changed stands and cannot be put back, which is the state an operator has to be
+    // told they are in before anything asks whether the fault went.
     if let Some(journal) = crate::app::targets::beside_env(ctx, JOURNAL) {
-        crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref());
+        if let Err(failure) =
+            crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref())
+        {
+            return Outcome::Stopped {
+                leaving: format!(
+                    "what the repair changed stands and could not be recorded, so it cannot be \
+                     put back: {failure}"
+                ),
+            };
+        }
     }
     if matches!(attempt, Attempt::Stopped { .. }) {
         // Nothing changed, or something changed half way. Either way the state it was left

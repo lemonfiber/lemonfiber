@@ -124,13 +124,12 @@ async fn settings(
     let recorded = super::reconfiguring::recorded(ctx);
     // What a plugin set is read off the journal, against the record of what is installed
     // — and a record that will not read is carried as that, so no setting is called
-    // orphaned by a plugin the machine may still have.
+    // orphaned by a plugin the machine may still have. A journal that will not read is
+    // left out rather than refusing the listing: what it adds is which plugin set a
+    // setting, and without it each setting is given its ordinary answer.
     let journalled = super::targets::layout(ctx)
-        .map(|paths| {
-            super::recover::journal_at(&paths.journal())
-                .changes()
-                .to_vec()
-        })
+        .and_then(|paths| super::recover::journal_at(&paths.journal()).ok())
+        .map(|journal| journal.changes().to_vec())
         .unwrap_or_default();
     let installed: Option<Vec<String>> = super::plugins::read(ctx).ok().map(|register| {
         register

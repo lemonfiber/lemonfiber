@@ -16,16 +16,23 @@ use super::Ctx;
 
 /// Everything lemonfiber changed, newest first.
 ///
-/// Cannot fail. A machine with nowhere to keep a journal has recorded no changes, which
-/// is an empty history rather than a refusal.
-pub fn history(ctx: &Ctx) -> HistoryReport {
+/// A machine with nowhere to keep a journal has recorded no changes, which is an empty
+/// history rather than a refusal.
+///
+/// # Errors
+///
+/// Where the journal is there and cannot be read. An empty history in its place would
+/// tell an operator nothing had changed on a machine whose record of what changed is
+/// the thing that is broken.
+pub fn history(ctx: &Ctx) -> Result<HistoryReport, Box<crate::error::Problem>> {
     let Some(paths) = super::targets::layout(ctx) else {
-        return HistoryReport {
+        return Ok(HistoryReport {
             horizon: horizon(&[]),
             ..HistoryReport::default()
-        };
+        });
     };
-    let journal = super::recover::journal_at(&paths.journal());
+    let journal = super::recover::journal_at(&paths.journal())
+        .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?;
     let changes = journal.changes();
 
     // What the environment file holds now, for the drift question. Read once: asking per
@@ -55,10 +62,10 @@ pub fn history(ctx: &Ctx) -> HistoryReport {
         .collect();
     read.reverse();
 
-    HistoryReport {
+    Ok(HistoryReport {
         changes: read,
         horizon: horizon(changes),
-    }
+    })
 }
 
 /// One change, as an operator reads it.

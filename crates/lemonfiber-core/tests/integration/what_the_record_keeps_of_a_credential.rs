@@ -82,11 +82,12 @@ fn no_credential_is_left_in_the_file_the_record_is_kept_in() {
     let root = scratch("in-the-clear");
     let journal = paths(&root).journal();
 
-    journalled(
+    assert!(journalled(
         &journal,
         &[set(KEY, Some(&was()), &now()), set(KEY, None, &now())],
         &a_machine(),
-    );
+    )
+    .is_ok());
 
     let written = std::fs::read_to_string(&journal).unwrap_or_default();
     assert!(!written.is_empty(), "the record was written");
@@ -110,11 +111,12 @@ fn a_setting_that_is_not_a_credential_is_recorded_as_what_it_is() {
     let root = scratch("in-the-open");
     let journal = paths(&root).journal();
 
-    journalled(
+    assert!(journalled(
         &journal,
         &[set("TZ", Some("UTC"), "Europe/Amsterdam")],
         &a_machine(),
-    );
+    )
+    .is_ok());
 
     let written = std::fs::read_to_string(&journal).unwrap_or_default();
     assert!(written.contains("Europe/Amsterdam"), "{written}");
@@ -130,9 +132,9 @@ fn the_record_still_hands_back_what_a_reversal_would_put_there() {
     let root = scratch("read-back");
     let journal = paths(&root).journal();
 
-    journalled(&journal, &[set(KEY, Some(&was()), &now())], &a_machine());
+    assert!(journalled(&journal, &[set(KEY, Some(&was()), &now())], &a_machine()).is_ok());
 
-    let held = as_read(&journal_at(&journal));
+    let held = as_read(&journal_at(&journal).unwrap_or_default());
 
     assert!(
         held.contains(&was()) && held.contains(&now()),
@@ -156,24 +158,25 @@ fn a_record_written_in_clear_reads_and_is_sealed_the_next_time_anything_is_added
     assert!(std::fs::write(&journal, format!("{older}\n")).is_ok());
 
     // It reads as it always did, before anything has been written over it.
-    let before = as_read(&journal_at(&journal));
+    let before = as_read(&journal_at(&journal).unwrap_or_default());
     assert!(
         before.contains(&was()),
         "the old record still reads: {before}"
     );
 
-    journalled(
+    assert!(journalled(
         &journal,
         &[set("TZ", None, "Europe/Amsterdam")],
         &a_machine(),
-    );
+    )
+    .is_ok());
 
     let written = std::fs::read_to_string(&journal).unwrap_or_default();
     assert!(
         !written.contains(&was()),
         "the credential the older version wrote is gone from the file: {written}"
     );
-    let after = as_read(&journal_at(&journal));
+    let after = as_read(&journal_at(&journal).unwrap_or_default());
     assert!(
         after.contains(&was()),
         "and is still there to put back: {after}"
@@ -190,7 +193,7 @@ fn the_key_is_written_owner_only_where_the_platform_has_the_notion() {
 
     let root = scratch("private");
     let layout = paths(&root);
-    journalled(&layout.journal(), &[set(KEY, None, &now())], &a_machine());
+    assert!(journalled(&layout.journal(), &[set(KEY, None, &now())], &a_machine()).is_ok());
 
     let mode =
         std::fs::metadata(layout.journal_key()).map(|kept| kept.permissions().mode() & 0o777);
@@ -208,14 +211,15 @@ fn the_key_is_written_owner_only_where_the_platform_has_the_notion() {
 fn a_record_whose_key_is_gone_is_refused_rather_than_put_back_as_it_reads() {
     let root = scratch("no-key");
     let layout = paths(&root);
-    journalled(
+    assert!(journalled(
         &layout.journal(),
         &[set(KEY, Some(&was()), &now())],
         &a_machine(),
-    );
+    )
+    .is_ok());
     assert!(std::fs::remove_file(layout.journal_key()).is_ok());
 
-    let undos = journal_at(&layout.journal()).rewind();
+    let undos = journal_at(&layout.journal()).unwrap_or_default().rewind();
     let refused = undo(&undos, &layout.env_file(), Vec::new());
 
     let problem = refused.err();

@@ -111,7 +111,8 @@ pub async fn undo(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>
 /// Put back the run stamped `at`.
 async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
-    let journal = super::recover::journal_at(&paths.journal());
+    let journal = super::recover::journal_at(&paths.journal())
+        .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
     let operation = operation_at(changes, at)?;
@@ -135,7 +136,8 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 /// the executor underneath gives.
 pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
-    let journal = super::recover::journal_at(&paths.journal());
+    let journal = super::recover::journal_at(&paths.journal())
+        .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
     let run = crate::rollback::everything(changes, operation);
@@ -155,7 +157,8 @@ pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, B
 /// the record, or a change the judgement will not put back.
 pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
-    let journal = super::recover::journal_at(&paths.journal());
+    let journal = super::recover::journal_at(&paths.journal())
+        .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
     judged(
         ctx,
@@ -229,7 +232,8 @@ async fn carried_out(
         &paths.journal(),
         &recording(run, &reversed, &ctx.stamp()),
         ctx.seams.random.as_ref(),
-    );
+    )
+    .map_err(|failure| Box::new(super::recover::unrecorded("The reversal", &failure)))?;
 
     Ok(Reversal {
         reversed,

@@ -142,7 +142,10 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
     let plan = wizard.plan();
     let changes = plan.changes(&before, stamp);
 
-    let mut log = Journal::new();
+    // What is already in the journal stays in it. A resumed apply, a recovered one and
+    // setup run again all arrive here on a machine that may have a record of earlier
+    // changes, and starting from an empty one would write that record over.
+    let mut log = super::recover::journal_at(&journal).map_err(Fault::Store)?;
 
     // The library and downloads live under the operator's chosen location, so it
     // must exist before anything mounts it — but only where it does not already.

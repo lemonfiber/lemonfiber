@@ -42,9 +42,48 @@ fn nowhere_to_keep_it_reads_as_the_default_and_refuses_to_write() {
 
 #[test]
 fn a_record_that_cannot_be_written_is_reported_rather_than_swallowed() {
-    // A directory where the file must go. Telling the operator something was
-    // remembered when it was not is the failure worth avoiding here.
+    // A directory where the record would be written before it is moved into
+    // place. Telling the operator something was remembered when it was not is the
+    // failure worth avoiding here.
     let path = scratch("blocked");
-    assert!(std::fs::create_dir_all(&path).is_ok());
-    assert!(keep(Some(path.path()), &BTreeSet::<String>::new()).is_err());
+    assert!(
+        std::fs::create_dir_all(path.with_file_name("record.json.writing").join("held")).is_ok()
+    );
+    let refused = keep(Some(path.path()), &BTreeSet::<String>::new());
+    assert!(
+        refused.is_err_and(|problem| problem.summary.contains("could not be saved")),
+        "the refusal is the write's"
+    );
+}
+
+/// A record that cannot be read is not written over with the default it read as.
+///
+/// The value a caller writes back was worked out from that default, so writing it
+/// would replace what the file still held. The file is left as it was.
+#[test]
+fn a_record_that_will_not_parse_is_not_written_over() {
+    let path = scratch("damaged");
+    assert!(crate::config::store::write(&path, "not json at all").is_ok());
+
+    let refused = keep(Some(path.path()), &BTreeSet::<String>::new());
+    assert!(refused.is_err(), "the write was refused");
+    assert_eq!(
+        std::fs::read_to_string(&*path).ok().as_deref(),
+        Some("not json at all"),
+        "and the file is as it was"
+    );
+}
+
+/// A record there and unreadable is not written over either.
+#[test]
+fn a_record_that_cannot_be_read_is_not_written_over() {
+    let path = scratch("unreadable");
+    // A directory with something in it where the record is: it cannot be read as a
+    // file, and a write refusing it is what is asked.
+    assert!(std::fs::create_dir_all(path.join("held")).is_ok());
+    let refused = keep(Some(path.path()), &BTreeSet::<String>::new());
+    assert!(
+        refused.is_err_and(|problem| problem.summary.contains("could not be read")),
+        "the refusal is the unreadable record's"
+    );
 }

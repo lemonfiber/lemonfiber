@@ -560,9 +560,13 @@ fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, curr
             },
         },
     ];
-    let _ = crate::app::targets::layout(ctx).map(|paths| {
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref());
+    let recorded = crate::app::targets::layout(ctx).map(|paths| {
+        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
     });
+    assert!(
+        recorded.is_some_and(|written| written.is_ok()),
+        "the journal was written"
+    );
 }
 
 /// A context over that file with a stack directory beside it, which is what places

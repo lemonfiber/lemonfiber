@@ -583,3 +583,31 @@ fn a_notification_answer_that_cannot_be_written_stops_the_apply() {
     assert!(stopped.is_err());
     assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);
 }
+
+/// An apply over a machine with a record of earlier changes keeps that record: a
+/// resumed or repeated setup that started an empty journal would write the history of
+/// everything before it over.
+#[test]
+fn an_apply_keeps_what_the_journal_already_held() {
+    let dir = scratch("keeps-journal");
+    let paths = layout(&dir);
+    let earlier = crate::app::recover::journalled(
+        &paths.journal(),
+        &[crate::test_support::a_fresh_write("EARLIER", "kept")],
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+    );
+    assert!(earlier.is_ok(), "{earlier:?}");
+    let mut wizard = reviewed(&dir.join("library"));
+
+    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+
+    let held = crate::app::recover::journal_at(&paths.journal()).unwrap_or_default();
+    assert!(
+        held.changes().iter().any(|change| matches!(
+            &change.kind,
+            crate::journal::Kind::Set { key, .. } if key == "EARLIER"
+        )),
+        "the earlier change is still recorded: {:?}",
+        held.changes()
+    );
+}

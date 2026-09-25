@@ -56,7 +56,10 @@ fn a_journal_reads_back_the_changes_that_were_written() {
         .join("\n");
     assert!(std::fs::write(&path, text).is_ok());
 
-    assert_eq!(super::journal_at(&path).changes(), changes);
+    assert_eq!(
+        super::journal_at(&path).unwrap_or_default().changes(),
+        changes
+    );
 }
 
 /// A repair adding what it changed keeps what is already there. The journal is
@@ -72,10 +75,10 @@ fn a_change_added_to_a_journal_keeps_what_was_already_in_it() {
     // anybody wrote to it would be.
     assert!(std::fs::write(&path, first).is_ok());
 
-    super::journalled(&path, &[a_fresh_write("TORRENT", "on")], &a_machine());
+    assert!(super::journalled(&path, &[a_fresh_write("TORRENT", "on")], &a_machine()).is_ok());
 
     assert_eq!(
-        super::journal_at(&path).changes(),
+        super::journal_at(&path).unwrap_or_default().changes(),
         [
             a_fresh_write("USENET", "on"),
             a_fresh_write("TORRENT", "on")
@@ -94,7 +97,7 @@ fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
 
     // One run per stamp, written one run at a time the way a machine accumulates them.
     for stamp in 0..=crate::journal::RUNS_KEPT {
-        super::journalled(
+        let recorded = super::journalled(
             &path,
             &[crate::journal::Change {
                 at: stamp.to_string(),
@@ -102,9 +105,10 @@ fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
             }],
             &a_machine(),
         );
+        assert!(recorded.is_ok(), "{recorded:?}");
     }
 
-    let held = super::journal_at(&path);
+    let held = super::journal_at(&path).unwrap_or_default();
     assert_eq!(
         crate::journal::runs(held.changes()),
         crate::journal::RUNS_KEPT,
@@ -124,7 +128,7 @@ fn a_repair_that_changed_nothing_writes_no_journal() {
     let path_dir = scratch("journal-none");
     let path = path_dir.join("journal.jsonl");
 
-    super::journalled(&path, &[], &a_machine());
+    assert!(super::journalled(&path, &[], &a_machine()).is_ok());
 
     assert!(!path.exists());
 }
@@ -136,10 +140,10 @@ fn a_journal_is_written_where_no_directory_has_been_made_yet() {
     let path_dir = scratch("journal-fresh");
     let path = path_dir.join("journal.jsonl");
 
-    super::journalled(&path, &[a_fresh_write("USENET", "on")], &a_machine());
+    assert!(super::journalled(&path, &[a_fresh_write("USENET", "on")], &a_machine()).is_ok());
 
     assert_eq!(
-        super::journal_at(&path).changes(),
+        super::journal_at(&path).unwrap_or_default().changes(),
         [a_fresh_write("USENET", "on")]
     );
 }
@@ -153,13 +157,22 @@ fn a_torn_final_line_is_dropped_and_the_rest_kept() {
     let good = serde_json::to_string(&a_fresh_write("USENET", "on")).unwrap_or_default();
     assert!(std::fs::write(&path, format!("{good}\n{{ torn")).is_ok());
 
-    assert_eq!(super::journal_at(&path).changes().len(), 1);
+    assert_eq!(
+        super::journal_at(&path).unwrap_or_default().changes().len(),
+        1
+    );
 }
 
 #[test]
 fn no_journal_file_reads_as_nothing_to_reverse() {
     let absent = Path::new("/lemonfiber/no/such/journal.jsonl");
-    assert_eq!(super::journal_at(absent).changes().len(), 0);
+    assert_eq!(
+        super::journal_at(absent)
+            .unwrap_or_default()
+            .changes()
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -558,4 +571,72 @@ fn a_setting_that_cannot_be_removed_stops_the_reversal() {
     let stopped = undo(&[restore("USENET", None, "on")], &env, Vec::new());
 
     assert!(stopped.is_err(), "the key could not be removed");
+}
+
+/// A line before the last that is not a change makes the journal one this build cannot
+/// read, rather than a history with that change missing from it.
+#[test]
+fn a_damaged_entry_before_the_last_is_refused_rather_than_skipped() {
+    let dir = scratch("journal-damaged");
+    let path = dir.join("journal.jsonl");
+    assert!(std::fs::create_dir_all(&dir).is_ok());
+    let good = serde_json::to_string(&a_fresh_write("USENET", "on")).unwrap_or_default();
+    let written = format!("{{ not a change }}\n{good}\n");
+    assert!(std::fs::write(&path, &written).is_ok());
+
+    let read = super::journal_at(&path);
+    assert!(
+        matches!(&read, Err(store::Failure::Unreadable { reason, .. }) if reason.contains("entry 1")),
+        "got: {read:?}"
+    );
+}
+
+/// A journal this build cannot read is not written over: the new entries are refused
+/// with it and the file is left as it was.
+#[test]
+fn a_journal_that_cannot_be_read_is_not_written_over() {
+    let dir = scratch("journal-kept");
+    let path = dir.join("journal.jsonl");
+    assert!(std::fs::create_dir_all(&dir).is_ok());
+    let good = serde_json::to_string(&a_fresh_write("USENET", "on")).unwrap_or_default();
+    let written = format!("{{ not a change }}\n{good}\n");
+    assert!(std::fs::write(&path, &written).is_ok());
+
+    let refused = super::journalled(&path, &[a_fresh_write("TORRENT", "on")], &a_machine());
+    assert!(refused.is_err(), "the record was refused");
+    assert_eq!(
+        std::fs::read_to_string(&path).ok(),
+        Some(written),
+        "and the journal is as it was"
+    );
+}
+
+/// A journal that is there and cannot be opened is refused, not read as empty.
+#[test]
+fn a_journal_that_cannot_be_opened_is_refused_rather_than_read_as_empty() {
+    let dir = scratch("journal-directory");
+    let path = dir.join("journal.jsonl");
+    assert!(std::fs::create_dir_all(path.join("held")).is_ok());
+    assert!(matches!(
+        super::journal_at(&path),
+        Err(store::Failure::Unreadable { .. })
+    ));
+}
+
+/// A change made and not recorded is said as that: it stands, and it cannot be put back.
+#[test]
+fn a_change_made_and_not_recorded_says_it_stands() {
+    let problem = super::unrecorded(
+        "The update",
+        &store::Failure::NotWritten {
+            path: Path::new("/journal.jsonl").to_path_buf(),
+            reason: "no space".to_owned(),
+        },
+    );
+    assert!(
+        problem.summary.contains("The update was done"),
+        "{problem:?}"
+    );
+    assert!(problem.meaning.contains("The change stands"), "{problem:?}");
+    assert!(problem.cause.is_some_and(|cause| cause.detail.is_some()));
 }

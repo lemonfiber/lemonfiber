@@ -90,7 +90,7 @@ async fn a_plugin_s_changes_are_in_the_history_named_as_the_plugin() {
         Some(1)
     );
 
-    let shown = crate::app::history::history(&ctx);
+    let shown = crate::app::history::history(&ctx).unwrap_or_default();
     assert!(!shown.changes.is_empty());
     assert!(shown.changes.iter().all(|one| one.operation == "komga"));
     assert!(shown
@@ -327,4 +327,16 @@ async fn a_register_that_cannot_be_written_puts_the_whole_install_back() {
     );
 
     let _ = std::fs::remove_dir_all(staging_of(&register));
+}
+
+/// A history whose journal cannot be read is refused rather than shown empty: an empty
+/// history would say nothing changed on a machine whose record of changes is broken.
+#[test]
+fn a_history_whose_journal_cannot_be_read_is_refused() {
+    let ctx = ctx("history-unreadable");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    assert!(std::fs::create_dir_all(journal.join("held")).is_ok());
+    assert!(crate::app::history::history(&ctx).is_err());
 }

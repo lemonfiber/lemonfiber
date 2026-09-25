@@ -14,83 +14,18 @@ use std::path::{Path, PathBuf};
 
 use crate::config::store;
 use crate::error::{Diagnose, Problem, Remedy, Severity};
-use crate::journal::{is_sealed, kept, Action, Change, Journal, Seal, Undo};
-use crate::ports::random::Random;
+use crate::journal::{is_sealed, Action, Undo};
 use crate::ports::service::Client as _;
 use crate::repair;
 
 use super::Ctx;
+
+mod journal;
+
 use crate::error::codes::setup::{
     NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_WITHDRAWN, STILL_HOLDING,
 };
-
-/// The change journal saved at `path`, empty where none is there or it does not
-/// read.
-///
-/// A torn final line — a crash caught mid-write — is dropped rather than failing
-/// the whole read, so a reversal still has every entry that fully landed to work
-/// from; an absent or unreadable file is an empty journal, nothing to reverse.
-///
-/// Credentials are opened here, with the key kept beside the file, because the
-/// record is sealed on disk and clear in memory — see [`crate::journal::sealing`].
-/// A value this machine has no key for is left sealed rather than dropped: which
-/// setting changed is still worth reading where what it changed to is not, and
-/// every reader that could act on the value asks whether it opened first.
-#[must_use]
-pub fn journal_at(path: &Path) -> Journal {
-    let seal = Seal::kept(path);
-    let changes = std::fs::read_to_string(path)
-        .unwrap_or_default()
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Change>(line).ok())
-        .map(|change| seal.opening(&change))
-        .collect();
-    Journal::replay(changes)
-}
-
-/// Add what a change made to the journal a reversal reads, keeping what is already there
-/// and dropping what has fallen outside the bound.
-///
-/// What is already there is read back and written out again beneath the new entries,
-/// because the journal is shared: the first-run wizard wrote what it applied, seeding
-/// wrote what it wired, and a repair adding its own must not take either away. The read
-/// is [`journal_at`]'s, so a torn final line — a crash caught mid-write — is dropped here
-/// rather than carried forward for ever.
-///
-/// The bound is applied on the way out, so the file itself stays inside it rather than
-/// only the reading of it: a record trimmed on read would go on growing on disk, and the
-/// horizon would be a claim about what is shown instead of about what is kept.
-///
-/// Written through the same seam every other record lemonfiber keeps goes through, so the
-/// journal is created private to its owner. It holds what a value was before it changed,
-/// and a record of an operator's configuration is not something to leave world-readable
-/// because this one caller wrote it a different way.
-///
-/// Silent where it cannot be written. A repair has already changed the thing it was asked
-/// to change by the time this runs, and failing the repair over the record of it would
-/// report a change that did happen as one that did not.
-///
-/// `random` is what a credential is sealed under: the key where this machine has yet to
-/// make one, and a fresh nonce for every value. Every change goes out through the seal,
-/// the ones read back included — which is what takes the clear values out of a journal an
-/// older version wrote, on the first change recorded after the upgrade.
-pub fn journalled(path: &Path, changes: &[Change], random: &dyn Random) {
-    if changes.is_empty() {
-        return;
-    }
-    let mut held: Vec<Change> = journal_at(path).changes().to_vec();
-    held.extend(changes.iter().cloned());
-    let seal = Seal::minted(path, random);
-    let written = kept(&held)
-        .iter()
-        .filter_map(|change| serde_json::to_string(&seal.sealing(change, random)).ok())
-        .fold(String::new(), |mut lines, line| {
-            lines.push_str(&line);
-            lines.push('\n');
-            lines
-        });
-    let _ = store::write(path, &written);
-}
+pub use journal::{journal_at, journalled, unrecorded};
 
 /// Put back the changes that live inside a service, answering with the ones left for
 /// [`undo`] to carry out on the filesystem and the environment file.

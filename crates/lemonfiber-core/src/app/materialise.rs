@@ -11,7 +11,6 @@
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-use crate::config::store;
 use crate::materialised::{checksum, decide, diff, Decision, Materialised};
 use crate::model::StackEdit;
 use crate::quality::Selection;
@@ -381,9 +380,7 @@ fn load(record_path: Option<&Path>) -> Materialised {
 /// describes: a run that cannot persist it still wrote the stack, and the worst a
 /// lost record costs is the next run preserving a file it could have safely rewritten.
 fn save(record_path: Option<&Path>, record: &Materialised) {
-    if let Some(path) = record_path {
-        let _ = store::write(path, &serde_json::to_string(record).unwrap_or_default());
-    }
+    let _ = super::record::keep(record_path, record);
 }
 
 /// Write one stack file, making its parent directory first. Both ways it can fail —
