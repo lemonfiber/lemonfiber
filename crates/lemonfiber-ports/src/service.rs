@@ -45,7 +45,8 @@ pub use clients::{
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use household::{
-    Access, Allowed, Certificate, Held, Household, Invited, Medium, Member, NamedLibrary, Unrated,
+    Access, Allowed, Certificate, Held, Household, Invited, Medium, Member, NamedLibrary, Signed,
+    Unrated,
 };
 pub use metering::{Metering, Moved};
 pub use notices::Noticing;

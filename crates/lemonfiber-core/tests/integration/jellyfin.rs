@@ -7,11 +7,11 @@
 //! The client speaks an async trait built on another, so it is driven from here
 //! rather than in-crate, where it would be compiled twice.
 
-use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::http::Fake;
 use std::sync::Arc;
 
 use lemonfiber_core::jellyfin::Jellyfin;
-use lemonfiber_core::ports::http::{Http, Method};
+use lemonfiber_core::ports::http::Http;
 
 fn jellyfin(fake: &Arc<Fake>) -> Jellyfin {
     let http: Arc<dyn Http> = fake.clone();
@@ -59,18 +59,6 @@ fn not_hers() -> String {
 
 /// A sign-in that hands back the account it proved, which is what a member's is read for.
 const SIGNED_IN_AS: &str = r#"{"AccessToken":"token","User":{"Id":"a7f3","Name":"ana"}}"#;
-
-/// One account read, rather than the household listed to look for it.
-fn about(answer: Answer) -> Arc<Fake> {
-    Fake::by_route(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, SIGNED_IN),
-        ),
-        (Method::Get, "/Users/", answer),
-    ])
-}
 
 /// A shelf with one of each kind on it, and one thing this build has no word for.
 const A_SHELF: &str = r#"{"Items":[

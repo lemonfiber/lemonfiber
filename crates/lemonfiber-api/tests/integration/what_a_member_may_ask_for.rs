@@ -312,7 +312,10 @@ async fn a_member_session_with_no_household_behind_it_is_unconfirmed() {
         .opened(
             &not_the_token(),
             moment(),
-            Opened::Member(MEMBER.to_owned()),
+            Opened::Member(lemonfiber_core::ports::service::Signed {
+                id: MEMBER.to_owned(),
+                token: "held".to_owned(),
+            }),
         )
         .await
     else {

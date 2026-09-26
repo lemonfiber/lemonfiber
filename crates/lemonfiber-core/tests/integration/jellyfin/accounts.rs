@@ -1,10 +1,11 @@
 //! The household's accounts: offered, withdrawn, reset and standing.
 
-use super::{about, hers, jellyfin, not_hers, reader, HOUSEHOLD, SIGNED_IN, SIGNED_IN_AS};
+use super::{hers, jellyfin, not_hers, reader, HOUSEHOLD, SIGNED_IN, SIGNED_IN_AS};
 use lemonfiber_core::ports::http::Method;
-use lemonfiber_core::ports::service::Failure;
+use lemonfiber_core::ports::service::{Failure, Signed};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::Household;
+use std::sync::Arc;
 
 /// An account with no password on it is an invitation; one with a password is a member.
 ///
@@ -177,8 +178,15 @@ async fn a_pair_the_server_knows_answers_with_the_account_it_proved() {
     let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN_AS)]);
 
     assert_eq!(
-        jellyfin(&fake).whoever("ana", &hers()).await.ok().flatten(),
-        Some("a7f3".to_owned())
+        jellyfin(&fake)
+            .whoever("ana", &hers(), "this-browser")
+            .await
+            .ok()
+            .flatten(),
+        Some(Signed {
+            id: "a7f3".to_owned(),
+            token: "token".to_owned()
+        })
     );
     // The member's own credentials, and the admin's nowhere near it: this is the one
     // call where somebody else's password travels, and it travels only to the route
@@ -200,7 +208,9 @@ async fn a_pair_the_server_refuses_is_nobody_rather_than_a_fault() {
     for refused in [401, 403] {
         let fake = Fake::in_turn(vec![Answer::reply(refused, r#"{"error":"no"}"#)]);
 
-        let said = jellyfin(&fake).whoever("ana", &not_hers()).await;
+        let said = jellyfin(&fake)
+            .whoever("ana", &not_hers(), "this-browser")
+            .await;
         assert!(
             matches!(said, Ok(None)),
             "a refusal at {refused} was read as something other than nobody"
@@ -215,7 +225,10 @@ async fn a_server_that_could_not_answer_is_not_a_pair_that_was_wrong() {
     let fake = Fake::in_turn(vec![Answer::reply(500, "upstream is unwell")]);
 
     assert!(
-        jellyfin(&fake).whoever("ana", &hers()).await.is_err(),
+        jellyfin(&fake)
+            .whoever("ana", &hers(), "this-browser")
+            .await
+            .is_err(),
         "a server that could not answer was read as a pair that was wrong"
     );
 }
@@ -227,7 +240,9 @@ async fn an_account_with_no_id_is_nobody() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"AccessToken":"t","User":{}}"#)]);
 
     assert!(matches!(
-        jellyfin(&fake).whoever("ana", &hers()).await,
+        jellyfin(&fake)
+            .whoever("ana", &hers(), "this-browser")
+            .await,
         Ok(None)
     ));
 }
@@ -240,27 +255,77 @@ const STILL_HELD: &str =
 const SWITCHED_OFF: &str =
     r#"{"Id":"a7f3","Name":"ana","HasPassword":true,"Policy":{"IsDisabled":true}}"#;
 
-#[tokio::test]
-async fn an_account_the_server_still_holds_is_standing() {
-    let fake = about(Answer::reply(200, STILL_HELD));
+/// What a member's sign-in was granted, as a session holds it.
+fn signed() -> Signed {
+    Signed {
+        id: "a7f3".to_owned(),
+        token: ('m'..='z').collect(),
+    }
+}
 
-    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(true)));
+/// The server answering one question as the member, with nothing else to ask.
+fn as_the_member(answer: Answer) -> Arc<Fake> {
+    Fake::by_route(vec![(Method::Get, "/Users/Me", answer)])
 }
 
 #[tokio::test]
-async fn an_account_the_server_no_longer_holds_is_not_standing() {
-    // The answer this question exists for, and the reason it is `Ok` rather than an
-    // error: a removed account is a fact the server stated, not a failure to answer.
-    let fake = about(Answer::reply(404, r#"{"error":"no such user"}"#));
+async fn a_sign_in_the_server_still_honours_is_standing() {
+    let fake = as_the_member(Answer::reply(200, STILL_HELD));
 
-    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(false)));
+    assert!(matches!(reader(&fake).standing(&signed()).await, Ok(true)));
+    // Asked as the member, with the access the sign-in was granted, and never as the
+    // administrator: the access is what a changed password takes back.
+    let carried: Vec<String> = fake
+        .requests()
+        .iter()
+        .flat_map(|request| request.headers.iter())
+        .filter(|(name, _)| name == "Authorization")
+        .map(|(_, value)| value.clone())
+        .collect();
+    assert_eq!(
+        carried,
+        [format!(r#"MediaBrowser Token="{}""#, signed().token)]
+    );
+}
+
+/// The answer this question exists for. A password changed at the server, by the
+/// member or by an administrator, withdraws the access the old sign-in holds, and so
+/// does removing the account.
+#[tokio::test]
+async fn a_sign_in_the_server_no_longer_honours_is_not_standing() {
+    let fake = as_the_member(Answer::reply(401, ""));
+
+    assert!(matches!(reader(&fake).standing(&signed()).await, Ok(false)));
 }
 
 #[tokio::test]
 async fn an_account_switched_off_at_the_server_is_not_standing() {
-    let fake = about(Answer::reply(200, SWITCHED_OFF));
+    let fake = as_the_member(Answer::reply(200, SWITCHED_OFF));
 
-    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(false)));
+    assert!(matches!(reader(&fake).standing(&signed()).await, Ok(false)));
+}
+
+/// An account whose password was taken off is an invitation offered again, and no
+/// session opened before that stands on it.
+#[tokio::test]
+async fn an_account_offered_again_is_not_standing() {
+    let fake = as_the_member(Answer::reply(
+        200,
+        r#"{"Id":"a7f3","Name":"ana","HasPassword":false}"#,
+    ));
+
+    assert!(matches!(reader(&fake).standing(&signed()).await, Ok(false)));
+}
+
+/// Access answered for another account is not this session's.
+#[tokio::test]
+async fn access_answered_for_another_account_is_not_standing() {
+    let fake = as_the_member(Answer::reply(
+        200,
+        r#"{"Id":"b8e4","Name":"ben","HasPassword":true}"#,
+    ));
+
+    assert!(matches!(reader(&fake).standing(&signed()).await, Ok(false)));
 }
 
 #[tokio::test]
@@ -268,10 +333,10 @@ async fn a_server_that_would_not_say_is_not_an_account_that_is_gone() {
     // The distinction the nested shape exists for, one floor up from the sign-in.
     // Collapsed, a media server restarting would sign out every member and tell each
     // of them their account had been removed.
-    let fake = about(Answer::reply(500, "upstream is unwell"));
+    let fake = as_the_member(Answer::reply(500, "upstream is unwell"));
 
     assert!(
-        reader(&fake).standing("a7f3").await.is_err(),
+        reader(&fake).standing(&signed()).await.is_err(),
         "a server that could not answer was read as an account that is gone"
     );
 }
@@ -281,7 +346,42 @@ async fn an_account_answered_without_a_policy_is_one_the_server_still_holds() {
     // Existence is what this was asked, and the server answered it. Reading a missing
     // flag as *switched off* would lock out everybody the day the field stopped
     // arriving — permanently, since the next call reads the same answer.
-    let fake = about(Answer::reply(200, r#"{"Id":"a7f3","Name":"ana"}"#));
+    let fake = as_the_member(Answer::reply(
+        200,
+        r#"{"Id":"a7f3","Name":"ana","HasPassword":true}"#,
+    ));
 
-    assert!(matches!(reader(&fake).standing("a7f3").await, Ok(true)));
+    assert!(matches!(reader(&fake).standing(&signed()).await, Ok(true)));
+}
+
+/// Each sign-in is named to the server as the device the caller chose, so a second
+/// sign-in to one account does not end the first.
+#[tokio::test]
+async fn a_sign_in_is_named_as_the_device_the_caller_chose() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN_AS)]);
+    let _ = jellyfin(&fake)
+        .whoever("ana", &hers(), "this-browser")
+        .await;
+    let named = fake
+        .requests()
+        .iter()
+        .flat_map(|request| request.headers.iter())
+        .any(|(name, value)| {
+            name == "Authorization" && value.contains(r#"DeviceId="this-browser""#)
+        });
+    assert!(named, "{:?}", fake.requests());
+}
+
+/// A sign-in the server granted no access for is nobody: nothing could be held
+/// against it.
+#[tokio::test]
+async fn a_sign_in_granted_no_access_is_nobody() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"User":{"Id":"a7f3"}}"#)]);
+
+    assert!(matches!(
+        jellyfin(&fake)
+            .whoever("ana", &hers(), "this-browser")
+            .await,
+        Ok(None)
+    ));
 }

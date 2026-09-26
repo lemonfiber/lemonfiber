@@ -598,6 +598,39 @@ async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
     let _ = fs::remove_dir_all(a_directory("member-withdrawn"));
 }
 
+/// A password changed at the server ends a session opened with the old one at its
+/// next call, rather than leaving it standing until it expires.
+#[tokio::test]
+async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
+    let path = keeping("member-password-changed");
+    let household = AHousehold::knowing("a7f3");
+    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as("ana", &hers()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK);
+    let opened = session(&answer.body);
+    let Some(elsewhere) = Token::mint(&Chance::exactly(Some(vec![b'q'; 32]))) else {
+        unreachable!("bytes of the minting width mint a token")
+    };
+
+    household.change_password();
+
+    assert_eq!(
+        admitting
+            .carried(&carrying(Some(&opened)), &elsewhere, moment())
+            .await,
+        Knocking::Nobody,
+        "a session outlived the password it was opened with"
+    );
+    let _ = fs::remove_dir_all(a_directory("member-password-changed"));
+}
+
 /// Gone and could-not-be-asked are different facts and must not arrive alike.
 ///
 /// Collapsing them would sign a household out for the length of a media-server

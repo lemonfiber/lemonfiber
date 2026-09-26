@@ -12,6 +12,19 @@ use async_trait::async_trait;
 
 use super::Failure;
 
+/// Who a sign-in proved somebody to be, and the access the server granted for it.
+///
+/// Both, because the second is what a session is held against: the id says whose
+/// session it is, and the access is what the server takes back when the password it
+/// was proved with changes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Signed {
+    /// The id the server files the account under.
+    pub id: String,
+    /// The access the server granted this sign-in.
+    pub token: String,
+}
+
 /// Making and withdrawing the accounts a household signs in with.
 ///
 /// Apart from the media server's setup because it is a different errand entirely:
@@ -44,10 +57,24 @@ pub trait Household: Send + Sync {
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses to answer —
     /// never for a name and password it simply does not recognise.
-    async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure>;
+    ///
+    /// `device` names this sign-in to the server, and is the caller's to make unique:
+    /// the server keeps one sign-in per account and device, so two sign-ins under one
+    /// name would end the first.
+    async fn whoever(
+        &self,
+        name: &str,
+        password: &str,
+        device: &str,
+    ) -> Result<Option<Signed>, Failure>;
 
-    /// Whether an account still stands: the server still holds it, and it is not
-    /// disabled.
+    /// Whether a sign-in still stands: the server still honours the access it granted,
+    /// the account is the one it was granted to, and it is not disabled.
+    ///
+    /// Asked with what the sign-in was granted rather than with the account's id,
+    /// because the server withdraws that access when the account's password changes —
+    /// so a session opened with the old password ends at the next call rather than
+    /// lasting until it expires.
     ///
     /// Asked on every call a member makes, because a session is a claim about an
     /// identity and only the media server can say whether that identity is still
@@ -72,7 +99,7 @@ pub trait Household: Send + Sync {
     /// must not arrive the same way: **gone** and **could not ask** are different
     /// facts, and a guard that read them alike would sign a household out for the
     /// length of a reboot.
-    async fn standing(&self, id: &str) -> Result<bool, Failure>;
+    async fn standing(&self, signed: &Signed) -> Result<bool, Failure>;
 
     /// Make an account somebody can claim by setting a password on it.
     ///
