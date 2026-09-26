@@ -23,7 +23,7 @@ use lemonfiber_api::events::{routes, stream, Streaming, LAST_EVENT_ID, PATH};
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::model::{kind, Envelope};
-use lemonfiber_core::ports::Narrator as _;
+use lemonfiber_core::ports::{Clock as _, Narrator as _};
 use lemonfiber_core::walkthrough::{Line, Narrator as _};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
@@ -516,4 +516,58 @@ async fn a_wait_from_before_a_gap_is_never_handed_to_a_client_that_comes_back() 
         Some(BEAT_SAID),
         "a wait it missed is over, and saying so would be saying it is not"
     );
+}
+
+/// A session voided while its stream is open ends the stream at the next thing said,
+/// rather than carrying on until the client next asks for something.
+///
+/// Removing the kept password is what voids an operator's session, and it is the
+/// same check every other request meets.
+#[tokio::test(start_paused = true)]
+async fn a_stream_whose_session_is_voided_ends_at_the_next_thing_said() {
+    let named = "listener-session-voided";
+    let kept = crate::door::keeping(named);
+    let admitting = Arc::new(lemonfiber_api::admission::Admitting {
+        kept: Some(kept.clone()),
+        ..lemonfiber_api::admission::Admitting::default()
+    });
+    let clock = Stopped::at(0);
+    let Some(credential) = admitting.credential() else {
+        unreachable!("the password was just kept");
+    };
+    let Some(admitted) = admitting
+        .sessions
+        .opened(
+            &crate::door::not_the_token(),
+            clock.now(),
+            lemonfiber_api::admission::sessions::Opened::Operator(credential),
+        )
+        .await
+    else {
+        unreachable!("a cycling source always mints a session");
+    };
+    let Some(token) = Token::mint(&given()) else {
+        unreachable!("a cycling source always mints one");
+    };
+    let live = Arc::new(Live::opening(clock.as_ref()));
+    let streaming = Arc::new(Streaming {
+        admitting,
+        token: Arc::new(token),
+        bound: lemonfiber_api::guard::Binding::here(8471),
+        live: Arc::clone(&live),
+        clock,
+    });
+    let answer = stream(State(streaming), saying(&welcome(&admitted.token))).await;
+    assert_eq!(answer.status(), StatusCode::OK);
+    let mut body = answer.into_body().into_data_stream();
+
+    say(&live, "while it stood").await;
+    let heard = body.next().await.and_then(Result::ok);
+    let _ = std::fs::remove_file(&kept);
+    say(&live, "after it went").await;
+    let after = body.next().await;
+    let _ = std::fs::remove_dir_all(crate::door::a_directory(named));
+
+    assert!(heard.is_some_and(|said| String::from_utf8_lossy(&said).contains("while it stood")));
+    assert!(after.is_none(), "a voided session was still told things");
 }

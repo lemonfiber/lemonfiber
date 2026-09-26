@@ -12,7 +12,7 @@ use std::time::Duration;
 use axum::Router;
 use hyper_util::rt::{TokioIo, TokioTimer};
 use hyper_util::service::TowerToHyperService;
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinSet;
 
@@ -47,9 +47,27 @@ impl Limits {
 /// once would spin on it.
 const AFTER_A_FAILED_ACCEPT: Duration = Duration::from_millis(100);
 
+/// Where connections arrive from.
+///
+/// A trait object rather than the listener itself so a test can stand in a listener
+/// that fails to accept, which a real one does when the process is out of
+/// descriptors.
+#[async_trait::async_trait]
+pub(super) trait Accepting: Send {
+    /// The next connection, or why none could be taken.
+    async fn accept(&self) -> std::io::Result<TcpStream>;
+}
+
+#[async_trait::async_trait]
+impl Accepting for TcpListener {
+    async fn accept(&self) -> std::io::Result<TcpStream> {
+        TcpListener::accept(self).await.map(|(socket, _)| socket)
+    }
+}
+
 /// Answer on `listener` with `surface` until `stop` says to, then let go.
 pub(super) async fn answering(
-    listener: TcpListener,
+    listener: Box<dyn Accepting>,
     surface: Router,
     mut stop: watch::Receiver<bool>,
     limits: Limits,
@@ -61,7 +79,7 @@ pub(super) async fn answering(
             accepted = listener.accept() => accepted,
             _ = stop.changed() => break,
         };
-        let Ok((socket, _)) = accepted else {
+        let Ok(socket) = accepted else {
             tokio::time::sleep(AFTER_A_FAILED_ACCEPT).await;
             continue;
         };
@@ -86,7 +104,7 @@ pub(super) async fn answering(
 
 /// One connection, answered until it ends or the socket it came in on stops.
 async fn connection(
-    socket: tokio::net::TcpStream,
+    socket: TcpStream,
     surface: Router,
     mut stop: watch::Receiver<bool>,
     _room: tokio::sync::OwnedSemaphorePermit,

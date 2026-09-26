@@ -414,7 +414,7 @@ async fn holding(
     let mut running = Vec::new();
     for (listener, _) in sockets {
         running.push(tokio::spawn(answering::answering(
-            listener,
+            Box::new(listener),
             surface.clone(),
             stopped.clone(),
             answering::Limits::SERVED,

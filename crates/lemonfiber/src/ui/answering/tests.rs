@@ -6,7 +6,7 @@ use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 
-use super::{answering, Limits};
+use super::{answering, Accepting, Limits};
 
 /// Tight bounds, so each case below takes a fraction of a second.
 const TIGHT: Limits = Limits {
@@ -36,8 +36,41 @@ async fn serving(
     let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
     let at = listener.local_addr().ok()?;
     let (stop, stopped) = watch::channel(false);
-    let running = tokio::spawn(answering(listener, surface(), stopped, limits));
+    let running = tokio::spawn(answering(Box::new(listener), surface(), stopped, limits));
     Some((at, stop, running))
+}
+
+/// A listener whose first accept fails, the way one out of descriptors does.
+struct FailingOnce {
+    /// Whether the failure has been given yet.
+    failed: std::sync::atomic::AtomicBool,
+    /// Where every later connection comes from.
+    listener: TcpListener,
+}
+
+#[async_trait::async_trait]
+impl Accepting for FailingOnce {
+    async fn accept(&self) -> std::io::Result<TcpStream> {
+        if !self.failed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            return Err(std::io::Error::other("out of descriptors"));
+        }
+        self.listener.accept().await.map(|(socket, _)| socket)
+    }
+}
+
+/// What a plain request to `at` is answered with.
+async fn answer_at(at: std::net::SocketAddr) -> String {
+    let mut answer = String::new();
+    if let Ok(mut stream) = TcpStream::connect(at).await {
+        if stream
+            .write_all(b"GET / HTTP/1.1\r\nhost: here\r\nconnection: close\r\n\r\n")
+            .await
+            .is_ok()
+        {
+            let _ = stream.read_to_string(&mut answer).await;
+        }
+    }
+    answer
 }
 
 /// Whether the server closes this connection within `within`.
@@ -57,19 +90,27 @@ async fn a_request_is_answered() {
     let Some((at, _stop, _running)) = serving(TIGHT).await else {
         unreachable!("a loopback socket could not be bound");
     };
-    let mut stream = TcpStream::connect(at).await.ok();
-    let asked = match stream.as_mut() {
-        Some(stream) => stream
-            .write_all(b"GET / HTTP/1.1\r\nhost: here\r\nconnection: close\r\n\r\n")
-            .await
-            .is_ok(),
-        None => false,
+    let answer = answer_at(at).await;
+    assert!(answer.contains("answered"), "{answer}");
+}
+
+/// A failed accept is waited out rather than ending the socket or spinning on it.
+#[tokio::test]
+async fn a_failed_accept_leaves_the_socket_answering() {
+    let Ok(listener) = TcpListener::bind("127.0.0.1:0").await else {
+        unreachable!("a loopback socket could not be bound");
     };
-    assert!(asked);
-    let mut answer = String::new();
-    if let Some(stream) = stream.as_mut() {
-        let _ = stream.read_to_string(&mut answer).await;
-    }
+    let Ok(at) = listener.local_addr() else {
+        unreachable!("a bound socket has an address");
+    };
+    let (_stop, stopped) = watch::channel(false);
+    let failing = FailingOnce {
+        failed: std::sync::atomic::AtomicBool::new(false),
+        listener,
+    };
+    let _running = tokio::spawn(answering(Box::new(failing), surface(), stopped, TIGHT));
+
+    let answer = answer_at(at).await;
     assert!(answer.contains("answered"), "{answer}");
 }
 
