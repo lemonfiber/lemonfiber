@@ -731,3 +731,52 @@ async fn the_room_check_counts_the_bytes_that_are_really_there() {
     );
     let _ = fs::remove_dir_all(&root);
 }
+
+/// A link planted in a directory a container writes to is not followed into the
+/// archive, and is not kept as a link either: what it points at stays out of a file the
+/// operator keeps and restores, and the files beside it are captured as ever.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_link_in_a_captured_directory_is_left_out() {
+    let root = scratch("linked-item");
+    let paths = install(&root);
+    let elsewhere = root.join("outside/private.txt");
+    write_file(&elsewhere, "not the stack's");
+    let linked = paths.service_config().join("sonarr/planted");
+    assert!(std::os::unix::fs::symlink(&elsewhere, &linked).is_ok());
+    let dest = root.join("backups/linked.tar.gz");
+    let items = vec![Item {
+        source: paths.service_config(),
+        archive_path: "services".to_owned(),
+        label: "services".to_owned(),
+    }];
+    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    assert!(Tar.write(&dest, &manifest, &items).await.is_ok());
+
+    let names: Vec<String> = File::open(&dest)
+        .ok()
+        .map(|file| {
+            let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+            archive
+                .entries()
+                .map(|entries| {
+                    entries
+                        .filter_map(Result::ok)
+                        .filter_map(|entry| {
+                            entry.path().ok().map(|path| path.display().to_string())
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    assert!(
+        names.iter().any(|name| name.ends_with("sonarr/config.xml")),
+        "{names:?}"
+    );
+    assert!(
+        !names.iter().any(|name| name.ends_with("planted")),
+        "{names:?}"
+    );
+}
