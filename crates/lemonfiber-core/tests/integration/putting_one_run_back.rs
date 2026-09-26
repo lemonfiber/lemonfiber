@@ -634,3 +634,46 @@ async fn a_rehearsed_reversal_separates_what_needs_the_service_from_what_does_no
         "a rehearsal recorded a reversal it did not make"
     );
 }
+
+/// Make the journal one that reads and cannot be written: the name it is written under
+/// before it is moved into place is taken by a directory.
+fn unrewritable(root: &Path) {
+    let journal = paths(root).journal();
+    let mut staging = journal.file_name().unwrap_or_default().to_os_string();
+    staging.push(".writing");
+    let _ = std::fs::create_dir_all(journal.with_file_name(staging).join("held"));
+}
+
+/// A journal that cannot be read refuses the reversal, and nothing is put back from a
+/// record with a change missing from it.
+#[tokio::test]
+async fn a_journal_that_cannot_be_read_refuses_the_reversal() {
+    let root = scratch("unreadable-journal");
+    env_holds(&root, "ONE=new\n");
+    let good =
+        serde_json::to_string(&set("1000", SEED, "ONE", Some("old"), "new")).unwrap_or_default();
+    let path = paths(&root).journal();
+    let _ = std::fs::write(&path, format!("{{ not a change }}\n{good}\n"));
+
+    let said = refusal(&root, "1000").await;
+    assert!(said.contains("could not be read"), "{said}");
+    assert!(reading(&root).contains("ONE=new"), "nothing was put back");
+}
+
+/// A reversal carried out and then not recorded is said as that: it stands, and it
+/// cannot be put back in turn, which is what a reversal nobody can read back is.
+#[tokio::test]
+async fn a_reversal_that_cannot_be_recorded_says_it_stands_unrecorded() {
+    let root = scratch("unrecorded-reversal");
+    env_holds(&root, "ONE=new\n");
+    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    unrewritable(&root);
+
+    let said = refusal(&root, "1000").await;
+    assert!(said.contains("UNDO-3"), "{said}");
+    assert!(said.contains("could not be recorded"), "{said}");
+    assert!(
+        reading(&root).contains("ONE=old"),
+        "the reversal itself stands"
+    );
+}

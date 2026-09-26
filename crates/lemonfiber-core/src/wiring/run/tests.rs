@@ -235,3 +235,25 @@ fn the_read_and_the_verb_answer_as_the_two_outcomes_they_are() {
         Ok(Outcome::Substitution(_))
     ));
 }
+
+/// A choice whose record cannot be written is not made: the journal goes down first,
+/// and a journal that will not take the entry stops the change it would have recorded.
+#[test]
+fn a_choice_the_journal_will_not_take_is_not_made() {
+    let (ctx, at) = ctx("unjournalled");
+    assert!(
+        std::fs::create_dir_all(at.join("config").join("journal.jsonl.writing").join("held"))
+            .is_ok()
+    );
+
+    let answered = substituting(
+        &ctx,
+        &Filling {
+            capability: "indexer.search".to_owned(),
+            service: "nzbhydra2".to_owned(),
+        },
+    );
+
+    assert!(answered.is_err(), "a choice was made with no record of it");
+    assert_eq!(recorded(&at), None, "and the settings file holds it anyway");
+}

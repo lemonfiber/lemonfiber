@@ -508,3 +508,32 @@ fn an_address_setting_loses_its_userinfo_whole() {
     assert!(!said.contains(&key_shaped()), "{said}");
     assert!(said.contains("@indexer.example/api"), "{said}");
 }
+
+/// The scan's own reading of an encoded key: short runs of letters and digits joined
+/// by the alphabet's own marks, long and mixed as a whole, and nothing the key rule
+/// alone would find.
+#[test]
+fn a_key_only_the_encoding_reveals_is_found_by_the_scan() {
+    let pieces: Vec<String> = ["Abc", "Def", "Ghi", "Jkl", "Mno", "Pqr", "Stu", "Vwx"]
+        .iter()
+        .zip('1'..='8')
+        .map(|(letters, digit)| format!("{letters}{digit}"))
+        .collect();
+    let joined = pieces.join("+");
+    let line = format!("gluetun | peer {joined}");
+    assert!(
+        residual(&[("logs".to_owned(), line.clone())], &Terms::default()).is_some(),
+        "{line}"
+    );
+
+    // Long and mixed in case with no digit in it is a name, not a key.
+    let named: String = [
+        "Abcd", "Efgh", "Ijkl", "Mnop", "Qrst", "Uvwx", "Yzab", "Cdef",
+    ]
+    .concat();
+    let line = format!("radarr | {named}");
+    assert!(
+        residual(&[("logs".to_owned(), line.clone())], &Terms::default()).is_none(),
+        "{line}"
+    );
+}
