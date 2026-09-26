@@ -643,3 +643,78 @@ impl Check for Offering {
         Some(&self.0)
     }
 }
+
+/// A repair that changed something is recorded, or is stopped saying it could not be.
+///
+/// Asked through the whole errand as well as in the crate, so every build of the step
+/// that records a repair is driven down each of its three ways: nowhere to record it,
+/// recorded, and not recordable.
+#[tokio::test]
+async fn a_repair_whose_change_cannot_be_recorded_is_stopped_saying_so() {
+    let changed = || Attempt::Carried {
+        changes: vec![lemonfiber_core::journal::Change {
+            at: "1".to_owned(),
+            operation: lemonfiber_core::repair::OPERATION.to_owned(),
+            target: ".env".to_owned(),
+            kind: lemonfiber_core::journal::Kind::Set {
+                key: "FORWARDED_PORT".to_owned(),
+                previous: None,
+                current: "51413".to_owned(),
+            },
+        }],
+    };
+
+    let recorded = drive(
+        &ctx("recordable"),
+        &checks(changed()),
+        Stance::Unattended,
+        &Always(true),
+    )
+    .await;
+    assert!(
+        !matches!(
+            recorded.mended.first().map(|mended| &mended.outcome),
+            Some(Outcome::Stopped { .. })
+        ),
+        "{recorded:?}"
+    );
+
+    let dir = lemonfiber_fixtures::scratch::Scratch::new("repair-unrecordable").kept();
+    let _ = std::fs::create_dir_all(dir.join("journal.jsonl.writing").join("held"));
+    let unrecordable = lemonfiber_testing::a_live_context()
+        .settings(Settings {
+            env_file: Some(dir.join(".env")),
+            ..Settings::default()
+        })
+        .build();
+    let stopped = drive(
+        &unrecordable,
+        &checks(changed()),
+        Stance::Unattended,
+        &Always(true),
+    )
+    .await;
+    assert!(
+        matches!(
+            stopped.mended.first().map(|mended| &mended.outcome),
+            Some(Outcome::Stopped { leaving }) if leaving.contains("could not be recorded")
+        ),
+        "{stopped:?}"
+    );
+
+    let nowhere = lemonfiber_testing::a_live_context().build();
+    let judged = drive(
+        &nowhere,
+        &checks(changed()),
+        Stance::Unattended,
+        &Always(true),
+    )
+    .await;
+    assert!(
+        !matches!(
+            judged.mended.first().map(|mended| &mended.outcome),
+            Some(Outcome::Stopped { .. })
+        ),
+        "{judged:?}"
+    );
+}

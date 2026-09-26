@@ -281,9 +281,13 @@ fn journal_a_set(ctx: &Ctx, operation: &str, key: &str, wrote: &str) {
             current: wrote.to_owned(),
         },
     };
-    let _ = crate::app::targets::layout(ctx).map(|paths| {
-        crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref());
+    let recorded = crate::app::targets::layout(ctx).map(|paths| {
+        crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
     });
+    assert!(
+        recorded.is_some_and(|written| written.is_ok()),
+        "the journal was written"
+    );
 }
 
 /// What removing that plugin came to.
@@ -344,7 +348,10 @@ fn journalled(ctx: &Ctx) -> Vec<Change> {
         .as_deref()
         .map(|env| env.with_file_name(crate::config::paths::JOURNAL))
         .unwrap_or_default();
-    super::super::recover::journal_at(&at).changes().to_vec()
+    super::super::recover::journal_at(&at)
+        .unwrap_or_default()
+        .changes()
+        .to_vec()
 }
 
 /// The paths a run journalled, in the order it recorded them.

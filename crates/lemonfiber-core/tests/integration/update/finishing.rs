@@ -144,3 +144,27 @@ async fn a_run_asked_to_wait_lets_what_is_coming_down_finish_first() {
     );
     assert_eq!(machine.started(), vec!["sonarr".to_owned()]);
 }
+
+/// An update that moved a service and could not record it is said as that: it stands,
+/// and it cannot be put back, which is what a run the record does not have is.
+#[tokio::test]
+async fn a_run_that_cannot_be_recorded_says_it_stands_unrecorded() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let (context, journal) = recording(&machine, &archive, "unrecorded");
+    let mut staging = journal.file_name().unwrap_or_default().to_os_string();
+    staging.push(".writing");
+    assert!(std::fs::create_dir_all(journal.with_file_name(staging).join("held")).is_ok());
+
+    let refused = dispatch(asking(true, Waiting::Never), &context).await.err();
+
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code),
+        Some(lemonfiber_core::error::codes::undo::CANNOT_SUCCEED),
+        "{refused:?}"
+    );
+    assert!(
+        refused.is_some_and(|problem| problem.summary.contains("The update was done")),
+        "the run was not said to stand"
+    );
+}

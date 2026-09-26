@@ -583,3 +583,59 @@ fn a_notification_answer_that_cannot_be_written_stops_the_apply() {
     assert!(stopped.is_err());
     assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);
 }
+
+/// An apply over a machine with a record of earlier changes keeps that record: a
+/// resumed or repeated setup that started an empty journal would write the history of
+/// everything before it over.
+#[test]
+fn an_apply_keeps_what_the_journal_already_held() {
+    let dir = scratch("keeps-journal");
+    let paths = layout(&dir);
+    let earlier = crate::app::recover::journalled(
+        &paths.journal(),
+        &[crate::test_support::a_fresh_write("EARLIER", "kept")],
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+    );
+    assert!(earlier.is_ok(), "{earlier:?}");
+    let mut wizard = reviewed(&dir.join("library"));
+
+    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+
+    let held = crate::app::recover::journal_at(&paths.journal()).unwrap_or_default();
+    assert!(
+        held.changes().iter().any(|change| matches!(
+            &change.kind,
+            crate::journal::Kind::Set { key, .. } if key == "EARLIER"
+        )),
+        "the earlier change is still recorded: {:?}",
+        held.changes()
+    );
+}
+
+/// A recovery over a journal that cannot be read is refused, and what setup had written
+/// is said to be unreadable rather than listed as nothing.
+#[test]
+fn a_recovery_over_a_journal_that_cannot_be_read_is_refused() {
+    let dir = scratch("recover-unreadable");
+    let paths = layout(&dir);
+    assert!(std::fs::create_dir_all(paths.journal().join("held")).is_ok());
+    let mut wizard = reviewed(&dir.join("library"));
+
+    let refused = crate::app::setup::recovered(
+        &mut wizard,
+        &applying(&paths, external(), "t"),
+        crate::wizard::Choice::RollBack,
+    );
+    assert!(
+        refused.is_err_and(|problem| problem.summary.contains("could not be read")),
+        "a recovery read a journal it could not open as one with nothing to put back"
+    );
+
+    let said = crate::app::setup::written_so_far(&paths);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said.first()
+            .is_some_and(|line| line.contains("could not be read")),
+        "{said:?}"
+    );
+}

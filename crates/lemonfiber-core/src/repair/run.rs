@@ -261,7 +261,11 @@ async fn permitted(ctx: &Ctx, mender: &dyn crate::doctor::Mend, repair: &Repair)
 /// could not be put back, or where a change needed a service that would not answer — the
 /// last of which names every such change together rather than one at a time.
 pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>> {
-    let undos = repair::undoing(crate::app::recover::journal_at(&paths.journal()).changes());
+    let undos = repair::undoing(
+        crate::app::recover::journal_at(&paths.journal())
+            .map_err(|failure| Box::new(failure.problem()))?
+            .changes(),
+    );
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -335,7 +339,11 @@ pub async fn reversing(ctx: &Ctx) -> Result<Reversal, Box<Problem>> {
 /// could not be put back, or where a change needed a service that would not answer.
 pub async fn retracting(ctx: &Ctx, paths: &Paths) -> Result<Reversal, Box<Problem>> {
     if ctx.dry_run {
-        let undos = repair::undoing(crate::app::recover::journal_at(&paths.journal()).changes());
+        let undos = repair::undoing(
+            crate::app::recover::journal_at(&paths.journal())
+                .map_err(|failure| Box::new(failure.problem()))?
+                .changes(),
+        );
         return Ok(crate::app::putting_back::would_reverse(undos));
     }
     retract(ctx, paths).await.map(|reversed| Reversal {

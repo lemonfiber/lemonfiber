@@ -413,3 +413,26 @@ async fn a_field_naming_nothing_secret_still_says_what_it_went_back_to() {
         "and nothing was withheld that did not need to be: {said}"
     );
 }
+
+/// A journal that cannot be read refuses the reversal, rehearsed or real, rather than
+/// putting back what the entries around a damaged one say.
+#[tokio::test]
+async fn a_journal_that_cannot_be_read_refuses_the_reversal() {
+    let root = scratch("unreadable-journal");
+    let path = paths(&root).journal();
+    let _ = std::fs::create_dir_all(path.join("held"));
+
+    let refused = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
+    assert!(
+        refused.is_err_and(|problem| problem.summary.contains("could not be read")),
+        "the reversal read a journal it could not open as one with nothing in it"
+    );
+
+    let mut rehearsing = ctx(&root, Fake::silent());
+    rehearsing.dry_run = true;
+    let rehearsed = lemonfiber_core::repair::run::retracting(&rehearsing, &paths(&root)).await;
+    assert!(
+        rehearsed.is_err_and(|problem| problem.summary.contains("could not be read")),
+        "the rehearsal read a journal it could not open as one with nothing in it"
+    );
+}

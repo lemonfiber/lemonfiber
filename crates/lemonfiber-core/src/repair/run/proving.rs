@@ -48,8 +48,12 @@ pub(super) async fn carried(
     // Recorded before the proof, and before anything else can go wrong. What a repair
     // changed is the operator's way back, and a way back that depends on the rest of the
     // run going well is one they find missing exactly when they need it.
-    if let Some(journal) = crate::app::targets::beside_env(ctx, JOURNAL) {
-        crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref());
+    //
+    // A record that cannot be written leaves the repair stopped rather than judged: what
+    // it changed stands and cannot be put back, which is the state an operator has to be
+    // told they are in before anything asks whether the fault went.
+    if let Some(stopped) = unrecorded(ctx, &attempt) {
+        return stopped;
     }
     if matches!(attempt, Attempt::Stopped { .. }) {
         // Nothing changed, or something changed half way. Either way the state it was left
@@ -57,6 +61,26 @@ pub(super) async fn carried(
         return Outcome::of(attempt, false);
     }
     judged(attempt, prove(ctx, services, again, &repair.check).await)
+}
+
+/// The repair stopped, where what it changed could not be recorded; nothing where it
+/// was, or where there is nowhere to record it.
+///
+/// Apart from [`carried`] because it decides, and a decision inside an async body is
+/// one the coverage report sums across the body's states rather than reading as lines.
+fn unrecorded(ctx: &Ctx, attempt: &Attempt) -> Option<Outcome> {
+    let journal = crate::app::targets::beside_env(ctx, JOURNAL)?;
+    let recorded =
+        crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref());
+    let Err(failure) = recorded else {
+        return None;
+    };
+    Some(Outcome::Stopped {
+        leaving: format!(
+            "what the repair changed stands and could not be recorded, so it cannot be put \
+             back: {failure}"
+        ),
+    })
 }
 
 /// Ask again whether the fault is gone.

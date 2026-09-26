@@ -123,7 +123,8 @@ fn substituting(
             &ctx.stamp(),
         )],
         ctx.seams.random.as_ref(),
-    );
+    )
+    .map_err(|failure| Box::new(failure.problem()))?;
     if let Err(err) = crate::config::store::set(path, super::FILLS_KEY, &substitution.setting) {
         return Err(Box::new(err.problem()));
     }

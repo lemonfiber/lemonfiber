@@ -76,12 +76,14 @@ pub(crate) fn carry_out(
             }
         };
         // Journalled first, as every write is, holding what goes between the markers so
-        // the reversal can tell its own region from one somebody has edited since.
+        // the reversal can tell its own region from one somebody has edited since. A
+        // record that cannot be written stops the write it would have recorded.
         crate::app::recover::journalled(
             &journal,
             &[bounded(plugin, &write.path, key, owner, body, stamp)],
             ctx.seams.random.as_ref(),
-        );
+        )
+        .map_err(|failure| Box::new(failure.problem()))?;
         let record = ctx
             .settings
             .env_file
@@ -111,7 +113,8 @@ fn made_whole(
         .iter()
         .map(|made_here| made(plugin, made_here, stamp))
         .collect();
-    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref());
+    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref())
+        .map_err(|failure| Box::new(failure.problem()))?;
 
     match content {
         None => std::fs::create_dir_all(path)

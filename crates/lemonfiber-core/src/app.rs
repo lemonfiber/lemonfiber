@@ -401,7 +401,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::ConfigShow => configuring::get(ctx, None).await.map(Outcome::Config),
         Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
         Command::Alerts(action) => appetite::alerts(ctx, action).map(Outcome::Alerts),
-        Command::History => Ok(Outcome::History(history::history(ctx))),
+        Command::History => history::history(ctx).map(Outcome::History),
         Command::Migrate(action) => migration::migrate(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace {

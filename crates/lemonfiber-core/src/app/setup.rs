@@ -22,7 +22,7 @@ use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
 use crate::error::codes::setup::{ALREADY_UNDERWAY, DOES_NOT_APPLY};
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Amiss, Diagnose as _, Problem, Remedy, Severity};
 use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::validate::{Validation, Validator};
@@ -272,7 +272,8 @@ pub(crate) fn recovered(
     choice: Choice,
 ) -> Result<(), Box<Problem>> {
     let paths = applying.paths;
-    let journal = crate::app::recover::journal_at(&paths.journal());
+    let journal = crate::app::recover::journal_at(&paths.journal())
+        .map_err(|failure| Box::new(failure.problem()))?;
     let env = paths.env_file();
     match Recovery::of(&journal).resolve(choice) {
         Resolution::Resume => resume(wizard, applying),
@@ -297,14 +298,15 @@ pub(crate) fn recovered(
 /// reads the same wherever the choice is put.
 ///
 /// Empty where the apply stopped before it wrote anything, which is worth being
-/// able to tell apart from having written something.
+/// able to tell apart from having written something. A journal that cannot be read is
+/// said as that, in the one line the list then holds, rather than as a list with
+/// nothing in it.
 #[must_use]
 pub fn written_so_far(paths: &Paths) -> Vec<String> {
-    crate::app::recover::journal_at(&paths.journal())
-        .changes()
-        .iter()
-        .map(described)
-        .collect()
+    match crate::app::recover::journal_at(&paths.journal()) {
+        Ok(journal) => journal.changes().iter().map(described).collect(),
+        Err(failure) => vec![failure.to_string()],
+    }
 }
 
 /// Ask each question the wizard presents here and has no answer for yet, in order.

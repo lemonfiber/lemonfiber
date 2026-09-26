@@ -292,3 +292,56 @@ async fn an_undo_that_knows_where_to_look_answers_with_what_went_back() {
 
     assert_eq!(reversal, Some(0));
 }
+
+/// A mender that changes one thing and reports it, for the record that follows.
+struct Changing;
+
+#[async_trait::async_trait]
+impl crate::doctor::Mend for Changing {
+    fn repairs(&self, _: &[Finding]) -> Vec<Repair> {
+        Vec::new()
+    }
+
+    async fn mend(&self, _: &Repair) -> Attempt {
+        Attempt::Carried {
+            changes: vec![crate::test_support::a_fresh_write(
+                "FORWARDED_PORT",
+                "51413",
+            )],
+        }
+    }
+}
+
+/// A repair whose change cannot be recorded is stopped rather than judged: what it
+/// changed stands and cannot be put back, which an operator is told before anything
+/// asks whether the fault went.
+#[tokio::test]
+async fn a_repair_whose_change_cannot_be_recorded_is_stopped_saying_so() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade("repair-unrecorded");
+    let config = dir.join("config");
+    let _ = std::fs::create_dir_all(config.join("journal.jsonl.writing").join("held"));
+    let settings = crate::config::Settings {
+        env_file: Some(config.join(".env")),
+        stack_dir: Some(dir.join("data").join("stack")),
+        ..crate::config::Settings::default()
+    };
+    let ctx = crate::test_support::a_context().settings(settings).build();
+
+    let outcome = super::proving::carried(&ctx, &[], &Changing, &[], &repair("vpn.port")).await;
+
+    assert!(
+        matches!(&outcome, Outcome::Stopped { leaving } if leaving.contains("could not be recorded")),
+        "{outcome:?}"
+    );
+}
+
+/// A machine with nowhere to keep a journal records nothing and goes on to judge the
+/// repair, rather than stopping it over a record there was never anywhere to keep.
+#[tokio::test]
+async fn a_repair_with_nowhere_to_record_is_judged_rather_than_stopped() {
+    let ctx = crate::test_support::a_context().build();
+
+    let outcome = super::proving::carried(&ctx, &[], &Changing, &[], &repair("vpn.port")).await;
+
+    assert!(!matches!(outcome, Outcome::Stopped { .. }), "{outcome:?}");
+}

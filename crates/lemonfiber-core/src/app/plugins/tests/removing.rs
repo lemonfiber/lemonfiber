@@ -477,3 +477,25 @@ async fn what_a_plugin_contributed_goes_with_it_when_the_plugin_does() {
         "and a run after it reads as one on a machine that never saw it"
     );
 }
+
+/// A journal that cannot be read refuses a removal before anything comes off, asked
+/// both ways a removal asks: whether it would go ahead, and going ahead.
+#[tokio::test]
+async fn a_journal_that_cannot_be_read_refuses_a_removal() {
+    let ctx = ctx("removal-unreadable-journal");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    assert!(std::fs::create_dir_all(journal.join("held")).is_ok());
+
+    let admitted = crate::app::putting_back::admitted(&ctx, "komga");
+    assert!(
+        admitted.is_err_and(|problem| problem.summary.contains("could not be read")),
+        "a removal was admitted over a journal nothing could read"
+    );
+    let everything = crate::app::putting_back::everything(&ctx, "komga").await;
+    assert!(
+        everything.is_err_and(|problem| problem.summary.contains("could not be read")),
+        "a removal went ahead over a journal nothing could read"
+    );
+}
