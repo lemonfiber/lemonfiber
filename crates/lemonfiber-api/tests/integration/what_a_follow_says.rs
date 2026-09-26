@@ -90,6 +90,9 @@ impl Run {
             .uri(path)
             .header("host", "127.0.0.1:8471")
             .header(TOKEN_HEADER, self.serving.token.as_str())
+            // Who the guard would have named, carried as it would have put it: these
+            // routes are served here without the guard in front of them.
+            .extension(lemonfiber_api::admission::Caller::Machine)
             .body(axum::body::Body::empty())
             .ok()?;
         let router = lemonfiber_api::read::routes().with_state(self.serving.clone());

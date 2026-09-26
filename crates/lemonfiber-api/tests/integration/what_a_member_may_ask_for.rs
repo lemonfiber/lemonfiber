@@ -404,12 +404,15 @@ async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
     let _ = fs::remove_dir_all(a_directory(named));
 }
 
-/// And it answers a caller it *can* vouch for, so the refusal above is the check
-/// rather than the route being shut.
+/// A member the household vouches for is refused the stream, and the machine is not,
+/// so the refusal is about who is asking rather than the route being shut.
+///
+/// The stream carries the operator's whole view — the dashboard, the log lines the
+/// operator follows, what setup is doing — and none of it is narrowed to a member.
 #[tokio::test]
-async fn the_stream_answers_a_member_it_could_check() {
+async fn the_stream_refuses_a_member_and_answers_the_machine() {
     let named = "stream-alone-open";
-    let (router, _, admitting) = door_with(
+    let (router, token, admitting) = door_with(
         Some(keeping(named)),
         AHousehold::knowing(MEMBER),
         not_the_token(),
@@ -425,13 +428,74 @@ async fn the_stream_answers_a_member_it_could_check() {
     let mut carried = from_here();
     carried.push((TOKEN_HEADER, session(&answer.body)));
 
-    let heard = asked(stream_alone(&admitting), "GET", "/api/events", &carried, "").await;
+    let refused = asked(stream_alone(&admitting), "GET", "/api/events", &carried, "").await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+    assert!(refused.body.contains("may ask for"), "{}", refused.body);
 
+    let mut machine = from_here();
+    machine.push((TOKEN_HEADER, token.as_str().to_owned()));
+    let heard = asked(stream_alone(&admitting), "GET", "/api/events", &machine, "").await;
     assert_eq!(
         heard.status,
         StatusCode::OK,
-        "a member the household vouched for was not let on to the stream"
+        "the machine was not let on to the stream"
     );
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// Every route this surface serves, walked as a member.
+///
+/// None answers a member with a success except the reads that are theirs, and the
+/// routes that are no command — a bundle, the logs, a job — refuse them outright. A
+/// route added later is walked by being added to the lists it is served from.
+#[tokio::test]
+async fn a_member_is_refused_every_route_that_is_not_theirs() {
+    use lemonfiber_api::read::table::{BUNDLE, HELD, LOGS, OFFERED, REQUESTS};
+
+    let named = "member-every-route";
+    let (router, carried) = as_a_member(named).await;
+    let operator_only: Vec<(&str, String)> = vec![
+        ("GET", LOGS.to_owned()),
+        (
+            "GET",
+            BUNDLE.replace("{name}", "lemonfiber-support-2026-01-01T00-00-00Z.tar.gz"),
+        ),
+        ("GET", "/api/jobs/anything".to_owned()),
+        ("DELETE", "/api/jobs/anything".to_owned()),
+    ];
+    for (method, path) in &operator_only {
+        let answer = asked(router.clone(), method, path, &carried, "").await;
+        assert_eq!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{method} {path}: {}",
+            answer.body
+        );
+    }
+
+    let mut walked: Vec<(&str, String)> = OFFERED
+        .iter()
+        .filter(|read| ![REQUESTS, HELD].contains(read))
+        .map(|read| ("GET", (*read).to_owned()))
+        .collect();
+    walked.extend(
+        lemonfiber_api::actions::OFFERED
+            .iter()
+            .map(|action| ("POST", format!("/api/actions/{action}"))),
+    );
+    walked.push(("GET", "/api/setup".to_owned()));
+    for step in ["answer", "next", "back", "apply", "recover"] {
+        walked.push(("POST", format!("/api/setup/{step}")));
+    }
+    for (method, path) in &walked {
+        let answer = asked(router.clone(), method, path, &carried, "{}").await;
+        assert!(
+            !answer.status.is_success(),
+            "{method} {path} answered a member with {}: {}",
+            answer.status,
+            answer.body
+        );
+    }
     let _ = fs::remove_dir_all(a_directory(named));
 }
 
@@ -486,5 +550,27 @@ async fn the_session_the_operator_buys_names_nobody() {
         "the operator's session named somebody: {}",
         answer.body
     );
+    let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// An account nobody has claimed has no password, and signing in to it with an empty
+/// one is an invitation being taken rather than a member proving who they are.
+#[tokio::test]
+async fn an_empty_password_opens_no_session() {
+    let named = "member-empty-password";
+    let (router, _, _) = door_with(
+        Some(keeping(named)),
+        AHousehold::knowing(MEMBER),
+        not_the_token(),
+    );
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &none_given()),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
     let _ = fs::remove_dir_all(a_directory(named));
 }

@@ -10,8 +10,10 @@ use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::{LogLine, LogQuery};
 
+use crate::admission::Caller;
 use crate::read::table::{Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
 use crate::router::Serving;
+use crate::serve::operator_only;
 
 use super::{enveloped, unreadable, went_wrong};
 
@@ -48,7 +50,14 @@ pub(super) fn routes() -> Router<Serving> {
 /// end, so it cannot be answered with what it read. It is answered with a name for
 /// the work instead — the same answer every request that outlives its own
 /// connection gets here — and the lines arrive on the stream.
-async fn log_lines(State(serving): State<Serving>, RawQuery(query): RawQuery) -> Response {
+async fn log_lines(
+    State(serving): State<Serving>,
+    caller: Caller,
+    RawQuery(query): RawQuery,
+) -> Response {
+    if let Some(refusal) = operator_only(&caller) {
+        return refusal;
+    }
     let asked = match Asked::read(LOGS, query.as_deref()) {
         Ok(asked) => asked,
         Err(problem) => return went_wrong(&problem),

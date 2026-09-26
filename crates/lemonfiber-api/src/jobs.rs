@@ -59,9 +59,10 @@ use started::Started;
 use tokio::sync::Mutex;
 use tokio::task::AbortHandle;
 
+use crate::admission::Caller;
 use crate::read::enveloped;
 use crate::router::Serving;
-use crate::serve::{carrying, SENTENCE};
+use crate::serve::{carrying, operator_only, SENTENCE};
 
 /// Bytes of name. Wide enough that two runs never mint the same one.
 const WIDTH: usize = 8;
@@ -364,7 +365,14 @@ pub fn routes() -> Router<Serving> {
 /// A name this run never handed out is absent rather than reported as unfinished:
 /// answering "still going" for work nothing is doing would leave a caller waiting
 /// on an outcome that is never coming.
-async fn became(State(serving): State<Serving>, Path(job): Path<String>) -> Response {
+async fn became(
+    State(serving): State<Serving>,
+    caller: Caller,
+    Path(job): Path<String>,
+) -> Response {
+    if let Some(refusal) = operator_only(&caller) {
+        return refusal;
+    }
     let Some(work) = serving.jobs.about(&job).await else {
         return unknown();
     };
@@ -376,7 +384,14 @@ async fn became(State(serving): State<Serving>, Path(job): Path<String>) -> Resp
 /// The same answer asking would have given, because releasing a name and asking
 /// about it are two questions with one answer: where the work now stands. So a
 /// caller that released one need not ask again to find out what it released.
-async fn released(State(serving): State<Serving>, Path(job): Path<String>) -> Response {
+async fn released(
+    State(serving): State<Serving>,
+    caller: Caller,
+    Path(job): Path<String>,
+) -> Response {
+    if let Some(refusal) = operator_only(&caller) {
+        return refusal;
+    }
     let Some(work) = serving.jobs.stop(&job).await else {
         return unknown();
     };

@@ -27,9 +27,10 @@ use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::support::{held, Held};
 
+use crate::admission::Caller;
 use crate::read::table::{wanted, BUNDLE};
 use crate::router::Serving;
-use crate::serve::carrying;
+use crate::serve::{carrying, operator_only};
 
 use super::went_wrong;
 
@@ -65,9 +66,13 @@ pub(super) fn routes() -> Router<Serving> {
 /// read's, which for this one means there is no parameter it will take.
 async fn bundle(
     State(serving): State<Serving>,
+    caller: Caller,
     Path(name): Path<String>,
     RawQuery(query): RawQuery,
 ) -> Response {
+    if let Some(refusal) = operator_only(&caller) {
+        return refusal;
+    }
     if let Err(problem) = wanted(BUNDLE, query.as_deref()) {
         return went_wrong(&problem);
     }
