@@ -400,3 +400,10 @@ fn an_address_that_carries_no_password_is_shown_exactly_as_it_was_written() {
         assert_eq!(without_credentials(kept), kept, "{kept}");
     }
 }
+
+/// An account name for the VPN is a credential: for many providers it is a token.
+#[test]
+fn a_vpn_account_name_reads_as_a_credential() {
+    assert!(super::is_secret("OPENVPN_USER"));
+    assert!(super::is_secret("USENET_USER"));
+}

@@ -38,6 +38,7 @@ const SECRET_MARKERS: &[&str] = &[
     "PRIVATE",
     "CREDENTIAL",
     "AUTH",
+    "USER",
 ];
 
 /// What is shown in place of a secret.

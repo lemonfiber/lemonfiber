@@ -318,9 +318,12 @@ fn a_password_in_front_of_the_host_does_not_ride_out_with_the_address() {
         "the password went into a file an operator is told to attach to a thread: \
          {redacted}"
     );
+    // The account goes with it: a service reached as `https://<token>@host` signs in by
+    // the name alone, so the whole of what stands in front of the host is one mark, the
+    // same mark wherever the same account appears.
     assert!(
-        redacted.contains("https://operator:"),
-        "and the account it names is still there to be recognised: {redacted}"
+        !redacted.contains("operator") && redacted.contains("https://<redacted:"),
+        "the whole of what stands in front of the host is marked: {redacted}"
     );
     assert!(redacted.contains("PUID=1000"));
 
@@ -404,4 +407,104 @@ fn prose_and_versions_are_not_mistaken_for_credentials() {
             .to_owned(),
     )];
     assert_eq!(residual(&ordinary, &Terms::default()), None);
+}
+
+/// A key in the base64 alphabet, built rather than written: upper and lower case,
+/// digits, and the `+`, `/` and `=` the key tokenizer splits on.
+fn encoded_key() -> String {
+    let body: String = ('A'..='F')
+        .chain('a'..='f')
+        .chain('0'..='9')
+        .chain(['+', '/'])
+        .cycle()
+        .take(43)
+        .collect();
+    format!("{body}=")
+}
+
+/// An identifier in the dashed form, built from hexadecimal ranges.
+fn dashed() -> String {
+    let hex =
+        |length: usize| -> String { ('a'..='f').chain('0'..='9').cycle().take(length).collect() };
+    format!("{}-{}-{}-{}-{}", hex(8), hex(4), hex(4), hex(4), hex(12))
+}
+
+/// A short password, built rather than written.
+fn short_password() -> String {
+    "emases".chars().rev().chain('1'..='4').collect()
+}
+
+/// Every shape a credential took through the redactor unchanged, each on its own line.
+fn shapes() -> Vec<(&'static str, String)> {
+    let password = short_password();
+    vec![
+        (
+            "a password before the host",
+            format!("sonarr | fetching https://reader:{password}@indexer.example/api failed"),
+        ),
+        (
+            "a token as the whole userinfo",
+            format!(
+                "sonarr | fetching https://{}@indexer.example/api failed",
+                key_shaped()
+            ),
+        ),
+        (
+            "a password named in the line",
+            format!("sabnzbd | login rejected password={password}"),
+        ),
+        (
+            "a key in the base64 alphabet",
+            format!("gluetun | wireguard key {} loaded", encoded_key()),
+        ),
+        (
+            "an identifier in the dashed form",
+            format!("jellyfin | device {} signed in", dashed()),
+        ),
+    ]
+}
+
+/// Each shape is withheld by the redactor.
+#[test]
+fn every_shape_a_credential_takes_in_a_log_line_is_withheld() {
+    let password = short_password();
+    for (what, line) in shapes() {
+        let said = prose(&line, &marks(salt()), &Terms::default());
+        for secret in [password.as_str(), &key_shaped(), &encoded_key(), &dashed()] {
+            assert!(!said.contains(secret), "{what}: {said}");
+        }
+        assert!(
+            residual(&[("logs".to_owned(), said.clone())], &Terms::default()).is_none(),
+            "{what}: what the redactor wrote is what the scan accepts: {said}"
+        );
+    }
+}
+
+/// And each shape, left as it was, is found by the scan behind the redactor on its own
+/// terms — so a redactor that missed one is a bundle that is not written.
+#[test]
+fn every_shape_left_in_the_clear_is_found_by_the_scan() {
+    for (what, line) in shapes() {
+        let found = residual(&[("logs".to_owned(), line.clone())], &Terms::default());
+        assert!(found.is_some(), "{what} passed the scan: {line}");
+    }
+}
+
+/// A path is built from the same alphabet as an encoded key, and it is left as a path.
+#[test]
+fn a_path_in_a_log_line_is_left_as_a_path() {
+    let line = "radarr | imported /data/media/movies/Some Film (2024)/Some.Film.2024.1080p.WEB.mkv";
+    let said = prose(line, &marks(salt()), &Terms::default());
+    assert!(said.contains("/data/media/movies/Some"), "{said}");
+    assert!(residual(&[("logs".to_owned(), line.to_owned())], &Terms::default()).is_none());
+}
+
+/// A settings value that is an address keeps its host and loses whatever stands in
+/// front of it, name and password both.
+#[test]
+fn an_address_setting_loses_its_userinfo_whole() {
+    let body = format!("INDEXER_URL=https://{}@indexer.example/api", key_shaped());
+    let said = settings(&body, &marks(salt()), &Terms::default());
+    assert!(!said.contains(&key_shaped()), "{said}");
+    assert!(said.contains("@indexer.example/api"), "{said}");
 }

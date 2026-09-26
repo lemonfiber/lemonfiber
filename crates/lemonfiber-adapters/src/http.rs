@@ -125,9 +125,13 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
     // can answer, so it does not ask: the query goes wholesale, out of the URL kept
     // on the failure and out of the reason read from the error.
     let query = query_of(&request.url);
-    let unreachable = |error: &reqwest::Error| Unreachable {
+    //
+    // The URL comes off the error before it is read, so the address with whatever it
+    // carries in front of its host never reaches the reason; the query rule stays as
+    // the second wall behind that.
+    let unreachable = |error: reqwest::Error| Unreachable {
         url: without_credentials(&request.url),
-        reason: withheld_query(&error.to_string(), query),
+        reason: withheld_query(&error.without_url().to_string(), query),
         attempts: 1,
     };
 
@@ -135,7 +139,7 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
     // still leaves the status known — but the port reports one Response or
     // none, so a truncated body is a failure to reach rather than a partial
     // answer.
-    let response = builder.send().await.map_err(|error| unreachable(&error))?;
+    let response = builder.send().await.map_err(unreachable)?;
     let status = response.status().as_u16();
     // Read before the body, because reading the body consumes the response. A header
     // whose value is not text is dropped rather than lossily rendered: what a caller
@@ -152,7 +156,7 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
                 .map(|value| (name.as_str().to_owned(), value.to_owned()))
         })
         .collect();
-    let body = response.text().await.map_err(|error| unreachable(&error))?;
+    let body = response.text().await.map_err(unreachable)?;
     Ok(Response {
         status,
         headers,
