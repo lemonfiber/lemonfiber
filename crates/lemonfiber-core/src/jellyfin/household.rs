@@ -15,11 +15,12 @@ mod shelf;
 
 use async_trait::async_trait;
 
-use super::{item_type, Jellyfin, AUTHORIZATION};
+use super::{item_type, Jellyfin};
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
 use crate::ports::service::{
-    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Unrated,
+    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Signed,
+    Unrated,
 };
 
 /// The account list, as the media server names its fields.
@@ -230,12 +231,17 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(held.into_iter().map(UserResource::member).collect())
     }
 
-    async fn whoever(&self, name: &str, password: &str) -> Result<Option<String>, Failure> {
-        whoever(self, name, password).await
+    async fn whoever(
+        &self,
+        name: &str,
+        password: &str,
+        device: &str,
+    ) -> Result<Option<Signed>, Failure> {
+        whoever(self, name, password, device).await
     }
 
-    async fn standing(&self, id: &str) -> Result<bool, Failure> {
-        standing(self, id).await
+    async fn standing(&self, signed: &Signed) -> Result<bool, Failure> {
+        standing(self, signed).await
     }
 
     async fn invite(&self, name: &str) -> Result<Member, Failure> {
@@ -338,30 +344,32 @@ impl crate::ports::service::Household for Jellyfin {
     }
 }
 
-/// The status the server answers about an account it does not hold.
-///
-/// One status and not the pair [`REFUSED`] carries. Those two say the credential
-/// this build signed in with was turned away, which is a fault on our side of the
-/// call — reading them as *there is no such account* would sign out an entire
-/// household the day the media server's own admin password changed.
-const GONE: u16 = 404;
-
-/// Whether an account still stands.
+/// Whether a sign-in still stands.
 ///
 /// Beside the impl rather than inside it because it decides, and an `#[async_trait]`
 /// body is one the coverage report attributes nothing inside.
 ///
-/// One account read rather than the household listed. Both would answer, and this is
-/// the cheaper of the two on a server whose household is large — which matters
-/// because it is asked on every call a member makes.
-async fn standing(jellyfin: &Jellyfin, id: &str) -> Result<bool, Failure> {
-    let request = jellyfin
-        .as_admin(Method::Get, &format!("/Users/{id}"), None)
-        .await?;
+/// Asked as the member, with the access their sign-in was granted, rather than as the
+/// administrator about their id. The server withdraws that access when the account's
+/// password is changed — by them or by an administrator — and when the account is
+/// removed, so a session opened with the old password is answered *gone* at its next
+/// call. Driven against `jellyfin/jellyfin:10.10.3`: `/Users/Me` answers `200` with
+/// the account while the access stands and `401` once the device is ended.
+///
+/// An account whose password was taken off, which is how an invitation is offered
+/// again, has no password to have proved: it is not standing either, whatever access
+/// is still held against it.
+async fn standing(jellyfin: &Jellyfin, signed: &Signed) -> Result<bool, Failure> {
+    let mut request = jellyfin.request(Method::Get, "/Users/Me", None);
+    request.headers.push((
+        "Authorization".to_owned(),
+        format!(r#"MediaBrowser Token="{}""#, signed.token),
+    ));
     let response = jellyfin.endpoint.send(&request).await?;
 
-    // Gone is an answer rather than a fault, and it is the answer this exists for.
-    if response.status == GONE {
+    // Access the server no longer honours is an answer rather than a fault, and it is
+    // the answer this exists for.
+    if response.status == WITHDRAWN {
         return Ok(false);
     }
 
@@ -373,11 +381,15 @@ async fn standing(jellyfin: &Jellyfin, id: &str) -> Result<bool, Failure> {
     // **An answer carrying no policy is an account that exists**, which is what this
     // was asked. Reading it as disabled instead would lock out everybody on a server
     // that stopped sending the field — permanently, since the next call reads the
-    // same answer — where the requirement this serves is about an identity that was
-    // *removed*, and removal is the status above. The flag is honoured where the
-    // server states it and nothing is inferred where it does not.
-    Ok(held.policy.is_none_or(|policy| !policy.disabled))
+    // same answer. The flag is honoured where the server states it and nothing is
+    // inferred where it does not.
+    Ok(held.id == signed.id
+        && held.has_password
+        && held.policy.is_none_or(|policy| !policy.disabled))
 }
+
+/// The status the server answers access it no longer honours with.
+const WITHDRAWN: u16 = 401;
 
 /// Who a name and a password prove somebody to be.
 ///
@@ -389,15 +401,22 @@ async fn whoever(
     jellyfin: &Jellyfin,
     name: &str,
     password: &str,
-) -> Result<Option<String>, Failure> {
+    device: &str,
+) -> Result<Option<Signed>, Failure> {
     // The member's own credentials, not the admin's, and not stored anywhere: what
     // comes back is the account this pair belongs to and nothing is kept of how it
     // was proved.
     let body = serde_json::json!({ "Username": name, "Pw": password }).to_string();
     let mut request = jellyfin.request(Method::Post, "/Users/AuthenticateByName", Some(body));
-    request
-        .headers
-        .push(("X-Emby-Authorization".to_owned(), AUTHORIZATION.to_owned()));
+    // Named per sign-in: the server keeps one sign-in per account and device, and a
+    // second under the same name would end the first — a member signed in from two
+    // browsers would be signed out of one of them.
+    request.headers.push((
+        "Authorization".to_owned(),
+        format!(
+            r#"MediaBrowser Client="lemonfiber", Device="lemonfiber", DeviceId="{device}", Version="1""#
+        ),
+    ));
     let response = jellyfin.endpoint.send(&request).await?;
 
     // A pair the server does not recognise is an answer rather than a fault, and the
@@ -415,7 +434,12 @@ async fn whoever(
     // An account with no id is an answer this build cannot use. Read as nobody rather
     // than as somebody with an empty name, because an empty id would match every
     // other account that answered the same way.
-    Ok(Some(signed.user.id).filter(|id| !id.is_empty()))
+    // Access that is empty is the same: nothing could be held against it.
+    Ok(Some(Signed {
+        id: signed.user.id,
+        token: signed.token,
+    })
+    .filter(|signed| !signed.id.is_empty() && !signed.token.is_empty()))
 }
 
 async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), Failure> {
@@ -472,6 +496,9 @@ const REFUSED: [u16; 2] = [401, 403];
 struct SignedIn {
     #[serde(rename = "User", default)]
     user: SignedInUser,
+    /// The access this sign-in was granted, which a session is then held against.
+    #[serde(rename = "AccessToken", default)]
+    token: String,
 }
 
 /// The account a sign-in proved, by the id the media server files it under.

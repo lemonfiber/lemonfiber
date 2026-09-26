@@ -49,13 +49,17 @@ use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::admission::{self as credential, Credential};
 use lemonfiber_core::model::{kind, Envelope};
-use lemonfiber_core::ports::service::Household;
+use lemonfiber_core::ports::random::Random;
+use lemonfiber_core::ports::service::{Household, Signed};
 use serde::Deserialize;
 
 use crate::guard::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER};
 use crate::read::enveloped;
 use crate::router::Serving;
 use crate::serve::{carrying, refused, Refusal, SENTENCE};
+
+/// How many unpredictable bytes name one sign-in at the media server.
+const DEVICE_BYTES: usize = 16;
 
 pub use attempts::Attempts;
 pub use sessions::Sessions;
@@ -131,7 +135,7 @@ impl Admitting {
     /// A household that could not be asked refuses rather than admitting. That is the
     /// safe direction and the honest one — nothing here proved anything, so nobody is
     /// let in on it.
-    async fn whoever(&self, given: &Given) -> Option<Opened> {
+    async fn whoever(&self, given: &Given, random: &dyn Random) -> Option<Opened> {
         if let Some(held) = self
             .credential()
             .filter(|held| held.verifies(&given.password))
@@ -147,7 +151,18 @@ impl Admitting {
             return None;
         }
 
-        (household.whoever(name, &given.password).await)
+        // A name for this sign-in at the server, fresh each time: the server keeps one
+        // sign-in per account and device, so a second under one name would end the
+        // first, and a member signed in from two browsers would lose one of them.
+        let device = random
+            .bytes(DEVICE_BYTES)?
+            .iter()
+            .fold(String::new(), |mut named, byte| {
+                use std::fmt::Write as _;
+                let _ = write!(named, "{byte:02x}");
+                named
+            });
+        (household.whoever(name, &given.password, &device).await)
             .ok()
             .flatten()
             .map(Opened::Member)
@@ -186,7 +201,7 @@ impl Admitting {
             // say whether that identity is still one, so an account removed there
             // reaches the person holding it at their next call rather than at their
             // next sign-in.
-            Some(Opened::Member(id)) => self.still_standing(id).await,
+            Some(Opened::Member(signed)) => self.still_standing(signed).await,
             None => Knocking::Nobody,
         }
     }
@@ -199,14 +214,14 @@ impl Admitting {
     /// collapsing it into *gone* would sign a household out for the length of a
     /// media-server reboot and tell them their account had been removed, which is
     /// the same mistake the sign-in door is built to avoid one floor down.
-    async fn still_standing(&self, id: String) -> Knocking {
+    async fn still_standing(&self, signed: Signed) -> Knocking {
         let Some(household) = self.household.as_ref() else {
             // A build with no household behind it has no member sessions to hold,
             // so one arriving here is a session this run cannot vouch for.
             return Knocking::Unconfirmed;
         };
-        match household.standing(&id).await {
-            Ok(true) => Knocking::Known(Caller::Member(id)),
+        match household.standing(&signed).await {
+            Ok(true) => Knocking::Known(Caller::Member(signed.id)),
             Ok(false) => Knocking::Nobody,
             Err(_) => Knocking::Unconfirmed,
         }
@@ -314,7 +329,11 @@ async fn opening(
     if let Some(left) = serving.admitting.attempts.waiting(now).await {
         return waiting(left.as_secs().max(1));
     }
-    let Some(who) = serving.admitting.whoever(&given).await else {
+    let Some(who) = serving
+        .admitting
+        .whoever(&given, serving.ctx.seams.random.as_ref())
+        .await
+    else {
         serving.admitting.attempts.wrong(now).await;
         return said(StatusCode::UNAUTHORIZED, NOT_THE_PASSWORD);
     };

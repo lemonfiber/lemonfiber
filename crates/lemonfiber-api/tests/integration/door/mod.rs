@@ -23,7 +23,7 @@ pub(crate) use lemonfiber_core::admission::{self as credential, Credential};
 pub(crate) use lemonfiber_core::app::Ctx;
 pub(crate) use lemonfiber_core::config::Settings;
 pub(crate) use lemonfiber_core::ports::service::{
-    Allowed, Certificate, Failure, Held, Household, Invited, Member, NamedLibrary,
+    Allowed, Certificate, Failure, Held, Household, Invited, Member, NamedLibrary, Signed,
 };
 pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
@@ -259,6 +259,9 @@ pub(crate) struct AHousehold {
     /// behind the same surface — which is the sequence the requirement is written
     /// about, and it cannot be staged with two separate households.
     withdrawn: AtomicBool,
+    /// Whether the account's password has since been changed at the server, which
+    /// withdraws the access every earlier sign-in holds.
+    moved_on: AtomicBool,
 }
 
 impl AHousehold {
@@ -268,12 +271,19 @@ impl AHousehold {
             known: Some(id.to_owned()),
             unreachable: AtomicBool::new(false),
             withdrawn: AtomicBool::new(false),
+            moved_on: AtomicBool::new(false),
         })
     }
 
     /// Take the account off the server, as an operator removing somebody would.
     pub(crate) fn withdraw(&self) {
         self.withdrawn.store(true, Ordering::SeqCst);
+    }
+
+    /// Change the account's password at the server, as the member or an administrator
+    /// would.
+    pub(crate) fn change_password(&self) {
+        self.moved_on.store(true, Ordering::SeqCst);
     }
 
     /// Stop answering at all, as a media server being restarted would.
@@ -287,6 +297,7 @@ impl AHousehold {
             known: None,
             unreachable: AtomicBool::new(false),
             withdrawn: AtomicBool::new(false),
+            moved_on: AtomicBool::new(false),
         })
     }
 
@@ -296,31 +307,35 @@ impl AHousehold {
             known: None,
             unreachable: AtomicBool::new(true),
             withdrawn: AtomicBool::new(false),
+            moved_on: AtomicBool::new(false),
         })
     }
 }
 
 #[async_trait::async_trait]
 impl Household for AHousehold {
-    async fn whoever(&self, _: &str, _: &str) -> Result<Option<String>, Failure> {
+    async fn whoever(&self, _: &str, _: &str, device: &str) -> Result<Option<Signed>, Failure> {
         if self.unreachable.load(Ordering::SeqCst) {
             return Err(Failure::Unavailable {
                 service: "jellyfin".to_owned(),
             });
         }
-        Ok(self.known.clone())
+        Ok(self.known.clone().map(|id| Signed {
+            id,
+            token: device.to_owned(),
+        }))
     }
 
-    async fn standing(&self, id: &str) -> Result<bool, Failure> {
+    async fn standing(&self, signed: &Signed) -> Result<bool, Failure> {
         if self.unreachable.load(Ordering::SeqCst) {
             return Err(Failure::Unavailable {
                 service: "jellyfin".to_owned(),
             });
         }
-        if self.withdrawn.load(Ordering::SeqCst) {
+        if self.withdrawn.load(Ordering::SeqCst) || self.moved_on.load(Ordering::SeqCst) {
             return Ok(false);
         }
-        Ok(self.known.as_deref() == Some(id))
+        Ok(self.known.as_deref() == Some(signed.id.as_str()))
     }
 
     async fn household(&self) -> Result<Vec<Member>, Failure> {

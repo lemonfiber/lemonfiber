@@ -19,6 +19,7 @@
 //! to stop the next one — and it needs no message passed from wherever the change
 //! happened, which matters because the change can happen in another process.
 
+use lemonfiber_core::ports::service::Signed;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
@@ -58,8 +59,10 @@ pub enum Opened {
     /// The operator, against the credential that was on disk when it opened. Held
     /// so a password changed afterwards voids it.
     Operator(Credential),
-    /// A household member, by the id the media server files them under.
-    Member(String),
+    /// A household member, by the id the media server files them under and the
+    /// access their sign-in was granted — held so a password changed afterwards,
+    /// which withdraws that access at the server, voids the session too.
+    Member(Signed),
 }
 
 impl Opened {
@@ -72,7 +75,7 @@ impl Opened {
     pub fn member(&self) -> Option<String> {
         match self {
             Self::Operator(_) => None,
-            Self::Member(id) => Some(id.clone()),
+            Self::Member(signed) => Some(signed.id.clone()),
         }
     }
 }
@@ -131,7 +134,7 @@ impl Sessions {
                 Some(Opened::Operator(opened.clone()))
             }
             Opened::Operator(_) => None,
-            Opened::Member(id) => Some(Opened::Member(id.clone())),
+            Opened::Member(signed) => Some(Opened::Member(signed.clone())),
         }
     }
 }
