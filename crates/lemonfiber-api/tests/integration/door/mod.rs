@@ -408,3 +408,8 @@ pub(crate) fn hers() -> String {
 pub(crate) fn nobodys() -> String {
     ('c'..='n').rev().collect()
 }
+
+/// No password at all, which is what an account nobody has claimed holds.
+pub(crate) fn none_given() -> String {
+    String::new()
+}

@@ -563,7 +563,14 @@ async fn an_empty_password_opens_no_session() {
         AHousehold::knowing(MEMBER),
         not_the_token(),
     );
-    let answer = asked(router, "POST", SESSION, &from_here(), &offering_as(WHO, "")).await;
+    let answer = asked(
+        router,
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering_as(WHO, &none_given()),
+    )
+    .await;
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
     let _ = fs::remove_dir_all(a_directory(named));
 }
