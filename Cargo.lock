@@ -1311,6 +1311,8 @@ dependencies = [
  "color-eyre",
  "etcetera",
  "flate2",
+ "hyper",
+ "hyper-util",
  "include_dir",
  "lemonfiber-adapters",
  "lemonfiber-api",

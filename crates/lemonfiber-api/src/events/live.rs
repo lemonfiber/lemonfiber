@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_core::ports::Clock;
-use tokio::sync::{broadcast, Mutex, Notify};
+use tokio::sync::{broadcast, watch, Mutex, Notify};
 
 use super::backlog::Backlog;
 use super::wire::{Event, Rendered, BEAT, BEAT_SAID};
@@ -49,6 +49,9 @@ pub struct Live {
     backlog: Mutex<Backlog>,
     /// A listener asking for a gather now rather than at the next tick.
     wanted: Notify,
+    /// How many times every stream open has been told to end. A listener remembers
+    /// the count it opened at and ends when it moves.
+    ended: watch::Sender<u64>,
 }
 
 impl Live {
@@ -60,6 +63,7 @@ impl Live {
             said,
             backlog: Mutex::new(Backlog::opening(clock)),
             wanted: Notify::new(),
+            ended: watch::channel(0).0,
         }
     }
 
@@ -96,7 +100,20 @@ impl Live {
         Listening {
             missed: backlog.since(seen).into(),
             said,
+            ended: self.ended.subscribe(),
         }
+    }
+
+    /// End every stream open now, whoever holds it.
+    ///
+    /// For the surface going away, or going back to answering this machine alone: a
+    /// stream is a request that never finishes, so a server waiting for its requests
+    /// to finish before it lets go would wait for ever, and a browser on the household
+    /// network would go on being told what the operator is shown after the password
+    /// that let it in is gone. A listener that opens after this is not ended by it.
+    pub fn end_every_stream(&self) {
+        self.ended
+            .send_modify(|count| *count = count.wrapping_add(1));
     }
 
     /// Ask for a gather now rather than at the next tick.
@@ -132,6 +149,8 @@ pub struct Listening {
     missed: VecDeque<Event>,
     /// What is said from here on.
     said: broadcast::Receiver<Event>,
+    /// Whether every stream has been told to end since this one opened.
+    ended: watch::Receiver<u64>,
 }
 
 impl Listening {
@@ -154,6 +173,12 @@ impl Listening {
                 Err(_) => None,
             },
             () = tokio::time::sleep(BEAT) => Some(BEAT_SAID.to_owned()),
+            // Told to end, or the stream it belongs to is gone: either way nothing more
+            // is coming, and the response ends rather than beating on for ever.
+            _ = self.ended.changed() => None,
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

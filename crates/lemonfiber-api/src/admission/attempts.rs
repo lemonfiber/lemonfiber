@@ -70,6 +70,33 @@ impl Attempts {
             .filter(|left| !left.is_zero())
     }
 
+    /// Take an attempt, or say how long is left before one is taken.
+    ///
+    /// The wait is read and the attempt counted under one lock, and counted as wrong
+    /// before the answer is checked: a right one takes it back with [`Self::right`].
+    /// Read and counted apart, every request arriving at once would pass the wait
+    /// together and have its guess checked before any of them was counted, and the
+    /// limit would be one guess per request in flight rather than the ones it allows.
+    ///
+    /// # Errors
+    ///
+    /// How long is left, where the wrong answers so far have earned a wait.
+    pub async fn taken(&self, now: SystemTime) -> Result<(), Duration> {
+        let mut wrong = self.wrong.lock().await;
+        if let Some(last) = wrong.last {
+            let since = now.duration_since(last).unwrap_or_default();
+            if let Some(left) = owed(wrong.count)
+                .checked_sub(since)
+                .filter(|left| !left.is_zero())
+            {
+                return Err(left);
+            }
+        }
+        wrong.count = wrong.count.saturating_add(1);
+        wrong.last = Some(now);
+        Ok(())
+    }
+
     /// Record a wrong one.
     pub async fn wrong(&self, now: SystemTime) {
         let mut wrong = self.wrong.lock().await;
