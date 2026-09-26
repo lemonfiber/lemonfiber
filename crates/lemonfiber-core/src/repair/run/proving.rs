@@ -70,9 +70,11 @@ pub(super) async fn carried(
 /// one the coverage report sums across the body's states rather than reading as lines.
 fn unrecorded(ctx: &Ctx, attempt: &Attempt) -> Option<Outcome> {
     let journal = crate::app::targets::beside_env(ctx, JOURNAL)?;
-    let failure =
-        crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref())
-            .err()?;
+    let recorded =
+        crate::app::recover::journalled(&journal, attempt.changes(), ctx.seams.random.as_ref());
+    let Err(failure) = recorded else {
+        return None;
+    };
     Some(Outcome::Stopped {
         leaving: format!(
             "what the repair changed stands and could not be recorded, so it cannot be put \
