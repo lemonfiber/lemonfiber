@@ -31,6 +31,8 @@ lemonfiber-core = { workspace = true }
 # server; the core cannot, and the api crate does not choose an address.
 lemonfiber-api = { workspace = true }
 axum = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
 clap = { workspace = true }
 etcetera = { workspace = true }
 color-eyre = { workspace = true }

@@ -73,6 +73,12 @@ sysinfo = { version = "0.39", default-features = false, features = ["disk"] }
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "process", "rt", "sync", "time"] }
 tokio-stream = "0.1"
+# The HTTP/1 connection axum's own `serve` is built on, taken directly so the web
+# surface can bound how long a request's headers may take to arrive and how many
+# connections it holds at once — neither of which `serve` lets a caller set. Both are
+# already in the tree via axum.
+hyper = { version = "1", default-features = false, features = ["server", "http1"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio", "service"] }
 # The service traits axum's own router is built on, so a test can call the assembled
 # router directly instead of putting a socket between itself and an endpoint. Already
 # in the tree via axum; only the combinators are taken.

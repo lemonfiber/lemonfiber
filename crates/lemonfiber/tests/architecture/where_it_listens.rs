@@ -46,6 +46,7 @@ const LISTENING: &[&str] = &[
     "UdpSocket::bind",
     "UnixListener::bind",
     "axum::serve(",
+    "serve_connection(",
 ];
 
 /// The named address constant that is loopback.
@@ -78,9 +79,10 @@ const LISTENS: &[(&str, &str)] = &[
          ask for at all",
     ),
     (
-        "crates/lemonfiber/src/ui.rs",
+        "crates/lemonfiber/src/ui/answering.rs",
         "holding open what that policy handed over, which is the other half of the one \
-         thing this product serves",
+         thing this product serves — each connection bounded in how long its headers may \
+         take and in how many are held at once",
     ),
 ];
 
