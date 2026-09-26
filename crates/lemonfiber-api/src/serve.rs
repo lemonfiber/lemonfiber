@@ -117,6 +117,19 @@ pub fn refused(refusal: Refusal) -> Response<Body> {
     carrying(refusal.status(), SENTENCE, Body::from(refusal.said()))
 }
 
+/// The refusal a member gets at a door that answers the operator alone, or nothing
+/// where the caller is not a member.
+///
+/// For the routes that are not a command and so never reach [`crate::entitled::may`]:
+/// a bundle, the logs, the work begun under a job's name and the event stream. Each
+/// carries what the operator is shown — a whole support bundle, every container's
+/// log lines, another caller's results — and none of it is narrowed to a member, so
+/// a member is refused outright rather than handed the operator's copy.
+#[must_use]
+pub fn operator_only(caller: &crate::admission::Caller) -> Option<Response<Body>> {
+    matches!(caller, crate::admission::Caller::Member(_)).then(|| refused(Refusal::NotYours))
+}
+
 /// Every response this surface produces, wearing the headers all of them carry.
 ///
 /// One place rather than one per handler: a header a caller's safety rests on is

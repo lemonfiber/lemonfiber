@@ -139,6 +139,13 @@ impl Admitting {
             return Some(Opened::Operator(held));
         }
         let (household, name) = (self.household.as_ref()?, given.name.as_deref()?);
+        // An account nobody has claimed yet has no password, and the media server
+        // lets an empty one sign in to it. That is an invitation still waiting for
+        // its person, not a member proving who they are, so an empty password opens
+        // nothing here.
+        if given.password.is_empty() {
+            return None;
+        }
 
         (household.whoever(name, &given.password).await)
             .ok()

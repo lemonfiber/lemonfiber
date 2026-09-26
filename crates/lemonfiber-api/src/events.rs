@@ -90,12 +90,16 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
         .admitting
         .carried(&headers, &streaming.token, now)
         .await;
-    // A stream is held open for hours, so the household is asked once and the answer
-    // stands for the life of it. That is the one place a cached yes is honest: the
-    // events this carries are the ones a caller would have been shown anyway, and a
-    // removed member's next *request* is refused, which is what the sentence asks.
     if matches!(knocking, Knocking::Unconfirmed) {
         return refused(Refusal::Unconfirmed);
+    }
+    // The stream carries the operator's whole view — the dashboard, every log line
+    // the operator follows, what setup is doing — and nothing on it is narrowed to a
+    // member, so a member is refused it rather than handed the operator's copy.
+    if let Knocking::Known(caller) = &knocking {
+        if let Some(refusal) = crate::serve::operator_only(caller) {
+            return refusal;
+        }
     }
     if let Err(refusal) = admitted(
         matches!(knocking, Knocking::Known(_)),
