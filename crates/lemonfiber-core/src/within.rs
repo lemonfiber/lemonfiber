@@ -12,7 +12,7 @@
 //! that means is the caller's to say, since it is the app for one of them and
 //! nothing at all for the other.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Where `asked` lands beneath a directory, or nothing where it leads outside one.
 ///
@@ -52,6 +52,30 @@ pub(crate) fn one_file(asked: &str) -> Option<PathBuf> {
         return None;
     }
     Some(PathBuf::from(only.as_os_str()))
+}
+
+/// Write `contents` to `path` in place, refusing where the file or the directory it is
+/// in is a link.
+///
+/// In place, because some of what lemonfiber writes this way is a file a container is
+/// given on its own, and a container given one file follows that file rather than
+/// whatever replaces it. Not through a link, because the directories these files sit
+/// in are ones containers can write to: a link planted there would turn lemonfiber's
+/// write into a write anywhere the operator can.
+///
+/// # Errors
+///
+/// Where the file or its directory is a link, or the write itself fails.
+pub(crate) fn write_unlinked(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    let linked =
+        |at: &Path| std::fs::symlink_metadata(at).is_ok_and(|meta| meta.file_type().is_symlink());
+    if linked(path) || path.parent().is_some_and(linked) {
+        return Err(std::io::Error::other(format!(
+            "{} is a link, and lemonfiber writes its own file there rather than following one",
+            path.display()
+        )));
+    }
+    std::fs::write(path, contents)
 }
 
 #[cfg(test)]

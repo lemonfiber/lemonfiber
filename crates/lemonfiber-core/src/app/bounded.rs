@@ -108,7 +108,10 @@ fn rewritten(
     // Written in place, as the file it already is: its mode stays what the stack gave it,
     // because the container reading it may not be its owner, and it stays the same file,
     // because a container given one file mounts that file and not whatever replaces it.
-    std::fs::write(path, after).map_err(|why| why.to_string())?;
+    //
+    // And never through a link, because the directory it is in is one a container can
+    // write to.
+    crate::within::write_unlinked(path, after.as_bytes()).map_err(|why| why.to_string())?;
     let mut kept: Materialised = super::record::kept(record);
     if kept.checksum(key) == Some(checksum(before.as_bytes())) {
         kept.record(key, checksum(after.as_bytes()));

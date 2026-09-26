@@ -401,7 +401,7 @@ fn write(target: &Path, content: &[u8]) -> Result<(), Failure> {
 /// coverage pass reads as a branch that the always-present parent never leaves.
 fn write_file(target: &Path, content: &[u8]) -> std::io::Result<()> {
     target.parent().map_or(Ok(()), std::fs::create_dir_all)?;
-    std::fs::write(target, content)
+    crate::within::write_unlinked(target, content)
 }
 
 #[cfg(test)]

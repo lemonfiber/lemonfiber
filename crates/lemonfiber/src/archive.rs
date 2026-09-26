@@ -83,6 +83,32 @@ fn atomically(
     fs::rename(&staging, dest).map_err(fault)
 }
 
+/// A directory and everything beneath it that is a directory or a file, in name order.
+///
+/// Written out rather than handed to `append_dir_all`, which follows a link to what it
+/// points at. A link is left out altogether rather than kept as a link: a restore
+/// refuses one, and a link is not something lemonfiber wrote. So is anything that is
+/// neither a file nor a directory, which no service keeps its configuration in.
+fn walked(
+    builder: &mut tar::Builder<GzEncoder<File>>,
+    name: &Path,
+    source: &Path,
+) -> std::io::Result<()> {
+    builder.append_dir(name, source)?;
+    let mut entries = fs::read_dir(source)?.collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(fs::DirEntry::file_name);
+    for entry in entries {
+        let kind = entry.file_type()?;
+        let at = name.join(entry.file_name());
+        if kind.is_dir() {
+            walked(builder, &at, &entry.path())?;
+        } else if kind.is_file() {
+            builder.append_path_with_name(entry.path(), &at)?;
+        }
+    }
+    Ok(())
+}
+
 /// The archive itself, created readable by its owner alone.
 ///
 /// The mode goes on at creation rather than after, so the bytes are never even briefly
@@ -291,9 +317,14 @@ impl Archive for Tar {
                 // A missing source is left out rather than failing the capture: a stack
                 // an operator runs from their own directory, or a service that has not
                 // written its configuration yet, is simply not in the archive.
+                //
+                // A link is never followed: these are directories containers write to,
+                // and a link planted in one would carry whatever it points at into an
+                // archive the operator keeps and restores.
+                builder.follow_symlinks(false);
                 for item in &items {
                     if item.source.is_dir() {
-                        builder.append_dir_all(&item.archive_path, &item.source)?;
+                        walked(builder, Path::new(&item.archive_path), &item.source)?;
                     }
                 }
                 Ok(())
