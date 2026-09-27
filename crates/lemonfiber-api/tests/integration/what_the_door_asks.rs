@@ -112,6 +112,28 @@ async fn wrong_answers_are_free_for_a_while_and_then_made_to_wait() {
     let _ = fs::remove_dir_all(a_directory("counted"));
 }
 
+/// Answers arriving together are counted before any of them is checked, so the free
+/// ones are free once each rather than once per request in flight.
+#[tokio::test]
+async fn answers_arriving_together_are_each_counted_before_any_is_checked() {
+    let path = keeping("counted-together");
+    let (_, _, admitting) = door(Some(path), Chance::cycling());
+
+    let taken =
+        futures_util::future::join_all((0..10u8).map(|_| admitting.attempts.taken(moment()))).await;
+
+    let let_through = taken.iter().filter(|one| one.is_ok()).count();
+    assert!(
+        let_through < 10,
+        "every one of ten at once was let through: {taken:?}"
+    );
+    assert!(
+        admitting.attempts.waiting(moment()).await.is_some(),
+        "ten answers at once earned no wait"
+    );
+    let _ = fs::remove_dir_all(a_directory("counted-together"));
+}
+
 /// Guessing at the door is what earns the wait, rather than a count a test set.
 ///
 /// The counting is a function, and a function the door does not call counts nothing:

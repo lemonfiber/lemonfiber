@@ -14,6 +14,7 @@
 //! The words are here and the printing is at the edge, so what an operator is
 //! told is proven rather than demonstrated.
 
+mod answering;
 #[cfg(test)]
 pub(crate) mod fixtures;
 pub(crate) mod password;
@@ -378,7 +379,11 @@ async fn serving(
             clock: Arc::clone(&ctx.seams.clock),
         });
         let surface = surface(serving, streaming, app);
-        match holding(sockets, surface, &admitting, offered, &mut until, look).await {
+        match holding(
+            sockets, surface, &live, &admitting, offered, &mut until, look,
+        )
+        .await
+        {
             Ending::Stopped => return ExitCode::SUCCESS,
             Ending::Revoked => {
                 for line in reverted() {
@@ -399,6 +404,7 @@ async fn serving(
 async fn holding(
     sockets: Vec<(TcpListener, SocketAddr)>,
     surface: Router,
+    live: &Live,
     admitting: &Arc<Admitting>,
     offered: Offered,
     until: &mut Until,
@@ -407,23 +413,25 @@ async fn holding(
     let (stopping, stopped) = tokio::sync::watch::channel(false);
     let mut running = Vec::new();
     for (listener, _) in sockets {
-        let mut leaving = stopped.clone();
-        let held = surface.clone();
-        running.push(tokio::spawn(async move {
-            let _ = axum::serve(listener, held)
-                .with_graceful_shutdown(async move {
-                    let _ = leaving.changed().await;
-                })
-                .await;
-        }));
+        running.push(tokio::spawn(answering::answering(
+            Box::new(listener),
+            surface.clone(),
+            stopped.clone(),
+            answering::Limits::SERVED,
+        )));
     }
     let ending = tokio::select! {
         () = &mut *until => Ending::Stopped,
         () = revoked(Arc::clone(admitting), offered, look) => Ending::Revoked,
     };
     let _ = stopping.send(true);
+    // Every stream ends with the binding it was opened on. A stream is a request that
+    // never finishes, so without this the sockets would wait on it for ever, and a
+    // browser on the household network would go on hearing what the operator is shown
+    // after the password that let it in was taken away.
+    live.end_every_stream();
     for server in running {
-        let _ = server.await;
+        let _ = tokio::time::timeout(answering::Limits::SERVED.let_go * 2, server).await;
     }
     ending
 }

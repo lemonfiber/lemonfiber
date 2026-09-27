@@ -115,15 +115,65 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
     // Asked for after the client is listening, so the gather it prompts is one
     // this client hears — which is what replaces whatever it still holds.
     streaming.live.nudge();
-    held(listening)
+    held(
+        listening,
+        Staying {
+            admitting: Arc::clone(&streaming.admitting),
+            token: Arc::clone(&streaming.token),
+            clock: Arc::clone(&streaming.clock),
+            headers,
+        },
+    )
 }
 
-/// The stream, as a response a client holds open.
+/// What a stream is asked, before each thing it says, to go on being said to.
+///
+/// Admission is a question about a moment, and a stream spans hours of them. A session
+/// that expires, a password changed or taken away, a member removed: each is refused at
+/// the next request, and a stream has no next request — so it is asked again here, on
+/// every event and every beat, and ends at the first answer that is not yes.
+///
+/// What it holds is what admission reads and nothing more. The stream itself is not
+/// among it: a stream holding on to what it listens to would keep that open after
+/// everything else had let it go, and would never hear that it had ended.
+pub struct Staying {
+    /// The register the rest of the surface asks.
+    admitting: Arc<crate::admission::Admitting>,
+    /// This run's token.
+    token: Arc<Token>,
+    /// The clock the rest of the surface reads.
+    clock: Arc<dyn Clock>,
+    /// What the client carried when it opened the stream.
+    headers: HeaderMap,
+}
+
+impl Staying {
+    /// Whether whoever opened the stream is still somebody it may be said to.
+    async fn still(&self) -> bool {
+        let now = self.clock.now();
+        match self
+            .admitting
+            .carried(&self.headers, &self.token, now)
+            .await
+        {
+            Knocking::Known(caller) => crate::serve::operator_only(&caller).is_none(),
+            Knocking::Nobody | Knocking::Unconfirmed => false,
+        }
+    }
+}
+
+/// The stream, as a response a client holds open while it may.
 #[must_use]
-pub fn held(listening: Listening) -> Response<Body> {
-    let talking = futures_util::stream::unfold(listening, |mut listening| async move {
-        let said = listening.next().await?;
-        Some((Ok::<String, Infallible>(said), listening))
-    });
+pub fn held(listening: Listening, staying: Staying) -> Response<Body> {
+    let talking = futures_util::stream::unfold(
+        (listening, staying),
+        |(mut listening, staying)| async move {
+            let said = listening.next().await?;
+            if !staying.still().await {
+                return None;
+            }
+            Some((Ok::<String, Infallible>(said), (listening, staying)))
+        },
+    );
     carrying(StatusCode::OK, STREAM, Body::from_stream(talking))
 }

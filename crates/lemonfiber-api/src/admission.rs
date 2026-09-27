@@ -136,11 +136,19 @@ impl Admitting {
     /// safe direction and the honest one — nothing here proved anything, so nobody is
     /// let in on it.
     async fn whoever(&self, given: &Given, random: &dyn Random) -> Option<Opened> {
-        if let Some(held) = self
-            .credential()
-            .filter(|held| held.verifies(&given.password))
-        {
-            return Some(Opened::Operator(held));
+        // Checked on a thread made for blocking: the hash is built to be slow, and run
+        // on the worker that answers requests it would stall every other request for as
+        // long as it takes, once per guess.
+        if let Some(held) = self.credential() {
+            let offered = given.password.clone();
+            let proved =
+                tokio::task::spawn_blocking(move || held.verifies(&offered).then_some(held))
+                    .await
+                    .ok()
+                    .flatten();
+            if let Some(held) = proved {
+                return Some(Opened::Operator(held));
+            }
         }
         let (household, name) = (self.household.as_ref()?, given.name.as_deref()?);
         // An account nobody has claimed yet has no password, and the media server
@@ -326,7 +334,7 @@ async fn opening(
         return said(StatusCode::BAD_REQUEST, NOT_A_PASSWORD);
     };
     let now = serving.ctx.seams.clock.now();
-    if let Some(left) = serving.admitting.attempts.waiting(now).await {
+    if let Err(left) = serving.admitting.attempts.taken(now).await {
         return waiting(left.as_secs().max(1));
     }
     let Some(who) = serving
@@ -334,7 +342,6 @@ async fn opening(
         .whoever(&given, serving.ctx.seams.random.as_ref())
         .await
     else {
-        serving.admitting.attempts.wrong(now).await;
         return said(StatusCode::UNAUTHORIZED, NOT_THE_PASSWORD);
     };
     serving.admitting.attempts.right().await;
