@@ -30,6 +30,9 @@ Ten claims are read from the tree, and each is a claim rather than a string:
                  anything is built
   installer-refuses
                the global build rewrites the shell installer before uploading it
+  superseded-runs-cancel
+               a pull request pushed again cancels the run it replaces, and a tag
+                 is grouped by its own run so a release is never cancelled
 
 `--self-test` breaks each claim in turn against a copy of the real files and
 fails unless that claim refuses the copy. A claim that cannot fail is not a gate.
@@ -47,6 +50,7 @@ import re
 import sys
 import tomllib
 
+import cancel_superseded_runs as superseded
 import pin_release_actions
 import scope_release_permissions as permissions
 import the_commit_a_release_is_cut_from as cut_from
@@ -401,6 +405,19 @@ def claim_allow_dirty(_workflow: dict, cargo: dict) -> list[str]:
     ]
 
 
+def claim_superseded_runs_cancel(workflow: dict, _cargo: dict) -> list[str]:
+    grouped = workflow.get("concurrency") or {}
+    wanted = yaml.safe_load(superseded.CONCURRENCY)["concurrency"]
+    if grouped == wanted:
+        return []
+    return [
+        (
+            "the workflow's concurrency group is not the one that cancels a pull "
+            f"request's superseded run and never a tag's: found {grouped!r}"
+        )
+    ]
+
+
 def unpinned(workflow_text: str) -> str:
     """One action put back on the moving tag `dist generate` reaches it by."""
     ref, (sha, version) = next(iter(pin_release_actions.PINNED.items()))
@@ -432,6 +449,7 @@ CLAIMS = {
     "on-main": claim_on_main,
     "on-main-behind-a-condition": claim_on_main,
     "installer-refuses": claim_installer_refuses,
+    "superseded-runs-cancel": claim_superseded_runs_cancel,
 }
 
 # Claims that read the file rather than the parsed workflow. YAML drops comments,
@@ -484,6 +502,7 @@ BREAKS = {
         w.replace(cut_from.INSTALLER_REFUSES, cut_from.GLOBAL_BUILT),
         c,
     ),
+    "superseded-runs-cancel": lambda w, c: (w.replace(superseded.GROUPED, superseded.SCOPED), c),
 }
 
 

@@ -12,6 +12,14 @@ on:
 # verdict on the pull request — asks for that itself.
 permissions:
   contents: read
+concurrency:
+  # A pull request pushed again cancels the run on its old head, which nobody
+  # will read and which holds runners the org shares (Q-R75). Every other event
+  # (a push to main, a tag, a merge queue) is grouped by its own run, so it is
+  # never cancelled and never cancels.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   sonar:
     runs-on: ubuntu-latest
