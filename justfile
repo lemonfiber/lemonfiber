@@ -341,6 +341,7 @@ release-workflow:
     python3 scripts/pin_release_actions.py
     python3 scripts/verify_dist_installer.py
     python3 scripts/scope_release_permissions.py
+    python3 scripts/cancel_superseded_runs.py
     python3 scripts/the_tag_a_shell_never_sees.py
     python3 scripts/the_commit_a_release_is_cut_from.py
     python3 scripts/verify_release_workflow.py
