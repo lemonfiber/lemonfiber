@@ -33,6 +33,8 @@ fn diagnosis(
             | Outcome::Glossary(_)
             | Outcome::Clients(_)
             | Outcome::Invitation(_)
+            | Outcome::Pairing(_)
+            | Outcome::Certificate(_)
             | Outcome::Removal(_)
             | Outcome::Catalogue(_)
             | Outcome::Wiring(_)

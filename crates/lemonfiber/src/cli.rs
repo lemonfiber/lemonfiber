@@ -6,6 +6,7 @@
 
 mod allowance;
 mod bandwidth;
+mod companion;
 mod credentials;
 mod plugin;
 mod removing;
@@ -31,6 +32,7 @@ pub use under::{
 // otherwise be a change at every call site that names it.
 pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
+pub use companion::{CompanionCommand, RawCompanion};
 pub use credentials::RawCredentials;
 pub use plugin::{Authoring, PluginCommand};
 pub use removing::{RawRemoval, RawRemoving};

@@ -1760,6 +1760,67 @@
         }
       }
     },
+    "certificate": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/CertificateReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "CertificateReport": {
+          "description": "What asking for the certificate to be replaced came to.",
+          "type": "object",
+          "properties": {
+            "consequence": {
+              "description": "What replacing it means for every phone already paired.",
+              "type": "string"
+            },
+            "fingerprint": {
+              "description": "What a phone would pin now: the new certificate where it was replaced, the one\nkept where it was not, and nothing where none has been made.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "replaced": {
+              "description": "Whether it was replaced. Unconfirmed, it is not, and what replacing it costs is\nwhat is said.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "replaced",
+            "consequence"
+          ]
+        }
+      }
+    },
     "clients": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -9456,6 +9517,107 @@
           "required": [
             "withheld",
             "from"
+          ]
+        }
+      }
+    },
+    "pairing": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Pairing"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Pairing": {
+          "description": "Pairing material, and what the operator is told beside it.",
+          "type": "object",
+          "properties": {
+            "caution": {
+              "description": "What is worth knowing about the address itself, where anything is.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "material": {
+              "description": "The material itself.",
+              "$ref": "#/$defs/PairingMaterial"
+            },
+            "replacing": {
+              "description": "What would make every paired phone refuse this machine, said now rather than\ndiscovered then.",
+              "type": "string"
+            },
+            "until": {
+              "description": "When it stops being good, as a date and a time of day.",
+              "type": "string"
+            },
+            "written": {
+              "description": "The material as the one line a code carries and a person types.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "material",
+            "written",
+            "until",
+            "replacing"
+          ]
+        },
+        "PairingMaterial": {
+          "description": "What a phone is handed, exactly as it reads it.\n\nFour fields and no more: a reader refuses one it does not know, which is what keeps a\ncredential from ever riding along under a name nobody thought to forbid.",
+          "type": "object",
+          "properties": {
+            "address": {
+              "description": "Where the phone reaches the stack: an `https` address on the household network.",
+              "type": "string"
+            },
+            "expires": {
+              "description": "When the material stops being good, in seconds since the Unix epoch.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "fingerprint": {
+              "description": "The certificate that address presents: SHA-256 over its DER encoding, in\nlower-case hex. Not the digest of its public key.",
+              "type": "string"
+            },
+            "stack": {
+              "description": "The stack's own identifier: opaque, minted once from nothing and kept, and the\nsame across every issue of the material, a change of address and a replacement of\nthe certificate. Not the stack's name and not its version, and it carries nothing\nabout the household or anybody in it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "address",
+            "fingerprint",
+            "expires",
+            "stack"
           ]
         }
       }

@@ -98,6 +98,10 @@ flate2 = "1"
 # terminal code that knows the terminal.
 qrcodegen = "1.8"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+# The certificate the web surface presents to a paired phone. Self-signed, because no
+# public authority signs the names a stack is reachable under, and made with ring,
+# which rustls already builds on.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
 # Verifying the signature a registry offers beside an image, with the library rustls
 # already builds on.
 ring = "0.17"

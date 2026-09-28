@@ -424,6 +424,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // definition is not a running command and this exists to tell the two apart.
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
+        Command::Companion(asked) => crate::companion::asked(ctx, asked).await,
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),

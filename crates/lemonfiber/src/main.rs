@@ -8,9 +8,10 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, CompanionCommand, Mending, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
+use lemonfiber_core::companion::Asked as Paired;
 
 mod acting;
 mod archive;
@@ -316,6 +317,10 @@ async fn main() -> ExitCode {
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
+        Request::Companion(asked) => Command::Companion(match asked.action {
+            CompanionCommand::Pair => Paired::Pair,
+            CompanionCommand::Certificate { confirm } => Paired::Certificate { confirm },
+        }),
         Request::Catalogue => Command::Catalogue,
         Request::Wiring { fill } => wiring(fill),
         Request::Outbound => Command::Outbound,

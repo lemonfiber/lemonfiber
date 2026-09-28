@@ -23,6 +23,7 @@ use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
 use lemonfiber_core::bundle::run::{Wanted, LINES};
+use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::{Tier, TIERS};
 use lemonfiber_core::update::run::Asked;
@@ -68,6 +69,9 @@ pub const OFFERED: &[&str] = &[
     "invite",
     "remove",
     "reissue",
+    // An action rather than a read, because it is made rather than read: the first one
+    // mints the stack's identifier, and material that expires is not for a cache.
+    "companion-pair",
     "household-allow",
     "household-approve",
     "household-decline",
@@ -295,6 +299,7 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
             None => Err(needs("archive")),
         },
         "watch" => Ok(Command::Watch { forms }),
+        "companion-pair" => Ok(Command::Companion(Paired::Pair)),
         // Which one is required of both halves, and a word naming none of them is
         // refused by name rather than taken for whichever came first in the list.
         "hosting-install" => {
@@ -311,9 +316,14 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
         "walkthrough" => Ok(Command::Walkthrough {
             item: item.filter(|named| !named.trim().is_empty()),
         }),
-        _ => Err(Refused::Unknown {
-            name: action.to_owned(),
-        }),
+        _ => Err(unknown(action)),
+    }
+}
+
+/// A name this surface does not offer, refused as itself rather than invented.
+fn unknown(action: &str) -> Refused {
+    Refused::Unknown {
+        name: action.to_owned(),
     }
 }
 

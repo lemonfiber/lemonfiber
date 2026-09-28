@@ -171,6 +171,14 @@ pub struct Settings {
     /// which reads as no authentication configured, because a credential nothing can
     /// find is a credential nothing can check.
     pub admission: Option<PathBuf>,
+    /// Where what pairing a phone needs is kept: the certificate the web surface presents
+    /// when it is served encrypted, the stack's own identifier, and how the surface was
+    /// last served.
+    ///
+    /// Absent where the surface could not find the platform's configuration directory,
+    /// which leaves nothing to pair with rather than a certificate made somewhere else
+    /// every run.
+    pub companion: Option<PathBuf>,
     /// The address the operator recorded for the household's own links.
     ///
     /// Where the front door is reached from another device in the house, on a
@@ -271,6 +279,7 @@ impl Default for Settings {
             port_forward: PortForward::default(),
             indexer: None,
             admission: None,
+            companion: None,
             household_host: None,
             exposed: Vec::new(),
             unmanaged: Vec::new(),

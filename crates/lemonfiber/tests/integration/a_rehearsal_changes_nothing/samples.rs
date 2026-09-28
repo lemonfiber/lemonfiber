@@ -138,6 +138,13 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("undo", Command::Undo { run: None }),
         ("stuck", Command::Stuck),
         ("front-door", Command::FrontDoor),
+        // The verb that writes rather than the one refused outright: pairing material is
+        // refused under the flag, and a replacement, confirmed, is what would un-pair
+        // every phone if a rehearsal carried it out.
+        (
+            "companion",
+            Command::Companion(lemonfiber_core::companion::Asked::Certificate { confirm: true }),
+        ),
         ("outbound", Command::Outbound),
         ("provenance", Command::Provenance),
         ("catalogue", Command::Catalogue),

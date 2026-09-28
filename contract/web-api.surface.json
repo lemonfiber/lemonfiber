@@ -10,6 +10,7 @@
     "beside": "ref:BesideReport",
     "bundle": "ref:Bundle",
     "catalogue": "ref:CatalogueReport",
+    "certificate": "ref:CertificateReport",
     "clients": "ref:Guidance",
     "config": "ref:ConfigReport",
     "credentials": "ref:Inventory",
@@ -31,6 +32,7 @@
     "migration": "ref:MigrationReport",
     "music": "ref:MusicReport",
     "outbound": "ref:Leaving",
+    "pairing": "ref:Pairing",
     "plugins": "ref:PluginInstalls",
     "preview": "ref:Plan",
     "provenance": "ref:ProvenanceReport",
@@ -870,6 +872,29 @@
         "tell": {
           "type": [
             "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CertificateReport": {
+      "fields": {
+        "consequence": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "fingerprint": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "replaced": {
+          "type": [
+            "boolean"
           ],
           "required": true
         }
@@ -3946,6 +3971,70 @@
         "moved": {
           "type": [
             "integer/uint64"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Pairing": {
+      "fields": {
+        "caution": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "material": {
+          "type": [
+            "ref:PairingMaterial"
+          ],
+          "required": true
+        },
+        "replacing": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "until": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "written": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PairingMaterial": {
+      "fields": {
+        "address": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "expires": {
+          "type": [
+            "integer/uint64"
+          ],
+          "required": true
+        },
+        "fingerprint": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "stack": {
+          "type": [
+            "string"
           ],
           "required": true
         }

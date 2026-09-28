@@ -44,6 +44,27 @@ pub struct RawUi {
     /// this machine is running.
     #[arg(long)]
     pub set_password: bool,
+    /// How what passes is carried.
+    #[command(flatten)]
+    pub transport: RawTransport,
+}
+
+/// How the web surface carries what passes over it.
+///
+/// Apart from the other flags because it is a different question — what reaches a
+/// device rather than which devices it reaches — and because the one flag in it is the
+/// one that turns a certificate on, which is worth being able to find on its own.
+#[derive(Debug, Args)]
+pub struct RawTransport {
+    /// Serve it encrypted, with a certificate this program made and keeps.
+    ///
+    /// Off unless asked for. A browser warns about a certificate nobody it trusts
+    /// signed, and learning to click past that warning costs more than plain text on
+    /// a network you trust; a paired phone is different, because it pins this
+    /// certificate instead of asking anybody. Needs `--port`: a paired phone keeps
+    /// the address it was given.
+    #[arg(long, requires = "port")]
+    pub tls: bool,
 }
 
 /// What a support bundle was asked for.

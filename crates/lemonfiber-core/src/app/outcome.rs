@@ -113,6 +113,10 @@ outcomes! {
     Clients(crate::clients::Guidance) => CLIENTS,
     /// An account offered to somebody in the house.
     Invitation(crate::model::Invitation) => INVITATION,
+    /// What a phone is handed to pair with this stack.
+    Pairing(crate::companion::Pairing) => PAIRING,
+    /// What replacing the certificate a paired phone pins came to, or would cost.
+    Certificate(crate::companion::Replacement) => CERTIFICATE,
     /// Somebody taken out of the household, or what taking them would cost.
     Removal(crate::model::HouseholdRemoval) => REMOVAL,
     /// What each service in this stack is for, and what became of the ones that went.

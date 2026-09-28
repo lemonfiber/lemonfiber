@@ -65,6 +65,8 @@ kinds! {
     CATALOGUE = "catalogue",
     /// The settings asked about, and what a change did to them.
     CONFIG = "config",
+    /// What replacing the certificate a paired phone pins came to, or would cost.
+    CERTIFICATE = "certificate",
     /// Every credential this stack holds, and what became of acting on one.
     CREDENTIALS = "credentials",
     /// One moment of what the stack is doing, as the dashboard assembles it.
@@ -107,6 +109,8 @@ kinds! {
     MUSIC = "music",
     /// Everything that leaves this machine, and what the stack's own services reach.
     OUTBOUND = "outbound",
+    /// What a phone is handed to pair with this stack.
+    PAIRING = "pairing",
     /// Every plugin installed on this machine, and what installing one came to.
     PLUGINS = "plugins",
     /// What starting or stopping would do, before it is done.

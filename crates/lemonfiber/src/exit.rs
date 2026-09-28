@@ -213,6 +213,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // An invitation was made or it was not; a refusal already comes back as a
         // problem, so there is nothing for a code to tell apart here.
         | Outcome::Invitation(_)
+        // Material was made, or a certificate was replaced or what replacing it costs
+        // was said; anything that stopped either comes back as a problem.
+        | Outcome::Pairing(_)
+        | Outcome::Certificate(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)

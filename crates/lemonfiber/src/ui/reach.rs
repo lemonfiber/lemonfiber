@@ -145,8 +145,9 @@ pub(crate) async fn held(
 }
 
 /// The address as it is printed, and as it is typed into a browser.
-pub(crate) fn address(bound: SocketAddr) -> String {
-    format!("http://{bound}")
+pub(crate) fn address(bound: SocketAddr, encrypted: bool) -> String {
+    let scheme = if encrypted { "https" } else { "http" };
+    format!("{scheme}://{bound}")
 }
 
 /// Not one of the addresses could be taken.

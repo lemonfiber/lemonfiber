@@ -15,6 +15,7 @@
 //! told is proven rather than demonstrated.
 
 mod answering;
+pub(crate) mod encrypted;
 #[cfg(test)]
 pub(crate) mod fixtures;
 pub(crate) mod password;
@@ -67,6 +68,8 @@ pub(crate) struct Asked {
     pub password: bool,
     /// How far this surface was asked to be reachable.
     pub reach: Reach,
+    /// Whether it is served encrypted, with the certificate this program keeps.
+    pub tls: bool,
 }
 
 /// What is said to a request whose port is not a number a machine could listen on.
@@ -92,6 +95,7 @@ impl Asked {
             assets: None,
             password: false,
             reach: Reach::Machine,
+            tls: false,
         }
     }
 
@@ -175,6 +179,7 @@ impl From<RawUi> for Asked {
             } else {
                 Reach::Machine
             },
+            tls: raw.transport.tls,
         }
     }
 }
@@ -333,6 +338,10 @@ async fn serving(
         ..Admitting::default()
     });
     let app = app(embedded, asked.assets.clone());
+    let encrypting = match encrypted::encrypting(&ctx, asked.tls, asked.port) {
+        Ok(encrypting) => encrypting,
+        Err(problem) => return complain(&problem),
+    };
 
     let mut reach = asked.reach;
     let mut browsing = asked.browser;
@@ -352,7 +361,12 @@ async fn serving(
         };
         let browser = match (browsing, at.first()) {
             (true, Some(first)) => {
-                opening(ctx.seams.runner.as_ref(), HOST_OS, &address(*first)).await
+                opening(
+                    ctx.seams.runner.as_ref(),
+                    HOST_OS,
+                    &address(*first, encrypting.is_some()),
+                )
+                .await
             }
             _ => Browser::Unasked,
         };
@@ -360,7 +374,11 @@ async fn serving(
         // already looking at the terminal that said so, and a second window is not
         // what they asked for.
         browsing = false;
-        for line in announcement(&at, offered, token.as_str(), browser) {
+        let fingerprint = encrypting.as_ref().map(|on| on.fingerprint.as_str());
+        for line in announcement(&at, offered, token.as_str(), browser, fingerprint) {
+            say!("{line}");
+        }
+        for line in recorded(&ctx, bound, fingerprint.is_some()) {
             say!("{line}");
         }
         let serving = Serving {
@@ -379,11 +397,13 @@ async fn serving(
             clock: Arc::clone(&ctx.seams.clock),
         });
         let surface = surface(serving, streaming, app);
-        match holding(
-            sockets, surface, &live, &admitting, offered, &mut until, look,
-        )
-        .await
-        {
+        let held = Held {
+            sockets,
+            surface,
+            offered,
+            tls: encrypting.as_ref().map(|on| on.acceptor.clone()),
+        };
+        match holding(held, &live, &admitting, &mut until, look).await {
             Ending::Stopped => return ExitCode::SUCCESS,
             Ending::Revoked => {
                 for line in reverted() {
@@ -395,6 +415,44 @@ async fn serving(
     }
 }
 
+/// Write down how this run is served, and say so where it could not be.
+///
+/// Pairing a phone reads it back, because the port is the one part of the address a
+/// phone reaches that nothing but this run knows. Nothing is said where it was written,
+/// and nothing where there is nowhere to write it, which pairing then says for itself.
+fn recorded(ctx: &Ctx, bound: Binding, encrypted: bool) -> Vec<String> {
+    let Some(directory) = ctx.settings.companion.as_deref() else {
+        return Vec::new();
+    };
+    let served = lemonfiber_core::companion::served::Served {
+        port: bound.port,
+        encrypted,
+        network: bound.beyond,
+    };
+    match lemonfiber_core::companion::served::record(directory, served) {
+        Ok(()) => Vec::new(),
+        Err(why) => vec![
+            String::new(),
+            format!(
+                "Where this is served could not be written down, so a phone cannot be \
+                 paired with it: {why}"
+            ),
+        ],
+    }
+}
+
+/// What one run of the serving loop holds open.
+struct Held {
+    /// Every socket that was taken, with the address it was taken on.
+    sockets: Vec<(TcpListener, SocketAddr)>,
+    /// What is answered on them.
+    surface: Router,
+    /// How far they were offered.
+    offered: Offered,
+    /// What each connection is handed to first, where this run encrypts.
+    tls: Option<tokio_rustls::TlsAcceptor>,
+}
+
 /// Hold every socket that was taken until one of the two endings arrives.
 ///
 /// Whatever ends it, the sockets are given up before this returns, so the next time
@@ -402,14 +460,18 @@ async fn serving(
 /// accepting on a socket this process already holds means the process is going down
 /// around it, and a second message about one event helps nobody.
 async fn holding(
-    sockets: Vec<(TcpListener, SocketAddr)>,
-    surface: Router,
+    held: Held,
     live: &Live,
     admitting: &Arc<Admitting>,
-    offered: Offered,
     until: &mut Until,
     look: Duration,
 ) -> Ending {
+    let Held {
+        sockets,
+        surface,
+        offered,
+        tls,
+    } = held;
     let (stopping, stopped) = tokio::sync::watch::channel(false);
     let mut running = Vec::new();
     for (listener, _) in sockets {
@@ -418,6 +480,7 @@ async fn holding(
             surface.clone(),
             stopped.clone(),
             answering::Limits::SERVED,
+            tls.clone(),
         )));
     }
     let ending = tokio::select! {

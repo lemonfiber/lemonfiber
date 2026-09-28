@@ -63,6 +63,7 @@ pub mod bundle;
 pub mod bytes;
 pub mod changelog;
 pub mod clients;
+pub mod companion;
 pub mod condition;
 pub mod config;
 pub mod credential;

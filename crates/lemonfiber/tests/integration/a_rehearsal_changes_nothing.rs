@@ -306,6 +306,7 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
             env_file: Some(dir.join(".env")),
             stack_dir: Some(dir.join("stack")),
             data_root: Some(dir.join("data")),
+            companion: Some(dir.join("companion")),
             protocols: Protocols::both(),
             ..Settings::default()
         },

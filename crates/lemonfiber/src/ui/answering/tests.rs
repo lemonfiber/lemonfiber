@@ -36,7 +36,13 @@ async fn serving(
     let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
     let at = listener.local_addr().ok()?;
     let (stop, stopped) = watch::channel(false);
-    let running = tokio::spawn(answering(Box::new(listener), surface(), stopped, limits));
+    let running = tokio::spawn(answering(
+        Box::new(listener),
+        surface(),
+        stopped,
+        limits,
+        None,
+    ));
     Some((at, stop, running))
 }
 
@@ -108,7 +114,13 @@ async fn a_failed_accept_leaves_the_socket_answering() {
         failed: std::sync::atomic::AtomicBool::new(false),
         listener,
     };
-    let _running = tokio::spawn(answering(Box::new(failing), surface(), stopped, TIGHT));
+    let _running = tokio::spawn(answering(
+        Box::new(failing),
+        surface(),
+        stopped,
+        TIGHT,
+        None,
+    ));
 
     let answer = answer_at(at).await;
     assert!(answer.contains("answered"), "{answer}");
@@ -176,4 +188,172 @@ async fn stopping_lets_go_of_a_response_that_never_ends() {
             .is_ok(),
         "the socket was still held after it was told to stop"
     );
+}
+
+/// Encrypted answering, as a paired phone meets it.
+mod encrypted {
+    use std::sync::Arc;
+
+    use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+    use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+    use rustls::{DigitallySignedStruct, SignatureScheme};
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio::sync::watch;
+
+    use super::{answer_at, surface, TIGHT};
+    use crate::ui::answering::answering;
+    use crate::ui::encrypted::{encrypting, Encrypting};
+
+    /// A client that trusts one certificate by its digest and nothing else, which is
+    /// what a paired phone is.
+    #[derive(Debug)]
+    struct Pinned(String);
+
+    impl Pinned {
+        /// The algorithms a signature may be checked with.
+        fn algorithms() -> rustls::crypto::WebPkiSupportedAlgorithms {
+            rustls::crypto::ring::default_provider().signature_verification_algorithms
+        }
+    }
+
+    impl ServerCertVerifier for Pinned {
+        fn verify_server_cert(
+            &self,
+            presented: &CertificateDer<'_>,
+            _intermediates: &[CertificateDer<'_>],
+            _name: &ServerName<'_>,
+            _stapled: &[u8],
+            _now: UnixTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
+            if lemonfiber_core::companion::certificate::fingerprint(presented) == self.0 {
+                Ok(ServerCertVerified::assertion())
+            } else {
+                Err(rustls::Error::General(
+                    "not the certificate pinned".to_owned(),
+                ))
+            }
+        }
+
+        fn verify_tls12_signature(
+            &self,
+            message: &[u8],
+            presented: &CertificateDer<'_>,
+            signed: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            rustls::crypto::verify_tls12_signature(message, presented, signed, &Self::algorithms())
+        }
+
+        fn verify_tls13_signature(
+            &self,
+            message: &[u8],
+            presented: &CertificateDer<'_>,
+            signed: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            rustls::crypto::verify_tls13_signature(message, presented, signed, &Self::algorithms())
+        }
+
+        fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+            Self::algorithms().supported_schemes()
+        }
+    }
+
+    /// What this run presents, from a certificate kept in a directory of its own.
+    fn presenting(named: &str) -> Option<Encrypting> {
+        let at = lemonfiber_fixtures::scratch::Scratch::new(named).kept();
+        let ctx = lemonfiber_testing::context::a_context()
+            .settings(lemonfiber_core::config::Settings {
+                companion: Some(at),
+                ..lemonfiber_core::config::Settings::default()
+            })
+            .build();
+        encrypting(&ctx, true, Some(1)).ok().flatten()
+    }
+
+    /// An encrypted socket being answered, and the switch that stops it.
+    async fn serving_encrypted(
+        on: &Encrypting,
+    ) -> Option<(std::net::SocketAddr, watch::Sender<bool>)> {
+        let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
+        let at = listener.local_addr().ok()?;
+        let (stop, stopped) = watch::channel(false);
+        tokio::spawn(answering(
+            Box::new(listener),
+            surface(),
+            stopped,
+            TIGHT,
+            Some(on.acceptor.clone()),
+        ));
+        Some((at, stop))
+    }
+
+    /// What a client pinning `fingerprint` is answered with, or nothing where it would
+    /// not connect.
+    async fn pinned_answer(at: std::net::SocketAddr, fingerprint: &str) -> Option<String> {
+        let config = rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .ok()?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(Pinned(fingerprint.to_owned())))
+        .with_no_client_auth();
+        let socket = TcpStream::connect(at).await.ok()?;
+        let name = ServerName::try_from("localhost").ok()?;
+        let mut stream = tokio_rustls::TlsConnector::from(Arc::new(config))
+            .connect(name, socket)
+            .await
+            .ok()?;
+        stream
+            .write_all(b"GET / HTTP/1.1\r\nhost: here\r\nconnection: close\r\n\r\n")
+            .await
+            .ok()?;
+        let mut answer = String::new();
+        let _ = stream.read_to_string(&mut answer).await;
+        Some(answer)
+    }
+
+    /// A client pinning the certificate this run presents is answered.
+    #[tokio::test]
+    async fn a_client_pinning_the_certificate_is_answered() {
+        let on = presenting("answering-encrypted");
+        let served = match &on {
+            Some(on) => serving_encrypted(on).await,
+            None => None,
+        };
+        let answer = match (&on, &served) {
+            (Some(on), Some((at, _))) => pinned_answer(*at, &on.fingerprint).await,
+            _ => None,
+        };
+        assert!(
+            answer.is_some_and(|said| said.contains("answered")),
+            "a phone that pinned this certificate is answered"
+        );
+        let refused = match &served {
+            Some((at, _)) => pinned_answer(*at, &"00".repeat(32)).await,
+            None => Some(String::new()),
+        };
+        assert_eq!(refused, None, "and one that pinned another refuses it");
+    }
+
+    /// Plain text sent to an encrypted socket is not answered, and the socket goes on
+    /// answering the next connection.
+    #[tokio::test]
+    async fn plain_text_to_an_encrypted_socket_is_not_answered() {
+        let on = presenting("answering-encrypted-plain");
+        let served = match &on {
+            Some(on) => serving_encrypted(on).await,
+            None => None,
+        };
+        let plain = match &served {
+            Some((at, _)) => answer_at(*at).await,
+            None => "no socket".to_owned(),
+        };
+        assert!(!plain.contains("answered"), "{plain}");
+        let after = match (&on, &served) {
+            (Some(on), Some((at, _))) => pinned_answer(*at, &on.fingerprint).await,
+            _ => None,
+        };
+        assert!(after.is_some_and(|said| said.contains("answered")));
+    }
 }

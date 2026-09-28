@@ -12,9 +12,11 @@ use std::time::Duration;
 use axum::Router;
 use hyper_util::rt::{TokioIo, TokioTimer};
 use hyper_util::service::TowerToHyperService;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinSet;
+use tokio_rustls::TlsAcceptor;
 
 /// The bounds one socket answers under.
 #[derive(Debug, Clone, Copy)]
@@ -66,11 +68,17 @@ impl Accepting for TcpListener {
 }
 
 /// Answer on `listener` with `surface` until `stop` says to, then let go.
+///
+/// Each connection is handed to `tls` first where this run encrypts, inside its own
+/// task and within the time its headers are given: a handshake is the other thing a
+/// device can send a byte at a time, and one doing so holds its own slot and nobody
+/// else's.
 pub(super) async fn answering(
     listener: Box<dyn Accepting>,
     surface: Router,
     mut stop: watch::Receiver<bool>,
     limits: Limits,
+    tls: Option<TlsAcceptor>,
 ) {
     let room = Arc::new(Semaphore::new(limits.at_once));
     let mut held = JoinSet::new();
@@ -92,6 +100,7 @@ pub(super) async fn answering(
             stop.clone(),
             permit,
             limits.headers_within,
+            tls.clone(),
         ));
     }
     drop(listener);
@@ -102,18 +111,39 @@ pub(super) async fn answering(
     held.abort_all();
 }
 
+/// What a connection is read from and written to, whether or not it is encrypted.
+///
+/// A trait object rather than a generic, so the one function below is the one that is
+/// run either way — two copies of it would be one that only an encrypted test reaches.
+trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
+
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
+
 /// One connection, answered until it ends or the socket it came in on stops.
+///
+/// A handshake that fails or does not finish in time ends the connection unanswered:
+/// there is nobody on the other end this surface could say anything useful to.
 async fn connection(
     socket: TcpStream,
     surface: Router,
     mut stop: watch::Receiver<bool>,
     _room: tokio::sync::OwnedSemaphorePermit,
     headers_within: Duration,
+    tls: Option<TlsAcceptor>,
 ) {
+    let io: Box<dyn Io> = match tls {
+        None => Box::new(socket),
+        Some(acceptor) => {
+            match tokio::time::timeout(headers_within, acceptor.accept(socket)).await {
+                Ok(Ok(encrypted)) => Box::new(encrypted),
+                Ok(Err(_)) | Err(_) => return,
+            }
+        }
+    };
     let answered = hyper::server::conn::http1::Builder::new()
         .timer(TokioTimer::new())
         .header_read_timeout(headers_within)
-        .serve_connection(TokioIo::new(socket), TowerToHyperService::new(surface));
+        .serve_connection(TokioIo::new(io), TowerToHyperService::new(surface));
     tokio::pin!(answered);
     tokio::select! {
         _ = answered.as_mut() => {}
