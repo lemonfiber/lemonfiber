@@ -1,6 +1,1182 @@
 {
   "releases": [
     {
+      "version": "0.16.0",
+      "tag": "v0.16.0",
+      "released_on": "2026-09-24",
+      "delivers": "Plugins — what one is, installing one, and what that leaves readable",
+      "patches": null,
+      "carried": null,
+      "withdrawn": null,
+      "user_facing": true,
+      "groups": [
+        {
+          "title": "New",
+          "entries": [
+            {
+              "summary": "What a plugin may claim, said by the binary that will read it",
+              "requirements": [
+                "F4-R2",
+                "F4-R15",
+                "F4-R18",
+                "F4-R19",
+                "F4-R20",
+                "F4-R21",
+                "F4-R22",
+                "F4-R23",
+                "F4-R24",
+                "F3-R33",
+                "F3-R34",
+                "F3-R35",
+                "F10-R8",
+                "ARCH-R92",
+                "ARCH-R93",
+                "ARCH-R106",
+                "ARCH-R107",
+                "ARCH-R108",
+                "ARCH-R109",
+                "ARCH-R110",
+                "ARCH-R111",
+                "ARCH-R112",
+                "ARCH-R113",
+                "ARCH-R114",
+                "ARCH-R115",
+                "ARCH-R116",
+                "ARCH-R117",
+                "ARCH-R118"
+              ]
+            },
+            {
+              "summary": "A claim held to the vocabulary, and shown by what it recorded",
+              "requirements": [
+                "F4-R3",
+                "F4-R4",
+                "F4-R6",
+                "F4-R7",
+                "F4-R8",
+                "F4-R13",
+                "F4-R16",
+                "F4-R17",
+                "F4-R25",
+                "ARCH-R102",
+                "ARCH-R118",
+                "ARCH-R119",
+                "ARCH-R120",
+                "ARCH-R121",
+                "ARCH-R122",
+                "Q-R61"
+              ],
+              "reference": "#680"
+            },
+            {
+              "summary": "The gate a tag must pass, on both lanes that cut one",
+              "requirements": [
+                "OPS-R70",
+                "OPS-R34",
+                "OPS-R54",
+                "Q-R64",
+                "Q-R53",
+                "Q-R67"
+              ],
+              "reference": "#683"
+            },
+            {
+              "summary": "What a manifest is refused for, in one pass",
+              "requirements": [
+                "F3-R1",
+                "F3-R2",
+                "F3-R8",
+                "F3-R10",
+                "F3-R12",
+                "F3-R21",
+                "F3-R22",
+                "F3-R35",
+                "ARCH-R83",
+                "ARCH-R84",
+                "ARCH-R87",
+                "ARCH-R89",
+                "ARCH-R90",
+                "ARCH-R91",
+                "ARCH-R94",
+                "ARCH-R95",
+                "ARCH-R100",
+                "ARCH-R101",
+                "ARCH-R117",
+                "OPS-R34",
+                "Q-R61"
+              ],
+              "reference": "#695"
+            },
+            {
+              "summary": "What anybody has said about a pinned image",
+              "requirements": [
+                "F3-R25"
+              ],
+              "reference": "#700"
+            },
+            {
+              "summary": "The guard answers who rather than whether",
+              "requirements": [
+                "N3-R1",
+                "N3-R2",
+                "N3-R3",
+                "N3-R9",
+                "Q-R3",
+                "Q-R61",
+                "N3-R13"
+              ],
+              "reference": "#698"
+            },
+            {
+              "summary": "The session says who it is for",
+              "requirements": [
+                "N3-R1",
+                "N3-R11"
+              ],
+              "reference": "#704"
+            },
+            {
+              "summary": "The service that faces them, not the one that is the door",
+              "requirements": [
+                "G10-R12",
+                "G10-R13"
+              ],
+              "reference": "#706"
+            },
+            {
+              "summary": "What the household holds, as one member can see it",
+              "requirements": [
+                "G10-R4",
+                "G10-R6",
+                "G10-R10",
+                "N3-R11",
+                "N3-R14",
+                "ARCH-R58",
+                "Q-R61",
+                "GOV-R12"
+              ],
+              "reference": "#707"
+            },
+            {
+              "summary": "The stack says what reaches what, and this reads it",
+              "requirements": [
+                "F4-R1",
+                "F4-R9",
+                "F4-R10",
+                "F4-R11",
+                "F4-R12",
+                "F9-R4",
+                "G1-R1"
+              ],
+              "reference": "#710"
+            },
+            {
+              "summary": "Every setting says where its value came from",
+              "requirements": [
+                "F7-R11"
+              ],
+              "reference": "#714"
+            },
+            {
+              "summary": "A manifest that reaches past what it declares is refused",
+              "requirements": [
+                "F3-R11",
+                "F3-R14",
+                "F3-R17",
+                "F3-R18",
+                "Q-R18",
+                "Q-R61"
+              ],
+              "reference": "#716"
+            },
+            {
+              "summary": "A plugin's contributed checks run where the bundled ones do",
+              "requirements": [
+                "F3-R26",
+                "F3-R27",
+                "F3-R28",
+                "F3-R29",
+                "F3-R30"
+              ],
+              "reference": "#723"
+            },
+            {
+              "summary": "Where an installed service keeps its state survives the install",
+              "requirements": [
+                "F3-R32"
+              ],
+              "reference": "#725"
+            },
+            {
+              "summary": "Lemonfiber writes the container a plugin may not supply",
+              "requirements": [
+                "F3-R23",
+                "F3-R24",
+                "ARCH-R85",
+                "ARCH-R86",
+                "ARCH-R87",
+                "ARCH-R88",
+                "ARCH-R100",
+                "ARCH-R101"
+              ],
+              "reference": "#727"
+            },
+            {
+              "summary": "A probe can ask for JSON, and an expectation can reach into one",
+              "requirements": [
+                "ARCH-R92",
+                "ARCH-R93",
+                "ARCH-R109",
+                "ARCH-R122",
+                "ARCH-R123",
+                "ARCH-R124",
+                "ARCH-R125",
+                "ARCH-R126",
+                "ARCH-R127",
+                "ARCH-R128"
+              ],
+              "reference": "#729"
+            },
+            {
+              "summary": "An install writes its wiring and journals every write",
+              "requirements": [
+                "F3-R31",
+                "F6-R2",
+                "F7-R1",
+                "F7-R2"
+              ],
+              "reference": "#733"
+            },
+            {
+              "summary": "A rehearsal states every change it would make and every proof",
+              "requirements": [
+                "F6-R1",
+                "F7-R6",
+                "F10-R3"
+              ],
+              "reference": "#735"
+            },
+            {
+              "summary": "A plugin's own proofs gate its install",
+              "requirements": [
+                "F3-R3",
+                "F3-R4",
+                "F3-R5",
+                "F6-R3"
+              ],
+              "reference": "#737"
+            },
+            {
+              "summary": "The stack's own checks gate an install too",
+              "requirements": [
+                "F6-R4",
+                "F6-R5",
+                "F6-R6"
+              ],
+              "reference": "#738"
+            },
+            {
+              "summary": "A plugin's contributed rows run from the register",
+              "requirements": [
+                "F3-R27",
+                "F3-R28"
+              ],
+              "reference": "#740"
+            },
+            {
+              "summary": "Removing one is a rollback with a name on it",
+              "requirements": [
+                "F6-R7",
+                "F6-R11",
+                "F6-R12",
+                "F3-R30"
+              ],
+              "reference": "#741"
+            },
+            {
+              "summary": "What a removal stops is said before it stops it",
+              "requirements": [
+                "F6-R8",
+                "F6-R10",
+                "F3-R13"
+              ],
+              "reference": "#743"
+            },
+            {
+              "summary": "Updating one is one operation that leaves one version standing",
+              "requirements": [
+                "F6-R9",
+                "F6-R13"
+              ],
+              "reference": "#745"
+            },
+            {
+              "summary": "A wiring and a check say where they came from",
+              "requirements": [
+                "F7-R3"
+              ],
+              "reference": "#746"
+            },
+            {
+              "summary": "One read says what each plugin is doing",
+              "requirements": [
+                "F7-R5"
+              ],
+              "reference": "#747"
+            },
+            {
+              "summary": "What a plugin holds and reaches is in the ordinary account",
+              "requirements": [
+                "F7-R8",
+                "F7-R9"
+              ],
+              "reference": "#748"
+            },
+            {
+              "summary": "A plugin's service is on the stack's proxy and its dashboard",
+              "requirements": [
+                "F3-R31"
+              ],
+              "reference": "#749"
+            },
+            {
+              "summary": "A value a plugin overrode says what it replaced, and one it left is orphaned",
+              "requirements": [
+                "F7-R4",
+                "F7-R10"
+              ],
+              "reference": "#752"
+            }
+          ]
+        },
+        {
+          "title": "Fixed",
+          "entries": [
+            {
+              "summary": "Ten contracts the detector reads as ten copies",
+              "requirements": [
+                "Q-R63"
+              ],
+              "reference": "#682"
+            },
+            {
+              "summary": "Two boundaries a credential crossed",
+              "requirements": [
+                "A4-R11",
+                "A7-R3"
+              ],
+              "reference": "#687"
+            },
+            {
+              "summary": "A tick nothing earned, and the guard that could not see it",
+              "requirements": [
+                "OPS-R54"
+              ],
+              "reference": "#688"
+            },
+            {
+              "summary": "An answer from outside the container read as no connectivity",
+              "requirements": [
+                "C2-R3",
+                "C2-R14"
+              ],
+              "reference": "#689"
+            },
+            {
+              "summary": "Four ways the tag gate could answer without having asked",
+              "requirements": [
+                "OPS-R70"
+              ],
+              "reference": "#690"
+            },
+            {
+              "summary": "A constraint written empty was read as evidence",
+              "requirements": [
+                "ARCH-R109"
+              ],
+              "reference": "#691"
+            },
+            {
+              "summary": "The tag reached five shells as script, not as an argument",
+              "requirements": [
+                "Q-R63"
+              ],
+              "reference": "#692"
+            },
+            {
+              "summary": "Three gates that could report clean without asking",
+              "requirements": [
+                "Q-R63"
+              ],
+              "reference": "#693"
+            },
+            {
+              "summary": "The recipe no longer reproduced the file it is the only way to change",
+              "requirements": [
+                "Q-R63"
+              ],
+              "reference": "#694"
+            },
+            {
+              "summary": "Checks that could not fail, and names that claimed more than they check",
+              "requirements": [
+                "Q-R3",
+                "Q-R61",
+                "OPS-R35"
+              ],
+              "reference": "#696"
+            },
+            {
+              "summary": "A member is found by the id their session carries",
+              "requirements": [
+                "G10-R4"
+              ],
+              "reference": "#708"
+            },
+            {
+              "summary": "The claims report says what its verdicts were reached against",
+              "requirements": [
+                "F10-R6",
+                "OPS-R34"
+              ],
+              "reference": "#711"
+            },
+            {
+              "summary": "The plugin schema's Kind is named for what it is the kind of",
+              "requirements": [
+                "ARCH-R63",
+                "F3-R2"
+              ],
+              "reference": "#742"
+            },
+            {
+              "summary": "A change says when it was made, and how far back it goes, in its own terms",
+              "requirements": [
+                "N11-R2",
+                "N11-R10",
+                "N1-R17"
+              ],
+              "reference": "#744"
+            }
+          ]
+        },
+        {
+          "title": "Maintenance",
+          "entries": [
+            {
+              "summary": "One walk over the closed fields, for both manifests",
+              "requirements": [
+                "Q-R63"
+              ],
+              "reference": "#681"
+            },
+            {
+              "summary": "The same install twice in one file, fixed once",
+              "requirements": [
+                "Q-R64",
+                "Q-R67",
+                "Q-R53"
+              ],
+              "reference": "#684"
+            },
+            {
+              "summary": "The ceiling back to nothing, and what took it off",
+              "requirements": [
+                "Q-R64",
+                "Q-R67"
+              ],
+              "reference": "#685"
+            },
+            {
+              "summary": "The shared pins catch up, and a check that says so",
+              "requirements": [
+                "Q-R68",
+                "GOV-R12"
+              ],
+              "reference": "#686"
+            },
+            {
+              "summary": "Take every reusable workflow whose own file has moved",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#697"
+            },
+            {
+              "summary": "A pin the updater can read",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#699"
+            },
+            {
+              "summary": "Three instructions a contributor cannot follow",
+              "requirements": [
+                "Q-R57",
+                "Q-R61",
+                "OPS-R51",
+                "GOV-R12"
+              ],
+              "reference": "#701"
+            },
+            {
+              "summary": "Take the sonar gate's refusal that says where the issues are",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#703"
+            },
+            {
+              "summary": "A page per command, and the set is compared too",
+              "requirements": [
+                "ARCH-R68"
+              ],
+              "reference": "#702"
+            },
+            {
+              "summary": "The comment policy, on a lexer and a planted tree",
+              "requirements": [
+                "Q-R6",
+                "Q-R7",
+                "L1-R1"
+              ],
+              "reference": "#705"
+            },
+            {
+              "summary": "The version that converts the wirings is the staged one",
+              "requirements": [
+                "F9-R4"
+              ],
+              "reference": "#709"
+            },
+            {
+              "summary": "The generated schema is the only description of the format now",
+              "requirements": [
+                "OPS-R34"
+              ],
+              "reference": "#712"
+            },
+            {
+              "summary": "The catalogue's gate has a row",
+              "requirements": [
+                "F3-R9"
+              ],
+              "reference": "#713"
+            },
+            {
+              "summary": "Bump the cargo group with 3 updates",
+              "requirements": [],
+              "reference": "#718"
+            },
+            {
+              "summary": "Bump base64 from 0.22.1 to 0.23.1",
+              "requirements": [],
+              "reference": "#719"
+            },
+            {
+              "summary": "Bump the shared-workflows group across 1 directory with 17 updates",
+              "requirements": [],
+              "reference": "#720"
+            },
+            {
+              "summary": "Bump the codeql group across 1 directory with 3 updates",
+              "requirements": [],
+              "reference": "#721"
+            },
+            {
+              "summary": "Bump SonarSource/sonarqube-scan-action",
+              "requirements": [],
+              "reference": "#722"
+            },
+            {
+              "summary": "A plugin's things go on the account that already exists",
+              "requirements": [
+                "F7-R12"
+              ],
+              "reference": "#724"
+            },
+            {
+              "summary": "Take the scorecard gate at v1.0.9",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#726"
+            },
+            {
+              "summary": "The workspace carries 0.16.0, which is what is about to ship",
+              "requirements": [
+                "OPS-R49",
+                "ARCH-R43"
+              ],
+              "reference": "#730"
+            },
+            {
+              "summary": "Take the eight shared gates at v1.0.12",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#734"
+            },
+            {
+              "summary": "Take the shared workflows at v1.0.14",
+              "requirements": [
+                "OPS-R48"
+              ],
+              "reference": "#736"
+            },
+            {
+              "summary": "Bump the shared-workflows group across 1 directory with 9 updates",
+              "requirements": [],
+              "reference": "#739"
+            },
+            {
+              "summary": "What the readme, the tracker and .docs say, checked against main",
+              "requirements": [
+                "Q-R10",
+                "OPS-R34"
+              ],
+              "reference": "#750"
+            },
+            {
+              "summary": "An installed plugin points at the update that exists",
+              "requirements": [
+                "F10-R7"
+              ],
+              "reference": "#751"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "0.15.0",
+      "tag": "v0.15.0",
+      "released_on": "2026-09-15",
+      "delivers": "Away from the keyboard — remote control, autostart, customisation",
+      "patches": null,
+      "carried": null,
+      "withdrawn": null,
+      "user_facing": true,
+      "groups": [
+        {
+          "title": "New",
+          "entries": [
+            {
+              "summary": "A dry run is one everywhere, or it refuses",
+              "requirements": [
+                "F1-R2",
+                "Q-R66",
+                "Q-R61"
+              ],
+              "reference": "#631"
+            },
+            {
+              "summary": "A rehearsal takes the operator's yes back",
+              "requirements": [
+                "F1-R2",
+                "Q-R66"
+              ],
+              "reference": "#632"
+            },
+            {
+              "summary": "Say what the vendored stack has moved on, not that it moved",
+              "requirements": [
+                "Q-R68"
+              ],
+              "reference": "#640"
+            },
+            {
+              "summary": "A second client waits for its turn",
+              "requirements": [
+                "B6-R8"
+              ],
+              "reference": "#647"
+            },
+            {
+              "summary": "The autostart answer is kept, and its cost is stated",
+              "requirements": [
+                "B8-R1"
+              ],
+              "reference": "#648"
+            },
+            {
+              "summary": "A rule of ours is guidance over somebody else's stack",
+              "requirements": [
+                "F1-R13"
+              ],
+              "reference": "#649"
+            },
+            {
+              "summary": "One stack, one host, asserted rather than assumed",
+              "requirements": [
+                "B6-R1",
+                "B6-R2",
+                "B6-R3",
+                "B6-R9",
+                "B6-R10",
+                "B6-R12"
+              ],
+              "reference": "#654"
+            },
+            {
+              "summary": "A licence an operator can check rather than take on faith",
+              "requirements": [
+                "F2-R4"
+              ],
+              "reference": "#651"
+            },
+            {
+              "summary": "What keeps running when nobody is watching",
+              "requirements": [
+                "B8-R5",
+                "B8-R10",
+                "B8-R9",
+                "B8-R2",
+                "B8-R3",
+                "B8-R4",
+                "B8-R7",
+                "B8-R6",
+                "B8-R12",
+                "B8-R14",
+                "B8-R11",
+                "B8-R8",
+                "B8-R13"
+              ],
+              "reference": "#657"
+            },
+            {
+              "summary": "One endpoint answers for the reads and the writes",
+              "requirements": [
+                "B6-R4",
+                "B6-R5",
+                "B6-R6",
+                "B6-R7",
+                "B6-R11"
+              ],
+              "reference": "#655"
+            },
+            {
+              "summary": "Nineteen names, each with what it does and what its loss costs",
+              "requirements": [
+                "F2-R13",
+                "F2-R1",
+                "F2-R3",
+                "F2-R7",
+                "F2-R8",
+                "F2-R9",
+                "F2-R11",
+                "F2-R12",
+                "F2-R14",
+                "F2-R15",
+                "F1-R5",
+                "Q-R11",
+                "Q-R32",
+                "E4-R1",
+                "Q-R61"
+              ],
+              "reference": "#656"
+            },
+            {
+              "summary": "A rehearsal is only a rehearsal on the commands that built it",
+              "requirements": [
+                "F1-R2",
+                "Q-R61",
+                "Q-R12"
+              ],
+              "reference": "#659"
+            },
+            {
+              "summary": "What a verb takes away, said before it takes it",
+              "requirements": [
+                "B2-R16",
+                "Q-R61"
+              ],
+              "reference": "#663"
+            },
+            {
+              "summary": "The stack is the operator's, and the build says what it cannot do",
+              "requirements": [
+                "B8-R1",
+                "E4-R1",
+                "F1-R1",
+                "F1-R4",
+                "F1-R5",
+                "F1-R7",
+                "F1-R8",
+                "F1-R10",
+                "F1-R11",
+                "F1-R12",
+                "F1-R13",
+                "F1-R14",
+                "F2-R10",
+                "Q-R61"
+              ],
+              "reference": "#658"
+            },
+            {
+              "summary": "Ask the machine that resolves the mount, not a shell beside it",
+              "requirements": [
+                "B6-R5"
+              ],
+              "reference": "#670"
+            },
+            {
+              "summary": "An alert says what it means, not only what happened",
+              "requirements": [
+                "B5-R8",
+                "G4-R1",
+                "G7-R7"
+              ],
+              "reference": "#672"
+            },
+            {
+              "summary": "A pre-release that announces nothing and records nothing",
+              "requirements": [
+                "OPS-R61",
+                "OPS-R62",
+                "OPS-R63",
+                "OPS-R64"
+              ],
+              "reference": "#674"
+            },
+            {
+              "summary": "A build cut ahead of its release, read as one",
+              "requirements": [
+                "E5-R1",
+                "E5-R11",
+                "OPS-R61",
+                "OPS-R64"
+              ],
+              "reference": "#675"
+            },
+            {
+              "summary": "A plugin is data, and nothing here can make it anything else",
+              "requirements": [
+                "F3-R6",
+                "F3-R7"
+              ],
+              "reference": "#677"
+            }
+          ]
+        },
+        {
+          "title": "Fixed",
+          "entries": [
+            {
+              "summary": "The marker that could not be uploaded",
+              "requirements": [
+                "ARCH-R98",
+                "E2-R9"
+              ],
+              "reference": "#624"
+            },
+            {
+              "summary": "Put a service's own words through the funnel that withholds credentials",
+              "requirements": [
+                "A7-R3"
+              ],
+              "reference": "#628"
+            },
+            {
+              "summary": "Name the miss the export merges away",
+              "requirements": [
+                "Q-R61",
+                "Q-R66"
+              ],
+              "reference": "#633"
+            },
+            {
+              "summary": "Ask the regions the question they can answer",
+              "requirements": [
+                "Q-R61",
+                "Q-R66"
+              ],
+              "reference": "#634"
+            },
+            {
+              "summary": "An empty alert list is not an analysis that found nothing",
+              "requirements": [
+                "Q-R53"
+              ],
+              "reference": "#641"
+            },
+            {
+              "summary": "The alerts gate reports instead of vanishing",
+              "requirements": [
+                "Q-R53"
+              ],
+              "reference": "#642"
+            },
+            {
+              "summary": "One language is a job shape too",
+              "requirements": [
+                "Q-R53"
+              ],
+              "reference": "#643"
+            },
+            {
+              "summary": "The ceiling falls to nothing",
+              "requirements": [
+                "Q-R64",
+                "Q-R67"
+              ],
+              "reference": "#646"
+            },
+            {
+              "summary": "What it took to make this gate portable",
+              "requirements": [
+                "Q-R64",
+                "Q-R53"
+              ],
+              "reference": "#645"
+            },
+            {
+              "summary": "A start that Compose did not carry out says so",
+              "requirements": [
+                "F1-R6"
+              ],
+              "reference": "#653"
+            },
+            {
+              "summary": "Split the names out, and report the test that failed",
+              "requirements": [
+                "Q-R61"
+              ],
+              "reference": "#666"
+            },
+            {
+              "summary": "Read a number from where it is decided",
+              "requirements": [
+                "G1-R2",
+                "Q-R12"
+              ],
+              "reference": "#664"
+            }
+          ]
+        },
+        {
+          "title": "Maintenance",
+          "entries": [
+            {
+              "summary": "The record catches up with fourteen",
+              "requirements": [
+                "E5-R11"
+              ],
+              "reference": "#625"
+            },
+            {
+              "summary": "Give the four invisible features rows of their own",
+              "requirements": [
+                "B6-R1",
+                "B6-R2",
+                "B6-R3",
+                "B6-R4",
+                "B6-R5",
+                "B6-R6",
+                "B6-R7",
+                "B6-R8",
+                "B6-R9",
+                "B6-R10",
+                "B6-R11",
+                "B6-R12",
+                "B8-R1",
+                "B8-R2",
+                "B8-R3",
+                "B8-R4",
+                "B8-R5",
+                "B8-R6",
+                "B8-R7",
+                "B8-R8",
+                "B8-R9",
+                "B8-R10",
+                "B8-R11",
+                "B8-R12",
+                "B8-R13",
+                "B8-R14",
+                "F1-R1",
+                "F1-R2",
+                "F1-R3",
+                "F1-R4",
+                "F1-R5",
+                "F1-R6",
+                "F1-R7",
+                "F1-R8",
+                "F1-R9",
+                "F1-R10",
+                "F1-R11",
+                "F1-R12",
+                "F1-R13",
+                "F1-R14",
+                "F2-R1",
+                "F2-R2",
+                "F2-R3",
+                "F2-R4",
+                "F2-R5",
+                "F2-R6",
+                "F2-R7",
+                "F2-R8",
+                "F2-R9",
+                "F2-R10",
+                "F2-R11",
+                "F2-R12",
+                "F2-R13",
+                "F2-R14",
+                "F2-R15",
+                "OPS-R34"
+              ],
+              "reference": "#626"
+            },
+            {
+              "summary": "Call the goal automations this repository never called",
+              "requirements": [
+                "OPS-R39",
+                "OPS-R40",
+                "OPS-R42"
+              ],
+              "reference": "#627"
+            },
+            {
+              "summary": "Say what an assertion pins, without quoting the line",
+              "requirements": [
+                "A7-R3",
+                "Q-R40"
+              ],
+              "reference": "#629"
+            },
+            {
+              "summary": "The assertions that forbid a credential stop quoting the line",
+              "requirements": [
+                "A7-R3",
+                "Q-R40",
+                "Q-R61"
+              ],
+              "reference": "#630"
+            },
+            {
+              "summary": "The release gates are read too",
+              "requirements": [
+                "Q-R66"
+              ],
+              "reference": "#635"
+            },
+            {
+              "summary": "The gate that runs, and the list that never did",
+              "requirements": [
+                "Q-R54"
+              ],
+              "reference": "#637"
+            },
+            {
+              "summary": "A failed scan says whether it was the host or this run",
+              "requirements": [
+                "Q-R64",
+                "Q-R63"
+              ],
+              "reference": "#639"
+            },
+            {
+              "summary": "The rule rationale has one home",
+              "requirements": [
+                "GOV-R12"
+              ],
+              "reference": "#638"
+            },
+            {
+              "summary": "Every proof runs before a release, or says why it cannot",
+              "requirements": [
+                "Q-R56"
+              ],
+              "reference": "#644"
+            },
+            {
+              "summary": "Five files split at seams each new module can be named for",
+              "requirements": [
+                "GOV-R12"
+              ],
+              "reference": "#650"
+            },
+            {
+              "summary": "The alert gate has one home, and this repo now calls it",
+              "requirements": [
+                "GOV-R12",
+                "Q-R53"
+              ],
+              "reference": "#652"
+            },
+            {
+              "summary": "Take the commit-msg hook that refuses a tool's trailer",
+              "requirements": [
+                "GOV-R46",
+                "Q-R57",
+                "GOV-R12"
+              ],
+              "reference": "#662"
+            },
+            {
+              "summary": "Bump the codeql group with 3 updates",
+              "requirements": [],
+              "reference": "#661"
+            },
+            {
+              "summary": "Bump the cargo group with 2 updates",
+              "requirements": [],
+              "reference": "#660"
+            },
+            {
+              "summary": "One file per seam, and the cap out of the file it was failing",
+              "requirements": [
+                "Q-R18"
+              ],
+              "reference": "#667"
+            },
+            {
+              "summary": "The stack describes its own errands, and nothing here does",
+              "requirements": [
+                "F2-R10"
+              ],
+              "reference": "#668"
+            },
+            {
+              "summary": "The stack is started now, and three services do not start",
+              "requirements": [
+                "F1-R1"
+              ],
+              "reference": "#669"
+            },
+            {
+              "summary": "Three of them were fixed, and two have never been started",
+              "requirements": [
+                "F1-R1"
+              ],
+              "reference": "#673"
+            },
+            {
+              "summary": "The rule about the tick character is kept by a linter now",
+              "requirements": [
+                "OPS-R34",
+                "F2-R5"
+              ],
+              "reference": "#671"
+            },
+            {
+              "summary": "The workspace carries the version a pre-release cuts",
+              "requirements": [
+                "OPS-R60"
+              ],
+              "reference": "#676"
+            },
+            {
+              "summary": "The workspace carries the version that is about to ship",
+              "requirements": [
+                "OPS-R49"
+              ],
+              "reference": "#678"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.14.0",
       "tag": "v0.14.0",
       "released_on": "2026-09-12",
@@ -5559,6 +6735,7 @@
     "A4-R11": {
       "feature": "Reconfiguration",
       "shipped_in": [
+        "0.16.0",
         "0.13.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"
@@ -5833,6 +7010,8 @@
     "A7-R3": {
       "feature": "Credential management & rotation",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.13.0",
         "0.9.0"
@@ -5882,6 +7061,55 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"
     },
+    "ARCH-R100": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R101": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R102": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R106": {
+      "feature": "Contract: `capability-vocabulary.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/capability-vocabulary/#requirements"
+    },
+    "ARCH-R107": {
+      "feature": "Contract: `capability-vocabulary.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/capability-vocabulary/#requirements"
+    },
+    "ARCH-R108": {
+      "feature": "Contract: `capability-vocabulary.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/capability-vocabulary/#requirements"
+    },
+    "ARCH-R109": {
+      "feature": "Contract: `capability-vocabulary.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/capability-vocabulary/#requirements"
+    },
     "ARCH-R11": {
       "feature": "Component model",
       "shipped_in": [
@@ -5890,12 +7118,145 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"
     },
+    "ARCH-R110": {
+      "feature": "Contract: `capability-vocabulary.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/capability-vocabulary/#requirements"
+    },
+    "ARCH-R111": {
+      "feature": "Contract: `extension-points.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/extension-points/#requirements"
+    },
+    "ARCH-R112": {
+      "feature": "Contract: `extension-points.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/extension-points/#requirements"
+    },
+    "ARCH-R113": {
+      "feature": "Contract: `extension-points.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/extension-points/#requirements"
+    },
+    "ARCH-R114": {
+      "feature": "Contract: `extension-points.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/extension-points/#requirements"
+    },
+    "ARCH-R115": {
+      "feature": "Contract: `extension-points.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/extension-points/#requirements"
+    },
+    "ARCH-R116": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R117": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R118": {
+      "feature": "Contract: `extension-points.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/extension-points/#requirements"
+    },
+    "ARCH-R119": {
+      "feature": "Contract: `capability-vocabulary.json`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/capability-vocabulary/#requirements"
+    },
     "ARCH-R12": {
       "feature": "Component model",
       "shipped_in": [
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"
+    },
+    "ARCH-R120": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R121": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R122": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R123": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R124": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R125": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R126": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R127": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R128": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
     },
     "ARCH-R13": {
       "feature": "Component model",
@@ -5938,6 +7299,13 @@
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"
+    },
+    "ARCH-R43": {
+      "feature": "Contract: versioning & compatibility",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"
     },
     "ARCH-R44": {
       "feature": "Component model",
@@ -6029,6 +7397,7 @@
     "ARCH-R58": {
       "feature": "Contract: the web API",
       "shipped_in": [
+        "0.16.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"
@@ -6057,6 +7426,7 @@
     "ARCH-R63": {
       "feature": "Contract: the web API",
       "shipped_in": [
+        "0.16.0",
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"
@@ -6071,6 +7441,7 @@
     "ARCH-R68": {
       "feature": "Component model",
       "shipped_in": [
+        "0.16.0",
         "0.10.0",
         "0.9.0"
       ],
@@ -6105,9 +7476,101 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"
     },
+    "ARCH-R83": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R84": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R85": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R86": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R87": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R88": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R89": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R90": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R91": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R92": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R93": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R94": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
+    "ARCH-R95": {
+      "feature": "Contract: `plugin.toml`",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/plugin-manifest/#requirements"
+    },
     "ARCH-R98": {
       "feature": "Contract: versioning & compatibility",
       "shipped_in": [
+        "0.15.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"
@@ -6378,6 +7841,13 @@
       "feature": "Lifecycle control",
       "shipped_in": [
         "0.1.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"
+    },
+    "B2-R16": {
+      "feature": "Lifecycle control",
+      "shipped_in": [
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"
     },
@@ -6699,6 +8169,7 @@
     "B5-R8": {
       "feature": "Notifications & alerting",
       "shipped_in": [
+        "0.15.0",
         "0.5.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"
@@ -6709,6 +8180,188 @@
         "0.5.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"
+    },
+    "B6-R1": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R10": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R11": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R12": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R2": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R3": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R4": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R5": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R6": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R7": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R8": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B6-R9": {
+      "feature": "Controlling a stack on another machine",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b6-remote-stack/#acceptance-criteria"
+    },
+    "B8-R1": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R10": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R11": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R12": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R13": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R14": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R2": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R3": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R4": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R5": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R6": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R7": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R8": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
+    },
+    "B8-R9": {
+      "feature": "Autostart & boot persistence",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b8-autostart/#acceptance-criteria"
     },
     "C1-R1": {
       "feature": "Diagnostics",
@@ -6852,6 +8505,7 @@
     "C2-R14": {
       "feature": "VPN verification",
       "shipped_in": [
+        "0.16.0",
         "0.6.0",
         "0.1.0"
       ],
@@ -6909,6 +8563,7 @@
     "C2-R3": {
       "feature": "VPN verification",
       "shipped_in": [
+        "0.16.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"
@@ -8744,6 +10399,7 @@
     "E2-R9": {
       "feature": "Self-update",
       "shipped_in": [
+        "0.15.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e2-self-update/#acceptance-criteria"
@@ -8868,6 +10524,7 @@
     "E4-R1": {
       "feature": "Rollback",
       "shipped_in": [
+        "0.15.0",
         "0.14.0",
         "0.2.0"
       ],
@@ -8937,6 +10594,13 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"
     },
+    "E5-R1": {
+      "feature": "Changelog & release notes",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
+    },
     "E5-R10": {
       "feature": "Changelog & release notes",
       "shipped_in": [
@@ -8947,6 +10611,7 @@
     "E5-R11": {
       "feature": "Changelog & release notes",
       "shipped_in": [
+        "0.15.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
@@ -9014,9 +10679,52 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e5-changelog/#acceptance-criteria"
     },
+    "F1-R1": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R10": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R11": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R12": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R13": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R14": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
     "F1-R2": {
       "feature": "Customisation & escape hatches",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
@@ -9024,55 +10732,441 @@
     "F1-R3": {
       "feature": "Customisation & escape hatches",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R4": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R5": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
     },
     "F1-R6": {
       "feature": "Customisation & escape hatches",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R7": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
+    },
+    "F1-R8": {
+      "feature": "Customisation & escape hatches",
+      "shipped_in": [
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
     },
     "F1-R9": {
       "feature": "Customisation & escape hatches",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"
     },
+    "F10-R3": {
+      "feature": "Writing a plugin",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f10-authoring/#acceptance-criteria"
+    },
+    "F10-R6": {
+      "feature": "Writing a plugin",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f10-authoring/#acceptance-criteria"
+    },
+    "F10-R7": {
+      "feature": "Writing a plugin",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f10-authoring/#acceptance-criteria"
+    },
+    "F10-R8": {
+      "feature": "Writing a plugin",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f10-authoring/#acceptance-criteria"
+    },
+    "F2-R1": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R10": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R11": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R12": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R13": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
     "F2-R14": {
       "feature": "Service catalogue",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R15": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
     },
     "F2-R2": {
       "feature": "Service catalogue",
       "shipped_in": [
+        "0.15.0",
         "0.2.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R3": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R4": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
     },
     "F2-R5": {
       "feature": "Service catalogue",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
     },
+    "F2-R6": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R7": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R8": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F2-R9": {
+      "feature": "Service catalogue",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"
+    },
+    "F3-R1": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R10": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R11": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R12": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R13": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R14": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R17": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R18": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R2": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R21": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
     "F3-R22": {
       "feature": "Plugin manifests",
       "shipped_in": [
+        "0.16.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
     },
+    "F3-R23": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R24": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R25": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R26": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R27": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R28": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R29": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R3": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R30": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R31": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R32": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R33": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R34": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R35": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R4": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R5": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R6": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R7": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R8": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F3-R9": {
+      "feature": "Plugin manifests",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f3-stack-manifests/#acceptance-criteria"
+    },
+    "F4-R1": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R10": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R11": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R12": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
     "F4-R13": {
       "feature": "The capability vocabulary",
       "shipped_in": [
+        "0.16.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
@@ -9084,9 +11178,311 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
     },
+    "F4-R15": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R16": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R17": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R18": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R19": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R2": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R20": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R21": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R22": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R23": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R24": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R25": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R3": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R4": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R6": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R7": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R8": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F4-R9": {
+      "feature": "The capability vocabulary",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f4-capabilities/#acceptance-criteria"
+    },
+    "F6-R1": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R10": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R11": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R12": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R13": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R2": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R3": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R4": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R5": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R6": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R7": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R8": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F6-R9": {
+      "feature": "Plugin lifecycle",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f6-plugin-lifecycle/#acceptance-criteria"
+    },
+    "F7-R1": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R10": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R11": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R12": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R2": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R3": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R4": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R5": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R6": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R8": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F7-R9": {
+      "feature": "Plugin provenance",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f7-plugin-provenance/#acceptance-criteria"
+    },
+    "F9-R4": {
+      "feature": "Capabilities of the bundled services",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f9-bundled-capabilities/#acceptance-criteria"
+    },
     "G1-R1": {
       "feature": "Interface tiers",
       "shipped_in": [
+        "0.16.0",
         "0.11.0",
         "0.9.0"
       ],
@@ -9130,6 +11526,7 @@
     "G1-R2": {
       "feature": "Interface tiers",
       "shipped_in": [
+        "0.15.0",
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"
@@ -9182,6 +11579,41 @@
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"
+    },
+    "G10-R10": {
+      "feature": "The household's web surface",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g10-household-web/#acceptance-criteria"
+    },
+    "G10-R12": {
+      "feature": "The household's web surface",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g10-household-web/#acceptance-criteria"
+    },
+    "G10-R13": {
+      "feature": "The household's web surface",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g10-household-web/#acceptance-criteria"
+    },
+    "G10-R4": {
+      "feature": "The household's web surface",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g10-household-web/#acceptance-criteria"
+    },
+    "G10-R6": {
+      "feature": "The household's web surface",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g10-household-web/#acceptance-criteria"
     },
     "G2-R1": {
       "feature": "Plain-language layer & in-product help",
@@ -9348,6 +11780,7 @@
     "G4-R1": {
       "feature": "Error & remedy model",
       "shipped_in": [
+        "0.15.0",
         "0.5.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"
@@ -9712,6 +12145,7 @@
     "G7-R7": {
       "feature": "Overall health summary",
       "shipped_in": [
+        "0.15.0",
         "0.5.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"
@@ -9822,6 +12256,8 @@
     "GOV-R12": {
       "feature": "Canonical spec",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.13.0",
         "0.12.0",
@@ -9868,6 +12304,13 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/50-governance/cross-repo-ci/"
     },
+    "GOV-R46": {
+      "feature": "Working with AI agents",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/50-governance/ai-contributors/#requirements"
+    },
     "GOV-R6": {
       "feature": "Canonical spec",
       "shipped_in": [
@@ -9885,6 +12328,7 @@
     "L1-R1": {
       "feature": "v1 release engineering",
       "shipped_in": [
+        "0.16.0",
         "0.3.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/l-release/l1-release-engineering/#acceptance-criteria"
@@ -9895,6 +12339,76 @@
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/10-functional/features/l-release/l1-release-engineering/#acceptance-criteria"
+    },
+    "N1-R17": {
+      "feature": "The companion app",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n1-companion-app/#acceptance-criteria"
+    },
+    "N11-R10": {
+      "feature": "What was done, and where it came from",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n11-the-record/#acceptance-criteria"
+    },
+    "N11-R2": {
+      "feature": "What was done, and where it came from",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n11-the-record/#acceptance-criteria"
+    },
+    "N3-R1": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
+    },
+    "N3-R11": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
+    },
+    "N3-R13": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
+    },
+    "N3-R14": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
+    },
+    "N3-R2": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
+    },
+    "N3-R3": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
+    },
+    "N3-R9": {
+      "feature": "The household's companion",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/10-functional/features/n-companion/n3-household-companion/#acceptance-criteria"
     },
     "OPS-R1": {
       "feature": "Releasing",
@@ -10005,6 +12519,8 @@
     "OPS-R34": {
       "feature": "Release staging — the version train",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.10.0",
         "0.9.1",
@@ -10012,9 +12528,53 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
     },
+    "OPS-R35": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R39": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R40": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R42": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R48": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R49": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.16.0",
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
     "OPS-R51": {
       "feature": "Project workflow",
       "shipped_in": [
+        "0.16.0",
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/70-operations/project-workflow/#requirements"
@@ -10029,7 +12589,43 @@
     "OPS-R54": {
       "feature": "Release staging — the version train",
       "shipped_in": [
+        "0.16.0",
         "0.14.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R60": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R61": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R62": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R63": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "OPS-R64": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
     },
@@ -10040,9 +12636,24 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/70-operations/setup-registry/#requirements"
     },
+    "OPS-R70": {
+      "feature": "Release staging — the version train",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"
+    },
+    "Q-R10": {
+      "feature": "Code comments",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/code-comments/#requirements"
+    },
     "Q-R11": {
       "feature": "Code standards",
       "shipped_in": [
+        "0.15.0",
         "0.1.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"
@@ -10050,6 +12661,7 @@
     "Q-R12": {
       "feature": "Code standards",
       "shipped_in": [
+        "0.15.0",
         "0.11.0",
         "0.1.0"
       ],
@@ -10065,6 +12677,8 @@
     "Q-R18": {
       "feature": "Code standards",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.10.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"
@@ -10092,12 +12706,33 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"
     },
+    "Q-R3": {
+      "feature": "Code comments",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/code-comments/#requirements"
+    },
     "Q-R30": {
       "feature": "CI/CD",
       "shipped_in": [
         "0.9.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"
+    },
+    "Q-R32": {
+      "feature": "CI/CD",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"
+    },
+    "Q-R40": {
+      "feature": "Security",
+      "shipped_in": [
+        "0.15.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/security/#requirements"
     },
     "Q-R5": {
       "feature": "Code comments",
@@ -10109,6 +12744,8 @@
     "Q-R53": {
       "feature": "Tooling",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.9.0",
         "0.2.0",
         "0.1.0"
@@ -10118,6 +12755,7 @@
     "Q-R54": {
       "feature": "Tooling",
       "shipped_in": [
+        "0.15.0",
         "0.14.0",
         "0.1.0"
       ],
@@ -10133,8 +12771,17 @@
     "Q-R56": {
       "feature": "Tooling",
       "shipped_in": [
+        "0.15.0",
         "0.9.0",
         "0.1.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
+    },
+    "Q-R57": {
+      "feature": "Tooling",
+      "shipped_in": [
+        "0.16.0",
+        "0.15.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
     },
@@ -10145,9 +12792,18 @@
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
     },
+    "Q-R6": {
+      "feature": "Code comments",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/code-comments/#requirements"
+    },
     "Q-R61": {
       "feature": "Testing strategy",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.11.0",
         "0.9.0",
@@ -10167,6 +12823,8 @@
     "Q-R63": {
       "feature": "Security",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.1.0"
       ],
@@ -10175,6 +12833,8 @@
     "Q-R64": {
       "feature": "CI/CD",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.11.0",
         "0.9.0",
@@ -10186,6 +12846,7 @@
     "Q-R66": {
       "feature": "Testing strategy",
       "shipped_in": [
+        "0.15.0",
         "0.14.0",
         "0.10.0",
         "0.9.0"
@@ -10195,6 +12856,8 @@
     "Q-R67": {
       "feature": "CI/CD",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"
@@ -10202,10 +12865,19 @@
     "Q-R68": {
       "feature": "Tooling",
       "shipped_in": [
+        "0.16.0",
+        "0.15.0",
         "0.14.0",
         "0.10.0"
       ],
       "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"
+    },
+    "Q-R7": {
+      "feature": "Code comments",
+      "shipped_in": [
+        "0.16.0"
+      ],
+      "url": "https://docs.lemonfiber.app/spec/40-quality/code-comments/#requirements"
     },
     "REPO-R10": {
       "feature": "`lemonfiber` — command reference",
