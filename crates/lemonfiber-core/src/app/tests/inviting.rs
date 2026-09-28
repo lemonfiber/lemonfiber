@@ -281,7 +281,7 @@ async fn offering(
 async fn an_account_already_here_is_offered_again_rather_than_made_twice() {
     let env = recorded_admin("already");
     let http = holding(
-        r#"{"Items":[]}"#,
+        made_lately("7"),
         r#"[{"Id":"7","Name":"Ana","HasPassword":false}]"#,
     );
     let recorded = std::sync::Arc::clone(&http);
@@ -329,7 +329,8 @@ async fn somebody_who_has_already_claimed_an_account_is_reported_as_in() {
 /// **Not by taking that account back and building another.** The identifier is what
 /// everything else in the stack knows somebody by, so a second account under the
 /// same name is the wrong one for anything holding the first. The window is
-/// restarted by dating the invitation again, and the account it names is untouched.
+/// restarted by writing down when it was offered again, and the account is switched
+/// on and bounded as a new one would be.
 #[tokio::test]
 async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for() {
     let env = recorded_admin("reissue");
@@ -351,10 +352,15 @@ async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for()
         !recorded.asked_for("/Users/New"),
         "a second account was made under a name the household already holds"
     );
+    let kept = std::fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
     assert!(
-        recorded.asked_for("/Users/7/Password"),
+        kept.contains(r#""7""#),
         "the invitation was offered again without being dated again, so the window \
-         it promises ran out before it was sent"
+         it promises ran out before it was sent: {kept}"
+    );
+    assert!(
+        recorded.asked_for("/Users/7/Policy"),
+        "the account was offered again without being made claimable"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
@@ -395,7 +401,7 @@ async fn an_invitation_for_nobody_is_refused_before_the_server_is_asked() {
 async fn a_name_typed_with_spaces_around_it_is_the_person_of_that_name() {
     let env = recorded_admin("trimmed");
     let http = holding(
-        r#"{"Items":[]}"#,
+        made_lately("7"),
         r#"[{"Id":"7","Name":"ana","HasPassword":false}]"#,
     );
     let recorded = std::sync::Arc::clone(&http);

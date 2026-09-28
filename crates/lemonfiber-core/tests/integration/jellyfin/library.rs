@@ -26,7 +26,7 @@ async fn a_present_title_signs_in_then_finds_it_in_the_library() {
             && request
                 .headers
                 .iter()
-                .any(|(name, value)| name == "X-Emby-Authorization" && value.contains("lemonfiber"))
+                .any(|(name, value)| name == "Authorization" && value.contains("lemonfiber"))
             && request.body.as_deref().is_some_and(|body| {
                 // The admin name identifies the sign-in; the password is carried under
                 // `Pw` (its value built from a range, not asserted as a literal here).
@@ -36,10 +36,9 @@ async fn a_present_title_signs_in_then_finds_it_in_the_library() {
     // Then the library read, narrowed to series and carrying the minted token.
     assert!(requests.get(1).is_some_and(|request| {
         request.url.contains("IncludeItemTypes=Series")
-            && request
-                .headers
-                .iter()
-                .any(|(name, value)| name == "X-Emby-Token" && value == "token")
+            && request.headers.iter().any(|(name, value)| {
+                name == "Authorization" && value == r#"MediaBrowser Token="token""#
+            })
     }));
 }
 

@@ -8,6 +8,7 @@ fn offered(withdrawn: Vec<String>) -> Invitation {
         caution: None,
         hours: 48,
         withdrawn,
+        suspended: Vec::new(),
         rehearsed: false,
         standing: InvitationStanding::Made,
         linked: Linked::Made,
@@ -64,9 +65,9 @@ fn reset() -> Invitation {
 /// Both halves matter and neither is obvious from the other. The first is what the
 /// operator is about to be asked — why the old password does not open it. The second
 /// is the consequence they have to be able to pass on: this window ends in the
-/// account being **removed**, and unlike an invitation nobody took up, that account
-/// is one somebody has watched on. "Lapses" is not a strong enough word for that, so
-/// this view does not use it here.
+/// account being **switched off** until the operator reissues it, and unlike an
+/// invitation nobody took up, that account is one somebody has watched on. "Lapses" is
+/// not a strong enough word for that, so this view does not use it here.
 #[test]
 fn a_reset_says_what_stopped_working_and_what_leaving_it_costs() {
     let said = invitation(&reset()).text();
@@ -76,7 +77,7 @@ fn a_reset_says_what_stopped_working_and_what_leaving_it_costs() {
         "a reset did not say the thing the person will ask about: {said}"
     );
     assert!(
-        said.contains("48 hours") && said.contains("the account is removed"),
+        said.contains("48 hours") && said.contains("switched off until you reissue it"),
         "a reset did not say the window or what happens at the end of it: {said}"
     );
     assert!(
@@ -133,6 +134,7 @@ fn somebody_already_in_the_house_is_asked_to_claim_nothing() {
 fn withdrawals_are_named_even_where_the_person_was_already_in() {
     let already_in = Invitation {
         withdrawn: vec!["bo".to_owned()],
+        suspended: Vec::new(),
         ..joined()
     };
 
@@ -348,6 +350,38 @@ fn somebody_already_here_is_told_about_the_link_as_well() {
     // evaluated on failure is a line the coverage gate never sees run.
     let text = invitation(&unlinked).text();
     assert!(text.contains("cannot ask for anything yet"), "{text}");
+}
+
+/// An account switched off rather than removed is named apart from the ones removed.
+///
+/// The two are different news: one is gone, and one is waiting for a reissue.
+#[test]
+fn a_reset_switched_off_is_named_apart_from_one_removed() {
+    let done = Invitation {
+        suspended: vec!["cy".to_owned()],
+        ..offered(vec!["bo".to_owned()])
+    };
+    let would = Invitation {
+        rehearsed: true,
+        ..done.clone()
+    };
+
+    let said = invitation(&done).text();
+    let rehearsal = invitation(&would).text();
+
+    assert!(said.contains("have been switched off and kept"), "{said}");
+    assert!(said.contains("  cy"), "{said}");
+    assert!(said.contains("have been withdrawn"), "{said}");
+    assert!(
+        rehearsal.contains("would be switched off and kept"),
+        "{rehearsal}"
+    );
+    assert!(
+        !invitation(&offered(Vec::new()))
+            .text()
+            .contains("switched off"),
+        "a run that switched nothing off said it had"
+    );
 }
 
 #[test]

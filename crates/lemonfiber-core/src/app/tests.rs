@@ -88,9 +88,24 @@ fn holding(log: &'static str, users: &'static str) -> std::sync::Arc<Fake> {
                 r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
             )],
         ),
-        ("/Users/7", vec![Answer::reply(204, "")]),
+        (
+            "/Users/7",
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"7","Policy":{"IsAdministrator":false}}"#,
+            )],
+        ),
         ("/Users", vec![Answer::reply(200, users)]),
     ])
+}
+
+/// What the media server records of account `id` being made an hour ago, by the test clock.
+fn made_lately(id: &str) -> &'static str {
+    let at = a_context().build().hours_ago(1);
+    Box::leak(
+        format!(r#"{{"Items":[{{"Type":"UserCreated","Date":"{at}","UserId":"{id}"}}]}}"#)
+            .into_boxed_str(),
+    )
 }
 
 /// What a version report looks like when the engine said `compose`.

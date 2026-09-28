@@ -84,6 +84,10 @@ fn a_server_holding_a_claimed_account() -> Arc<Fake> {
         ),
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         (RESET, vec![Answer::reply(204, "")]),
+        (
+            "/Users/9",
+            vec![Answer::reply(200, r#"{"Id":"9","Name":"ana","Policy":{}}"#)],
+        ),
         ("/Users", vec![Answer::reply(200, CLAIMED)]),
     ])
 }
@@ -356,6 +360,9 @@ async fn what_is_passed_on_carries_no_password() {
             "name",
             "rehearsed",
             "standing",
+            // Accounts switched off on the way past, by name. Not a password, and
+            // asserted here so that adding one would have to pass this list.
+            "suspended",
             "withdrawn"
         ],
         "an empty list means no invitation was read and this asserts nothing; a field \
@@ -436,6 +443,7 @@ async fn what_a_reset_passes_on_is_an_invitation_with_no_password_in_it() {
             "name",
             "rehearsed",
             "standing",
+            "suspended",
             "withdrawn"
         ],
         "an empty list means the reset did not answer and this asserts nothing; a field \

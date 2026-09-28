@@ -67,6 +67,7 @@ mod what_a_change_costs_before_it_is_made;
 mod what_a_full_disk_stops;
 mod what_a_household_may_ask_for;
 mod what_a_refusal_carries;
+mod what_an_invitation_guards;
 mod what_an_invitation_is;
 mod what_an_invitation_lets_them_watch;
 mod what_changing_one_answer_costs;

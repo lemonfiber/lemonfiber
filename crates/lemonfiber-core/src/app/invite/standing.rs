@@ -7,7 +7,7 @@
 //! on its way through.
 
 use crate::app::Ctx;
-use crate::invitation::{offered, run_out, Offered, HOURS_OF_RECORD, HOURS_TO_CLAIM};
+use crate::invitation::{offered, run_out, Offers, Spent, HOURS_OF_RECORD, HOURS_TO_CLAIM, RECORD};
 use crate::model::InvitationStanding;
 use crate::ports::service::{Household as _, Member};
 
@@ -46,9 +46,14 @@ pub(crate) fn already_here<'a>(held: &'a Held, name: &str) -> Option<&'a Member>
         .find(|member| member.name.to_lowercase() == asked)
 }
 
-/// Whether this account is one the sweep was about to take back.
-pub(crate) fn has_run_out(held: &Held, member: &Member) -> bool {
-    held.spent.iter().any(|gone| gone.member.id == member.id)
+/// Whether offering this account again starts its window afresh.
+///
+/// It does where the window has run out, and where the account is switched off: a
+/// suspended one is kept for exactly this, and an offer that left it switched off would
+/// send somebody an address they cannot sign in at.
+pub(crate) fn renews(held: &Held, member: &Member) -> bool {
+    !member.claimed
+        && (member.access.disabled || held.spent.every().any(|gone| gone.member.id == member.id))
 }
 
 /// What the media server holds right now, as this command needs to see it.
@@ -56,13 +61,18 @@ pub(crate) struct Held {
     /// Every account it has, claimed or not.
     pub(crate) household: Vec<Member>,
     /// The invitations among them that have run out.
-    pub(crate) spent: Vec<Offered>,
+    pub(crate) spent: Spent,
+    /// What this program recorded offering.
+    pub(crate) offers: Offers,
 }
 
 /// The invitations nobody claimed in time, as the media server holds them now.
 ///
 /// Best-effort: a media server that will not answer is not a reason to refuse the
-/// invitation the operator asked for. The sweep runs again next time.
+/// invitation the operator asked for. The sweep runs again next time. **Neither half is
+/// read without the other**, because an invitation the server's record could not be read
+/// for would be one this program had no date for, and an undated invitation is one that
+/// has run out.
 ///
 /// **Reading and acting are separate** so that a rehearsal can do the first without
 /// the second — the whole of what `--dry-run` promises is that the second does not
@@ -71,33 +81,49 @@ pub(crate) struct Held {
 pub(crate) async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held {
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
     let since = ctx.hours_ago(HOURS_OF_RECORD);
+    let offers: Offers = crate::app::record::beside(ctx, RECORD);
     let (Ok(household), Ok(records)) =
         (server.household().await, server.when_invited(&since).await)
     else {
         return Held {
             household: Vec::new(),
-            spent: Vec::new(),
+            spent: Spent::default(),
+            offers,
         };
     };
-    let waiting = offered(household.clone(), &records);
+    let waiting = offered(household.clone(), &records, &offers);
     Held {
         household,
-        spent: run_out(&waiting, &cutoff).into_iter().cloned().collect(),
+        spent: run_out(&waiting, &cutoff),
+        offers,
     }
+}
+
+/// What the sweep did, account by account.
+pub(crate) struct Taken {
+    /// The offers nobody took up, removed.
+    pub(crate) withdrawn: Vec<String>,
+    /// The accounts somebody had been in, switched off and kept.
+    pub(crate) suspended: Vec<String>,
 }
 
 /// Take back the invitations that have run out, naming the ones actually taken.
 ///
 /// A server that refuses one is not reported as having given it back: the operator
 /// reads this list as what is gone.
-pub(crate) async fn take_back(
-    server: &crate::jellyfin::Jellyfin,
-    spent: &[Offered],
-) -> Vec<String> {
-    let mut taken = Vec::new();
-    for invitation in spent {
+pub(crate) async fn take_back(server: &crate::jellyfin::Jellyfin, spent: &Spent) -> Taken {
+    let mut taken = Taken {
+        withdrawn: Vec::new(),
+        suspended: Vec::new(),
+    };
+    for invitation in &spent.withdrawn {
         if server.withdraw(&invitation.member.id).await.is_ok() {
-            taken.push(invitation.member.name.clone());
+            taken.withdrawn.push(invitation.member.name.clone());
+        }
+    }
+    for invitation in &spent.suspended {
+        if server.suspend(&invitation.member.id).await.is_ok() {
+            taken.suspended.push(invitation.member.name.clone());
         }
     }
     taken

@@ -45,6 +45,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
             },
             last_seen: Some("2026-08-30T10:00:00.0000000Z".to_owned()),
             claimed: true,
+            standing: lemonfiber_core::model::MemberStanding::Active,
             asking: None,
         }],
         available: true,
@@ -171,6 +172,7 @@ fn a_household(
             }),
             last_seen: None,
             claimed: true,
+            standing: lemonfiber_core::model::MemberStanding::Active,
         }],
         available: true,
         findings: Vec::new(),
@@ -450,6 +452,7 @@ fn an_account_switched_off_says_so_and_does_not_invent_a_last_visit() {
             },
             last_seen: None,
             claimed: true,
+            standing: MemberStanding::Suspended,
             ..HouseholdMember::default()
         }],
         available: true,
@@ -461,7 +464,10 @@ fn an_account_switched_off_says_so_and_does_not_invent_a_last_visit() {
 
     let text = household(&report).text();
     assert!(
-        text.contains("Sam — switched off · can watch nothing · no sign-in recorded"),
+        text.contains(
+            "Sam — switched off — reissue to switch it back on · can watch nothing · no \
+             sign-in recorded"
+        ),
         "{text}"
     );
     assert!(
@@ -694,5 +700,26 @@ fn what_a_limit_is_not_is_printed_under_the_list() {
     assert!(
         !unwarned.contains("not a security boundary"),
         "a household nobody narrowed was warned about a limit it does not have:              {unwarned}"
+    );
+}
+
+/// An invitation that ran out says so, rather than reading as one still standing.
+#[test]
+fn an_invitation_that_ran_out_says_so() {
+    let report = HouseholdReport {
+        members: vec![HouseholdMember {
+            name: "Bo".to_owned(),
+            claimed: false,
+            standing: MemberStanding::Expired,
+            ..HouseholdMember::default()
+        }],
+        available: true,
+        ..HouseholdReport::default()
+    };
+
+    let text = household(&report).text();
+    assert!(
+        text.contains("invited, and it ran out before anybody set a password"),
+        "{text}"
     );
 }

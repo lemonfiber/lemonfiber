@@ -33,12 +33,12 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
         InvitationStanding::Joined => format!("{} is already in the house", report.name),
         // Said as what stopped working and what is at stake, because both are things
         // the operator is about to be asked. The window is the same one an offer has,
-        // counted from the reset — but what is withdrawn at the end of it is an account
+        // counted from the reset — and what happens at the end of it is to an account
         // somebody has watched on, so this is the one place the consequence is spelled
         // out rather than left to the word "lapses".
         InvitationStanding::Reset => format!(
             "{}'s old password no longer works — they set a new one next time they sign \
-             in, within {} hours or the account is removed",
+             in, within {} hours or the account is switched off until you reissue it",
             report.name, report.hours
         ),
     });
@@ -92,13 +92,26 @@ fn footer(mut lines: Lines, report: &Invitation) -> Lines {
 
 /// What the sweep took back on the way past, where it took anything.
 fn withdrawals(mut lines: Lines, report: &Invitation) -> Lines {
-    if !report.withdrawn.is_empty() {
-        lines.spaced(if report.rehearsed {
-            "Nobody claimed these in time, so they would be withdrawn:"
-        } else {
-            "Nobody claimed these in time, so they have been withdrawn:"
-        });
-        for name in &report.withdrawn {
+    let said = [
+        (
+            &report.withdrawn,
+            "Nobody claimed these in time, so they would be withdrawn:",
+            "Nobody claimed these in time, so they have been withdrawn:",
+        ),
+        (
+            &report.suspended,
+            "Nobody claimed these again in time, so they would be switched off and kept \
+             for you to reissue:",
+            "Nobody claimed these again in time, so they have been switched off and kept \
+             for you to reissue:",
+        ),
+    ];
+    for (names, would, did) in said {
+        if names.is_empty() {
+            continue;
+        }
+        lines.spaced(if report.rehearsed { would } else { did });
+        for name in names {
             lines.put(format!("  {name}"));
         }
     }

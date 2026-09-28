@@ -145,6 +145,30 @@ impl Restriction {
     }
 }
 
+/// Where one member's account stands.
+///
+/// **Switched off is its own answer rather than a flag beside another.** An account the
+/// media server switched off after too many wrong passwords reads, on every other field,
+/// exactly like one that works — and the person holding it has only been told their
+/// password is wrong. What unlocks it is a reissue, which is the operator's to do, so the
+/// operator is the one who has to be able to see it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum MemberStanding {
+    /// Offered, and the offer still stands: nobody has set a password yet.
+    Invited,
+    /// Offered, and the offer ran out before anybody claimed it. The next invitation
+    /// takes it back.
+    Expired,
+    /// Claimed, and able to sign in.
+    #[default]
+    Active,
+    /// Switched off — by the operator, by the media server after too many wrong
+    /// passwords, or when a reset ran out unclaimed. The account and what they watched
+    /// are kept, and a reissue switches it back on.
+    Suspended,
+}
+
 /// One household member: who they are, what they may watch, when they were last
 /// seen, and everything they have asked for.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -161,6 +185,9 @@ pub struct HouseholdMember {
     /// Whether somebody has set a password on the account. False is an invitation
     /// nobody has taken up rather than a member who is not here.
     pub claimed: bool,
+    /// Where the account stands: an invitation still out or run out, a member who can
+    /// sign in, or one switched off.
+    pub standing: MemberStanding,
     /// What they may ask for, and what their period has left of it.
     ///
     /// Absent where the request service holds no account for them, and where it could

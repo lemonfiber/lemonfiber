@@ -9,8 +9,8 @@
 //!
 //! The sweep withdraws invitations nobody claimed, and withdrawing means removing the
 //! account; offering again does not mean deleting and rebuilding, because an invitation
-//! is dated by the record of a password moving off the account, and there is one to
-//! write whether or not there was a password to take.
+//! is dated by what this program writes down when it offers one, and the account is
+//! readied to be claimed the way a new one is.
 //!
 //! Driven through `dispatch` as every surface reaches it, because the app layer is
 //! compiled twice — once with its in-crate tests and once as the library these binaries
@@ -44,15 +44,17 @@ const RECORDED: &str = r#"{"Items":[
     {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}
 ]}"#;
 
-/// Where Ana's invitation is dated again.
-const REDATE: &str = "/Users/9/Password";
+/// Where Ana's account is readied to be claimed again.
+const READY: &str = "/Users/9/Policy";
+
+/// Ana's account, as the media server answers a read of it.
+const ANA: &str = r#"{"Id":"9","Name":"Ana","HasPassword":false,"Policy":{"IsDisabled":false}}"#;
 
 /// Where a second account under the same name would be asked for.
 const NEW_ACCOUNT: &str = "/Users/New";
 
-/// A media server holding both expired invitations, answering the re-dating with
-/// `redate`.
-fn a_server(redate: Answer) -> Arc<Fake> {
+/// A media server holding both expired invitations, answering the readying with `ready`.
+fn a_server(ready: Answer) -> Arc<Fake> {
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     Fake::by_path_in_turn(vec![
         (
@@ -62,7 +64,8 @@ fn a_server(redate: Answer) -> Arc<Fake> {
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         ("/System/ActivityLog", vec![Answer::reply(200, RECORDED)]),
-        (REDATE, vec![redate]),
+        (READY, vec![ready]),
+        ("/Users/9", vec![Answer::reply(200, ANA)]),
         (
             NEW_ACCOUNT,
             vec![Answer::reply(
@@ -74,7 +77,7 @@ fn a_server(redate: Answer) -> Arc<Fake> {
     ])
 }
 
-/// Everything answering, and the re-dating accepted.
+/// Everything answering, and the readying accepted.
 fn answering() -> Arc<Fake> {
     a_server(Answer::reply(204, ""))
 }
@@ -130,17 +133,29 @@ impl Ran {
             .any(|request| request.url.contains(NEW_ACCOUNT))
     }
 
-    /// Whether the invitation was dated again.
-    fn redated(&self) -> bool {
+    /// Whether the account was readied to be claimed again.
+    fn readied(&self) -> bool {
         self.sent
             .iter()
-            .any(|request| request.method == Method::Post && request.url.contains(REDATE))
+            .any(|request| request.method == Method::Post && request.url.contains(READY))
     }
 }
 
 /// Offer somebody an account, and hand back what was said and what was sent.
 async fn offering(scratch: &str, name: &str, http: Arc<Fake>, rehearsing: bool) -> Ran {
+    offering_beside(scratch, name, http, rehearsing, |_| ()).await
+}
+
+/// The same, with `beside` given the configuration directory first.
+async fn offering_beside(
+    scratch: &str,
+    name: &str,
+    http: Arc<Fake>,
+    rehearsing: bool,
+    beside: fn(&std::path::Path),
+) -> Ran {
     let env = recorded_admin(scratch);
+    beside(env.parent().unwrap_or(std::path::Path::new("/")));
     let ctx = context(&env, http.clone(), rehearsing);
 
     let said = dispatch(
@@ -167,9 +182,9 @@ async fn offering(scratch: &str, name: &str, http: Arc<Fake>, rehearsing: bool) 
 /// The requirement, stated as the three things that must not happen.
 ///
 /// Ana's invitation ran out. Offering it again must leave **her account** in place — not
-/// delete it, not build a second one under the same name — and must date the one she has
-/// so the window it is offered with is real. All three are asserted together because any
-/// one of them alone is satisfied by doing nothing at all.
+/// delete it, not build a second one under the same name — and must ready the one she has
+/// to be claimed. All three are asserted together because any one of them alone is
+/// satisfied by doing nothing at all.
 #[tokio::test]
 async fn an_invitation_that_ran_out_is_offered_again_on_the_same_account() {
     let ran = offering("renewed", "ana", answering(), false).await;
@@ -185,9 +200,8 @@ async fn an_invitation_that_ran_out_is_offered_again_on_the_same_account() {
         "a second account was made under a name the household already holds"
     );
     assert!(
-        ran.redated(),
-        "the invitation was offered again without being dated again, so the window it \
-         promises ran out before it was sent"
+        ran.readied(),
+        "the invitation was offered again on an account nobody made claimable"
     );
 }
 
@@ -234,7 +248,7 @@ async fn everybody_else_s_expired_invitation_is_still_taken_back() {
     );
 }
 
-/// A rehearsal takes nothing back and dates nothing.
+/// A rehearsal takes nothing back and readies nothing.
 #[tokio::test]
 async fn a_rehearsal_neither_withdraws_nor_dates() {
     let ran = offering("rehearsal", "ana", answering(), true).await;
@@ -247,21 +261,39 @@ async fn a_rehearsal_neither_withdraws_nor_dates() {
         "a rehearsal did not say it was one"
     );
     assert!(ran.deleted().is_empty(), "a rehearsal took an account back");
-    assert!(!ran.redated(), "a rehearsal dated an invitation again");
+    assert!(!ran.readied(), "a rehearsal readied an account");
 }
 
-/// A server that will not date it again says so, rather than promising a window.
+/// An offer that cannot be written down says so, rather than promising a window.
 ///
 /// The account is untouched either way. What would be wrong is the message: an invitation
-/// dated when it was first made has already run out, so the operator would send somebody
-/// a window that the next run takes the account away for missing.
+/// nothing dates is one the next run takes back, so the operator would send somebody a
+/// window that is not there. A record this program cannot read is one it will not write
+/// over, which is how this one is made unwritable.
 #[tokio::test]
 async fn an_invitation_that_cannot_be_dated_again_is_refused() {
-    let ran = offering("undated", "ana", a_server(Answer::reply(403, "")), false).await;
+    let ran = offering_beside("undated", "ana", answering(), false, |directory| {
+        let _ = std::fs::write(directory.join("invitations.json"), "not a record");
+    })
+    .await;
 
     assert_eq!(ran.refusal, Some("INVITE-5".to_owned()));
+    assert!(!ran.readied(), "an undated invitation was readied anyway");
     assert!(
         !ran.made_another_account(),
-        "a second account was made after the re-dating was refused"
+        "a second account was made after the dating was refused"
+    );
+}
+
+/// A server that will not ready the account says so, rather than sending an address
+/// somebody cannot sign in at.
+#[tokio::test]
+async fn an_account_the_server_will_not_ready_is_refused() {
+    let ran = offering("unready", "ana", a_server(Answer::reply(403, "")), false).await;
+
+    assert_eq!(ran.refusal, Some("INVITE-10".to_owned()));
+    assert!(
+        !ran.deleted().contains(&"9"),
+        "an account that was already hers was taken away because it could not be readied"
     );
 }

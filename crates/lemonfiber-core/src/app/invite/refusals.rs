@@ -51,7 +51,8 @@ pub(crate) fn nowhere_to_send() -> crate::error::Problem {
     )
 }
 
-/// Said where an expired invitation could not be dated again, so its window is not real.
+/// Said where an invitation offered again could not be dated again, so its window is not
+/// real.
 ///
 /// The account is untouched and still theirs — what failed is the write that says when it
 /// was offered. Reported rather than glossed over because the message the operator is
@@ -61,10 +62,27 @@ pub(crate) fn would_not_renew(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::WOULD_NOT_RENEW,
         crate::error::Severity::Error,
-        format!("the media server would not offer {name}'s invitation again"),
-        "Their account is still there and still has no password on it; what could not be \
-         written is when it was offered, which is what the window is counted from",
-        crate::error::Remedy::new("Check the media server is running, then run this again"),
+        format!("{name}'s invitation could not be offered again"),
+        "Their account is still there as it was; what could not be written down is when it \
+         was offered, which is what the window is counted from",
+        crate::error::Remedy::new(
+            "Check the configuration directory can be written, then run this again",
+        ),
+    )
+}
+
+/// Said where the name given is the account that administers the media server.
+///
+/// This is the account lemonfiber signs in as, and offering it would put a household
+/// member's limits on it.
+pub(crate) fn runs_the_server(name: &str) -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::codes::invite::RUNS_THE_SERVER,
+        crate::error::Severity::Error,
+        format!("{name} administers the media server, so it is not an account to offer"),
+        "This is the account lemonfiber signs in as, and an invitation would put a \
+         household member's limits on it",
+        crate::error::Remedy::new("Invite the person under a name of their own"),
     )
 }
 

@@ -4,8 +4,8 @@
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
 use lemonfiber_core::model::{
-    HouseholdMember, HouseholdReport, MemberRequest, Restriction, StuckReport, TraceReport,
-    UnsupportedReport,
+    HouseholdMember, HouseholdReport, MemberRequest, MemberStanding, Restriction, StuckReport,
+    TraceReport, UnsupportedReport,
 };
 use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
@@ -211,8 +211,8 @@ fn allowed(policy: lemonfiber_core::asking::Policy, allows: Option<&str>) -> Str
 /// stopped watching.
 fn standing(member: &HouseholdMember) -> String {
     let mut said = Vec::new();
-    if member.access.disabled {
-        said.push("switched off".to_owned());
+    if member.standing == MemberStanding::Suspended {
+        said.push("switched off — reissue to switch it back on".to_owned());
     }
     if member.access.administrator {
         said.push("runs the server".to_owned());
@@ -272,6 +272,8 @@ fn standing(member: &HouseholdMember) -> String {
                 || "no sign-in recorded".to_owned(),
                 |day| format!("last seen {day}"),
             )
+    } else if member.standing == MemberStanding::Expired {
+        "invited, and it ran out before anybody set a password".to_owned()
     } else {
         "invited, nobody has set a password yet".to_owned()
     });

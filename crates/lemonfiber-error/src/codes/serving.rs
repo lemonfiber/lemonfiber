@@ -85,7 +85,8 @@ codes! {
         /// to the specification of that status. The operator asked for something reasonable
         /// and mistyped it, and is owed a sentence about the name rather than about HTTP.
         NOBODY_NAMED = "INVITE-4",
-        /// Said where an expired invitation could not be dated again, so its window is not real.
+        /// Said where an invitation offered again could not be dated again, so its window is not
+        /// real.
         ///
         /// The account is untouched and still theirs — what failed is the write that says when it
         /// was offered. Reported rather than glossed over because the message the operator is
@@ -102,12 +103,27 @@ codes! {
         ///
         /// The ones there are, named: the fix is one word, and the words are already in hand.
         NO_SUCH_LIBRARY = "INVITE-7",
-        /// Said where the account was made and what it may watch could not be written on it.
+        /// Said where what the account may watch could not be written on it.
         ///
-        /// Said as an account that exists and is open, because that is what is now true. An
-        /// operator told only that something failed would not know whether to invite again or
-        /// to go and narrow an account that is already there.
+        /// A new account is taken back rather than left open, so the offer is refused whole;
+        /// an existing one keeps what it already had. Said as which of the two is now true,
+        /// because an operator told only that something failed would not know whether an
+        /// open account is standing somewhere.
         WOULD_NOT_ALLOW = "INVITE-8",
+        /// Said where the offer could not be written down.
+        ///
+        /// An invitation runs out a set time after it is offered, and one this machine has no
+        /// date for is taken back the next time anybody is invited — so an offer that could
+        /// not be dated is not made.
+        UNRECORDED = "INVITE-9",
+        /// Said where the account could not be made one its person can claim: switched on,
+        /// and bounded against guessing at its password.
+        UNGUARDED = "INVITE-10",
+        /// Said where the name given is the account that administers the media server.
+        ///
+        /// This is the account lemonfiber signs in as, and offering it would put a household
+        /// member's limits on it.
+        RUNS_THE_SERVER = "INVITE-11",
     }
     /// The `KEPT` codes.
     kept {

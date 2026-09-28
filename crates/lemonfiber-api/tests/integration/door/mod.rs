@@ -365,6 +365,12 @@ impl Household for AHousehold {
     async fn allow(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
+    async fn claimable(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn suspend(&self, _: &str) -> Result<(), Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
 }
 
 /// A surface with a household behind it, minting its sessions from `random`.
