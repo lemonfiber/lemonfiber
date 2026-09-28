@@ -35,14 +35,16 @@ fn a_library_list_that_would_not_answer_is_not_a_library_that_is_missing() {
     );
 }
 
-/// An account made and then not narrowed says both halves: that it exists, and
-/// that it is open.
+/// A refusal to narrow says which of the two is now true: a new account taken back, or
+/// an existing one allowed what it was allowed before.
 #[test]
-fn an_account_that_could_not_be_narrowed_says_it_is_open() {
-    let problem = would_not_allow("ana");
+fn an_account_that_could_not_be_narrowed_says_what_became_of_it() {
+    let new = would_not_allow("ana", true);
+    let existing = would_not_allow("ana", false);
 
-    assert!(problem.summary.contains("ana"), "{problem:?}");
-    assert!(problem.meaning.contains("open"), "{problem:?}");
+    assert!(new.summary.contains("ana"), "{new:?}");
+    assert!(new.meaning.contains("taken back"), "{new:?}");
+    assert!(existing.meaning.contains("still there"), "{existing:?}");
 }
 
 /// Where a refusal's first remedy points, which is where it puts the words

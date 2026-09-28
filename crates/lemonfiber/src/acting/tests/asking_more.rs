@@ -112,6 +112,7 @@ fn an_offer() -> lemonfiber_core::model::Invitation {
         caution: None,
         hours: 48,
         withdrawn: Vec::new(),
+        suspended: Vec::new(),
         rehearsed: true,
         standing: lemonfiber_core::model::InvitationStanding::Made,
         linked: lemonfiber_core::model::Linked::NotTried,

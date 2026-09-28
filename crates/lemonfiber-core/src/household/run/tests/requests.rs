@@ -27,6 +27,7 @@ fn assembled(
             now: SystemTime::UNIX_EPOCH,
             reasons: &crate::asking::Reasons::default(),
             hosted: false,
+            expired: &std::collections::BTreeSet::new(),
             expiring: None,
             no_room: false,
         },

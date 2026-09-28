@@ -95,6 +95,8 @@ pub(super) struct Naming<'a> {
     /// naming a period and saying nothing runs it, on a machine that is running it, is
     /// as misleading as one implying a background that is not there.
     pub(super) hosted: bool,
+    /// The invitations that have run out, by the account's id.
+    pub(super) expired: &'a std::collections::BTreeSet<String>,
 }
 
 /// The title each \*arr knows its items by, keyed by the service and the id the request

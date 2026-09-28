@@ -140,6 +140,7 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
         caution: None,
         hours: 48,
         withdrawn: vec!["bo".to_owned()],
+        suspended: Vec::new(),
         rehearsed: false,
         standing: InvitationStanding::Made,
         linked: Linked::Made,

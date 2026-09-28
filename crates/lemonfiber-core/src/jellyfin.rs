@@ -27,8 +27,17 @@ mod setup;
 const AUTHORIZATION: &str =
     r#"MediaBrowser Client="lemonfiber", Device="lemonfiber", DeviceId="lemonfiber", Version="1""#;
 
-/// The header carrying the access token on every read after sign-in.
-const TOKEN_HEADER: &str = "X-Emby-Token";
+/// The header both the sign-in and every read after it are carried in.
+///
+/// **The one scheme every supported line accepts.** Measured side by side on `10.10.3`,
+/// `10.11.11` and `12.1`: `12.1` answers a sign-in carried in `X-Emby-Authorization` with
+/// `400` and a token in `X-Emby-Token` with `401`, and all three accept both in this header.
+const AUTHORIZATION_HEADER: &str = "Authorization";
+
+/// The access a read carries, in the scheme [`AUTHORIZATION_HEADER`] is parsed by.
+fn carrying(token: &str) -> String {
+    format!(r#"MediaBrowser Token="{token}""#)
+}
 
 /// A client for one Jellyfin — its first-run setup, and, once lemonfiber holds the
 /// household's admin credential, reading its library to answer a trace.
@@ -89,7 +98,9 @@ impl Jellyfin {
     ) -> Result<Request, Failure> {
         let token = self.sign_in().await?;
         let mut request = self.request(method, path, body);
-        request.headers.push((TOKEN_HEADER.to_owned(), token));
+        request
+            .headers
+            .push((AUTHORIZATION_HEADER.to_owned(), carrying(&token)));
         Ok(request)
     }
 
@@ -144,7 +155,7 @@ impl Jellyfin {
         let mut request = self.request(Method::Post, "/Users/AuthenticateByName", Some(body));
         request
             .headers
-            .push(("X-Emby-Authorization".to_owned(), AUTHORIZATION.to_owned()));
+            .push((AUTHORIZATION_HEADER.to_owned(), AUTHORIZATION.to_owned()));
         let response = self.endpoint.send(&request).await?;
         let session: Session = self
             .endpoint

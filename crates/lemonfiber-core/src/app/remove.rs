@@ -138,9 +138,15 @@ async fn also_from_the_request_service(
     held: &Held,
     findings: &mut Vec<String>,
 ) -> Revoked {
-    let (Some(access), Held::Account(id)) = (asking, held) else {
+    let (access, id) = match (asking, held) {
+        (Some(access), Held::Account(id)) => (access, id),
+        // A service that would not say what it holds may hold an account for them, and
+        // removal is not complete until it is known not to. Said as the middle state
+        // rather than rounded up: the one this feature refuses to leave behind is the one
+        // rounding would hide.
+        (_, Held::Unreadable) => return Revoked::MediaServerOnly,
         // Nothing there to revoke, so nothing is outstanding.
-        return Revoked::Everywhere;
+        _ => return Revoked::Everywhere,
     };
     if access.seerr.remove_member(id).await.is_ok() {
         return Revoked::Everywhere;

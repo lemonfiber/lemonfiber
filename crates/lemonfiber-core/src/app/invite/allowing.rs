@@ -125,18 +125,24 @@ fn no_such_library(named: &str, held: &[NamedLibrary]) -> crate::error::Problem 
     )
 }
 
-/// Said where the account was made and what it may watch could not be written on it.
+/// Said where what the account may watch could not be written on it.
 ///
-/// Said as an account that exists and is open, because that is what is now true. An
-/// operator told only that something failed would not know whether to invite again or
-/// to go and narrow an account that is already there.
-pub(crate) fn would_not_allow(name: &str) -> crate::error::Problem {
+/// A new account is taken back rather than left open, so the offer is refused whole; an
+/// existing one keeps what it already had. Said as which of the two is now true, because
+/// an operator told only that something failed would not know whether an open account is
+/// standing somewhere.
+pub(crate) fn would_not_allow(name: &str, new: bool) -> crate::error::Problem {
+    let meaning = if new {
+        "The account was taken back rather than left open to every library, so there is \
+         no invitation to send"
+    } else {
+        "Their account is still there, allowed what it was allowed before"
+    };
     crate::error::Problem::new(
         crate::error::codes::invite::WOULD_NOT_ALLOW,
         crate::error::Severity::Error,
-        format!("{name} has an account, but the media server would not set what it may watch"),
-        "The account exists and is open — every library, no age limit — so it is not an \
-         invitation to send on until that is put right",
+        format!("the media server would not set what {name} may watch"),
+        meaning,
         crate::error::Remedy::new(
             "Run this again with the same choices, or set them in the media server's own \
              settings",

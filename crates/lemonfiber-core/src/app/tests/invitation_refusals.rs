@@ -293,6 +293,10 @@ async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
                 r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
             )],
         ),
+        (
+            "/Users/9",
+            vec![Answer::reply(200, r#"{"Id":"9","Policy":{}}"#)],
+        ),
         ("/Users", vec![Answer::Silent]),
     ]);
     let ctx = a_context()

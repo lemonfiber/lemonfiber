@@ -14,6 +14,7 @@ use crate::invitation::HOURS_TO_CLAIM;
 use crate::model::{Invitation, InvitationStanding, Linked};
 use crate::ports::service::Household as _;
 
+use super::standing::Held;
 use super::{reaching, Reaching};
 
 /// Make somebody's account claimable again, and hand back the invitation to send them.
@@ -33,7 +34,8 @@ use super::{reaching, Reaching};
 ///
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
 /// where it will not answer, where nobody is named, where nobody by that name is here,
-/// or where the account named administers the server.
+/// where the account named administers the server, or where the reset could not be
+/// dated or the account switched back on.
 pub(crate) async fn reissue(
     ctx: &Ctx,
     name: String,
@@ -63,19 +65,34 @@ pub(crate) async fn reissue(
     if ctx.dry_run {
         return Ok(renewed(member.name, reachable, true));
     }
+    // Dated before the password comes off, so an account is never left claimable with
+    // nothing to say when its window closes — which the next sweep would read as closed.
+    let held = Held {
+        offers: crate::app::record::beside(ctx, crate::invitation::RECORD),
+        household,
+        spent: crate::invitation::Spent::default(),
+    };
+    if !super::offering::recorded_now(ctx, &held, &member) {
+        return Err(Box::new(super::offering::unrecorded(&member.name)));
+    }
     if server.unclaim(&member.id).await.is_err() {
         return Err(Box::new(would_not_reissue(&member.name)));
     }
+    // Switched back on after the password comes off, and never before: an account locked
+    // by wrong guesses, or switched off when its last window closed, is one its person
+    // cannot sign in to until this is written — and switched on first, it would open to
+    // the old password for as long as the reset took.
+    super::offering::guarded(&server, &member, None, false).await?;
     Ok(renewed(member.name, reachable, false))
 }
 /// The invitation a reissue account is sent with.
 ///
 /// `Reset` rather than `Made`, because what the person needs to hear is different: nobody
 /// is being invited, and the news is that the password they had has stopped working. The
-/// window is the offer's, and it is real — the sweep withdraws this one like any other,
-/// which for an account somebody has watched on is a larger loss than for an offer nobody
-/// took up. That is why the message says what happens at the end of it rather than
-/// leaving the word "lapses" to carry it.
+/// window is the offer's, and it is real — at the end of it the sweep switches this account
+/// off, keeping it for another reissue, rather than removing what somebody has watched on.
+/// That is why the message says what happens at the end of it rather than leaving the
+/// word "lapses" to carry it.
 fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> Invitation {
     Invitation {
         name,
@@ -83,6 +100,7 @@ fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> In
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn: Vec::new(),
+        suspended: Vec::new(),
         rehearsed,
         standing: InvitationStanding::Reset,
         // Whoever it is was already known to the request service, or was never known to

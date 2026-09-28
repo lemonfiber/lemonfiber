@@ -197,6 +197,30 @@ pub trait Household: Send + Sync {
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure>;
+
+    /// Put an account in the state its person can claim it from: switched on, with no
+    /// wrong passwords counted against it, switched off again after a few more, and
+    /// narrowed to what was chosen — in one write, so there is no moment at which it is
+    /// claimable and not yet narrowed.
+    ///
+    /// **Bounded, because the password its person sets is one anybody on the network can
+    /// guess at.** A media server keeps no limit on a new account, so a member's password
+    /// could be guessed at without end; one that switches itself off after a handful of
+    /// wrong ones is guessed at a handful of times and then waits for the operator. Asked
+    /// of household accounts only — never of the administrator this program signs in as,
+    /// which a stranger could otherwise switch off by getting its password wrong.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn claimable(&self, id: &str, allowed: &Allowed) -> Result<(), Failure>;
+
+    /// Switch an account off, keeping it and everything hung off it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn suspend(&self, id: &str) -> Result<(), Failure>;
 }
 
 /// One library the media server holds, with the name it was given.

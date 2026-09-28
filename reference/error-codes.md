@@ -73,6 +73,9 @@ what to do about it, is written for operators at
 - `INVITE-6`
 - `INVITE-7`
 - `INVITE-8`
+- `INVITE-9`
+- `INVITE-10`
+- `INVITE-11`
 - `KEPT-1`
 - `LIFE-1`
 - `LIFE-2`
