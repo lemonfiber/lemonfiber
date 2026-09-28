@@ -595,10 +595,47 @@ fn where_a_refusal_lies_decides_the_status_a_job_is_answered_with() {
         "a request that could not be answered as it stands"
     );
     assert_eq!(
+        refusing(Amiss::Held),
+        Some(StatusCode::CONFLICT.as_u16()),
+        "work that found other work holding the stack, which is busy and not broken"
+    );
+    assert_eq!(
         refusing(Amiss::Answering),
         Some(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
-        "and this product's own failure, which is what every one of them said before"
+        "and this product's own failure"
     );
+}
+
+/// Work turned away because another operation held the stack is busy, not broken: the
+/// refusal the claim itself raises comes to `409`, so a client can say another
+/// operation is in progress and offer the same request again once it is done.
+#[tokio::test(start_paused = true)]
+async fn work_turned_away_by_other_work_is_a_conflict_and_not_a_failure() {
+    use lemonfiber_core::ports::filesystem::FileSystem;
+    use std::path::PathBuf;
+
+    let holder = format!("{}\n1\nup", std::process::id().wrapping_add(1));
+    let claimed_by_another = lemonfiber_testing::a_context()
+        .runner(Arc::new(Idle))
+        .filesystem(lemonfiber_fixtures::files::Files::at(vec![(
+            PathBuf::from("/tmp/lemonfiber-busy/lifecycle.lock"),
+            holder.as_str(),
+        )]) as Arc<dyn FileSystem>)
+        .settings(Settings {
+            env_file: Some(PathBuf::from("/tmp/lemonfiber-busy/.env")),
+            ..Settings::default()
+        })
+        .build();
+
+    let refused = lemonfiber_core::app::claimed(&claimed_by_another, "down")
+        .await
+        .err();
+    let status = refused.map(|problem| match Standing::failed(&problem) {
+        Standing::Failed(_, status) => status.as_u16(),
+        _ => 0,
+    });
+
+    assert_eq!(status, Some(StatusCode::CONFLICT.as_u16()));
 }
 
 /// And the door answers with the status the standing carries, not a constant.

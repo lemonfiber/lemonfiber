@@ -134,13 +134,16 @@ pub(crate) fn went_wrong(problem: &Problem) -> Response {
 ///
 /// The two a caller can act on are told apart the way the write surface tells its
 /// own apart: what a request *named* and this product does not have is absent,
-/// and how a request *asked* is bad. Every surface that answers with a problem
+/// and how a request *asked* is bad. Work that stopped because other work held the
+/// stack is a conflict, which a caller can offer again once that work is done, and
+/// never this product failing (`ARCH-R135`). Every surface that answers with a problem
 /// reads this one, so a single refusal cannot carry two statuses depending on
 /// which door it arrived through.
 pub(crate) const fn refusing(problem: &Problem) -> StatusCode {
     match problem.amiss {
         Amiss::Naming => StatusCode::NOT_FOUND,
         Amiss::Asking => StatusCode::BAD_REQUEST,
+        Amiss::Held => StatusCode::CONFLICT,
         Amiss::Answering => FAILED,
     }
 }

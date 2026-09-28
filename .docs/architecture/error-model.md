@@ -31,13 +31,14 @@ pub struct Problem {
 
 `amiss` is the one field that does not travel. `Naming` is a thing the request
 asked for that there is no such thing as; `Asking` is a request wrong in itself;
-`Answering` — the default — is this product's own failure. It is set where the
-problem is raised, because that is the only place that knows, and each surface
-says it in its own terms: the web answers `404`, `400` or `500`, and the command
-line has its exit codes. Writing it into the document as well would be the same
-fact stated twice, which is two things to keep agreeing.
+`Held` is other work holding what the request needed, such as another operation's
+claim on the stack; `Answering` — the default — is this product's own failure. It
+is set where the problem is raised, because that is the only place that knows, and
+each surface says it in its own terms: the web answers `404`, `400`, `409` or `500`,
+and the command line has its exit codes. Writing it into the document as well would
+be the same fact stated twice, which is two things to keep agreeing.
 
-Nothing else distinguishes those three. `severity` is how much a problem matters
+Nothing else distinguishes those four. `severity` is how much a problem matters
 and `state` is whether a remedy exists — no such word and the engine being down
 agree on both, which is why every refused read once answered `500`.
 

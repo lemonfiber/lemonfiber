@@ -65,8 +65,8 @@ pub enum Severity {
     Critical,
 }
 
-/// Where a problem lies: in what a request named, in how it asked, or in the
-/// answering of it.
+/// Where a problem lies: in what a request named, in how it asked, in other work
+/// holding what it needed, or in the answering of it.
 ///
 /// Nothing else here carries this. Severity is how much a problem matters and
 /// state is whether there is a remedy, and a word this product does not explain
@@ -87,6 +87,10 @@ pub enum Amiss {
     Naming,
     /// How the request asked, which cannot be answered as it stands.
     Asking,
+    /// Other work, holding what this needed for as long as it runs. Nothing about the
+    /// request was wrong and nothing is broken: the same request is answered once
+    /// that work is done.
+    Held,
 }
 
 /// Where a problem stands with respect to being fixed.
