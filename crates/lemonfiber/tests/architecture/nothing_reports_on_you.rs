@@ -154,6 +154,15 @@ const MINTING: &[(&str, &str)] = &[
          one — deliberately not stable, and stability is what an identifier is",
     ),
     (
+        "crates/lemonfiber-core/src/companion/identifier.rs",
+        "the stack's own identifier, which a paired phone knows this stack by. It outlives the \
+         run and has to — a phone pairing again has to land on the machine it already holds — \
+         and it is derived from nothing, so it carries nothing about the address, the household \
+         or anybody in it. It leaves this machine only inside pairing material, which the \
+         operator hands to their own phone themselves; it reaches no request this product \
+         makes, no report sent anywhere and no bundle",
+    ),
+    (
         "crates/lemonfiber-core/src/journal/sealing.rs",
         "the key the change journal's credentials are sealed under, and a fresh nonce for each \
          value sealed with it. The key outlives the run and has to — a key made afresh opens \

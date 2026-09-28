@@ -15,8 +15,8 @@ use clap::Subcommand;
 
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
-    PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCredentials, RawDoctor,
-    RawRemoving, RawSetup, RawUi, UpdateCommand,
+    PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
+    RawDoctor, RawRemoving, RawSetup, RawUi, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -523,14 +523,13 @@ pub enum Request {
     Support(Asked),
     /// Serve the web interface, for as long as you leave it running.
     ///
-    /// Started when you ask for it and not before: nothing is installed, nothing
-    /// keeps running afterwards, and stopping it leaves nothing behind. It listens
-    /// on this machine only.
-    ///
-    /// The connection is not encrypted, which it says when it starts, along with the
-    /// whole address it was given and the token every request to it must carry. The
-    /// token is minted for this run, printed once here, and kept nowhere else.
+    /// Started when you ask for it and not before: nothing is installed, nothing keeps
+    /// running afterwards, and stopping it leaves nothing behind. It listens on this
+    /// machine only unless `--lan` says otherwise and serves plain text unless `--tls`
+    /// does, which it says when it starts, with the address and this run's token.
     Ui(RawUi),
+    /// Pair a phone with this stack, or replace the certificate a paired phone pins.
+    Companion(RawCompanion),
     /// Restore your configuration from a backup archive.
     ///
     /// Verifies the archive and lists what it holds before anything is

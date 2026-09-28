@@ -132,7 +132,7 @@ fn refusing_the_network_says_how_to_be_allowed_it() {
 #[test]
 fn the_address_is_printed_whole() {
     assert_eq!(
-        address(SocketAddr::from(([127, 0, 0, 1], 8471))),
+        address(SocketAddr::from(([127, 0, 0, 1], 8471)), false),
         "http://127.0.0.1:8471"
     );
 }

@@ -18,6 +18,7 @@ mod bandwidth;
 mod catalogue;
 mod changelog;
 mod clients;
+mod companion;
 mod credentials;
 mod doctor;
 pub(crate) mod door;
@@ -183,12 +184,9 @@ impl Lines {
     }
 }
 
-/// Render an outcome, for a person or for a script.
-///
-/// One renderer per answer, rather than one function that knows all four. They
-/// have nothing in common beyond arriving here: what a version report owes an
-/// operator and what a lifecycle report owes them are different questions, and
-/// a single body deciding both reads as one thing with four moods.
+/// Render an outcome, for a person or for a script, one renderer per answer: what a
+/// version report owes an operator and what a lifecycle report owes them are different
+/// questions.
 pub(crate) fn render(outcome: &Outcome, json: bool) {
     answer(outcome, json).print();
 }
@@ -250,6 +248,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),
         Outcome::Invitation(report) => invitation::invitation(report),
+        Outcome::Pairing(report) => companion::pairing(report),
+        Outcome::Certificate(report) => companion::certificate(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),

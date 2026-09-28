@@ -1,6 +1,7 @@
 use super::{
     asked, carried, not_taught_yet, refused, repair, restore, update, verdict, Asked, Rehearsal,
-    A_SEARCH_IS_THE_ANSWER, THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
+    A_SEARCH_IS_THE_ANSWER, MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION,
+    THE_WALK_IS_THE_OBSERVATION,
 };
 use crate::app::command::{
     AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
@@ -142,7 +143,7 @@ fn bundling(write: bool) -> Command {
     }
 }
 
-/// The three that refuse the flag for good say so, the read half of each command
+/// The four that refuse the flag for good say so, the read half of each command
 /// that shares a name with one does not, and the reason reaches the operator.
 ///
 /// Driven rather than read, because the two halves of `trace` and of `doctor` are
@@ -156,6 +157,11 @@ fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
         (examining(true), true),
         (examining(false), false),
         (Command::Walkthrough { item: None }, true),
+        (Command::Companion(crate::companion::Asked::Pair), true),
+        (
+            Command::Companion(crate::companion::Asked::Certificate { confirm: true }),
+            false,
+        ),
         (bundling(false), false),
     ] {
         let asked = asked(&command);
@@ -253,7 +259,7 @@ fn reads() -> Vec<Command> {
     ]
 }
 
-/// The three that refuse the flag for good, each with its own reason.
+/// The four that refuse the flag for good, each with its own reason.
 ///
 /// Listed with their reasons rather than under one verdict, because here the
 /// reason is the whole of the verdict: they differ in nothing else.
@@ -267,6 +273,10 @@ fn refused_for_good() -> Vec<(Command, Rehearsal)> {
         (
             Command::Walkthrough { item: None },
             Rehearsal::Cannot(THE_WALK_IS_THE_OBSERVATION),
+        ),
+        (
+            Command::Companion(crate::companion::Asked::Pair),
+            Rehearsal::Cannot(MATERIAL_IS_MATERIAL),
         ),
     ]
 }
@@ -396,6 +406,7 @@ fn taught_to_report() -> Vec<Command> {
 /// way in.
 fn answering_twice() -> Vec<Command> {
     vec![
+        Command::Companion(crate::companion::Asked::Certificate { confirm: true }),
         Command::Migrate(MigrateAction::Act {
             mode: crate::migration::mode::Mode::Adopt,
             confirmed: true,

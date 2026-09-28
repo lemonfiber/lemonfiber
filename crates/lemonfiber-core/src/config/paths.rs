@@ -221,6 +221,18 @@ impl Paths {
         self.config.join("admission.json")
     }
 
+    /// What pairing a phone with this stack rests on: the certificate the web surface
+    /// presents, the stack's own identifier, and how the surface was last served.
+    ///
+    /// Kept with configuration rather than beside the stack, for the reason the password
+    /// is: a backup carries it, and a restore that dropped the certificate or the
+    /// identifier would leave every paired phone refusing a machine it had been told was
+    /// this one.
+    #[must_use]
+    pub fn companion(&self) -> PathBuf {
+        self.config.join("companion")
+    }
+
     /// What is installed of somebody else's, and what installing each decided.
     ///
     /// Kept with configuration rather than beside the stack, and it is the record

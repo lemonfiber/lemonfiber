@@ -66,6 +66,30 @@ const TLS: &[&str] = &[
     "axum-server",
 ];
 
+/// The two of those the surface serves encrypted with, when it is asked to.
+const SERVES_TLS: &[&str] = &["rustls", "tokio-rustls"];
+
+/// The files that may name them, and what each does with them.
+///
+/// One decides whether a run encrypts at all and holds the certificate it presents,
+/// and one hands each connection to it. A third arriving is a second way to turn a
+/// certificate on, which is the argument this list exists to make somebody have.
+const ENCRYPTS: &[(&str, &str)] = &[
+    (
+        "crates/lemonfiber/src/ui/encrypted.rs",
+        "whether a run encrypts, which only the flag asking for it turns on, and the \
+         certificate it presents",
+    ),
+    (
+        "crates/lemonfiber/src/ui/answering.rs",
+        "handing each connection to that certificate before anything is read from it",
+    ),
+    (
+        "crates/lemonfiber/src/ui.rs",
+        "carrying what the first hands over to the second",
+    ),
+];
+
 /// The files that listen, and what each one serves.
 ///
 /// Two entries, and the pair is the point: one file decides which addresses may be
@@ -142,6 +166,11 @@ const ASKED: &[(&str, &str)] = &[
         "set_password",
         "whether a password is asked for before it starts, which settles who may open it and \
          nothing about where it is opened from",
+    ),
+    (
+        "transport",
+        "whether what passes is encrypted, which settles nothing about which address it \
+         passes on",
     ),
 ];
 
@@ -402,63 +431,99 @@ fn the_web_surface_can_be_asked_for_nothing_that_names_an_address() {
     );
 }
 
-/// Nothing that serves can turn a certificate on.
+/// A certificate of its own is served only where somebody asked for one.
 ///
 /// A certificate this program made for itself is one a browser warns about, and an
-/// operator who learns to click past that warning has been taught something that
-/// costs them far more than plain text on a network they trust. So there is none —
-/// not switched off, not present — and the transport is said in words instead, which
-/// the sentences beside the address are held to.
-///
-/// This is about the **default**, and a default is only a default while there is
-/// something it could be instead. Today there is nothing: the crate that takes the
-/// socket carries nothing it could serve TLS with, so a run cannot be talked into
-/// one. The day that changes, this is the line that has to be argued away.
+/// operator who learns to click past that warning has been taught something that costs
+/// them far more than plain text on a network they trust — so it is never the default.
+/// A paired phone is the reader it exists for: it pins the certificate from pairing
+/// material instead of asking anybody. Three things hold the default, and each is a
+/// line somebody would have to argue away: the one flag that asks for it takes no
+/// default and names no value; the only TLS the crate that serves carries is the one
+/// library it serves with, and the API crate carries none; and the only files that
+/// name it are the ones written down above.
 #[test]
-fn nothing_that_serves_can_turn_on_a_certificate_of_its_own() {
-    // Both crates, not the one that happens to hold the listener today. The binary
-    // takes the socket and the API crate builds what answers on it, and a certificate
-    // put in front of this surface could be reached for from either — a rule read out
-    // of one manifest is a rule the other is not held to, which reads as enforced.
-    //
-    // `lemonfiber-core` is deliberately not here: it carries a TLS library for the
-    // Usenet client, which is a connection this product *makes* rather than one it
-    // answers. A guard that refused that would be refusing the wrong thing.
-    let serving = ["Cargo.toml", "../lemonfiber-api/Cargo.toml"];
-    let mut carried: Vec<String> = Vec::new();
-    let mut read = 0_usize;
-    for path in serving {
-        let text = fs::read_to_string(path).unwrap_or_default();
+fn a_certificate_of_its_own_is_served_only_where_asked_for() {
+    // `lemonfiber-core` is deliberately not read: it carries a TLS library for the
+    // Usenet client, which is a connection this product *makes*, and it makes the
+    // certificate this crate serves — which is not the same as serving it.
+    let manifest = |path: &str| -> Option<String> {
+        let text = fs::read_to_string(path).ok()?;
         // The declarations, not the prose about them: a manifest explains why several
-        // of its dependencies are the ones they are, and one of those explanations
-        // names a TLS library that is somebody else's dependency.
-        let manifest: String = text
+        // of its dependencies are the ones they are.
+        let declared: String = text
             .lines()
             .filter(|line| !line.trim_start().starts_with('#'))
             .collect::<Vec<&str>>()
             .join("\n");
-        if !manifest.contains("[dependencies]") {
-            continue;
-        }
-        read += 1;
-        carried.extend(
-            TLS.iter()
-                .filter(|named| manifest.contains(**named))
-                .map(|named| format!("{path}: {named}")),
-        );
-    }
-    // What was read, before what was found. A path that names no manifest leaves this
-    // passing about a crate it never opened.
+        declared.contains("[dependencies]").then_some(declared)
+    };
+    let carried = |declared: &str| -> BTreeSet<String> {
+        declared
+            .lines()
+            .filter_map(|line| line.split_once(" = ").map(|(name, _)| name.trim()))
+            .filter(|name| TLS.iter().any(|tls| name.contains(tls)))
+            .map(str::to_owned)
+            .collect()
+    };
+    let serving = manifest("Cargo.toml");
+    let api = manifest("../lemonfiber-api/Cargo.toml");
+    assert!(
+        serving.is_some() && api.is_some(),
+        "a manifest that serves could not be read, so this checks less than it says"
+    );
     assert_eq!(
-        read,
-        serving.len(),
-        "read {read} of the {} manifests that serve, so this checks less than it says",
-        serving.len()
+        carried(&serving.unwrap_or_default()),
+        SERVES_TLS
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect::<BTreeSet<String>>(),
+        "the crate that serves carries TLS beyond the one library it serves with"
+    );
+    assert_eq!(
+        carried(&api.unwrap_or_default()),
+        BTreeSet::<String>::new(),
+        "the API crate carries what it would take to put a certificate in front of this"
+    );
+
+    let shipped = shipped();
+    let naming: BTreeSet<&str> = shipped
+        .iter()
+        .filter(|(path, ships)| {
+            path.starts_with("crates/lemonfiber/src/") && ships.contains("rustls")
+        })
+        .map(|(path, _)| path.as_str())
+        .collect();
+    assert_eq!(
+        naming,
+        ENCRYPTS
+            .iter()
+            .map(|(path, _)| *path)
+            .collect::<BTreeSet<&str>>(),
+        "a certificate can be reached for somewhere this list does not name"
     );
     assert!(
-        carried.is_empty(),
-        "a crate that serves carries what it would take to put a certificate in front \
-         of this surface: {carried:?}"
+        ENCRYPTS.iter().all(|(_, why)| !why.trim().is_empty()),
+        "every file that encrypts says what it does with it"
+    );
+
+    let flag: Vec<&str> = shipped
+        .values()
+        .filter(|ships| ships.contains("pub struct RawUi {"))
+        .flat_map(|ships| {
+            let lines: Vec<&str> = ships.lines().map(str::trim).collect();
+            lines
+                .windows(2)
+                .filter(|pair| pair.get(1) == Some(&"pub tls: bool,"))
+                .filter_map(|pair| pair.first().copied())
+                .collect::<Vec<&str>>()
+        })
+        .collect();
+    assert_eq!(
+        flag,
+        vec![r#"#[arg(long, requires = "port")]"#],
+        "the flag that turns a certificate on is not the bare switch that is off unless \
+         somebody types it"
     );
 }
 

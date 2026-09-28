@@ -174,6 +174,7 @@ pub(crate) fn read_settings() -> Settings {
         port_forward: port_forward_from_env(&recorded),
         indexer: indexer_from_env(&recorded),
         admission: here().map(|paths| paths.admission()),
+        companion: here().map(|paths| paths.companion()),
         household_host: household_host_from_env(&recorded),
         exposed: exposed_from_env(&recorded),
         unmanaged: lemonfiber_core::config::unmanaged_from_env(&recorded),

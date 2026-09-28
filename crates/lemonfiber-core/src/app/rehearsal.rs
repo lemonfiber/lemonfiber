@@ -56,6 +56,11 @@ const THE_CHECK_IS_THE_DISRUPTION: &str = "the disruptive checks find out what h
      by making it happen — a killswitch that has not been tested is a killswitch nobody \
      knows about, and there is nothing to predict from";
 
+/// Why pairing material cannot be rehearsed.
+const MATERIAL_IS_MATERIAL: &str = "pairing material is the answer itself — a rehearsed \
+     one would be real material a phone could pair with, made by a run that promised to \
+     make nothing";
+
 /// Why a walkthrough cannot be rehearsed.
 const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observation — \
      what it reports is what this stack actually did with a real item, which cannot be \
@@ -158,6 +163,14 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Status { .. } => reads("ps"),
         Command::Stuck => reads("stuck"),
         Command::FrontDoor => reads("front-door"),
+        Command::Companion(crate::companion::Asked::Pair) => {
+            cannot("companion pair", MATERIAL_IS_MATERIAL)
+        }
+        // Unconfirmed it already is the rehearsal: what replacing costs, and nothing
+        // replaced.
+        Command::Companion(crate::companion::Asked::Certificate { .. }) => {
+            reports("companion certificate")
+        }
         Command::Explain { .. } => reads("explain"),
         Command::Glossary => reads("glossary"),
         Command::Clients => reads("clients"),

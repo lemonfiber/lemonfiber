@@ -84,7 +84,7 @@ hyper-util = { version = "0.1", default-features = false, features = ["tokio", "
 # in the tree via axum; only the combinators are taken.
 tower = { version = "0.5", default-features = false }
 toml = "1.1"
-# Decoding the base64 a PEM key and a registry's signature are carried in. The 0.22
+# The base64 a PEM key, a registry's signature and the companion certificate are carried in. The 0.22
 # line is the one reqwest and bollard use.
 base64 = "0.22"
 # Encrypting what the store keeps at rest.
@@ -98,6 +98,11 @@ flate2 = "1"
 # terminal code that knows the terminal.
 qrcodegen = "1.8"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+# The certificate the web surface presents to a paired phone. Self-signed, because no
+# public authority signs the names a stack is reachable under, and made with ring,
+# which rustls already builds on. Without its `pem` feature, which brings a base64 of
+# another line: the PEM is written and read with the base64 above.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring"] }
 # Verifying the signature a registry offers beside an image, with the library rustls
 # already builds on.
 ring = "0.17"

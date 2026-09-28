@@ -87,6 +87,7 @@ fn each_flag_reaches_the_choice_it_names() {
             "/srv/app",
             "--set-password",
             "--lan",
+            "--tls",
         ]),
         Some(Asked {
             port: Some(7171),
@@ -94,8 +95,16 @@ fn each_flag_reaches_the_choice_it_names() {
             assets: Some(PathBuf::from("/srv/app")),
             password: true,
             reach: Reach::Network,
+            tls: true,
         })
     );
+}
+
+/// Encrypted is asked for on a port that stays the same, or not at all: a paired
+/// phone keeps the address it was given.
+#[test]
+fn encrypted_is_refused_by_the_command_line_without_a_port() {
+    assert_eq!(asked_for(&["lemonfiber", "ui", "--tls"]), None);
 }
 
 /// A port the command line will not read never reaches this surface at all,
@@ -170,6 +179,7 @@ fn filling_one_choice_leaves_the_other_four_alone() {
             assets: Some(PathBuf::from("/srv/app")),
             password: true,
             reach: Reach::Network,
+            tls: false,
         })
     );
     assert_eq!(
@@ -278,7 +288,7 @@ async fn no_way_of_failing_to_open_a_browser_fails_the_command() {
     };
     for runner in [missing(), exited(1)] {
         assert_eq!(
-            opening(&runner, HostOs::Linux, &address(bound())).await,
+            opening(&runner, HostOs::Linux, &address(bound(), false)).await,
             Browser::Unopened
         );
         assert_eq!(
@@ -679,3 +689,5 @@ async fn a_password_taken_away_gives_up_the_network_and_keeps_this_machine() {
     assert_eq!(ended, crate::exit::shown(ExitCode::SUCCESS));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+mod encrypted;

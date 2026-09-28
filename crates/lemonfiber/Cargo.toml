@@ -33,6 +33,10 @@ lemonfiber-api = { workspace = true }
 axum = { workspace = true }
 hyper = { workspace = true }
 hyper-util = { workspace = true }
+# Serving the web surface encrypted, when it is asked to be, with the certificate the
+# core keeps. Nothing turns it on by default.
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
 clap = { workspace = true }
 etcetera = { workspace = true }
 color-eyre = { workspace = true }

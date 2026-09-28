@@ -83,6 +83,11 @@ what to do about it, is written for operators at
 - `LIFE-4`
 - `LIFE-5`
 - `LIFE-6`
+- `PAIR-1`
+- `PAIR-2`
+- `PAIR-3`
+- `PAIR-4`
+- `PAIR-5`
 - `PLUGIN-1`
 - `PLUGIN-2`
 - `PLUGIN-3`
@@ -159,6 +164,8 @@ what to do about it, is written for operators at
 - `SERVE-1`
 - `SERVE-2`
 - `SERVE-3`
+- `SERVE-4`
+- `SERVE-5`
 - `SETUP-1`
 - `SETUP-2`
 - `SETUP-3`

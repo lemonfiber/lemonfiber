@@ -8,9 +8,7 @@ Part of the [command reference](../commands.md).
 ```text
 Serve the web interface, for as long as you leave it running.
 
-Started when you ask for it and not before: nothing is installed, nothing keeps running afterwards, and stopping it leaves nothing behind. It listens on this machine only.
-
-The connection is not encrypted, which it says when it starts, along with the whole address it was given and the token every request to it must carry. The token is minted for this run, printed once here, and kept nowhere else.
+Started when you ask for it and not before: nothing is installed, nothing keeps running afterwards, and stopping it leaves nothing behind. It listens on this machine only unless `--lan` says otherwise and serves plain text unless `--tls` does, which it says when it starts, with the address and this run's token.
 
 Usage: lemonfiber ui [OPTIONS]
 
@@ -53,6 +51,11 @@ Options:
 
       --data-dir <PATH>
           Keep lemonfiber's own data under a directory of your own
+
+      --tls
+          Serve it encrypted, with a certificate this program made and keeps.
+
+          Off unless asked for. A browser warns about a certificate nobody it trusts signed, and learning to click past that warning costs more than plain text on a network you trust; a paired phone is different, because it pins this certificate instead of asking anybody. Needs `--port`: a paired phone keeps the address it was given.
 
   -h, --help
           Print help (see a summary with '-h')

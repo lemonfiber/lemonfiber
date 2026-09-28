@@ -78,18 +78,30 @@ pub(crate) fn announcement(
     offered: Offered,
     token: &str,
     browser: Browser,
+    fingerprint: Option<&str>,
 ) -> Vec<String> {
+    let encrypted = fingerprint.is_some();
     // One address is a sentence and several are a list. A machine whose IPv6
     // wildcard already answers for IPv4 has one socket, and being handed a list of
     // one would be being handed a shape that exists for somebody else's machine.
     let mut lines = match at {
-        [only] => vec![format!("{PRODUCT} is serving at {}", address(*only))],
+        [only] => vec![format!(
+            "{PRODUCT} is serving at {}",
+            address(*only, encrypted)
+        )],
         several => std::iter::once(format!("{PRODUCT} is serving at:"))
-            .chain(several.iter().map(|bound| format!("  {}", address(*bound))))
+            .chain(
+                several
+                    .iter()
+                    .map(|bound| format!("  {}", address(*bound, encrypted))),
+            )
             .collect(),
     };
     lines.push(String::new());
-    lines.extend(transport(offered));
+    lines.extend(match fingerprint {
+        Some(fingerprint) => certified(offered, fingerprint),
+        None => transport(offered),
+    });
     lines.push(String::new());
     lines.push("The token for this run, which the page will ask you for:".to_owned());
     lines.push(format!("  {token}"));
@@ -144,6 +156,34 @@ pub(super) fn transport(offered: Offered) -> Vec<String> {
                 .to_owned(),
         ],
     }
+}
+
+/// What being served encrypted means, where it was asked for.
+///
+/// The certificate is named in full, because it is the one thing an operator comparing
+/// what a phone was handed against what this machine presents has to be able to read.
+/// A browser's warning is said before it arrives, so it reads as expected rather than
+/// as something having gone wrong.
+pub(super) fn certified(offered: Offered, fingerprint: &str) -> Vec<String> {
+    let mut lines = vec![
+        format!(
+            "This connection is encrypted, with a certificate {PRODUCT} made for itself. A \
+             browser warns about it, because nothing it trusts signed it; a paired phone \
+             pins it instead:"
+        ),
+        format!("  {fingerprint}"),
+    ];
+    lines.push(match offered {
+        Offered::Network => format!(
+            "Anything on your network can reach this, which is what you asked for. It asks \
+             whoever opens it for the password you set. Pair a phone with `{PRODUCT} \
+             companion pair`."
+        ),
+        Offered::Machine | Offered::Refused => "Nothing on your network can reach it — it \
+             listens on this machine and nowhere else, so no phone can be paired with it."
+            .to_owned(),
+    });
+    lines
 }
 
 /// What giving up a network binding says.

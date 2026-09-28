@@ -68,6 +68,16 @@ pub const EVERY: &[Entry] = &[
         at: Paths::admission,
     },
     Entry {
+        accessor: "companion",
+        what: "what pairing a phone rests on",
+        why: "The certificate the web interface presents when it is served encrypted, and its \
+              key; this stack's own identifier, which a paired phone knows it by; and the port \
+              it was last served on. Removing it means every paired phone refuses this machine \
+              until it is paired again.",
+        secret: true,
+        at: Paths::companion,
+    },
+    Entry {
         accessor: "outbound",
         what: "the record of what left this machine",
         why: "When each outbound request went, what kind it was, and where it went — so what \

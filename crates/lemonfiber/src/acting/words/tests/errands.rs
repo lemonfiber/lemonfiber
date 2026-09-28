@@ -221,6 +221,7 @@ fn the_rows_show_what_was_named_rather_than_what_it_would_have_been() {
             assets: Some(std::path::PathBuf::from("/srv/app")),
             password: true,
             reach: crate::ui::reach::Reach::Network,
+            tls: false,
         },
         open: Open::Nothing { refused: None },
     };

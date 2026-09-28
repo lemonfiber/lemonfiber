@@ -8,7 +8,7 @@ use super::{announcement, opener, opening, reverted, Browser};
 
 /// Everything a starting surface says, as one block of text.
 fn said(browser: Browser) -> String {
-    announcement(&[bound()], Offered::Machine, "000fa5ff", browser).join("\n")
+    announcement(&[bound()], Offered::Machine, "000fa5ff", browser, None).join("\n")
 }
 
 /// The word the claim about the transport turns on. A rewording that drops it
@@ -45,7 +45,7 @@ const SOMEBODY_ELSE: &[&str] = &["else", "other"];
 /// itself, which is the failure this is here for.
 fn about_the_connection(browser: Browser) -> Vec<String> {
     said(browser)
-        .replace(&address(bound()), " ")
+        .replace(&address(bound(), false), " ")
         .to_lowercase()
         .split(['.', ';', '\n', '\u{2014}'])
         .map(|sentence| sentence.trim().to_owned())
@@ -113,7 +113,7 @@ async fn whatever_the_browser_did_the_address_is_the_first_thing_said() {
     // three a run reaches: one that opened, one that would not, and one that was
     // never asked for. Line 0, because an operator whose browser did not open has
     // to find the address, and one printed below an apology is one they scroll for.
-    let url = address(bound());
+    let url = address(bound(), false);
     let reached = [
         Browser::Unasked,
         opening(&exited(0), HostOs::Linux, &url).await,
@@ -128,7 +128,7 @@ async fn whatever_the_browser_did_the_address_is_the_first_thing_said() {
     }
     for browser in reached {
         assert_eq!(
-            announcement(&[bound()], Offered::Machine, "000fa5ff", browser)
+            announcement(&[bound()], Offered::Machine, "000fa5ff", browser, None)
                 .first()
                 .map(|line| line.contains(&url)),
             Some(true),
@@ -181,12 +181,14 @@ async fn the_words_are_about_the_connection_a_run_actually_takes() {
     let taken = held(Offered::Machine, None).await.ok();
     let checked = taken.and_then(|taken| {
         let at: Vec<SocketAddr> = taken.iter().map(|(_, bound)| *bound).collect();
-        let said = announcement(&at, Offered::Machine, "000fa5ff", Browser::Unasked).join("\n");
+        let said =
+            announcement(&at, Offered::Machine, "000fa5ff", Browser::Unasked, None).join("\n");
         at.first().map(|first| {
             (
-                address(*first).starts_with("http://"),
+                address(*first, false).starts_with("http://"),
                 at.iter().all(|bound| bound.ip().is_loopback()),
-                at.iter().all(|bound| said.contains(&address(*bound))),
+                at.iter()
+                    .all(|bound| said.contains(&address(*bound, false))),
             )
         })
     });
@@ -247,4 +249,36 @@ fn giving_up_the_network_says_what_went_at_once_and_what_went_after() {
         said.contains("this machine only"),
         "and where it ends up: {said}"
     );
+}
+
+/// Served encrypted, the address is `https`, the certificate is named in full, the
+/// browser's warning is said before it arrives, and where a phone may be paired from is
+/// said — the network, and not this machine alone.
+#[test]
+fn an_encrypted_run_names_its_certificate_and_where_a_phone_pairs_from() {
+    let fingerprint = "ab".repeat(32);
+    let on = |offered| {
+        announcement(
+            &[bound()],
+            offered,
+            "000fa5ff",
+            Browser::Unasked,
+            Some(&fingerprint),
+        )
+        .join("\n")
+    };
+    let network = on(Offered::Network);
+    assert!(network.contains(&address(bound(), true)), "{network}");
+    assert!(network.starts_with(&format!(
+        "{} is serving at https://",
+        lemonfiber_core::PRODUCT
+    )));
+    assert!(network.contains(&fingerprint), "{network}");
+    assert!(network.contains("browser warns"), "{network}");
+    assert!(network.contains("companion pair"), "{network}");
+    assert!(!network.contains("not encrypted"), "{network}");
+
+    let here = on(Offered::Machine);
+    assert!(here.contains(&fingerprint), "{here}");
+    assert!(here.contains("no phone can be paired with it"), "{here}");
 }

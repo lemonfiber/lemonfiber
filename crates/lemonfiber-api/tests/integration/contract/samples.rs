@@ -210,6 +210,12 @@ fn serving() -> Vec<Outcome> {
             findings: Vec::new(),
         }),
         Outcome::FrontDoor(a_front_door()),
+        Outcome::Pairing(a_pairing()),
+        Outcome::Certificate(lemonfiber_core::companion::Replacement {
+            replaced: false,
+            fingerprint: Some("ab".repeat(32)),
+            consequence: "Every paired phone refuses this machine until paired again.".to_owned(),
+        }),
         // Carrying its caution rather than leaving it out, so the optional half
         // of the shape is compared too.
         Outcome::Clients(lemonfiber_core::clients::guidance(Some(
@@ -288,4 +294,22 @@ fn keeping() -> Vec<Outcome> {
         Outcome::Bandwidth(a_shared_line()),
         Outcome::Outbound(what_leaves()),
     ]
+}
+
+/// Pairing material, with the caution an address that is a number carries, so the
+/// optional half of the shape is compared too.
+fn a_pairing() -> lemonfiber_core::companion::Pairing {
+    let material = lemonfiber_core::companion::Material {
+        address: "https://192.168.1.9:8443".to_owned(),
+        fingerprint: "ab".repeat(32),
+        expires: 1_790_813_400,
+        stack: "000102030405060708090a0b0c0d0e0f".to_owned(),
+    };
+    lemonfiber_core::companion::Pairing {
+        written: serde_json::to_string(&material).unwrap_or_default(),
+        material,
+        until: "2026-10-01T00:10:00".to_owned(),
+        replacing: "It changes only when somebody replaces it.".to_owned(),
+        caution: Some("That address is a number.".to_owned()),
+    }
 }

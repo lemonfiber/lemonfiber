@@ -59,6 +59,7 @@ Commands:
   backup        Back up your configuration to an archive, so it stops being precious
   support       Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
   ui            Serve the web interface, for as long as you leave it running
+  companion     Pair a phone with this stack, or replace the certificate a paired phone pins
   restore       Restore your configuration from a backup archive
   help          Print this message or the help of the given subcommand(s)
 
@@ -139,4 +140,5 @@ Options:
 - [`lemonfiber backup`](commands/backup.md)
 - [`lemonfiber support`](commands/support.md)
 - [`lemonfiber ui`](commands/ui.md)
+- [`lemonfiber companion`](commands/companion.md)
 - [`lemonfiber restore`](commands/restore.md)

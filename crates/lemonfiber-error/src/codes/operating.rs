@@ -117,6 +117,19 @@ codes! {
         /// Raised when the stack's own location is not on the machine being operated.
         ABSENT_THERE = "LIFE-6",
     }
+    /// The `PAIR` codes.
+    pair {
+        /// Raised when there is nowhere to keep what pairing a phone needs.
+        NOWHERE = "PAIR-1",
+        /// Raised when the web surface has not been served encrypted on the network.
+        NOT_SERVED = "PAIR-2",
+        /// Raised when the certificate the surface presents cannot be read or made.
+        NO_CERTIFICATE = "PAIR-3",
+        /// Raised when this machine has no address a phone could reach it at.
+        NO_ADDRESS = "PAIR-4",
+        /// Raised when the stack's identifier cannot be read or made.
+        UNNAMED = "PAIR-5",
+    }
     /// The `PROC` codes.
     proc {
         /// Raised when the program a subprocess needs is missing.
@@ -146,6 +159,10 @@ codes! {
         NO_TOKEN = "SERVE-2",
         /// Raised when the network was asked for and nothing here can say who is knocking.
         NO_PASSWORD = "SERVE-3",
+        /// Raised when serving encrypted was asked for with no port that stays the same.
+        UNSETTLED_PORT = "SERVE-4",
+        /// Raised when the certificate to serve encrypted with cannot be read or made.
+        NO_CERTIFICATE = "SERVE-5",
     }
     /// The `SETUP` codes.
     setup {
