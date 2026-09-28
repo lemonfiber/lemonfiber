@@ -69,10 +69,14 @@ updates:
     cooldown:
       default-days: 3
     # base64 stays on the line reqwest and bollard carry, because `deny.toml` refuses
-    # a second copy of a crate and a bump of ours alone would be one.
+    # a second copy of a crate and a bump of ours alone would be one. hyper-util
+    # 0.1.21 moved to base64 0.23, so it waits on the same line: offered, it is a
+    # second copy beside bollard's and reqwest's 0.22.
     ignore:
       - dependency-name: base64
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: hyper-util
+        versions: [">= 0.1.21"]
     groups:
       cargo:
         patterns: ["*"]
@@ -93,11 +97,14 @@ updates:
       include: scope
     cooldown:
       default-days: 3
-    # The harness builds the workspace's crates, so base64 stays on their line for
-    # the reason given above: a bump here alone is a second copy `deny.toml` refuses.
+    # The harness builds the workspace's crates, so base64 and hyper-util stay on
+    # their line for the reason given above: a bump here alone is a second copy
+    # `deny.toml` refuses.
     ignore:
       - dependency-name: base64
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: hyper-util
+        versions: [">= 0.1.21"]
     groups:
       fuzz:
         patterns: ["*"]
