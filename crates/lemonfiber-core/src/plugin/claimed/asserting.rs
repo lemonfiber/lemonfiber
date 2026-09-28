@@ -13,11 +13,11 @@
 
 use std::path::Path;
 
-use lemonfiber_plugin::{Manifest, Service};
+use lemonfiber_plugin::{Declaration, Manifest, Service};
 
-use super::super::judging::judge;
+use super::super::judging::{faults, Fault};
 use super::super::recorded::{self, Recording};
-use super::Verdict;
+use super::{FailingAsDeclared, Verdict};
 
 /// Which kind of assertion a verdict is about.
 ///
@@ -48,7 +48,7 @@ pub struct Asserted {
     pub verdict: Verdict,
 }
 
-/// Every proof, against the recording it names.
+/// Every proof, against the recordings it names.
 pub(super) fn proved(
     manifest: &Manifest,
     root: &Path,
@@ -59,25 +59,25 @@ pub(super) fn proved(
         .iter()
         .map(|proof| {
             let service = manifest.asks(proof.service.as_deref());
+            let asserting = Asserting {
+                at: format!("proof {}", proof.id),
+                fixture: proof.fixture.as_deref(),
+                request: &proof.request,
+                expect: &proof.expect,
+                expected: &proof.expected,
+            };
             Asserted {
                 kind: Assertion::Proof,
                 id: proof.id.clone(),
                 says: proof.title.clone(),
                 service: service.map_or_else(String::new, |service| service.id.clone()),
-                verdict: recorded_answer(
-                    proof.fixture.as_deref(),
-                    &proof.request,
-                    &proof.expect,
-                    service,
-                    root,
-                    refusals,
-                ),
+                verdict: assessed(&asserting, service, root, refusals),
             }
         })
         .collect()
 }
 
-/// Every contributed check, against the recording it names.
+/// Every contributed check, against the recordings it names.
 ///
 /// A remedy is not one of these. It asks nothing and expects nothing — it is what to do
 /// about a check that fired — so running it would be reporting a verdict about a
@@ -93,31 +93,22 @@ pub(super) fn checked(
         .filter(|entry| entry.at == lemonfiber_plugin::extension::check())
         .map(|entry| {
             let service = manifest.asks(entry.service.as_deref());
-            let (Some(request), Some(expect)) = (&entry.request, &entry.expect) else {
-                return Asserted {
-                    kind: Assertion::Check,
-                    id: entry.id.clone(),
-                    says: entry.title.clone().unwrap_or_default(),
-                    service: service.map_or_else(String::new, |service| service.id.clone()),
-                    verdict: Verdict::Unproven {
-                        why: "asks nothing, or says nothing about the answer, so there is \
-                              nothing to decide"
-                            .to_owned(),
-                    },
-                };
-            };
-            let mut answered = |named: Option<&str>| {
-                recorded_answer(named, request, expect, service, root, refusals)
-            };
-            let verdict = match entry.fires_on.as_deref() {
-                None => answered(entry.fixture.as_deref()),
-                Some(fires_on) if entry.fixture.as_deref().is_none_or(|one| one == fires_on) => {
-                    fired(answered(Some(fires_on)), fires_on)
+            let verdict = match (&entry.request, &entry.expect) {
+                (Some(request), Some(expect)) => {
+                    let asserting = Asserting {
+                        at: format!("contribution {}", entry.id),
+                        fixture: entry.fixture.as_deref(),
+                        request,
+                        expect,
+                        expected: &entry.expected,
+                    };
+                    assessed(&asserting, service, root, refusals)
                 }
-                Some(fires_on) => {
-                    let held = answered(entry.fixture.as_deref());
-                    both(held, fired(answered(Some(fires_on)), fires_on))
-                }
+                _ => Verdict::Unproven {
+                    why: "asks nothing, or says nothing about the answer, so there is \
+                          nothing to decide"
+                        .to_owned(),
+                },
             };
             Asserted {
                 kind: Assertion::Check,
@@ -130,38 +121,169 @@ pub(super) fn checked(
         .collect()
 }
 
-/// What a check came to on the recording it says it fires on.
+/// One assertion that is not a probe, as it is run: where it was declared, what it
+/// asks, and the recordings it names.
+struct Asserting<'a> {
+    /// Where the manifest declares it, as a refusal places it.
+    at: String,
+    /// The recording it holds itself to.
+    fixture: Option<&'a str>,
+    /// What it asks.
+    request: &'a lemonfiber_plugin::Request,
+    /// What the answer must be.
+    expect: &'a lemonfiber_plugin::Expect,
+    /// The recordings it is declared to fail on.
+    expected: &'a [Declaration],
+}
+
+/// What an assertion came to across every recording it names.
 ///
-/// Turned over, because firing is what that recording is for: failing there is the
-/// check finding what it exists to find, and passing there is a check that finds
-/// nothing. A recording that could not be run establishes nothing either way.
-fn fired(verdict: Verdict, fires_on: &str) -> Verdict {
-    match verdict {
-        Verdict::Failed { .. } => Verdict::Passed,
-        Verdict::Passed => Verdict::Failed {
-            faults: vec![format!(
-                "passes on {fires_on}, the recording it says it fires on, so it finds nothing"
-            )],
-        },
-        unproven @ Verdict::Unproven { .. } => unproven,
+/// Its own recording is held to the expectation as written, unless a declaration names
+/// that same recording: a declaration is about the recording it names and changes the
+/// verdict there and nowhere else. Every declared recording is judged on every
+/// constraint, so a failure that is not the declared one is seen.
+fn assessed(
+    one: &Asserting,
+    service: Option<&Service>,
+    root: &Path,
+    refusals: &mut Vec<lemonfiber_plugin::Violation>,
+) -> Verdict {
+    let mut verdicts = Vec::new();
+    let own = one
+        .fixture
+        .filter(|own| !one.expected.iter().any(|declared| declared.fixture == *own));
+    if let Some(own) = own {
+        verdicts.push(recorded_answer(
+            Some(own),
+            one.request,
+            one.expect,
+            service,
+            root,
+            refusals,
+        ));
+    }
+    for declaration in one.expected {
+        verdicts.push(declared(one, declaration, service, root, refusals));
+    }
+    match verdicts.into_iter().reduce(both) {
+        Some(verdict) => verdict,
+        // Names no recording at all, which the runner says in its own words.
+        None => recorded_answer(None, one.request, one.expect, service, root, refusals),
     }
 }
 
-/// Two verdicts about one check, which holds only where both do.
+/// What an assertion came to on a recording it is declared to fail on.
 ///
-/// Unproven wins over failed: a check whose recording could not be run has not been
-/// shown to be wrong, and saying it failed would send its author to the wrong file.
+/// A recording the plugin does not carry is refused as well as unproven: the manifest
+/// declares a failure on something nobody can read, and the run could not look.
+fn declared(
+    one: &Asserting,
+    declaration: &Declaration,
+    service: Option<&Service>,
+    root: &Path,
+    refusals: &mut Vec<lemonfiber_plugin::Violation>,
+) -> Verdict {
+    let named = declaration.fixture.as_str();
+    let carried = crate::within::beneath(named).is_some_and(|inside| root.join(inside).is_file());
+    if !named.trim().is_empty() && !carried {
+        refusals.push(lemonfiber_plugin::Violation {
+            location: format!("{}.expected {named}", one.at),
+            message: "names a recording the plugin's source does not hold; a failure is \
+                      declared on a recording somebody can read"
+                .to_owned(),
+        });
+    }
+    match faulted(
+        Some(named),
+        one.request,
+        one.expect,
+        service,
+        root,
+        refusals,
+    ) {
+        Err(why) => Verdict::Unproven { why },
+        Ok(faults) => as_declared(declaration, faults),
+    }
+}
+
+/// Whether what failed on a declared recording is the failure the declaration describes.
+///
+/// It is only where the named constraint, at the named place, is the one thing that
+/// failed. Anything else failing there is reported with every fault, whether or not the
+/// declared one failed too; the named one holding makes the declaration stale.
+fn as_declared(declaration: &Declaration, faults: Vec<Fault>) -> Verdict {
+    let fixture = &declaration.fixture;
+    let said = match &declaration.place {
+        Some(place) => format!("{} at {place}", declaration.constraint.as_str()),
+        None => declaration.constraint.as_str().to_owned(),
+    };
+    let is_named = |fault: &Fault| {
+        fault.constraint == declaration.constraint && fault.place == declaration.place
+    };
+    if !faults.iter().all(is_named) {
+        let every: Vec<&str> = faults.iter().map(|fault| fault.said.as_str()).collect();
+        return Verdict::Failed {
+            faults: vec![format!(
+                "{fixture} is declared to fail on {said}, and fails on: {}",
+                every.join("; ")
+            )],
+        };
+    }
+    match faults.into_iter().next() {
+        None => Verdict::Failed {
+            faults: vec![format!(
+                "{fixture} is declared to fail on {said}, and {said} holds there, so the \
+                 declaration is stale; it goes in the change that made the recording pass"
+            )],
+        },
+        Some(fault) => Verdict::FailingAsDeclared {
+            declared: vec![FailingAsDeclared {
+                fixture: fixture.clone(),
+                constraint: declaration.constraint,
+                place: declaration.place.clone(),
+                held: fault.held,
+                reason: declaration.reason.clone(),
+            }],
+        },
+    }
+}
+
+/// Two verdicts about one assertion, reported as one.
+///
+/// Failed wins over everything, because a failure has to fail the run whatever else the
+/// other recordings came to; a recording that could not be run is then named among the
+/// faults rather than dropped. Unproven wins over failing as declared and over passed,
+/// because what was not run was not shown. Failing as declared wins over passed, because
+/// it is never counted as a pass.
 fn both(first: Verdict, second: Verdict) -> Verdict {
     match (first, second) {
-        (unproven @ Verdict::Unproven { .. }, _) | (_, unproven @ Verdict::Unproven { .. }) => {
-            unproven
-        }
         (Verdict::Failed { faults: mut all }, Verdict::Failed { faults }) => {
             all.extend(faults);
             Verdict::Failed { faults: all }
         }
-        (failed @ Verdict::Failed { .. }, Verdict::Passed)
-        | (Verdict::Passed, failed @ Verdict::Failed { .. }) => failed,
+        (Verdict::Failed { mut faults }, Verdict::Unproven { why })
+        | (Verdict::Unproven { why }, Verdict::Failed { mut faults }) => {
+            faults.push(why);
+            Verdict::Failed { faults }
+        }
+        (failed @ Verdict::Failed { .. }, _) | (_, failed @ Verdict::Failed { .. }) => failed,
+        (Verdict::Unproven { why: first }, Verdict::Unproven { why: second }) => {
+            Verdict::Unproven {
+                why: format!("{first}; {second}"),
+            }
+        }
+        (unproven @ Verdict::Unproven { .. }, _) | (_, unproven @ Verdict::Unproven { .. }) => {
+            unproven
+        }
+        (
+            Verdict::FailingAsDeclared { declared: mut all },
+            Verdict::FailingAsDeclared { declared },
+        ) => {
+            all.extend(declared);
+            Verdict::FailingAsDeclared { declared: all }
+        }
+        (declared @ Verdict::FailingAsDeclared { .. }, Verdict::Passed)
+        | (Verdict::Passed, declared @ Verdict::FailingAsDeclared { .. }) => declared,
         (Verdict::Passed, Verdict::Passed) => Verdict::Passed,
     }
 }
@@ -180,17 +302,34 @@ pub(super) fn recorded_answer(
     root: &Path,
     refusals: &mut Vec<lemonfiber_plugin::Violation>,
 ) -> Verdict {
+    match faulted(named, request, expect, service, root, refusals) {
+        Err(why) => Verdict::Unproven { why },
+        Ok(faults) if faults.is_empty() => Verdict::Passed,
+        Ok(faults) => Verdict::Failed {
+            faults: faults.into_iter().map(|fault| fault.said).collect(),
+        },
+    }
+}
+
+/// Every way the recording an assertion names is not what it declares, or why it could
+/// not be run against that recording at all.
+fn faulted(
+    named: Option<&str>,
+    request: &lemonfiber_plugin::Request,
+    expect: &lemonfiber_plugin::Expect,
+    service: Option<&Service>,
+    root: &Path,
+    refusals: &mut Vec<lemonfiber_plugin::Violation>,
+) -> Result<Vec<Fault>, String> {
     let Some(service) = service else {
-        return Verdict::Unproven {
-            why: "does not settle which of this plugin's services it asks, so there is no image \
-                  to hold its recording to"
+        return Err(
+            "does not settle which of this plugin's services it asks, so there is no image \
+             to hold its recording to"
                 .to_owned(),
-        };
+        );
     };
-    let recording = match recorded::read(root, named.unwrap_or_default()) {
-        Ok(recording) => recording,
-        Err(unrunnable) => return Verdict::Unproven { why: unrunnable.0 },
-    };
+    let recording =
+        recorded::read(root, named.unwrap_or_default()).map_err(|unrunnable| unrunnable.0)?;
     let named = named.unwrap_or_default();
     if let Some(wrong) = elsewhere(&recording, service, named) {
         // Refused *rather than run against*. Judging it anyway would report an assertion
@@ -201,27 +340,20 @@ pub(super) fn recorded_answer(
         // line, away from the refusal that explains it.
         let why = wrong.to_string();
         refusals.push(wrong);
-        return Verdict::Unproven { why };
+        return Err(why);
     }
     if !recorded::records(&recording, request) {
-        return Verdict::Unproven {
-            why: format!(
-                "{named} records {}, and this asks {}",
-                recorded::said(
-                    &recording.request.method,
-                    &recording.request.path,
-                    recording.request.accept.as_deref()
-                ),
-                recorded::said(&request.method, &request.path, request.accept.as_deref())
+        return Err(format!(
+            "{named} records {}, and this asks {}",
+            recorded::said(
+                &recording.request.method,
+                &recording.request.path,
+                recording.request.accept.as_deref()
             ),
-        };
+            recorded::said(&request.method, &request.path, request.accept.as_deref())
+        ));
     }
-    let faults = judge(expect, &recording.response);
-    if faults.is_empty() {
-        Verdict::Passed
-    } else {
-        Verdict::Failed { faults }
-    }
+    Ok(faults(expect, &recording.response))
 }
 
 /// A recording taken from an image this manifest does not install.

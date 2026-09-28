@@ -59,8 +59,8 @@ use thiserror::Error;
 use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
-    claimed, read, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence, Ran, Unreadable,
-    Verdict,
+    claimed, read, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
+    FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use container::{profile, written};
 pub use declared::{Declaration, Secret};

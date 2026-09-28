@@ -100,8 +100,9 @@ async fn a_plugin_that_holds_its_own_proofs_and_breaks_the_stack_is_still_put_ba
     assert_eq!(
         install
             .as_ref()
-            .map(|one| came_to(one.proofs.first().and_then(|proof| proof.came_to.as_ref()))),
-        Some("held"),
+            .map(|one| came_to(one.proofs.first().and_then(|proof| proof.came_to.as_ref())))
+            .as_deref(),
+        Some("passed"),
         "the plugin answered its own proof"
     );
     assert_eq!(
@@ -277,10 +278,34 @@ async fn the_report_carries_the_verdict_and_says_it_was_the_service_that_answere
     let stated: Vec<Option<Verdict>> = shown
         .map(|one| one.proofs.into_iter().map(|proof| proof.came_to).collect())
         .unwrap_or_default();
-    assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "held");
+    assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "passed");
     assert!(
         why(stated.first().and_then(Option::as_ref)).is_empty(),
         "a proof that held carries no reason, because nothing stopped it"
+    );
+}
+
+/// A proof declared to fail on a recording is held to its expectation as written when
+/// the install asks the service: the declaration is about that recording alone.
+#[tokio::test]
+async fn a_proof_declared_to_fail_on_a_recording_is_held_to_its_expectation_live() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("declared-live", runner, answering(503));
+    let declaring = PROVING.replacen(
+        "expect  = { status = 200 }\n",
+        "expect  = { status = 200 }\nexpected = [{ fixture = \"fixtures/starting.json\", \
+         verdict = \"fails\", constraint = \"status\", reason = \"Recorded while it started.\" }]\n",
+        1,
+    );
+    assert_ne!(
+        declaring, PROVING,
+        "the fixture no longer says what its proof expects"
+    );
+
+    let outcome = installing(&ctx, &source("declared-live", &declaring)).await;
+    assert_eq!(
+        came_to(verdicts(outcome).first().and_then(Option::as_ref)),
+        "failed"
     );
 }
 

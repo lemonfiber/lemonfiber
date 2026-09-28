@@ -258,6 +258,36 @@ async fn a_refuted_row_fails_and_carries_the_remedy_the_plugin_declared() {
     );
 }
 
+/// A check declared to fail on a recording is held to its expectation as written when
+/// it asks the live service: the declaration is about that recording and nothing else,
+/// so an unclaimed server an operator runs is found, as the check exists to find it.
+#[tokio::test]
+async fn a_declared_failure_changes_nothing_about_the_live_service() {
+    let declaring = DECLARING.replace(
+        "fixture   = \"fixtures/claim.json\"\n",
+        "fixture   = \"fixtures/claim.json\"\nexpected  = [{ fixture = \"fixtures/claim.json\", \
+         verdict = \"fails\", constraint = \"json\", place = \"isClaimed\", \
+         reason = \"Recorded from a server nobody has claimed.\" }]\n",
+    );
+    assert_ne!(
+        declaring, DECLARING,
+        "the fixture no longer names its recording"
+    );
+    let finding = only(&declaring, refuting()).await;
+    assert_eq!(
+        failed(&finding).map(|one| one.code),
+        Some(CONTRIBUTED_FAILED),
+        "{finding:?}"
+    );
+    assert!(
+        matches!(
+            only(&declaring, holding()).await.verdict,
+            Verdict::Pass { .. }
+        ),
+        "and it holds where the service answers what it declares"
+    );
+}
+
 /// A remedy is text and stays text, however much its action reads like a command.
 ///
 /// The half that would not fail on its own: a remedy carried as a string and never

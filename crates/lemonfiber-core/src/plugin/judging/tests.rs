@@ -1,7 +1,9 @@
 use lemonfiber_plugin::Expect;
 
 use super::super::recorded::{Answer, Recording};
-use super::judge;
+use lemonfiber_plugin::vocabulary::Constraint;
+
+use super::{faults, judge};
 
 /// An answer built out of a recording, which is the only way one is ever built.
 ///
@@ -570,5 +572,61 @@ fn an_expectation_that_declares_nothing_finds_nothing_wrong() {
     assert_eq!(
         judge(&expects("{}"), &answered(r#"{"status": 500}"#)),
         Vec::<String>::new()
+    );
+}
+
+/// Every fault says which constraint it is, where within it, and what the answer held
+/// there — the three things a declaration that an assertion fails is held to.
+#[test]
+fn every_fault_is_placed_by_its_constraint_with_what_the_answer_held() {
+    let placed = |expect: &str, response: &str| -> Vec<(Constraint, Option<String>, String)> {
+        faults(&expects(expect), &answered(response))
+            .into_iter()
+            .map(|fault| (fault.constraint, fault.place, fault.held))
+            .collect()
+    };
+    let at =
+        |constraint, place: &str, held: &str| (constraint, Some(place.to_owned()), held.to_owned());
+    let whole = |constraint, held: &str| (constraint, None, held.to_owned());
+
+    assert_eq!(
+        placed(
+            r#"{"status": 200, "json": {"/claimed": true, "/gone": 1},
+                "json_has_keys": ["/absent"], "json_types": {"/claimed": "int"},
+                "json_at_least": {"/count": 3, "/claimed": 1}}"#,
+            r#"{"status": 401, "json": {"claimed": false, "count": 2}}"#,
+        ),
+        vec![
+            whole(Constraint::Status, "401"),
+            at(Constraint::Json, "/claimed", "false"),
+            at(Constraint::Json, "/gone", "nothing"),
+            at(Constraint::JsonHasKeys, "/absent", "nothing"),
+            at(Constraint::JsonTypes, "/claimed", "false"),
+            at(Constraint::JsonAtLeast, "/claimed", "false"),
+            at(Constraint::JsonAtLeast, "/count", "2"),
+        ]
+    );
+    assert_eq!(
+        placed(
+            r#"{"json_array_min": 2, "json_is_absent": true, "content_type": "json",
+                "body_starts_with": "<?xml"}"#,
+            r#"{"status": 200, "headers": {"content-type": "text/html"}, "json": [1],
+                "body_starts_with": "<html>"}"#,
+        ),
+        vec![
+            whole(Constraint::JsonArrayMin, "a list of 1"),
+            whole(Constraint::JsonIsAbsent, "a list"),
+            whole(Constraint::ContentType, "\"text/html\""),
+            whole(Constraint::BodyStartsWith, "\"<html>\""),
+        ]
+    );
+    assert_eq!(
+        placed(r#"{"json_array_min": 1}"#, r#"{"status": 200}"#),
+        vec![whole(Constraint::JsonArrayMin, "no document")],
+        "a body that is not a document holds none"
+    );
+    assert_eq!(
+        placed(r#"{"json_array_min": 1}"#, r#"{"status": 200, "json": {}}"#),
+        vec![whole(Constraint::JsonArrayMin, "an object")]
     );
 }

@@ -19,7 +19,7 @@
         "optional": [
           "timeout_s",
           "service",
-          "fires_on"
+          "expected"
         ],
         "bounds": {
           "timeout_s": {

@@ -16,8 +16,8 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Asserted, Capabilities, Claimed, Claiming, Credential, Evidence, Points, Probe, Provenance,
-    Ran, Verdict, Vouched,
+    Asserted, Capabilities, Claimed, Claiming, Credential, Evidence, FailingAsDeclared, Points,
+    Probe, Provenance, Ran, Verdict, Vouched,
 };
 
 // The operator's half: what one machine has installed, and what installing one came
@@ -377,7 +377,32 @@ fn came_to(verdict: &Verdict) -> String {
         Verdict::Passed => "the recording answers it".to_owned(),
         Verdict::Failed { faults } => format!("refuted: {}", faults.join("; ")),
         Verdict::Unproven { why } => format!("unproven: {why}"),
+        Verdict::FailingAsDeclared { declared } => format!(
+            "failing as declared, and not counted as passed: {}",
+            as_declared(declared)
+        ),
     }
+}
+
+/// Each recording an assertion fails on as declared: where, what it held, and why.
+fn as_declared(declared: &[FailingAsDeclared]) -> String {
+    declared
+        .iter()
+        .map(|one| {
+            let at = one
+                .place
+                .as_ref()
+                .map_or_else(String::new, |place| format!(" at {place}"));
+            format!(
+                "{} fails {}{at}, holding {}: {}",
+                one.fixture,
+                one.constraint.as_str(),
+                one.held,
+                one.reason
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 /// A count and the thing counted, pluralised where it is not one.

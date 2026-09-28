@@ -622,7 +622,7 @@ request   = { method = "GET", path = "/" }
 expect    = { status = 200 }
 why       = "w"
 fixture   = "f.json"
-fires_on  = "g.json"
+expected  = [{ fixture = "g.json", verdict = "fails", constraint = "status", reason = "r" }]
 timeout_s = 10
 service   = "s"
 for       = "p:two"

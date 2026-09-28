@@ -12,6 +12,7 @@
 use std::collections::BTreeMap;
 
 use lemonfiber_plugin::pointing::{self, Step};
+use lemonfiber_plugin::vocabulary::Constraint;
 use lemonfiber_plugin::{Expect, Expected, ExpectedKind};
 use serde_json::Value;
 
@@ -71,17 +72,72 @@ pub(crate) fn live(response: &crate::ports::http::Response) -> Answer {
     }
 }
 
+/// One way an answer is not the declared one.
+///
+/// Placed as well as said, because a declaration that an assertion fails on a recording
+/// names the constraint and the place that fail there, and whether the failure is the
+/// declared one is a question about those two rather than about a sentence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fault {
+    /// Which constraint of the expectation it is.
+    pub constraint: Constraint,
+    /// Where within that constraint, written as the expectation writes it, for the four
+    /// constraints that look at places.
+    pub place: Option<String>,
+    /// What the answer held there.
+    pub held: String,
+    /// The whole of it, as a refusal says it.
+    pub said: String,
+}
+
+impl Fault {
+    /// A fault about the answer as a whole.
+    fn whole(constraint: Constraint, held: String, said: String) -> Self {
+        Self {
+            constraint,
+            place: None,
+            held,
+            said,
+        }
+    }
+
+    /// A fault at one place within the answer.
+    fn at(constraint: Constraint, key: &str, held: String, said: String) -> Self {
+        Self {
+            constraint,
+            place: Some(key.to_owned()),
+            held,
+            said,
+        }
+    }
+
+    /// A place the answer does not reach.
+    fn missing(constraint: Constraint, key: &str, missing: &Missing) -> Self {
+        Self::at(constraint, key, "nothing".to_owned(), missing.about(key))
+    }
+}
+
 /// Every way this answer is not the one the expectation declared.
 ///
 /// An empty answer is the assertion holding.
 #[must_use]
 pub fn judge(expect: &Expect, answer: &Answer) -> Vec<String> {
+    faults(expect, answer)
+        .into_iter()
+        .map(|fault| fault.said)
+        .collect()
+}
+
+/// Every way this answer is not the one the expectation declared, each placed.
+#[must_use]
+pub fn faults(expect: &Expect, answer: &Answer) -> Vec<Fault> {
     let mut faults = Vec::new();
     if let Some(wanted) = expect.status {
         if answer.status != wanted {
-            faults.push(format!(
-                "answered {} where it declares {wanted}",
-                answer.status
+            faults.push(Fault::whole(
+                Constraint::Status,
+                answer.status.to_string(),
+                format!("answered {} where it declares {wanted}", answer.status),
             ));
         }
     }
@@ -93,54 +149,68 @@ pub fn judge(expect: &Expect, answer: &Answer) -> Vec<String> {
 }
 
 /// The places an answer must carry with the exact value it must hold.
-fn exact(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
+fn exact(expect: &Expect, answer: &Answer, faults: &mut Vec<Fault>) {
     let Some(wanted) = &expect.json else { return };
     for (key, value) in wanted {
         match held(answer, key) {
-            Err(missing) => faults.push(missing.about(key)),
-            Ok(found) if !same(value, found) => {
-                faults.push(format!(
+            Err(missing) => faults.push(Fault::missing(Constraint::Json, key, &missing)),
+            Ok(found) if !same(value, found) => faults.push(Fault::at(
+                Constraint::Json,
+                key,
+                readable(found),
+                format!(
                     "{key} is {}, and it declares {}",
                     readable(found),
                     said(value)
-                ));
-            }
+                ),
+            )),
             Ok(_) => {}
         }
     }
 }
 
 /// The places an answer must carry, whatever they hold, and the kinds they must be.
-fn keys(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
+fn keys(expect: &Expect, answer: &Answer, faults: &mut Vec<Fault>) {
     for key in expect.json_has_keys.iter().flatten() {
         if let Err(missing) = held(answer, key) {
-            faults.push(missing.about(key));
+            faults.push(Fault::missing(Constraint::JsonHasKeys, key, &missing));
         }
     }
     for (key, kind) in expect.json_types.iter().flatten() {
         match held(answer, key) {
-            Err(missing) => faults.push(missing.about(key)),
-            Ok(found) if !is_kind(found, *kind) => faults.push(format!(
-                "{key} is {}, and it declares {}",
-                kind_of(found),
-                kind_said(*kind)
+            Err(missing) => faults.push(Fault::missing(Constraint::JsonTypes, key, &missing)),
+            Ok(found) if !is_kind(found, *kind) => faults.push(Fault::at(
+                Constraint::JsonTypes,
+                key,
+                readable(found),
+                format!(
+                    "{key} is {}, and it declares {}",
+                    kind_of(found),
+                    kind_said(*kind)
+                ),
             )),
             Ok(_) => {}
         }
     }
     for (key, least) in expect.json_at_least.iter().flatten() {
         match held(answer, key) {
-            Err(missing) => faults.push(missing.about(key)),
+            Err(missing) => faults.push(Fault::missing(Constraint::JsonAtLeast, key, &missing)),
             Ok(found) => match found.as_i64() {
-                None => faults.push(format!(
-                    "{key} is {}, and it declares at least {least}",
-                    readable(found)
+                None => faults.push(Fault::at(
+                    Constraint::JsonAtLeast,
+                    key,
+                    readable(found),
+                    format!(
+                        "{key} is {}, and it declares at least {least}",
+                        readable(found)
+                    ),
                 )),
-                Some(found) if found < *least => {
-                    faults.push(format!(
-                        "{key} is {found}, and it declares at least {least}"
-                    ));
-                }
+                Some(number) if number < *least => faults.push(Fault::at(
+                    Constraint::JsonAtLeast,
+                    key,
+                    number.to_string(),
+                    format!("{key} is {number}, and it declares at least {least}"),
+                )),
                 Some(_) => {}
             },
         }
@@ -148,24 +218,42 @@ fn keys(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
 }
 
 /// What the body is as a whole: a list of a given length, or not a document at all.
-fn shape(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
+fn shape(expect: &Expect, answer: &Answer, faults: &mut Vec<Fault>) {
     if let Some(least) = expect.json_array_min {
         match answer.json.as_ref().and_then(Value::as_array) {
-            None => faults.push("the body is not a list".to_owned()),
-            Some(entries) if (entries.len() as u64) < least => faults.push(format!(
-                "the list holds {}, and it declares at least {least}",
-                entries.len()
+            None => faults.push(Fault::whole(
+                Constraint::JsonArrayMin,
+                answer
+                    .json
+                    .as_ref()
+                    .map_or("no document", kind_of)
+                    .to_owned(),
+                "the body is not a list".to_owned(),
+            )),
+            Some(entries) if (entries.len() as u64) < least => faults.push(Fault::whole(
+                Constraint::JsonArrayMin,
+                format!("a list of {}", entries.len()),
+                format!(
+                    "the list holds {}, and it declares at least {least}",
+                    entries.len()
+                ),
             )),
             Some(_) => {}
         }
     }
-    if expect.json_is_absent == Some(true) && answer.json.is_some() {
-        faults.push("the body parsed as a document, and it declares that it does not".to_owned());
+    if expect.json_is_absent == Some(true) {
+        if let Some(document) = &answer.json {
+            faults.push(Fault::whole(
+                Constraint::JsonIsAbsent,
+                kind_of(document).to_owned(),
+                "the body parsed as a document, and it declares that it does not".to_owned(),
+            ));
+        }
     }
 }
 
 /// What the answer was served as, and what it begins with where it is not a document.
-fn served(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
+fn served(expect: &Expect, answer: &Answer, faults: &mut Vec<Fault>) {
     if let Some(wanted) = &expect.content_type {
         let served = answer
             .headers
@@ -173,17 +261,21 @@ fn served(expect: &Expect, answer: &Answer, faults: &mut Vec<String>) {
             .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
             .map_or("", |(_, value)| value.as_str());
         if !served.contains(wanted.as_str()) {
-            faults.push(format!(
-                "it was served as {served:?}, and it declares {wanted:?}"
+            faults.push(Fault::whole(
+                Constraint::ContentType,
+                format!("{served:?}"),
+                format!("it was served as {served:?}, and it declares {wanted:?}"),
             ));
         }
     }
     if let Some(wanted) = &expect.body_starts_with {
         let begins = answer.body_starts_with.as_deref().unwrap_or_default();
         if !begins.starts_with(wanted.as_str()) {
-            faults.push(format!(
-                "the body begins {:?}, and it declares {wanted:?}",
-                begins.chars().take(40).collect::<String>()
+            let front: String = begins.chars().take(40).collect();
+            faults.push(Fault::whole(
+                Constraint::BodyStartsWith,
+                format!("{front:?}"),
+                format!("the body begins {front:?}, and it declares {wanted:?}"),
             ));
         }
     }

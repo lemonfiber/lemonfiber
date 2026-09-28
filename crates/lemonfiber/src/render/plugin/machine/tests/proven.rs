@@ -80,6 +80,19 @@ fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
                     }),
                     ..proof()
                 },
+                Proving {
+                    proof: "owned".to_owned(),
+                    came_to: Some(Verdict::FailingAsDeclared {
+                        declared: vec![lemonfiber_core::plugin::FailingAsDeclared {
+                            fixture: "fixtures/unclaimed.json".to_owned(),
+                            constraint: lemonfiber_core::plugin::Constraint::Json,
+                            place: Some("/claimed".to_owned()),
+                            held: "false".to_owned(),
+                            reason: "nobody has claimed it".to_owned(),
+                        }],
+                    }),
+                    ..proof()
+                },
             ],
             against: Some(Evidence::Service),
             ..install(one, false)
@@ -94,6 +107,13 @@ fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
     );
     assert!(
         said.contains("established nothing: nothing answered on port 25600"),
+        "{said}"
+    );
+    assert!(
+        said.contains(
+            "did not hold, as its manifest declares: fixtures/unclaimed.json fails json at \
+             /claimed, holding false: nobody has claimed it"
+        ),
         "{said}"
     );
 }
