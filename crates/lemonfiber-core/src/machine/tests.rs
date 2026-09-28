@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use super::{drawing, online, proc_moment, sysctl_moment, Asking, PMSET, SYSCTL};
-use crate::ports::machine::{Power, Started, Supply};
+use async_trait::async_trait;
+
+use super::{drawing, online, proc_moment, sysctl_moment, Asking, PMSET, PS, SYSCTL};
+use crate::ports::machine::{Power, Running, Started, Supply};
 use crate::ports::process::{Failure, Output};
 use crate::ports::Runner;
 use lemonfiber_fixtures::support::{Recording, Scripted};
@@ -150,4 +152,84 @@ fn a_mains_adapter_answers_one_or_nothing_this_understands() {
     assert_eq!(online(" 1 \n"), Some(Power::Mains));
     assert_eq!(online("0"), Some(Power::Battery));
     assert_eq!(online("Unknown"), None);
+}
+
+/// A runner on which `ps` answers as given, and every other program as given too.
+struct Listing {
+    /// What `ps` comes to.
+    ps: Scripted,
+    /// What anything else comes to.
+    otherwise: Scripted,
+}
+
+#[async_trait]
+impl Runner for Listing {
+    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        if argv.first().map(String::as_str) == Some(PS) {
+            return self.ps.run(argv).await;
+        }
+        self.otherwise.run(argv).await
+    }
+}
+
+/// A program's answer, as it exited and what it printed.
+fn exited(status: i32, stdout: &str) -> Output {
+    Output {
+        status: Some(status),
+        stdout: stdout.to_owned(),
+        stderr: String::new(),
+    }
+}
+
+/// A program that is not on this machine.
+fn missing() -> Result<Output, Failure> {
+    Err(Failure::NotFound {
+        program: "absent".to_owned(),
+    })
+}
+
+/// Whether process 38480 is running, on a machine answering as given.
+async fn is_running(
+    ps: Result<Output, Failure>,
+    otherwise: Result<Output, Failure>,
+) -> Option<bool> {
+    Asking::over(Arc::new(Listing {
+        ps: Scripted(ps),
+        otherwise: Scripted(otherwise),
+    }))
+    .alive(38_480)
+    .await
+}
+
+#[tokio::test]
+async fn a_process_is_running_where_the_listing_names_it_and_gone_where_it_names_nothing() {
+    assert_eq!(
+        is_running(Ok(exited(0, "38480\n")), missing()).await,
+        Some(true)
+    );
+    assert_eq!(is_running(Ok(exited(1, "")), missing()).await, Some(false));
+    // A listing naming something else, or a failure that printed something, is not
+    // an answer about this process.
+    assert_eq!(is_running(Ok(exited(0, "12\n")), missing()).await, None);
+    assert_eq!(
+        is_running(Ok(exited(1, "ps: illegal option")), missing()).await,
+        None
+    );
+}
+
+#[tokio::test]
+async fn where_there_is_no_ps_the_windows_listing_is_asked() {
+    let found =
+        "\r\nlemonfiber.exe               38480 Console                    1     12,345 K\r\n";
+    assert_eq!(
+        is_running(missing(), Ok(exited(0, found))).await,
+        Some(true)
+    );
+    let none = "INFO: No tasks are running which match the specified criteria.\r\n";
+    assert_eq!(
+        is_running(missing(), Ok(exited(0, none))).await,
+        Some(false)
+    );
+    assert_eq!(is_running(missing(), Ok(exited(1, ""))).await, None);
+    assert_eq!(is_running(missing(), missing()).await, None);
 }
