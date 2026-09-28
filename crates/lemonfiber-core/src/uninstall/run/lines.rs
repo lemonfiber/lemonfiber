@@ -112,7 +112,7 @@ fn images(gathered: &Gathered, project: &str) -> Vec<Item> {
     gathered
         .services
         .iter()
-        .map(|service| format!("{}:{}", service.image, service.tag))
+        .map(lemonfiber_manifest::Service::reference)
         .collect::<std::collections::BTreeSet<String>>()
         .into_iter()
         .filter_map(|reference| image(gathered, &reference, project))

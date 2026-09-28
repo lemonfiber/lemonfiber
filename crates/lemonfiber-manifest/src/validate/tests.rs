@@ -163,6 +163,35 @@ fn an_empty_tag_is_caught() {
     );
 }
 
+/// A service that names no digest runs whatever its tag points at when it is pulled.
+#[test]
+fn a_service_naming_no_digest_is_caught() {
+    assert!(
+        messages(&without("digest = "))
+            .iter()
+            .any(|m| m.contains("names no digest")),
+        "a tag alone was accepted as naming what runs"
+    );
+}
+
+/// A digest in any other shape is refused rather than handed to the engine to reject.
+#[test]
+fn a_digest_in_another_shape_is_caught() {
+    for shape in [
+        "sha256:ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+        "sha256:abab",
+        "md5:abababababababababababababababab",
+    ] {
+        let text = STACK.replacen("digest = ", &format!("digest = \"{shape}\" # "), 1);
+        assert!(
+            messages(&text)
+                .iter()
+                .any(|m| m.contains("is not `sha256:`")),
+            "{shape} was accepted as a digest"
+        );
+    }
+}
+
 #[test]
 fn a_published_port_with_no_binding_is_caught() {
     let text = edited("bind = \"loopback\"\n", "");

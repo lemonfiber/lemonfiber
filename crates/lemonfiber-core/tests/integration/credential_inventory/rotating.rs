@@ -161,7 +161,7 @@ async fn a_proven_replacement_is_recorded_and_every_consumer_is_accounted_for() 
     let landed = rotated.as_ref().is_some_and(|one| !one.kept_the_existing());
     assert!(landed, "the replacement is the value in force");
     // Every consumer is named, including the ones a restart still has to reach.
-    assert_eq!(rotated.map(|one| one.consumers.len()), Some(4));
+    assert_eq!(rotated.map(|one| one.consumers.len()), Some(3));
     // The record moved, and what it moved to is not what it was.
     let now = recorded(&env, QBITTORRENT_PASSWORD_KEY);
     assert!(now.is_some(), "a password is still recorded");

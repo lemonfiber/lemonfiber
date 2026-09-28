@@ -59,10 +59,9 @@ async fn the_arrs_in_the_stack_are_handed_to_the_request_service() {
 
 /// Each service's key is published where the stack's own services read it.
 ///
-/// Three of them are configured by the environment and by nothing else — there is
-/// no endpoint to tell them anything — so a key that is read and not written down
-/// is one the quality sync, the archive extractor and the dashboard all run
-/// without. Asserted on the file, because that is the whole of the mechanism.
+/// Two of them are configured by the environment and by nothing else — there is no
+/// endpoint to tell them anything — so a key that is read and not written down is one
+/// the quality sync and the archive extractor both run without. Asserted on the file, because that is the whole of the mechanism.
 #[tokio::test]
 async fn each_services_key_is_published_where_the_stack_reads_it() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -101,16 +100,17 @@ fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
     )
 }
 
-/// A service the dashboard has a widget for is published even where no \*arr list
-/// holds it.
+/// Every key a service wrote down is published, even where no \*arr list holds it.
 ///
-/// The keys were published by walking the media-filing \*arrs, which is the right
-/// set for root folders and download clients and the wrong one here: Prowlarr
-/// manages no media and so declares no media types, and the subtitle finder is not
-/// Servarr-shaped at all. Both have a key, both have a widget, and neither key was
-/// written — so those widgets asked with an empty credential and were refused.
-/// qBittorrent is reached by name and password rather than by key, and half a
-/// credential authenticates as badly as none.
+/// The media-filing \*arrs are the right set for root folders and download clients and
+/// the wrong one here: Prowlarr manages no media and so declares no media types, and
+/// the subtitle finder is not Servarr-shaped at all, and both have a key. qBittorrent
+/// is reached by name and password rather than by key, and half a credential
+/// authenticates as badly as none.
+///
+/// **What nothing reads is retired on the way.** The media server's key
+/// filed under lemonfiber's name is revoked and forgotten, and the listening server's
+/// token is forgotten: nothing reads either, and each administers its whole service.
 #[tokio::test]
 async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -121,9 +121,9 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         crate::config::QBITTORRENT_PASSWORD_KEY,
         "minted-earlier",
     );
-    // The media server signs in and lists its keys; the listening server says it
-    // already has an account and hands a token back on sign-in. Both need a
-    // password already recorded, which is what a run that made them would leave.
+    // The media server signs in and lists its keys, one of them lemonfiber's; the
+    // listening server says it already has an account. What an earlier run published
+    // for the dashboard is in the file, to be retired.
     let _ = store::set(
         &env,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
@@ -134,6 +134,8 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
         "minted-earlier",
     );
+    let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
+    let _ = store::set(&env, "AUDIOBOOKSHELF_API_KEY", "listening-token");
     let http = Fake::by_path(vec![
         (
             "/Users/AuthenticateByName",
@@ -147,13 +149,9 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
             ),
         ),
         ("/status", Answer::reply(200, r#"{"isInit":true}"#)),
-        (
-            "/login",
-            Answer::reply(200, r#"{"user":{"token":"listening-token"}}"#),
-        ),
     ]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
-        .with_http(http)
+        .with_http(http.clone())
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED), None)
                 .with_bazarr(FINDER_CONFIG)
@@ -192,8 +190,6 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         "PROWLARR_API_KEY=the-key",
         "BAZARR_API_KEY=finder-key",
         "SEERR_API_KEY=request-key",
-        "JELLYFIN_API_KEY=jellyfin-key",
-        "AUDIOBOOKSHELF_API_KEY=listening-token",
         "QBITTORRENT_USERNAME=admin",
     ] {
         assert!(
@@ -201,6 +197,63 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
             "{expected} was not published: {written}"
         );
     }
+    for retired in ["JELLYFIN_API_KEY", "AUDIOBOOKSHELF_API_KEY"] {
+        assert!(
+            !written.contains(retired),
+            "{retired} is still held for a dashboard that reads nothing: {written}"
+        );
+    }
+    let revoked: Vec<String> = http
+        .requests()
+        .into_iter()
+        .filter(|asked| asked.method == Method::Delete)
+        .map(|asked| asked.url)
+        .collect();
+    assert_eq!(revoked.len(), 1, "{revoked:?}");
+    assert!(
+        revoked
+            .iter()
+            .all(|url| url.ends_with("/Auth/Keys/jellyfin-key")),
+        "the media server's key minted for the dashboard was not revoked: {revoked:?}"
+    );
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
+/// A media server key that would not be revoked is kept in the file, so the next run
+/// can still find which key it was.
+#[tokio::test]
+async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
+    let env = recorded_admin("unrevoked");
+    let _ = store::set(
+        &env,
+        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
+    let http = Fake::by_path(vec![
+        (
+            "/Users/AuthenticateByName",
+            Answer::reply(200, r#"{"AccessToken":"t"}"#),
+        ),
+        ("/Auth/Keys", Answer::reply(500, "")),
+    ]);
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+        .with_http(http)
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+    let _ = super::super::published::publish_keys(
+        &ctx,
+        &[jellyfin_svc()],
+        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        None,
+    )
+    .await;
+
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    assert!(
+        written.contains("JELLYFIN_API_KEY=jellyfin-key"),
+        "a key still valid on the server was forgotten: {written}"
+    );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
@@ -239,12 +292,56 @@ async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
     );
 }
 
+/// A rehearsal names the settings it would fill and none of their values, and touches
+/// no service on the way.
+///
+/// Claiming the listening server and revoking the media server's key are both writes,
+/// so a rehearsal asks neither server anything; what it reports is what the services
+/// already wrote down.
+#[tokio::test]
+async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
+    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let env = config_scratch("publish-rehearsed-keys");
+    let http = Fake::always(Answer::reply(200, r#"{"isInit":false}"#));
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .rehearsing();
+
+    let wiring = super::super::published::publish_keys(
+        &ctx,
+        &[arr("sonarr", 8989, "tv"), audiobookshelf_svc()],
+        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        None,
+    )
+    .await;
+
+    assert_eq!(
+        wiring.state,
+        crate::seed::State::WouldWire {
+            yours: None,
+            ours: Some("SONARR_API_KEY".to_owned()),
+        },
+        "{wiring:?}"
+    );
+    assert!(
+        !format!("{wiring:?}").contains("the-key"),
+        "a rehearsal carried a key: {wiring:?}"
+    );
+    assert!(
+        http.requests().is_empty(),
+        "a rehearsal asked a server something: {:?}",
+        http.requests()
+    );
+    assert!(!env.exists(), "a rehearsal wrote a settings file");
+}
+
 /// A service whose manifest entry names no file publishes no key.
 ///
 /// The request service was declared that way until its key was found to be in a
 /// file — an entry saying the key comes from somewhere this cannot read leaves
 /// nothing to publish, and an older stack pinned here still says so. Publishing an
-/// empty value instead would have the dashboard authenticate with it and be
+/// empty value instead would have whatever reads it authenticate with it and be
 /// refused, which reads as a broken service rather than an unconfigured one.
 #[tokio::test]
 async fn a_service_whose_entry_names_no_file_publishes_no_key() {
@@ -279,18 +376,15 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
 
 /// A listening server with no account gets one, and its password is kept.
 ///
-/// The token is not: the service hands back the same one on every sign-in, so what
-/// is recorded is the password it was made with and the token is asked for again.
+/// Its root account goes to whoever makes the first one, from anywhere on the
+/// network, so it is claimed here. Nothing is signed in for: no token is published,
+/// since nothing in the stack reads one.
 #[tokio::test]
 async fn a_listening_server_with_no_account_is_given_one() {
     let env = recorded_admin("listening-fresh");
     let http = Fake::by_path(vec![
         ("/status", Answer::reply(200, r#"{"isInit":false}"#)),
         ("/init", Answer::reply(200, "")),
-        (
-            "/login",
-            Answer::reply(200, r#"{"user":{"token":"listening-token"}}"#),
-        ),
     ]);
     let ctx = seed_ctx(None, true, Vec::new(), Some(vec![9; 32]), Some(env.clone()))
         .with_http(http.clone())
@@ -304,11 +398,11 @@ async fn a_listening_server_with_no_account_is_given_one() {
     )
     .await;
 
-    assert_eq!(wiring.state, crate::seed::State::Wired, "{wiring:?}");
+    assert!(is_skipped(&wiring), "{wiring:?}");
     let written = std::fs::read_to_string(&env).unwrap_or_default();
     assert!(
-        written.contains("AUDIOBOOKSHELF_API_KEY=listening-token"),
-        "the token was not published: {written}"
+        !written.contains("AUDIOBOOKSHELF_API_KEY"),
+        "a token was published for a dashboard that reads none: {written}"
     );
     assert!(
         written.contains("AUDIOBOOKSHELF_PASSWORD="),
@@ -323,39 +417,39 @@ async fn a_listening_server_with_no_account_is_given_one() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
-/// A server somebody else set up publishes nothing, rather than a wrong key.
+/// A listening server that already has an account is left as it is.
 ///
-/// Both of these are reached with a password lemonfiber minted. Where one already
-/// has an account and no password is recorded, there is no way to sign in — and a
-/// key published from a failed sign-in would be an empty one, which the dashboard
-/// would authenticate with and be refused.
+/// Somebody made that account, and its password is theirs: making a second is refused
+/// by the server, and recording a password for an account this did not make would be
+/// recording one that signs in to nothing.
 #[tokio::test]
-async fn a_server_set_up_by_somebody_else_publishes_nothing() {
+async fn a_listening_server_somebody_already_claimed_is_left_alone() {
     let env = recorded_admin("set-up-elsewhere");
-    let http = Fake::by_path(vec![
-        ("/status", Answer::reply(200, r#"{"isInit":true}"#)),
-        ("/Users/AuthenticateByName", Answer::reply(401, "")),
-    ]);
+    let http = Fake::by_path(vec![("/status", Answer::reply(200, r#"{"isInit":true}"#))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
-        .with_http(http)
+        .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[audiobookshelf_svc(), jellyfin_svc()],
+        &[audiobookshelf_svc()],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         None,
     )
     .await;
 
-    assert!(
-        matches!(wiring.state, crate::seed::State::Skipped { .. }),
-        "{wiring:?}"
-    );
+    assert!(is_skipped(&wiring), "{wiring:?}");
     let written = std::fs::read_to_string(&env).unwrap_or_default();
     assert!(
-        !written.contains("AUDIOBOOKSHELF_API_KEY") && !written.contains("JELLYFIN_API_KEY"),
-        "a key was published for a server that could not be signed in to: {written}"
+        !written.contains("AUDIOBOOKSHELF_PASSWORD"),
+        "a password was recorded for an account somebody else made: {written}"
+    );
+    assert!(
+        !http
+            .requests()
+            .iter()
+            .any(|asked| asked.url.contains("/init")),
+        "a second account was asked for"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }

@@ -50,6 +50,12 @@ pub struct ServiceProvenance {
     /// printed together for a person, because a version without the image it belongs
     /// to names nothing that can be fetched.
     pub pinned: String,
+    /// The digest of the image that runs, where the stack names one.
+    ///
+    /// Beside the tag rather than instead of it: the tag is the version somebody reads,
+    /// and the digest is the one image that version was when it was pinned, which is
+    /// what is pulled and what somebody verifies against the registry.
+    pub digest: Option<String>,
 }
 
 impl From<&lemonfiber_manifest::Service> for ServiceProvenance {
@@ -61,6 +67,7 @@ impl From<&lemonfiber_manifest::Service> for ServiceProvenance {
             upstream: service.upstream.clone(),
             image: service.image.clone(),
             pinned: service.tag.clone(),
+            digest: service.digest.clone(),
         }
     }
 }

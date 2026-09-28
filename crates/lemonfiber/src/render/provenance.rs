@@ -8,10 +8,11 @@
 //! because it is what a check against a project has to be a check *of* — a licence
 //! read off a repository's front page says nothing about the version being run.
 //!
-//! The image and the tag are printed as one reference rather than as two fields. They
-//! are carried apart so a caller can compare versions without parsing them out of a
-//! string, and joined here because a version on its own names nothing anybody can
-//! fetch, and fetching it is what verifying comes to.
+//! The image, the tag and the digest are printed as one reference rather than as three
+//! fields. They are carried apart so a caller can compare versions without parsing them
+//! out of a string, and joined here because a version on its own names nothing anybody
+//! can fetch, and fetching it is what verifying comes to — by the digest, which is what
+//! is pulled, since the tag beside it is a label its publisher can move.
 //!
 //! It closes on the licences rather than the services. Nineteen entries is more than
 //! anybody holds at once, and the question underneath the listing — *is all of this
@@ -55,7 +56,10 @@ fn entry(service: &ServiceProvenance) -> Lines {
     lines.spaced(format!("  {} — {}", service.id, service.name));
     lines.put(format!("    licence  {}", service.license));
     lines.put(format!("    project  {}", service.upstream));
-    lines.put(format!("    pinned   {}:{}", service.image, service.pinned));
+    lines.put(match &service.digest {
+        Some(digest) => format!("    pinned   {}:{}@{digest}", service.image, service.pinned),
+        None => format!("    pinned   {}:{}", service.image, service.pinned),
+    });
     lines
 }
 

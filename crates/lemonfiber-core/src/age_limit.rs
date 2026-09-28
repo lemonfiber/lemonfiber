@@ -1,7 +1,7 @@
 //! How far up an account may watch, in the one set of words every surface says it in.
 //!
 //! **The media server keeps this as a number, and the number is an age.** It holds back
-//! everything it rates above that number. Driven against `jellyfin/jellyfin:10.10.3`:
+//! everything it rates above that number. Driven against `10.10.3` and the pinned `10.11.11`:
 //! its own rating tables, read at `GET /Localization/ParentalRatings`, put every
 //! certificate against the age it is for — `TV-Y7` at 7, `12A` at 12, `PG-13` at 13,
 //! `15` at 15, `18` at 18. So nought is not "nothing at all": it is everything the

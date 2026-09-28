@@ -255,10 +255,6 @@ const QBITTORRENT: Entry = Entry {
             "the tunnel's forwarded-port push, which signs in on every connect and release",
             "lemonfiber restart torrent",
         ),
-        Consumer::from_its_environment(
-            "the dashboard's transfers panel",
-            "lemonfiber restart dash",
-        ),
         Consumer::by_seeding("each library service's download-client registration"),
     ],
     origin: Origin::Lemonfiber,
@@ -285,12 +281,9 @@ const JELLYFIN: Entry = Entry {
 const AUDIOBOOKSHELF: Entry = Entry {
     name: "Audiobookshelf account password",
     setting: config::AUDIOBOOKSHELF_PASSWORD_KEY,
-    consumers: &[
-        Consumer::at_the_service("Audiobookshelf's own first account"),
-        Consumer::read_by_lemonfiber(
-            "the dashboard's listening panel, whose token is derived from it",
-        ),
-    ],
+    consumers: &[Consumer::at_the_service(
+        "Audiobookshelf's own first account",
+    )],
     origin: Origin::Lemonfiber,
     needed: Needed::Always,
     proven_by: None,
@@ -300,13 +293,10 @@ const AUDIOBOOKSHELF: Entry = Entry {
 const BINDERY: Entry = Entry {
     name: "Book library API key",
     setting: config::BINDERY_API_KEY,
-    consumers: &[
-        Consumer::from_its_environment(
-            "the book library service, which takes this key rather than minting its own",
-            "lemonfiber restart books",
-        ),
-        Consumer::from_its_environment("the dashboard's books panel", "lemonfiber restart dash"),
-    ],
+    consumers: &[Consumer::from_its_environment(
+        "the book library service, which takes this key rather than minting its own",
+        "lemonfiber restart books",
+    )],
     origin: Origin::Lemonfiber,
     needed: Needed::Always,
     proven_by: None,

@@ -10,6 +10,12 @@
 //! reports that name and the id it resolved to, and an image re-tagged since keeps
 //! the id while losing the name.
 //!
+//! **An image pulled by digest carries no tag.** A stack that names
+//! `linuxserver/sonarr:4.0.20@sha256:…` is pulled by the digest, and the engine files
+//! the image under `linuxserver/sonarr@sha256:…` and nothing else — the version lives
+//! only in the name the container was started from. So an image is reported under its
+//! tags, its digests, and every name a container was started from it by.
+//!
 //! Pure, so every case of it is driven without a daemon.
 
 use std::collections::HashMap;
@@ -58,19 +64,39 @@ pub(super) fn correlate(images: Vec<ImageSummary>, containers: &[ContainerSummar
         .map(|image| {
             let mut projects: Vec<String> = std::iter::once(&image.id)
                 .chain(image.repo_tags.iter())
+                .chain(image.repo_digests.iter())
                 .filter_map(|key| held.get(key))
                 .flatten()
                 .cloned()
                 .collect();
             projects.sort_unstable();
             projects.dedup();
+            let mut names: Vec<String> = image
+                .repo_tags
+                .into_iter()
+                .chain(image.repo_digests)
+                .chain(started_as(containers, &image.id))
+                .collect();
+            names.sort_unstable();
+            names.dedup();
             Image {
-                tags: image.repo_tags,
+                tags: names,
                 bytes: u64::try_from(image.size).unwrap_or_default(),
                 projects,
             }
         })
         .collect()
+}
+
+/// Every name a container was started from this image by.
+fn started_as<'a>(
+    containers: &'a [ContainerSummary],
+    id: &'a str,
+) -> impl Iterator<Item = String> + 'a {
+    containers
+        .iter()
+        .filter(move |container| container.image_id.as_deref() == Some(id))
+        .filter_map(|container| container.image.clone())
 }
 
 #[cfg(test)]

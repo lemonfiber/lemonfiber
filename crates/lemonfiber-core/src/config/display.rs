@@ -225,10 +225,6 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the address the household's own links point at, which is where the front door is",
     ),
     (
-        "HOMEPAGE_VAR_QBITTORRENT_USER",
-        "the account name the dashboard widget signs in as, beside a withheld password",
-    ),
-    (
         "UN_SONARR_0_URL",
         "where the extractor reaches the television service",
     ),

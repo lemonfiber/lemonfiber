@@ -159,6 +159,7 @@ fn diagnosing() -> Vec<Outcome> {
                 upstream: "https://github.com/Sonarr/Sonarr".to_owned(),
                 image: "lscr.io/linuxserver/sonarr".to_owned(),
                 pinned: "4.0.15".to_owned(),
+                digest: None,
             }],
         }),
         // One service and one removal rather than a whole stack: every field of

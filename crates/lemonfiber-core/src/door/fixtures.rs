@@ -9,6 +9,7 @@ pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Ser
         profile: "media".to_owned(),
         image: "image".to_owned(),
         tag: "1".to_owned(),
+        digest: None,
         port: Some(1),
         bind,
         health: None,

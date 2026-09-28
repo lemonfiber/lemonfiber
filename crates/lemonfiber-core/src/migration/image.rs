@@ -10,24 +10,34 @@ use crate::ports::docker::Image;
 use super::Ours;
 use crate::model::UnsupportedReport;
 
-/// The repository part of an image tag, with any version dropped.
+/// A name with any digest dropped: `repository:tag@sha256:…` and `repository@sha256:…`
+/// are the names a digest-pinned image is started from and pulled under.
+fn undigested(name: &str) -> &str {
+    name.split_once('@').map_or(name, |(before, _)| before)
+}
+
+/// The repository part of an image name, with any version and any digest dropped.
 ///
 /// A registry may itself carry a port, so only a final segment holding no path
 /// separator is a version rather than part of the address.
 #[must_use]
-pub fn repository(tag: &str) -> &str {
-    match tag.rsplit_once(':') {
+pub fn repository(name: &str) -> &str {
+    let name = undigested(name);
+    match name.rsplit_once(':') {
         Some((repository, version)) if !version.contains('/') => repository,
-        _ => tag,
+        _ => name,
     }
 }
 
-/// The version part of a tag, which is what is left once the repository is dropped.
+/// The version part of a name, which is what is left once the repository and any
+/// digest are dropped. Empty for a name that carries only a digest.
 #[must_use]
-pub(crate) fn version_of(tag: &str) -> &str {
-    let repository = repository(tag);
-    tag.get(repository.len()..)
-        .map_or(tag, |rest| rest.strip_prefix(':').unwrap_or(tag))
+pub(crate) fn version_of(name: &str) -> &str {
+    let named = undigested(name);
+    named
+        .get(repository(named).len()..)
+        .and_then(|rest| rest.strip_prefix(':'))
+        .unwrap_or_default()
 }
 
 /// The first tag of this image whose repository is one lemonfiber runs.
@@ -48,8 +58,10 @@ pub(crate) fn standing_on(images: &[Image], project: &str, image: &str) -> Optio
             pulled
                 .tags
                 .iter()
-                .find(|tag| repository(tag) == image)
-                .map(|tag| version_of(tag).to_owned())
+                .filter(|tag| repository(tag) == image)
+                .map(|tag| version_of(tag))
+                .find(|version| !version.is_empty())
+                .map(str::to_owned)
         })
 }
 

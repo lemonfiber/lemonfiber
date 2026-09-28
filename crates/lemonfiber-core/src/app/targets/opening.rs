@@ -279,55 +279,39 @@ pub(crate) async fn bazarr_reader(
     ))
 }
 
-/// The listening server's token, creating its first account where there is none.
+/// Claim the listening server by making its first account, where nobody has.
 ///
-/// The second service in the stack with no key to read. Its first account is made
-/// here, with a minted password recorded like the media server's, and the token its
-/// dashboard panel uses is signed in for rather than stored — the service hands back
-/// the same one every time, so recording it would be a second copy of one secret.
-///
-/// Nothing where the randomness to mint a password is unavailable, or where the
-/// server already has an account lemonfiber did not make: its password is unknown
-/// then, and there is no way to sign in for a token.
-pub(crate) async fn audiobookshelf_token(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-) -> Option<(String, Option<String>)> {
-    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Audiobookshelf)?;
-    let client =
-        crate::audiobookshelf::Audiobookshelf::new(ctx.seams.http.clone(), addr.loopback, &addr.id);
-    let recorded = super::recorded_secret(ctx, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY);
-
-    let (password, minted) = match (client.has_account().await.ok()?, recorded) {
-        (true, Some(known)) => (known, None),
-        (true, None) => return None,
-        (false, _) => {
-            let fresh = crate::secret::generate(ctx.seams.random.as_ref())?;
-            client
-                .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
-                .await
-                .ok()?;
-            (fresh.clone(), Some(fresh))
-        }
-    };
-
-    let token = client
-        .token(crate::config::AUDIOBOOKSHELF_USER, &password)
-        .await
-        .ok()?;
-    Some((token, minted))
-}
-
-/// The media server's own key, minted under lemonfiber's name and reused after.
-///
-/// The one credential in the stack that is asked for rather than read: Jellyfin keeps
-/// its keys in its own database. Nothing where lemonfiber does not hold the admin
-/// password — a server somebody else set up is one this cannot sign in to, and asking
-/// is the only way to get a key.
-pub(crate) async fn jellyfin_key(
+/// The server gives its root account to whoever makes the first one, from anywhere on
+/// the network, so an unclaimed one is anybody's. Made here with a minted password,
+/// which is answered back to be recorded; nothing where the server already has an
+/// account or will not answer, and nothing where the randomness to mint one is
+/// unavailable.
+pub(crate) async fn claim_audiobookshelf(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Option<String> {
+    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Audiobookshelf)?;
+    let client =
+        crate::audiobookshelf::Audiobookshelf::new(ctx.seams.http.clone(), addr.loopback, &addr.id);
+    if client.has_account().await.ok()? {
+        return None;
+    }
+    let fresh = crate::secret::generate(ctx.seams.random.as_ref())?;
+    client
+        .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
+        .await
+        .ok()?;
+    Some(fresh)
+}
+
+/// Revoke the media server key filed under lemonfiber's name, where it can.
+///
+/// Answers whether one was revoked. Nothing where lemonfiber does not hold the admin
+/// password: a server somebody else set up is one this cannot sign in to.
+pub(crate) async fn revoke_jellyfin_key(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> Option<bool> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
     let password = crate::seed::run::identity::recorded_jellyfin_password(ctx)?;
     let client = crate::jellyfin::Jellyfin::authenticated(
@@ -337,7 +321,7 @@ pub(crate) async fn jellyfin_key(
         crate::config::JELLYFIN_ADMIN_USER,
         password,
     );
-    client.api_key().await.ok()
+    client.revoke_our_key().await.ok()
 }
 
 /// A client for the book \*arr, holding the key lemonfiber minted for it.
@@ -364,8 +348,8 @@ pub(crate) fn bindery_reader(
 
 /// The request service's own key, read from the settings file it writes.
 ///
-/// Wanted only so the dashboard's widget can authenticate — lemonfiber itself reaches
-/// Seerr by signing in rather than by key. Nothing before Seerr is initialised, since
+/// Published with the rest of the stack's keys; lemonfiber itself reaches Seerr by
+/// signing in rather than by key. Nothing before Seerr is initialised, since
 /// that is the run that writes one.
 pub(crate) async fn seerr_key(
     ctx: &Ctx,
