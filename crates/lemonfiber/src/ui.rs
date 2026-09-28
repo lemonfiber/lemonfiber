@@ -355,10 +355,13 @@ async fn serving(
             Err(problem) => return complain(&problem),
         };
         let at: Vec<SocketAddr> = sockets.iter().map(|(_, bound)| *bound).collect();
-        let bound = Binding {
-            port: at.first().map_or(0, SocketAddr::port),
-            beyond: offered == Offered::Network,
-        };
+        let bound = encrypted::bound(
+            &ctx,
+            at.first().map_or(0, SocketAddr::port),
+            offered == Offered::Network,
+            encrypting.is_some(),
+        )
+        .await;
         let browser = match (browsing, at.first()) {
             (true, Some(first)) => {
                 opening(
@@ -378,13 +381,13 @@ async fn serving(
         for line in announcement(&at, offered, token.as_str(), browser, fingerprint) {
             say!("{line}");
         }
-        for line in recorded(&ctx, bound, fingerprint.is_some()) {
+        for line in recorded(&ctx, &bound, fingerprint.is_some()) {
             say!("{line}");
         }
         let serving = Serving {
             ctx: Arc::clone(&ctx),
             token: Arc::clone(&token),
-            bound,
+            bound: bound.clone(),
             jobs: jobs.clone(),
             admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
@@ -420,7 +423,7 @@ async fn serving(
 /// Pairing a phone reads it back, because the port is the one part of the address a
 /// phone reaches that nothing but this run knows. Nothing is said where it was written,
 /// and nothing where there is nowhere to write it, which pairing then says for itself.
-fn recorded(ctx: &Ctx, bound: Binding, encrypted: bool) -> Vec<String> {
+fn recorded(ctx: &Ctx, bound: &Binding, encrypted: bool) -> Vec<String> {
     let Some(directory) = ctx.settings.companion.as_deref() else {
         return Vec::new();
     };

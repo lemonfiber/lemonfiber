@@ -56,7 +56,7 @@ fn this_runs(headers: &HeaderMap, token: &Token) -> bool {
 fn verdict(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
     Token::mint(&given()).map_or(Err(Refusal::Unknown), |token| {
         let headers = saying(pairs);
-        admitted(this_runs(&headers, &token), &headers, bound())
+        admitted(this_runs(&headers, &token), &headers, &bound())
     })
 }
 
@@ -72,7 +72,7 @@ fn carrying_the_token(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
     let mut every = vec![(TOKEN_HEADER, token.as_str())];
     every.extend_from_slice(pairs);
     let headers = saying(&every);
-    admitted(this_runs(&headers, &token), &headers, bound())
+    admitted(this_runs(&headers, &token), &headers, &bound())
 }
 
 #[test]

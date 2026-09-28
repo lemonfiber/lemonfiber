@@ -122,7 +122,7 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
         Knocking::Nobody | Knocking::Unconfirmed => None,
     };
     let known = at_the_door || caller.is_some();
-    match admitted(known, request.headers(), serving.bound) {
+    match admitted(known, request.headers(), &serving.bound) {
         Ok(()) => {
             // Carried on the request rather than looked up again, so a handler
             // asking who this is gets the answer the guard actually admitted

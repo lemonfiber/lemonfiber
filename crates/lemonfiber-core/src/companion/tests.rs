@@ -5,7 +5,7 @@ use lemonfiber_fixtures::ports::Renamed;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::FixedRandom;
 
-use super::{certificate, encrypted, paired, replacing, served, Material};
+use super::{answers_to, certificate, comparable, encrypted, paired, replacing, served, Material};
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
@@ -320,5 +320,57 @@ async fn both_halves_are_reached_through_the_one_command() {
             .map(|held| held.fingerprint),
         before,
         "a rehearsal replaced nothing"
+    );
+}
+
+/// The name a run answers to is the one pairing hands a phone — this machine's own
+/// where it has one, the household's address where the operator wrote one instead —
+/// and nothing where there is neither.
+#[tokio::test]
+async fn a_run_answers_to_the_name_pairing_hands_out() {
+    assert_eq!(
+        answers_to(&machine(None, Some("den"), None), 8443).await,
+        Some("den.local".to_owned())
+    );
+    assert_eq!(
+        answers_to(&machine(None, None, Some("media.home")), 8443).await,
+        Some("media.home".to_owned())
+    );
+    assert_eq!(answers_to(&machine(None, None, None), 8443).await, None);
+}
+
+/// The machine-readable report carries the short form beside the material, derived
+/// from the fingerprint that material carries.
+#[tokio::test]
+async fn the_report_carries_the_form_a_person_compares() {
+    let at = served_from("companion-compared", 8443);
+    let pairing = paired(&machine(Some(at), Some("den"), None)).await;
+    let written = pairing
+        .as_ref()
+        .ok()
+        .and_then(|made| serde_json::to_value(made).ok());
+    let expected = pairing
+        .as_ref()
+        .map(|made| comparable(&made.material.fingerprint))
+        .ok();
+    assert!(expected.is_some());
+    assert_eq!(
+        written
+            .as_ref()
+            .and_then(|said| said.get("compare"))
+            .and_then(serde_json::Value::as_str),
+        expected.as_deref()
+    );
+}
+
+/// The short form a person compares is derived one way everywhere, and these are the
+/// values that way gives — the last one what a phone paired with a real stack showed.
+#[test]
+fn a_fingerprint_is_compared_in_four_groups_of_four() {
+    assert_eq!(comparable(&"0".repeat(64)), "22VK-KPHH-NKH9-TUWA");
+    assert_eq!(comparable(&"f".repeat(64)), "Z9JL-Q3PK-BZ6M-HRQZ");
+    assert_eq!(
+        comparable("5adc06f2b08ee084fa1134edd9afda47c36b6441b1d0ea3d6b1a7401ffe63aea"),
+        "WJC8-PK8N-WX3E-8T6S"
     );
 }

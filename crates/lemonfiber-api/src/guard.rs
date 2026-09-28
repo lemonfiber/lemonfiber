@@ -36,12 +36,15 @@ const LOOPBACK: [&str; 3] = ["127.0.0.1", "localhost", "[::1]"];
 /// address on each family it can and a request names whichever one the device it is
 /// on reached — so there is no single address to hold a request to, and the port is
 /// the part every one of them shares.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
     /// The port every address it took is on.
     pub port: u16,
     /// Whether it is offered past this machine.
     pub beyond: bool,
+    /// The one name past loopback's that it answers to: the one pairing material gives
+    /// a phone for this machine, where it is served encrypted on a network.
+    pub named: Option<String>,
 }
 
 impl Binding {
@@ -51,6 +54,7 @@ impl Binding {
         Self {
             port,
             beyond: false,
+            named: None,
         }
     }
 }
@@ -148,7 +152,7 @@ const fn digit(nibble: u8) -> char {
 /// A request without one is refused: `Host` is not optional in the version of
 /// HTTP a browser speaks, and its absence is not something to be lenient about.
 #[must_use]
-pub(crate) fn host_is_here(host: Option<&str>, at: Binding) -> bool {
+pub(crate) fn host_is_here(host: Option<&str>, at: &Binding) -> bool {
     host.is_some_and(|host| names_here(host, at))
 }
 
@@ -156,21 +160,25 @@ pub(crate) fn host_is_here(host: Option<&str>, at: Binding) -> bool {
 ///
 /// A request without one is allowed. `Origin` is a browser's word about itself,
 /// and a script or a command-line client is entitled to say nothing — it is the
-/// browser this check exists to catch, and a browser always speaks.
+/// browser this check exists to catch, and a browser always speaks. A page served
+/// encrypted names itself `https`, and is held to the same address as one that is not.
 #[must_use]
-pub(crate) fn origin_is_here(origin: Option<&str>, at: Binding) -> bool {
+pub(crate) fn origin_is_here(origin: Option<&str>, at: &Binding) -> bool {
     origin.is_none_or(|origin| {
-        let stated = origin.strip_prefix("http://").unwrap_or(origin);
+        let stated = origin
+            .strip_prefix("https://")
+            .or_else(|| origin.strip_prefix("http://"))
+            .unwrap_or(origin);
         names_here(stated, at)
     })
 }
 
 /// Whether `stated` carries this server's port and names somewhere it answers.
-fn names_here(stated: &str, at: Binding) -> bool {
+fn names_here(stated: &str, at: &Binding) -> bool {
     let Some((name, port)) = stated.rsplit_once(':') else {
         return false;
     };
-    port.parse::<u16>().is_ok_and(|port| port == at.port) && reaches_here(name, at.beyond)
+    port.parse::<u16>().is_ok_and(|port| port == at.port) && reaches_here(name, at)
 }
 
 /// Whether a host name is one this surface answers to.
@@ -187,8 +195,21 @@ fn names_here(stated: &str, at: Binding) -> bool {
 /// anywhere. So a literal address is let through and a name is not — which costs an
 /// operator who reaches this by a name their network hands out, and that is the half
 /// of the trade worth saying out loud rather than the half worth hiding.
-fn reaches_here(name: &str, beyond: bool) -> bool {
-    is_loopback_name(name) || (beyond && is_address(name))
+///
+/// **One name is let through besides**, and only where the run names it: the one
+/// pairing material gives a phone, which a run serving encrypted on a network answers
+/// to because a paired phone reaches it by nothing else. It is this machine's own name
+/// or the household's address the operator wrote down, and neither is a name somebody
+/// else's page is served under, which is the name a rebound request carries. Compared
+/// without regard to case, because a name is.
+fn reaches_here(name: &str, at: &Binding) -> bool {
+    is_loopback_name(name)
+        || (at.beyond
+            && (is_address(name)
+                || at
+                    .named
+                    .as_deref()
+                    .is_some_and(|named| named.eq_ignore_ascii_case(name))))
 }
 
 /// Whether a host name is one of loopback's own.

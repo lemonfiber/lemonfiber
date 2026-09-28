@@ -27,6 +27,10 @@ pub(super) fn pairing(report: &Pairing) -> Lines {
         report.material.address
     ));
     lines.put(format!("  {}", report.material.fingerprint));
+    lines.put(format!(
+        "  A phone the line is typed into shows {}; pair it only if it does.",
+        report.compare
+    ));
     if let Some(caution) = &report.caution {
         lines.put(format!("  {caution}"));
     }

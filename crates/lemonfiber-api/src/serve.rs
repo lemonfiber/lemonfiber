@@ -79,7 +79,7 @@ impl Refusal {
 /// # Errors
 ///
 /// Returns the refusal a caller should answer with.
-pub fn admitted(known: bool, headers: &HeaderMap, at: Binding) -> Result<(), Refusal> {
+pub fn admitted(known: bool, headers: &HeaderMap, at: &Binding) -> Result<(), Refusal> {
     if !known {
         return Err(Refusal::Unknown);
     }

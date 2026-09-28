@@ -104,7 +104,7 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
     if let Err(refusal) = admitted(
         matches!(knocking, Knocking::Known(_)),
         &headers,
-        streaming.bound,
+        &streaming.bound,
     ) {
         return refused(refusal);
     }
