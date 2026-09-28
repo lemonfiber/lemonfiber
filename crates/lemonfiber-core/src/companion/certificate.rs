@@ -25,6 +25,12 @@ const CERTIFICATE: &str = "certificate.pem";
 /// The private key it was made with, readable by its owner alone.
 const KEY: &str = "key.pem";
 
+/// The label a PEM block holding a certificate carries.
+const CERTIFIED: &str = "CERTIFICATE";
+
+/// The label a PEM block holding a PKCS #8 private key carries.
+const PRIVATE_KEY: &str = "PRIVATE KEY";
+
 /// The one name the certificate is made out to.
 ///
 /// A phone does not check it — it pins the certificate itself — and a browser warns
@@ -37,10 +43,10 @@ const NAMED: &str = "localhost";
 /// The certificate this machine presents, and the key that goes with it.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Kept {
-    /// The certificate, in PEM.
-    certificate: String,
-    /// The private key, in PEM.
-    key: String,
+    /// The certificate, DER-encoded.
+    certificate: Vec<u8>,
+    /// The private key, in PKCS #8.
+    key: Vec<u8>,
     /// What a phone pins: SHA-256 over the certificate's DER encoding, lower-case hex.
     pub fingerprint: String,
 }
@@ -57,24 +63,21 @@ impl std::fmt::Debug for Kept {
 impl Kept {
     /// The certificate and its key as DER — the certificate, and the key in PKCS #8 —
     /// which is what a TLS server is handed.
-    ///
-    /// Nothing where either no longer reads, which a certificate that was read to make
-    /// this cannot come to.
     #[must_use]
-    pub fn presented(&self) -> Option<(Vec<u8>, Vec<u8>)> {
-        let certificate = der(&self.certificate, "CERTIFICATE")?;
-        let key = rcgen::KeyPair::from_pem(&self.key).ok()?.serialize_der();
-        Some((certificate, key))
+    pub fn presented(&self) -> (Vec<u8>, Vec<u8>) {
+        (self.certificate.clone(), self.key.clone())
     }
 
     /// A certificate and key as they were written down, or why they are not one.
-    fn read(certificate: String, key: String) -> Result<Self, Unkept> {
-        let der = der(&certificate, "CERTIFICATE")
+    fn read(certificate: &str, key: &str) -> Result<Self, Unkept> {
+        let certificate = der(certificate, CERTIFIED)
             .ok_or_else(|| Unkept::Unreadable(format!("{CERTIFICATE} is not a certificate")))?;
-        rcgen::KeyPair::from_pem(&key)
-            .map_err(|_| Unkept::Unreadable(format!("{KEY} is not a private key")))?;
+        let key = der(key, PRIVATE_KEY)
+            .and_then(|bytes| rcgen::KeyPair::try_from(bytes).ok())
+            .ok_or_else(|| Unkept::Unreadable(format!("{KEY} is not a private key")))?
+            .serialize_der();
         Ok(Self {
-            fingerprint: fingerprint(&der),
+            fingerprint: fingerprint(&certificate),
             certificate,
             key,
         })
@@ -93,6 +96,19 @@ fn der(pem: &str, label: &str) -> Option<Vec<u8>> {
     base64::engine::general_purpose::STANDARD
         .decode(joined)
         .ok()
+}
+
+/// `der` as a PEM block labelled `label`: base64 in lines of sixty-four.
+fn pem(label: &str, der: &[u8]) -> String {
+    let encoded = base64::engine::general_purpose::STANDARD.encode(der);
+    let mut lines = String::new();
+    for (at, letter) in encoded.chars().enumerate() {
+        if at > 0 && at % 64 == 0 {
+            lines.push('\n');
+        }
+        lines.push(letter);
+    }
+    format!("-----BEGIN {label}-----\n{lines}\n-----END {label}-----\n")
 }
 
 /// Why there is no certificate to present.
@@ -125,7 +141,7 @@ pub fn kept(directory: &Path) -> Result<Option<Kept>, Unkept> {
     let key = std::fs::read_to_string(directory.join(KEY)).ok();
     match (certificate, key) {
         (None, None) => Ok(None),
-        (Some(certificate), Some(key)) => Kept::read(certificate, key).map(Some),
+        (Some(certificate), Some(key)) => Kept::read(&certificate, &key).map(Some),
         _ => Err(Unkept::Unreadable(format!(
             "only one of {CERTIFICATE} and {KEY} is there, and a certificate is presented with \
              the key it was made with"
@@ -163,14 +179,22 @@ pub fn replaced(directory: &Path) -> Result<Kept, Unkept> {
 /// refused as half of a pair when it is next read — rather than a certificate somebody
 /// could pin whose key is gone.
 fn made(directory: &Path) -> Result<Kept, Unkept> {
-    let made = rcgen::generate_simple_self_signed(vec![NAMED.to_owned()])
-        .map_err(|why| Unkept::Unmade(format!("a certificate could not be made: {why}")))?;
-    let (certificate, key) = (made.cert.pem(), made.signing_key.serialize_pem());
+    let generated = rcgen::generate_simple_self_signed(vec![NAMED.to_owned()]);
+    let made = generated.as_ref().map_err(unmade)?;
+    let (certificate, key) = (
+        pem(CERTIFIED, made.cert.der()),
+        pem(PRIVATE_KEY, &made.signing_key.serialize_der()),
+    );
     for (name, text) in [(KEY, &key), (CERTIFICATE, &certificate)] {
         crate::config::store::write(&directory.join(name), text)
             .map_err(|why| Unkept::Unmade(format!("{name} could not be written: {why}")))?;
     }
-    Kept::read(certificate, key)
+    Kept::read(&certificate, &key)
+}
+
+/// Why a certificate could not be made, as it is reported.
+fn unmade(why: &rcgen::Error) -> Unkept {
+    Unkept::Unmade(format!("a certificate could not be made: {why}"))
 }
 
 #[cfg(test)]

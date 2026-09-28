@@ -53,22 +53,22 @@ pub(crate) fn encrypting(
     })?;
     let kept = certificate::kept_or_made(directory)
         .map_err(|why| Box::new(uncertified(&why.to_string())))?;
-    let config = kept
-        .presented()
-        .and_then(|(certificate, key)| {
-            rustls::ServerConfig::builder_with_provider(Arc::new(
-                rustls::crypto::ring::default_provider(),
-            ))
-            .with_safe_default_protocol_versions()
-            .ok()?
+    let (certificate, key) = kept.presented();
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .ok()
+    .and_then(|builder| {
+        builder
             .with_no_client_auth()
             .with_single_cert(
                 vec![CertificateDer::from(certificate)],
                 PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key)),
             )
             .ok()
-        })
-        .ok_or_else(|| Box::new(uncertified("the certificate kept would not serve")))?;
+    })
+    .ok_or_else(|| Box::new(uncertified("the certificate kept would not serve")))?;
     Ok(Some(Encrypting {
         acceptor: TlsAcceptor::from(Arc::new(config)),
         fingerprint: kept.fingerprint,

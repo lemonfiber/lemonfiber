@@ -1,6 +1,8 @@
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{fingerprint, kept, kept_or_made, replaced, Unkept, CERTIFICATE, KEY};
+use super::{
+    der, fingerprint, kept, kept_or_made, pem, replaced, unmade, Unkept, CERTIFICATE, KEY,
+};
 
 /// What a phone pins is SHA-256 over the DER encoding, in lower-case hex, and nothing
 /// else of the same length.
@@ -25,7 +27,7 @@ fn a_certificate_is_made_once_and_kept() {
     assert_eq!(made, again, "the second run presents what the first made");
     assert!(
         made.as_ref()
-            .is_ok_and(|held| held.fingerprint.len() == 64 && held.presented().is_some()),
+            .is_ok_and(|held| held.fingerprint.len() == 64 && !held.presented().0.is_empty()),
         "{made:?}"
     );
     let described = format!("{made:?}");
@@ -77,4 +79,40 @@ fn a_certificate_that_cannot_be_written_down_is_not_made() {
         matches!(replaced(&blocked), Err(Unkept::Unmade(why)) if why.contains(KEY)),
         "the key is written first"
     );
+}
+
+/// A block that opens and never closes is not a certificate, whatever follows it.
+#[test]
+fn a_block_that_is_never_closed_holds_nothing() {
+    assert_eq!(
+        der("-----BEGIN CERTIFICATE-----\nAAAA\n", "CERTIFICATE"),
+        None
+    );
+    assert_eq!(
+        der(
+            "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n",
+            "CERTIFICATE"
+        ),
+        Some(vec![0, 0, 0])
+    );
+}
+
+/// What stopped a certificate being made is said, not swallowed.
+#[test]
+fn a_certificate_that_could_not_be_made_says_why() {
+    assert!(matches!(
+        unmade(&rcgen::Error::RingUnspecified),
+        Unkept::Unmade(why) if why.starts_with("a certificate could not be made: ")
+    ));
+}
+
+/// What is written is what is read back, broken into the lines PEM readers expect.
+#[test]
+fn a_block_written_reads_back_as_what_it_holds() {
+    let held: Vec<u8> = (0..=255).collect();
+    let written = pem("CERTIFICATE", &held);
+    assert!(written.starts_with("-----BEGIN CERTIFICATE-----\n"));
+    assert!(written.ends_with("\n-----END CERTIFICATE-----\n"));
+    assert!(written.lines().all(|line| line.len() <= 64), "{written}");
+    assert_eq!(der(&written, "CERTIFICATE"), Some(held));
 }
