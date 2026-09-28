@@ -17,7 +17,7 @@ use crate::ports::docker::{Images, Locations};
 use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
 use crate::ports::http::Http;
-use crate::ports::machine::{Started, Supply};
+use crate::ports::machine::{Running, Started, Supply};
 use crate::ports::narration::Silent;
 use crate::ports::network::Site;
 use crate::ports::nntp::Nntp;
@@ -66,6 +66,12 @@ pub struct Ctx {
     /// its battery. A media stack started on battery empties one in an afternoon,
     /// which is a thing to have chosen rather than a thing to discover.
     pub power: Arc<dyn Supply>,
+    /// How this machine is asked whether a process is still running.
+    ///
+    /// Beside the two above and built over the same runner, for the claim a lifecycle
+    /// operation holds on the stack: a run that was killed holding it has left nothing
+    /// to wait for, and only the machine can say that it has gone.
+    pub running: Arc<dyn Running>,
     /// How a credential is proven against the service it authenticates to.
     ///
     /// A port because setup proves one the moment it is entered, on every surface:
@@ -146,11 +152,12 @@ impl Ctx {
         // rather than over the machine: asking this machine its name means running a
         // program, and which program runner that is, is this context's answer already.
         let site: Arc<dyn Site> = Arc::new(crate::network::Here::over(Arc::clone(&seams.runner)));
-        // One object answering both questions about this machine's state, held as the
-        // two seams that ask them, for the reason the site is built here.
+        // One object answering every question about this machine's state, held as the
+        // seams that ask them, for the reason the site is built here.
         let asking = Arc::new(crate::machine::Asking::over(Arc::clone(&seams.runner)));
         let started: Arc<dyn Started> = Arc::clone(&asking) as Arc<dyn Started>;
-        let power: Arc<dyn Supply> = asking as Arc<dyn Supply>;
+        let power: Arc<dyn Supply> = Arc::clone(&asking) as Arc<dyn Supply>;
+        let running: Arc<dyn Running> = asking as Arc<dyn Running>;
         Self {
             dry_run: false,
             force: false,
@@ -163,6 +170,7 @@ impl Ctx {
             site,
             started,
             power,
+            running,
             // Nobody, until a surface says otherwise. A context is built before the
             // thing that would listen exists in both surfaces, and a default that
             // said something would have to guess where.
@@ -345,6 +353,16 @@ impl Ctx {
     #[must_use]
     pub fn with_started(mut self, started: Arc<dyn Started>) -> Self {
         self.started = started;
+        self
+    }
+
+    /// The same context, asking the given seam whether a process is still running.
+    ///
+    /// So a test can drive both answers a claim's holder can give — still there, and
+    /// gone — without starting a process or waiting for one to die.
+    #[must_use]
+    pub fn with_running(mut self, running: Arc<dyn Running>) -> Self {
+        self.running = running;
         self
     }
 

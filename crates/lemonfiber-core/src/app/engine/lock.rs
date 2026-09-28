@@ -30,13 +30,20 @@
 //! line behind it. That is a large mechanism for a distinction nobody watching a
 //! stack come up could tell had been made.
 //!
-//! **The wait is bounded, because nothing here checks whether the holder is alive.**
-//! Asking the operating system about a process id is a dependency and a portability
-//! problem, so a run that was killed leaves the stack claimed until somebody says
-//! `--force`. Waiting on that claim with no end would be a terminal that never comes
+//! **A claim whose holder has gone is taken at once.** The claim records the process
+//! that wrote it, and this machine is asked whether that process is still running —
+//! at the first look and every ten seconds after, rather than on every look, because
+//! asking means running a program. A run that was killed holding the stack has left
+//! nothing to wait for, so the stack is taken from it the way `--force` takes it, and
+//! the run says what it took the stack from. A process this machine says is running
+//! is waited on, and so is one it will not answer about: a process id is reused once
+//! its process has gone, and a wait nobody needed is the side to be wrong on.
+//!
+//! **The wait is bounded, because the holder can be alive and stuck.** A run that is
+//! still there and never finishes would otherwise be a terminal that never comes
 //! back — indistinguishable from a hang, and with nothing said about the one thing
-//! that would fix it. The bound is what turns a dead holder back into a refusal an
-//! operator can act on.
+//! that would fix it. The bound is what turns it back into a refusal an operator can
+//! act on.
 //!
 //! **A refusal names the operation, not the process.** A process id is the wrong
 //! noun for the case this feature exists for: two browser tabs on one server share a
@@ -77,6 +84,13 @@ const AGAIN: Duration = Duration::from_millis(500);
 /// with an ending longer than this — the hour a teardown can spend letting downloads
 /// finish — happens *outside* the claim on purpose, so it is not what this waits on.
 const TURN: Duration = Duration::from_secs(300);
+
+/// How many looks go by between asking whether the holder is still running.
+///
+/// Twenty, which at [`AGAIN`] is every ten seconds: asking runs a program, and a run
+/// waiting out the whole bound behind a live holder asks thirty times rather than six
+/// hundred.
+const ASKED_EVERY: u32 = 20;
 
 /// What is said once the wait is over and this run has the stack.
 const TOOK_IT: &str = "the other operation finished — taking the stack now";
@@ -121,12 +135,15 @@ pub async fn claimed(ctx: &Ctx, doing: &str) -> Result<Claim, Box<Problem>> {
 /// every look: a line repeated twice a second is one whoever is reading scrolls past.
 async fn queued(ctx: &Ctx, path: &Path, doing: &str) -> Result<Claim, Box<Problem>> {
     let mut waited = Duration::ZERO;
+    let mut looks: u32 = 0;
+    let mut taken = false;
     loop {
         if ctx.seams.filesystem.claim(path, &marker(ctx, doing)).await {
-            // Said only to somebody who was told to wait. Whoever read that line is
-            // owed the moment it stopped being true, and whoever never saw one has
-            // nothing to be told the end of.
-            if !waited.is_zero() {
+            // Said only to somebody who was told to wait, and not to one already told
+            // the stack was taken from a run that had gone. Whoever read the waiting
+            // line is owed the moment it stopped being true, and whoever never saw one
+            // has nothing to be told the end of.
+            if !waited.is_zero() && !taken {
                 ctx.narrator.say(TOOK_IT).await;
             }
             return Ok(Claim(Some(path.to_path_buf())));
@@ -134,6 +151,12 @@ async fn queued(ctx: &Ctx, path: &Path, doing: &str) -> Result<Claim, Box<Proble
         // Checked after the attempt rather than before it, so the last look before
         // the bound is a real attempt at the claim rather than a sleep followed by a
         // refusal that never tried.
+        if looks.is_multiple_of(ASKED_EVERY) && gone(ctx, path).await {
+            looks = 0;
+            taken = true;
+            continue;
+        }
+        looks = looks.saturating_add(1);
         if waited >= TURN {
             return Err(Box::new(refusal(ctx, path, waited).await));
         }
@@ -143,6 +166,44 @@ async fn queued(ctx: &Ctx, path: &Path, doing: &str) -> Result<Claim, Box<Proble
         tokio::time::sleep(AGAIN).await;
         waited = waited.saturating_add(AGAIN);
     }
+}
+
+/// Whether the run holding the stack has gone, having taken the claim from it if so.
+///
+/// Asked of this machine about the process the claim names. Taken only where the
+/// machine says that process is not running, and only while the claim still says what
+/// it said when that was asked — another run arriving at the same answer may already
+/// have taken the stack, and its claim is not this one's to remove. A claim this
+/// process wrote is never asked about: it is another client of this server, still going.
+async fn gone(ctx: &Ctx, path: &Path) -> bool {
+    let read = ctx.seams.filesystem.read(path).await.unwrap_or_default();
+    let held = holding(&read);
+    let Some(pid) = held.pid.parse::<u32>().ok() else {
+        return false;
+    };
+    if pid == std::process::id() || ctx.running.alive(pid).await != Some(false) {
+        return false;
+    }
+    if ctx.seams.filesystem.read(path).await.as_deref() != Some(read.as_str()) {
+        return false;
+    }
+    ctx.seams.filesystem.remove(path).await;
+    ctx.narrator.say(&abandoned(&held)).await;
+    true
+}
+
+/// What is said when the stack is taken from a run that has gone.
+fn abandoned(held: &Holder) -> String {
+    let started = held
+        .since
+        .and_then(|since| UNIX_EPOCH.checked_add(Duration::from_secs(since)))
+        .and_then(crate::instant::written)
+        .map(|at| format!(", started {at} UTC,"))
+        .unwrap_or_default();
+    format!(
+        "the operation that held the stack{}{started} is no longer running — taking the stack",
+        about(&held.doing)
+    )
 }
 
 /// Give the stack back.
@@ -205,7 +266,11 @@ struct Holder {
 
 /// Read back what the claim beside the settings says about whoever holds it.
 async fn holder(ctx: &Ctx, path: &Path) -> Holder {
-    let held = ctx.seams.filesystem.read(path).await.unwrap_or_default();
+    holding(&ctx.seams.filesystem.read(path).await.unwrap_or_default())
+}
+
+/// What a claim, as written, says about whoever holds it.
+fn holding(held: &str) -> Holder {
     let mut lines = held.lines();
     let pid = lines.next().unwrap_or_default().trim().to_owned();
     let since = lines

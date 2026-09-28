@@ -26,6 +26,7 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
 };
+use lemonfiber_core::ports::machine::Running;
 use lemonfiber_core::ports::Narrator;
 use lemonfiber_fixtures::heard::Heard;
 
@@ -464,4 +465,217 @@ async fn a_machine_that_keeps_no_settings_is_not_blocked_by_the_lock() {
         released(&ctx_without_settings(&files), claim).await;
     }
     assert!(files.at(&lockfile()).is_none(), "nothing was written");
+}
+
+/// A machine answering whether a process is running as scripted, one answer per
+/// question and the last one repeated, and able to have another run take the stack at
+/// the moment it is asked.
+struct Answering {
+    /// The answers, in the order they are given.
+    answers: Vec<Option<bool>>,
+    /// How many have been asked for.
+    asked: Mutex<usize>,
+    /// A claim written into the files the first time it is asked, as another run
+    /// taking the stack between the question and the answer would write one.
+    meanwhile: Option<(Arc<Remembering>, String)>,
+}
+
+impl Answering {
+    /// A machine answering these, in order.
+    fn saying(answers: &[Option<bool>]) -> Arc<Self> {
+        Arc::new(Self {
+            answers: answers.to_vec(),
+            asked: Mutex::new(0),
+            meanwhile: None,
+        })
+    }
+
+    /// How many times it was asked.
+    fn times(&self) -> usize {
+        self.asked.lock().map(|asked| *asked).unwrap_or_default()
+    }
+}
+
+#[async_trait]
+impl Running for Answering {
+    async fn alive(&self, _pid: u32) -> Option<bool> {
+        let asked = self
+            .asked
+            .lock()
+            .map(|mut asked| {
+                *asked += 1;
+                *asked - 1
+            })
+            .unwrap_or_default();
+        if asked == 0 {
+            if let Some((files, claim)) = &self.meanwhile {
+                files.write(&lockfile(), claim).await;
+            }
+        }
+        let last = self.answers.len().saturating_sub(1);
+        self.answers.get(asked.min(last)).copied().flatten()
+    }
+}
+
+/// A context whose machine answers as `running` does, narrating to `heard`.
+fn ctx_asking(files: &Arc<Remembering>, heard: &Arc<Heard>, running: &Arc<Answering>) -> Ctx {
+    ctx_narrating(files, heard).with_running(Arc::clone(running) as Arc<dyn Running>)
+}
+
+/// The case a handset found: a run killed holding the stack, days ago. Nothing is
+/// waited on, because nothing is there to finish, and the run says what it took the
+/// stack from.
+#[tokio::test(start_paused = true)]
+async fn a_claim_whose_run_has_gone_is_taken_at_once() {
+    let files = Arc::new(Remembering::default());
+    files
+        .write(&lockfile(), &written(somebody_else(), 1_789_428_749, "up"))
+        .await;
+    let heard = Arc::new(Heard::default());
+    let running = Answering::saying(&[Some(false)]);
+
+    let started = tokio::time::Instant::now();
+    let taken = claimed(&ctx_asking(&files, &heard, &running), "down").await;
+
+    assert!(taken.is_ok(), "the stack was taken");
+    assert_eq!(started.elapsed(), Duration::ZERO, "without waiting at all");
+    let marker = files.at(&lockfile()).unwrap_or_default();
+    assert!(
+        marker.ends_with("\ndown") && marker.starts_with(&std::process::id().to_string()),
+        "and the claim is this run's now: {marker:?}"
+    );
+    let said = heard.said().join(" / ");
+    assert_eq!(
+        said,
+        "the operation that held the stack (up), started 2026-09-14T23:32:29 UTC, is no \
+         longer running — taking the stack"
+    );
+}
+
+/// A holder the machine says is running is waited on exactly as before, and the
+/// machine is asked every ten seconds rather than on every look.
+#[tokio::test(start_paused = true)]
+async fn a_claim_whose_run_is_still_there_is_waited_on() {
+    let files = Arc::new(Remembering::default());
+    files
+        .write(
+            &lockfile(),
+            &written(somebody_else(), TWELVE_SECONDS_AGO, "up"),
+        )
+        .await;
+    let heard = Arc::new(Heard::default());
+    let running = Answering::saying(&[Some(true)]);
+
+    let refused = claimed(&ctx_asking(&files, &heard, &running), "down").await;
+
+    assert!(refused.is_err(), "the wait ran out and was refused");
+    assert_eq!(
+        running.times(),
+        31,
+        "asked at the first look and every ten seconds"
+    );
+    assert!(
+        !heard.said().join(" / ").contains("no longer running"),
+        "and nothing was taken from it"
+    );
+}
+
+/// A holder that dies while this run is waiting gives the stack up at the next time
+/// the machine is asked, and the run says it was taken rather than that it finished.
+#[tokio::test(start_paused = true)]
+async fn a_run_that_dies_while_it_is_waited_on_gives_the_stack_up() {
+    let files = Arc::new(Remembering::default());
+    files
+        .write(
+            &lockfile(),
+            &written(somebody_else(), TWELVE_SECONDS_AGO, "up"),
+        )
+        .await;
+    let heard = Arc::new(Heard::default());
+    let running = Answering::saying(&[Some(true), Some(false)]);
+
+    let started = tokio::time::Instant::now();
+    let taken = claimed(&ctx_asking(&files, &heard, &running), "down").await;
+
+    assert!(taken.is_ok());
+    assert_eq!(
+        started.elapsed(),
+        Duration::from_secs(10),
+        "at the next question"
+    );
+    let said = heard.said().join(" / ");
+    assert!(
+        said.contains("no longer running — taking the stack"),
+        "{said}"
+    );
+    assert!(
+        !said.contains("finished"),
+        "it did not finish, it went: {said}"
+    );
+}
+
+/// A machine that will not say is a holder waited on, and a claim this very process
+/// wrote is never asked about at all: it is another client of this server.
+#[tokio::test(start_paused = true)]
+async fn a_holder_nobody_can_vouch_for_is_waited_on() {
+    let files = Arc::new(Remembering::default());
+    files
+        .write(
+            &lockfile(),
+            &written(somebody_else(), TWELVE_SECONDS_AGO, "up"),
+        )
+        .await;
+    let heard = Arc::new(Heard::default());
+    let unanswered = Answering::saying(&[None]);
+    assert!(claimed(&ctx_asking(&files, &heard, &unanswered), "down")
+        .await
+        .is_err());
+
+    files
+        .write(
+            &lockfile(),
+            &written(std::process::id(), TWELVE_SECONDS_AGO, "up"),
+        )
+        .await;
+    let everything_gone = Answering::saying(&[Some(false)]);
+    assert!(
+        claimed(&ctx_asking(&files, &heard, &everything_gone), "down")
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        everything_gone.times(),
+        0,
+        "this process is not asked about"
+    );
+}
+
+/// Another run that found the same holder gone and took the stack first has a claim
+/// of its own, and that one is not removed on the strength of the old holder's death.
+#[tokio::test(start_paused = true)]
+async fn a_claim_that_changed_while_the_machine_was_asked_is_left_alone() {
+    let files = Arc::new(Remembering::default());
+    files
+        .write(&lockfile(), &written(somebody_else(), 1, "up"))
+        .await;
+    let heard = Arc::new(Heard::default());
+    let theirs = written(
+        somebody_else().wrapping_add(1),
+        TWELVE_SECONDS_AGO,
+        "restart",
+    );
+    let running = Arc::new(Answering {
+        answers: vec![Some(false), Some(true)],
+        asked: Mutex::new(0),
+        meanwhile: Some((Arc::clone(&files), theirs.clone())),
+    });
+
+    let refused = claimed(&ctx_asking(&files, &heard, &running), "down").await;
+
+    assert!(refused.is_err(), "the new holder was waited on");
+    assert_eq!(
+        files.at(&lockfile()),
+        Some(theirs),
+        "and its claim was left in place"
+    );
 }

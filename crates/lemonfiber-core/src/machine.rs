@@ -1,6 +1,6 @@
 //! Asking the operating system what state this machine is in.
 //!
-//! Two questions with one answer each, asked the way this workspace asks a machine
+//! Three questions with one answer each, asked the way this workspace asks a machine
 //! its name: through the process port every other program here goes through, so a
 //! run that has already scripted what programs say has scripted these too, and
 //! there stays one place in this workspace that spawns anything.
@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::ports::machine::{Power, Started, Supply};
+use crate::ports::machine::{Power, Running, Started, Supply};
 use crate::ports::Runner;
 
 /// The program the BSD way of asking runs.
@@ -47,6 +47,12 @@ const POWER_ONLINE: [[&str; 2]; 2] = [
     ["cat", "/sys/class/power_supply/AC/online"],
     ["cat", "/sys/class/power_supply/ACAD/online"],
 ];
+
+/// The program that lists processes on macOS and Linux.
+const PS: &str = "ps";
+
+/// The program that lists processes on Windows.
+const TASKLIST: &str = "tasklist";
 
 /// This machine, asked about the state it is in.
 pub struct Asking {
@@ -80,6 +86,43 @@ impl Started for Asking {
 impl Supply for Asking {
     async fn source(&self) -> Option<Power> {
         supply(self).await
+    }
+}
+
+#[async_trait]
+impl Running for Asking {
+    async fn alive(&self, pid: u32) -> Option<bool> {
+        alive(self, pid).await
+    }
+}
+
+/// Whether a process is running, from whichever platform answers.
+///
+/// `ps -p` exits non-zero and prints nothing for a process that is not there, which
+/// is an answer; a `ps` that would not run at all is not one, and Windows is asked
+/// instead. `tasklist` exits cleanly either way and says so in what it prints.
+async fn alive(asking: &Asking, pid: u32) -> Option<bool> {
+    let number = pid.to_string();
+    let listed = [PS, "-p", number.as_str(), "-o", "pid="].map(str::to_owned);
+    if let Ok(output) = asking.runner.run(&listed).await {
+        return listing(&output.stdout, &number, output.succeeded());
+    }
+    let filter = format!("PID eq {pid}");
+    let tasks = [TASKLIST, "/FI", filter.as_str(), "/NH"].map(str::to_owned);
+    let output = asking.runner.run(&tasks).await.ok()?;
+    output
+        .succeeded()
+        .then(|| output.stdout.split_whitespace().any(|word| word == number))
+}
+
+/// What `ps -p` said about one process: there where it printed that process's id,
+/// gone where it exited non-zero having printed nothing, and no answer otherwise.
+fn listing(said: &str, pid: &str, succeeded: bool) -> Option<bool> {
+    let named = said.split_whitespace().any(|word| word == pid);
+    match (succeeded, named) {
+        (_, true) => Some(true),
+        (false, false) if said.trim().is_empty() => Some(false),
+        _ => None,
     }
 }
 
