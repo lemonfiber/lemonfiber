@@ -93,6 +93,11 @@ updates:
       include: scope
     cooldown:
       default-days: 3
+    # The harness builds the workspace's crates, so base64 stays on their line for
+    # the reason given above: a bump here alone is a second copy `deny.toml` refuses.
+    ignore:
+      - dependency-name: base64
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       fuzz:
         patterns: ["*"]
