@@ -2,15 +2,16 @@
 //!
 //! An invitation is not a page anybody has to be running a server to answer. It is
 //! an account with no password on it: made by the operator, claimed by whoever sets
-//! the first password, and gone if nobody does.
+//! the first password, and taken back if nobody does.
 //!
-//! That means nothing here is written down on this machine. **Whether an account is
-//! claimed** is a field the media server already keeps, and **when it was made** is
-//! in the record it keeps of things happening — not on the account itself, which
-//! carries no date at all. Both are read back rather than remembered, so an
-//! invitation survives this program being closed, reinstalled, or run from
-//! somewhere else.
+//! **Whether an account is claimed** is a field the media server keeps. **When it was
+//! offered** is in the record it keeps of things happening — not on the account itself,
+//! which carries no date at all — and in the record this program keeps of what it offered.
+//! This adapter reads the server's half; the program's own is kept beside its
+//! configuration, because the server's record is bounded and can be pushed along by
+//! anybody able to make it record something.
 
+mod policy;
 mod shelf;
 
 use async_trait::async_trait;
@@ -149,40 +150,6 @@ struct ActivityResource {
     items: Vec<EntryResource>,
 }
 
-/// Whether an account may open every library, as the media server names the field.
-///
-/// The same three names [`PolicyResource`] reads by. A policy written under one
-/// spelling and read under another is a limit that reads back as no limit at all, so
-/// the three are declared where a reader meets both halves at once.
-const EVERY_LIBRARY: &str = "EnableAllFolders";
-
-/// The libraries it may open, where it is not every one.
-const CHOSEN_LIBRARIES: &str = "EnabledFolders";
-
-/// The highest rating it may watch, which the server holds as a number.
-const AGE_LIMIT: &str = "MaxParentalRating";
-
-/// The kinds of unrated thing the server holds back, as it names them.
-///
-/// All of them, because what a household means by "hold back what has no rating" is
-/// all of them — a policy naming some would hold back an unrated film and let an
-/// unrated series through, which is a distinction nobody asked for and nobody would
-/// find. Every name here was written and read back off `jellyfin/jellyfin:10.10.3`.
-const UNRATED_KINDS: [&str; 9] = [
-    "Movie",
-    "Trailer",
-    "Series",
-    "Music",
-    "Book",
-    "LiveTvChannel",
-    "LiveTvProgram",
-    "ChannelContent",
-    "Other",
-];
-
-/// The kinds of unrated thing held back, as the media server names the field.
-const UNRATED: &str = "BlockUnratedItems";
-
 /// Where the server's own certificates and the ages it holds them against are read.
 ///
 /// **The answer is the operator's country's, not this product's.** The server keeps a
@@ -318,7 +285,15 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
-        allow(self, id, allowed).await
+        policy::rewritten(self, id, &policy::Edit::Allow(allowed)).await
+    }
+
+    async fn claimable(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
+        policy::rewritten(self, id, &policy::Edit::Claimable(allowed)).await
+    }
+
+    async fn suspend(&self, id: &str) -> Result<(), Failure> {
+        policy::rewritten(self, id, &policy::Edit::Suspend).await
     }
 
     async fn holdings(&self, member: &str, most: u32) -> Result<Vec<Held>, Failure> {
@@ -362,8 +337,8 @@ impl crate::ports::service::Household for Jellyfin {
 async fn standing(jellyfin: &Jellyfin, signed: &Signed) -> Result<bool, Failure> {
     let mut request = jellyfin.request(Method::Get, "/Users/Me", None);
     request.headers.push((
-        "Authorization".to_owned(),
-        format!(r#"MediaBrowser Token="{}""#, signed.token),
+        super::AUTHORIZATION_HEADER.to_owned(),
+        super::carrying(&signed.token),
     ));
     let response = jellyfin.endpoint.send(&request).await?;
 
@@ -412,7 +387,7 @@ async fn whoever(
     // second under the same name would end the first — a member signed in from two
     // browsers would be signed out of one of them.
     request.headers.push((
-        "Authorization".to_owned(),
+        super::AUTHORIZATION_HEADER.to_owned(),
         format!(
             r#"MediaBrowser Client="lemonfiber", Device="lemonfiber", DeviceId="{device}", Version="1""#
         ),
@@ -440,49 +415,6 @@ async fn whoever(
         token: signed.token,
     })
     .filter(|signed| !signed.id.is_empty() && !signed.token.is_empty()))
-}
-
-async fn allow(jellyfin: &Jellyfin, id: &str, allowed: &Allowed) -> Result<(), Failure> {
-    // The account's own policy, read first, with what was chosen written over it.
-    // **A body naming only what changed is refused.** Driven against
-    // `jellyfin/jellyfin:10.10.3`: this endpoint answers `400` to one, naming
-    // `AuthenticationProviderId` and `PasswordResetProviderId` as required — and a
-    // body carrying those two and nothing else is accepted and puts every other
-    // field back to the server's own default, which is every setting made in the
-    // media server's own screens undone by an age limit.
-    let request = jellyfin
-        .as_admin(Method::Get, &format!("/Users/{id}"), None)
-        .await?;
-    let response = jellyfin.endpoint.send(&request).await?;
-    let held: AccountResource = jellyfin
-        .endpoint
-        .decode(&response, "what the account is allowed could not be read")?;
-
-    let mut policy = held.policy;
-    // Only what was chosen. Every other key travels back as it came, and the two
-    // this call may write are left alone where nothing was said about them —
-    // naming libraries is not saying there is no age limit.
-    if let Some(libraries) = &allowed.libraries {
-        policy.insert(EVERY_LIBRARY.to_owned(), false.into());
-        policy.insert(CHOSEN_LIBRARIES.to_owned(), libraries.clone().into());
-    }
-    if let Some(limit) = allowed.age_limit {
-        policy.insert(AGE_LIMIT.to_owned(), limit.into());
-    }
-    if let Some(unrated) = allowed.unrated {
-        let kinds = match unrated {
-            Unrated::HeldBack => UNRATED_KINDS.to_vec(),
-            Unrated::LetThrough => Vec::new(),
-        };
-        policy.insert(UNRATED.to_owned(), kinds.into());
-    }
-
-    let body = serde_json::Value::Object(policy).to_string();
-    let request = jellyfin
-        .as_admin(Method::Post, &format!("/Users/{id}/Policy"), Some(body))
-        .await?;
-    let response = jellyfin.endpoint.send(&request).await?;
-    jellyfin.endpoint.expect_success(&response)
 }
 
 /// The statuses a media server refuses a name and password with.

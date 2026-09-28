@@ -3890,6 +3890,10 @@
                 "$ref": "#/$defs/MemberRequest"
               }
             },
+            "standing": {
+              "description": "Where the account stands: an invitation still out or run out, a member who can\nsign in, or one switched off.",
+              "$ref": "#/$defs/MemberStanding"
+            },
             "to_hand_over": {
               "description": "What this member would be told, in the words they would read it in.\n\nEverything a household member is owed at the moment of asking and cannot be\nshown where they ask: what happens to what they ask for, what their period has\nleft and when it makes room, roughly what a thing costs before they choose one,\nwhat is still waiting on an answer, and what was refused and why. Written to\nthem rather than about them, so it can be handed over as it stands.\n\nEmpty where there is nothing to tell them — a member the request service holds\nno account for has no standing to report and nothing waiting.",
               "type": "array",
@@ -3903,6 +3907,7 @@
             "requests",
             "access",
             "claimed",
+            "standing",
             "to_hand_over"
           ]
         },
@@ -4124,6 +4129,31 @@
           },
           "required": [
             "id"
+          ]
+        },
+        "MemberStanding": {
+          "description": "Where one member's account stands.\n\n**Switched off is its own answer rather than a flag beside another.** An account the\nmedia server switched off after too many wrong passwords reads, on every other field,\nexactly like one that works — and the person holding it has only been told their\npassword is wrong. What unlocks it is a reissue, which is the operator's to do, so the\noperator is the one who has to be able to see it.",
+          "oneOf": [
+            {
+              "description": "Offered, and the offer still stands: nobody has set a password yet.",
+              "type": "string",
+              "const": "invited"
+            },
+            {
+              "description": "Offered, and the offer ran out before anybody claimed it. The next invitation\ntakes it back.",
+              "type": "string",
+              "const": "expired"
+            },
+            {
+              "description": "Claimed, and able to sign in.",
+              "type": "string",
+              "const": "active"
+            },
+            {
+              "description": "Switched off — by the operator, by the media server after too many wrong\npasswords, or when a reset ran out unclaimed. The account and what they watched\nare kept, and a reissue switches it back on.",
+              "type": "string",
+              "const": "suspended"
+            }
           ]
         },
         "Moment": {
@@ -7084,6 +7114,10 @@
                 "$ref": "#/$defs/MemberRequest"
               }
             },
+            "standing": {
+              "description": "Where the account stands: an invitation still out or run out, a member who can\nsign in, or one switched off.",
+              "$ref": "#/$defs/MemberStanding"
+            },
             "to_hand_over": {
               "description": "What this member would be told, in the words they would read it in.\n\nEverything a household member is owed at the moment of asking and cannot be\nshown where they ask: what happens to what they ask for, what their period has\nleft and when it makes room, roughly what a thing costs before they choose one,\nwhat is still waiting on an answer, and what was refused and why. Written to\nthem rather than about them, so it can be handed over as it stands.\n\nEmpty where there is nothing to tell them — a member the request service holds\nno account for has no standing to report and nothing waiting.",
               "type": "array",
@@ -7097,6 +7131,7 @@
             "requests",
             "access",
             "claimed",
+            "standing",
             "to_hand_over"
           ]
         },
@@ -7318,6 +7353,31 @@
           },
           "required": [
             "id"
+          ]
+        },
+        "MemberStanding": {
+          "description": "Where one member's account stands.\n\n**Switched off is its own answer rather than a flag beside another.** An account the\nmedia server switched off after too many wrong passwords reads, on every other field,\nexactly like one that works — and the person holding it has only been told their\npassword is wrong. What unlocks it is a reissue, which is the operator's to do, so the\noperator is the one who has to be able to see it.",
+          "oneOf": [
+            {
+              "description": "Offered, and the offer still stands: nobody has set a password yet.",
+              "type": "string",
+              "const": "invited"
+            },
+            {
+              "description": "Offered, and the offer ran out before anybody claimed it. The next invitation\ntakes it back.",
+              "type": "string",
+              "const": "expired"
+            },
+            {
+              "description": "Claimed, and able to sign in.",
+              "type": "string",
+              "const": "active"
+            },
+            {
+              "description": "Switched off — by the operator, by the media server after too many wrong\npasswords, or when a reset ran out unclaimed. The account and what they watched\nare kept, and a reissue switches it back on.",
+              "type": "string",
+              "const": "suspended"
+            }
           ]
         },
         "Passed": {
@@ -7730,7 +7790,7 @@
               ]
             },
             "hours": {
-              "description": "How many hours it stands before it is withdrawn.\n\nCounted from when it was *offered*, which for an account whose password was\ntaken off is the moment of the reset rather than when the account was made.\nWhat happens at the end is withdrawal, and withdrawal removes the account.",
+              "description": "How many hours it stands before it is withdrawn.\n\nCounted from when it was *offered*, which for an account whose password was\ntaken off is the moment of the reset rather than when the account was made.\nWhat happens at the end depends on the account: one nobody has been in is\nremoved, and one somebody has is switched off and kept.",
               "type": "integer",
               "format": "int64"
             },
@@ -7750,8 +7810,15 @@
               "description": "What was found where this was going.",
               "$ref": "#/$defs/InvitationStanding"
             },
+            "suspended": {
+              "description": "Accounts somebody had been in, reset and not claimed again in time, switched off\non the way past rather than removed.\n\nKept because removing one takes what they watched with it. Switched off because\nan account with no password that anybody may still claim is the thing a window\nexists to close. Offering it again, or reissuing it, switches it back on. On a\nrehearsal these are the ones that *would* be switched off.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "withdrawn": {
-              "description": "Invitations nobody claimed in time, taken back on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be taken back.",
+              "description": "Invitations nobody claimed in time, removed on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be removed.",
               "type": "array",
               "items": {
                 "type": "string"
@@ -7763,6 +7830,7 @@
             "address",
             "hours",
             "withdrawn",
+            "suspended",
             "rehearsed",
             "standing",
             "linked"

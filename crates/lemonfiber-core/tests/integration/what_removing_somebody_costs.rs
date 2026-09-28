@@ -182,6 +182,23 @@ async fn somebody_who_never_asked_for_anything_has_nothing_to_revoke_there() {
     );
 }
 
+/// A request service that would not say what it holds is not reported as emptied.
+///
+/// It may hold an account for them, so the removal went as far as the media server and
+/// no further as far as anybody can tell — which is the middle state, not the whole one.
+#[tokio::test]
+async fn a_request_service_that_would_not_say_is_not_reported_as_revoked() {
+    let http = answering_with(Answer::reply(500, ""), Answer::reply(200, "{}"));
+    let said = removing("unread", "ana", true, http).await;
+
+    let report = said.unwrap_or_else(|| unreachable!("a confirmed removal answers"));
+    assert_eq!(
+        report.revoked,
+        Revoked::MediaServerOnly,
+        "a service nobody could ask was reported as having nothing left"
+    );
+}
+
 /// A request service that will not give the account up leaves it, and says so.
 #[tokio::test]
 async fn an_account_the_request_service_keeps_is_reported_rather_than_claimed_gone() {

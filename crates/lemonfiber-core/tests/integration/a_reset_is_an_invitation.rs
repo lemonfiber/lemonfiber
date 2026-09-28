@@ -5,9 +5,10 @@
 //! gets in again without the operator choosing the next one. What comes back is
 //! therefore an invitation and not a report of its own — the same address, the same code,
 //! the same window, the same line about setting a password. The window is real and is
-//! counted **from the reset**: the media server records one, so an account offered again
-//! is dated by that rather than by when it was made — without which it would be expired
-//! the instant it was reset, and withdrawn by the next invitation offered to anybody.
+//! counted **from the reset**: it is written down when the reset is made, so an account
+//! offered again is dated by that rather than by when it was made — without which it would
+//! be expired the instant it was reset, and switched off by the next invitation offered to
+//! anybody.
 //!
 //! That the operator learns nothing is held structurally in
 //! `an_invitation_sets_nobodys_password`, over both commands at once. What is held here
@@ -49,6 +50,14 @@ fn a_server(who: Answer, reset: Answer) -> Arc<Fake> {
             vec![signed_in.clone(), signed_in],
         ),
         (RESET, vec![reset]),
+        // Her own account, read and written back to switch it on after the reset.
+        (
+            "/Users/9",
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"Ana","Policy":{"IsAdministrator":false}}"#,
+            )],
+        ),
         ("/Users", vec![who]),
     ])
 }
@@ -302,6 +311,10 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
                 200,
                 r#"{"Id":"4","Name":"cy","HasPassword":false}"#,
             )],
+        ),
+        (
+            "/Users/4",
+            vec![Answer::reply(200, r#"{"Id":"4","Policy":{}}"#)],
         ),
         ("/Users", vec![Answer::reply(200, household)]),
     ]);

@@ -130,14 +130,23 @@ pub struct Invitation {
     ///
     /// Counted from when it was *offered*, which for an account whose password was
     /// taken off is the moment of the reset rather than when the account was made.
-    /// What happens at the end is withdrawal, and withdrawal removes the account.
+    /// What happens at the end depends on the account: one nobody has been in is
+    /// removed, and one somebody has is switched off and kept.
     pub hours: i64,
-    /// Invitations nobody claimed in time, taken back on the way past.
+    /// Invitations nobody claimed in time, removed on the way past.
     ///
     /// Reported rather than done quietly: an operator who invited somebody last
     /// week and hears nothing would otherwise have no way to learn the account is
-    /// gone. On a rehearsal these are the ones that *would* be taken back.
+    /// gone. On a rehearsal these are the ones that *would* be removed.
     pub withdrawn: Vec<String>,
+    /// Accounts somebody had been in, reset and not claimed again in time, switched off
+    /// on the way past rather than removed.
+    ///
+    /// Kept because removing one takes what they watched with it. Switched off because
+    /// an account with no password that anybody may still claim is the thing a window
+    /// exists to close. Offering it again, or reissuing it, switches it back on. On a
+    /// rehearsal these are the ones that *would* be switched off.
+    pub suspended: Vec<String>,
     /// Whether the account was made, or only described.
     ///
     /// A rehearsal can say the whole answer without writing any of it — the name is

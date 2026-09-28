@@ -81,11 +81,14 @@ async fn an_age_limit_is_written_onto_the_policy_the_account_already_had() {
             "BlockUnratedItems": every_unrated_kind(),
             "IsAdministrator": false,
             "IsDisabled": false,
+            "InvalidLoginAttemptCount": 0,
+            "LoginAttemptsBeforeLockout": 5,
             "EnableMediaPlayback": false,
             "AuthenticationProviderId": "Default",
             "PasswordResetProviderId": "Default"
         })],
-        "an empty list means no policy was written at all"
+        "an empty list means no policy was written at all; two means the account was \
+         readied and narrowed in separate writes"
     );
 }
 
@@ -127,19 +130,30 @@ async fn named_libraries_reach_the_server_as_the_identifiers_it_holds_them_by() 
     );
 }
 
-/// An offer that chooses neither writes no policy at all.
+/// An offer that chooses neither writes nothing about what the account may watch.
 ///
-/// Not "writes an open one": offering somebody already here a second invitation must
-/// leave what their household narrowed their account to exactly as it was.
+/// What it does write is the account readied to be claimed: switched on, no wrong
+/// passwords counted, and a limit on them. Every key about access travels back as the
+/// server sent it, so the account opens exactly what the server made it open.
 #[tokio::test]
-async fn an_invitation_that_chooses_nothing_writes_nothing() {
+async fn an_invitation_that_chooses_nothing_writes_nothing_about_access() {
     let (sent, made) = offering("chooses-nothing", AS_IT_OPENS, Allowance::default()).await;
 
     assert!(made.is_some(), "the invitation itself was refused");
-    assert!(
-        policies(&sent).is_empty(),
-        "an invitation that chose nothing wrote a policy anyway: {:?}",
-        policies(&sent)
+    assert_eq!(
+        policies(&sent),
+        vec![serde_json::json!({
+            "EnableAllFolders": true,
+            "EnabledFolders": [],
+            "IsAdministrator": false,
+            "IsDisabled": false,
+            "InvalidLoginAttemptCount": 0,
+            "LoginAttemptsBeforeLockout": 5,
+            "EnableMediaPlayback": false,
+            "AuthenticationProviderId": "Default",
+            "PasswordResetProviderId": "Default"
+        })],
+        "an invitation that chose nothing changed what the account may watch"
     );
 }
 
@@ -236,14 +250,14 @@ async fn a_library_list_that_will_not_answer_costs_no_account() {
     );
 }
 
-/// A policy the media server will not take leaves an account that exists, and says so.
+/// A policy the media server will not take costs the account, rather than leaving it open.
 ///
 /// The one refusal that comes after the account is made, because it is the one thing
-/// that cannot be settled before there is an account to write on. What the operator is
-/// told is that the account is there and open — not that something went wrong — since
-/// the two lead to different next moves.
+/// that cannot be settled before there is an account to write on. An account the server
+/// made is open to every library and bounded by nothing, so it is taken back rather than
+/// left standing for somebody to find.
 #[tokio::test]
-async fn a_policy_the_server_will_not_take_says_the_account_is_open() {
+async fn a_policy_the_server_will_not_take_costs_the_account() {
     let (sent, made) = driving(
         "refused-policy",
         a_server(
@@ -266,6 +280,13 @@ async fn a_policy_the_server_will_not_take_says_the_account_is_open() {
     assert!(
         sent.iter().any(|request| request.url.contains(NEW_ACCOUNT)),
         "the account this refusal is about was never made"
+    );
+    assert!(
+        sent.iter().any(|request| {
+            request.method == lemonfiber_core::ports::http::Method::Delete
+                && request.url.ends_with("/Users/9")
+        }),
+        "an account left open by a refused policy was not taken back"
     );
 }
 
@@ -344,9 +365,12 @@ async fn an_offer_that_narrows_nothing_says_nothing_about_unrated_content() {
     let (sent, made) = offering("unrated-untouched", AS_IT_OPENS, Allowance::default()).await;
 
     assert!(made.is_some(), "the invitation itself was refused");
+    let written = policies(&sent);
     assert!(
-        policies(&sent).is_empty(),
-        "an invitation that chose nothing wrote a policy anyway: {:?}",
-        policies(&sent)
+        !written.is_empty()
+            && written
+                .iter()
+                .all(|policy| policy.get("BlockUnratedItems").is_none()),
+        "an invitation that chose nothing wrote what becomes of unrated content: {written:?}"
     );
 }

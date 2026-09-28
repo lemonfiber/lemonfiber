@@ -291,6 +291,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             caution: None,
             hours: 48,
             withdrawn: Vec::new(),
+            suspended: Vec::new(),
             rehearsed: false,
             standing: lemonfiber_core::model::InvitationStanding::Made,
             linked: lemonfiber_core::model::Linked::Made,

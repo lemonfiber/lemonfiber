@@ -15,18 +15,16 @@
 //!
 //! **Expiry happens here rather than on a clock**, for the same reason. Nothing runs
 //! in the background to sweep at the moment an invitation runs out, so the sweep is
-//! done when the operator next offers one. An invitation therefore stands a little
-//! past its window on a quiet stack, which is the direction to err in: it is an
-//! account nobody has claimed, reachable only by somebody who was told about it.
+//! done when the operator next offers one. An invitation therefore stands past its
+//! window on a quiet stack, until the next offer is made.
 //!
-//! **An account offered again is dated from when it was offered again.** Once a password
-//! can be taken off an existing account, "unclaimed" stops meaning "new": the record that
-//! an account was *made* is months old for a household member, so a reset read that way
-//! would be expired before anybody was told about it, and the next offer to anybody would
-//! withdraw it. The media server records the reset too, and
-//! [`offered`](crate::invitation::offered) takes the later of the two.
+//! **Every offer is written down before it is handed back**, with when it runs out.
+//! The media server's own record of when an account was made is bounded and can be
+//! pushed along, and an offer nothing can date is one the sweep treats as expired —
+//! see [`crate::invitation`].
 
 mod allowing;
+mod offering;
 mod refusals;
 mod reissuing;
 mod standing;
@@ -34,13 +32,15 @@ mod standing;
 pub(crate) use reissuing::reissue;
 
 use crate::app::{Allowance, Ctx};
-use crate::invitation::{Offered, HOURS_TO_CLAIM};
+use crate::invitation::{Spent, HOURS_TO_CLAIM};
 use crate::model::{Applied, Invitation, InvitationStanding, Linked};
-use crate::ports::service::{Household as _, Member, Requests as _};
+use crate::ports::service::{Allowed, Household as _, Member, Requests as _};
 
 use allowing::{allowing, would_not_allow};
-use refusals::{no_credential, no_media_server, nobody_named, nowhere_to_send, would_not_renew};
-use standing::{already_here, has_run_out, held, standing_of, take_back, Held};
+use refusals::{
+    no_credential, no_media_server, nobody_named, nowhere_to_send, runs_the_server, would_not_renew,
+};
+use standing::{already_here, held, renews, standing_of, take_back, Held};
 
 /// Offer somebody an account, and withdraw any nobody claimed in time.
 ///
@@ -57,8 +57,8 @@ use standing::{already_here, has_run_out, held, standing_of, take_back, Held};
 /// # Errors
 ///
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server
-/// to hold the account, where it will not answer, or where no library goes by a name
-/// that was given.
+/// to hold the account, where it will not answer, where the name is the account that
+/// administers it, or where no library goes by a name that was given.
 pub(crate) async fn offer(
     ctx: &Ctx,
     name: String,
@@ -77,31 +77,20 @@ pub(crate) async fn offer(
 
     let held = held(ctx, &server).await;
     let already = already_here(&held, &name).cloned();
-    // The one being offered again is not among the ones taken back. Withdrawing means
-    // removing the account, and this is the account the offer is *for* — so the sweep
-    // goes around it, and everybody else's expired invitation is taken as before.
-    let renewing = already
+    // Refused before anything else, a rehearsal included. This is the account the program
+    // signs in as, and an offer would write a household member's limits on it.
+    if let Some(member) = already
         .as_ref()
-        .is_some_and(|member| has_run_out(&held, member));
-    let sweeping: Vec<Offered> = held
-        .spent
-        .iter()
-        .filter(|gone| {
-            already
-                .as_ref()
-                .is_none_or(|member| member.id != gone.member.id)
-        })
-        .cloned()
-        .collect();
-    // `Made` rather than `Waiting`, because an invitation that ran out does not still
-    // stand — one is being made now, on an account they already had. That the account
-    // is not new is the requirement being met and not something to report: what the
-    // operator sends is the same either way.
-    let standing = if renewing {
-        InvitationStanding::Made
-    } else {
-        standing_of(already.as_ref())
-    };
+        .filter(|member| member.access.administrator)
+    {
+        return Err(Box::new(runs_the_server(&member.name)));
+    }
+    let renewing = already.as_ref().is_some_and(|member| renews(&held, member));
+    // The one being offered again is not among the ones taken back. This is the account
+    // the offer is *for* — so the sweep goes around it, and everybody else's expired
+    // invitation is taken as before.
+    let sweeping = around(&held.spent, already.as_ref());
+    let standing = standing_after(already.as_ref(), renewing);
     // Resolved before the account is made, and in a rehearsal too. A library named
     // wrong is a refusal the operator is owed instead of an account, not after one —
     // and a rehearsal that skipped the check would say an invitation would be made
@@ -120,7 +109,8 @@ pub(crate) async fn offer(
             address: reachable.url,
             caution: reachable.caution,
             hours: HOURS_TO_CLAIM,
-            withdrawn: sweeping.into_iter().map(|it| it.member.name).collect(),
+            withdrawn: names(&sweeping.withdrawn),
+            suspended: names(&sweeping.suspended),
             rehearsed: true,
             standing,
             linked: Linked::NotTried,
@@ -131,40 +121,18 @@ pub(crate) async fn offer(
         });
     }
 
-    let withdrawn = take_back(&server, &sweeping).await;
+    let taken = take_back(&server, &sweeping).await;
 
     // The account comes back from whichever this is about, so the operator is told
     // the name somebody signs in as rather than the one they typed — those differ by
     // case whenever an account was already here.
-    let member = if let Some(member) = already {
-        // An invitation that ran out is offered again by dating it again. The account
-        // already has no password, so taking one off changes nothing about it — what it
-        // does is write the record that says when it was offered, which is what the
-        // window is counted from. Refused rather than glossed: the message about to be
-        // sent promises a window, and one that will not be honoured is worse than none.
-        if renewing {
-            server
-                .unclaim(&member.id)
-                .await
-                .map_err(|_| Box::new(would_not_renew(&member.name)))?;
+    let member = match already {
+        Some(member) => {
+            again(ctx, &server, &held, &member, renewing, allowed.as_ref()).await?;
+            member
         }
-        member
-    } else {
-        server
-            .invite(&name)
-            .await
-            .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?
+        None => made(ctx, &server, &held, &name, allowed.as_ref()).await?,
     };
-
-    // Written on the account, which is why it happens after there is one. Nothing is
-    // written where nothing was chosen: an offer that named neither must leave what an
-    // account already here is allowed exactly as its household set it.
-    if let Some(allowed) = &allowed {
-        server
-            .allow(&member.id, allowed)
-            .await
-            .map_err(|_| Box::new(would_not_allow(&member.name)))?;
-    }
 
     // The account being narrowed is named only where something was written on it: an
     // offer that says nothing about access must not quietly take a permission off
@@ -179,12 +147,123 @@ pub(crate) async fn offer(
         address: reachable.url,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
-        withdrawn,
+        withdrawn: taken.withdrawn,
+        suspended: taken.suspended,
         rehearsed: false,
         standing,
         linked,
         applied,
     })
+}
+
+/// What has run out, leaving out the account this offer is for.
+fn around(spent: &Spent, already: Option<&Member>) -> Spent {
+    let not_this = |gone: &&crate::invitation::Offered| {
+        already.is_none_or(|member| member.id != gone.member.id)
+    };
+    Spent {
+        withdrawn: spent.withdrawn.iter().filter(not_this).cloned().collect(),
+        suspended: spent.suspended.iter().filter(not_this).cloned().collect(),
+    }
+}
+
+/// The names of the accounts a sweep reaches.
+fn names(spent: &[crate::invitation::Offered]) -> Vec<String> {
+    spent.iter().map(|gone| gone.member.name.clone()).collect()
+}
+
+/// What was found where the invitation was going, once this offer has been made.
+///
+/// An invitation that ran out does not still stand, so offering it again is not
+/// `Waiting`: one is being made now, on an account they already had — `Made` for an
+/// account nobody has been in, and `Reset` for one somebody has, because what they need
+/// to hear is that a password they had has stopped working.
+fn standing_after(already: Option<&Member>, renewing: bool) -> InvitationStanding {
+    match already {
+        Some(member) if renewing && member.last_seen.is_some() => InvitationStanding::Reset,
+        Some(_) if renewing => InvitationStanding::Made,
+        _ => standing_of(already),
+    }
+}
+
+/// Offer an account that is already here: dated again where its window had closed, and
+/// narrowed where anything was chosen.
+///
+/// Nothing is taken back on the way out of this. The account was here before the offer
+/// and is still theirs; what a failure leaves is the account as it stood.
+async fn again(
+    ctx: &Ctx,
+    server: &crate::jellyfin::Jellyfin,
+    held: &Held,
+    member: &Member,
+    renewing: bool,
+    allowed: Option<&Allowed>,
+) -> Result<(), Box<crate::error::Problem>> {
+    // Dated first, then switched on: the other way round, a record that would not write
+    // leaves an account open with nothing to date it by.
+    if renewing {
+        if !offering::recorded_now(ctx, held, member) {
+            return Err(Box::new(would_not_renew(&member.name)));
+        }
+        return offering::guarded(server, member, allowed, false).await;
+    }
+    // Written only where something was chosen: an offer that named neither must leave
+    // what an account already here is allowed exactly as its household set it.
+    let Some(allowed) = allowed else {
+        return Ok(());
+    };
+    server
+        .allow(&member.id, allowed)
+        .await
+        .map_err(|_| Box::new(would_not_allow(&member.name, false)))
+}
+
+/// Make the account, date it, and ready it — or none of it.
+///
+/// **An account that fails either is taken back.** Both are part of what the offer
+/// promises: a window, and an account narrowed as the operator chose and bounded against
+/// a stranger guessing at it. The media server makes an account open to every library and
+/// bounded by nothing, so one left behind by a failure half way is the least guarded
+/// account the household holds.
+async fn made(
+    ctx: &Ctx,
+    server: &crate::jellyfin::Jellyfin,
+    held: &Held,
+    name: &str,
+    allowed: Option<&Allowed>,
+) -> Result<Member, Box<crate::error::Problem>> {
+    let member = server
+        .invite(name)
+        .await
+        .map_err(|failure| Box::new(crate::error::Diagnose::problem(&failure)))?;
+    let finished = if offering::recorded_now(ctx, held, &member) {
+        offering::guarded(server, &member, allowed, true).await
+    } else {
+        Err(Box::new(offering::unrecorded(&member.name)))
+    };
+    let Err(refusal) = finished else {
+        return Ok(member);
+    };
+    Err(Box::new(undone(server, &member, *refusal).await))
+}
+
+/// Take back an account a refused offer made, saying so on the refusal.
+///
+/// Where the media server will not take it back either, the refusal says which account
+/// was left and what it is, because that is now the operator's to remove.
+async fn undone(
+    server: &crate::jellyfin::Jellyfin,
+    member: &Member,
+    refusal: crate::error::Problem,
+) -> crate::error::Problem {
+    if server.withdraw(&member.id).await.is_ok() {
+        return refusal;
+    }
+    refusal.or_try(crate::error::Remedy::new(format!(
+        "The account {} was made and could not be taken back: it has no password and \
+         nothing held back. Remove it in the media server's own settings",
+        member.name
+    )))
 }
 
 /// Hold what this person may ask for to the same decision as what they may watch.
@@ -251,12 +330,18 @@ async fn applied(
 /// in between, which is the only kind of "later" that survives this program being
 /// closed, reinstalled, or run from somewhere else.
 ///
-/// The invitations just taken back are left out: they no longer have an account.
+/// The invitations just removed are left out: they no longer have an account.
 fn to_link(held: &Held, made: &Member) -> Vec<String> {
     let mut linking: Vec<String> = held
         .household
         .iter()
-        .filter(|member| !held.spent.iter().any(|gone| gone.member.id == member.id))
+        .filter(|member| {
+            !held
+                .spent
+                .withdrawn
+                .iter()
+                .any(|gone| gone.member.id == member.id)
+        })
         .map(|member| member.id.clone())
         .collect();
     // The account just made was not in the household when it was read.

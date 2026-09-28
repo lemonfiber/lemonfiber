@@ -2598,6 +2598,12 @@
           ],
           "required": true
         },
+        "standing": {
+          "type": [
+            "ref:MemberStanding"
+          ],
+          "required": true
+        },
         "to_hand_over": {
           "type": [
             "array[string]"
@@ -2842,6 +2848,12 @@
         "standing": {
           "type": [
             "ref:InvitationStanding"
+          ],
+          "required": true
+        },
+        "suspended": {
+          "type": [
+            "array[string]"
           ],
           "required": true
         },
@@ -3456,6 +3468,15 @@
         }
       },
       "variants": []
+    },
+    "MemberStanding": {
+      "fields": {},
+      "variants": [
+        "\"active\"",
+        "\"expired\"",
+        "\"invited\"",
+        "\"suspended\""
+      ]
     },
     "Mended": {
       "fields": {
