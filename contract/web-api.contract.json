@@ -9566,6 +9566,10 @@
                 "null"
               ]
             },
+            "compare": {
+              "description": "The fingerprint in the short form a person compares with what the phone shows\nafter typing the line in, as [`comparable`] derives it.",
+              "type": "string"
+            },
             "material": {
               "description": "The material itself.",
               "$ref": "#/$defs/PairingMaterial"
@@ -9586,6 +9590,7 @@
           "required": [
             "material",
             "written",
+            "compare",
             "until",
             "replacing"
           ]

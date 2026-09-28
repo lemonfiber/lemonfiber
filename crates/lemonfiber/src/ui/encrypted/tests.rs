@@ -1,11 +1,15 @@
+use axum::http::{header, HeaderMap, HeaderValue};
+use lemonfiber_api::admission::here;
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::companion::certificate;
+use lemonfiber_core::companion::{certificate, paired, served};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
+use lemonfiber_core::platform::Environment;
+use lemonfiber_fixtures::ports::Renamed;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_testing::context::a_context;
 
-use super::encrypting;
+use super::{bound, encrypting};
 
 /// A machine keeping what pairing needs at `directory`.
 fn keeping(directory: Option<std::path::PathBuf>) -> Ctx {
@@ -79,4 +83,60 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
         Some(NO_CERTIFICATE),
         "a key that is not the certificate's own does not serve"
     );
+}
+
+/// A machine called `den`, served encrypted on the network on `port`, keeping what
+/// pairing needs.
+fn served_as_den(named: &str, port: u16) -> Ctx {
+    let at = Scratch::new(named).kept();
+    let _ = certificate::kept_or_made(&at);
+    let _ = served::record(
+        &at,
+        served::Served {
+            port,
+            encrypted: true,
+            network: true,
+        },
+    );
+    a_context()
+        .settings(Settings {
+            companion: Some(at),
+            ..Settings::default()
+        })
+        .environment(Environment::MacOs)
+        .build()
+        .with_site(Renamed::called(Some("den")))
+}
+
+/// A request naming `host`, as a phone that was handed it sends one.
+fn naming(host: &str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    if let Ok(value) = HeaderValue::from_str(host) {
+        headers.insert(header::HOST, value);
+    }
+    headers
+}
+
+/// The address pairing hands a phone is one the run it was made for answers: a phone
+/// that was paired reaches the surface by exactly that name, so a run refusing it is a
+/// pairing that cannot be used.
+#[tokio::test]
+async fn the_address_a_phone_is_handed_is_one_the_run_answers() {
+    let ctx = served_as_den("encrypting-answers-the-paired-name", 8443);
+    let address = paired(&ctx)
+        .await
+        .map(|made| made.material.address)
+        .unwrap_or_default();
+    let host = address.strip_prefix("https://").unwrap_or_default();
+    assert_eq!(host, "den.local:8443");
+
+    assert!(here(&naming(host), &bound(&ctx, 8443, true, true).await));
+    // Only where it is served encrypted on the network, which is the only run
+    // pairing is made for. Anywhere else a name is refused.
+    assert!(!here(&naming(host), &bound(&ctx, 8443, true, false).await));
+    assert!(!here(&naming(host), &bound(&ctx, 8443, false, true).await));
+    assert!(!here(
+        &naming("elsewhere.local:8443"),
+        &bound(&ctx, 8443, true, true).await
+    ));
 }

@@ -319,7 +319,7 @@ pub fn routes() -> Router<Serving> {
 
 /// Whether a request says it came from where this server is listening.
 #[must_use]
-pub fn here(headers: &HeaderMap, at: Binding) -> bool {
+pub fn here(headers: &HeaderMap, at: &Binding) -> bool {
     let said = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
     host_is_here(said(header::HOST.as_str()), at)
         && origin_is_here(said(header::ORIGIN.as_str()), at)

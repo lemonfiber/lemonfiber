@@ -3985,6 +3985,12 @@
           ],
           "required": false
         },
+        "compare": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
         "material": {
           "type": [
             "ref:PairingMaterial"

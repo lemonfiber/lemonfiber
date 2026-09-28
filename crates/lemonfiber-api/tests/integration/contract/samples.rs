@@ -307,6 +307,7 @@ fn a_pairing() -> lemonfiber_core::companion::Pairing {
     };
     lemonfiber_core::companion::Pairing {
         written: serde_json::to_string(&material).unwrap_or_default(),
+        compare: lemonfiber_core::companion::comparable(&material.fingerprint),
         material,
         until: "2026-10-01T00:10:00".to_owned(),
         replacing: "It changes only when somebody replaces it.".to_owned(),

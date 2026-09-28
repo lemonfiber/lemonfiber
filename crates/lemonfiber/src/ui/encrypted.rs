@@ -12,8 +12,9 @@
 
 use std::sync::Arc;
 
+use lemonfiber_api::guard::Binding;
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::companion::certificate;
+use lemonfiber_core::companion::{answers_to, certificate};
 use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
 use lemonfiber_core::error::{Problem, Remedy, Severity};
 use lemonfiber_core::PRODUCT;
@@ -73,6 +74,24 @@ pub(crate) fn encrypting(
         acceptor: TlsAcceptor::from(Arc::new(config)),
         fingerprint: kept.fingerprint,
     }))
+}
+
+/// What a request has to name to be answered by a run on `port`.
+///
+/// Served encrypted on a network, that includes the name pairing material gives a
+/// phone, which is the only name a paired phone reaches it by. Anywhere else a name is
+/// refused.
+pub(crate) async fn bound(ctx: &Ctx, port: u16, network: bool, encrypted: bool) -> Binding {
+    let named = if network && encrypted {
+        answers_to(ctx, port).await
+    } else {
+        None
+    };
+    Binding {
+        port,
+        beyond: network,
+        named,
+    }
 }
 
 /// Encrypted was asked for with no port named.

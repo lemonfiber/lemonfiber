@@ -94,6 +94,9 @@ pub struct Pairing {
     pub material: Material,
     /// The material as the one line a code carries and a person types.
     pub written: String,
+    /// The fingerprint in the short form a person compares with what the phone shows
+    /// after typing the line in, as [`comparable`] derives it.
+    pub compare: String,
     /// When it stops being good, as a date and a time of day.
     pub until: String,
     /// What would make every paired phone refuse this machine, said now rather than
@@ -137,14 +140,9 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
     let held = certificate::kept(directory)
         .map_err(|why| Box::new(no_certificate(&why.to_string())))?
         .ok_or_else(|| Box::new(no_certificate("none has been made")))?;
-    let named = ctx.site.name().await;
-    let reached = crate::door::address(
-        named.as_deref(),
-        ctx.settings.household_host.as_deref(),
-        ctx.environment,
-        served.port,
-    )
-    .ok_or_else(|| Box::new(no_address()))?;
+    let reached = reached(ctx, served.port)
+        .await
+        .ok_or_else(|| Box::new(no_address()))?;
     let stack = identifier::kept_or_minted(directory, ctx.seams.random.as_ref())
         .map_err(|why| Box::new(unnamed(&why.to_string())))?;
     let expiring = ctx.seams.clock.now() + LASTS;
@@ -158,6 +156,7 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
     };
     Ok(Pairing {
         written: serde_json::to_string(&material).unwrap_or_default(),
+        compare: comparable(&material.fingerprint),
         material,
         until: crate::instant::written(expiring).unwrap_or_default(),
         replacing: format!(
@@ -167,6 +166,63 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
         ),
         caution: reached.caution,
     })
+}
+
+/// The letters and digits nobody reads as another: no `0`, `1`, `I` or `O`.
+const COMPARABLE: &[u8; 32] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+/// A fingerprint in the form a person compares by eye: sixteen characters in four
+/// groups of four.
+///
+/// SHA-256 over the fingerprint as its sixty-four lower-case hex characters, and the
+/// first sixteen bytes of that digest, each modulo thirty-two, as an index into
+/// [`COMPARABLE`]. The phone derives it the same way, so the two agree exactly when the
+/// fingerprints do.
+#[must_use]
+pub fn comparable(fingerprint: &str) -> String {
+    let digest = ring::digest::digest(&ring::digest::SHA256, fingerprint.as_bytes());
+    let letters: Vec<char> = digest
+        .as_ref()
+        .iter()
+        .take(16)
+        .filter_map(|byte| {
+            COMPARABLE
+                .get(usize::from(byte % 32))
+                .copied()
+                .map(char::from)
+        })
+        .collect();
+    letters
+        .chunks(4)
+        .map(|group| group.iter().collect::<String>())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// The name pairing material gives a phone for this machine on `port`, where it gives
+/// one.
+///
+/// A run serving encrypted on a network answers to it, because a paired phone reaches
+/// the surface by this name and no other.
+pub async fn answers_to(ctx: &Ctx, port: u16) -> Option<String> {
+    let reached = reached(ctx, port).await?;
+    let written = format!(":{port}");
+    reached
+        .url
+        .strip_prefix("http://")
+        .and_then(|rest| rest.strip_suffix(written.as_str()))
+        .map(str::to_owned)
+}
+
+/// The household's address for this machine on `port`, which is where a phone is sent.
+async fn reached(ctx: &Ctx, port: u16) -> Option<crate::door::Address> {
+    let named = ctx.site.name().await;
+    crate::door::address(
+        named.as_deref(),
+        ctx.settings.household_host.as_deref(),
+        ctx.environment,
+        port,
+    )
 }
 
 /// Replace the certificate the surface presents, or say what replacing it would cost.

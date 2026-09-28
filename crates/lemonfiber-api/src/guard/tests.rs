@@ -21,6 +21,7 @@ fn beyond() -> Binding {
     Binding {
         port: 8471,
         beyond: true,
+        named: None,
     }
 }
 
@@ -87,51 +88,51 @@ fn a_request_carrying_nothing_is_not() {
 
 #[test]
 fn a_host_naming_this_address_is_here() {
-    assert!(host_is_here(Some("127.0.0.1:8471"), bound()));
-    assert!(host_is_here(Some("localhost:8471"), bound()));
-    assert!(host_is_here(Some("[::1]:8471"), bound()));
-    assert!(host_is_here(Some("stack.localhost:8471"), bound()));
+    assert!(host_is_here(Some("127.0.0.1:8471"), &bound()));
+    assert!(host_is_here(Some("localhost:8471"), &bound()));
+    assert!(host_is_here(Some("[::1]:8471"), &bound()));
+    assert!(host_is_here(Some("stack.localhost:8471"), &bound()));
 }
 
 #[test]
 fn a_host_naming_another_port_is_not() {
-    assert!(!host_is_here(Some("localhost:9000"), bound()));
+    assert!(!host_is_here(Some("localhost:9000"), &bound()));
 }
 
 #[test]
 fn a_host_naming_somewhere_else_is_not() {
-    assert!(!host_is_here(Some("example.com:8471"), bound()));
+    assert!(!host_is_here(Some("example.com:8471"), &bound()));
 }
 
 #[test]
 fn a_host_carrying_no_port_is_not() {
-    assert!(!host_is_here(Some("localhost"), bound()));
+    assert!(!host_is_here(Some("localhost"), &bound()));
 }
 
 #[test]
 fn a_host_carrying_something_that_is_not_a_port_is_not() {
-    assert!(!host_is_here(Some("localhost:doorway"), bound()));
+    assert!(!host_is_here(Some("localhost:doorway"), &bound()));
 }
 
 #[test]
 fn a_request_without_a_host_is_refused() {
-    assert!(!host_is_here(None, bound()));
+    assert!(!host_is_here(None, &bound()));
 }
 
 #[test]
 fn an_origin_naming_this_address_is_here() {
-    assert!(origin_is_here(Some("http://localhost:8471"), bound()));
-    assert!(origin_is_here(Some("127.0.0.1:8471"), bound()));
+    assert!(origin_is_here(Some("http://localhost:8471"), &bound()));
+    assert!(origin_is_here(Some("127.0.0.1:8471"), &bound()));
 }
 
 #[test]
 fn an_origin_naming_somewhere_else_is_not() {
-    assert!(!origin_is_here(Some("http://evil.example:8471"), bound()));
+    assert!(!origin_is_here(Some("http://evil.example:8471"), &bound()));
 }
 
 #[test]
 fn a_request_stating_no_origin_is_allowed() {
-    assert!(origin_is_here(None, bound()));
+    assert!(origin_is_here(None, &bound()));
 }
 
 /// Offered past this machine, an address is let through and a name is not.
@@ -143,13 +144,46 @@ fn a_request_stating_no_origin_is_allowed() {
 /// not one and cannot be made to resolve anywhere.
 #[test]
 fn offered_to_a_network_an_address_reaches_it_and_a_name_still_does_not() {
-    assert!(host_is_here(Some("192.168.1.10:8471"), beyond()));
-    assert!(host_is_here(Some("[fe80::1]:8471"), beyond()));
-    assert!(host_is_here(Some("localhost:8471"), beyond()));
-    assert!(!host_is_here(Some("lemonfiber.local:8471"), beyond()));
-    assert!(!host_is_here(Some("evil.example:8471"), beyond()));
+    assert!(host_is_here(Some("192.168.1.10:8471"), &beyond()));
+    assert!(host_is_here(Some("[fe80::1]:8471"), &beyond()));
+    assert!(host_is_here(Some("localhost:8471"), &beyond()));
+    assert!(!host_is_here(Some("lemonfiber.local:8471"), &beyond()));
+    assert!(!host_is_here(Some("evil.example:8471"), &beyond()));
     // And the port is still held, whichever address named it.
-    assert!(!host_is_here(Some("192.168.1.10:9000"), beyond()));
+    assert!(!host_is_here(Some("192.168.1.10:9000"), &beyond()));
     // On this machine, an address off loopback reaches nothing at all.
-    assert!(!host_is_here(Some("192.168.1.10:8471"), bound()));
+    assert!(!host_is_here(Some("192.168.1.10:8471"), &bound()));
+}
+
+/// Served encrypted on a network, the one name pairing gives a phone is let through,
+/// in whatever case it arrives, and every other name is still refused.
+#[test]
+fn the_name_a_phone_was_given_reaches_it_and_no_other_name_does() {
+    let paired = Binding {
+        named: Some("den.local".to_owned()),
+        ..beyond()
+    };
+    assert!(host_is_here(Some("den.local:8471"), &paired));
+    assert!(host_is_here(Some("Den.Local:8471"), &paired));
+    assert!(host_is_here(Some("192.168.1.10:8471"), &paired));
+    assert!(!host_is_here(Some("den.local:9000"), &paired));
+    assert!(!host_is_here(Some("evil.example:8471"), &paired));
+    assert!(!host_is_here(Some("den.local:8471"), &beyond()));
+    // A name is only ever let through past this machine, whatever a binding names.
+    let here = Binding {
+        named: Some("den.local".to_owned()),
+        ..bound()
+    };
+    assert!(!host_is_here(Some("den.local:8471"), &here));
+}
+
+/// A page served encrypted names itself `https`, and is held to the same address.
+#[test]
+fn an_encrypted_page_is_held_to_the_same_address() {
+    assert!(origin_is_here(Some("https://localhost:8471"), &bound()));
+    assert!(origin_is_here(Some("https://192.168.1.10:8471"), &beyond()));
+    assert!(!origin_is_here(
+        Some("https://evil.example:8471"),
+        &beyond()
+    ));
 }
