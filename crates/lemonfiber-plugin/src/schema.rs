@@ -19,7 +19,8 @@ use crate::conforming::nonconforming;
 use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
 pub use evidence::{
-    Claim, ClaimProbe, Contribution, Expect, Expected, ExpectedKind, Proof, Request,
+    Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
+    Request,
 };
 pub use recipe::{Capture, Pair, Recipe, Step, StepCall, RUN};
 

@@ -124,7 +124,7 @@ pub(super) fn looking(manifest: &Manifest, found: &mut Vec<Violation>) {
 /// The four key-wise constraints and no others: `json_array_min`, `json_is_absent`,
 /// `content_type` and `body_starts_with` are about the answer as a whole rather than
 /// about somewhere in it.
-fn places(expect: &Expect) -> Vec<(&'static str, &str)> {
+pub(super) fn places(expect: &Expect) -> Vec<(&'static str, &str)> {
     let exact = expect
         .json
         .iter()

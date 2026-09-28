@@ -109,9 +109,23 @@ pub enum Credential {
 /// A kind of constraint an expectation can put on a body.
 ///
 /// The same vocabulary a proof's expectation and a contributed check's use, so that
-/// "a status alone is not evidence" is one rule rather than three.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+/// "a status alone is not evidence" is one rule rather than three. Read as well as
+/// written: a declaration that an assertion fails on a recording names the one of these
+/// that fails there.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
+#[schemars(rename = "PluginConstraint")]
 pub enum Constraint {
     /// The status alone.
     Status,
@@ -134,6 +148,19 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    /// Every constraint, in the order an expectation's fields are declared.
+    pub const EVERY: [Self; 9] = [
+        Self::Status,
+        Self::Json,
+        Self::JsonHasKeys,
+        Self::JsonTypes,
+        Self::JsonAtLeast,
+        Self::JsonArrayMin,
+        Self::JsonIsAbsent,
+        Self::ContentType,
+        Self::BodyStartsWith,
+    ];
+
     /// The key an expectation writes it as.
     ///
     /// The same word the artefact serialises, held to it by a test below — a listing
@@ -152,6 +179,18 @@ impl Constraint {
             Self::ContentType => "content_type",
             Self::BodyStartsWith => "body_starts_with",
         }
+    }
+
+    /// Whether it constrains places within the answer rather than the answer as a whole.
+    ///
+    /// The four that are keyed by a place: a fault in one of them is at a place, and a
+    /// declaration that one fails names the place as well as the key.
+    #[must_use]
+    pub const fn is_key_wise(self) -> bool {
+        matches!(
+            self,
+            Self::Json | Self::JsonHasKeys | Self::JsonTypes | Self::JsonAtLeast
+        )
     }
 }
 

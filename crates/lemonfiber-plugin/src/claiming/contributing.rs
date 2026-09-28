@@ -274,7 +274,6 @@ pub(super) fn present(entry: &Contribution) -> BTreeMap<&'static str, Held> {
         ("category", &entry.category),
         ("why", &entry.why),
         ("fixture", &entry.fixture),
-        ("fires_on", &entry.fires_on),
         ("service", &entry.service),
         ("for", &entry.about),
         ("action", &entry.action),
@@ -292,6 +291,9 @@ pub(super) fn present(entry: &Contribution) -> BTreeMap<&'static str, Held> {
     }
     if entry.expect.is_some() {
         carried.insert("expect", Held::Other);
+    }
+    if !entry.expected.is_empty() {
+        carried.insert("expected", Held::Other);
     }
     carried
 }

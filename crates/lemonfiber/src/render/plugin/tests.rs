@@ -362,6 +362,52 @@ fn each_of_the_three_verdicts_says_itself() {
     );
 }
 
+/// Failing as declared is said as neither of the others: not counted as passed, with
+/// each recording, what it held, and the reason — and the place only where there is one.
+#[test]
+fn failing_as_declared_says_itself_with_each_recording() {
+    let entry = |fixture: &str, place: Option<&str>, reason: &str| {
+        lemonfiber_core::plugin::FailingAsDeclared {
+            fixture: fixture.to_owned(),
+            constraint: if place.is_some() {
+                lemonfiber_core::plugin::Constraint::Json
+            } else {
+                lemonfiber_core::plugin::Constraint::Status
+            },
+            place: place.map(str::to_owned),
+            held: if place.is_some() { "false" } else { "200" }.to_owned(),
+            reason: reason.to_owned(),
+        }
+    };
+    let text = claims(&read(
+        vec![with(
+            "media.serve",
+            Shown::Demonstrated,
+            Some(Filling::Unfilled),
+            Verdict::FailingAsDeclared {
+                declared: vec![
+                    entry(
+                        "fixtures/identity.json",
+                        Some("/MediaContainer/claimed"),
+                        "unclaimed",
+                    ),
+                    entry("fixtures/open.json", None, "also unclaimed"),
+                ],
+            },
+        )],
+        Vec::new(),
+    ))
+    .text();
+    assert!(
+        text.contains(
+            "failing as declared, and not counted as passed: fixtures/identity.json fails json \
+             at /MediaContainer/claimed, holding false: unclaimed; fixtures/open.json fails \
+             status, holding 200: also unclaimed"
+        ),
+        "{text}"
+    );
+}
+
 /// One violation and several are counted as they are read.
 #[test]
 fn a_page_counts_what_it_refused() {

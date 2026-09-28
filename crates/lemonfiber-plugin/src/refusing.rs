@@ -30,6 +30,7 @@ mod bundled;
 pub mod carried;
 mod colliding;
 mod evidence;
+mod failing;
 mod naming;
 mod reaching;
 mod recipes;
@@ -65,6 +66,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     carried::carried(manifest, &mut found);
     evidence::asking(manifest, &mut found);
     evidence::looking(manifest, &mut found);
+    failing::declared(manifest, &mut found);
     requiring(manifest, &mut found);
     recipes::declared(manifest, &mut found);
     readable(manifest, &mut found);
@@ -356,9 +358,11 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         every.push((format!("{at}.title"), proof.title.as_str()));
         every.push((format!("{at}.request.path"), proof.request.path.as_str()));
         every.push((format!("{at}.why"), proof.why.as_str()));
+        reasons(&at, &proof.expected, &mut every);
     }
     for entry in &manifest.contributions {
         let at = format!("contribution {}", entry.id);
+        reasons(&at, &entry.expected, &mut every);
         for (field, text) in [
             ("title", entry.title.as_deref()),
             ("why", entry.why.as_deref()),
@@ -391,6 +395,19 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         every.push((format!("override {}.why", over.id), over.why.as_str()));
     }
     every
+}
+
+/// What each declaration that an assertion fails says: the recording and the reason.
+fn reasons<'a>(
+    at: &str,
+    expected: &'a [crate::schema::Declaration],
+    every: &mut Vec<(String, &'a str)>,
+) {
+    for declaration in expected {
+        let at = format!("{at}.expected {}", declaration.fixture);
+        every.push((format!("{at}.fixture"), declaration.fixture.as_str()));
+        every.push((format!("{at}.reason"), declaration.reason.as_str()));
+    }
 }
 
 #[cfg(test)]

@@ -207,13 +207,12 @@
           ],
           "default": null
         },
-        "fires_on": {
-          "description": "A recorded response the check must fail on.\n\nFor a check whose passing state cannot be recorded, such as one that needs an\naccount nobody holds: the state it exists to find can be, and proving the check\nholds it to firing there. It may name the same file as `fixture`.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
+        "expected": {
+          "description": "Recordings the check fails on, each with the constraint that fails there and why.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PluginExpectedFailure"
+          }
         },
         "fixture": {
           "description": "The recorded response the check is proved against.",
@@ -538,6 +537,56 @@
         }
       ]
     },
+    "PluginConstraint": {
+      "description": "A kind of constraint an expectation can put on a body.\n\nThe same vocabulary a proof's expectation and a contributed check's use, so that\n\"a status alone is not evidence\" is one rule rather than three. Read as well as\nwritten: a declaration that an assertion fails on a recording names the one of these\nthat fails there.",
+      "oneOf": [
+        {
+          "description": "The status alone.",
+          "type": "string",
+          "const": "status"
+        },
+        {
+          "description": "Keys carrying exactly these values.",
+          "type": "string",
+          "const": "json"
+        },
+        {
+          "description": "Keys that must be present, whatever they hold.",
+          "type": "string",
+          "const": "json_has_keys"
+        },
+        {
+          "description": "Keys that must hold a given kind of thing.",
+          "type": "string",
+          "const": "json_types"
+        },
+        {
+          "description": "Keys that must hold at least a given number.",
+          "type": "string",
+          "const": "json_at_least"
+        },
+        {
+          "description": "The answer read as an array, with at least a given number of entries.",
+          "type": "string",
+          "const": "json_array_min"
+        },
+        {
+          "description": "The answer did not parse as JSON at all.",
+          "type": "string",
+          "const": "json_is_absent"
+        },
+        {
+          "description": "The content type it is served as.",
+          "type": "string",
+          "const": "content_type"
+        },
+        {
+          "description": "What the body must begin with.",
+          "type": "string",
+          "const": "body_starts_with"
+        }
+      ]
+    },
     "PluginCriticality": {
       "description": "How much a plugin's service costs when it is absent.\n\nFour rather than the stack's five. `critical` means *its failure has consequences\noutside the machine*, and in the bundled stack exactly one service holds it; it is\nnot a severity a contributor assigns to their own work, because the classification\ndrives how failures are reported and how hard lemonfiber tries to stop the operator\nproceeding. A manifest declaring it is refused by name, with these four listed.",
       "oneOf": [
@@ -561,6 +610,52 @@
           "type": "string",
           "const": "optional"
         }
+      ]
+    },
+    "PluginDeclaredVerdict": {
+      "description": "The one verdict a declaration may name.",
+      "oneOf": [
+        {
+          "description": "The assertion fails on the recording, on the constraint the declaration names.",
+          "type": "string",
+          "const": "fails"
+        }
+      ]
+    },
+    "PluginExpectedFailure": {
+      "description": "A recording an assertion fails on, the one constraint of its expectation that fails\nthere, and why.\n\nFor an assertion whose passing state nobody can record, such as a check that a server\nhas an owner where claiming one needs an account the plugin's CI does not hold: the\nstate it exists to find can be recorded, and the declaration says which constraint\ntells the two states apart. It changes the verdict on that recording and on nothing\nelse — the live service and every other recording are held to the expectation as it\nis written.\n\nIt names a constraint rather than only a recording, because a recording that began\nfailing for another reason — a truncated file, an error recorded by mistake — would\notherwise read as failing as declared, excusing a failure nobody had looked at.",
+      "type": "object",
+      "properties": {
+        "constraint": {
+          "description": "The key of the expectation that fails on the recording, and one it carries.",
+          "$ref": "#/$defs/PluginConstraint"
+        },
+        "fixture": {
+          "description": "The recording the assertion fails on. It may be the assertion's own `fixture`.",
+          "type": "string"
+        },
+        "place": {
+          "description": "Where within that constraint it fails, written exactly as the expectation writes\nit. Present for a key-wise constraint and absent for one about the whole answer.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "description": "Why this recording is one the assertion fails on. Reported with the verdict every\ntime.",
+          "type": "string"
+        },
+        "verdict": {
+          "description": "`fails`, and nothing else: passing is what the expectation already says, and\ncould-not-run is never excused.",
+          "$ref": "#/$defs/PluginDeclaredVerdict"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fixture",
+        "verdict",
+        "constraint",
+        "reason"
       ]
     },
     "PluginHealth": {
@@ -750,6 +845,14 @@
         "expect": {
           "description": "What the answer must be.",
           "$ref": "#/$defs/Expect"
+        },
+        "expected": {
+          "description": "Recordings this proof fails on, each with the constraint that fails there and why.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PluginExpectedFailure"
+          }
         },
         "fixture": {
           "description": "A recorded response to run against where no instance exists.",

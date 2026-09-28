@@ -287,7 +287,7 @@ fn within(expect: &Expect, probe: &Probe, at: &str, found: &mut Vec<Violation>) 
 /// `json_array_min = 0` stays a constraint, and the difference is real: the shape check
 /// behind it still requires the body to parse as an array, which is what the vocabulary
 /// says *reads as a list* means.
-fn carries(expect: &Expect, constraint: Constraint) -> bool {
+pub(crate) fn carries(expect: &Expect, constraint: Constraint) -> bool {
     match constraint {
         Constraint::Status => expect.status.is_some(),
         Constraint::Json => expect.json.as_ref().is_some_and(|held| !held.is_empty()),

@@ -207,7 +207,7 @@ const DOCTOR_CHECK: Point = Point {
         required: &[
             "id", "title", "category", "request", "expect", "why", "fixture",
         ],
-        optional: &["timeout_s", "service", "fires_on"],
+        optional: &["timeout_s", "service", "expected"],
         bounds: &[Bounded {
             field: "timeout_s",
             limits: CHECK_TIMEOUT,

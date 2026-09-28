@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_plugin::Manifest;
 
-use super::{both, checked, proved, Asserted, Assertion, Verdict};
+use lemonfiber_plugin::vocabulary::Constraint;
+
+use super::{both, checked, proved, Asserted, Assertion, FailingAsDeclared, Verdict};
 
 /// A plugin whose evidence is a proof and a contributed check rather than a claim.
 ///
@@ -280,109 +282,331 @@ fn a_proof_naming_a_service_the_plugin_does_not_declare_settles_nothing() {
     );
 }
 
-/// The check with `fires_on` naming the one recording it has.
-fn firing_on_its_fixture() -> String {
-    changed(&[(
-        "fixture   = \"fixtures/guarded.json\"\n",
-        "fixture   = \"fixtures/guarded.json\"\nfires_on  = \"fixtures/guarded.json\"\n",
-    )])
-}
-
-/// A check whose passing state cannot be recorded is proved by failing on the state
-/// it exists to find, and that is reported as the check holding.
-#[test]
-fn a_check_that_fails_on_the_recording_it_fires_on_holds() {
-    let at = source("fires", 200);
-    assert_eq!(
-        checks(&firing_on_its_fixture(), &at)
-            .first()
-            .map(|one| one.verdict.clone()),
-        Some(Verdict::Passed)
+/// A recording beside the others, of the same request, answering this status and body.
+fn recorded(at: &Path, named: &str, status: u16, json: &str) {
+    let _ = std::fs::write(
+        at.join(named),
+        format!(
+            r#"{{"recorded_from": "{PINNED}", "note": "The same read.",
+                    "request": {{"method": "GET", "path": "/api/series"}},
+                    "response": {{"status": {status}, "json": {json}}}}}"#
+        ),
     );
 }
 
-/// A check that passes on the recording it says it fires on finds nothing.
+/// The check, declaring the failures these entries describe.
+fn check_declaring(entries: &str) -> String {
+    changed(&[(
+        "fixture   = \"fixtures/guarded.json\"\n",
+        &format!("fixture   = \"fixtures/guarded.json\"\nexpected  = [{entries}]\n"),
+    )])
+}
+
+/// The check's declaration that its own recording fails on its status.
+const FAILS_ON_ITS_STATUS: &str = r#"{ fixture = "fixtures/guarded.json", verdict = "fails", constraint = "status", reason = "Recorded from a Kavita nobody has claimed." }"#;
+
+/// What the one check came to.
+fn verdict_of(text: &str, at: &Path) -> Option<Verdict> {
+    checks(text, at).first().map(|one| one.verdict.clone())
+}
+
+/// A check whose passing state cannot be recorded, failing where it declares it does
+/// on the one constraint it names, is failing as declared: not passed, not failed, and
+/// carrying what the recording held and why.
 #[test]
-fn a_check_that_passes_on_the_recording_it_fires_on_is_refuted() {
-    let at = source("does-not-fire", 401);
+fn a_check_failing_where_it_declares_is_failing_as_declared() {
+    let at = source("as-declared", 200);
     assert_eq!(
-        checks(&firing_on_its_fixture(), &at)
-            .first()
-            .map(|one| one.verdict.clone()),
+        verdict_of(&check_declaring(FAILS_ON_ITS_STATUS), &at),
+        Some(Verdict::FailingAsDeclared {
+            declared: vec![FailingAsDeclared {
+                fixture: "fixtures/guarded.json".to_owned(),
+                constraint: Constraint::Status,
+                place: None,
+                held: "200".to_owned(),
+                reason: "Recorded from a Kavita nobody has claimed.".to_owned(),
+            }],
+        })
+    );
+}
+
+/// The verdict reads as the fourth outcome, apart from the other three, with the place
+/// said only where the constraint has one.
+#[test]
+fn failing_as_declared_is_its_own_outcome_on_the_wire() {
+    let declared = |place: Option<&str>| Verdict::FailingAsDeclared {
+        declared: vec![FailingAsDeclared {
+            fixture: "fixtures/identity-anonymous.json".to_owned(),
+            constraint: Constraint::Json,
+            place: place.map(str::to_owned),
+            held: "false".to_owned(),
+            reason: "Nobody has claimed it.".to_owned(),
+        }],
+    };
+    assert_eq!(
+        serde_json::to_value(declared(Some("/MediaContainer/claimed"))).ok(),
+        Some(serde_json::json!({
+            "outcome": "failing-as-declared",
+            "declared": [{
+                "fixture": "fixtures/identity-anonymous.json",
+                "constraint": "json",
+                "place": "/MediaContainer/claimed",
+                "held": "false",
+                "reason": "Nobody has claimed it.",
+            }],
+        }))
+    );
+    assert_eq!(
+        serde_json::to_value(declared(None))
+            .ok()
+            .and_then(|said| said.pointer("/declared/0/place").cloned()),
+        None
+    );
+}
+
+/// The declared constraint holding on the recording makes the declaration stale, and
+/// that fails, naming it.
+#[test]
+fn a_declared_recording_that_passes_makes_the_declaration_stale() {
+    let at = source("stale", 401);
+    assert_eq!(
+        verdict_of(&check_declaring(FAILS_ON_ITS_STATUS), &at),
         Some(Verdict::Failed {
             faults: vec![
-                "passes on fixtures/guarded.json, the recording it says it fires on, so it \
-                 finds nothing"
+                "fixtures/guarded.json is declared to fail on status, and status holds there, \
+                 so the declaration is stale; it goes in the change that made the recording pass"
                     .to_owned()
             ],
         })
     );
 }
 
-/// With a recording of each state, the check has to hold on one and fire on the other.
+/// A failure the declaration does not describe is failed, naming the declared
+/// constraint and every constraint that failed, whether or not the declared one did.
 #[test]
-fn a_check_with_a_recording_of_each_state_holds_on_one_and_fires_on_the_other() {
-    let at = source("each-state", 401);
-    let _ = std::fs::write(
-        at.join("fixtures/open.json"),
-        format!(
-            r#"{{"recorded_from": "{PINNED}", "note": "The same read, answered.",
-                    "request": {{"method": "GET", "path": "/api/series"}},
-                    "response": {{"status": 200}}}}"#
-        ),
-    );
-    let both = changed(&[(
-        "fixture   = \"fixtures/guarded.json\"\n",
-        "fixture   = \"fixtures/guarded.json\"\nfires_on  = \"fixtures/open.json\"\n",
-    )]);
+fn a_failure_the_declaration_does_not_name_is_failed_naming_every_fault() {
+    let at = source("another-failure", 401);
+    let declaring_json = |status: u16| {
+        recorded(
+            &at,
+            "fixtures/guarded.json",
+            status,
+            r#"{"claimed": false}"#,
+        );
+        verdict_of(
+            &changed(&[
+                ("expect    = { status = 401 }\n", "expect    = { status = 401, json = { claimed = true } }\n"),
+                (
+                    "fixture   = \"fixtures/guarded.json\"\n",
+                    "fixture   = \"fixtures/guarded.json\"\nexpected  = [{ fixture = \"fixtures/guarded.json\", verdict = \"fails\", constraint = \"json\", place = \"claimed\", reason = \"Unclaimed.\" }]\n",
+                ),
+            ]),
+            &at,
+        )
+    };
     assert_eq!(
-        checks(&both, &at).first().map(|one| one.verdict.clone()),
-        Some(Verdict::Passed)
+        declaring_json(500),
+        Some(Verdict::Failed {
+            faults: vec![
+                "fixtures/guarded.json is declared to fail on json at claimed, and fails on: \
+                 answered 500 where it declares 401; claimed is false, and it declares true"
+                    .to_owned()
+            ],
+        })
     );
-
-    let neither = changed(&[(
-        "fixture   = \"fixtures/guarded.json\"\n",
-        "fixture   = \"fixtures/open.json\"\nfires_on  = \"fixtures/guarded.json\"\n",
-    )]);
     assert!(
-        checks(&neither, &at).first().is_some_and(|one| matches!(
-            &one.verdict,
-            Verdict::Failed { faults } if faults.len() == 2
-        )),
-        "held on neither, and both are said"
-    );
-
-    let missing = changed(&[(
-        "fixture   = \"fixtures/guarded.json\"\n",
-        "fixture   = \"fixtures/guarded.json\"\nfires_on  = \"fixtures/nowhere.json\"\n",
-    )]);
-    assert!(
-        checks(&missing, &at)
-            .first()
-            .is_some_and(|one| matches!(one.verdict, Verdict::Unproven { .. })),
-        "a recording that is not there establishes nothing"
+        matches!(declaring_json(401), Some(Verdict::FailingAsDeclared { .. })),
+        "the same declaration, with only the named constraint failing"
     );
 }
 
-/// A check with a recording of each state holds only where both verdicts do, and one
-/// it could not run leaves it unproven rather than failed, whichever side that was.
+/// A declaration is about the recording it names. The check's own recording is held to
+/// its expectation as written, so it has to pass there and fail as declared on the other.
 #[test]
-fn two_verdicts_about_one_check_hold_only_together() {
+fn a_declaration_changes_the_verdict_on_its_own_recording_and_no_other() {
+    let at = source("each-state", 401);
+    recorded(&at, "fixtures/open.json", 200, "null");
+    let on_open = r#"{ fixture = "fixtures/open.json", verdict = "fails", constraint = "status", reason = "Unclaimed." }"#;
+    assert!(
+        matches!(
+            verdict_of(&check_declaring(on_open), &at),
+            Some(Verdict::FailingAsDeclared { declared }) if declared.len() == 1
+        ),
+        "held on its own recording and failed as declared on the other"
+    );
+
+    let _ = std::fs::write(at.join("fixtures/guarded.json"), "");
+    let unreadable = verdict_of(&check_declaring(on_open), &at);
+    assert!(
+        matches!(&unreadable, Some(Verdict::Unproven { why }) if why.contains("guarded.json")),
+        "its own recording unread is unproven, whatever the declared one came to: {unreadable:?}"
+    );
+
+    recorded(&at, "fixtures/guarded.json", 200, "null");
+    assert!(
+        matches!(
+            verdict_of(&check_declaring(on_open), &at),
+            Some(Verdict::Failed { faults }) if faults == ["answered 200 where it declares 401"]
+        ),
+        "failing on its own recording is failed: that recording is not the declared one"
+    );
+}
+
+/// Every declared recording is reported, each with its own reason.
+#[test]
+fn two_declared_recordings_are_both_reported() {
+    let at = source("two-declared", 200);
+    recorded(&at, "fixtures/open.json", 200, "null");
+    let both_declared = check_declaring(&format!(
+        r#"{FAILS_ON_ITS_STATUS}, {{ fixture = "fixtures/open.json", verdict = "fails", constraint = "status", reason = "Also unclaimed." }}"#
+    ));
+    assert!(
+        matches!(
+            verdict_of(&both_declared, &at),
+            Some(Verdict::FailingAsDeclared { declared })
+                if declared.iter().map(|one| one.reason.as_str()).collect::<Vec<_>>()
+                    == ["Recorded from a Kavita nobody has claimed.", "Also unclaimed."]
+        ),
+        "both declarations are carried"
+    );
+}
+
+/// A declared recording that is not there is refused by name, and the assertion is
+/// unproven: a declaration never stands in for a run.
+#[test]
+fn a_declared_recording_that_is_not_there_is_refused_and_unproven() {
+    let at = source("declared-nowhere", 401);
+    let declaring = changed(&[(
+        "fixture = \"fixtures/guarded.json\"\nwhy",
+        "expected = [{ fixture = \"fixtures/nowhere.json\", verdict = \"fails\", constraint = \"status\", reason = \"r\" }]\nwhy",
+    )]);
+    let (asserted, refusals) = proofs(&declaring, &at);
+    assert!(
+        matches!(
+            asserted.first().map(|one| &one.verdict),
+            Some(Verdict::Unproven { why }) if why.contains("nowhere.json")
+        ),
+        "got: {asserted:?}"
+    );
+    assert_eq!(
+        refusals,
+        vec![
+            "proof guarded.expected fixtures/nowhere.json: names a recording the plugin's \
+             source does not hold; a failure is declared on a recording somebody can read"
+                .to_owned()
+        ]
+    );
+
+    let blank = changed(&[(
+        "fixture = \"fixtures/guarded.json\"\nwhy",
+        "expected = [{ fixture = \"\", verdict = \"fails\", constraint = \"status\", reason = \"r\" }]\nwhy",
+    )]);
+    let (asserted, refusals) = proofs(&blank, &at);
+    assert!(
+        matches!(
+            asserted.first().map(|one| &one.verdict),
+            Some(Verdict::Unproven { why }) if why.contains("names no recording")
+        ),
+        "got: {asserted:?}"
+    );
+    assert!(
+        refusals.is_empty(),
+        "a blank recording is the manifest's refusal to make, not this run's: {refusals:?}"
+    );
+}
+
+/// A proof naming no recording and declaring none has nothing to be run against, and
+/// says so rather than reading as held.
+#[test]
+fn a_proof_naming_no_recording_is_unproven() {
+    let at = source("no-recording", 401);
+    let silent = changed(&[("fixture = \"fixtures/guarded.json\"\nwhy", "why")]);
+    let (asserted, _) = proofs(&silent, &at);
+    assert!(
+        matches!(
+            asserted.first().map(|one| &one.verdict),
+            Some(Verdict::Unproven { why }) if why.contains("names no recording")
+        ),
+        "got: {asserted:?}"
+    );
+}
+
+/// A proof may declare a failure too, and failing as declared does not stop it being
+/// installed; its own recording failing still does.
+#[test]
+fn a_proof_failing_as_declared_is_reported_apart_and_does_not_stop_an_install() {
+    let at = source("proof-declared", 200);
+    let declaring = changed(&[(
+        "fixture = \"fixtures/guarded.json\"\nwhy",
+        "fixture = \"fixtures/guarded.json\"\nexpected = [{ fixture = \"fixtures/guarded.json\", verdict = \"fails\", constraint = \"status\", reason = \"r\" }]\nwhy",
+    )]);
+    let (asserted, refusals) = proofs(&declaring, &at);
+    assert!(
+        matches!(
+            asserted.first().map(|one| &one.verdict),
+            Some(Verdict::FailingAsDeclared { .. })
+        ),
+        "got: {asserted:?}"
+    );
+    assert!(refusals.is_empty(), "{refusals:?}");
+    assert!(
+        super::super::installs(&[], &[], &asserted),
+        "failing as declared is not a failed proof"
+    );
+}
+
+/// Two verdicts about one assertion come to one. A failure fails the run whatever else
+/// was found, and names what could not be run beside it; what could not be run is
+/// never read as shown; failing as declared is never read as passed.
+#[test]
+fn two_verdicts_about_one_assertion_come_to_one() {
     let failed = |fault: &str| Verdict::Failed {
         faults: vec![fault.to_owned()],
     };
-    let unproven = || Verdict::Unproven {
-        why: "no recording".to_owned(),
+    let unproven = |why: &str| Verdict::Unproven {
+        why: why.to_owned(),
     };
-    assert_eq!(both(Verdict::Passed, failed("fires")), failed("fires"));
-    assert_eq!(both(failed("holds"), Verdict::Passed), failed("holds"));
-    assert_eq!(both(unproven(), failed("fires")), unproven());
-    assert_eq!(both(failed("holds"), unproven()), unproven());
+    let entry = |reason: &str| FailingAsDeclared {
+        fixture: "f.json".to_owned(),
+        constraint: Constraint::Status,
+        place: None,
+        held: "200".to_owned(),
+        reason: reason.to_owned(),
+    };
+    let declared = |reason: &str| Verdict::FailingAsDeclared {
+        declared: vec![entry(reason)],
+    };
     assert_eq!(
-        both(failed("holds"), failed("fires")),
+        both(failed("one"), failed("two")),
         Verdict::Failed {
-            faults: vec!["holds".to_owned(), "fires".to_owned()],
+            faults: vec!["one".to_owned(), "two".to_owned()],
         }
     );
+    assert_eq!(
+        both(unproven("unread"), failed("stale")),
+        Verdict::Failed {
+            faults: vec!["stale".to_owned(), "unread".to_owned()],
+        }
+    );
+    assert_eq!(
+        both(failed("stale"), unproven("unread")),
+        Verdict::Failed {
+            faults: vec!["stale".to_owned(), "unread".to_owned()],
+        }
+    );
+    assert_eq!(both(Verdict::Passed, failed("one")), failed("one"));
+    assert_eq!(both(declared("r"), failed("one")), failed("one"));
+    assert_eq!(both(failed("one"), Verdict::Passed), failed("one"));
+    assert_eq!(both(unproven("a"), unproven("b")), unproven("a; b"));
+    assert_eq!(both(declared("r"), unproven("a")), unproven("a"));
+    assert_eq!(both(unproven("a"), Verdict::Passed), unproven("a"));
+    assert_eq!(
+        both(declared("r"), declared("s")),
+        Verdict::FailingAsDeclared {
+            declared: vec![entry("r"), entry("s")],
+        }
+    );
+    assert_eq!(both(Verdict::Passed, declared("r")), declared("r"));
+    assert_eq!(both(declared("r"), Verdict::Passed), declared("r"));
     assert_eq!(both(Verdict::Passed, Verdict::Passed), Verdict::Passed);
 }

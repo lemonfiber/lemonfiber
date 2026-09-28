@@ -93,6 +93,36 @@ pub enum Verdict {
         /// What stopped it being run.
         why: String,
     },
+    /// It fails on the recordings its manifest declares it fails on, on the constraint
+    /// each declaration names and on nothing else, and holds on every other recording it
+    /// was run against.
+    ///
+    /// Apart from passed and from failed, and counted as neither. The assertion does not
+    /// hold there, so a pass would say the opposite of what the recording shows; and the
+    /// failure is the one its author described and gave a reason for, so it does not
+    /// fail the run. Only ever reached against recordings: the live service is held to
+    /// the expectation as it is written.
+    FailingAsDeclared {
+        /// Each declared recording, what it held, and why it is one the assertion fails on.
+        declared: Vec<FailingAsDeclared>,
+    },
+}
+
+/// One recording an assertion fails on as its manifest declares.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginFailingAsDeclared")]
+pub struct FailingAsDeclared {
+    /// The recording.
+    pub fixture: String,
+    /// The constraint of the expectation that fails there.
+    pub constraint: lemonfiber_plugin::vocabulary::Constraint,
+    /// Where within that constraint, for one that looks at places.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// What the recording held there.
+    pub held: String,
+    /// Why the manifest says this recording is one the assertion fails on.
+    pub reason: String,
 }
 
 /// One probe a claim binds, and what running it against its recording came to.

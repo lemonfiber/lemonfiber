@@ -1205,9 +1205,9 @@
           ],
           "required": false
         },
-        "fires_on": {
+        "expected": {
           "type": [
-            "null|string"
+            "array[ref:PluginExpectedFailure]"
           ],
           "required": false
         },
@@ -4302,6 +4302,20 @@
       },
       "variants": []
     },
+    "PluginConstraint": {
+      "fields": {},
+      "variants": [
+        "\"body_starts_with\"",
+        "\"content_type\"",
+        "\"json\"",
+        "\"json_array_min\"",
+        "\"json_at_least\"",
+        "\"json_has_keys\"",
+        "\"json_is_absent\"",
+        "\"json_types\"",
+        "\"status\""
+      ]
+    },
     "PluginDeclaration": {
       "fields": {
         "claims": {
@@ -4349,12 +4363,88 @@
       },
       "variants": []
     },
+    "PluginDeclaredVerdict": {
+      "fields": {},
+      "variants": [
+        "\"fails\""
+      ]
+    },
     "PluginEvidence": {
       "fields": {},
       "variants": [
         "\"recordings\"",
         "\"service\""
       ]
+    },
+    "PluginExpectedFailure": {
+      "fields": {
+        "constraint": {
+          "type": [
+            "ref:PluginConstraint"
+          ],
+          "required": true
+        },
+        "fixture": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "place": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "verdict": {
+          "type": [
+            "ref:PluginDeclaredVerdict"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginFailingAsDeclared": {
+      "fields": {
+        "constraint": {
+          "type": [
+            "ref:PluginConstraint"
+          ],
+          "required": true
+        },
+        "fixture": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "held": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "place": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "reason": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
     },
     "PluginInstall": {
       "fields": {
@@ -4866,6 +4956,12 @@
     },
     "PluginVerdict": {
       "fields": {
+        "declared": {
+          "type": [
+            "array[ref:PluginFailingAsDeclared]"
+          ],
+          "required": true
+        },
         "faults": {
           "type": [
             "array[string]"
@@ -4875,6 +4971,7 @@
         "outcome": {
           "type": [
             "const:\"failed\"",
+            "const:\"failing-as-declared\"",
             "const:\"passed\"",
             "const:\"unproven\""
           ],
@@ -4889,6 +4986,7 @@
       },
       "variants": [
         "\"failed\"",
+        "\"failing-as-declared\"",
         "\"passed\"",
         "\"unproven\""
       ]

@@ -181,18 +181,19 @@ fn answering(status: u16) -> Arc<dyn Http> {
     )])
 }
 
-/// What one verdict is, in one word.
+/// What one verdict is, in one word: the outcome it is published under, or `unasked`.
 ///
 /// A word rather than a pattern at each case, because a pattern's other half is a
-/// branch nothing ever takes — and a case that cannot say which of the three it
+/// branch nothing ever takes — and a case that cannot say which of the outcomes it
 /// got is a case that would pass on any of them.
-fn came_to(verdict: Option<&Verdict>) -> &'static str {
-    match verdict {
-        None => "unasked",
-        Some(Verdict::Passed) => "held",
-        Some(Verdict::Failed { .. }) => "failed",
-        Some(Verdict::Unproven { .. }) => "unproven",
-    }
+fn came_to(verdict: Option<&Verdict>) -> String {
+    verdict
+        .and_then(|verdict| serde_json::to_value(verdict).ok())
+        .and_then(|said| {
+            said.get("outcome")
+                .and_then(|word| word.as_str().map(str::to_owned))
+        })
+        .unwrap_or_else(|| "unasked".to_owned())
 }
 
 /// What a verdict that established nothing says stopped it.
@@ -202,7 +203,10 @@ fn came_to(verdict: Option<&Verdict>) -> &'static str {
 fn why(verdict: Option<&Verdict>) -> String {
     match verdict {
         Some(Verdict::Unproven { why }) => why.clone(),
-        None | Some(Verdict::Passed | Verdict::Failed { .. }) => String::new(),
+        None
+        | Some(Verdict::Passed | Verdict::Failed { .. } | Verdict::FailingAsDeclared { .. }) => {
+            String::new()
+        }
     }
 }
 
