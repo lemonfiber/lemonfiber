@@ -20,6 +20,10 @@ reimplementing them. Two scripts decide, both the spec's:
     and ticked in the implementation status;
   * the no-stub gate — no requirement the version locks is unbuilt.
 
+Before either, the release record: the binary this tag builds carries
+`reference/changelog.json`, and a record without the release before this one
+cannot name what is running. 0.15.0 and 0.16.0 both went out that way.
+
 **The spec is read at `main`, deliberately unpinned.** A pinned copy would be a
 gate held to the goal set as it was, which is the failure mode of every
 stand-in: right about a moment that has passed. What a release is held to is
@@ -41,6 +45,8 @@ or the question could not be answered.
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import shutil
 import subprocess
 import sys
@@ -69,6 +75,15 @@ SELF = "lemonfiber"
 #: resolves the catalogue from its working directory, so it has to run inside the
 #: spec checkout, and it refuses a path outside it.
 TRACKER = "IMPLEMENTATION-STATUS.md"
+
+#: The release record the binary carries, which `just changelog` writes after a
+#: tag. It may lack the release being tagged, whose notes follow the tag, and no
+#: other: a binary built from a tree whose record stops short of the release before
+#: it cannot name the release it is.
+RECORD = "reference/changelog.json"
+
+#: A release tag, and nothing else a tag list can hold.
+RELEASE_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 #: The names of the two questions that *are* this gate. Everything else it asks
 #: is a precondition for asking these, and a run reaching the end without both of
@@ -146,6 +161,29 @@ def decide(steps: list[Step]) -> tuple[int, list[str]]:
     return 0, lines
 
 
+def unrecorded(version: str, tags: list[str], recorded: set[str]) -> list[str]:
+    """Every release tagged before `version` whose notes the record does not hold.
+
+    Kept apart from the git and file reads, so the self-test can hold it to each
+    case without a repository. A tag that is not a plain release tag is not a
+    release, and `version` itself is left out because its notes follow its tag.
+    """
+    about = RELEASE_TAG.match(f"v{version}")
+    if about is None:
+        return []
+    before = tuple(int(part) for part in about.groups())
+    missing = []
+    for tag in tags:
+        tagged = RELEASE_TAG.match(tag.strip())
+        if tagged is None:
+            continue
+        release = tuple(int(part) for part in tagged.groups())
+        named = ".".join(tagged.groups())
+        if release < before and named not in recorded:
+            missing.append(named)
+    return sorted(missing, key=lambda named: tuple(int(part) for part in named.split(".")))
+
+
 def ran(*args: str, cwd: Path | None = None) -> tuple[bool, str]:
     """A command, and whether it was happy. Its words are kept either way."""
     try:
@@ -219,6 +257,27 @@ def gather(spec: Path, version: str, work: Path) -> tuple[list[Step], list[str]]
     return steps, args
 
 
+def written(version: str) -> Step:
+    """Whether the record this tag's binary carries holds every release before it."""
+    name = "the release record holds every earlier release"
+    ok, tags = ran("git", "tag", "--list", "v*", cwd=ROOT)
+    if not ok:
+        return Step(name, False, tags)
+    try:
+        record = json.loads((ROOT / RECORD).read_text(encoding="utf-8"))
+        recorded = {release["version"] for release in record["releases"]}
+    except (OSError, ValueError, KeyError, TypeError) as unreadable:
+        return Step(name, False, f"{RECORD} could not be read: {unreadable}")
+    missing = unrecorded(version, tags.split(), recorded)
+    return Step(
+        name,
+        not missing,
+        f"{RECORD} has no notes for {', '.join(missing)}, so this binary could not name "
+        "the release before it. Run `just changelog`, merge what it writes, then tag."
+        if missing else "",
+    )
+
+
 def check(version: str, spec: Path, work: Path) -> list[Step]:
     """Every question this gate asks, in the order a failure is worth hearing."""
     steps: list[Step] = []
@@ -265,6 +324,10 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
                       "a shallow clone loses its oldest citations, so the verdict would "
                       "depend on the depth of a fetch" if shallow else said if not ok else ""))
     if shallow or not ok:
+        return steps
+
+    steps.append(written(version))
+    if not steps[-1].ok:
         return steps
 
     cloned, repos = gather(spec, version, work)
@@ -363,6 +426,20 @@ def self_test() -> int:
             broken.append(f"the refusal did not name check {spoiled}")
         if "why it failed" not in joined:
             broken.append(f"the refusal dropped what check {spoiled} said")
+
+    # The record: the release being tagged may lack notes, an earlier one may not,
+    # and a tag that is not a release tag is not a release.
+    tags = ["v0.14.0", "v0.15.0", "v0.16.0", "v0.9.1", "not-a-release", "v0.17.0-rc.1"]
+    if unrecorded("0.17.0", tags, {"0.16.0", "0.15.0", "0.14.0", "0.9.1"}):
+        broken.append("a record holding every earlier release was refused")
+    if unrecorded("0.17.0", ["v0.17.0", *tags], {"0.16.0", "0.15.0", "0.14.0", "0.9.1"}):
+        broken.append("the release being tagged was required to have its notes already")
+    if unrecorded("0.17.0", tags, {"0.14.0", "0.9.1"}) != ["0.15.0", "0.16.0"]:
+        broken.append("a record missing two releases did not name both, oldest first")
+    if unrecorded("0.10.0", tags, {"0.9.1"}):
+        broken.append("a release after the one being tagged was required of the record")
+    if unrecorded("0.10.0", tags, set()) != ["0.9.1"]:
+        broken.append("a patch release missing from the record was not named")
 
     for line in broken:
         print(f"::error::{line}")
