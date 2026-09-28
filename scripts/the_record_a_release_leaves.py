@@ -508,6 +508,26 @@ def standing(stored: dict, fresh: dict) -> tuple[str, list[str]]:
     return ("current", [])
 
 
+def overdue(stored: dict, fresh: dict) -> list[str]:
+    """Releases whose notes should have been written by now, and were not.
+
+    `pending` is the ordinary state of the trunk between a tag and the refresh that
+    follows it, so the newest tag may lack its notes. An older one may not: a later
+    release was tagged after it, which is a whole release cycle in which nobody wrote
+    them, and a binary built in that time carries a record that cannot name the
+    release it is. The check refuses that, and the state the binary reports does not
+    change.
+    """
+    said = {one["version"] for one in stored["releases"]}
+    tagged = [one["version"] for one in fresh["releases"]]
+    newest = max(tagged, key=ordered, default=None)
+    return [
+        f"{version} has been tagged, a later release followed it, and its notes are still not written"
+        for version in tagged
+        if version not in said and version != newest
+    ]
+
+
 def summaries(release_record: dict) -> list[str]:
     """What one release changed, as the lines a reader would count."""
     return [
@@ -676,6 +696,14 @@ def self_test() -> int:
     if standing(altered, record)[0] != "stale":
         failures.append("a record disagreeing with a tag it holds was not called stale")
 
+    # One tag behind is the refresh not yet made; two is a refresh that was missed.
+    if overdue(record, record) or overdue(behind, record):
+        failures.append("a record at most one tag behind was called overdue")
+    two_behind = {"releases": record["releases"][2:], "requirements": record["requirements"]}
+    missed = overdue(two_behind, record)
+    if len(missed) != 1 or record["releases"][1]["version"] not in missed[0]:
+        failures.append(f"a record two tags behind did not name the release it missed: {missed}")
+
     for line in failures:
         print(f"self-test: {line}", file=sys.stderr)
     print("self-test: every claim holds." if not failures else "self-test: FAILED")
@@ -721,10 +749,13 @@ def main() -> int:
     if arguments.check:
         kept = json.loads(arguments.check.read_text(encoding="utf-8"))
         where, why = standing(kept, record)
+        late = overdue(kept, record)
         for line in why:
             print(f"::{'error' if where == 'stale' else 'notice'}::{line}")
+        for line in late:
+            print(f"::error::{line}. Run `just changelog` and commit what it writes.")
         print(f"the kept record is {where}.")
-        return 1 if where == "stale" else 0
+        return 1 if where == "stale" or late else 0
     print(json.dumps(record, indent=2, ensure_ascii=False))
     return 0
 
