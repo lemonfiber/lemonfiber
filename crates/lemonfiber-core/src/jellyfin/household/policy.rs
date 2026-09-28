@@ -139,6 +139,10 @@ const WRONG_SO_FAR: &str = "InvalidLoginAttemptCount";
 /// `v10.10.3` and `v12.1`: a failed sign-in switches the account off only where this is
 /// set, and a policy written with `-1` clears it — so an account nobody set it on can be
 /// guessed at without end. Written as a number because `0` is read as three.
+///
+/// **`10.11.11` records the lockout and does not keep it.** Driven: the fifth wrong
+/// password is logged as `UserLockedOut`, the account stays switched on, and the right
+/// password still signs in. `10.10.3` switches it off and refuses the right one `403`.
 const WRONG_BEFORE_LOCKOUT: &str = "LoginAttemptsBeforeLockout";
 
 /// How many wrong passwords a household account is given before it switches itself off.

@@ -192,7 +192,7 @@ pub fn is_route(text: &str) -> bool {
 ///
 /// `$` is Compose's, which substitutes from the stack's environment file — the one
 /// holding every key the stack has. `{{` is the dashboard's, which substitutes from
-/// its own environment, which carries the stack's API keys so its widgets can read.
+/// its own environment into what it reads.
 #[must_use]
 pub fn substituted(text: &str) -> Option<&'static str> {
     if text.contains('$') {

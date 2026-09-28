@@ -6345,6 +6345,12 @@
     },
     "ServiceProvenance": {
       "fields": {
+        "digest": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "id": {
           "type": [
             "string"

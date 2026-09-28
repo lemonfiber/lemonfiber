@@ -24,7 +24,7 @@ fn rehearsed(rotation: &Rotation) -> Option<(String, Vec<String>)> {
 fn the_torrent_password_reaches_its_own_service_and_leaves_the_rest_pending() {
     let consumers = reached(config::QBITTORRENT_PASSWORD_KEY);
 
-    assert_eq!(consumers.len(), 4, "{consumers:?}");
+    assert_eq!(consumers.len(), 3, "{consumers:?}");
     assert_eq!(
         consumers.first().map(|one| &one.reach),
         Some(&Reach::Updated)
@@ -36,7 +36,7 @@ fn the_torrent_password_reaches_its_own_service_and_leaves_the_rest_pending() {
             Reach::Updated | Reach::Failed { .. } => None,
         })
         .collect();
-    assert_eq!(waiting.len(), 3, "{waiting:?}");
+    assert_eq!(waiting.len(), 2, "{waiting:?}");
     assert!(waiting.contains(&"lemonfiber seed"), "{waiting:?}");
     assert!(
         waiting.contains(&"lemonfiber restart torrent"),

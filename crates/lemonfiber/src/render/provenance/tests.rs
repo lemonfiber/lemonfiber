@@ -11,6 +11,7 @@ fn service(id: &str, license: &str) -> ServiceProvenance {
         upstream: format!("https://github.com/{id}/{id}"),
         image: format!("lscr.io/linuxserver/{id}"),
         pinned: "4.0.15".to_owned(),
+        digest: None,
     }
 }
 
@@ -31,6 +32,24 @@ fn a_service_is_named_with_its_licence_its_project_and_what_is_actually_run() {
     );
     assert!(
         said.contains("pinned   lscr.io/linuxserver/sonarr:4.0.15"),
+        "{said}"
+    );
+}
+
+/// A service pinned by digest is printed with it, since the digest is what is pulled.
+#[test]
+fn a_digest_is_printed_beside_the_version_it_pins() {
+    let pinned = ServiceProvenance {
+        digest: Some("sha256:a5c1".to_owned()),
+        ..service("sonarr", "GPL-3.0-only")
+    };
+    let said = comes_from(&ProvenanceReport {
+        services: vec![pinned],
+    })
+    .text();
+
+    assert!(
+        said.contains("pinned   lscr.io/linuxserver/sonarr:4.0.15@sha256:a5c1"),
         "{said}"
     );
 }

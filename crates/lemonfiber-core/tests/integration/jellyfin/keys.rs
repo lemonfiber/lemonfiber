@@ -1,85 +1,68 @@
-//! The key lemonfiber keeps on the media server, and choosing an identity.
+//! Revoking the key filed under lemonfiber's name on the media server, and choosing an
+//! identity.
 
 use super::{reader, OURS_TOO, SIGNED_IN, SOMEONE_ELSES};
 use lemonfiber_core::ports::http::Method;
-use lemonfiber_core::ports::service::{Allowed, Failure};
+use lemonfiber_core::ports::service::Allowed;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::Household;
 
-/// A key already filed under lemonfiber's name is handed back, not minted again.
+/// The key filed under lemonfiber's name is revoked, and nobody else's.
 ///
-/// Seeding runs repeatedly, and a fresh key each time would leave every earlier one
-/// valid on the server for as long as the stack lives.
+/// An API key on this server administers all of it, and nothing in the stack reads
+/// lemonfiber's. Seerr's key beside it is Seerr's, and is left alone.
 #[tokio::test]
-async fn a_key_already_ours_is_reused_rather_than_minted_again() {
+async fn the_key_filed_under_our_name_is_revoked_and_no_other() {
     let fake = Fake::in_turn(vec![
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OURS_TOO),
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(204, ""),
     ]);
-    let held = reader(&fake).api_key().await;
+    let revoked = reader(&fake).revoke_our_key().await;
 
-    // The value is not in the message: it is a credential, and a failing
-    // assertion prints its message into the run's log.
+    assert!(matches!(revoked, Ok(true)), "{revoked:?}");
+    let deleted: Vec<String> = fake
+        .requests()
+        .into_iter()
+        .filter(|asked| asked.method == Method::Delete)
+        .map(|asked| asked.url)
+        .collect();
+    assert_eq!(deleted.len(), 1, "{deleted:?}");
     assert!(
-        held.is_ok_and(|key| key == "ours"),
-        "the key already filed under our name was not handed back"
+        deleted.iter().all(|url| url.ends_with("/Auth/Keys/ours")),
+        "a key that was not ours was revoked: {deleted:?}"
     );
+}
+
+/// With no key of ours there is nothing to revoke, and nothing is asked to be.
+#[tokio::test]
+async fn with_no_key_of_ours_nothing_is_revoked() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, SOMEONE_ELSES),
+    ]);
+
+    assert!(matches!(reader(&fake).revoke_our_key().await, Ok(false)));
     assert!(
         !fake
             .requests()
             .iter()
-            .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")),
-        "a key that already existed was minted a second time"
+            .any(|asked| asked.method == Method::Delete),
+        "somebody else's key was revoked"
     );
 }
 
-/// With no key of ours, one is minted and then read back from the list.
-///
-/// Read back rather than taken from the mint's answer, which carries no body at all —
-/// so the value is only knowable by asking again.
+/// A revocation the server refuses is reported rather than called done.
 #[tokio::test]
-async fn a_key_is_minted_where_none_is_ours_yet() {
+async fn a_revocation_the_server_refuses_is_reported() {
     let fake = Fake::in_turn(vec![
-        Answer::reply(200, SIGNED_IN),
-        Answer::reply(200, SOMEONE_ELSES),
-        Answer::reply(200, SIGNED_IN),
-        Answer::reply(204, ""),
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OURS_TOO),
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(500, ""),
     ]);
-    let held = reader(&fake).api_key().await;
-
-    // The value is not in the message: it is a credential, and a failing
-    // assertion prints its message into the run's log.
-    assert!(
-        held.is_ok_and(|key| key == "ours"),
-        "the key already filed under our name was not handed back"
-    );
-    let minted = fake
-        .requests()
-        .into_iter()
-        .find(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys"));
-    assert!(
-        minted.is_some_and(|asked| asked.url.contains("App=lemonfiber")),
-        "the key was not minted under lemonfiber's own name"
-    );
-}
-
-/// A mint the server takes but does not list is reported rather than called done.
-#[tokio::test]
-async fn a_key_that_does_not_appear_after_minting_is_reported() {
-    let fake = Fake::in_turn(vec![
-        Answer::reply(200, SIGNED_IN),
-        Answer::reply(200, SOMEONE_ELSES),
-        Answer::reply(200, SIGNED_IN),
-        Answer::reply(204, ""),
-        Answer::reply(200, SIGNED_IN),
-        Answer::reply(200, SOMEONE_ELSES),
-    ]);
-    assert!(matches!(
-        reader(&fake).api_key().await,
-        Err(Failure::Refused { .. })
-    ));
+    assert!(reader(&fake).revoke_our_key().await.is_err());
 }
 
 /// A key list that cannot be read is a failure, not an absent key.
@@ -89,7 +72,7 @@ async fn a_key_list_that_cannot_be_read_is_reported() {
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, "not json"),
     ]);
-    assert!(reader(&fake).api_key().await.is_err());
+    assert!(reader(&fake).revoke_our_key().await.is_err());
 }
 
 /// The account's own policy, as the media server hands it back.

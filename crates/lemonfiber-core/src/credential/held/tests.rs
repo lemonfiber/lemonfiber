@@ -30,7 +30,7 @@ fn the_torrent_password_names_the_port_push_as_well_as_the_client() {
 
     assert!(consumers.contains("forwarded-port push"), "{consumers}");
     assert!(consumers.contains("web UI"), "{consumers}");
-    assert!(QBITTORRENT.consumers.len() >= 4, "{consumers}");
+    assert!(QBITTORRENT.consumers.len() >= 3, "{consumers}");
 }
 
 #[test]

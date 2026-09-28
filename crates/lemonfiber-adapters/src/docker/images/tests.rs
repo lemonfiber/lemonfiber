@@ -119,3 +119,33 @@ fn one_project_holding_two_containers_is_named_once() {
         Some(vec!["lemonfiber".to_owned()])
     );
 }
+
+/// An image pulled by digest carries no tag, and is named by its digest and by the name
+/// its container was started from — which is the only place its version survives.
+#[test]
+fn an_image_pulled_by_digest_is_named_by_what_it_was_started_from() {
+    let pinned = "linuxserver/sonarr:4.0.20@sha256:a5c1";
+    let correlated = correlate(
+        vec![ImageSummary {
+            repo_digests: vec!["linuxserver/sonarr@sha256:a5c1".to_owned()],
+            ..image("sha256:bb", &[], 300)
+        }],
+        &[container("sha256:bb", pinned, Some("media"))],
+    );
+
+    let names = correlated
+        .first()
+        .map(|image| image.tags.clone())
+        .unwrap_or_default();
+    assert_eq!(
+        names,
+        [
+            "linuxserver/sonarr:4.0.20@sha256:a5c1",
+            "linuxserver/sonarr@sha256:a5c1"
+        ]
+    );
+    assert_eq!(
+        correlated.first().map(|image| image.projects.clone()),
+        Some(vec!["media".to_owned()])
+    );
+}

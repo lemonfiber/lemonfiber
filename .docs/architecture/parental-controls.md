@@ -61,18 +61,25 @@ is a disagreement nobody spots.
 `GET /Localization/ParentalRatings` answers with the media server's own certificates
 against the ages it holds them at. Driven against `jellyfin/jellyfin:10.10.3`, it
 answers **without authentication** and **before the setup wizard has run**, and the
-answer differs by the country the server keeps:
+answer differs by the country the server keeps — and by the server's version, since the
+tables are the server's own and `10.11` rewrote them. Read off the pinned `10.11.11`'s
+own tables:
 
 | Country | What it names |
 |---------|---------------|
-| `US` (the default) | `G` 0 · `TV-Y7` 7 · `PG` 10 · `PG-13` 13 · `TV-14` 14 · `R`, `NC-17`, `TV-MA` 17 · `21` 21 · `XXX` 1000 · `Banned` 1001 |
-| `GB` | `U` 0 · `6+` 6 · `7+` 7 · `PG` 8 · `12A` 12 · `15` 15 · `18` 18 · `R18` 1000 · `Banned` 1001 |
+| `US` (the default) | `G`, `TV-Y` 0 · `TV-Y7` 7 · `PG`, `TV-PG` 10 · `PG-13` 13 · `TV-14` 14 · `R`, `NC-17`, `TV-MA` 17 · `TV-X`, `TV-AO` 18 |
+| `GB` | `U` 0 · `6+` 6 · `7+` 7 · `PG` 8 · `9` 9 · `12A`, `12` 12 · `13+` 13 · `14+` 14 · `15` 15 · `16` 16 · `18` 18 · `R18` 1000 |
+
+On `10.10.3` the same `US` table put `TV-PG` at 13, so one limit admits different
+television on the two versions. Since `10.11` a certificate also carries a second number
+beside its age — `NC-17` is 17 and one, `R` is 17 and nought — which a limit written as
+an age alone does not narrow by: a limit of 17 admits both.
 
 The first row is why a number alone is not what a parent chose. The steps lemonfiber
 offers are 0, 7, 12, 15 and 18 — a British ladder — and **under an American table a
-limit of 18 holds back nothing an American calls adult**, because the highest
-certificate below it is `R` at 17. So a limit is never reported as a bare number: it
-is said as the certificates on either side of it, taken from the server's own table.
+limit of 18 holds back nothing an American calls adult**, because every one of its
+certificates is at 18 or below. So a limit is never reported as a bare number: it is
+said as the certificates on either side of it, taken from the server's own table.
 
 One row of that table carries no age at all — the server's name for content it has no
 rating for. It is not a certificate and is dropped on the way in; what to do about
@@ -135,8 +142,8 @@ is asked to sign in again.
 ## What the server shows a restricted member
 
 Everything above is what lemonfiber *writes*. This is what the media server then does
-with it, driven against `jellyfin/jellyfin:10.10.3` rather than read off its
-documentation — and driving it needed the one thing no fake supplies, a library holding
+with it, driven against `jellyfin/jellyfin:10.10.3` and again against the pinned
+`10.11.11` rather than read off its documentation — and driving it needed the one thing no fake supplies, a library holding
 content the server has a certificate for. That library is
 [`scripts/a_library_with_certificates_on_it.py`](../../scripts/a_library_with_certificates_on_it.py):
 a container of its own, eleven titles whose `.nfo` files carry a certificate in `<mpaa>`,
@@ -178,7 +185,14 @@ directions, on a token nobody re-authenticated**:
 
 The refresh was `POST /Library/Refresh` — the same call
 [`jellyfin/library.rs`](../../crates/lemonfiber-core/src/jellyfin/library.rs) already
-sends — and it took about a second.
+sends — and on `10.10.3` it took about a second.
+
+**On `10.11.11` a library scan does not re-read a changed `.nfo` at all.** The same
+rewrite, followed by `POST /Library/Refresh` and a minute's wait, left both titles on
+their old certificates and the member's answers where they were. The forced item refresh
+below re-read it within two seconds, as on `10.10.3`. So on the pinned server a
+certificate changes what a member may open once that item's metadata is refreshed, and
+not on a scan.
 
 **But a scan re-reads what it can see has changed, and only that.** With the same
 content change made and the file's modification time put back afterwards,

@@ -11691,6 +11691,13 @@
           "description": "Where one service comes from, as the stack declares it.",
           "type": "object",
           "properties": {
+            "digest": {
+              "description": "The digest of the image that runs, where the stack names one.\n\nBeside the tag rather than instead of it: the tag is the version somebody reads,\nand the digest is the one image that version was when it was pinned, which is\nwhat is pulled and what somebody verifies against the registry.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "id": {
               "description": "The service's id, which is also its Compose service name.",
               "type": "string"

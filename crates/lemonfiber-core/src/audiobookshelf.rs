@@ -1,14 +1,9 @@
-//! Setting up the listening server, and reading the token its dashboard panel uses.
+//! Claiming the listening server before anybody else on the network can.
 //!
-//! Like Jellyfin, this one has no key to read: it starts with no account at all and
-//! refuses everything until one exists. So the first run creates it, the same way the
-//! media server's is created, and the credential lemonfiber keeps is the password it
+//! Like Jellyfin, this one has no key to read: it starts with no account at all, and
+//! the first visitor to it makes the root one. So the first run makes it, the same way
+//! the media server's is made, and the credential lemonfiber keeps is the password it
 //! minted rather than a key the service wrote down.
-//!
-//! **The token it hands back on sign-in is stable**, so a later run signs in again
-//! and gets the same value rather than minting a second one. That is what lets the
-//! token be published without recording it: the password is the durable secret, and
-//! the token is derived from it on demand.
 
 use std::sync::Arc;
 
@@ -22,9 +17,6 @@ use crate::ports::service::Failure;
 /// one exists.
 const INIT: &str = "/init";
 
-/// Where a sign-in is made, which is how the token is obtained.
-const LOGIN: &str = "/login";
-
 /// Where the server says whether it has an account yet.
 const STATUS: &str = "/status";
 
@@ -33,20 +25,6 @@ const STATUS: &str = "/status";
 struct Status {
     #[serde(rename = "isInit", default)]
     is_init: bool,
-}
-
-/// A sign-in's answer, of which one field is read.
-#[derive(Deserialize)]
-struct SignedIn {
-    #[serde(default)]
-    user: User,
-}
-
-/// The signed-in account, and the token its reads carry.
-#[derive(Deserialize, Default)]
-struct User {
-    #[serde(default)]
-    token: String,
 }
 
 /// A client for one Audiobookshelf.
@@ -105,26 +83,5 @@ impl Audiobookshelf {
             .send(&self.request(Method::Post, INIT, Some(body)))
             .await?;
         self.endpoint.expect_success(&response)
-    }
-
-    /// The token this account's reads carry, obtained by signing in.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] where the server is unreachable, refuses the sign-in, or
-    /// answers with no token in it.
-    pub async fn token(&self, name: &str, password: &str) -> Result<String, Failure> {
-        let body = serde_json::json!({ "username": name, "password": password }).to_string();
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Post, LOGIN, Some(body)))
-            .await?;
-        let signed_in: SignedIn = self
-            .endpoint
-            .decode(&response, "the sign-in was not accepted")?;
-        if signed_in.user.token.is_empty() {
-            return Err(self.endpoint.refused("the sign-in carried no token"));
-        }
-        Ok(signed_in.user.token)
     }
 }

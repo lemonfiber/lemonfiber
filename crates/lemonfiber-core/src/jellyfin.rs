@@ -104,34 +104,29 @@ impl Jellyfin {
         Ok(request)
     }
 
-    /// The API key the dashboard authenticates with, minted once and reused after.
+    /// Revoke the API key filed under lemonfiber's name, where there is one.
     ///
-    /// Jellyfin writes no key to a file — it keeps them in its own database — so this
-    /// is the one credential in the stack that has to be asked for rather than read.
-    /// It is minted under lemonfiber's own name so an operator can see which key is
-    /// whose, and a key already under that name is handed back rather than a second
-    /// one made: a fresh key every seed would leave the old ones behind for as long
-    /// as the stack runs.
+    /// No part of the stack reads one: an API key on this server administers all of it,
+    /// and the dashboard is published to the household network, which is not somewhere
+    /// one is kept. A key on the server is a credential nothing needs, so it is taken off
+    /// rather than left valid.
+    ///
+    /// Answers whether one was there to revoke.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, or
-    /// answers the key list with something unreadable.
-    pub async fn api_key(&self) -> Result<String, Failure> {
-        if let Some(existing) = self.our_key().await? {
-            return Ok(existing);
-        }
-        let minting = self
-            .as_admin(Method::Post, &format!("/Auth/Keys?App={APP}"), None)
+    /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, answers
+    /// the key list with something unreadable, or refuses the revocation.
+    pub async fn revoke_our_key(&self) -> Result<bool, Failure> {
+        let Some(ours) = self.our_key().await? else {
+            return Ok(false);
+        };
+        let revoking = self
+            .as_admin(Method::Delete, &format!("/Auth/Keys/{ours}"), None)
             .await?;
-        let response = self.endpoint.send(&minting).await?;
+        let response = self.endpoint.send(&revoking).await?;
         self.endpoint.expect_success(&response)?;
-        // Asked for again rather than read from the answer: the mint replies with no
-        // body at all, so the key it made is only knowable by listing them.
-        self.our_key().await?.ok_or_else(|| {
-            self.endpoint
-                .refused("the key that was just made is not listed")
-        })
+        Ok(true)
     }
 
     /// The key already filed under lemonfiber's name, where there is one.

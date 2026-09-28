@@ -2,16 +2,16 @@
 //!
 //! [`crate::age_limit`] holds the number and the words for it. This holds the other
 //! half: the certificates a household already recognises, read off the media server
-//! rather than shipped, because **the table differs by country**. Driven against
-//! `jellyfin/jellyfin:10.10.3`, `GET /Localization/ParentalRatings` answers with the
-//! server's own certificates against the ages they are for, and the same read under a
-//! different country is a different list — `U` at nought, `PG` at eight, `12A` at
-//! twelve for the United Kingdom; `G` at nought, `PG` at ten, `PG-13` at thirteen,
-//! `R` at seventeen for the United States.
+//! rather than shipped, because **the table differs by country, and by version**.
+//! `GET /Localization/ParentalRatings` answers with the server's own certificates
+//! against the ages they are for, and the same read under a different country is a
+//! different list — on the pinned `10.11.11`, `U` at nought, `PG` at eight, `12A` at
+//! twelve for the United Kingdom; `G` at nought, `PG` and `TV-PG` at ten, `PG-13` at
+//! thirteen, `R` at seventeen for the United States. `10.10.3` put `TV-PG` at thirteen.
 //!
 //! **A number alone is not what a parent chose.** Under a United States table a limit
-//! of eighteen holds back nothing an American calls adult, because the highest
-//! certificate below it is `R` at seventeen. An operator reading "nothing above about
+//! of eighteen holds back nothing an American calls adult, because every certificate it
+//! names is at eighteen or below. An operator reading "nothing above about
 //! 18" beside that table has been told something true and misleading at once. So a
 //! limit is said as the certificates on either side of it: what it still allows, and
 //! the first thing it holds back.
@@ -55,7 +55,8 @@ pub struct Rated {
 ///
 /// One certificate per step [`crate::age_limit`] offers, so no step is ever bare. They
 /// are the British ones, which is the ladder those steps were written against — read
-/// off `jellyfin/jellyfin:10.10.3` under `GB` rather than recalled.
+/// off the server's own `GB` table, at the same ages on `10.10.3` and `10.11.11`, rather
+/// than recalled.
 const FALLBACK: &[(u32, &str)] = &[(0, "U"), (7, "7+"), (12, "12A"), (15, "15"), (18, "18")];
 
 /// Said after a reading whose names came from the mapping rather than the server.

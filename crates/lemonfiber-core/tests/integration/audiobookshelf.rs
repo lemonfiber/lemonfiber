@@ -1,15 +1,14 @@
 //! The listening server's client, driven through the HTTP port against a fake
 //! transport.
 //!
-//! Its first-run is two calls — make the account, then sign in for the token — and
-//! the second is what the dashboard's panel authenticates with. The shapes here were
-//! read off `ghcr.io/advplyr/audiobookshelf:2.17.7`, and the flow driven against it.
+//! Its first run is one question and one call: whether an account exists, and making
+//! the first one. The shapes here were read off `ghcr.io/advplyr/audiobookshelf:2.17.7`,
+//! and the flow driven against it.
 
 use std::sync::Arc;
 
 use lemonfiber_core::audiobookshelf::Audiobookshelf;
 use lemonfiber_core::ports::http::{Http, Method};
-use lemonfiber_core::ports::service::Failure;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 fn server(fake: &Arc<Fake>) -> Audiobookshelf {
@@ -68,41 +67,4 @@ async fn a_server_that_already_has_an_account_refuses_a_second() {
         .create_account("admin", &password())
         .await
         .is_err());
-}
-
-/// Signing in hands back the token the dashboard's panel authenticates with.
-#[tokio::test]
-async fn signing_in_hands_back_the_token_the_panel_uses() {
-    let fake = Fake::always(Answer::reply(200, r#"{"user":{"token":"the-token"}}"#));
-    let held = server(&fake).token("admin", &password()).await;
-    assert!(
-        held.as_ref().is_ok_and(|token| token == "the-token"),
-        "{held:?}"
-    );
-}
-
-/// A sign-in carrying no token is reported rather than handed back as an empty one.
-///
-/// An empty token published is worse than none: the panel would authenticate with it
-/// and be refused, which reads as the service being broken rather than unconfigured.
-#[tokio::test]
-async fn a_sign_in_without_a_token_is_reported() {
-    let empty = Fake::always(Answer::reply(200, r#"{"user":{"token":""}}"#));
-    assert!(matches!(
-        server(&empty).token("admin", &password()).await,
-        Err(Failure::Refused { .. })
-    ));
-
-    let nothing = Fake::always(Answer::reply(200, "{}"));
-    assert!(server(&nothing).token("admin", &password()).await.is_err());
-}
-
-/// A refused sign-in is reported as one.
-#[tokio::test]
-async fn a_refused_sign_in_is_reported() {
-    let fake = Fake::always(Answer::reply(401, ""));
-    assert!(matches!(
-        server(&fake).token("admin", &password()).await,
-        Err(Failure::Unauthorised { .. })
-    ));
 }

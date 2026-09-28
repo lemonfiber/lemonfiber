@@ -63,6 +63,24 @@ fn service(text: &str) -> Option<Service> {
 }
 
 #[test]
+fn a_service_is_referred_to_by_its_digest_where_it_pins_one() {
+    let digest = format!("sha256:{}", "ab".repeat(32));
+    let pinned = service(MINIMAL).map(|service| Service {
+        digest: Some(digest.clone()),
+        ..service
+    });
+    assert_eq!(
+        pinned.map(|service| service.reference()),
+        Some(format!("lscr.io/linuxserver/qbittorrent@{digest}"))
+    );
+    assert_eq!(
+        service(MINIMAL).map(|service| service.reference()),
+        Some("lscr.io/linuxserver/qbittorrent:5.0.3".to_owned()),
+        "a service pinning no digest is named by its tag"
+    );
+}
+
+#[test]
 fn reads_every_declared_collection() {
     let counted = parse(MINIMAL).map(|manifest| {
         (

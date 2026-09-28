@@ -24,6 +24,7 @@ fn bundled(id: &str, provides: &[&str]) -> lemonfiber_manifest::Service {
         profile: "media".to_owned(),
         image: "example/image".to_owned(),
         tag: "1".to_owned(),
+        digest: None,
         port: None,
         bind: None,
         health: None,

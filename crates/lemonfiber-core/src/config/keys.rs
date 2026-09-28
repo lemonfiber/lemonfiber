@@ -229,9 +229,8 @@ pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 ///
 /// The same shape as Jellyfin's and for the same reason: the service starts with no
 /// account and writes no key, so lemonfiber mints this, creates the account with it,
-/// and keeps it. The token its dashboard panel uses is derived from this on demand
-/// rather than recorded beside it — the service hands back the same one every
-/// sign-in, so a second record would be a second copy of the same secret.
+/// and keeps it. The account is made so that nobody else on the network can claim the
+/// server first; no token of it is recorded.
 pub(crate) const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 
 /// The environment key holding the book \*arr's API key.
@@ -254,16 +253,16 @@ pub(crate) const JELLYFIN_ADMIN_USER: &str = "admin";
 /// The account name qBittorrent's web UI is reached under.
 ///
 /// One source of truth for the name, so the client that logs in, the download-client
-/// registration that hands it to an \*arr, and the dashboard's own widget all present
-/// the same one. Separate from Jellyfin's although both spell it `admin`: they are two
+/// registration that hands it to an \*arr, and the tunnel's forwarded-port push all
+/// present the same one. Separate from Jellyfin's although both spell it `admin`: they are two
 /// services, and either may change without the other.
 pub(crate) const QBITTORRENT_USER: &str = "admin";
 
 /// The environment key holding the account name qBittorrent is reached under.
 ///
-/// The dashboard reads both halves of the credential from the environment and has no
-/// default for this one, so a name that is never written leaves its widget unable to
-/// authenticate.
+/// The tunnel's forwarded-port push reads both halves of the credential from the
+/// environment, so the name is written beside the password rather than left to the
+/// default it falls back on.
 pub(crate) const QBITTORRENT_USERNAME_KEY: &str = "QBITTORRENT_USERNAME";
 
 /// Every setting lemonfiber names.

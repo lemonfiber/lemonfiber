@@ -36,7 +36,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-IMAGE = "jellyfin/jellyfin:10.10.3"
+# The image the stack pins, by its digest: a tag is a label its publisher can move.
+IMAGE = (
+    "jellyfin/jellyfin:10.11.11"
+    "@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db"
+)
 CONTAINER = "lemonfiber-certificates"
 PORT = 18096
 
@@ -120,10 +124,16 @@ class Server:
         except urllib.error.HTTPError as refused:
             return refused.code, refused.read().decode()[:200]
 
-    def wait(self, seconds=120):
+    def wait(self, seconds=300):
+        """Until the server answers as itself rather than with its startup page.
+
+        10.11 answers `/System/Info/Public` while it is still migrating its database,
+        and every other request with `503` and a page saying it is starting — so the
+        wait is on a request that needs the server to be up.
+        """
         for _ in range(seconds):
             try:
-                status, _ = self.call("GET", "/System/Info/Public")
+                status, _ = self.call("GET", "/Users/Public")
                 if status == 200:
                     return True
             except OSError:
@@ -248,13 +258,22 @@ def catalogued(server, who, token=False):
 
 
 def settled(server, who, expected, seconds=120):
-    """Wait for the scan to have found everything, rather than racing it."""
+    """Wait for the scan to have found everything and read every certificate.
+
+    Both, because they are two passes on 10.11.11: the titles are listed before their
+    `.nfo` files are read, and a title whose certificate has not been read yet is one
+    the server treats as unrated.
+    """
+    rated = sum(1 for _, certificate in CATALOGUE if certificate is not None)
     for _ in range(seconds):
         _, held = catalogued(server, who)
-        if len(held) >= expected:
+        read = sum(1 for certificate, _ in held.values() if certificate is not None)
+        if len(held) >= expected and read >= rated:
             return held
         time.sleep(2)
-    raise SystemExit(f"the scan found {len(held)} of {expected} titles")
+    raise SystemExit(
+        f"the scan found {len(held)} of {expected} titles and read {read} of {rated} certificates"
+    )
 
 
 def what_is_offered(server, admin, member, token):

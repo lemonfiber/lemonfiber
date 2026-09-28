@@ -428,9 +428,12 @@ impl Diagnose for Failure {
 /// establish that from a name and a size.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Image {
-    /// Every name it answers to, as the engine reports them.
+    /// Every name it answers to: its tags, its digests, and each name a container
+    /// was started from it by.
     ///
-    /// Empty for an image nothing tags any more, which is still an image taking up
+    /// All three, because an image pulled by digest carries no tag — the version it
+    /// was pinned at survives only in the name its container was started from.
+    /// Empty for an image nothing names any more, which is still an image taking up
     /// room and so still worth reporting.
     pub tags: Vec<String>,
     /// What it occupies, as the engine reports its size.

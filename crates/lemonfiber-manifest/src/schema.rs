@@ -173,7 +173,19 @@ pub struct Service {
     /// Image reference without a tag.
     pub image: String,
     /// Explicit version — a floating tag is a validation failure.
+    ///
+    /// The version an operator reads, and nothing more: a tag is a label its publisher
+    /// can move to another image, so what runs is named by [`Self::digest`].
     pub tag: String,
+    /// The digest of the image's multi-architecture index, `sha256:` and 64 lower-case
+    /// hex digits.
+    ///
+    /// What actually runs. A digest names one index for good, where the tag beside it
+    /// could be moved to a different one tomorrow, so the stack resolves every image by
+    /// this and a service without one is refused by validation. Optional here so that
+    /// refusal can name the service, rather than the file failing to parse.
+    #[serde(default)]
+    pub digest: Option<String>,
     /// Primary UI or API port, absent for services with no listener.
     #[serde(default)]
     pub port: Option<u16>,
@@ -259,6 +271,19 @@ pub struct Service {
     /// the sum rather than counted as costing nothing.
     #[serde(default)]
     pub memory_mib: Option<u32>,
+}
+
+impl Service {
+    /// The name the engine files this service's image under: `image@digest` where the
+    /// stack pins one, since the tag beside a digest is never applied to what is pulled,
+    /// and `image:tag` where it does not.
+    #[must_use]
+    pub fn reference(&self) -> String {
+        match &self.digest {
+            Some(digest) => format!("{}@{digest}", self.image),
+            None => format!("{}:{}", self.image, self.tag),
+        }
+    }
 }
 
 /// A service this stack used to carry, and what became of it.

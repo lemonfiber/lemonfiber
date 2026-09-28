@@ -179,6 +179,7 @@ fn check_services(
             .into_iter()
             .chain(placed(service, profiles))
             .chain(pinned(service))
+            .chain(digested(service))
             .chain(published(service))
             .chain(estimated(service))
             .chain(licensed(service, &osi))
@@ -343,6 +344,35 @@ fn pinned(service: &Service) -> Option<String> {
             "is pinned to {}, which moves — that is not a pin",
             service.tag
         )
+    })
+}
+
+/// A service names the image that runs by its digest, and not only by a tag.
+///
+/// A tag is a label its publisher can move, so an image resolved by one is whatever
+/// that label points at on the day it is pulled. The digest cannot move.
+fn digested(service: &Service) -> Option<String> {
+    match service.digest.as_deref() {
+        None => Some(format!(
+            "names no digest, so {} runs whatever that tag points at when it is pulled",
+            service.tag
+        )),
+        Some(digest) if !is_digest(digest) => Some(format!(
+            "has digest {digest:?}, which is not `sha256:` and 64 lower-case hex digits"
+        )),
+        Some(_) => None,
+    }
+}
+
+/// Whether this is a digest in the one form the stack writes: `sha256:` and 64
+/// lower-case hex digits.
+#[must_use]
+pub fn is_digest(digest: &str) -> bool {
+    digest.strip_prefix("sha256:").is_some_and(|hex| {
+        hex.len() == 64
+            && hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     })
 }
 

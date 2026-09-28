@@ -1,21 +1,27 @@
 //! Publishing each service's key where the stack's own services read it.
 //!
-//! Three services in the stack are configured by what they read out of the
-//! environment rather than by an API call: the quality sync, the archive extractor
-//! and the dashboard each name the \*arrs they work with and expect a key for each.
-//! None of them can be told anything over HTTP — there is nothing to POST to — so
-//! the only way to wire them is to put the keys where they look.
+//! Two services in the stack are configured by what they read out of the environment
+//! rather than by an API call: the quality sync and the archive extractor each name the
+//! \*arrs they work with and expect a key for each. Neither can be told anything over
+//! HTTP — there is nothing to POST to — so the only way to wire them is to put the keys
+//! where they look.
 //!
 //! **The names here are this product's own, not theirs.** A key is published as
 //! `{SERVICE}_API_KEY`, and the stack maps that to whatever each consumer calls it —
-//! one of them wants `UN_SONARR_0_API_KEY`, another `HOMEPAGE_VAR_SONARR_KEY`. Which
-//! means a service added later needs a line of Compose rather than a line of Rust,
-//! and this file never learns any consumer's vocabulary.
+//! the extractor wants `UN_SONARR_0_API_KEY`. Which means a service added later needs a
+//! line of Compose rather than a line of Rust, and this file never learns any
+//! consumer's vocabulary.
 //!
-//! Only keys that were actually read are published. A service that has not written
-//! its key yet is left out rather than published as empty: the quality sync refuses
-//! its whole configuration over one undefined variable, so an empty value is worse
-//! than an absent one.
+//! **Only keys a service already wrote down are published.** Nothing here is minted for
+//! the purpose. The dashboard is published to the household network and holds no
+//! credential of any service, so a media server API key filed under lemonfiber's name,
+//! and a listening server token in the environment file, are retired rather than
+//! published. The listening server's first account is still made, because an unclaimed
+//! one is anybody's to take.
+//!
+//! A service that has not written its key yet is left out rather than published as
+//! empty: the quality sync refuses its whole configuration over one undefined variable,
+//! so an empty value is worse than an absent one.
 
 use lemonfiber_manifest::Service;
 
@@ -62,17 +68,15 @@ pub(super) async fn publish_keys(
 ) -> crate::seed::Wiring {
     let mut published = written_down(ctx, services, project).await;
 
-    // Before [`asked_for`], because asking is where this connection does its writing.
-    // Both of the keys it gathers are read by being made — the media server mints one
-    // when it is asked for one, and the listening server has no account at all until
-    // this makes it, with a password minted and recorded to go with it — so a pass that
-    // gathered them would have created the very things it promised only to describe,
-    // and left a secret behind for a question.
+    // Before anything is written: claiming the listening server makes an account and
+    // mints its password, and retiring revokes a key, so a rehearsal that got past here
+    // would have changed the very things it promised only to describe.
     if ctx.dry_run {
         return would_publish(ctx, services, published, sabnzbd_key);
     }
 
-    published.extend(asked_for(ctx, services).await);
+    claimed(ctx, services).await;
+    retired(ctx, services).await;
     published.extend(pairs_with_a_password(ctx, services, sabnzbd_key));
 
     if published.is_empty() {
@@ -100,12 +104,6 @@ fn nothing_to_publish() -> crate::seed::State {
 /// Every pair gathered here is a setting and the credential destined for it, and the
 /// report is serialized — so the names are the whole of what an operator is deciding
 /// about, and the values are the one thing a question must never make a second copy of.
-///
-/// Two of the names come from the stack rather than from a gathered key, because those
-/// two are the ones [`asked_for`] would have had to create to learn. A real run reaches
-/// this line having just minted the media server's admin password and made the
-/// listening server's first account; this one did neither, and taking the names from
-/// the services present says what a real run would fill without filling anything.
 fn would_publish(
     ctx: &Ctx,
     services: &[Service],
@@ -113,7 +111,6 @@ fn would_publish(
     sabnzbd_key: Option<&str>,
 ) -> crate::seed::Wiring {
     let mut settings: Vec<String> = written.into_iter().map(|(name, _)| name).collect();
-    settings.extend(would_ask_for(services));
     settings.extend(
         pairs_with_a_password(ctx, services, sabnzbd_key)
             .into_iter()
@@ -130,22 +127,6 @@ fn would_publish(
         }
     };
     crate::seed::Wiring::settled(CONNECTION.to_owned(), state)
-}
-
-/// The names the asked-for keys would be published under, taken without asking for
-/// them.
-///
-/// Named from the stack rather than from what the services answered, which is the only
-/// way to name them at all without making them: see [`would_publish`].
-fn would_ask_for(services: &[Service]) -> Vec<String> {
-    [
-        lemonfiber_manifest::ApiKind::Audiobookshelf,
-        lemonfiber_manifest::ApiKind::Jellyfin,
-    ]
-    .into_iter()
-    .filter_map(|kind| with_api(services, kind))
-    .map(|service| published_as(&service.id))
-    .collect()
 }
 
 /// A key published under the id of the service answering `kind`, where both the key
@@ -166,9 +147,9 @@ fn under_its_service(
 ///
 /// Every Servarr-shaped service, not only the ones that file media: Prowlarr manages
 /// none and so declares no media types, which is what keeps it out of the \*arr list
-/// used for root folders and download clients — but it has a key, and the dashboard
-/// has a widget that reads it. The other two are not Servarr-shaped and each keeps its
-/// key in a file of its own shape.
+/// used for root folders and download clients — but it has a key like the rest, and a
+/// service added to the stack is given it with a line of Compose. The other two are not
+/// Servarr-shaped and each keeps its key in a file of its own shape.
 async fn written_down(
     ctx: &Ctx,
     services: &[Service],
@@ -198,44 +179,50 @@ async fn written_down(
     found
 }
 
-/// The keys no service writes down, which have to be asked for.
-///
-/// The media server keeps its own in a database, and the listening server has no
-/// account at all until one is made — so where this makes one, the password it used is
-/// recorded, since that is the durable half. The token is signed in for again on every
-/// later run.
-async fn asked_for(ctx: &Ctx, services: &[Service]) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    if let Some((token, minted)) = crate::app::targets::audiobookshelf_token(ctx, services).await {
-        if let Some(password) = &minted {
-            crate::app::targets::record_secret(
-                ctx,
-                crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
-                password,
-            );
-        }
-        found.extend(under_its_service(
-            services,
-            lemonfiber_manifest::ApiKind::Audiobookshelf,
-            Some(token),
-        ));
+/// Make the listening server's first account, recording the password it was made with.
+async fn claimed(ctx: &Ctx, services: &[Service]) {
+    if let Some(password) = crate::app::targets::claim_audiobookshelf(ctx, services).await {
+        crate::app::targets::record_secret(
+            ctx,
+            crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+            &password,
+        );
     }
-    let jellyfin = crate::app::targets::jellyfin_key(ctx, services).await;
-    found.extend(under_its_service(
-        services,
-        lemonfiber_manifest::ApiKind::Jellyfin,
-        jellyfin,
-    ));
-    found
+}
+
+/// Revoke the media server key filed under lemonfiber's name, and forget the media
+/// server's and the listening server's settings in the environment file.
+///
+/// The media server's is forgotten only once its key is off the server — or was never
+/// there — so a revocation that failed leaves the value where the next run can still
+/// find which key it was. The listening server's token cannot be revoked on its own;
+/// forgetting it is what leaves nothing on this machine holding it.
+async fn retired(ctx: &Ctx, services: &[Service]) {
+    let Some(env) = ctx.settings.env_file.as_deref() else {
+        return;
+    };
+    let revoked = crate::app::targets::revoke_jellyfin_key(ctx, services).await;
+    let media_server =
+        with_api(services, lemonfiber_manifest::ApiKind::Jellyfin).filter(|_| revoked.is_some());
+    let listening = with_api(services, lemonfiber_manifest::ApiKind::Audiobookshelf);
+    // Only what is there: the file is rewritten by every removal, and a setting that
+    // was never published is not a reason to touch it.
+    for setting in media_server
+        .into_iter()
+        .chain(listening)
+        .map(|service| published_as(&service.id))
+        .filter(|setting| crate::app::targets::recorded_secret(ctx, setting).is_some())
+    {
+        let _ = crate::config::store::unset(env, &setting);
+    }
 }
 
 /// The credentials that are not a key: one already read for the download clients, and
 /// one account name.
 ///
-/// The name is published only once a password exists for it to pair with — a dashboard
-/// holding one half of a credential authenticates with neither, and a name published
-/// on its own would let this connection report success on a stack where nothing was
-/// read at all.
+/// The name is published only once a password exists for it to pair with — one half of
+/// a credential authenticates with neither, and a name published on its own would let
+/// this connection report success on a stack where nothing was read at all.
 fn pairs_with_a_password(
     ctx: &Ctx,
     services: &[Service],

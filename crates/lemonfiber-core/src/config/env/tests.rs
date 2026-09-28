@@ -11,10 +11,10 @@ fn the_stack_s_own_example_round_trips_byte_for_byte() {
 #[test]
 fn reads_every_setting_the_example_declares() {
     let file = EnvFile::parse(EXAMPLE);
-    assert_eq!(file.keys().len(), 39);
+    assert_eq!(file.keys().len(), 28);
     assert_eq!(file.get("DATA_ROOT"), Some("./data"));
     assert_eq!(file.get("TZ"), Some("Europe/Amsterdam"));
-    // Six of the thirty-nine carry a digit. A key pattern of letters and
+    // Six of the twenty-eight carry a digit. A key pattern of letters and
     // underscores alone would read them as prose and drop them silently.
     assert_eq!(file.get("UN_SONARR_0_URL"), Some(""));
 }

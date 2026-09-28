@@ -36,7 +36,7 @@ use lemonfiber_fixtures::support::spoke;
 use tokio::sync::mpsc::{channel, Receiver};
 
 /// The version the manifest pins Sonarr at, and the one behind it.
-const SONARR: (&str, &str) = ("4.0.14", "4.0.15");
+const SONARR: (&str, &str) = ("4.0.14", "4.0.20");
 
 /// How a service the run started comes back, once it has been started.
 #[derive(Clone, Copy, PartialEq, Eq)]

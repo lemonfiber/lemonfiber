@@ -13,6 +13,7 @@ fn a_service(id: &str, port: Option<u16>) -> Service {
         profile: "media".to_owned(),
         image: "example/image".to_owned(),
         tag: "1".to_owned(),
+        digest: None,
         port,
         bind: None,
         health: None,

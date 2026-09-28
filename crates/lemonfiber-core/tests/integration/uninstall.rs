@@ -29,8 +29,9 @@ use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_fixtures::support::{spoke, Recording, Reporting, Scripted, SeedFs};
 use lemonfiber_fixtures::walking::Walking;
 
-/// One image this stack declares, named once so a case does not spell the tag twice.
-const SONARR: &str = "lscr.io/linuxserver/sonarr:4.0.15";
+/// One image this stack declares, named once so a case does not spell the digest twice.
+const SONARR: &str =
+    "lscr.io/linuxserver/sonarr@sha256:a5c1a5fecbef946927ab90ad68df319ac5fe644057e5fc18cd993f01ac07b2b2";
 
 /// Somewhere for the backup a destructive tier takes before anything goes.
 ///

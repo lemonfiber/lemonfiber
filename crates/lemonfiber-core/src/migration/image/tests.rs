@@ -10,7 +10,31 @@ fn a_version_is_dropped_to_leave_the_repository() {
 #[test]
 fn an_image_named_without_a_version_is_all_repository() {
     assert_eq!(repository("plex"), "plex");
-    assert_eq!(version_of("plex"), "plex");
+    assert_eq!(version_of("plex"), "");
+}
+
+/// A name a digest-pinned image is started from keeps its version beside the digest,
+/// and the name it is pulled under carries only the digest.
+#[test]
+fn a_digest_is_dropped_before_the_version_is_read() {
+    assert_eq!(repository("plex:1.2@sha256:ab12"), "plex");
+    assert_eq!(version_of("plex:1.2@sha256:ab12"), "1.2");
+    assert_eq!(repository("plex@sha256:ab12"), "plex");
+    assert_eq!(version_of("plex@sha256:ab12"), "");
+}
+
+/// The version standing is read from the name a container was started by, since an
+/// image pulled by digest carries no tag at all.
+#[test]
+fn the_version_standing_is_read_past_a_name_that_carries_only_a_digest() {
+    let images = [image(
+        &["plex@sha256:ab12", "plex:1.2@sha256:ab12"],
+        &["media"],
+    )];
+    assert_eq!(
+        standing_on(&images, "media", "plex"),
+        Some("1.2".to_owned())
+    );
 }
 
 #[test]

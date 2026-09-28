@@ -31,6 +31,7 @@ fn manifest_service(
         profile: "media".to_owned(),
         image: "example/image".to_owned(),
         tag: "1".to_owned(),
+        digest: None,
         port,
         bind: None,
         health: None,

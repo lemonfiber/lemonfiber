@@ -220,10 +220,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // offers only what the stack can actually deliver.
     wirings.extend(seed_fulfilment_targets(ctx, &manifest.services, project.as_deref()).await);
 
-    // The keys the stack's own services read out of the environment. Three of them
-    // are configured that way and by no other means — the quality sync, the archive
-    // extractor and the dashboard — so without this they run with nothing, and the
-    // quality sync refuses its whole configuration over a single undefined name.
+    // The keys the stack's own services read out of the environment. Two of them are
+    // configured that way and by no other means — the quality sync and the archive
+    // extractor — so without this they run with nothing, and the quality sync refuses
+    // its whole configuration over a single undefined name.
     wirings.push(
         published::publish_keys(
             ctx,

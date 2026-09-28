@@ -263,7 +263,7 @@ pub(crate) fn service_consumers(name: &str, setting: &str) -> Vec<(String, Reach
         (
             format!(
                 "the stack's own services, which read it from the environment as {setting} — \
-                 the dashboard, and the quality sync and archive extractor where they cover \
+                 the quality sync and archive extractor where they cover \
                  {name}"
             ),
             Reached::FromItsEnvironment {

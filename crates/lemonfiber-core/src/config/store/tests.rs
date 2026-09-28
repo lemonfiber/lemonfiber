@@ -267,9 +267,7 @@ fn a_credential_is_recognised_by_its_name_rather_than_its_value() {
     for key in [
         "WIREGUARD_PRIVATE_KEY",
         "QBITTORRENT_PASSWORD",
-        // A password key that says PASS but not PASSWORD, which the stack's
-        // own .env.example ships and an earlier marker list showed in the
-        // clear.
+        // A password key that says PASS but not PASSWORD.
         "HOMEPAGE_VAR_QBITTORRENT_PASS",
         "SONARR_API_KEY",
         "some_token",
