@@ -322,6 +322,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         contributions: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         from: String::new(),
+        revision: String::new(),
         installed_at: String::new(),
     }
 }

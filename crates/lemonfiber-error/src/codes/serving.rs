@@ -176,6 +176,13 @@ codes! {
         /// Raised when a plugin is installed from a source other than the one its name is
         /// already installed from.
         TWO_SOURCES = "PLUGIN-14",
+        /// Raised when a plugin is named from a git source and fetching from one is
+        /// switched off.
+        SOURCE_OFF = "PLUGIN-15",
+        /// Raised when a git source could not be reached or would not hand over a revision.
+        UNFETCHED = "PLUGIN-16",
+        /// Raised when a git source holds no branch, tag or commit by the name given.
+        NO_REVISION = "PLUGIN-17",
     }
     /// The `PROVIDER` codes.
     provider {

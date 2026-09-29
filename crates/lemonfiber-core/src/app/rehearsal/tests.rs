@@ -393,7 +393,7 @@ fn taught_to_report() -> Vec<Command> {
         Command::Setup(SetupAction::Apply),
         Command::Backup { service: None },
         Command::Plugins(plugins::Asked::Install {
-            path: std::path::PathBuf::from("/srv/komga"),
+            source: crate::plugin::Source::Path(std::path::PathBuf::from("/srv/komga")),
         }),
         Command::Plugins(plugins::Asked::Update {
             path: std::path::PathBuf::from("komga"),

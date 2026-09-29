@@ -443,3 +443,26 @@ fn the_printer_reaches_this_renderer_for_this_outcome() {
     .text();
     assert!(drawn.contains("komga 1.2.0"), "{drawn}");
 }
+
+/// A plugin from a git source is said with the commit it was installed at.
+#[test]
+fn a_plugin_from_a_git_source_is_said_with_its_commit() {
+    let one = Installed {
+        from: "https://example.org/plugin-komga".to_owned(),
+        revision: "8fa05ba718f70624f2c122f8c0371d47e6c90d0e".to_owned(),
+        ..recorded("komga", Some(household()))
+    };
+    let said = installs(&Installs {
+        removal: None,
+        installed: vec![one],
+        install: None,
+        update: None,
+        substituted: Vec::new(),
+    })
+    .text();
+
+    assert!(
+        said.contains("from       https://example.org/plugin-komga at 8fa05ba718f7 — unreviewed"),
+        "{said}"
+    );
+}

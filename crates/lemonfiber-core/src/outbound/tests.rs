@@ -101,7 +101,46 @@ fn a_name_is_given_for_every_request() {
             "indexer",
             "usenet",
             "household",
-            "updates"
+            "updates",
+            "plugin-source"
         ]
+    );
+}
+
+/// The git sources installed plugins came from are where fetching from one goes, each
+/// once, and a plugin from a directory reaches nowhere.
+#[test]
+fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
+    let from = |source: &str| crate::plugin::Installed {
+        plugin: "komga".to_owned(),
+        version: "1.0.0".to_owned(),
+        services: Vec::new(),
+        provides: Vec::new(),
+        contributions: Vec::new(),
+        declared: crate::plugin::Declaration::default(),
+        from: source.to_owned(),
+        revision: String::new(),
+        installed_at: String::new(),
+    };
+    let installed = [
+        from("https://example.org/plugin-komga"),
+        from("/home/ana/plugin-local"),
+        from("https://example.org/plugin-komga"),
+        from("git@example.org:ana/plugin-kuma.git"),
+    ];
+
+    let leaving = leaving(&Settings::default(), &[], &installed);
+    let fetching = leaving
+        .ours
+        .iter()
+        .find(|one| one.reach == Reach::PluginSource)
+        .map(|one| one.destination.clone());
+
+    assert_eq!(
+        fetching,
+        Some(vec![
+            "https://example.org/plugin-komga".to_owned(),
+            "git@example.org:ana/plugin-kuma.git".to_owned(),
+        ])
     );
 }

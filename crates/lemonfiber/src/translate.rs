@@ -397,8 +397,10 @@ pub(crate) enum Under {
 /// verbs are about this machine and go where every other verb goes.
 pub(crate) fn plugin(read: PluginCommand) -> Under {
     match read {
-        PluginCommand::Install { path } => {
-            Under::Dispatched(Command::Plugins(plugins::Asked::Install { path }))
+        PluginCommand::Install { source } => {
+            Under::Dispatched(Command::Plugins(plugins::Asked::Install {
+                source: lemonfiber_core::plugin::Source::named(&source),
+            }))
         }
         PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
         PluginCommand::Remove { plugin } => {

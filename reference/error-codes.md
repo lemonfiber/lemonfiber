@@ -106,6 +106,9 @@ what to do about it, is written for operators at
 - `PLUGIN-12`
 - `PLUGIN-13`
 - `PLUGIN-14`
+- `PLUGIN-15`
+- `PLUGIN-16`
+- `PLUGIN-17`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`
