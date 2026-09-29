@@ -175,10 +175,10 @@ rows = [
     "`ARCH-R98`",
     "`release-contract.yml` uploads a `stack-schema-N` asset on every published release, and [`self_update/offered.rs`](crates/lemonfiber-core/src/self_update/offered.rs) reads it; a release with none reads as not stated (`a_release_declares_its_stack_generation_in_the_name_of_a_published_file`, `a_release_publishing_no_declaration_reads_as_nothing_rather_than_a_generation`).",
   ] },
-  { state = "partial", cells = [
+  { state = "done", cells = [
     "A stack that asks for a newer binary, refused in its own words",
     "`ARCH-R4`, `ARCH-R5`",
-    "Each refusal has a variant and a message of its own in [`error.rs`](crates/lemonfiber-manifest/src/error.rs), and the one for a binary too old is never produced: `min_cli_version` is parsed and compared with nothing. In the core an unsupported generation and a binary too old share one headline and differ only in their detail, and no test holds the three messages apart.",
+    "`Manifest::admits` ([`binary.rs`](crates/lemonfiber-manifest/src/binary.rs)) holds `min_cli_version` to the running version, ordering by the three numbers and putting a release after its pre-releases, and every stack the core reads passes through it once parsed ([`stack.rs`](crates/lemonfiber-core/src/stack.rs)'s `manifest`). A stack naming nothing, or something that is not a version, requires nothing: the schema generation is the gate for a file this build cannot read. A binary too old is its own refusal, `STACK-9`, headed *This stack needs lemonfiber X or newer* with the running version beside it and `lemonfiber update self` as the remedy, apart from `STACK-2`'s unsupported generation and `STACK-7`'s file that will not parse; a test holds the three headlines and codes apart, and another reads a stack naming `999.0.0` and is refused naming it.",
   ] },
   { state = "partial", cells = [
     "Platform behaviour in one component",

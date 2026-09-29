@@ -33,13 +33,16 @@ use lemonfiber_manifest::{validate, Date, Manifest};
 use thiserror::Error;
 
 use crate::error::codes::stack::{
-    STACK_INVALID, STACK_MALFORMED, STACK_NOT_EMBEDDED, STACK_NOT_SET_UP, STACK_NOT_WRITTEN,
-    STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
+    STACK_INVALID, STACK_MALFORMED, STACK_NEEDS_NEWER, STACK_NOT_EMBEDDED, STACK_NOT_SET_UP,
+    STACK_NOT_WRITTEN, STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
 };
 use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 
 /// The manifest's filename, at the root of any stack directory.
 const MANIFEST: &str = "stack.toml";
+
+/// The version of lemonfiber running, which a stack's `min_cli_version` is held to.
+const RUNNING: &str = env!("CARGO_PKG_VERSION");
 
 /// One file a stack would write: its path within the stack directory, and its
 /// content.
@@ -226,7 +229,9 @@ impl Source {
     /// cannot use it.
     pub fn manifest(self) -> Result<Manifest, Failure> {
         let text = self.manifest_text()?;
-        Manifest::from_toml(&text).map_err(refused)
+        let manifest = Manifest::from_toml(&text).map_err(refused)?;
+        manifest.admits(RUNNING).map_err(refused)?;
+        Ok(manifest)
     }
 }
 
@@ -246,8 +251,10 @@ fn refused(err: lemonfiber_manifest::Failure) -> Failure {
         lemonfiber_manifest::Failure::Unrecognised(named) => Failure::Unrecognised {
             names: named.iter().map(ToString::to_string).collect(),
         },
-        lemonfiber_manifest::Failure::UnsupportedSchema { .. }
-        | lemonfiber_manifest::Failure::BinaryTooOld { .. } => Failure::Unusable { reason },
+        lemonfiber_manifest::Failure::UnsupportedSchema { .. } => Failure::Unusable { reason },
+        lemonfiber_manifest::Failure::BinaryTooOld { required, running } => {
+            Failure::TooOld { required, running }
+        }
     }
 }
 
@@ -318,14 +325,22 @@ pub enum Failure {
     },
     /// The manifest was read, and this build cannot use it.
     ///
-    /// The pairing, and only the pairing: a stack that declares a schema generation
-    /// this build does not read, or that requires a newer binary. A file that will
-    /// not parse and a name this build has never heard of are [`Failure::Malformed`]
-    /// and [`Failure::Unrecognised`], because neither is answered by a version.
+    /// A stack declaring a schema generation this build does not read. A file that
+    /// will not parse, a name this build has never heard of and a stack needing a newer
+    /// binary are [`Failure::Malformed`], [`Failure::Unrecognised`] and
+    /// [`Failure::TooOld`], each with an answer of its own.
     #[error("the stack manifest cannot be used: {reason}")]
     Unusable {
         /// The parser's own words.
         reason: String,
+    },
+    /// The stack names a newer `lemonfiber` than the one running.
+    #[error("the stack requires lemonfiber {required} or newer, and this is {running}")]
+    TooOld {
+        /// The oldest version the stack runs with, as it wrote it.
+        required: String,
+        /// The version running.
+        running: String,
     },
     /// The manifest is not TOML, so nothing in it has been read.
     #[error("the stack manifest could not be parsed: {reason}")]
@@ -386,6 +401,21 @@ impl Diagnose for Failure {
             )
             .in_state(State::Guided)
             .with_detail(reason.clone()),
+            Self::TooOld { required, running } => Problem::new(
+                STACK_NEEDS_NEWER,
+                Severity::Error,
+                format!("This stack needs lemonfiber {required} or newer"),
+                format!(
+                    "The stack names the oldest lemonfiber it works with, and this is \
+                     {running}. It relies on something this version cannot do, so nothing \
+                     in it is started rather than started in part."
+                ),
+                Remedy::new(format!("Update lemonfiber to {required} or newer"))
+                    .with_detail("lemonfiber update self"),
+            )
+            .or_try(Remedy::new("Or point at a stack this version runs")
+                .with_detail("lemonfiber --stack-dir <path>"))
+            .in_state(State::Guided),
             Self::Malformed { reason } => Problem::new(
                 STACK_MALFORMED,
                 Severity::Error,

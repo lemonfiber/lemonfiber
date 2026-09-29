@@ -22,6 +22,9 @@ static SPLIT_MOUNTS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/
 /// here rather than where it was emptied.
 static NOT_A_STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/config");
 
+/// A stack naming a lemonfiber far newer than any this build could be.
+static NEEDS_NEWER: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stack-needs-newer");
+
 /// The stack this repository carries as a submodule, read from disk.
 fn checked_out() -> Source {
     Source::External(Path::new(concat!(
@@ -199,6 +202,48 @@ fn an_unusable_manifest_reads_as_a_pairing_rather_than_a_syntax_error() {
     assert_eq!(problem.detail.as_deref(), Some(reason));
 }
 
+/// A stack needing a newer binary, one this build cannot read and one that will not
+/// parse are three answers, and each says its own.
+#[test]
+fn a_binary_too_old_is_told_apart_from_a_generation_and_a_syntax_error() {
+    let too_old = Failure::TooOld {
+        required: "0.99.0".to_owned(),
+        running: "0.17.0".to_owned(),
+    }
+    .problem();
+    let unusable = Failure::Unusable {
+        reason: "schema 99".to_owned(),
+    }
+    .problem();
+    let malformed = Failure::Malformed {
+        reason: "expected a value".to_owned(),
+    }
+    .problem();
+    assert_eq!(too_old.code, crate::error::codes::stack::STACK_NEEDS_NEWER);
+    assert_eq!(
+        too_old.summary,
+        "This stack needs lemonfiber 0.99.0 or newer"
+    );
+    assert!(too_old.meaning.contains("0.17.0"), "{}", too_old.meaning);
+    let summaries = [&too_old.summary, &unusable.summary, &malformed.summary];
+    assert!(summaries
+        .iter()
+        .all(|one| summaries.iter().filter(|other| other == &one).count() == 1));
+    assert_ne!(too_old.code, unusable.code);
+}
+
+/// A stack directory naming a newer binary than this one is refused as one, naming
+/// the version it asked for.
+#[test]
+fn a_stack_asking_for_a_newer_binary_is_refused_naming_it() {
+    let refused = Source::Embedded(&NEEDS_NEWER).manifest();
+    assert!(
+        matches!(&refused, Err(Failure::TooOld { required, running })
+            if required == "999.0.0" && running == env!("CARGO_PKG_VERSION")),
+        "{refused:?}"
+    );
+}
+
 #[test]
 fn a_build_that_lost_its_stack_admits_it_rather_than_guessing() {
     let problem = Failure::NotEmbedded.problem();
@@ -216,6 +261,10 @@ fn every_failure_says_something_and_offers_something() {
         },
         Failure::Unusable {
             reason: "schema 99".to_owned(),
+        },
+        Failure::TooOld {
+            required: "0.99.0".to_owned(),
+            running: "0.17.0".to_owned(),
         },
         Failure::Malformed {
             reason: "expected a value".to_owned(),

@@ -193,6 +193,7 @@ what to do about it, is written for operators at
 - `STACK-6`
 - `STACK-7`
 - `STACK-8`
+- `STACK-9`
 - `STORAGE-1`
 - `STORAGE-2`
 - `STORAGE-3`

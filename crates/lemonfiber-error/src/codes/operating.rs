@@ -209,6 +209,8 @@ codes! {
         STACK_MALFORMED = "STACK-7" => Validation,
         /// Raised when a manifest declares names this build does not know.
         STACK_UNRECOGNISED = "STACK-8" => Validation,
+        /// Raised when a stack names a newer lemonfiber than the one running.
+        STACK_NEEDS_NEWER = "STACK-9",
     }
     /// The `TELLING` codes.
     telling {
