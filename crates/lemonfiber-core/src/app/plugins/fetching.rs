@@ -26,21 +26,36 @@ pub(super) struct Fetched<'a> {
     pub(super) url: &'a str,
     /// The one commit the named revision resolved to.
     pub(super) commit: &'a str,
+    /// What signed the catalogue index it was resolved through, where it was.
+    pub(super) signed: Option<&'a str>,
+}
+
+/// What the catalogue vouched for, which the fetched commit is held to.
+pub(super) struct Vouched<'a> {
+    /// The entry its verified index holds.
+    pub(super) entry: &'a crate::plugin::catalogue::Entry,
+    /// What signed that index.
+    pub(super) signed: &'a str,
 }
 
 /// Install the plugin a git source holds at the revision named, or at what it serves
 /// by default.
 ///
+/// Where the catalogue vouched for it, the manifest the commit holds has to be the one
+/// the catalogue reviewed before anything is installed.
+///
 /// # Errors
 ///
 /// Where fetching from a git source is switched off, where the source cannot be
 /// reached or holds nothing by the revision named, where the commit cannot be fetched,
-/// and every refusal an install from a directory makes.
+/// where it holds a manifest other than the one the catalogue reviewed, and every
+/// refusal an install from a directory makes.
 pub(super) async fn installed(
     ctx: &Ctx,
     held: Register,
     url: &str,
     revision: Option<&str>,
+    vouched: Option<&Vouched<'_>>,
 ) -> Result<Installs, Box<Problem>> {
     if !ctx.settings.reaching.allows(REACH_PLUGIN_SOURCE_KEY) {
         return Err(Box::new(switched_off(url)));
@@ -49,17 +64,36 @@ pub(super) async fn installed(
     let into = checkout(&commit);
     let _ = tokio::fs::remove_dir_all(&into).await;
     let result = match fetched(ctx, url, &commit, &into).await {
-        Ok(()) => {
-            let from = Fetched {
-                url,
-                commit: &commit,
-            };
-            super::install(ctx, held, &into, Some(&from)).await
-        }
+        Ok(()) => match as_reviewed(&into, vouched).await {
+            Ok(()) => {
+                let from = Fetched {
+                    url,
+                    commit: &commit,
+                    signed: vouched.map(|vouched| vouched.signed),
+                };
+                super::install(ctx, held, &into, Some(&from)).await
+            }
+            Err(problem) => Err(problem),
+        },
         Err(problem) => Err(problem),
     };
     let _ = tokio::fs::remove_dir_all(&into).await;
     result
+}
+
+/// Whether the manifest a checkout holds is the one the catalogue reviewed, where the
+/// catalogue vouched for it at all.
+async fn as_reviewed(into: &Path, vouched: Option<&Vouched<'_>>) -> Result<(), Box<Problem>> {
+    let Some(vouched) = vouched else {
+        return Ok(());
+    };
+    let manifest = tokio::fs::read(into.join("plugin.toml"))
+        .await
+        .unwrap_or_default();
+    if vouched.entry.holds(&manifest) {
+        return Ok(());
+    }
+    Err(Box::new(super::cataloguing::not_as_reviewed(vouched.entry)))
 }
 
 /// The one commit a revision names on a source, or the one it serves by default.
@@ -220,8 +254,11 @@ async fn standing(ctx: &Ctx, from: &str) -> Fetchable {
         };
     }
     match Source::named(from) {
-        Source::Path(path) => {
-            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+        // A record keeps where an install read its manifest, which is never a name, so a
+        // `from` shaped as one is a directory written without a `./` in front of it.
+        Source::Name(_) | Source::Path(_) => {
+            let path = Path::new(from);
+            if tokio::fs::try_exists(path).await.unwrap_or(false) {
                 Fetchable::Reachable
             } else {
                 Fetchable::Unreachable {

@@ -1,8 +1,8 @@
 //! Which of the requests lemonfiber makes on its own account this operator allows.
 //!
 //! Every one of them is off by one setting, and all of them are off by one more.
-//! The blanket switch is not a convenience over the seven: an operator who wants
-//! nothing to leave this machine wants *nothing* to, and asking them to find seven
+//! The blanket switch is not a convenience over the eight: an operator who wants
+//! nothing to leave this machine wants *nothing* to, and asking them to find eight
 //! settings is asking them to miss one — which they would then find out about from
 //! a packet capture rather than from here.
 //!
@@ -50,6 +50,10 @@ pub const REACH_UPDATES_KEY: &str = "LEMONFIBER_REACH_UPDATES";
 /// names, and asking whether such a source can still be reached.
 pub const REACH_PLUGIN_SOURCE_KEY: &str = "LEMONFIBER_REACH_PLUGIN_SOURCE";
 
+/// The setting that stops lemonfiber fetching the catalogue's index and its signature
+/// to resolve a plugin installed by name.
+pub const REACH_CATALOGUE_KEY: &str = "LEMONFIBER_REACH_CATALOGUE";
+
 /// Every setting that switches one request off.
 ///
 /// The leak check's own source is not among them: it is named rather than switched,
@@ -64,6 +68,7 @@ pub const SWITCHES: &[&str] = &[
     REACH_HOUSEHOLD_KEY,
     REACH_UPDATES_KEY,
     REACH_PLUGIN_SOURCE_KEY,
+    REACH_CATALOGUE_KEY,
 ];
 
 /// Whether this operator has asked that nothing leave the machine.

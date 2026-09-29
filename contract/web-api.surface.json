@@ -4042,6 +4042,7 @@
     "OutboundReach": {
       "fields": {},
       "variants": [
+        "\"catalogue\"",
         "\"echo\"",
         "\"guides\"",
         "\"household\"",
@@ -4808,6 +4809,12 @@
             "array[ref:PluginPlaced]"
           ],
           "required": true
+        },
+        "signed": {
+          "type": [
+            "string"
+          ],
+          "required": false
         },
         "version": {
           "type": [

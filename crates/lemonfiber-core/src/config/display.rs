@@ -119,6 +119,12 @@ pub const SHOWN: &[(&str, &str)] = &[
          install from one that was refused before anything was fetched",
     ),
     (
+        super::REACH_CATALOGUE_KEY,
+        "whether the catalogue may be asked for its index to resolve a plugin you install \
+         by name, which explains an install by name that was refused before anything was \
+         fetched",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

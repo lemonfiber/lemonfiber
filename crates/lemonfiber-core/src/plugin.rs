@@ -19,6 +19,8 @@
 
 // The bundled stack's own claims, judged by the reader and the judge a plugin's meet.
 pub mod bundled;
+// The catalogue's signed index, and what a name resolves to through it.
+pub mod catalogue;
 mod claimed;
 // The container written from a record, rather than anything read out of a manifest.
 // Beside the record because it is the derivation the record deliberately does not

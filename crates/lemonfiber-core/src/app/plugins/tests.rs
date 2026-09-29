@@ -431,6 +431,7 @@ fn document(ctx: &Ctx) -> String {
     std::fs::read_to_string(stack_of(ctx).join("compose/plugins/komga.yml")).unwrap_or_default()
 }
 
+mod cataloguing;
 mod fetching;
 mod fronting;
 mod installing;

@@ -1,6 +1,6 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes eight
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes nine
 //! requests on its own account and they are enumerated here in full; the services
 //! in the stack make a great many more, and those are **theirs** — an indexer
 //! query is Prowlarr asking an indexer, a poster is Radarr asking a metadata
@@ -31,7 +31,7 @@ pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RE
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Eight, and the closed set is the claim. A ninth is a decision somebody makes by
+/// Nine, and the closed set is the claim. A tenth is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
 ///
@@ -51,6 +51,10 @@ pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RE
 /// The eighth goes where the operator points it and nowhere else: a plugin's git
 /// source, named at install. It is the only entry whose destination nobody chose in
 /// advance, which is why it is made only when somebody names one.
+///
+/// The ninth goes to one place this build names, and only when an operator installs a
+/// plugin by name: the catalogue's newest release, for its index and the signature over
+/// it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "OutboundReach")]
@@ -71,6 +75,8 @@ pub enum Reach {
     Updates,
     /// Fetching a plugin from a git source the operator names.
     PluginSource,
+    /// Reading the catalogue's index to resolve a plugin installed by name.
+    Catalogue,
 }
 
 impl Reach {
@@ -86,6 +92,7 @@ impl Reach {
             Self::Household => "household",
             Self::Updates => "updates",
             Self::PluginSource => "plugin-source",
+            Self::Catalogue => "catalogue",
         }
     }
 }

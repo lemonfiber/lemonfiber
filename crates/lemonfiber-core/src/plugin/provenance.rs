@@ -35,7 +35,7 @@ use serde::Serialize;
 /// Fixed for this curve, so the parse is a length and a prefix rather than a DER
 /// reader. A key that is not this shape is refused naming what was expected, which
 /// is a better answer than a partial parse of something else.
-const P256_SPKI_PREFIX: &[u8] = &[
+pub(crate) const P256_SPKI_PREFIX: &[u8] = &[
     0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
     0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
 ];
@@ -150,15 +150,26 @@ impl Key {
     }
 
     /// Whether this key made this signature over these bytes.
-    fn made(&self, signature: &[u8], over: &str) -> bool {
+    pub(crate) fn made(&self, signature: &[u8], over: &[u8]) -> bool {
         UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, &self.point)
-            .verify(over.as_bytes(), signature)
+            .verify(over, signature)
             .is_ok()
+    }
+
+    /// The SHA-256 of the key as its PEM carries it, in lower-case hexadecimal.
+    ///
+    /// What tells one key from another where both go by the same name: a key that is
+    /// replaced keeps what it is called and changes this.
+    #[must_use]
+    pub fn fingerprint(&self) -> String {
+        let mut der = P256_SPKI_PREFIX.to_vec();
+        der.extend_from_slice(&self.point);
+        crate::secret::render(ring::digest::digest(&ring::digest::SHA256, &der).as_ref())
     }
 }
 
 /// Base64, as the wrappers around keys and signatures carry it.
-fn decoded(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn decoded(text: &str) -> Option<Vec<u8>> {
     use base64::Engine as _;
     base64::engine::general_purpose::STANDARD.decode(text).ok()
 }
@@ -216,7 +227,7 @@ pub fn held(
         }
         if let Some(key) = keys
             .iter()
-            .find(|key| key.made(&one.signature, &one.payload))
+            .find(|key| key.made(&one.signature, one.payload.as_bytes()))
         {
             return Provenance::Signed {
                 by: key.named.clone(),

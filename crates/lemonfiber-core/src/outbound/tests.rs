@@ -102,7 +102,8 @@ fn a_name_is_given_for_every_request() {
             "usenet",
             "household",
             "updates",
-            "plugin-source"
+            "plugin-source",
+            "catalogue"
         ]
     );
 }
@@ -120,6 +121,7 @@ fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
         declared: crate::plugin::Declaration::default(),
         from: source.to_owned(),
         revision: String::new(),
+        signed: String::new(),
         installed_at: String::new(),
     };
     let installed = [

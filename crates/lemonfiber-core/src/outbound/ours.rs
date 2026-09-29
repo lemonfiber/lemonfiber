@@ -1,4 +1,4 @@
-//! The eight requests lemonfiber makes on its own account.
+//! The nine requests lemonfiber makes on its own account.
 //!
 //! Each answers four questions, and the answers are prose because the reader is a
 //! person deciding whether they are comfortable with it. *Where* it goes is read
@@ -12,16 +12,17 @@
 
 use super::{Outbound, Reach};
 use crate::config::{
-    Settings, IP_ECHO_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
-    REACH_PLUGIN_SOURCE_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY,
+    Settings, IP_ECHO_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY,
+    REACH_INDEXER_KEY, REACH_PLUGIN_SOURCE_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY,
+    REACH_USENET_KEY,
 };
 use lemonfiber_manifest::Service;
 
 /// Every request lemonfiber makes, in the order an operator meets them: what the
 /// stack is built from, what keeps it current, the three that prove something, the
 /// one that carries a sentence to somebody who lives here, the one this program
-/// makes about itself, and the one that fetches a plugin from where its operator
-/// pointed.
+/// makes about itself, the one that fetches a plugin from where its operator
+/// pointed, and the one that resolves a plugin's name through the catalogue.
 pub const EVERY: &[Reach] = &[
     Reach::Registry,
     Reach::Guides,
@@ -31,6 +32,7 @@ pub const EVERY: &[Reach] = &[
     Reach::Household,
     Reach::Updates,
     Reach::PluginSource,
+    Reach::Catalogue,
 ];
 
 /// The repository the community quality guides are synced from, probed for
@@ -129,6 +131,10 @@ fn destination(
         Reach::Household => vec![PUSHOVER.to_owned(), PUSHBULLET.to_owned()],
         Reach::Updates => vec![RELEASE_LIST.to_owned()],
         Reach::PluginSource => sources(installed),
+        Reach::Catalogue => vec![
+            crate::plugin::catalogue::INDEX.to_owned(),
+            crate::plugin::catalogue::SIGNATURE.to_owned(),
+        ],
     }
 }
 
@@ -205,8 +211,14 @@ pub fn purpose(reach: Reach) -> &'static str {
              it and nothing stops without it."
         }
         Reach::PluginSource => {
-            "Fetch the one revision of a plugin you install from a git source you name, and \
-             nothing else from it. Made only when you name one."
+            "Fetch the one revision of a plugin you install from a git source you name, or \
+             from the origin the catalogue names for a plugin you install by name, and \
+             nothing else from it. Made only when you install one."
+        }
+        Reach::Catalogue => {
+            "Read the newest catalogue release's index and the signature over it, so a plugin \
+             you install by name is resolved only through an index this build has verified. \
+             Made only when you install one by name."
         }
     }
 }
@@ -257,6 +269,13 @@ pub fn sends(reach: Reach) -> &'static str {
              tag or commit you named, and git's own request for that commit. Nothing about \
              this machine or the stack, and nothing of the repository is run."
         }
+        Reach::Catalogue => {
+            "Two unauthenticated requests, one for the index and one for its signature, and \
+             the one GitHub answers each with: the address its download host serves that file \
+             from, which is asked in turn. No credential, nothing about this machine, and not \
+             the name you are installing — the whole index is fetched and the name is looked \
+             up here."
+        }
     }
 }
 
@@ -271,6 +290,7 @@ pub fn switch(reach: Reach) -> &'static str {
         Reach::Household => REACH_HOUSEHOLD_KEY,
         Reach::Updates => REACH_UPDATES_KEY,
         Reach::PluginSource => REACH_PLUGIN_SOURCE_KEY,
+        Reach::Catalogue => REACH_CATALOGUE_KEY,
     }
 }
 
@@ -312,8 +332,13 @@ pub fn cost(reach: Reach) -> &'static str {
         }
         Reach::PluginSource => {
             "A plugin can be installed only from a directory on this machine. Nothing \
-             installed stops, and a git source you name is refused before anything is \
-             fetched."
+             installed stops, and a git source you name, or the origin a name resolves to in \
+             the catalogue, is refused before anything is fetched."
+        }
+        Reach::Catalogue => {
+            "A plugin cannot be installed by name, and is refused before anything is fetched. \
+             Nothing installed stops, and installing from a git source or a directory you name \
+             is unaffected."
         }
     }
 }

@@ -25,15 +25,15 @@ pub(super) fn origin(one: &Installed) -> String {
         .get(..12)
         .map(|short| format!(" at {short}"))
         .unwrap_or_default();
-    format!(
-        "{}{at} — {}",
-        or_unrecorded(&one.from),
-        if one.declared.reviewed {
-            "reviewed"
-        } else {
-            "unreviewed: nobody vouched for it"
-        }
-    )
+    let vouched = if one.declared.reviewed {
+        format!(
+            "reviewed: from the catalogue, signed by {}",
+            or_unrecorded(&one.signed)
+        )
+    } else {
+        "unreviewed: nobody vouched for it".to_owned()
+    };
+    format!("{}{at} — {vouched}", or_unrecorded(&one.from))
 }
 
 /// Everything the record says a plugin is doing.

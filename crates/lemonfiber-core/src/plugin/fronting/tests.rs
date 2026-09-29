@@ -27,6 +27,7 @@ fn installed(services: Vec<Placed>) -> Installed {
         declared: crate::plugin::Declaration::default(),
         from: String::new(),
         revision: String::new(),
+        signed: String::new(),
         installed_at: String::new(),
     }
 }

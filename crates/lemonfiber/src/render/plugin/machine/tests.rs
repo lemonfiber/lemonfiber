@@ -35,6 +35,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         declared: lemonfiber_core::plugin::Declaration::default(),
         from: String::new(),
         revision: String::new(),
+        signed: String::new(),
         installed_at: String::new(),
     }
 }

@@ -323,6 +323,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         declared: lemonfiber_core::plugin::Declaration::default(),
         from: String::new(),
         revision: String::new(),
+        signed: String::new(),
         installed_at: String::new(),
     }
 }

@@ -17,7 +17,7 @@ const TAGGED: &str = "2222222222222222222222222222222222222222";
 
 /// A git source that serves `MANIFEST`, and everything else answered the way the
 /// default runner answers it.
-struct Serving {
+pub(super) struct Serving {
     /// What `git ls-remote` answers, or how it fails.
     listed: Result<String, String>,
     /// How the fetch fails, where it does.
@@ -27,7 +27,7 @@ struct Serving {
 }
 
 impl Serving {
-    fn listing(listed: &str) -> Self {
+    pub(super) fn listing(listed: &str) -> Self {
         Self {
             listed: Ok(listed.to_owned()),
             fetch: None,
@@ -35,7 +35,7 @@ impl Serving {
         }
     }
 
-    fn asked(&self) -> Vec<Vec<String>> {
+    pub(super) fn asked(&self) -> Vec<Vec<String>> {
         self.asked
             .lock()
             .map(|asked| asked.clone())
@@ -77,7 +77,7 @@ impl Runner for Serving {
 }
 
 /// A context whose runner is `serving`.
-fn served(name: &str, serving: &Arc<Serving>) -> Ctx {
+pub(super) fn served(name: &str, serving: &Arc<Serving>) -> Ctx {
     let mut ctx = ctx(name);
     ctx.seams.runner = serving.clone();
     ctx

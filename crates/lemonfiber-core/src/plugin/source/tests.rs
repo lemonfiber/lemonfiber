@@ -9,13 +9,34 @@ fn git(url: &str, revision: Option<&str>) -> Source {
     }
 }
 
-/// Anything that is not an address git fetches from is a path.
+/// Anything that is neither an address git fetches from nor a plugin's id is a path.
 #[test]
 fn a_directory_is_a_path() {
-    for written in ["./komga", "/home/ana/komga", "komga/plugin.toml", "komga@2"] {
+    for written in [
+        "./komga",
+        "/home/ana/komga",
+        "komga/plugin.toml",
+        "komga@2",
+        "Komga",
+        "2komga",
+        "komga-",
+        "-komga",
+        "komga--kuma",
+        "komga_kuma",
+        "",
+    ] {
         assert_eq!(Source::named(written), Source::Path(PathBuf::from(written)));
     }
     assert!(!Source::named("./komga").is_git());
+}
+
+/// A bare word shaped as a plugin's id is a name for the catalogue to resolve.
+#[test]
+fn a_word_shaped_as_an_id_is_a_name() {
+    for written in ["komga", "uptime-kuma", "a2", "plugin-2-go"] {
+        assert_eq!(Source::named(written), Source::Name(written.to_owned()));
+        assert!(!Source::named(written).is_git());
+    }
 }
 
 /// An address names no revision unless one follows its last `@`.
