@@ -158,3 +158,19 @@ async fn work_that_cannot_be_named_is_not_started() {
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR.as_u16());
     assert!(body.contains("randomness"), "{body}");
 }
+
+/// Each act on a setup already on the machine, agreed to over the web, is taken as the
+/// work it names rather than refused for carrying its yes: the agreement reaches the
+/// command, and the command reaches the core as a job.
+#[tokio::test]
+async fn a_migration_agreed_to_over_the_web_is_named_and_left_to_run() {
+    for mode in lemonfiber_core::migration::mode::EVERY {
+        let action = format!("migrate-{}", mode.slug());
+        let (status, body) = said(Chance::cycling(), &action, r#"{"confirm":true}"#).await;
+        assert_eq!(status, StatusCode::ACCEPTED.as_u16(), "{action}: {body}");
+        assert!(
+            body.contains(&action),
+            "{action} is named in its job: {body}"
+        );
+    }
+}

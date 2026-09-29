@@ -117,10 +117,20 @@ pub const TAKES_FORMS: &[&str] = &[
 /// Choosing for music is inside `quality-set` and drops the agreement, because
 /// picking an audio format is not a choice this host has to transcode for. The
 /// command line drops it there too.
+///
+/// The four acts on a setup already on the machine are forks too. Unconfirmed each
+/// says what it would come to and changes nothing; confirmed, adopting and importing
+/// are the operator saying they have backed up the databases it named, standing
+/// beside starts a second stack on the ports it chose, and replacing stops what it
+/// named. `migrate <mode> --confirm` is the same fork at the command line.
 pub const TAKES_AGREEMENT: &[&str] = &[
     "config-set",
     "forget",
     "invite",
+    "migrate-adopt",
+    "migrate-beside",
+    "migrate-import",
+    "migrate-replace",
     "uninstall",
     "remove",
     "quality-set",

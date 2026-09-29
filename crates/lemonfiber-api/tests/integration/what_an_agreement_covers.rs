@@ -112,6 +112,39 @@ fn a_reset_an_upgrade_and_a_restore_carry_the_agreement_into_the_command() {
     );
 }
 
+// ── A migration's agreement decides whether it is carried out ─────────────────
+
+#[test]
+fn a_migration_carries_the_agreement_into_the_command_and_is_the_account_without_it() {
+    use lemonfiber_core::app::MigrateAction;
+    use lemonfiber_core::migration::mode::EVERY;
+
+    for mode in EVERY {
+        let action = format!("migrate-{}", mode.slug());
+        let asked = |confirm: bool| {
+            command(
+                &action,
+                Arguments {
+                    confirm,
+                    ..Arguments::default()
+                },
+            )
+        };
+        let carried =
+            |confirmed: bool| Some(Command::Migrate(MigrateAction::Act { mode, confirmed }));
+        assert_eq!(
+            asked(true),
+            carried(true),
+            "{action} agreed to is carried out"
+        );
+        assert_eq!(
+            asked(false),
+            carried(false),
+            "{action} unagreed is the account"
+        );
+    }
+}
+
 // ── A repair's agreement is the yes to an offer, which is its own group ────────
 
 #[test]

@@ -8,7 +8,7 @@ use super::acting::{
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::{Answer, Chosen, Decision, Keeping};
-use lemonfiber_core::app::{Command, QualityAction, Setting, Waiting};
+use lemonfiber_core::app::{Command, MigrateAction, QualityAction, Setting, Waiting};
 use lemonfiber_core::bundle::run::Wanted;
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
@@ -115,6 +115,10 @@ fn carries_agreement(command: &Command) -> bool {
             | Command::Space { confirm: true }
             | Command::Remove { confirm: true, .. }
             | Command::Invite { confirm: true, .. }
+            | Command::Migrate(MigrateAction::Act {
+                confirmed: true,
+                ..
+            })
             | Command::Restore {
                 consent: RestoreConsent::Given { .. } | RestoreConsent::Standing,
                 ..
