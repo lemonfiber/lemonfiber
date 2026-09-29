@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::time::Duration;
 
-use super::{attributed, examine};
+use super::{attributed, examine, named};
 use crate::doctor::fixtures::{finding, problem};
 use crate::doctor::{Category, Check, Finding, Narrowing, Overall, Verdict};
 use crate::error::{Problem, Remedy};
@@ -179,6 +179,47 @@ fn a_finding_about_no_service_is_left_alone() {
     );
     let linked = attributed(vec![environment.clone()], &stack());
     assert_eq!(linked, vec![environment]);
+}
+
+/// A finding about a service carries what the stack calls it, beside the id it already
+/// had; one about the machine, or about a service the stack does not declare, carries no
+/// name rather than its id standing in as one.
+#[test]
+fn a_finding_carries_the_name_its_service_is_known_by() {
+    let tunnel =
+        Finding::in_category(Category::Vpn, "vpn.tunnel", "The tunnel", failing()).about("gluetun");
+    let client = Finding::in_category(
+        Category::Credentials,
+        "credentials.qbittorrent",
+        "The client",
+        failing(),
+    )
+    .about("qbittorrent");
+    let stranger =
+        Finding::in_category(Category::Services, "services.gone", "Gone", failing()).about("gone");
+    let environment = Finding::in_category(
+        Category::Environment,
+        "environment.compose",
+        "Compose",
+        failing(),
+    );
+
+    let found = named(vec![tunnel, client, stranger, environment], &stack());
+    assert_eq!(
+        found
+            .iter()
+            .map(|finding| finding.service_name.as_deref())
+            .collect::<Vec<_>>(),
+        vec![Some("Gluetun"), Some("qBittorrent"), None, None],
+    );
+    assert_eq!(
+        found
+            .iter()
+            .map(|finding| finding.service.as_deref())
+            .collect::<Vec<_>>(),
+        vec![Some("gluetun"), Some("qbittorrent"), Some("gone"), None],
+        "the id stays beside the name"
+    );
 }
 
 /// A failing verdict, for the tests above.

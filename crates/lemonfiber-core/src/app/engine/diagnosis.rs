@@ -108,6 +108,7 @@ pub(crate) async fn examined(
     // Attributed after the acknowledged ones are marked, so a choice the operator has
     // already answered is not offered as the explanation for anything else.
     report.findings = crate::doctor::attributed(report.findings, services);
+    report.findings = crate::doctor::named(report.findings, services);
     // Last, so a finding already explained by another service's trouble is quoted with
     // its own output rather than instead of it. Reading a service's output is not the
     // check's own business, which is why it happens here and not inside one.

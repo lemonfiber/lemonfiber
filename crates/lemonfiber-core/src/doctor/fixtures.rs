@@ -17,6 +17,7 @@ pub(super) fn finding(title: &str, verdict: Verdict) -> Finding {
         category: Category::Vpn,
         title: title.to_owned(),
         service: None,
+        service_name: None,
         caused_by: None,
         said: None,
         verdict,

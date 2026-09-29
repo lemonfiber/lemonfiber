@@ -47,7 +47,7 @@ use crate::repair::{Attempt, Repair, Writing};
 pub use narrowing::Narrowing;
 
 pub use bundled::BUNDLED_CHECKS;
-pub use examining::{attributed, examine, overall};
+pub use examining::{attributed, examine, named, overall};
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///
@@ -181,6 +181,18 @@ pub struct Finding {
     /// thing wrong.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service: Option<String>,
+    /// What the stack calls that service in front of an operator.
+    ///
+    /// Carried beside the id rather than left for a surface to derive, because the id is
+    /// a key and not a name: capitalising `qbittorrent` does not arrive at qBittorrent,
+    /// and the stack has already written the name down. Absent where the finding is about
+    /// no service, and where the stack declares no service by that id — an id standing in
+    /// for a name would put the key back in front of the operator.
+    ///
+    /// Set after the run, like [`Self::caused_by`], from the same manifest that says
+    /// which service depends on which.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_name: Option<String>,
     /// The check whose finding explains this one, where another does.
     ///
     /// Set after the run rather than by the check itself: a check is independent
@@ -222,6 +234,7 @@ impl Finding {
             title: title.to_owned(),
             verdict,
             service: None,
+            service_name: None,
             caused_by: None,
             said: None,
             origin: crate::origin::Origin::Bundled,

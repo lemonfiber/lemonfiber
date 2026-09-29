@@ -195,11 +195,24 @@ async fn logs(ctx: &Ctx, lines: u32) -> Result<String, Box<Problem>> {
 
 /// The diagnosis as a person reads it: one line per finding, worst first, which is the
 /// order the report already puts them in.
+///
+/// A line whose finding carries a code leads with it. The code is what somebody helping
+/// searches for and quotes back, and the one handle on a finding that reads the same on
+/// every screen the operator might be looking at; a pass, or a check that could not run,
+/// has none, and its line is left as it was rather than given an identifier of another kind.
 fn findings(report: &crate::model::DoctorReport) -> String {
     report
         .findings
         .iter()
-        .map(|finding| format!("{}: {}", finding.title, reading(&finding.verdict)))
+        .map(|finding| {
+            let line = format!("{}: {}", finding.title, reading(&finding.verdict));
+            match &finding.verdict {
+                Verdict::Warn(problem) | Verdict::Fail(problem) => {
+                    format!("{} {line}", problem.code)
+                }
+                Verdict::Pass { .. } | Verdict::Unverified { .. } | Verdict::Skipped { .. } => line,
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }

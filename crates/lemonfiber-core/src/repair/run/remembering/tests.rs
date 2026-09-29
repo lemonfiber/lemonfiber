@@ -12,6 +12,7 @@ fn found(verdict: Verdict) -> Finding {
         title: "room on the volume".to_owned(),
         verdict,
         service: None,
+        service_name: None,
         caused_by: None,
         said: None,
         origin: crate::origin::Origin::Bundled,

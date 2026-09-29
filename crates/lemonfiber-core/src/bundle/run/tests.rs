@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{reading, write};
+use super::{findings, reading, write};
 use crate::app::fixtures::FakeArchive;
 use crate::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
 use crate::doctor::Verdict;
@@ -66,6 +66,54 @@ fn a_verdict_reads_in_the_words_the_check_used() {
             reason: "nothing to read".to_owned()
         }),
         "nothing to read"
+    );
+}
+
+/// A finding that carries a code leads its line with it, since the code is what somebody
+/// helping searches for; one that carries none reads as it did, with no other identifier
+/// standing in for a code it does not have.
+#[test]
+fn a_finding_with_a_code_leads_its_line_with_it() {
+    let report = crate::model::DoctorReport {
+        overall: crate::doctor::Overall::Broken,
+        findings: vec![
+            crate::doctor::Finding::in_category(
+                crate::doctor::Category::Vpn,
+                "vpn.tunnel",
+                "Gluetun tunnel",
+                Verdict::Fail(problem()),
+            ),
+            crate::doctor::Finding::in_category(
+                crate::doctor::Category::Storage,
+                "storage.headroom",
+                "Room to grow",
+                Verdict::Warn(problem()),
+            ),
+            crate::doctor::Finding::in_category(
+                crate::doctor::Category::Storage,
+                "storage.free",
+                "Free space",
+                Verdict::Pass {
+                    note: Some("340 GiB left".to_owned()),
+                },
+            ),
+            crate::doctor::Finding::in_category(
+                crate::doctor::Category::Environment,
+                "environment.engine",
+                "Container engine",
+                Verdict::Unverified {
+                    reason: "nothing answered".to_owned(),
+                    remedy: Remedy::new("try again"),
+                },
+            ),
+        ],
+    };
+    assert_eq!(
+        findings(&report),
+        "BUNDLE-0 Gluetun tunnel: something is wrong\n\
+         BUNDLE-0 Room to grow: something is wrong\n\
+         Free space: 340 GiB left\n\
+         Container engine: nothing answered"
     );
 }
 

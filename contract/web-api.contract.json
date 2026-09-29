@@ -5595,6 +5595,13 @@
                 "null"
               ]
             },
+            "service_name": {
+              "description": "What the stack calls that service in front of an operator.\n\nCarried beside the id rather than left for a surface to derive, because the id is\na key and not a name: capitalising `qbittorrent` does not arrive at qBittorrent,\nand the stack has already written the name down. Absent where the finding is about\nno service, and where the stack declares no service by that id — an id standing in\nfor a name would put the key back in front of the operator.\n\nSet after the run, like [`Self::caused_by`], from the same manifest that says\nwhich service depends on which.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "title": {
               "description": "The one-line summary of what was checked.",
               "type": "string"
@@ -10600,6 +10607,13 @@
             },
             "service": {
               "description": "The service this is about, where it is about one.\n\nAbsent for the checks that are about the machine rather than about\nsomething running on it — the environment, the filesystem, the operator's\nown choices. Carried so that one service's trouble can be attributed to\nthe service underneath it rather than counted as one more independent\nthing wrong.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "service_name": {
+              "description": "What the stack calls that service in front of an operator.\n\nCarried beside the id rather than left for a surface to derive, because the id is\na key and not a name: capitalising `qbittorrent` does not arrive at qBittorrent,\nand the stack has already written the name down. Absent where the finding is about\nno service, and where the stack declares no service by that id — an id standing in\nfor a name would put the key back in front of the operator.\n\nSet after the run, like [`Self::caused_by`], from the same manifest that says\nwhich service depends on which.",
               "type": [
                 "string",
                 "null"

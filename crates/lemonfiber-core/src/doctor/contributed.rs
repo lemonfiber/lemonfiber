@@ -267,6 +267,7 @@ impl Contributed {
             title: self.title.clone(),
             verdict,
             service: self.service.clone(),
+            service_name: None,
             caused_by: None,
             said: None,
             origin: self.origin(),

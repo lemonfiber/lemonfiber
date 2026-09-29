@@ -2016,6 +2016,12 @@
           ],
           "required": false
         },
+        "service_name": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "title": {
           "type": [
             "string"

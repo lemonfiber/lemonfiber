@@ -101,6 +101,30 @@ pub fn attributed(
         .collect()
 }
 
+/// Give each finding about a service the name the stack calls that service by.
+///
+/// After the run rather than inside each check, for the reason [`attributed`] is: the
+/// manifest already says what every service is called, and a check that looked it up
+/// would be one more place to forget to. A finding about no service, or about one the
+/// stack does not declare, is left without a name rather than handed its id as one.
+#[must_use]
+pub fn named(findings: Vec<Finding>, services: &[lemonfiber_manifest::Service]) -> Vec<Finding> {
+    findings
+        .into_iter()
+        .map(|finding| {
+            let name = finding
+                .service
+                .as_deref()
+                .and_then(|service| services.iter().find(|declared| declared.id == service))
+                .map(|declared| declared.name.clone());
+            Finding {
+                service_name: name,
+                ..finding
+            }
+        })
+        .collect()
+}
+
 /// The finding a check becomes when it does not answer within its budget.
 ///
 /// Reported against what the check says it reports against, and against its family
@@ -119,6 +143,7 @@ fn timed_out(check: &dyn Check) -> Finding {
         ),
         category: check.category(),
         service: reported.as_ref().and_then(|one| one.service.clone()),
+        service_name: None,
         caused_by: None,
         said: None,
         title: "Check timed out".to_owned(),
