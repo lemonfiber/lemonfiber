@@ -139,6 +139,7 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
                 held.installed(),
                 &super::targets::chosen_fillers(ctx),
             ),
+            sources: fetching::standings(ctx, held.installed()).await,
             installed: held.installed().to_vec(),
             install: None,
             removal: None,
@@ -310,6 +311,7 @@ async fn install(
         })),
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     })
 }
 

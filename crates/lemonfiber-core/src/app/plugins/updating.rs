@@ -290,6 +290,7 @@ fn answering(installed: Vec<Installed>, update: Update) -> Installs {
         removal: None,
         update: Some(Box::new(update)),
         substituted: Vec::new(),
+        sources: Vec::new(),
     }
 }
 

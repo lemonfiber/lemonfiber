@@ -18,7 +18,7 @@ use crate::app::Ctx;
 use crate::config::REACH_PLUGIN_SOURCE_KEY;
 use crate::error::codes::plugin::{NO_REVISION, SOURCE_OFF, UNFETCHED};
 use crate::error::{Problem, Remedy, Severity, State};
-use crate::plugin::{Installs, Register};
+use crate::plugin::{Fetchable, Installed, Installs, Register, Source, Sourced};
 
 /// Where an install came from, where that is not the directory it read.
 pub(super) struct Fetched<'a> {
@@ -191,6 +191,51 @@ fn no_revision(url: &str, asked: &str) -> Problem {
         ),
     )
     .in_state(State::Guided)
+}
+
+/// Whether each installed plugin's source can still be fetched, asked now.
+///
+/// Asked only when somebody lists what is installed, never in the background: a git
+/// source is asked for the commit it serves by default, which is the least a
+/// repository answers, and a directory is looked for. A directory that is no longer
+/// there cannot be fetched from, which is the same answer a repository that stopped
+/// answering gets.
+pub(super) async fn standings(ctx: &Ctx, installed: &[Installed]) -> Vec<Sourced> {
+    let mut standings = Vec::new();
+    for one in installed {
+        standings.push(Sourced {
+            plugin: one.plugin.clone(),
+            from: one.from.clone(),
+            standing: standing(ctx, &one.from).await,
+        });
+    }
+    standings
+}
+
+/// What asking one source comes to.
+async fn standing(ctx: &Ctx, from: &str) -> Fetchable {
+    if from.is_empty() {
+        return Fetchable::Unasked {
+            why: "the record names no source, so there is nowhere to ask".to_owned(),
+        };
+    }
+    match Source::named(from) {
+        Source::Path(path) if path.exists() => Fetchable::Reachable,
+        Source::Path(_) => Fetchable::Unreachable {
+            why: format!("{from} is no longer there"),
+        },
+        Source::Git { .. } if !ctx.settings.reaching.allows(REACH_PLUGIN_SOURCE_KEY) => {
+            Fetchable::Unasked {
+                why: format!(
+                    "fetching from a git source is switched off by {REACH_PLUGIN_SOURCE_KEY}"
+                ),
+            }
+        }
+        Source::Git { url, .. } => match git(ctx, &["ls-remote", "--", &url, "HEAD"]).await {
+            Ok(_) => Fetchable::Reachable,
+            Err(why) => Fetchable::Unreachable { why },
+        },
+    }
 }
 
 /// Where one commit is checked out while it is installed, and removed from after.

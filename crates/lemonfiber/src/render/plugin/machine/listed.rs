@@ -8,7 +8,7 @@
 //! from, whether it was reviewed and when it was installed, which are said for every
 //! plugin because *not recorded* is itself the answer an operator needs.
 
-use lemonfiber_core::plugin::{Installed, Substituted};
+use lemonfiber_core::plugin::{Fetchable, Installed, Sourced, Substituted};
 
 use super::super::super::Lines;
 
@@ -37,10 +37,29 @@ pub(super) fn origin(one: &Installed) -> String {
 }
 
 /// Everything the record says a plugin is doing.
-pub(super) fn provenance(one: &Installed, substituted: &[Substituted]) -> Lines {
+pub(super) fn provenance(
+    one: &Installed,
+    substituted: &[Substituted],
+    sources: &[Sourced],
+) -> Lines {
     let mut lines = Lines::default();
     let declared = &one.declared;
     lines.put(format!("    from       {}", origin(one)));
+    // Said only where it is not the ordinary case: a source that answered is what an
+    // operator assumes, and one that did not is the news that it cannot be updated.
+    match sources
+        .iter()
+        .find(|source| source.plugin == one.plugin)
+        .map(|source| &source.standing)
+    {
+        Some(Fetchable::Unreachable { why }) => lines.put(format!(
+            "    source     cannot be fetched, so it cannot be updated: {why}"
+        )),
+        Some(Fetchable::Unasked { why }) => {
+            lines.put(format!("    source     not asked: {why}"));
+        }
+        _ => {}
+    }
     lines.put(format!(
         "    installed  {}",
         if one.installed_at.is_empty() {
