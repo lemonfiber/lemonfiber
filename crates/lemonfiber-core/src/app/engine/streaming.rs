@@ -13,7 +13,7 @@
 
 use tokio::sync::mpsc::Receiver;
 
-use super::{compose, readied, settled_into, Ctx};
+use super::{compose, fell_short_into, readied, settled_into, Ctx};
 use crate::error::{Diagnose, Problem};
 use crate::model::LifecycleReport;
 use crate::ports::docker::{LogLine, LogQuery};
@@ -199,6 +199,8 @@ pub async fn started(
     super::super::autostart::noted(ctx, &action, forms, &report);
     if status == Some(0) {
         settled_into(ctx, &manifest, &mut report).await?;
+    } else {
+        fell_short_into(ctx, &manifest, &mut report).await;
     }
     Ok(report)
 }

@@ -170,7 +170,7 @@ fn stopping_on_purpose_and_falling_over_are_told_apart() {
 #[test]
 fn every_lifecycle_the_engine_reports_has_a_state() {
     for (lifecycle, expected) in [
-        (Lifecycle::Created, State::Stopped),
+        (Lifecycle::Created, State::Failed),
         (Lifecycle::Running, State::Running),
         (Lifecycle::Paused, State::Stopped),
         (Lifecycle::Restarting, State::CrashLooping),

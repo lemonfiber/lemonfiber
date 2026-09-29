@@ -25,11 +25,13 @@ pub struct LifecycleReport {
     pub rehearsed: bool,
     /// The exit status, absent for a rehearsal or a signalled process.
     pub status: Option<i32>,
-    /// What each service ended up doing, where the action waited to find out.
+    /// What each service ended up doing, where the action waited to find out, or
+    /// where a start did not complete, read once when it ended.
     ///
     /// Empty for actions that do not wait. Stopping is finished when Compose
     /// says it is, and surveying afterwards would only report the absence it
-    /// was asked to produce.
+    /// was asked to produce. A start that failed is not waited on, and names every
+    /// service it addressed and those they depend on as the engine had them then.
     pub services: Vec<crate::docker::Service>,
     /// What those services amount to, as one word.
     pub condition: Option<crate::docker::Condition>,

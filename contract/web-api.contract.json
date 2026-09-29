@@ -8300,7 +8300,7 @@
               "type": "boolean"
             },
             "services": {
-              "description": "What each service ended up doing, where the action waited to find out.\n\nEmpty for actions that do not wait. Stopping is finished when Compose\nsays it is, and surveying afterwards would only report the absence it\nwas asked to produce.",
+              "description": "What each service ended up doing, where the action waited to find out, or\nwhere a start did not complete, read once when it ended.\n\nEmpty for actions that do not wait. Stopping is finished when Compose\nsays it is, and surveying afterwards would only report the absence it\nwas asked to produce. A start that failed is not waited on, and names every\nservice it addressed and those they depend on as the engine had them then.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/Service"

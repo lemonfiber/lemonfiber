@@ -134,7 +134,8 @@ async fn a_start_that_succeeded_waits_for_its_services() {
 }
 
 /// Nothing is waited on after a Compose invocation that failed: there is nothing to
-/// wait for, and waiting would turn a fast failure into a slow one.
+/// wait for, and waiting would turn a fast failure into a slow one. What it addressed
+/// is still read once and reported.
 #[tokio::test]
 async fn a_start_that_failed_is_not_then_waited_on() {
     let ctx = ctx(Ok(spoke("")));
@@ -142,8 +143,8 @@ async fn a_start_that_failed_is_not_then_waited_on() {
     let report = reported(&ctx, Some(1)).await;
 
     assert_eq!(
-        report.map(|report| (report.status, report.services.is_empty())),
-        Ok((Some(1), true))
+        report.map(|report| (report.status, report.services.len())),
+        Ok((Some(1), LIBRARY.len()))
     );
 }
 

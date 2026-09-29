@@ -161,11 +161,15 @@ fn read(container: &Container) -> State {
         // offers, the safer reading is the one that shows the operator
         // something rather than the one that hides it behind `starting`.
         Lifecycle::Restarting => State::CrashLooping,
-        // Created has never run; paused exists and is not serving. Both are a
-        // container that is there and doing nothing, which is what stopped
-        // means — a paused container's last health verdict is a claim about a
-        // container that can no longer answer.
-        Lifecycle::Created | Lifecycle::Paused => State::Stopped,
+        // Created has never run, and lemonfiber never creates a container without
+        // starting it, so one left created is a start that did not happen — most
+        // often behind a dependency that never became ready. That is a failure,
+        // not something the operator turned off.
+        Lifecycle::Created => State::Failed,
+        // Paused exists and is not serving, which is what stopped means — a paused
+        // container's last health verdict is a claim about a container that can no
+        // longer answer.
+        Lifecycle::Paused => State::Stopped,
         // A clean exit is a service that was stopped; any other is one that
         // fell over. An engine that has forgotten the code is not evidence of
         // either, so it is reported as merely stopped.

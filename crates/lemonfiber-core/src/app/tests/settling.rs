@@ -355,9 +355,11 @@ async fn a_compose_invocation_that_failed_is_not_then_waited_on() {
         forms: vec!["library".to_owned()],
     };
     let produced = report(dispatch(command, &ctx).await);
+    // Read once and reported as found. With no patience at all, a start that waited
+    // would have ended on the wait rather than on what Compose refused.
     assert_eq!(
-        produced.map(|report| (report.status, report.condition)),
-        Some((Some(1), None)),
+        produced.map(|report| (report.status, report.services.len())),
+        Some((Some(1), LIBRARY.len())),
         "waiting for health after Compose refused would report the wrong fault"
     );
 }

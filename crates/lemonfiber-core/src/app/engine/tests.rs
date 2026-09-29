@@ -151,3 +151,37 @@ fn a_service_the_stack_says_nothing_about_costs_no_words() {
         Some("")
     );
 }
+
+/// A failed start against an engine that will not answer leaves the report as the
+/// start's own failure: no service read, and no condition made up for them.
+///
+/// Driven here rather than through a dispatched start, because a start meets an engine
+/// that is not there at its preflight and never reaches the read at all.
+#[tokio::test]
+async fn a_start_that_failed_reads_nothing_from_an_engine_that_is_not_there() {
+    let rehearsed = crate::test_support::a_context().build().rehearsing();
+    let started = crate::app::dispatch(
+        crate::app::Command::Up {
+            forms: vec!["library".to_owned()],
+        },
+        &rehearsed,
+    )
+    .await;
+    let Ok(crate::app::Outcome::Lifecycle(mut report)) = started else {
+        unreachable!("a rehearsed start answers with its plan: {started:?}");
+    };
+    let gone = crate::test_support::a_context()
+        .engine(std::sync::Arc::new(
+            lemonfiber_fixtures::support::Reporting::absent(),
+        ))
+        .build();
+    let manifest = Manifest::from_toml(STACK);
+
+    if let Ok(manifest) = &manifest {
+        super::fell_short_into(&gone, manifest, &mut report).await;
+    }
+
+    assert!(manifest.is_ok());
+    assert!(report.services.is_empty(), "{:?}", report.services);
+    assert_eq!(report.condition, None);
+}
