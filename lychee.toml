@@ -27,3 +27,15 @@ max_retries = 2
 # The list lives in `lemonfiber/spec`'s `hygiene.yml`, which is also where the
 # reasoning for each accepted code is written.
 exclude_loopback = true
+
+# One URL is not checked: the OSI licence list, named in
+# `crates/lemonfiber-manifest/src/spdx_osi.txt` as where to confirm an identifier.
+# opensource.org answers GitHub's runners `403` on some runs and `200` on others, from
+# the same commit, so the gate went red on pull requests that touched no link. A 403
+# cannot be accepted for one host alone — lychee's `hosts` table sets headers and
+# pacing, not status codes, and the accept list that runs is the shared one — so this
+# is the narrowest exception there is: that one address, anchored at both ends, and
+# every other link on the host and everywhere else still checked. The pattern spells
+# its separators as character classes because this file is itself checked, and a
+# plain address inside it would be read as a link.
+exclude = ['^https:[/][/]opensource[.]org[/]license$']
