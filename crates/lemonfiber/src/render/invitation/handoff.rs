@@ -24,10 +24,12 @@ pub(crate) fn handoff(report: &Handoff) -> Lines {
     if let Some(reason) = &report.reason {
         lines.put(format!("  {reason}"));
     }
-    match report.state {
-        HandoffState::Ready | HandoffState::Pending => handing(&mut lines, report),
-        HandoffState::Connected => signed_in(&mut lines, report),
-        HandoffState::Unprovisioned | HandoffState::Failed => {}
+    match (report.state, &report.address) {
+        (HandoffState::Ready | HandoffState::Pending, Some(address)) => {
+            handing(&mut lines, report, address);
+        }
+        (HandoffState::Connected, _) => signed_in(&mut lines, report),
+        _ => {}
     }
     lines
 }
@@ -52,10 +54,7 @@ fn headline(report: &Handoff) -> String {
 }
 
 /// The address, its code, the apps to point at it, and the steps.
-fn handing(lines: &mut Lines, report: &Handoff) {
-    let Some(address) = &report.address else {
-        return;
-    };
+fn handing(lines: &mut Lines, report: &Handoff, address: &str) {
     lines.spaced(format!("  {address}"));
     if let Some(caution) = &report.caution {
         lines.put(format!("  {caution}"));

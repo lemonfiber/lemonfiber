@@ -356,6 +356,9 @@ fn always_reported() -> Vec<Command> {
         Command::Reissue {
             name: "ana".to_owned(),
         },
+        Command::Handoff {
+            name: "ana".to_owned(),
+        },
         Command::Forget { confirm: true },
         Command::Space {
             agreement: Some("anything".to_owned()),

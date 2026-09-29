@@ -16,12 +16,13 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::common::household::recorded_admin;
+use crate::common::household::{recorded_admin, stack_without};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{HandedSession, Handoff, HandoffState};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
@@ -440,4 +441,46 @@ async fn nothing_recorded_is_refused_as_not_set_up() {
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-3"));
+}
+
+/// A hand-off over `stack`, with everything else answering.
+async fn over(env: &Path, stack: Source) -> Ran {
+    let http = answering(NOBODY_ELSE);
+    let ctx = lemonfiber_testing::a_context()
+        .over(stack)
+        .settings(Settings {
+            env_file: Some(env.to_path_buf()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+    ran(&ctx, "Ana", &http).await
+}
+
+/// A stack with no media server has nothing for a device to sign in to.
+#[tokio::test]
+async fn a_stack_with_no_media_server_hands_nothing_over() {
+    let env = recorded_admin("handoff-no-server");
+    let ran = over(&env, stack_without("jellyfin", "handoff")).await;
+    gone(&env);
+
+    assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-2"));
+    assert!(ran.sent.is_empty());
+}
+
+/// A stack that cannot be read is refused rather than read as having no media server.
+#[tokio::test]
+async fn a_stack_that_cannot_be_read_hands_nothing_over() {
+    let env = recorded_admin("handoff-unreadable-stack");
+    let ran = over(
+        &env,
+        Source::External(Path::new("/lemonfiber/no/such/stack")),
+    )
+    .await;
+    gone(&env);
+
+    assert!(ran.handoff.is_none());
+    assert!(ran.refusal.is_some_and(|code| !code.starts_with("HANDOFF")));
+    assert!(ran.sent.is_empty());
 }

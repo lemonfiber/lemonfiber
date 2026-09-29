@@ -177,3 +177,28 @@ fn a_caution_about_the_address_is_said_beside_it() {
 
     assert!(said.contains("That address is a number."), "{said}");
 }
+
+/// An address too long to draw still gets the words, and the steps under it.
+#[test]
+fn an_address_too_long_to_draw_still_gets_the_words() {
+    let far_too_long = format!("http://{}", "h".repeat(8000));
+    let said = handoff(&Handoff {
+        address: Some(far_too_long.clone()),
+        ..issued()
+    })
+    .text();
+
+    assert!(
+        said.contains(&far_too_long),
+        "the address itself went missing"
+    );
+    assert!(
+        !said.contains('\u{2588}'),
+        "an address that fits in no code was drawn"
+    );
+    assert!(
+        said.contains("1. Open the app."),
+        "{}",
+        &said[..said.len().min(200)]
+    );
+}

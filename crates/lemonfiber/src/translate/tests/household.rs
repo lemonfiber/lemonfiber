@@ -291,3 +291,19 @@ fn a_line_asked_about_and_not_changed_carries_no_answers() {
         Command::Bandwidth(BandwidthAsked::default())
     );
 }
+
+/// Handing a device over names the person, and reaches the hand-off with that name.
+#[test]
+fn a_hand_off_names_whose_device_it_is() {
+    assert_eq!(
+        household(
+            None,
+            Some(HouseholdCommand::Handoff {
+                name: "ana".to_owned(),
+            })
+        ),
+        Ok(Command::Handoff {
+            name: "ana".to_owned(),
+        })
+    );
+}

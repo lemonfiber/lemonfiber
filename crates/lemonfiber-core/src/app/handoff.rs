@@ -157,9 +157,7 @@ fn clients(address: &str) -> Vec<HandedClient> {
             device: device.device.to_owned(),
             client: device.client.to_owned(),
             open_source: device.open_source,
-            code: device
-                .deep_link
-                .map_or_else(|| address.to_owned(), |link| link.replace(ADDRESS, address)),
+            code: code(device.deep_link, address),
             deep_link: device.deep_link.is_some(),
         })
         .collect();
@@ -169,6 +167,11 @@ fn clients(address: &str) -> Vec<HandedClient> {
 
 /// Where the server's address goes in a client's link.
 const ADDRESS: &str = "{address}";
+
+/// What one app's code carries: its link with the address in it, or the address alone.
+fn code(deep_link: Option<&str>, address: &str) -> String {
+    deep_link.map_or_else(|| address.to_owned(), |link| link.replace(ADDRESS, address))
+}
 
 /// How the person signs in on the new device, one step at a time.
 fn steps(member: &Member, address: &str, quick_connect: bool) -> Vec<String> {
@@ -287,3 +290,6 @@ fn runs_the_server(name: &str) -> Problem {
         Remedy::new("Invite the person under a name of their own, and hand that over"),
     )
 }
+
+#[cfg(test)]
+mod tests;
