@@ -47,7 +47,7 @@ pub(super) async fn installed(
     }
     let commit = resolved(ctx, url, revision).await?;
     let into = checkout(&commit);
-    let _ = std::fs::remove_dir_all(&into);
+    let _ = tokio::fs::remove_dir_all(&into).await;
     let result = match fetched(ctx, url, &commit, &into).await {
         Ok(()) => {
             let from = Fetched {
@@ -58,7 +58,7 @@ pub(super) async fn installed(
         }
         Err(problem) => Err(problem),
     };
-    let _ = std::fs::remove_dir_all(&into);
+    let _ = tokio::fs::remove_dir_all(&into).await;
     result
 }
 
