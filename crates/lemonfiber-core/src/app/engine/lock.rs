@@ -61,7 +61,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::app::Ctx;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::plural::s;
 
 /// What the claim is called, beside the settings it belongs to.
@@ -319,6 +319,7 @@ async fn refusal(ctx: &Ctx, path: &Path, waited: Duration) -> Problem {
         ),
         Remedy::new("Wait for it to finish, then run this again"),
     )
+    .lies_in(Amiss::Held)
     .with_detail(format!(
         "The claim is at {}{}. If you are sure that run is gone, `--force` takes the \
          stack from it.",

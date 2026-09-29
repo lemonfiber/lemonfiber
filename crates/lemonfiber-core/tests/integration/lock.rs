@@ -23,6 +23,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use lemonfiber_core::app::{claimed, dispatch, released, Command, Ctx};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::error::Amiss;
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
 };
@@ -266,6 +267,23 @@ async fn a_run_whose_turn_never_comes_is_told_what_is_in_the_way() {
         said.contains(&format!("written by process {}", somebody_else())),
         "and the process is in the detail, where `--force` is: {said}"
     );
+}
+
+/// Being turned away by other work is not this product failing: it lies in the work
+/// holding the stack, which is what a surface answering requests reads to say so.
+#[tokio::test(start_paused = true)]
+async fn a_refusal_for_other_work_lies_in_that_work() {
+    let files = Arc::new(Remembering::default());
+    files
+        .write(
+            &lockfile(),
+            &written(somebody_else(), TWELVE_SECONDS_AGO, "up"),
+        )
+        .await;
+
+    let refused = claimed(&ctx(&files), "down").await.err();
+
+    assert_eq!(refused.map(|problem| problem.amiss), Some(Amiss::Held));
 }
 
 /// The case a pid was always the wrong noun for.
