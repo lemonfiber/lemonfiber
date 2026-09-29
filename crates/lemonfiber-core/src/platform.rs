@@ -13,7 +13,14 @@
 
 use serde::Serialize;
 
+use crate::ports::docker::{Origin, Reach, Target};
 use crate::ports::hosting::Manager;
+
+/// The name Docker Desktop gives the context it installs on Linux.
+const DESKTOP_CONTEXT: &str = "desktop-linux";
+
+/// Where under a home directory Docker Desktop's own socket lives on Linux.
+const DESKTOP_SOCKET: &str = "/.docker/desktop/";
 
 /// The operating system this build targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -84,11 +91,11 @@ pub enum Environment {
 }
 
 impl Environment {
-    /// Decide the environment from the build target and what the daemon says.
+    /// Decide the environment from the build target and the engine it is pointed at.
     ///
-    /// `desktop` is whether the engine reports itself as Docker Desktop. It is
-    /// an argument rather than something read here, so a test can reach all four
-    /// environments without four machines.
+    /// `desktop` is whether that engine is Docker Desktop's, as
+    /// [`Self::engine_is_desktop`] answers it. It is an argument rather than something
+    /// read here, so a test can reach all four environments without four machines.
     #[must_use]
     pub const fn resolve(host: HostOs, desktop: bool) -> Self {
         match host {
@@ -98,6 +105,20 @@ impl Environment {
             HostOs::Linux => Self::LinuxNative,
             HostOs::Other => Self::Unsupported,
         }
+    }
+
+    /// Whether the engine a run is pointed at is Docker Desktop's.
+    ///
+    /// Read off where the engine was found rather than asked of the daemon: Docker
+    /// Desktop on Linux installs a context of its own, named `desktop-linux`, whose
+    /// endpoint is a socket under `~/.docker/desktop/`, and a run resolves its engine
+    /// from those before it does anything. Either one said is Desktop. Anything else —
+    /// the machine's own daemon, a socket of Docker Engine's, a remote engine — is not.
+    #[must_use]
+    pub fn engine_is_desktop(target: &Target) -> bool {
+        let named = matches!(&target.origin, Origin::Context(name) if name == DESKTOP_CONTEXT);
+        let socket = matches!(&target.reach, Reach::Socket(path) if path.contains(DESKTOP_SOCKET));
+        named || socket
     }
 
     /// Whether file ownership on the data volume is real rather than mapped.

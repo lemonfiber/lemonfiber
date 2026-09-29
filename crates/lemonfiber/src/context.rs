@@ -55,10 +55,10 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // below reads it off the settings rather than asking the environment again.
     crate::render::host::settle(&settings.docker);
 
-    // Docker Engine and Docker Desktop are told apart by asking the daemon,
-    // which needs the engine adapter. Until then this is what can be seen from
-    // here, and nothing yet depends on the difference.
-    let environment = Environment::resolve(HOST_OS, false);
+    // Docker Engine and Docker Desktop are told apart by where the engine was found,
+    // which the settings already carry.
+    let environment =
+        Environment::resolve(HOST_OS, Environment::engine_is_desktop(&settings.docker));
 
     // Every engine seam is built from the one resolved target the settings carry,
     // which is the same field the Compose invocation is built from. That is the whole

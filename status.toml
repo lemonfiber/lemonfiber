@@ -110,9 +110,9 @@ rows = [
     "Platform detection (macOS / Linux / WSL2)",
     "[`platform.rs`](crates/lemonfiber-core/src/platform.rs)",
   ] },
-  { state = "partial", cells = [
+  { state = "done", cells = [
     "Linux with Docker Desktop told apart from native Linux (`ARCH-R27`)",
-    "`Environment::LinuxDesktop` and the resolver that yields it are in [`platform.rs`](crates/lemonfiber-core/src/platform.rs), and nothing detects Docker Desktop: the one call outside tests, in [`context.rs`](crates/lemonfiber/src/context.rs), is `Environment::resolve(HOST_OS, false)`, so every Linux machine is read as native Linux.",
+    "[`context.rs`](crates/lemonfiber/src/context.rs) resolves the environment from the engine the run is pointed at: `Environment::engine_is_desktop` ([`platform.rs`](crates/lemonfiber-core/src/platform.rs)) reads Docker Desktop off the context it installs on Linux, `desktop-linux`, or the socket it listens on under `~/.docker/desktop/`, both of which the resolved target already carries, so nothing is spawned to ask. Anything else Linux is pointed at — the machine's own daemon, Docker Engine's socket, a remote engine — is native Linux. A test drives each shape through the resolver to `LinuxDesktop` or `LinuxNative`, and the setup wizard asks for the service user only where ownership is real.",
   ] },
   { state = "done", cells = [
     "Compose command builder (pure, golden-tested)",
