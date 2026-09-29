@@ -5585,6 +5585,12 @@
             "array[ref:SpaceLeft]"
           ],
           "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []

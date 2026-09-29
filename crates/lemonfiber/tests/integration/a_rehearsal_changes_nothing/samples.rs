@@ -202,7 +202,12 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
                 waiting: Waiting::Never,
             }),
         ),
-        ("space", Command::Space { confirm: true }),
+        (
+            "space",
+            Command::Space {
+                agreement: Some("anything".to_owned()),
+            },
+        ),
         (
             "stop-seeding",
             Command::StopSeeding {

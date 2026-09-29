@@ -64,7 +64,7 @@ fn measuring_a_volume(available: u64) -> crate::app::Ctx {
 #[tokio::test]
 async fn a_machine_with_no_data_location_is_told_to_set_one() {
     let ctx = a_context().build();
-    let refused = space(&ctx, false).await;
+    let refused = space(&ctx, None).await;
     assert!(refused.is_err_and(|problem| problem.code == crate::space::NOWHERE_TO_MEASURE));
 }
 
@@ -77,7 +77,7 @@ async fn a_data_location_that_will_not_be_read_is_a_refusal_rather_than_an_empty
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(500))))
         .with_occupancy(Walking::refusing("permission denied"));
-    let refused = space(&ctx, false).await;
+    let refused = space(&ctx, None).await;
     assert!(
         refused.is_err_and(|problem| problem.code == crate::space::WALK_REFUSED
             && problem.detail.as_deref() == Some("permission denied"))
@@ -89,7 +89,7 @@ async fn the_reckoning_measures_the_volume_and_walks_what_is_on_it() {
     // Asserted through the answer rather than unwrapped out of it: a closure
     // for the case that cannot happen is a line no run ever reaches, and the
     // coverage gate counts it against a file every one of whose cases passed.
-    let reckoned = space(&measuring_a_volume(900_000_000_000), false).await;
+    let reckoned = space(&measuring_a_volume(900_000_000_000), None).await;
     assert!(
         reckoned.is_ok_and(|reckoned| {
             let headings: Vec<String> = reckoned
@@ -110,7 +110,7 @@ async fn the_reckoning_measures_the_volume_and_walks_what_is_on_it() {
 #[tokio::test]
 async fn a_full_volume_halts_what_would_fetch_more_and_says_what_it_protects() {
     let ctx = measuring_a_volume(500);
-    assert!(space(&ctx, false)
+    assert!(space(&ctx, None)
         .await
         .is_ok_and(|reckoned| reckoned.halted));
 
@@ -131,7 +131,7 @@ async fn a_disk_nobody_could_measure_does_not_stop_work_on_a_guess() {
     // is a claim about a volume rather than about the absence of a reading.
     let ctx = a_context().build();
     assert!(
-        space(&ctx, false).await.is_err(),
+        space(&ctx, None).await.is_err(),
         "and the reading still says so"
     );
     assert!(admits(&ctx).await.is_ok());
@@ -166,7 +166,7 @@ fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
 
 #[tokio::test]
 async fn a_download_nothing_ever_linked_is_named_as_costing_nothing() {
-    let reckoned = space(&holding_one("Never.Taken", "space-named"), false).await;
+    let reckoned = space(&holding_one("Never.Taken", "space-named"), None).await;
     assert!(
         reckoned.is_ok_and(|reckoned| reckoned
             .candidates
@@ -182,21 +182,23 @@ async fn nothing_is_removed_until_an_answer_arrives_and_then_only_what_was_offer
     let ctx =
         holding_one("Never.Taken", "space-offered").with_eraser(Arc::clone(&erasing) as Arc<_>);
 
-    assert!(space(&ctx, false).await.is_ok());
+    assert!(space(&ctx, None).await.is_ok());
     assert!(
         erasing.asked().is_empty(),
         "a reading removes nothing, whatever it found"
     );
 
-    let taken = space(&ctx, true).await;
+    let taken = answered(&ctx).await;
     assert_eq!(
         erasing.asked(),
         vec![PathBuf::from("/srv/media/downloads/Never.Taken/b.mkv")],
         "the imported one is not touched"
     );
-    assert!(taken.is_ok_and(|taken| taken
-        .reclaimed
-        .is_some_and(|reclaimed| reclaimed.bytes == 3_000 && reclaimed.left.is_empty())));
+    assert!(
+        taken.is_ok_and(|taken| taken.reclaimed.is_some_and(|reclaimed| {
+            reclaimed.bytes == 3_000 && reclaimed.left.is_empty() && !reclaimed.rehearsed
+        }))
+    );
 }
 
 #[tokio::test]
@@ -204,7 +206,7 @@ async fn what_could_not_be_removed_is_reported_rather_than_counted_as_freed() {
     let erasing = Erasing::refusing("permission denied");
     let ctx =
         holding_one("Never.Taken", "space-refused").with_eraser(Arc::clone(&erasing) as Arc<_>);
-    let taken = space(&ctx, true).await;
+    let taken = answered(&ctx).await;
     assert!(taken.is_ok_and(
         |taken| taken.reclaimed.is_some_and(|reclaimed| reclaimed.bytes == 0
             && reclaimed.gone.is_empty()
@@ -221,11 +223,36 @@ async fn a_rehearsal_says_what_would_go_and_takes_nothing() {
     let ctx = holding_one("Never.Taken", "space-rehearsed")
         .with_eraser(Arc::clone(&erasing) as Arc<_>)
         .rehearsing();
-    let taken = space(&ctx, true).await;
+    let taken = answered(&ctx).await;
     assert!(erasing.asked().is_empty(), "a rehearsal removes nothing");
-    assert!(taken.is_ok_and(|taken| taken
-        .reclaimed
-        .is_some_and(|reclaimed| reclaimed.gone.len() == 1 && reclaimed.bytes == 3_000)));
+    assert!(
+        taken.is_ok_and(|taken| taken.reclaimed.is_some_and(|reclaimed| {
+            reclaimed.rehearsed && reclaimed.gone.len() == 1 && reclaimed.bytes == 3_000
+        })),
+        "and says so, rather than reporting what it would take as freed"
+    );
+}
+
+/// An answer is spent only on the reading it was given for. Given for any other, it
+/// is refused by name and nothing is taken.
+#[tokio::test]
+async fn an_answer_to_another_reading_is_refused_and_takes_nothing() {
+    let erasing = Erasing::willing();
+    let ctx =
+        holding_one("Never.Taken", "space-another").with_eraser(Arc::clone(&erasing) as Arc<_>);
+    let standing = space(&ctx, None).await.map(|reckoned| reckoned.agreement);
+
+    let refused = space(&ctx, Some("00000000".to_owned())).await;
+
+    assert!(erasing.asked().is_empty(), "nothing was taken");
+    assert!(refused.is_err_and(|problem| {
+        problem.code == crate::error::codes::space::ANOTHER_OFFER
+            && problem
+                .remedies
+                .first()
+                .and_then(|remedy| remedy.detail.as_deref())
+                .is_some_and(|detail| standing.is_ok_and(|name| detail.ends_with(&name)))
+    }));
 }
 
 #[tokio::test]
@@ -244,7 +271,7 @@ async fn a_download_the_operator_already_answered_for_is_left_alone() {
         let _ = std::fs::write(&at, "{\"checks\":[\"queue.Never.Taken\"]}");
     }
 
-    let reckoned = space(&ctx, false).await;
+    let reckoned = space(&ctx, None).await;
     assert!(
         reckoned.is_ok_and(|reckoned| reckoned.candidates.iter().all(|candidate| {
             candidate.standing == Standing::LeftAlone && !candidate.offered()
@@ -295,7 +322,7 @@ async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
     // A service still waiting for it is also what stops it being called waste,
     // whatever the filesystem says about how many names point at its file — so
     // both halves are asserted over the one answer.
-    let reckoned = space(&ctx, false).await;
+    let reckoned = space(&ctx, None).await;
     assert!(
         reckoned.is_ok_and(|reckoned| {
             reckoned.interrupted.iter().any(|stopped| {
@@ -321,7 +348,7 @@ async fn a_stack_that_cannot_be_read_at_all_is_a_refusal_rather_than_an_empty_on
             SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
         ))
         .with_occupancy(Walking::holding(a_tree()));
-    assert!(space(&ctx, false).await.is_err());
+    assert!(space(&ctx, None).await.is_err());
 }
 
 #[tokio::test]
@@ -340,7 +367,7 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
             SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
         ))
         .with_occupancy(Walking::holding(a_tree()));
-    let reckoned = space(&ctx, false).await;
+    let reckoned = space(&ctx, None).await;
     assert!(
         reckoned.is_ok_and(|reckoned| reckoned.volumes.len() == 1
             && reckoned
@@ -349,4 +376,15 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
                 .all(|line| line.category.heading() != "the services' own files")),
         "one volume, and no line for files there is nowhere to keep"
     );
+}
+
+/// The offer read and then answered by name, as a surface that asks twice does.
+async fn answered(
+    ctx: &crate::app::Ctx,
+) -> Result<crate::space::Reckoning, Box<crate::error::Problem>> {
+    let offer = space(ctx, None)
+        .await
+        .map(|reckoned| reckoned.agreement)
+        .ok();
+    space(ctx, offer).await
 }

@@ -112,7 +112,6 @@ fn carries_agreement(command: &Command) -> bool {
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
             | Command::Forget { confirm: true }
-            | Command::Space { confirm: true }
             | Command::Remove { confirm: true, .. }
             | Command::Invite { confirm: true, .. }
             | Command::Migrate(MigrateAction::Act {
@@ -187,16 +186,20 @@ fn carries_offer(command: &Command) -> bool {
             consent: RestoreConsent::Given { listing },
             ..
         } => listing == OFFER,
-        // The third has no other way of saying yes at all: the offer's own name is the
-        // agreement, so an offer dropped here is a removal nobody could ask for — and
-        // one silently kept would be a removal nobody read the cost of.
+        // Letting a download go and reclaiming room have no other way of saying yes at
+        // all: the offer's own name is the agreement, so an offer dropped here is a
+        // removal nobody could ask for — and one silently kept would be a removal
+        // nobody read the cost or the list of.
         Command::StopSeeding {
             agreement: Some(named),
             ..
+        }
+        | Command::Space {
+            agreement: Some(named),
         } => named == OFFER,
-        // And the fourth, where the offer's own name is the only yes the removal
-        // that reaches the library takes: dropped, it is a removal nobody could ask
-        // for; kept silently, one nobody read the cost of.
+        // And the removal that reaches the library, where the offer's own name is the
+        // only yes it takes: dropped, it is a removal nobody could ask for; kept
+        // silently, one nobody read the cost of.
         Command::Uninstall(asked) => asked.agreement.as_deref() == Some(OFFER),
         _ => false,
     }

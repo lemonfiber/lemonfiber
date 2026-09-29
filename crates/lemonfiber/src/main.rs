@@ -333,7 +333,7 @@ async fn main() -> ExitCode {
         Request::Remove { name, confirm } => Command::Remove { name, confirm },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Uninstall(asked) => removing(asked),
-        Request::Space { confirm } => Command::Space { confirm },
+        Request::Space { offer } => Command::Space { agreement: offer },
         Request::StopSeeding { download, offer } => letting(download, offer),
         Request::Bandwidth(asked) => translate::sharing(asked),
         Request::Seed => Command::Seed,

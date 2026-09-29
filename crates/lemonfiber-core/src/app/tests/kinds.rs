@@ -735,7 +735,7 @@ async fn a_dispatched_accounting_of_the_disk_serialises_under_its_own_kind() {
     // A machine with no data location has nothing to account for, which is the
     // one answer this reaches with nothing running and nothing on a disk — and
     // it exercises the dispatch arm, which is what this is here for.
-    let refused = dispatch(Command::Space { confirm: false }, &ctx(Ok(spoke(""))))
+    let refused = dispatch(Command::Space { agreement: None }, &ctx(Ok(spoke(""))))
         .await
         .err()
         .map(|problem| problem.code);

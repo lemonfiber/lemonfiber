@@ -387,6 +387,35 @@ fn the_yes_to_letting_a_download_go_is_the_name_the_offer_gave_itself() {
     );
 }
 
+/// The yes to reclaiming room is the name the account gave itself, carried off the
+/// account rather than set as a flag, so what is taken is the list that was read.
+#[test]
+fn the_yes_to_reclaiming_room_is_the_name_the_account_gave_itself() {
+    let errand = every()
+        .find(|errand| errand.action == "space")
+        .unwrap_or(all().0);
+    let account = lemonfiber_core::space::reckon(&lemonfiber_core::space::Measured::default());
+
+    let stage = super::weighed(
+        errand,
+        Given::nothing(),
+        &Outcome::Space(account.clone()),
+        vec!["what would go".to_owned()],
+    );
+    let mut answered = None;
+    if let Stage::Agreeing { errand, given, .. } = &stage {
+        answered = Some(errand.sent(given));
+    }
+
+    assert_eq!(
+        answered,
+        Some(Ok(Command::Space {
+            agreement: Some(account.agreement),
+        })),
+        "the account that was read is what the yes names"
+    );
+}
+
 /// An answer of another shape carries no offer to answer.
 ///
 /// The same rule the re-point above it follows, for the same reason: a name read
@@ -402,7 +431,7 @@ fn an_answer_that_is_not_an_offer_carries_no_name_to_answer_it_with() {
     // And an errand whose yes is a flag takes no name off one either, however
     // right the shape of the answer looks.
     assert_eq!(
-        sending("space").and_then(|errand| errand.answering(&Outcome::StopSeeding(an_offer()))),
+        sending("forget").and_then(|errand| errand.answering(&Outcome::StopSeeding(an_offer()))),
         None
     );
 }

@@ -8,16 +8,16 @@ Part of the [command reference](../commands.md).
 ```text
 Account for the disk: where the room went, when it runs out, what can go.
 
-Says when the disk will be full rather than that it already is, counting what is queued against what is left. Breaks the rest down by where it went, and marks what could be got back — the downloads nothing ever imported and the archives already unpacked cost nothing at all. Those two are what `--confirm` takes, and nothing else ever is: a torrent still seeding is named with what removing it does to your standing with the tracker and left with you, and nothing you asked to be left alone is on offer at any level of fullness.
+Says when the disk will be full rather than that it already is, counting what is queued against what is left. Breaks the rest down by where it went, and marks what could be got back — the downloads nothing ever imported and the archives already unpacked cost nothing at all. Those two are on offer, and nothing else ever is: a torrent still seeding is named with what removing it does to your standing with the tracker and left with you, and nothing you asked to be left alone is on offer at any level of fullness. The account prints a name for its offer, and answering with that name is the yes; the disk is read again first, and an answer given for a different reading is refused.
 
 Usage: lemonfiber space [OPTIONS]
 
 Options:
-      --confirm
-          Go ahead and remove what was listed as costing nothing
-
       --json
           Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the account printed it
 
       --dry-run
           Say what would happen, and change nothing

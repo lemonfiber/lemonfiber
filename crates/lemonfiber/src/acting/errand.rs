@@ -216,6 +216,7 @@ impl Errand {
     fn answering(&self, outcome: &Outcome) -> Option<String> {
         match (self.going, outcome) {
             (Going::Answered, Outcome::StopSeeding(offer)) => Some(offer.agreement.clone()),
+            (Going::Answered, Outcome::Space(reckoned)) => Some(reckoned.agreement.clone()),
             _ => None,
         }
     }

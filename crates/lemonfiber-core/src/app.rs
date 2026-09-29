@@ -467,7 +467,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // The same shape, over the operator's own disk rather than over lemonfiber's
         // files: unconfirmed it accounts and offers, confirmed it takes what the
         // account named as costing nothing.
-        Command::Space { confirm } => space::space(ctx, confirm).await.map(Outcome::Space),
+        Command::Space { agreement } => space::space(ctx, agreement).await.map(Outcome::Space),
         // The one download the account leaves with the operator, asked for by name and
         // answered by the offer's own name. Apart from the account rather than an
         // argument to it, because a yes to reclaiming what costs nothing is not a yes

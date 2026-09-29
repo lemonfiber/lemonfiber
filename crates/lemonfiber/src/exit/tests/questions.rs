@@ -90,6 +90,7 @@ fn accounting_for_the_disk_is_a_question_and_a_half_done_cleanup_is_not() {
     assert_eq!(
         asked(lemonfiber_core::space::Reckoning {
             reclaimed: Some(lemonfiber_core::space::Reclaimed {
+                rehearsed: false,
                 gone: vec!["/srv/media/downloads/Gone/a.rar".to_owned()],
                 bytes: 400,
                 left: Vec::new(),
@@ -101,6 +102,7 @@ fn accounting_for_the_disk_is_a_question_and_a_half_done_cleanup_is_not() {
     assert_ne!(
         asked(lemonfiber_core::space::Reckoning {
             reclaimed: Some(lemonfiber_core::space::Reclaimed {
+                rehearsed: false,
                 gone: Vec::new(),
                 bytes: 0,
                 left: vec![lemonfiber_core::space::Left {
