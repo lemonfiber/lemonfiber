@@ -244,6 +244,16 @@ pub struct Service {
     /// generator refuses a name the vocabulary does not carry, by name.
     #[serde(default)]
     pub provides: Vec<String>,
+    /// The evidence for what [`Self::provides`] names: one claim per capability, each
+    /// binding the capability's probes to requests on this service and to recordings.
+    ///
+    /// Kept as the tables the stack wrote rather than read here. A claim is the plugin
+    /// contract's shape and that contract's reader is what holds it, so a bundled
+    /// service and a plugin standing in for it meet one set of binding rules; a second
+    /// reader here would be a second answer to what a claim may say, and this crate
+    /// cannot reach the first, which reads this one.
+    #[serde(default)]
+    pub claim: Vec<Claimed>,
     /// Same-profile dependencies only.
     #[serde(default)]
     pub depends_on: Vec<String>,
@@ -272,6 +282,17 @@ pub struct Service {
     #[serde(default)]
     pub memory_mib: Option<u32>,
 }
+
+/// One `[[service.claim]]` table, exactly as the stack wrote it.
+///
+/// Compared as TOML values compare. `Eq` is claimed although a TOML float is not
+/// reflexive for `NaN`: a claim carries statuses, paths and names, and a `NaN` in one
+/// is a claim the plugin contract's reader refuses before anything compares it.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(transparent)]
+pub struct Claimed(pub toml::Table);
+
+impl Eq for Claimed {}
 
 impl Service {
     /// The name the engine files this service's image under: `image@digest` where the

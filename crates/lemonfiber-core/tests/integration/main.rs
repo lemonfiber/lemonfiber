@@ -77,6 +77,7 @@ mod what_is_actually_listening;
 mod what_is_already_here;
 mod what_removing_somebody_costs;
 mod what_running_out_of_time_closes;
+mod what_the_bundled_stack_claims;
 mod what_the_household_is_handed;
 mod what_the_household_is_told_before_they_ask;
 mod what_the_record_keeps_of_a_credential;

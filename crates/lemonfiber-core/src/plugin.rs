@@ -17,6 +17,8 @@
 //! not carry, are both refused by name. An untested contract is worse than an absent
 //! one, because a plugin author will trust it.
 
+// The bundled stack's own claims, judged by the reader and the judge a plugin's meet.
+pub mod bundled;
 mod claimed;
 // The container written from a record, rather than anything read out of a manifest.
 // Beside the record because it is the derivation the record deliberately does not

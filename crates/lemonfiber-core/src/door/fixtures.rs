@@ -27,6 +27,7 @@ pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Ser
         without_it: "nothing".to_owned(),
         media_types: Vec::new(),
         provides: Vec::new(),
+        claim: Vec::new(),
         depends_on: Vec::new(),
         grants: Vec::new(),
         host_managed: false,

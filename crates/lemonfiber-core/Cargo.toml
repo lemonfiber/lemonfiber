@@ -47,6 +47,9 @@ lemonfiber-testing = { workspace = true }
 # reach the network. It depends on `lemonfiber-ports` alone, so this is not a cycle.
 lemonfiber-adapters = { workspace = true }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
+# A bundled claim as the stack writes it, for the tests that judge one: the stack's own
+# reader keeps each claim as the TOML table it found.
+toml = { workspace = true }
 
 [lints]
 workspace = true
