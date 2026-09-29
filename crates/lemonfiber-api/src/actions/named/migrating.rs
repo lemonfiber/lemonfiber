@@ -1,15 +1,14 @@
 //! The acts about a setup that was already on this machine.
 //!
 //! Apart from the table that names them for the reason the household's requests are:
-//! what these read off the carrier is one field, and the group is going to grow. Three
-//! of the four modes a survey describes — importing, standing beside, replacing — are
-//! not offered yet, and each will arrive here as a name of its own rather than as an
-//! argument to this one, because standing a second stack up and stopping somebody's are
-//! not the same act under a flag.
+//! what these read off the carrier is one field. Each of the four modes a survey
+//! describes — adopting, importing, standing beside, replacing — is a name of its own
+//! rather than an argument to one, because standing a second stack up and stopping
+//! somebody's are not the same act under a flag.
 //!
-//! Adopting is the only one built. Unconfirmed it says what it would come to and writes
-//! nothing, so what a browser agrees to is what it was shown; confirming is the operator
-//! saying they have backed up the databases it named.
+//! Unconfirmed, each says what it would come to and changes nothing, so what a browser
+//! agrees to is what it was shown; `confirm` is the agreement, carried into the command
+//! as the core's `confirmed`.
 
 use lemonfiber_core::app::{Command, MigrateAction};
 use lemonfiber_core::migration::mode::{Mode, EVERY};

@@ -174,6 +174,15 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
     if let Some(refused) = beforehand(action, &given) {
         return Err(refused);
     }
+    carried(action, given)
+}
+
+/// The command an action's arguments come to, once nothing they carry is refused.
+///
+/// Apart from [`named`] so that what each action reads off the carrier can be asked
+/// with nothing in the way — which is how an argument an action reads and the table
+/// refuses it is found, rather than by somebody asking for it over the web.
+fn carried(action: &str, given: Arguments) -> Result<Command, Refused> {
     // Everything addressed to somebody who lives here goes next door before this
     // takes the carrier apart: an account offered, a password taken off, an account
     // taken away, what the household may ask for, and one thing it already asked for.
@@ -436,3 +445,6 @@ fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
         },
     )
 }
+
+#[cfg(test)]
+mod tests;
