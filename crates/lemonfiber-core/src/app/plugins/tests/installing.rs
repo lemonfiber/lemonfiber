@@ -145,6 +145,58 @@ async fn installing_what_is_installed_is_refused_naming_it() {
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
+/// One name from a second source is refused naming both, and nothing is written.
+#[tokio::test]
+async fn one_name_from_a_second_source_is_refused_naming_both() {
+    let ctx = ctx("two-sources");
+    let first = source("two-sources-first", MANIFEST);
+    let second = source("two-sources-second", MANIFEST);
+    assert_eq!(counted(installing(&ctx, &first).await), Some(1));
+
+    let (code, summary) = installing(&ctx, &second)
+        .await
+        .err()
+        .map(|problem| (problem.code.to_string(), problem.summary))
+        .unwrap_or_default();
+
+    assert_eq!(code, "PLUGIN-14");
+    assert!(
+        summary.contains(&first.display().to_string())
+            && summary.contains(&second.display().to_string()),
+        "{summary}"
+    );
+    assert_eq!(counted(reading(&ctx).await), Some(1));
+}
+
+/// The same source named another way is the same source: its directory and the
+/// manifest inside it are one place, and installing either again is an update.
+#[tokio::test]
+async fn one_source_named_two_ways_is_still_one_source() {
+    let ctx = ctx("one-source");
+    let at = source("one-source", MANIFEST);
+    assert_eq!(counted(installing(&ctx, &at).await), Some(1));
+
+    assert_eq!(
+        refusal(installing(&ctx, &at.join("plugin.toml")).await),
+        "PLUGIN-5"
+    );
+}
+
+/// A source that has gone is still the source it was, compared as it was written.
+#[tokio::test]
+async fn a_source_that_has_gone_is_still_told_from_another() {
+    let ctx = ctx("gone-source");
+    let first = source("gone-source-first", MANIFEST);
+    assert_eq!(counted(installing(&ctx, &first).await), Some(1));
+    let _ = std::fs::remove_dir_all(&first);
+
+    let second = source("gone-source-second", MANIFEST);
+    assert_eq!(refusal(installing(&ctx, &second).await), "PLUGIN-14");
+    let again = source("gone-source-first", MANIFEST);
+    let _ = std::fs::remove_dir_all(&second);
+    assert_eq!(refusal(installing(&ctx, &again).await), "PLUGIN-5");
+}
+
 /// The gate this record exists to pass, in the place it runs. A damaged record
 /// read as empty would answer *nothing is installed* about a machine running
 /// somebody else's service — and then install a second copy over it.

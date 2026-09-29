@@ -173,6 +173,9 @@ codes! {
         STUCK = "PLUGIN-12",
         /// Raised when a plugin's service would answer on a label another plugin's already does.
         ANSWERED = "PLUGIN-13",
+        /// Raised when a plugin is installed from a source other than the one its name is
+        /// already installed from.
+        TWO_SOURCES = "PLUGIN-14",
     }
     /// The `PROVIDER` codes.
     provider {
