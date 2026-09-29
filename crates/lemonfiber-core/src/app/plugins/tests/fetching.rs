@@ -285,3 +285,110 @@ fn a_listing_is_read_past_what_is_not_a_commit() {
     );
     assert_eq!(super::super::fetching::listed_commit("", "main"), None);
 }
+
+/// What `plugin installed` said about each source.
+async fn standings(ctx: &Ctx) -> Vec<crate::plugin::Fetchable> {
+    report(reading(ctx).await)
+        .map(|one| {
+            one.sources
+                .into_iter()
+                .map(|source| source.standing)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// A git source that answers can be updated from; one that stopped answering cannot,
+/// and the listing says what asking it said.
+#[tokio::test]
+async fn a_git_source_is_asked_whether_it_still_answers_when_plugins_are_listed() {
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let mut ctx = served("git-listed", &serving);
+    assert_eq!(
+        counted(from_git(&ctx, "https://example.org/plugin-komga").await),
+        Some(1)
+    );
+
+    assert_eq!(
+        standings(&ctx).await,
+        vec![crate::plugin::Fetchable::Reachable]
+    );
+
+    let gone = Arc::new(Serving {
+        listed: Err("fatal: repository not found".to_owned()),
+        fetch: None,
+        asked: Mutex::new(Vec::new()),
+    });
+    ctx.seams.runner = gone.clone();
+    assert_eq!(
+        standings(&ctx).await,
+        vec![crate::plugin::Fetchable::Unreachable {
+            why: "fatal: repository not found".to_owned()
+        }]
+    );
+    assert!(gone
+        .asked()
+        .iter()
+        .any(|one| one.first().map(String::as_str) == Some("ls-remote")));
+}
+
+/// With fetching from a git source switched off, nothing is asked and the listing
+/// says so rather than calling the source unreachable.
+#[tokio::test]
+async fn a_git_source_switched_off_is_not_asked_when_plugins_are_listed() {
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let mut ctx = served("git-listed-off", &serving);
+    assert_eq!(
+        counted(from_git(&ctx, "https://example.org/plugin-komga").await),
+        Some(1)
+    );
+    ctx.settings.reaching =
+        crate::config::Reaching::without(crate::config::REACH_PLUGIN_SOURCE_KEY);
+    let quiet = Arc::new(Serving::listing(""));
+    ctx.seams.runner = quiet.clone();
+
+    assert!(matches!(
+        standings(&ctx).await.as_slice(),
+        [crate::plugin::Fetchable::Unasked { .. }]
+    ));
+    assert!(quiet.asked().is_empty());
+}
+
+/// A directory still there can be updated from; one that has gone cannot.
+#[tokio::test]
+async fn a_directory_that_has_gone_is_a_source_that_cannot_be_fetched() {
+    let ctx = ctx("dir-listed");
+    let at = source("dir-listed", MANIFEST);
+    assert_eq!(counted(installing(&ctx, &at).await), Some(1));
+    assert_eq!(
+        standings(&ctx).await,
+        vec![crate::plugin::Fetchable::Reachable]
+    );
+
+    let _ = std::fs::remove_dir_all(&at);
+
+    assert!(matches!(
+        standings(&ctx).await.as_slice(),
+        [crate::plugin::Fetchable::Unreachable { .. }]
+    ));
+}
+
+/// A record naming no source has nowhere to ask, and says so.
+#[tokio::test]
+async fn a_record_naming_no_source_is_not_asked() {
+    let ctx = ctx("no-source-listed");
+    let at = source("no-source-listed", MANIFEST);
+    let mut installed = report(installing(&ctx, &at).await)
+        .map(|one| one.installed)
+        .unwrap_or_default();
+    for one in &mut installed {
+        one.from = String::new();
+    }
+
+    let said = super::super::fetching::standings(&ctx, &installed).await;
+
+    assert!(matches!(
+        said.first().map(|one| &one.standing),
+        Some(crate::plugin::Fetchable::Unasked { .. })
+    ));
+}

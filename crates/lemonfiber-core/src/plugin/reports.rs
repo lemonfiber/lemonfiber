@@ -238,4 +238,47 @@ pub struct Installs {
     /// because none of them changes a choice.
     #[serde(default)]
     pub substituted: Vec<Substituted>,
+    /// Whether each installed plugin's source can still be fetched, asked now.
+    ///
+    /// Filled on the reading of what is installed and nowhere else, for the reason
+    /// `substituted` is: it is the one read an operator makes of what each plugin is
+    /// doing, and the one moment this machine asks anybody where a plugin came from. A
+    /// run that installs, updates or removes one leaves it empty.
+    #[serde(default)]
+    pub sources: Vec<Sourced>,
+}
+
+/// Whether one installed plugin's source can still be fetched.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginSource")]
+pub struct Sourced {
+    /// The plugin, by its id.
+    pub plugin: String,
+    /// The source the record says it came from.
+    pub from: String,
+    /// What asking it came to.
+    pub standing: Fetchable,
+}
+
+/// What asking a plugin's source came to.
+///
+/// **Unreachable is not untrusted.** A plugin whose source has gone keeps running as it
+/// was installed; what it loses is the way to a newer version, and that is said now
+/// rather than found out at the next update.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(tag = "standing", rename_all = "kebab-case")]
+#[schemars(rename = "PluginSourceStanding")]
+pub enum Fetchable {
+    /// It answered, so the plugin can be updated from it.
+    Reachable,
+    /// It did not answer, or is no longer there, so the plugin cannot be updated from it.
+    Unreachable {
+        /// What asking it said.
+        why: String,
+    },
+    /// Nothing was asked, so nothing is known either way.
+    Unasked {
+        /// Why nothing was asked.
+        why: String,
+    },
 }

@@ -252,6 +252,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         })),
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     }
 }
 

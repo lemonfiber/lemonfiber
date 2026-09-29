@@ -11051,6 +11051,14 @@
                 }
               ]
             },
+            "sources": {
+              "description": "Whether each installed plugin's source can still be fetched, asked now.\n\nFilled on the reading of what is installed and nowhere else, for the reason\n`substituted` is: it is the one read an operator makes of what each plugin is\ndoing, and the one moment this machine asks anybody where a plugin came from. A\nrun that installs, updates or removes one leaves it empty.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PluginSource"
+              }
+            },
             "substituted": {
               "description": "Every capability the operator chose an installed plugin's service to fill.\n\nFilled on the reading of what is installed, which is the one read of what each\nplugin is doing; a run that installs, updates or removes one leaves it empty,\nbecause none of them changes a choice.",
               "type": "array",
@@ -11409,6 +11417,83 @@
             "id",
             "of",
             "why"
+          ]
+        },
+        "PluginSource": {
+          "description": "Whether one installed plugin's source can still be fetched.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "The source the record says it came from.",
+              "type": "string"
+            },
+            "plugin": {
+              "description": "The plugin, by its id.",
+              "type": "string"
+            },
+            "standing": {
+              "description": "What asking it came to.",
+              "$ref": "#/$defs/PluginSourceStanding"
+            }
+          },
+          "required": [
+            "plugin",
+            "from",
+            "standing"
+          ]
+        },
+        "PluginSourceStanding": {
+          "description": "What asking a plugin's source came to.\n\n**Unreachable is not untrusted.** A plugin whose source has gone keeps running as it\nwas installed; what it loses is the way to a newer version, and that is said now\nrather than found out at the next update.",
+          "oneOf": [
+            {
+              "description": "It answered, so the plugin can be updated from it.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "reachable"
+                }
+              },
+              "required": [
+                "standing"
+              ]
+            },
+            {
+              "description": "It did not answer, or is no longer there, so the plugin cannot be updated from it.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "unreachable"
+                },
+                "why": {
+                  "description": "What asking it said.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "standing",
+                "why"
+              ]
+            },
+            {
+              "description": "Nothing was asked, so nothing is known either way.",
+              "type": "object",
+              "properties": {
+                "standing": {
+                  "type": "string",
+                  "const": "unasked"
+                },
+                "why": {
+                  "description": "Why nothing was asked.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "standing",
+                "why"
+              ]
+            }
           ]
         },
         "PluginSubstituted": {

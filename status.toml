@@ -2366,6 +2366,11 @@ rows = [
     "`F5-R4`",
     "`lemonfiber plugin install` takes a directory, the `plugin.toml` inside it, or a git repository with a branch, tag or commit after its last `@` ([`source.rs`](crates/lemonfiber-core/src/plugin/source.rs), which reads neither an address's `user@` nor git's own `git@host:` as a revision). **What is installed is one commit**: a name is resolved with `git ls-remote` before anything is fetched — a tag to the commit it points at, not the tag's own object — and a whole commit is taken as given ([`fetching.rs`](crates/lemonfiber-core/src/app/plugins/fetching.rs)). That commit is fetched as data, shallow, with no tags, no submodules and hooks switched off, into a directory of its own that is removed afterwards, a rehearsal included; the install then reads it as it reads any directory, so the technical bar is the same one. A source that will not answer, a commit it will not hand over and a name it does not hold are each refused by name (`PLUGIN-16`, `PLUGIN-17`). Fetching is the eighth request on the account of what leaves this machine, switched off by `LEMONFIBER_REACH_PLUGIN_SOURCE` (`PLUGIN-15`).",
   ] },
+  { state = "done", cells = [
+    "A plugin whose source has gone keeps running and says it cannot be updated",
+    "`F5-R11`",
+    "`plugin installed` asks each installed plugin's source whether it can still be fetched, then and never in the background ([`fetching.rs`](crates/lemonfiber-core/src/app/plugins/fetching.rs)'s `standings`): a git source is asked for the commit it serves by default with `git ls-remote`, and a directory is looked for. One that does not answer, or is no longer there, is listed as **cannot be fetched, so it cannot be updated**, with what asking it said; the plugin itself is untouched and keeps running as installed. A git source is not asked where fetching from one is switched off, and a record naming no source has nowhere to ask; both are listed as not asked, with why, rather than as unreachable. A source that answered is not mentioned. The doctor does not ask.",
+  ] },
   { state = "partial", cells = [
     "Where a plugin came from, at which commit, and what signed it",
     "`F5-R7`",
@@ -2379,7 +2384,7 @@ rows = [
   { state = "open", cells = [
     "The plugin catalogue",
     "`F5`",
-    "The catalogue route is not built. `lemonfiber/lemonfiber-plugins` registers each plugin by origin and commit and its CI validates every manifest and runs every proof, but it tags and signs no release, and no signing mechanism, trust root or install-from-catalogue flow is specified: ADR-0023 is proposed and names none. Here, `plugin install` takes a directory or a git source; nothing installs by name through a signed index, the record holds no signer, and nothing checks whether an origin can still be fetched.",
+    "The catalogue route is not built. `lemonfiber/lemonfiber-plugins` registers each plugin by origin and commit and its CI validates every manifest and runs every proof, but it tags and signs no release, and no signing mechanism, trust root or install-from-catalogue flow is specified: ADR-0023 is proposed and names none. Here, `plugin install` takes a directory or a git source; nothing installs by name through a signed index, and the record holds no signer.",
   ] },
   { state = "done", cells = [
     "An install writes its wiring, and every write is on the record",

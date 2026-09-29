@@ -174,6 +174,7 @@ fn answering(installed: Vec<Installed>, removal: Removal) -> crate::plugin::Inst
         removal: Some(removal),
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     }
 }
 
