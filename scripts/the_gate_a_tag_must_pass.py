@@ -82,6 +82,14 @@ TRACKER = "IMPLEMENTATION-STATUS.md"
 #: it cannot name the release it is.
 RECORD = "reference/changelog.json"
 
+#: What judges every claim the embedded stack makes against the recordings it
+#: carries, from the tree being tagged.
+CLAIMS = ("cargo", "run", "--locked", "--quiet", "--example", "bundled_claims",
+          "-p", "lemonfiber-core")
+
+#: The line the judge begins a claim nothing could show with.
+UNPROVEN = "unproven:"
+
 #: A release tag, and nothing else a tag list can hold.
 RELEASE_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
@@ -278,6 +286,26 @@ def written(version: str) -> Step:
     )
 
 
+def unproven_warned(said: str) -> str:
+    """The judge's words, with every unproven claim carried as a warning.
+
+    `decide` keeps a passing step's warnings and drops the rest of what it said,
+    so this is what keeps a claim nothing has shown from being thrown away by a
+    run that passed: unproven refuses nothing and is never silent either.
+    """
+    return "\n".join(
+        f"::warning::{line}" if line.startswith(UNPROVEN) else line
+        for line in said.splitlines()
+    )
+
+
+def claimed() -> Step:
+    """Whether a recording refutes, or the contract refuses, a bundled claim."""
+    ok, said = ran(*CLAIMS, cwd=ROOT)
+    return Step("no bundled claim is refuted by its recording", ok,
+                unproven_warned(said) if ok else said)
+
+
 def check(version: str, spec: Path, work: Path) -> list[Step]:
     """Every question this gate asks, in the order a failure is worth hearing."""
     steps: list[Step] = []
@@ -327,6 +355,10 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
         return steps
 
     steps.append(written(version))
+    if not steps[-1].ok:
+        return steps
+
+    steps.append(claimed())
     if not steps[-1].ok:
         return steps
 
@@ -426,6 +458,18 @@ def self_test() -> int:
             broken.append(f"the refusal did not name check {spoiled}")
         if "why it failed" not in joined:
             broken.append(f"the refusal dropped what check {spoiled} said")
+
+    # A bundled claim nothing could show passes the gate and is still said: each
+    # unproven line is kept as a warning, and nothing else the judge printed is.
+    judged = unproven_warned("unproven: sonarr provides library.manage\ndemonstrated: x\n2 unproven")
+    code, said = decide([Step(MUST_ASK[0], True, judged), *passed[1:]])
+    joined = "\n".join(said)
+    if code != 0:
+        broken.append("an unproven bundled claim refused the tag")
+    if "sonarr provides library.manage" not in joined:
+        broken.append("an unproven bundled claim was dropped from a run that passed")
+    if "demonstrated: x" in joined:
+        broken.append("the judge's ordinary output was printed from a run that passed")
 
     # The record: the release being tagged may lack notes, an earlier one may not,
     # and a tag that is not a release tag is not a release.

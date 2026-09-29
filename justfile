@@ -144,6 +144,10 @@ plugin-schema:
     cargo run --quiet --example plugin_schema -p lemonfiber-core > contract/plugin-manifest.schema.json.next
     mv contract/plugin-manifest.schema.json.next contract/plugin-manifest.schema.json
 
+# Judge every claim the embedded stack makes against the recordings it carries.
+bundled-claims:
+    cargo run --quiet --example bundled_claims -p lemonfiber-core
+
 # Rewrite the capability vocabulary from the types and the stack this build pins.
 #
 # Who declares each capability is read out of `assets/media-stack/stack.toml` rather

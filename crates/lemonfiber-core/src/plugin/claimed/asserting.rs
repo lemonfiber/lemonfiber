@@ -328,10 +328,27 @@ fn faulted(
                 .to_owned(),
         );
     };
+    let pinned = format!("{}@{}", service.image, service.digest);
+    pinned_to(named, request, expect, &pinned, root, refusals)
+}
+
+/// Every way the recording an assertion names is not what it declares, held to the one
+/// image the recording must have been taken from.
+///
+/// Apart from [`faulted`] because a bundled service's claims are judged by it too, and
+/// what they name is the stack's `image@digest` rather than a plugin service.
+pub(in crate::plugin) fn pinned_to(
+    named: Option<&str>,
+    request: &lemonfiber_plugin::Request,
+    expect: &lemonfiber_plugin::Expect,
+    pinned: &str,
+    root: &Path,
+    refusals: &mut Vec<lemonfiber_plugin::Violation>,
+) -> Result<Vec<Fault>, String> {
     let recording =
         recorded::read(root, named.unwrap_or_default()).map_err(|unrunnable| unrunnable.0)?;
     let named = named.unwrap_or_default();
-    if let Some(wrong) = elsewhere(&recording, service, named) {
+    if let Some(wrong) = elsewhere(&recording, pinned, named) {
         // Refused *rather than run against*. Judging it anyway would report an assertion
         // as answered by an image nobody is installing, which is the passing verdict this
         // refusal exists to stop somebody reading.
@@ -363,10 +380,9 @@ fn faulted(
 /// nothing else would notice it.
 fn elsewhere(
     recording: &Recording,
-    service: &Service,
+    pinned: &str,
     named: &str,
 ) -> Option<lemonfiber_plugin::Violation> {
-    let pinned = format!("{}@{}", service.image, service.digest);
     if recording.recorded_from == pinned {
         return None;
     }

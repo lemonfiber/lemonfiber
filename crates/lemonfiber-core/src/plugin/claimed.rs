@@ -20,6 +20,7 @@ use lemonfiber_plugin::{Claim, ClaimProbe, Manifest, Service};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::plugin::{capabilities, Ungenerated};
+pub(in crate::plugin) use asserting::pinned_to;
 pub use asserting::{Asserted, Assertion};
 
 /// The one file a plugin is described by.

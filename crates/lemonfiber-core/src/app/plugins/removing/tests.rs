@@ -37,6 +37,7 @@ fn bundled(id: &str, provides: &[&str]) -> lemonfiber_manifest::Service {
         without_it: "nothing works".to_owned(),
         media_types: Vec::new(),
         provides: provides.iter().map(|one| (*one).to_owned()).collect(),
+        claim: Vec::new(),
         depends_on: Vec::new(),
         grants: Vec::new(),
         host_managed: false,

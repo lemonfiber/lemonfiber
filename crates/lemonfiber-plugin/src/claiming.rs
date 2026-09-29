@@ -15,6 +15,7 @@
 //! the forms, the paths. Those are the reader's, and this module is only the half that
 //! needs a published set to decide at all.
 
+mod bundled;
 mod contributing;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,6 +23,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::schema::{Claim, Expect, Manifest, Service};
 use crate::vocabulary::{self, Capability, Constraint, Probe, Removed};
 use crate::Violation;
+
+pub use bundled::{bundled, Bundled};
 
 /// Everything a manifest declares that the two published vocabularies refuse.
 ///
