@@ -220,10 +220,15 @@ async fn standing(ctx: &Ctx, from: &str) -> Fetchable {
         };
     }
     match Source::named(from) {
-        Source::Path(path) if path.exists() => Fetchable::Reachable,
-        Source::Path(_) => Fetchable::Unreachable {
-            why: format!("{from} is no longer there"),
-        },
+        Source::Path(path) => {
+            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+                Fetchable::Reachable
+            } else {
+                Fetchable::Unreachable {
+                    why: format!("{from} is no longer there"),
+                }
+            }
+        }
         Source::Git { .. } if !ctx.settings.reaching.allows(REACH_PLUGIN_SOURCE_KEY) => {
             Fetchable::Unasked {
                 why: format!(
