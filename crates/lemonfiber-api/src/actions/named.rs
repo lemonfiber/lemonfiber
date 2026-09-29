@@ -257,7 +257,7 @@ fn carried(action: &str, given: Arguments) -> Result<Command, Refused> {
         // The same reading twice, over the operator's own disk: unconfirmed it is the
         // account `/api/space` answers with, and confirmed it takes only what that
         // account named as costing nothing.
-        "space" => Ok(Command::Space { confirm }),
+        "space" => Ok(Command::Space { agreement: offer }),
         // The one thing that account names and leaves alone, asked for on its own.
         "stop-seeding" => stopping(download, offer),
         // Unconfirmed it is the listing `/api/uninstall` answers with, so what a

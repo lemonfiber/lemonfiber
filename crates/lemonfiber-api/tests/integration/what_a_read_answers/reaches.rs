@@ -126,7 +126,7 @@ async fn where_the_disk_went_is_the_envelope_the_command_renders() {
     // A page can be told how much room is left; it cannot walk a tree or count the
     // names pointing at a file, and the whole answer here is built out of those.
     let expected =
-        as_the_command_renders_it(&measuring("rendered"), Command::Space { confirm: false }).await;
+        as_the_command_renders_it(&measuring("rendered"), Command::Space { agreement: None }).await;
 
     assert!(expected.is_some(), "the command answered");
     assert_eq!(

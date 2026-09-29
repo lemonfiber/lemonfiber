@@ -425,7 +425,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // Nothing confirmed, because a read never takes anything: what this answers
         // with is the account and the offer, and the action beside it is where an
         // answer to that offer goes.
-        SPACE => Ok(Command::Space { confirm: false }),
+        SPACE => Ok(Command::Space { agreement: None }),
         // Nothing asked of it, for the same reason: what this answers with is the
         // account of the line, and the action beside it is where a limit is
         // declared.

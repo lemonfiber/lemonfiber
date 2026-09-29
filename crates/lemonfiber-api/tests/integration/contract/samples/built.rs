@@ -316,6 +316,7 @@ pub(super) fn a_reckoning() -> lemonfiber_core::space::Reckoning {
     };
     lemonfiber_core::space::Reckoning {
         reclaimed: Some(lemonfiber_core::space::Reclaimed {
+            rehearsed: false,
             gone: vec!["/srv/media/downloads/Gone/a.rar".to_owned()],
             bytes: 400,
             left: vec![lemonfiber_core::space::Left {

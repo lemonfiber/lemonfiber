@@ -14058,7 +14058,7 @@
           "type": "object",
           "properties": {
             "agreement": {
-              "description": "What this offer names itself, so an answer to it can say which offer it was\nanswering.",
+              "description": "What this offer names itself, so an answer to it can say which offer it was\nanswering. The answer is this name, and nothing else is a yes to a cleanup.",
               "type": "string"
             },
             "candidates": {
@@ -14105,7 +14105,7 @@
               }
             },
             "reclaimed": {
-              "description": "What became of a confirmed cleanup, where one was asked for.",
+              "description": "What became of an answered cleanup, where the offer was answered.",
               "anyOf": [
                 {
                   "$ref": "#/$defs/Reclaimed"
@@ -14176,7 +14176,7 @@
           ]
         },
         "Reclaimed": {
-          "description": "What became of a confirmed cleanup.",
+          "description": "What became of an answered cleanup.",
           "type": "object",
           "properties": {
             "bytes": {
@@ -14186,7 +14186,7 @@
               "minimum": 0
             },
             "gone": {
-              "description": "The paths that were taken.",
+              "description": "The paths that were taken, or would have been in a rehearsal.",
               "type": "array",
               "items": {
                 "type": "string"
@@ -14198,9 +14198,14 @@
               "items": {
                 "$ref": "#/$defs/SpaceLeft"
               }
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal. Rehearsed, `gone` and `bytes` are what would have\nbeen taken and nothing was: no room was freed.",
+              "type": "boolean"
             }
           },
           "required": [
+            "rehearsed",
             "gone",
             "bytes",
             "left"

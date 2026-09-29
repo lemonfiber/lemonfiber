@@ -105,7 +105,7 @@ fn back(reclaimable: &[Consumption]) -> Lines {
             reading(line)
         ));
         let taken = if line.reclaim.offered() {
-            " — and this is what --confirm takes"
+            " — and this is what answering the offer takes"
         } else {
             ""
         };
@@ -239,11 +239,11 @@ fn stopped(report: &Reckoning) -> Lines {
     lines
 }
 
-/// What a confirmed run took, or what one would take.
+/// What an answered run took, or what answering would take.
 fn ending(report: &Reckoning) -> Lines {
     let mut lines = Lines::default();
     let Some(taken) = &report.reclaimed else {
-        lines.spaced(offer(report));
+        lines.extend(offer(report));
         return lines;
     };
     lines.extend(took(taken));
@@ -256,20 +256,36 @@ fn ending(report: &Reckoning) -> Lines {
 /// anything reclaimable at all: a disk whose only reclaimable room is a torrent
 /// still seeding has nothing an answer would take, and inviting one would be
 /// inviting an answer to a question nothing here asks.
-fn offer(report: &Reckoning) -> String {
-    if report.reclaimable.iter().any(|line| line.reclaim.offered()) {
-        return "Nothing was removed. Add --confirm to take the lines marked above — never a \
-                torrent still seeding, and never anything you asked to be left alone."
-            .to_owned();
+fn offer(report: &Reckoning) -> Lines {
+    let mut lines = Lines::default();
+    if !report.reclaimable.iter().any(|line| line.reclaim.offered()) {
+        lines.spaced("Nothing here can be got back for free.");
+        return lines;
     }
-    "Nothing here can be got back for free.".to_owned()
+    lines.spaced(
+        "Nothing was removed. To take the lines marked above — never a torrent still \
+         seeding, and never anything you asked to be left alone — answer this offer by name:",
+    );
+    lines.put(format!("  lemonfiber space --offer {}", report.agreement));
+    lines
 }
 
-/// What a confirmed run took, and what it could not.
+/// What an answered run took, and what it could not.
+///
+/// A rehearsal took nothing and freed nothing, so it says what would have gone
+/// rather than reporting it as room got back.
 fn took(taken: &Reclaimed) -> Lines {
     let mut lines = Lines::default();
     if taken.gone.is_empty() {
         lines.spaced("Nothing was removed.");
+    } else if taken.rehearsed {
+        lines.spaced(format!(
+            "Rehearsed: nothing was removed. This would have freed {}:",
+            humanize(taken.bytes)
+        ));
+        for at in &taken.gone {
+            lines.put(format!("  {at}"));
+        }
     } else {
         lines.spaced(format!("Removed, freeing {}:", humanize(taken.bytes)));
         for at in &taken.gone {

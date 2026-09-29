@@ -214,11 +214,10 @@ const HELD: &str = "A.Show.S01E01.1080p";
 const READ: &str = "0f0f0f0f";
 
 #[test]
-fn stopping_one_download_seeding_refuses_the_yes_the_account_beside_it_takes() {
-    // The account's yes is to reclaiming what costs nothing. This takes the one thing
-    // on the disk that costs something, so the account's shape of yes is refused by
-    // name here rather than quietly accepted: what this takes is the offer's own name,
-    // which nobody holds who did not read what it cost.
+fn stopping_one_download_seeding_refuses_a_blanket_yes() {
+    // This takes the one thing on the disk that costs something, so a blanket yes is
+    // refused by name here rather than quietly accepted: what this takes is the
+    // offer's own name, which nobody holds who did not read what it cost.
     assert!(
         !TAKES_AGREEMENT.contains(&"stop-seeding"),
         "a blanket yes would be agreement from somebody who read no consequence"

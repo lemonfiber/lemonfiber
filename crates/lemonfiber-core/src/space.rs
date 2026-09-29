@@ -74,10 +74,13 @@ pub struct Stalled {
     pub said: Option<String>,
 }
 
-/// What became of a confirmed cleanup.
+/// What became of an answered cleanup.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Reclaimed {
-    /// The paths that were taken.
+    /// Whether this was a rehearsal. Rehearsed, `gone` and `bytes` are what would have
+    /// been taken and nothing was: no room was freed.
+    pub rehearsed: bool,
+    /// The paths that were taken, or would have been in a rehearsal.
     pub gone: Vec<String>,
     /// What they occupied.
     pub bytes: u64,
@@ -152,14 +155,14 @@ pub struct Reckoning {
     /// The imports that stopped part-way, with what is on disk for each.
     pub interrupted: Vec<Interrupted>,
     /// What this offer names itself, so an answer to it can say which offer it was
-    /// answering.
+    /// answering. The answer is this name, and nothing else is a yes to a cleanup.
     pub agreement: String,
-    /// What became of a confirmed cleanup, where one was asked for.
+    /// What became of an answered cleanup, where the offer was answered.
     pub reclaimed: Option<Reclaimed>,
 }
 
 impl Reckoning {
-    /// The paths a confirmed cleanup would take.
+    /// The paths an answered cleanup would take.
     ///
     /// Only what costs nothing: the downloads nothing ever imported, and the
     /// archive parts whose contents are already unpacked beside them. Everything
@@ -209,8 +212,7 @@ pub fn reckon(measured: &Measured) -> Reckoning {
         &measured.data,
     );
     let level = Level::worst(measured.volumes.iter().map(|volume| volume.level));
-    let agreement = naming(&candidates);
-    Reckoning {
+    let mut reckoned = Reckoning {
         volumes: measured.volumes.clone(),
         halted: level.halts(),
         level,
@@ -219,9 +221,11 @@ pub fn reckon(measured: &Measured) -> Reckoning {
         outsized: outsized::outsized(&measured.data),
         interrupted: interrupted(measured, &candidates),
         candidates,
-        agreement,
+        agreement: String::new(),
         reclaimed: None,
-    }
+    };
+    reckoned.agreement = naming(&reckoned.offering(measured));
+    reckoned
 }
 
 /// Where the room went.
@@ -372,15 +376,15 @@ fn tree_of(root: &Path, path: &Path) -> String {
 
 /// What this offer names itself.
 ///
-/// Built from what would actually be taken and what each of them is, so an answer
+/// Built from every path an answer would take and what each occupies, so an answer
 /// given against one listing cannot be spent on a different one: a download that
-/// has finished seeding since the offer was read makes this a different name, and
-/// the answer is refused rather than acting on something nobody saw.
-fn naming(candidates: &[Candidate]) -> String {
-    let words: Vec<String> = candidates
+/// has finished seeding since the offer was read, or an archive part that has been
+/// unpacked beside, makes this a different name, and the answer is refused rather
+/// than acting on something nobody saw.
+fn naming(offered: &[&Occupant]) -> String {
+    let words: Vec<String> = offered
         .iter()
-        .filter(|candidate| candidate.offered())
-        .map(|candidate| format!("{}:{}", candidate.name, candidate.bytes))
+        .map(|occupant| format!("{}:{}", occupant.path.display(), occupant.bytes))
         .collect();
     crate::agreement::over(&words.iter().map(String::as_str).collect::<Vec<&str>>())
 }

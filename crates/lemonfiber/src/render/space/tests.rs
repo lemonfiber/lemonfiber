@@ -105,7 +105,7 @@ fn which_lines_an_answer_takes_is_marked_beside_them_rather_than_inferred() {
     let text = said(&reckon(&a_stack()));
     let marked: Vec<&str> = text
         .lines()
-        .filter(|line| line.contains("what --confirm takes"))
+        .filter(|line| line.contains("what answering the offer takes"))
         .collect();
     assert_eq!(marked.len(), 1, "{text}");
     assert!(
@@ -130,9 +130,13 @@ fn what_removing_a_seeding_torrent_costs_is_beside_it_rather_than_afterwards() {
 
 #[test]
 fn nothing_is_removed_without_an_answer_and_the_offer_says_what_it_excludes() {
-    let text = said(&reckon(&a_stack()));
+    let reckoned = reckon(&a_stack());
+    let text = said(&reckoned);
     assert!(text.contains("Nothing was removed."), "{text}");
-    assert!(text.contains("--confirm"), "{text}");
+    assert!(
+        text.contains(&format!("lemonfiber space --offer {}", reckoned.agreement)),
+        "the answer is the offer's own name: {text}"
+    );
     assert!(text.contains("never a torrent still seeding"), "{text}");
 }
 
@@ -202,9 +206,10 @@ fn an_import_that_stopped_with_nothing_written_names_no_figure() {
 }
 
 #[test]
-fn a_confirmed_run_says_what_went_and_what_would_not() {
+fn an_answered_run_says_what_went_and_what_would_not() {
     let taken = Reckoning {
         reclaimed: Some(Reclaimed {
+            rehearsed: false,
             gone: vec!["/srv/media/downloads/Never.Taken/b.mkv".to_owned()],
             bytes: 3_000,
             left: vec![Left {
@@ -221,9 +226,10 @@ fn a_confirmed_run_says_what_went_and_what_would_not() {
 }
 
 #[test]
-fn a_confirmed_run_that_took_nothing_says_nothing_went() {
+fn an_answered_run_that_took_nothing_says_nothing_went() {
     let taken = Reckoning {
         reclaimed: Some(Reclaimed {
+            rehearsed: false,
             gone: Vec::new(),
             bytes: 0,
             left: Vec::new(),
@@ -231,6 +237,25 @@ fn a_confirmed_run_that_took_nothing_says_nothing_went() {
         ..reckon(&a_stack())
     };
     assert!(said(&taken).contains("Nothing was removed."));
+}
+
+/// A rehearsed cleanup took nothing, so it is labelled as one and says what would
+/// have gone rather than reporting it as room freed.
+#[test]
+fn a_rehearsed_run_says_what_would_have_gone_and_frees_nothing() {
+    let rehearsed = Reckoning {
+        reclaimed: Some(Reclaimed {
+            rehearsed: true,
+            gone: vec!["/srv/media/downloads/Never.Taken/b.mkv".to_owned()],
+            bytes: 3_000,
+            left: Vec::new(),
+        }),
+        ..reckon(&a_stack())
+    };
+    let text = said(&rehearsed);
+    assert!(text.contains("Rehearsed: nothing was removed."), "{text}");
+    assert!(text.contains("Never.Taken/b.mkv"), "{text}");
+    assert!(!text.contains("Removed, freeing"), "{text}");
 }
 
 #[test]
@@ -253,7 +278,7 @@ fn what_the_operator_asked_to_be_left_alone_says_so_and_carries_no_ratio() {
     );
     assert!(text.contains("left alone at your request"), "{text}");
     assert!(
-        !text.contains("what --confirm takes"),
+        !text.contains("what answering the offer takes"),
         "nothing on offer, so nothing is marked as taken: {text}"
     );
 }
@@ -289,7 +314,7 @@ fn a_disk_whose_only_reclaimable_room_is_seeding_invites_no_answer() {
         text.contains("Nothing here can be got back for free."),
         "{text}"
     );
-    assert!(!text.contains("--confirm"), "{text}");
+    assert!(!text.contains("--offer"), "{text}");
 }
 
 #[test]

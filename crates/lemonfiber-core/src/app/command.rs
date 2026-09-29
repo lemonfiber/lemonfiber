@@ -415,16 +415,16 @@ pub enum Command {
     /// Account for the disk: where the room went, when it runs out, and what could
     /// be got back.
     ///
-    /// One argument, and it is the same shape a forget takes: unconfirmed it
-    /// reports and offers, confirmed it takes what the report already named as
-    /// costing nothing. There is no argument choosing *what* to reclaim, because
+    /// One argument, and it is the shape a stop-seeding takes: unanswered it reports
+    /// and offers, naming the offer; answered with that name it takes what the report
+    /// named as costing nothing. There is no argument choosing *what* to reclaim, because
     /// the answer to that is never a caller's — a seeding torrent's removal has a
     /// consequence outside this machine and is named and left, and something the
     /// operator asked to be left alone is not on offer at any level of fullness.
     Space {
-        /// Whether the operator agreed to what the unconfirmed run listed; without
-        /// it, nothing is removed.
-        confirm: bool,
+        /// The offer being answered, as the run that made it named itself; without
+        /// one, nothing is removed.
+        agreement: Option<String>,
     },
     /// Ask the download client to let one completed download go, files and all.
     ///

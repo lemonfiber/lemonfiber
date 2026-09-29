@@ -138,32 +138,33 @@ pub const TAKES_AGREEMENT: &[&str] = &[
     "repair",
     "reset",
     "restore",
-    "space",
     "support",
     "update",
 ];
 
 /// The actions whose command carries what the operator read before answering.
 ///
-/// The three that show the operator something and then act on what they answered. A
+/// The ones that show the operator something and then act on what they answered. A
 /// repair is offered and then carried out; a restore is listed and then overwrites;
 /// letting a download go states what that costs a tracker's opinion of somebody and
-/// then asks the client to take it. All three are two requests with a decision in the
+/// then asks the client to take it; a disk account names what it would reclaim and
+/// then takes it; removing the tier that reaches the operator's own content lists
+/// what would go and then removes it. Each is two requests with a decision in the
 /// gap, and in that gap the thing that was read can move — a repair's effects
 /// rewritten by a fresh diagnosis, a restore's re-point derived again from a data root
-/// that has changed, a download's ratio earned while somebody was deciding. So the
-/// answer names what it was given for, and the run that acts builds that name again
-/// and compares.
+/// that has changed, a download's ratio earned while somebody was deciding, a file on
+/// offer imported after all. So the answer names what it was given for, and the run
+/// that acts builds that name again and compares.
 ///
-/// On two of them it sits beside a `confirm` that can stand in for it. On the third
-/// there is no `confirm` at all — see [`TAKES_AGREEMENT`], which deliberately leaves
-/// it out — so the name of the offer is the only way to say yes to it. That is the
-/// point of it there: a blanket yes would be a removal agreed to by somebody who had
-/// not read what it costs.
+/// On a repair, a restore and a removal it sits beside a `confirm` that can stand in
+/// for it where nothing needs naming. On letting a download go and on reclaiming room
+/// there is no `confirm` at all — see [`TAKES_AGREEMENT`], which leaves both out — so
+/// the name of the offer is the only way to say yes. That is the point of it there: a
+/// blanket yes to a removal would be agreement from somebody who had not read what
+/// would go.
 ///
-/// No other action needs one, because no other action shows the operator something
-/// and then acts on what they answered. Everywhere else the reply is the answer.
-pub const TAKES_CONSENT: &[&str] = &["repair", "restore", "stop-seeding", "uninstall"];
+/// Everywhere else the reply is the answer.
+pub const TAKES_CONSENT: &[&str] = &["repair", "restore", "space", "stop-seeding", "uninstall"];
 
 /// The action whose command carries which completed download it is about.
 ///

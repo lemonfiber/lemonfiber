@@ -112,7 +112,6 @@ fn carries_agreement(command: &Command) -> bool {
             | Command::QualityUpgrade { confirm: true }
             | Command::Reset { confirm: true }
             | Command::Forget { confirm: true }
-            | Command::Space { confirm: true }
             | Command::Remove { confirm: true, .. }
             | Command::Invite { confirm: true, .. }
             | Command::Migrate(MigrateAction::Act {
@@ -198,6 +197,11 @@ fn carries_offer(command: &Command) -> bool {
         // that reaches the library takes: dropped, it is a removal nobody could ask
         // for; kept silently, one nobody read the cost of.
         Command::Uninstall(asked) => asked.agreement.as_deref() == Some(OFFER),
+        // And reclaiming room, which likewise has no other yes: dropped, the account
+        // could never be answered; kept silently, a cleanup nobody read the list of.
+        Command::Space {
+            agreement: Some(named),
+        } => named == OFFER,
         _ => false,
     }
 }

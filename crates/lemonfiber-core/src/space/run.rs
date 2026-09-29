@@ -13,6 +13,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use crate::error::codes::space::ANOTHER_OFFER;
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
 use crate::ports::service::{Queued, Queues, Seeded, Seeding};
 use crate::space::{
@@ -39,12 +40,18 @@ const SERVICE_FILES: &str = "config";
 /// Returns a [`Problem`] where there is no data location to measure, where the
 /// stack could not be read, or where the data location is there and will not be
 /// walked.
-pub(crate) async fn space(ctx: &Ctx, confirm: bool) -> Result<Reckoning, Box<Problem>> {
+pub(crate) async fn space(ctx: &Ctx, agreement: Option<String>) -> Result<Reckoning, Box<Problem>> {
     let gathered = measure(ctx).await?;
     let mut reckoned = reckon(&gathered.measured);
-    if confirm {
-        reckoned.reclaimed = Some(reclaim(ctx, &reckoned, &gathered.measured).await);
+    let Some(given) = agreement else {
+        return Ok(reckoned);
+    };
+    // Built again from this reading and compared, so an answer given against one
+    // listing is never spent on another.
+    if given != reckoned.agreement {
+        return Err(Box::new(another_offer(&reckoned.agreement)));
     }
+    reckoned.reclaimed = Some(reclaim(ctx, &reckoned, &gathered.measured).await);
     Ok(reckoned)
 }
 
@@ -85,7 +92,7 @@ pub(crate) async fn admits(ctx: &Ctx) -> Result<(), Box<Problem>> {
              take the file with it, which turns a disk that is full into work that \
              is gone. Fetching more onto it is what this is protecting against.",
             Remedy::new("Free space, then run this again")
-                .with_detail("lemonfiber space --confirm"),
+                .with_detail("lemonfiber space, then answer the offer it names"),
         )
         .in_state(State::Guided),
     ))
@@ -293,6 +300,7 @@ fn marked(ctx: &Ctx, held: &[Seeded]) -> BTreeSet<String> {
 /// the platform's words for why, and the room the others freed is still freed.
 async fn reclaim(ctx: &Ctx, reckoned: &Reckoning, measured: &Measured) -> Reclaimed {
     let mut taken = Reclaimed {
+        rehearsed: ctx.dry_run,
         gone: Vec::new(),
         bytes: 0,
         left: Vec::new(),
@@ -317,6 +325,21 @@ async fn reclaim(ctx: &Ctx, reckoned: &Reckoning, measured: &Measured) -> Reclai
         }
     }
     taken
+}
+
+/// The answer names an offer that is not the one standing now.
+fn another_offer(standing: &str) -> Problem {
+    Problem::new(
+        ANOTHER_OFFER,
+        Severity::Error,
+        "That answer was given for a different reading of the disk",
+        "Every path a cleanup would take, and what each occupies, is in the name an \
+         offer goes by, so an offer that has moved since it was read is a different \
+         offer. Taking this one would be taking something nobody saw.",
+        Remedy::new("Read the offer again, and answer the name it prints")
+            .with_detail(format!("the offer standing now is {standing}")),
+    )
+    .in_state(State::Guided)
 }
 
 /// There is nowhere to measure.
