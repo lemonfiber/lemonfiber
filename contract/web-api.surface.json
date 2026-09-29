@@ -4040,6 +4040,7 @@
         "\"guides\"",
         "\"household\"",
         "\"indexer\"",
+        "\"plugin-source\"",
         "\"registry\"",
         "\"updates\"",
         "\"usenet\""
@@ -4787,6 +4788,12 @@
         "provides": {
           "type": [
             "array[string]"
+          ],
+          "required": false
+        },
+        "revision": {
+          "type": [
+            "string"
           ],
           "required": false
         },

@@ -555,6 +555,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         contributions: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         from: String::new(),
+        revision: String::new(),
         installed_at: String::new(),
     }
 }

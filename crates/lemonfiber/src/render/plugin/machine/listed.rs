@@ -18,8 +18,15 @@ use super::super::super::Lines;
 /// nobody reviewed is said to be one at the moment it is installed and for as long as
 /// it is listed, in the same words.
 pub(super) fn origin(one: &Installed) -> String {
+    // The first twelve of a commit, which is how git itself shortens one and plenty to
+    // find it by; the whole of it is on the record for anything that reads the record.
+    let at = one
+        .revision
+        .get(..12)
+        .map(|short| format!(" at {short}"))
+        .unwrap_or_default();
     format!(
-        "{} — {}",
+        "{}{at} — {}",
         or_unrecorded(&one.from),
         if one.declared.reviewed {
             "reviewed"

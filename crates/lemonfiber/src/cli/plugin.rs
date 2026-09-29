@@ -45,14 +45,20 @@ pub enum PluginCommand {
     /// it on, and every mount it can ever have. A plugin supplies none of that and
     /// there is no field in which it could ask for more of it.
     ///
+    /// A git repository is installed at one commit: the branch, tag or commit named
+    /// after its last `@`, or what it serves by default, resolved before anything is
+    /// fetched. That commit is fetched as data, nothing of it is run, and the record
+    /// keeps the repository and the commit.
+    ///
     /// Installing over an installation is refused naming it: that is an update,
     /// which puts one set of changes back before it applies another.
     ///
     /// `--dry-run` settles everything the real run settles, says the same account of
     /// it, and writes nothing.
     Install {
-        /// The plugin's source: its directory, or the `plugin.toml` inside it.
-        path: PathBuf,
+        /// The plugin's source: its directory, the `plugin.toml` inside it, or a git
+        /// repository, at a branch, tag or commit named after its last `@`.
+        source: String,
     },
     /// Say what is installed, and what each plugin is doing.
     ///

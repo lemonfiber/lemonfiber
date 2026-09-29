@@ -9563,7 +9563,7 @@
           ]
         },
         "OutboundReach": {
-          "description": "One of the requests lemonfiber makes on its own account.\n\nSeven, and the closed set is the claim. An eighth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.",
+          "description": "One of the requests lemonfiber makes on its own account.\n\nEight, and the closed set is the claim. A ninth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.\n\nThe eighth goes where the operator points it and nowhere else: a plugin's git\nsource, named at install. It is the only entry whose destination nobody chose in\nadvance, which is why it is made only when somebody names one.",
           "oneOf": [
             {
               "description": "Fetching the service images the stack runs.",
@@ -9599,6 +9599,11 @@
               "description": "Asking which version of lemonfiber itself has been released.",
               "type": "string",
               "const": "updates"
+            },
+            {
+              "description": "Fetching a plugin from a git source the operator names.",
+              "type": "string",
+              "const": "plugin-source"
             }
           ]
         },
@@ -10988,6 +10993,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "revision": {
+              "description": "The commit it was installed at, where it came from a git source.\n\nThe one commit the revision named at install resolved to, so what was installed\ncan be told from whatever that source serves now. Empty for a plugin installed\nfrom a directory, which has no revision to name, and for a record written before\nthis was kept.",
+              "type": "string",
+              "default": ""
             },
             "services": {
               "description": "What was placed, one entry per service the plugin declares.",

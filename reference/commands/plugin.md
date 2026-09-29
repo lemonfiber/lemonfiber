@@ -239,15 +239,17 @@ What is written is the record of what the install settled: the plugin, and for e
 
 It then says what container lemonfiber writes from that record, which is the question worth asking before a stranger's service is on the machine: the image pinned to its digest, the profile it sits in, the interface its tier publishes it on, and every mount it can ever have. A plugin supplies none of that and there is no field in which it could ask for more of it.
 
+A git repository is installed at one commit: the branch, tag or commit named after its last `@`, or what it serves by default, resolved before anything is fetched. That commit is fetched as data, nothing of it is run, and the record keeps the repository and the commit.
+
 Installing over an installation is refused naming it: that is an update, which puts one set of changes back before it applies another.
 
 `--dry-run` settles everything the real run settles, says the same account of it, and writes nothing.
 
-Usage: lemonfiber plugin install [OPTIONS] <PATH>
+Usage: lemonfiber plugin install [OPTIONS] <SOURCE>
 
 Arguments:
-  <PATH>
-          The plugin's source: its directory, or the `plugin.toml` inside it
+  <SOURCE>
+          The plugin's source: its directory, the `plugin.toml` inside it, or a git repository, at a branch, tag or commit named after its last `@`
 
 Options:
       --json

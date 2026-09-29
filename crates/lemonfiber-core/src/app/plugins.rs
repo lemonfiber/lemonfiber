@@ -54,6 +54,8 @@ mod removing;
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
 mod standing;
+// Installing from a git source: the revision resolved, the commit fetched as data.
+mod fetching;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;
@@ -83,8 +85,9 @@ pub enum Asked {
     /// there is no flag by which an operator could be talked into installing
     /// something on terms the manifest did not declare.
     Install {
-        /// The plugin's source: its directory, or the `plugin.toml` inside it.
-        path: PathBuf,
+        /// The plugin's source: its directory, the `plugin.toml` inside it, or a git
+        /// repository at a revision.
+        source: crate::plugin::Source,
     },
     /// Say what is installed, and what each install decided.
     Installed,
@@ -144,7 +147,12 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
         // Boxed, because each carries a whole install's worth of state across its awaits
         // — the stack's checks read twice, a reversal, a record — and every command the
         // dispatcher runs would otherwise be as large as the one that installs.
-        Asked::Install { path } => Box::pin(install(ctx, held, path)).await,
+        Asked::Install { source } => match source {
+            crate::plugin::Source::Path(path) => Box::pin(install(ctx, held, path, None)).await,
+            crate::plugin::Source::Git { url, revision } => {
+                Box::pin(fetching::installed(ctx, held, url, revision.as_deref())).await
+            }
+        },
         Asked::Remove { plugin } => Box::pin(removing::remove(ctx, held, plugin)).await,
         Asked::Update { path } => Box::pin(updating::update(ctx, held, path)).await,
     }
@@ -182,17 +190,31 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
 /// out from under one leaves something Compose will never be asked about again; then
 /// the files go back through the rollback layer, over the journal entries the writing
 /// already made. Nothing here undoes anything itself.
-async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Installs, Box<Problem>> {
+async fn install(
+    ctx: &Ctx,
+    held: Register,
+    path: &Path,
+    from: Option<&fetching::Fetched<'_>>,
+) -> Result<Installs, Box<Problem>> {
     let manifest = accepted(path)?;
 
     // One stamp for the run, taken before anything is decided, so the record says it
-    // was installed at the moment its changes are journalled under.
+    // was installed at the moment its changes are journalled under. A plugin fetched
+    // from a git source is recorded as coming from that source, at the one commit that
+    // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
-    let would = Installed::of(&manifest).installed(path, &stamp);
+    let settled = Installed::of(&manifest).installed(path, &stamp);
+    let (would, named) = match from {
+        Some(fetched) => (
+            settled.fetched(fetched.url, fetched.commit),
+            PathBuf::from(fetched.url),
+        ),
+        None => (settled, path.to_path_buf()),
+    };
     let mut after = held.clone();
     after
         .record(would.clone())
-        .map_err(|there| Box::new(already(&there, path)))?;
+        .map_err(|there| Box::new(already(&there, &named)))?;
     writing::unanswered(&would, held.installed())?;
 
     // Where the writes land, asked for before the branch rather than inside it. What
