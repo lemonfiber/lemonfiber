@@ -48,6 +48,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             },
             named(&install.would)
         ));
+        lines.put(format!("    from {}", listed::origin(&install.would)));
         lines.extend(services(&install.would));
         lines.extend(contesting(&install.contests, install.recorded));
         lines.extend(changes(&install.changes, acted));
