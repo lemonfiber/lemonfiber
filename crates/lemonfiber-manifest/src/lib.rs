@@ -6,6 +6,7 @@
 //! `lemonfiber-core`, which is what lets both be tested with no Docker, no
 //! terminal and no configuration.
 
+mod binary;
 mod date;
 mod error;
 pub mod names;
