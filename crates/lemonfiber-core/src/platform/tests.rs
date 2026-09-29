@@ -117,3 +117,44 @@ fn each_platform_names_the_service_manager_it_actually_has() {
 fn this_build_targets_a_platform_lemonfiber_supports() {
     assert_ne!(HOST_OS, HostOs::Other);
 }
+
+/// Docker Desktop on Linux is told apart by the context it installs and the socket it
+/// listens on, and anything else Linux is pointed at is Docker Engine.
+#[test]
+fn docker_desktop_is_told_apart_by_where_its_engine_was_found() {
+    use crate::ports::docker::{Origin, Target};
+
+    let desktop_context = Target::at(
+        "unix:///home/ana/.docker/desktop/docker.sock",
+        Origin::Context("desktop-linux".to_owned()),
+    );
+    let desktop_socket = Target::socket("/home/ana/.docker/desktop/docker.sock");
+    let named_only = Target {
+        origin: Origin::Context("desktop-linux".to_owned()),
+        ..Target::local()
+    };
+    for desktop in [&desktop_context, &desktop_socket, &named_only] {
+        assert!(Environment::engine_is_desktop(desktop), "{desktop:?}");
+        assert_eq!(
+            Environment::resolve(HostOs::Linux, Environment::engine_is_desktop(desktop)),
+            Environment::LinuxDesktop
+        );
+    }
+
+    let engine = [
+        Target::local(),
+        Target::socket("/var/run/docker.sock"),
+        Target::at("ssh://ana@server", Origin::Context("server".to_owned())),
+        Target::at("tcp://10.0.0.2:2375", Origin::Variable),
+    ];
+    for native in &engine {
+        assert!(!Environment::engine_is_desktop(native), "{native:?}");
+    }
+    assert_eq!(
+        Environment::resolve(
+            HostOs::Linux,
+            Environment::engine_is_desktop(&Target::local())
+        ),
+        Environment::LinuxNative
+    );
+}
