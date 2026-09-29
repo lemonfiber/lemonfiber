@@ -54,9 +54,12 @@ mod removing;
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
 mod standing;
+// Installing what the record already holds: an update, or a second source for one name.
+mod twice;
 mod updating;
 mod writing;
 
+use twice::already;
 use writing::{carry_out, nowhere_to_write};
 
 /// What is asked about the plugins on this machine.
@@ -107,8 +110,6 @@ use crate::error::codes::plugin::UNREADABLE;
 use crate::error::codes::plugin::REFUSED;
 
 use crate::error::codes::plugin::UNRECORDED;
-
-use crate::error::codes::plugin::ALREADY;
 
 use crate::error::codes::plugin::UNRECORDABLE;
 use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
@@ -191,7 +192,7 @@ async fn install(ctx: &Ctx, held: Register, path: &Path) -> Result<Installs, Box
     let mut after = held.clone();
     after
         .record(would.clone())
-        .map_err(|there| Box::new(already(&there)))?;
+        .map_err(|there| Box::new(already(&there, path)))?;
     writing::unanswered(&would, held.installed())?;
 
     // Where the writes land, asked for before the branch rather than inside it. What
@@ -486,24 +487,6 @@ fn unrecordable(plugin: &str, why: Problem, back: &super::putting_back::Reversal
     )
     .in_state(State::Guided)
     .caused_by(why)
-}
-
-/// This plugin is installed, so what was asked for is an update.
-fn already(held: &crate::plugin::Already) -> Problem {
-    Problem::new(
-        ALREADY,
-        Severity::Error,
-        format!("{} is already installed", held.plugin),
-        "Nothing was written. Installing over an installation is an update, which puts one set \
-         of changes back before it applies another — doing it as an install would leave the \
-         record describing one version and the machine carrying two.",
-        Remedy::new(format!(
-            "Run `lemonfiber plugin update` on the new source, or remove {} first",
-            held.plugin
-        )),
-    )
-    .in_state(State::Guided)
-    .with_detail(format!("the record holds version {}", held.version))
 }
 
 #[cfg(test)]
