@@ -437,20 +437,7 @@ async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::P
     let Some(password) = super::seed::identity::recorded_jellyfin_password(ctx) else {
         return Err(Box::new(no_credential()));
     };
-    // Where a *person* reaches the media server, which is neither of the URLs the
-    // stack wires itself with: those name a host only this machine or this stack can
-    // resolve, and an invitation carrying one sends somebody an address that cannot
-    // open. Asked now rather than remembered, so a machine renamed since the last
-    // look answers as it is. Where there is no name and nothing recorded there is no
-    // address rather than a guess — an invented one is the one thing that gets sent
-    // on, and what gets sent on has to be true.
-    let named = ctx.site.name().await;
-    let Some(reachable) = crate::door::address(
-        named.as_deref(),
-        ctx.settings.household_host.as_deref(),
-        ctx.environment,
-        jellyfin.port,
-    ) else {
+    let Some(reachable) = household_address(ctx, jellyfin.port).await else {
         return Err(Box::new(nowhere_to_send()));
     };
     Ok(Reaching {
@@ -464,6 +451,27 @@ async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::P
         reachable,
         services: manifest.services,
     })
+}
+
+/// Where a *person* reaches the media server on `port`.
+///
+/// Neither of the URLs the stack wires itself with: those name a host only this machine or
+/// this stack can resolve, and a message carrying one sends somebody an address that cannot
+/// open. Asked now rather than remembered, so a machine renamed since the last look answers
+/// as it is. Where there is no name and nothing recorded there is no address rather than a
+/// guess — an invented one is the one thing that gets sent on, and what gets sent on has to
+/// be true.
+///
+/// Shared by everything that hands a person the way in, because an address derived twice is
+/// an address that can differ between the two.
+pub(crate) async fn household_address(ctx: &Ctx, port: u16) -> Option<crate::door::Address> {
+    let named = ctx.site.name().await;
+    crate::door::address(
+        named.as_deref(),
+        ctx.settings.household_host.as_deref(),
+        ctx.environment,
+        port,
+    )
 }
 
 #[cfg(test)]

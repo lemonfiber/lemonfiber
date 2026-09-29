@@ -113,6 +113,8 @@ outcomes! {
     Clients(crate::clients::Guidance) => CLIENTS,
     /// An account offered to somebody in the house.
     Invitation(crate::model::Invitation) => INVITATION,
+    /// Where handing somebody's device the way onto the stack stands.
+    Handoff(crate::model::Handoff) => HANDOFF,
     /// What a phone is handed to pair with this stack.
     Pairing(crate::companion::Pairing) => PAIRING,
     /// What replacing the certificate a paired phone pins came to, or would cost.

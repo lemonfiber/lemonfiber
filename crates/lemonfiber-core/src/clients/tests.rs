@@ -214,3 +214,34 @@ fn the_limits_that_hold_for_everything_are_stated() {
         "and what lemonfiber will not do: {NOTHING_IS_INSTALLED}"
     );
 }
+
+/// Every app this table recommends is open source.
+///
+/// A closed one may be named, flagged, and never as the answer for a device, so an entry
+/// that recommended one would be the table giving a closed app as the default.
+#[test]
+fn every_app_recommended_is_open_source() {
+    let closed: Vec<&str> = DEVICES
+        .iter()
+        .filter(|one| !one.open_source)
+        .map(|one| one.device)
+        .collect();
+
+    assert!(closed.is_empty(), "recommends a closed app for {closed:?}");
+}
+
+/// Every app is handed the address as its code, because none is known here to take a
+/// link that opens it at a server.
+///
+/// A link belongs on an entry only where the app is known to answer it, and the address
+/// is what every app can be pointed at.
+#[test]
+fn every_app_falls_back_to_the_address() {
+    let linked: Vec<&str> = DEVICES
+        .iter()
+        .filter(|one| one.deep_link.is_some())
+        .map(|one| one.device)
+        .collect();
+
+    assert!(linked.is_empty(), "a link is claimed for {linked:?}");
+}

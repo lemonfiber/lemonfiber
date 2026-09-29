@@ -57,7 +57,7 @@ pub(crate) fn held(member: String, most: Option<u32>) -> Result<Command, u8> {
 
 /// What is being asked about the household: who is here, or what they may ask for.
 ///
-/// One word with four things under it, because they are one subject. Naming nothing is
+/// One word with five things under it, because they are one subject. Naming nothing is
 /// the reading; naming one of the three is a decision about what that reading shows.
 ///
 /// **The narrowing and the decisions do not mix.** `--member` on the word itself narrows
@@ -96,6 +96,7 @@ pub(crate) fn household(
         HouseholdCommand::Expiring { after, never } => {
             Ok(Command::Expiring(arranging(after, never)))
         }
+        HouseholdCommand::Handoff { name } => Ok(Command::Handoff { name }),
     }
 }
 

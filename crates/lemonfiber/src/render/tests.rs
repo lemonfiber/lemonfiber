@@ -297,6 +297,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             linked: lemonfiber_core::model::Linked::Made,
             applied: None,
         }),
+        a_handoff(),
         Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
             name: "ana".to_owned(),
             confirmed: false,
@@ -407,3 +408,21 @@ fn a_removal() -> lemonfiber_core::uninstall::Uninstall {
 mod outcomes;
 mod plain;
 mod settings;
+
+/// A hand-off waiting on the device, which is the state that draws the most: the
+/// address, its code, the steps and the apps.
+fn a_handoff() -> Outcome {
+    Outcome::Handoff(lemonfiber_core::model::Handoff {
+        name: "ana".to_owned(),
+        state: lemonfiber_core::model::HandoffState::Pending,
+        reason: None,
+        address: Some("http://a-machine.local:8096".to_owned()),
+        caution: None,
+        issued: None,
+        quick_connect: false,
+        steps: vec!["Open the app.".to_owned()],
+        clients: Vec::new(),
+        sessions: Vec::new(),
+        rehearsed: false,
+    })
+}

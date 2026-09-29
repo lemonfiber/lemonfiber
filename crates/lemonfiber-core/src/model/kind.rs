@@ -91,6 +91,8 @@ kinds! {
     HOUSEHOLD = "household",
     /// What one member can watch, as the media server answers it for them.
     HELD = "held",
+    /// Where handing somebody's device the way onto the stack stands.
+    HANDOFF = "handoff",
     /// What copying an operator's own records across came to.
     IMPORT = "import",
     /// An account offered to somebody in the house.

@@ -6,9 +6,9 @@
 //! for. Each has to say what it lacks before it can name a command, which is longer
 //! than a row — and none of the fields they read is one that table reads.
 //!
-//! **A name is required of three of the six and optional on a fourth.** Offering,
-//! reissuing and removing are addressed to one person and have lost their subject
-//! without one. Choosing what may be asked for is a decision about the *household*,
+//! **A name is required of four of the seven and optional on a fifth.** Offering,
+//! reissuing, removing and handing a device over are addressed to one person and have
+//! lost their subject without one. Choosing what may be asked for is a decision about the *household*,
 //! and naming somebody narrows it to them — so a choice with nobody named is a
 //! request in its own right rather than an omission. The two that rule on one waiting
 //! request name a number instead, because a household asks for the same film twice
@@ -25,10 +25,11 @@ use crate::actions::{Arguments, Refused};
 /// A list rather than a match arm for the reason the tables next door are lists: it is
 /// read from two places — the row that hands them over, and the reading below that
 /// tells them apart — and two matches would be two answers to which requests these are.
-const ADDRESSED: [&str; 6] = [
+const ADDRESSED: [&str; 7] = [
     "invite",
     "reissue",
     "remove",
+    "household-handoff",
     "household-allow",
     "household-approve",
     "household-decline",
@@ -61,7 +62,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         ..
     } = given;
     match action {
-        "invite" | "reissue" | "remove" => about_a_person(
+        "invite" | "reissue" | "remove" | "household-handoff" => about_a_person(
             action,
             name,
             confirm,
@@ -73,7 +74,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         ),
         "household-allow" => allowing(name, policy.as_deref(), requests, days),
         "household-approve" => deciding(action, request, Answer::LetThrough),
-        // The last of the six. A refusal is the one decision that owes the person who
+        // The last of the seven. A refusal is the one decision that owes the person who
         // asked a sentence, so it is the one that cannot be made without one.
         _ => match reason {
             Some(reason) => deciding(action, request, Answer::TurnedDown { reason }),
@@ -82,15 +83,15 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
     }
 }
 
-/// The command one of the three household actions names.
+/// The command one of the four actions addressed to a person names.
 ///
 /// All are addressed to a member rather than to a form, a file or a service, and all are
 /// refused the same way when nobody is named — so the refusal is written once.
 ///
-/// What they may watch reaches only the one that makes an account. The other two are
+/// What they may watch reaches only the one that makes an account. The other three are
 /// given it and drop it, which they may because the carrier refuses it to them first:
-/// a library, an age limit or a choice about unrated content named to a reissue or a
-/// removal is turned away by name before this is reached.
+/// a library, an age limit or a choice about unrated content named to a reissue, a
+/// removal or a hand-off is turned away by name before this is reached.
 fn about_a_person(
     action: &str,
     name: Option<String>,
@@ -113,6 +114,7 @@ fn about_a_person(
             confirm,
         }),
         "reissue" => Ok(Command::Reissue { name }),
+        "household-handoff" => Ok(Command::Handoff { name }),
         _ => Ok(Command::Remove { name, confirm }),
     }
 }

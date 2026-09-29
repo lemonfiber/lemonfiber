@@ -329,16 +329,23 @@ pub const TAKES_ARCHIVE: &[&str] = &["restore"];
 
 /// The actions that are about a person rather than a form, a file or a service.
 ///
-/// Four. Three of them are one errand — offering somebody an account, letting its
-/// password be set again, and taking it away — and each of those *requires* a name,
-/// because a request addressed to nobody has lost its subject.
+/// Five. Three of them are one errand — offering somebody an account, letting its
+/// password be set again, and taking it away — and the fourth hands that account's
+/// person a device to sign in on. Each of those *requires* a name, because a request
+/// addressed to nobody has lost its subject.
 ///
-/// The fourth is not that errand and does not require one. Choosing what may be asked
+/// The fifth is not that errand and does not require one. Choosing what may be asked
 /// for is a decision about the household, and naming somebody narrows it to them: a
 /// choice with nobody named is the household's own, which is a request rather than an
 /// omission. So the name is optional there and refused nowhere else, which is exactly
 /// what this list says and [`crate::actions::named`] enforces separately.
-pub const TAKES_NAME: &[&str] = &["invite", "reissue", "remove", "household-allow"];
+pub const TAKES_NAME: &[&str] = &[
+    "invite",
+    "reissue",
+    "remove",
+    "household-handoff",
+    "household-allow",
+];
 
 /// The action whose command carries what the household may ask for.
 ///

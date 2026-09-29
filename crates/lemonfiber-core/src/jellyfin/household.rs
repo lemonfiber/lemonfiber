@@ -20,8 +20,8 @@ use super::{item_type, Jellyfin};
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
 use crate::ports::service::{
-    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Signed,
-    Unrated,
+    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Session,
+    Signed, Unrated,
 };
 
 /// The account list, as the media server names its fields.
@@ -88,6 +88,23 @@ impl UserResource {
             last_seen: self.last_activity,
         }
     }
+}
+
+/// One signed-in device, as the media server names its fields.
+///
+/// Narrowed to one account here rather than by the server: the server's own narrowing
+/// is to the sessions an account may control remotely, and a phone that takes no
+/// remote control is still a phone that signed in.
+#[derive(serde::Deserialize)]
+struct SessionResource {
+    #[serde(rename = "UserId", default)]
+    user: String,
+    #[serde(rename = "DeviceName", default)]
+    device: String,
+    #[serde(rename = "Client", default)]
+    client: String,
+    #[serde(rename = "LastActivityDate", default)]
+    last_activity: Option<String>,
 }
 
 /// One account with its policy left exactly as the media server sent it.
@@ -294,6 +311,34 @@ impl crate::ports::service::Household for Jellyfin {
 
     async fn suspend(&self, id: &str) -> Result<(), Failure> {
         policy::rewritten(self, id, &policy::Edit::Suspend).await
+    }
+
+    async fn sessions(&self, member: &str) -> Result<Vec<Session>, Failure> {
+        let request = self.as_admin(Method::Get, "/Sessions", None).await?;
+        let response = self.endpoint.send(&request).await?;
+        let listed: Vec<SessionResource> = self
+            .endpoint
+            .decode(&response, "the media server's sessions could not be read")?;
+        Ok(listed
+            .into_iter()
+            .filter(|session| session.user == member)
+            .map(|session| Session {
+                device: session.device,
+                client: session.client,
+                last_seen: session.last_activity,
+            })
+            .collect())
+    }
+
+    async fn quick_connect(&self) -> Result<bool, Failure> {
+        let request = self
+            .as_admin(Method::Get, "/QuickConnect/Enabled", None)
+            .await?;
+        let response = self.endpoint.send(&request).await?;
+        self.endpoint.decode(
+            &response,
+            "the media server would not say whether it signs devices in by code",
+        )
     }
 
     async fn holdings(&self, member: &str, most: u32) -> Result<Vec<Held>, Failure> {

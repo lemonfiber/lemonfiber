@@ -248,6 +248,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),
         Outcome::Invitation(report) => invitation::invitation(report),
+        Outcome::Handoff(report) => invitation::handoff(report),
         Outcome::Pairing(report) => companion::pairing(report),
         Outcome::Certificate(report) => companion::certificate(report),
         Outcome::Removal(report) => removal::removal(report),

@@ -59,6 +59,10 @@ what to do about it, is written for operators at
 - `GONE-1`
 - `GONE-2`
 - `GONE-3`
+- `HANDOFF-1`
+- `HANDOFF-2`
+- `HANDOFF-3`
+- `HANDOFF-4`
 - `HOST-1`
 - `HOST-2`
 - `HOST-3`

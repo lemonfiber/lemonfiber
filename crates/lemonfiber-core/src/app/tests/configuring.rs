@@ -50,6 +50,7 @@ fn settings_of(
             | Outcome::Glossary(_)
             | Outcome::Clients(_)
             | Outcome::Invitation(_)
+            | Outcome::Handoff(_)
             | Outcome::Pairing(_)
             | Outcome::Certificate(_)
             | Outcome::Removal(_)

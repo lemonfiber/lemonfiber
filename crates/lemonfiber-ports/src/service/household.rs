@@ -221,6 +221,38 @@ pub trait Household: Send + Sync {
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn suspend(&self, id: &str) -> Result<(), Failure>;
+
+    /// The devices signed in to one account now, as the server has them. `member` is
+    /// the account's identifier, as [`Member::id`] carries it.
+    ///
+    /// Asked of the server rather than remembered, because a device that signed out
+    /// is one the server no longer lists: a copy kept here would go on calling it
+    /// connected.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn sessions(&self, member: &str) -> Result<Vec<Session>, Failure>;
+
+    /// Whether the server offers the sign-in by short code, in which a device already
+    /// signed in approves a new one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn quick_connect(&self) -> Result<bool, Failure>;
+}
+
+/// One device signed in to an account, as the media server lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Session {
+    /// What the device calls itself.
+    pub device: String,
+    /// The app it signed in with.
+    pub client: String,
+    /// When the server last heard from it, as the server writes an instant, where it
+    /// says.
+    pub last_seen: Option<String>,
 }
 
 /// One library the media server holds, with the name it was given.

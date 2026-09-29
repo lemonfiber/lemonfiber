@@ -196,6 +196,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::refusals,
     },
     Entry {
+        accessor: "handoffs",
+        what: "when each person was handed a code",
+        why: "The media server says which devices are signed in and nothing about a code \
+              handed over and not yet used. This is what tells somebody still to sign in \
+              from somebody never handed anything.",
+        secret: false,
+        at: Paths::handoffs,
+    },
+    Entry {
         accessor: "plugins",
         what: "what is installed of somebody else's",
         why: "Each plugin you installed, and what installing it settled: the images it runs, \

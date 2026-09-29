@@ -75,6 +75,7 @@ pub const OFFERED: &[&str] = &[
     "household-allow",
     "household-approve",
     "household-decline",
+    "household-handoff",
     "support",
     "restore",
     "watch",
