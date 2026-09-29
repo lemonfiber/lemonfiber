@@ -15,6 +15,7 @@ use crate::stack::compose::{build, Action};
 mod diagnosis;
 mod fetching;
 mod grounded;
+pub(crate) mod halted;
 mod inflight;
 mod lock;
 mod remote;
@@ -166,6 +167,31 @@ const fn starts(action: &Action) -> bool {
     matches!(action, Action::Up | Action::Start(_))
 }
 
+/// The services an action is aimed at: the ones it names, or everything its plan holds.
+///
+/// What a stop is written down against and what a start lets go of, so the two are
+/// asked of the same list. Naming none is the whole plan, as it is to Compose.
+pub(crate) fn addressed(action: &Action, plan: &Plan) -> Vec<String> {
+    match action {
+        Action::Start(named)
+        | Action::Stop(named)
+        | Action::Remove(named)
+        | Action::Restart(named)
+            if !named.is_empty() =>
+        {
+            named.clone()
+        }
+        Action::Up
+        | Action::Down
+        | Action::Start(_)
+        | Action::Stop(_)
+        | Action::Remove(_)
+        | Action::Restart(_)
+        | Action::Pull
+        | Action::Config => plan.services.clone(),
+    }
+}
+
 /// Everything a lifecycle command settles before anything runs: the manifest, the
 /// command to spawn, and the report it will be filling in.
 ///
@@ -280,6 +306,11 @@ async fn worked(
         mint_adopted_secrets(ctx, &manifest);
     }
 
+    // Let go of what is about to start before it runs, and write down what a stop
+    // stopped once it has: a start that falls over must read as the failure it is,
+    // and a stop the operator asked for must not.
+    let addressed = addressed(action, &report.plan);
+    halted::before(ctx, action, &addressed);
     let output = ctx
         .seams
         .runner
@@ -287,6 +318,7 @@ async fn worked(
         .await
         .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
+    halted::after(ctx, action, &addressed).await;
 
     // What the operator has just asked for, written down before anything is waited
     // on. A start whose services never settle has still started them, and a boot

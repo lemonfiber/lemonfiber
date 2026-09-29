@@ -246,11 +246,14 @@ async fn moved(
 /// on the versions it was already running.
 async fn whole(ctx: &Ctx, action: &Action) -> Result<Vec<crate::model::StackEdit>, Box<Problem>> {
     let (argv, edits) = engine::invocation(ctx, &[], action)?;
+    let addressed = engine::addressed(action, &engine::preview(ctx, &[])?);
+    engine::halted::before(ctx, action, &addressed);
     ctx.seams
         .runner
         .run(&argv)
         .await
         .map_err(|err| Box::new(err.problem()))?;
+    engine::halted::after(ctx, action, &addressed).await;
     Ok(edits)
 }
 
@@ -308,6 +311,8 @@ async fn staged(ctx: &Ctx, manifest: &Manifest, taking: &[Step]) -> (Vec<Applied
 
 /// Move one service onto its pin, and find out whether it came back.
 async fn one(ctx: &Ctx, manifest: &Manifest, step: &Step) -> (Ending, Option<String>) {
+    let service = std::slice::from_ref(&step.change.service);
+    engine::halted::before(ctx, &Action::Start(service.to_vec()), service);
     match ctx.seams.runner.run(&step.argv).await {
         Err(failure) => (Ending::NotFetched, Some(failure.to_string())),
         Ok(output) if !output.succeeded() => (Ending::NotFetched, Some(refusal(&output))),
@@ -348,7 +353,13 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
                 Some("the container engine stopped answering".to_owned()),
             );
         };
-        let seen = survey(manifest, &profiles, &containers, ctx.settings.protocols);
+        let seen = survey(
+            manifest,
+            &profiles,
+            &containers,
+            &engine::halted::load(ctx),
+            ctx.settings.protocols,
+        );
         let state = seen
             .iter()
             .find(|one| one.id == service)

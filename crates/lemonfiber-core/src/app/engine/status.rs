@@ -42,7 +42,8 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .map_err(|err| Box::new(err.problem()))?;
     // Surveyed whole and narrowed after, because which forms are up is a question
     // about every service they hold rather than about the ones asked after.
-    let everything = survey(&manifest, &whole, &containers, protocols);
+    let halted = super::halted::load(ctx);
+    let everything = survey(&manifest, &whole, &containers, &halted, protocols);
     let brought = brought(&manifest, protocols, &everything);
     let active_forms: Vec<String> = brought.iter().map(|(form, _)| form.clone()).collect();
     let filtered = left_out(&manifest, &brought);
@@ -75,7 +76,7 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         active_forms,
         filtered,
         condition,
-        undeclared: undeclared(&manifest, &containers),
+        undeclared: undeclared(&manifest, &containers, &halted),
         services,
         disturbs: crate::model::Disturbances::all(ctx.patience),
         unsupported,

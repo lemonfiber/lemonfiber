@@ -11,7 +11,7 @@
 
 use lemonfiber_manifest::Manifest;
 
-use super::{compose, lock, settled_into, Composed};
+use super::{compose, halted, lock, settled_into, Composed};
 use crate::app::Ctx;
 use crate::docker::{stopping_order, survey, Service, State};
 use crate::error::{Diagnose, Problem};
@@ -91,7 +91,13 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let running = survey(&manifest, &declared, &containers, ctx.settings.protocols);
+    let running = survey(
+        &manifest,
+        &declared,
+        &containers,
+        &halted::load(ctx),
+        ctx.settings.protocols,
+    );
 
     let mut switched = moved(&running, &plan.services);
     if !switched.stopped.is_empty() {
@@ -104,6 +110,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         ));
     }
     let stopping = switched.stop_command.clone();
+    let leaving_behind = switched.stopped.clone();
 
     // Only what is about to start. A service the switch keeps running already holds
     // its port and cannot clash with itself, and one it is stopping is giving a port
@@ -138,11 +145,13 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
             .await
             .map_err(|err| Box::new(err.problem()))?;
         report.status = output.status;
+        halted::after(ctx, &Action::Stop(leaving_behind.clone()), &leaving_behind).await;
         if !output.succeeded() {
             return Ok(report);
         }
     }
 
+    halted::before(ctx, &Action::Up, &report.plan.services);
     let started = ctx
         .seams
         .runner

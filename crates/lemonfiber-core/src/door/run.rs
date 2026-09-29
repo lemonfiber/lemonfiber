@@ -28,7 +28,13 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         .iter()
         .map(|profile| profile.id.clone())
         .collect();
-    let running = crate::docker::survey(&manifest, &profiles, &containers, ctx.settings.protocols);
+    let running = crate::docker::survey(
+        &manifest,
+        &profiles,
+        &containers,
+        &crate::app::engine::halted::load(ctx),
+        ctx.settings.protocols,
+    );
     // Asked now rather than remembered: a machine renamed since the last look
     // answers as it is, which is the whole of how a changed address is noticed.
     let named = ctx.site.name().await;

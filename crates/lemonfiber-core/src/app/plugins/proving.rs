@@ -68,6 +68,7 @@ pub(crate) async fn started(
         .iter()
         .map(|placed| placed.service.clone())
         .collect();
+    crate::app::engine::halted::before(ctx, &Action::Start(services.clone()), &services);
     let command = invocation(ctx, installed, stack, &Action::Start(services));
     let answered = match ctx.seams.runner.run(&command).await {
         Ok(output) if output.succeeded() => return Ok(()),
@@ -101,6 +102,7 @@ pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
         .iter()
         .map(|placed| placed.service.clone())
         .collect();
+    crate::app::engine::halted::before(ctx, &Action::Start(services.clone()), &services);
     let command = invocation(ctx, installed, stack, &Action::Start(services));
     match ctx.seams.runner.run(&command).await {
         Ok(output) if output.succeeded() => None,

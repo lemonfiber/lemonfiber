@@ -508,6 +508,7 @@ async fn observe(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Result<Vec<
         manifest,
         &profiles,
         &containers,
+        &crate::app::engine::halted::load(ctx),
         ctx.settings.protocols,
     ))
 }
