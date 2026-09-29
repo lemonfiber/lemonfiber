@@ -1,4 +1,4 @@
-//! The seven requests lemonfiber makes on its own account.
+//! The eight requests lemonfiber makes on its own account.
 //!
 //! Each answers four questions, and the answers are prose because the reader is a
 //! person deciding whether they are comfortable with it. *Where* it goes is read
@@ -13,14 +13,15 @@
 use super::{Outbound, Reach};
 use crate::config::{
     Settings, IP_ECHO_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
-    REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY,
+    REACH_PLUGIN_SOURCE_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY,
 };
 use lemonfiber_manifest::Service;
 
 /// Every request lemonfiber makes, in the order an operator meets them: what the
 /// stack is built from, what keeps it current, the three that prove something, the
-/// one that carries a sentence to somebody who lives here, and the one this program
-/// makes about itself.
+/// one that carries a sentence to somebody who lives here, the one this program
+/// makes about itself, and the one that fetches a plugin from where its operator
+/// pointed.
 pub const EVERY: &[Reach] = &[
     Reach::Registry,
     Reach::Guides,
@@ -29,6 +30,7 @@ pub const EVERY: &[Reach] = &[
     Reach::Usenet,
     Reach::Household,
     Reach::Updates,
+    Reach::PluginSource,
 ];
 
 /// The repository the community quality guides are synced from, probed for
@@ -66,6 +68,21 @@ pub const PUSHBULLET: &str = "https://api.pushbullet.com/v2/pushes";
 /// does not name.
 pub const RELEASE_LIST: &str = "https://api.github.com/repos/lemonfiber/lemonfiber/releases";
 
+/// The git sources installed plugins came from, each once.
+///
+/// Where the next fetch goes is wherever an operator names, so what can be listed is
+/// where the installed ones came from — each is asked again when plugins are listed
+/// and fetched again when one is updated. A plugin from a directory reaches nowhere.
+fn sources(installed: &[crate::plugin::Installed]) -> Vec<String> {
+    let mut named: Vec<String> = Vec::new();
+    for one in installed {
+        if crate::plugin::Source::named(&one.from).is_git() && !named.contains(&one.from) {
+            named.push(one.from.clone());
+        }
+    }
+    named
+}
+
 /// What an image with no registry in its name is fetched from.
 const DOCKER_HUB: &str = "docker.io";
 
@@ -74,10 +91,15 @@ const DOCKER_HUB: &str = "docker.io";
 const NOTHING_CONFIGURED: &str = "nothing configured";
 
 /// One request, filled in against this machine.
-pub(super) fn outbound(reach: Reach, settings: &Settings, services: &[Service]) -> Outbound {
+pub(super) fn outbound(
+    reach: Reach,
+    settings: &Settings,
+    services: &[Service],
+    installed: &[crate::plugin::Installed],
+) -> Outbound {
     Outbound {
         reach,
-        destination: destination(reach, settings, services),
+        destination: destination(reach, settings, services, installed),
         purpose: purpose(reach).to_owned(),
         sends: sends(reach).to_owned(),
         allowed: allowed(reach, settings),
@@ -87,7 +109,12 @@ pub(super) fn outbound(reach: Reach, settings: &Settings, services: &[Service]) 
 }
 
 /// Where a request goes as this machine stands.
-fn destination(reach: Reach, settings: &Settings, services: &[Service]) -> Vec<String> {
+fn destination(
+    reach: Reach,
+    settings: &Settings,
+    services: &[Service],
+    installed: &[crate::plugin::Installed],
+) -> Vec<String> {
     match reach {
         Reach::Registry => registries(services),
         Reach::Guides => vec![GUIDE_SOURCE.to_owned()],
@@ -101,6 +128,7 @@ fn destination(reach: Reach, settings: &Settings, services: &[Service]) -> Vec<S
             .map_or_else(Vec::new, |host| vec![host.clone()]),
         Reach::Household => vec![PUSHOVER.to_owned(), PUSHBULLET.to_owned()],
         Reach::Updates => vec![RELEASE_LIST.to_owned()],
+        Reach::PluginSource => sources(installed),
     }
 }
 
@@ -176,6 +204,10 @@ pub fn purpose(reach: Reach) -> &'static str {
              whether theirs is current gets an answer rather than a shrug. Nothing waits on \
              it and nothing stops without it."
         }
+        Reach::PluginSource => {
+            "Fetch the one revision of a plugin you install from a git source you name, and \
+             nothing else from it. Made only when you name one."
+        }
     }
 }
 
@@ -220,6 +252,11 @@ pub fn sends(reach: Reach) -> &'static str {
              the address requires of anybody asking and which is the same word in every \
              copy of this program."
         }
+        Reach::PluginSource => {
+            "A git fetch of one commit from the address you named: the address, the branch, \
+             tag or commit you named, and git's own request for that commit. Nothing about \
+             this machine or the stack, and nothing of the repository is run."
+        }
     }
 }
 
@@ -233,6 +270,7 @@ pub fn switch(reach: Reach) -> &'static str {
         Reach::Usenet => REACH_USENET_KEY,
         Reach::Household => REACH_HOUSEHOLD_KEY,
         Reach::Updates => REACH_UPDATES_KEY,
+        Reach::PluginSource => REACH_PLUGIN_SOURCE_KEY,
     }
 }
 
@@ -271,6 +309,11 @@ pub fn cost(reach: Reach) -> &'static str {
             "The version report stops saying whether this copy is the newest, and answers \
              that it could not tell. Nothing else changes: lemonfiber never replaces itself \
              and every other thing it does works exactly as well on an old one."
+        }
+        Reach::PluginSource => {
+            "A plugin can be installed only from a directory on this machine. Nothing \
+             installed stops, and a git source you name is refused before anything is \
+             fetched."
         }
     }
 }

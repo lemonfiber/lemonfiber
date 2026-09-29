@@ -262,7 +262,7 @@ async fn installing(ctx: &Ctx, at: &Path) -> Result<Installs, Box<crate::error::
     plugins(
         ctx,
         &Asked::Install {
-            path: at.to_path_buf(),
+            source: crate::plugin::Source::Path(at.to_path_buf()),
         },
     )
     .await
@@ -431,6 +431,7 @@ fn document(ctx: &Ctx) -> String {
     std::fs::read_to_string(stack_of(ctx).join("compose/plugins/komga.yml")).unwrap_or_default()
 }
 
+mod fetching;
 mod fronting;
 mod installing;
 mod proving;

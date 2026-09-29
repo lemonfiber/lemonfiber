@@ -12,6 +12,7 @@ fn filling(plugin: &str, provides: &[&str]) -> Installed {
         contributions: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         from: String::new(),
+        revision: String::new(),
         installed_at: String::new(),
     }
 }

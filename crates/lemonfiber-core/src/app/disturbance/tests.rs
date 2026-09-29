@@ -102,7 +102,7 @@ fn removing_or_updating_a_plugin_takes_something_away_and_installing_one_does_no
 
     for quiet in [
         Command::Plugins(Asked::Install {
-            path: std::path::PathBuf::from("komga"),
+            source: crate::plugin::Source::Path(std::path::PathBuf::from("komga")),
         }),
         Command::Plugins(Asked::Installed),
     ] {

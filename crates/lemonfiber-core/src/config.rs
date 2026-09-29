@@ -43,7 +43,7 @@ use crate::ports::docker::Target;
 
 pub use reaching::{
     offline, Reaching, OFFLINE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
-    REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY, SWITCHES,
+    REACH_PLUGIN_SOURCE_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY, SWITCHES,
 };
 
 /// Which download protocols the operator actually has accounts for.

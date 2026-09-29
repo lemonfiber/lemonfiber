@@ -53,7 +53,7 @@ fn each_registry_is_named_once_however_many_images_come_from_it() {
 #[test]
 fn the_guide_source_is_the_one_the_probe_is_handed() {
     assert_eq!(
-        destination(Reach::Guides, &Settings::default(), &[]),
+        destination(Reach::Guides, &Settings::default(), &[], &[]),
         vec![GUIDE_SOURCE.to_owned()]
     );
 }
@@ -68,7 +68,7 @@ fn an_indexer_is_named_without_the_key_it_authenticates_with() {
         }),
         ..Settings::default()
     };
-    let named = destination(Reach::Indexer, &settings, &[]);
+    let named = destination(Reach::Indexer, &settings, &[], &[]);
     let shown = named.join(" ");
     assert_eq!(named.len(), 1, "{shown}");
     assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
@@ -77,8 +77,8 @@ fn an_indexer_is_named_without_the_key_it_authenticates_with() {
 
 #[test]
 fn a_request_with_nothing_configured_names_nowhere() {
-    for reach in [Reach::Indexer, Reach::Usenet] {
-        assert!(destination(reach, &Settings::default(), &[]).is_empty());
+    for reach in [Reach::Indexer, Reach::Usenet, Reach::PluginSource] {
+        assert!(destination(reach, &Settings::default(), &[], &[]).is_empty());
     }
     // And what a surface puts there instead, which is read from here by the
     // renderer in another crate — so it is exercised from both compilations of
@@ -93,7 +93,7 @@ fn a_usenet_provider_is_named_by_the_host_the_operator_gave() {
         ..Settings::default()
     };
     assert_eq!(
-        destination(Reach::Usenet, &settings, &[]),
+        destination(Reach::Usenet, &settings, &[], &[]),
         vec!["news.example.net".to_owned()]
     );
 }
@@ -101,7 +101,7 @@ fn a_usenet_provider_is_named_by_the_host_the_operator_gave() {
 #[test]
 fn the_echo_is_the_sources_in_force_and_is_off_when_there_are_none() {
     let settings = Settings::default();
-    assert!(!destination(Reach::Echo, &settings, &[]).is_empty());
+    assert!(!destination(Reach::Echo, &settings, &[], &[]).is_empty());
     assert!(allowed(Reach::Echo, &settings));
     let switched_off = Settings {
         ip_echo: Vec::new(),
@@ -117,7 +117,7 @@ fn the_echo_is_the_sources_in_force_and_is_off_when_there_are_none() {
 /// reading this was told it could go.
 #[test]
 fn where_a_household_member_is_told_is_the_two_the_list_names() {
-    let named = destination(Reach::Household, &Settings::default(), &[]);
+    let named = destination(Reach::Household, &Settings::default(), &[], &[]);
 
     assert_eq!(named.len(), 2, "{named:?}");
     assert!(
