@@ -67,6 +67,17 @@ codes! {
         /// Raised when the backup a destructive removal takes first could not be taken.
         NOT_BACKED_UP = "GONE-3",
     }
+    /// The `HANDOFF` codes.
+    handoff {
+        /// Said where the hand-off is for nobody: the name is blank, or only spaces.
+        NOBODY_NAMED = "HANDOFF-1",
+        /// Said where the stack holds no media server for a device to sign in to.
+        NO_MEDIA_SERVER = "HANDOFF-2",
+        /// Said where the media server's own account was never recorded.
+        NOT_SET_UP = "HANDOFF-3",
+        /// Said where the account named administers the media server.
+        RUNS_THE_SERVER = "HANDOFF-4",
+    }
     /// The `INVITE` codes.
     invite {
         /// Said where the stack holds no media server: there is nothing to make an account on.

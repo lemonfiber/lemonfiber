@@ -16,6 +16,7 @@ use std::sync::Arc;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::{Reaching, Settings};
 use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
@@ -206,4 +207,35 @@ pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
         })
         .build()
         .with_http(transport.clone())
+}
+
+/// The shipped stack with one service's block taken out.
+///
+/// Leaked because `Source::External` holds a `&'static Path`, and kept per-service so
+/// two tests wanting different omissions do not share one directory.
+pub fn stack_without(service: &str, tag: &str) -> Source {
+    let from = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/media-stack"
+    ));
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("without-{tag}")).kept();
+    let _ = std::fs::create_dir_all(&to);
+    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
+    // The links that named it go with it. A stack that drops a service drops what
+    // reached it, and one that kept them would be refused for naming a service the
+    // manifest no longer declares — which is the rule working rather than the case
+    // these tests are about.
+    let named = format!("\"{service}\"");
+    let services: String = read
+        .split("[[service]]")
+        .filter(|block| !block.contains(&format!("id = {named}")))
+        .collect::<Vec<_>>()
+        .join("[[service]]");
+    let kept: String = services
+        .split("[[wiring]]")
+        .filter(|block| !block.contains(&named))
+        .collect::<Vec<_>>()
+        .join("[[wiring]]");
+    let _ = std::fs::write(to.join("stack.toml"), kept);
+    Source::External(Box::leak(to.into_boxed_path()))
 }

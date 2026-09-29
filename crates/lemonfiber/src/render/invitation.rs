@@ -14,6 +14,12 @@ use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 use super::{qr, Lines};
 use crate::say;
 
+// Where a device handed that address stands: the same address and the same code,
+// asked about again once somebody has it.
+mod handoff;
+
+pub(super) use handoff::handoff;
+
 /// What an operator is told after offering somebody an account.
 pub(super) fn invitation(report: &Invitation) -> Lines {
     let mut lines = Lines::default();

@@ -273,6 +273,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Hosting(_) => reports("hosting"),
         Command::Invite { .. } => reports("invite"),
         Command::Reissue { .. } => reports("reissue"),
+        Command::Handoff { .. } => reports("household handoff"),
         Command::Forget { .. } => reports("forget"),
         Command::Space { .. } => reports("space"),
         Command::StopSeeding { .. } => reports("stop-seeding"),

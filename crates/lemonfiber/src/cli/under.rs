@@ -10,11 +10,12 @@
 
 use clap::{Subcommand, ValueEnum};
 
-/// What can be decided about what the household may ask for.
+/// What can be decided about the household, and done for one person in it.
 ///
-/// Three, and they are two different errands. Choosing a policy settles what happens to
-/// everything asked for from now on; approving and declining settle one thing somebody
-/// has already asked for, which is why each names a request and the choice does not.
+/// Choosing a policy settles what happens to everything asked for from now on; approving
+/// and declining settle one thing somebody has already asked for, which is why each names
+/// a request and the choice does not. Handing a device over is about one person, and
+/// names them.
 #[derive(Debug, Subcommand)]
 pub enum HouseholdCommand {
     /// Choose what happens to what the household asks for, and how much it may ask.
@@ -75,6 +76,17 @@ pub enum HouseholdCommand {
         /// Stop closing anything for waiting, whatever was arranged before.
         #[arg(long)]
         never: bool,
+    },
+    /// Hand somebody's phone or television the way onto the stack, and see whether it
+    /// arrived.
+    ///
+    /// The first run issues a code to scan, which carries the server's address and nothing
+    /// that signs anybody in. Every run asks the media server which of their devices are
+    /// signed in, so running it again says whether theirs has. Nobody is approved on their
+    /// behalf, and no account is made: invite them first.
+    Handoff {
+        /// Who it is for, named the way they sign in.
+        name: String,
     },
 }
 

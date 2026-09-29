@@ -37,6 +37,7 @@ fn configuration_and_regenerable_data_are_kept_apart() {
         paths.bandwidth(),
         paths.accepted(),
         paths.refusals(),
+        paths.handoffs(),
         paths.admission(),
         paths.updates(),
         paths.plugins(),

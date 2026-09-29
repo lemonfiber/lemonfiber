@@ -3,6 +3,7 @@
 //! One binary rather than one per file: each file is a module here, so the
 //! suite links once and the shared fakes are compiled once.
 
+mod a_phone_handed_over;
 mod a_reset_is_an_invitation;
 mod a_service_this_build_has_never_heard_of;
 mod a_start_that_fell_short;

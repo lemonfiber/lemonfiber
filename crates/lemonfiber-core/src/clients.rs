@@ -64,6 +64,14 @@ pub struct Device {
     pub caution: Option<&'static str>,
     /// What to do instead where this is a bad device to be stuck with.
     pub instead: Option<&'static str>,
+    /// Whether the app named is open source. A closed one may be named, with this false
+    /// beside it, and is never the one recommended.
+    pub open_source: bool,
+    /// A link that opens the app already pointed at this server, where the app is known to
+    /// take one, with `{address}` where the server's address goes. Absent otherwise, and a
+    /// hand-off then carries the address alone as its code, which the app is pointed at by
+    /// scanning or typing.
+    pub deep_link: Option<&'static str>,
 }
 
 /// Every device this product has something to say about.
@@ -77,6 +85,8 @@ pub const DEVICES: &[Device] = &[
         client: "the official Jellyfin app, from Google Play",
         caution: None,
         instead: None,
+        open_source: true,
+        deep_link: None,
     },
     Device {
         device: "iPhone or iPad",
@@ -84,6 +94,8 @@ pub const DEVICES: &[Device] = &[
         client: "the official Jellyfin app, from the App Store",
         caution: None,
         instead: None,
+        open_source: true,
+        deep_link: None,
     },
     Device {
         device: "Android TV or Fire TV",
@@ -91,6 +103,8 @@ pub const DEVICES: &[Device] = &[
         client: "the official Jellyfin app, from the device's own store",
         caution: None,
         instead: None,
+        open_source: true,
+        deep_link: None,
     },
     Device {
         device: "Apple TV",
@@ -101,6 +115,8 @@ pub const DEVICES: &[Device] = &[
              is the answer if you do not already have an opinion.",
         ),
         instead: None,
+        open_source: true,
+        deep_link: None,
     },
     Device {
         device: "A web browser",
@@ -111,6 +127,8 @@ pub const DEVICES: &[Device] = &[
              whenever an app for the device is missing, broken, or more trouble than it is worth.",
         ),
         instead: None,
+        open_source: true,
+        deep_link: None,
     },
     Device {
         device: "Smart TV (LG, Samsung)",
@@ -126,6 +144,8 @@ pub const DEVICES: &[Device] = &[
              turns this into the well-served case above. Casting from a phone works too, and \
              costs nothing to try first.",
         ),
+        open_source: true,
+        deep_link: None,
     },
     Device {
         device: "Kodi",
@@ -136,6 +156,8 @@ pub const DEVICES: &[Device] = &[
              in order to reach this stack.",
         ),
         instead: None,
+        open_source: true,
+        deep_link: None,
     },
 ];
 

@@ -21,6 +21,7 @@ Commands:
   approve   Let one waiting request through, by the number the household list gives it
   decline   Turn one waiting request down, saying why
   expiring  Close the requests nobody has ruled on, once they have waited too long
+  handoff   Hand somebody's phone or television the way onto the stack, and see whether it arrived
   help      Print this message or the help of the given subcommand(s)
 
 Options:
@@ -193,6 +194,42 @@ Options:
 
       --never
           Stop closing anything for waiting, whatever was arranged before
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household handoff`
+
+```text
+Hand somebody's phone or television the way onto the stack, and see whether it arrived.
+
+The first run issues a code to scan, which carries the server's address and nothing that signs anybody in. Every run asks the media server which of their devices are signed in, so running it again says whether theirs has. Nobody is approved on their behalf, and no account is made: invite them first.
+
+Usage: lemonfiber household handoff [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>
+          Who it is for, named the way they sign in
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
 
       --force
           Take the stack from a run that claimed it and did not give it back

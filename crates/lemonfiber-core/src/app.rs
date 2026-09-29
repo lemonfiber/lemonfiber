@@ -55,6 +55,7 @@ pub(crate) mod expiring;
 #[cfg(test)]
 pub(crate) mod fixtures;
 pub mod forwarding;
+pub(crate) mod handoff;
 pub(crate) mod held;
 pub(crate) mod history;
 pub(crate) mod hosting;
@@ -156,6 +157,17 @@ async fn removed(ctx: &Ctx, name: String, confirm: bool) -> Result<Outcome, Box<
     remove::remove(ctx, name, confirm)
         .await
         .map(Outcome::Removal)
+}
+
+/// Which app to use on which device, with what the quality in force does to playback.
+///
+/// Beside the table because it has a step before the answer. One caution above the
+/// devices is this machine's own: the quality preset on record and the platform decide
+/// together whether playback here will be transcoded on the processor, which is the
+/// likeliest cause of trouble on any of them. Both are read best-effort, so a machine with
+/// nothing set up is answered in full and simply warned about nothing.
+fn guided(ctx: &Ctx) -> Outcome {
+    Outcome::Clients(crate::clients::guidance(quality::straining(ctx)))
 }
 
 /// Put back the last repair, or the run a stamp names.
@@ -428,15 +440,14 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
-        Command::Clients => Ok(Outcome::Clients(crate::clients::guidance(
-            quality::straining(ctx),
-        ))),
+        Command::Clients => Ok(guided(ctx)),
         Command::Invite {
             name,
             allowance: to,
             confirm,
         } => invited(ctx, name, to, confirm).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
+        Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
         Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Wiring(asked) => wiring::wiring(ctx, &asked),

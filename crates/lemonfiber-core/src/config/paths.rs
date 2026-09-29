@@ -187,6 +187,14 @@ impl Paths {
         self.config.join("refusals.json")
     }
 
+    /// When each person was first handed a code to sign a device in with. Kept with
+    /// configuration because the media server records no such thing, and it is what tells
+    /// a code still waiting on somebody's phone from one never handed over.
+    #[must_use]
+    pub fn handoffs(&self) -> PathBuf {
+        self.config.join("handoffs.json")
+    }
+
     /// The choices the operator answered whose cost was stated to them once —
     /// running with no VPN, or with a provider that forwards no port. Kept with
     /// configuration because it records a decision, and a backup that restored the

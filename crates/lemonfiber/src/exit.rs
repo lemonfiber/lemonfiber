@@ -26,7 +26,7 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::codes::{leaves, Leaves};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, Triggered};
+use lemonfiber_core::model::{Disposition, HandoffState, Triggered};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
@@ -165,6 +165,18 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // downloading is working, and reporting that as a failure would contradict
         // the sentence that just told the operator nothing was cancelled; and one
         // that found the content already here answered the question it was asked.
+        // A hand-off that could not go ahead failed, and one for somebody with no account
+        // named somebody the media server does not hold, which is the operator's to put
+        // right. Waiting on the person's device is not a failure: it is where every
+        // hand-off stands between the code and the sign-in, and a script polling for the
+        // sign-in reads the state rather than the code.
+        Outcome::Handoff(report) => match report.state {
+            HandoffState::Failed => ExitCode::from(FAILURE),
+            HandoffState::Unprovisioned => ExitCode::from(VALIDATION),
+            HandoffState::Ready | HandoffState::Pending | HandoffState::Connected => {
+                ExitCode::SUCCESS
+            }
+        },
         Outcome::Walkthrough(report) => {
             if report.state.is_a_problem() {
                 ExitCode::from(FAILURE)

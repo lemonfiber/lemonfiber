@@ -434,3 +434,42 @@ fn a_problem_is_reported_with_its_remedies_and_a_missing_home_with_its_own_words
     assert_ne!(format!("{:?}", no_config_home()), success());
     let _ = USAGE;
 }
+
+/// A hand-off waiting on somebody's device answered its question; one that could not go
+/// ahead failed, and one for somebody with no account names somebody who is not there.
+#[test]
+fn a_hand_off_waiting_on_the_device_is_not_a_failure() {
+    let at = |state| {
+        format!(
+            "{:?}",
+            settled(&Outcome::Handoff(lemonfiber_core::model::Handoff {
+                name: "ana".to_owned(),
+                state,
+                reason: None,
+                address: None,
+                caution: None,
+                issued: None,
+                quick_connect: false,
+                steps: Vec::new(),
+                clients: Vec::new(),
+                sessions: Vec::new(),
+                rehearsed: false,
+            }))
+        )
+    };
+    for answered in [
+        lemonfiber_core::model::HandoffState::Ready,
+        lemonfiber_core::model::HandoffState::Pending,
+        lemonfiber_core::model::HandoffState::Connected,
+    ] {
+        assert_eq!(at(answered), success(), "{answered:?}");
+    }
+    assert_eq!(
+        at(lemonfiber_core::model::HandoffState::Failed),
+        shown(std::process::ExitCode::from(FAILURE))
+    );
+    assert_eq!(
+        at(lemonfiber_core::model::HandoffState::Unprovisioned),
+        shown(std::process::ExitCode::from(VALIDATION))
+    );
+}

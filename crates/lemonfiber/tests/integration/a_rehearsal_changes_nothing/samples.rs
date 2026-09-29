@@ -316,6 +316,12 @@ pub(super) fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
             }),
         ),
         ("expiring", Command::Expiring(Arranged::After(30))),
+        (
+            "handoff",
+            Command::Handoff {
+                name: "ana".to_owned(),
+            },
+        ),
         // `up --at-boot` is a flag rather than a subcommand, so the sample above
         // cannot reach it — and it is the one command here that writes three records
         // of its own, which is exactly the shape a rehearsal gets wrong.

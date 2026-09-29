@@ -65,8 +65,8 @@ pub use operating::{
     setup, stack, telling, tui, update, watch, word,
 };
 pub use serving::{
-    admit, backup, bundle, cred, gone, invite, kept, plugin, provider, qual, quota, rate, reissue,
-    remove, repair, restore, seed, space, storage, undo, vpn, wire, wiring,
+    admit, backup, bundle, cred, gone, handoff, invite, kept, plugin, provider, qual, quota, rate,
+    reissue, remove, repair, restore, seed, space, storage, undo, vpn, wire, wiring,
 };
 
 /// Every code there is, family by family, in number order.

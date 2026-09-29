@@ -291,12 +291,6 @@ pub enum Command {
     /// A read with no arguments. The table it answers with is the same for every
     /// machine — the client landscape belongs to the platforms rather than to this
     /// stack — and nothing is asked of the engine to build it.
-    ///
-    /// One caution above it is this machine's own: the quality preset on record and
-    /// the platform decide together whether playback here will be transcoded on the
-    /// processor, which is the likeliest cause of trouble on any of the devices
-    /// below. Both are read best-effort, so a machine with nothing set up is
-    /// answered in full and simply warned about nothing.
     Clients,
     /// Offer somebody in the house an account they can claim: one on the media server
     /// with no password, which whoever sets the first password claims. Takes back any
@@ -316,6 +310,12 @@ pub enum Command {
     /// first password themselves. What is handed back is the invitation to send them.
     Reissue {
         /// Whose account to make claimable again.
+        name: String,
+    },
+    /// Hand somebody's device the way onto the stack, and say whether it arrived. Makes
+    /// no account: a name with none behind it is answered as not provisioned.
+    Handoff {
+        /// Whose device is being handed over.
         name: String,
     },
     /// Take somebody out of the household, revoking their access to both the media
