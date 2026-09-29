@@ -5,6 +5,7 @@
 
 mod a_reset_is_an_invitation;
 mod a_service_this_build_has_never_heard_of;
+mod a_start_that_fell_short;
 mod an_expired_invitation_keeps_its_account;
 mod an_invitation_sets_nobodys_password;
 mod audiobookshelf;

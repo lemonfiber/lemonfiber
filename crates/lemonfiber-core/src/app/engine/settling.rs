@@ -204,3 +204,27 @@ pub(crate) async fn settled_into(
     report.forwarding = super::super::forwarding::after_start(ctx, manifest).await;
     Ok(())
 }
+
+/// Record where a start that did not complete left what it addressed.
+///
+/// Read once, now, and not waited on: nothing is going to settle, and the operator is
+/// owed what did not come back rather than another wait. The plan's profiles hold the
+/// services the start addressed and, because a dependency never crosses a profile,
+/// every service those depend on — so a download client left created behind a tunnel
+/// that never became ready is reported beside that tunnel.
+///
+/// An engine that will not answer leaves both empty: the start's own failure is
+/// already the report, and there is nothing read to put beside it.
+pub(crate) async fn fell_short_into(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    report: &mut LifecycleReport,
+) {
+    let Ok(containers) = ctx.seams.engine.list(&ctx.settings.project).await else {
+        return;
+    };
+    let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
+    let read = survey(manifest, &profiles, &containers, ctx.settings.protocols);
+    report.condition = Some(condition(&read));
+    report.services = read;
+}

@@ -24,7 +24,7 @@ pub(crate) use remote::verified;
 mod settling;
 mod status;
 mod stopping;
-pub(crate) use settling::settled_into;
+pub(crate) use settling::{fell_short_into, settled_into};
 mod streaming;
 mod switch;
 mod waiting;
@@ -295,9 +295,14 @@ async fn worked(
 
     // Starting waits for the services to be usable, because "started" that
     // means "a process exists" is a claim the operator will disprove by opening
-    // a browser. Nothing else waits: stopping is done when Compose says so.
-    if starts(action) && output.succeeded() {
-        settled_into(ctx, &manifest, &mut report).await?;
+    // a browser. Nothing else waits: stopping is done when Compose says so. A start
+    // that failed is not waited on, and still says where what it addressed stands.
+    if starts(action) {
+        if output.succeeded() {
+            settled_into(ctx, &manifest, &mut report).await?;
+        } else {
+            fell_short_into(ctx, &manifest, &mut report).await;
+        }
     }
 
     Ok(report)
