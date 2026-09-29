@@ -340,10 +340,10 @@ fn door(read: lemonfiber::cli::PluginCommand) -> Option<Command> {
 fn the_words_about_this_machine_become_commands() {
     assert_eq!(
         door(lemonfiber::cli::PluginCommand::Install {
-            path: std::path::PathBuf::from("/srv/komga")
+            source: "/srv/komga".to_owned()
         }),
         Some(Command::Plugins(plugins::Asked::Install {
-            path: std::path::PathBuf::from("/srv/komga")
+            source: lemonfiber_core::plugin::Source::Path(std::path::PathBuf::from("/srv/komga"))
         }))
     );
     assert_eq!(

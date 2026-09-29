@@ -29,6 +29,8 @@ mod declared;
 mod fronting;
 mod installed;
 mod register;
+// Where the plugin to install is, told apart by how the operator wrote it.
+mod source;
 // Where an install puts what it writes. Beside the record and the container rather
 // than inside either: the record says what was decided and the container says what
 // follows from it, and this says where both of those land on the machine.
@@ -72,7 +74,10 @@ pub use placing::{documents, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};
 pub use register::{Already, Register, Unreadable as Unrecorded};
-pub use reports::{Install, Installs, Removal, Restored, Substituted, Unfilled, Update};
+pub use reports::{
+    Fetchable, Install, Installs, Removal, Restored, Sourced, Substituted, Unfilled, Update,
+};
+pub use source::Source;
 pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
 pub use verified::{against, Changed, Verification};
 

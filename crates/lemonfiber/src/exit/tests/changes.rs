@@ -322,6 +322,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         contributions: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         from: String::new(),
+        revision: String::new(),
         installed_at: String::new(),
     }
 }
@@ -347,6 +348,7 @@ fn installed(
         })),
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     })
 }
 
@@ -396,6 +398,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
             }),
             update: None,
             substituted: Vec::new(),
+            sources: Vec::new(),
         })
     };
 
@@ -463,6 +466,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
                 }),
             })),
             substituted: Vec::new(),
+            sources: Vec::new(),
         })
     };
     assert_eq!(
@@ -493,6 +497,7 @@ fn reading_what_is_installed_always_succeeds() {
                 install: None,
                 update: None,
                 substituted: Vec::new(),
+                sources: Vec::new(),
             }
         ))),
         success()

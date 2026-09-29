@@ -401,6 +401,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
         removal: None,
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     };
     let done = Installs {
         removal: None,
@@ -420,6 +421,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
         }),
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     };
     assert!(read.install.is_none());
     assert_eq!(done.install.map(|one| one.recorded), Some(true));

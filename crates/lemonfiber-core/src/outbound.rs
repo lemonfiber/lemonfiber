@@ -1,6 +1,6 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes seven
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes eight
 //! requests on its own account and they are enumerated here in full; the services
 //! in the stack make a great many more, and those are **theirs** — an indexer
 //! query is Prowlarr asking an indexer, a poster is Radarr asking a metadata
@@ -31,7 +31,7 @@ pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RE
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Seven, and the closed set is the claim. An eighth is a decision somebody makes by
+/// Eight, and the closed set is the claim. A ninth is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
 ///
@@ -47,6 +47,10 @@ pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RE
 /// left off a list of what this program reaches. What it costs to allow is the shortest
 /// answer on the list: it carries nothing at all, so the only thing switching it off
 /// keeps from anybody is the knowledge that a version came out.
+///
+/// The eighth goes where the operator points it and nowhere else: a plugin's git
+/// source, named at install. It is the only entry whose destination nobody chose in
+/// advance, which is why it is made only when somebody names one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "OutboundReach")]
@@ -65,6 +69,8 @@ pub enum Reach {
     Household,
     /// Asking which version of lemonfiber itself has been released.
     Updates,
+    /// Fetching a plugin from a git source the operator names.
+    PluginSource,
 }
 
 impl Reach {
@@ -79,6 +85,7 @@ impl Reach {
             Self::Usenet => "usenet",
             Self::Household => "household",
             Self::Updates => "updates",
+            Self::PluginSource => "plugin-source",
         }
     }
 }
@@ -161,7 +168,7 @@ pub fn leaving(
     Leaving {
         ours: EVERY
             .iter()
-            .map(|reach| ours::outbound(*reach, settings, services))
+            .map(|reach| ours::outbound(*reach, settings, services, installed))
             .collect(),
         theirs,
     }

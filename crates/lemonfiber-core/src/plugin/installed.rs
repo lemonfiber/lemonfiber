@@ -254,6 +254,14 @@ pub struct Installed {
     /// the source it was asked about, because that is what it would record.
     #[serde(default)]
     pub from: String,
+    /// The commit it was installed at, where it came from a git source.
+    ///
+    /// The one commit the revision named at install resolved to, so what was installed
+    /// can be told from whatever that source serves now. Empty for a plugin installed
+    /// from a directory, which has no revision to name, and for a record written before
+    /// this was kept.
+    #[serde(default)]
+    pub revision: String,
     /// When it was installed, as the record stamps every change: whole seconds since
     /// the epoch.
     ///
@@ -300,6 +308,7 @@ impl Installed {
                 .collect(),
             declared: super::declared::Declaration::of(manifest),
             from: String::new(),
+            revision: String::new(),
             installed_at: String::new(),
         }
     }
@@ -314,6 +323,16 @@ impl Installed {
         Self {
             from: from.display().to_string(),
             installed_at: at.to_owned(),
+            ..self
+        }
+    }
+
+    /// The same record, as installed from a git source at one commit.
+    #[must_use]
+    pub fn fetched(self, from: &str, revision: &str) -> Self {
+        Self {
+            from: from.to_owned(),
+            revision: revision.to_owned(),
             ..self
         }
     }

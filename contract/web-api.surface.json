@@ -4040,6 +4040,7 @@
         "\"guides\"",
         "\"household\"",
         "\"indexer\"",
+        "\"plugin-source\"",
         "\"registry\"",
         "\"updates\"",
         "\"usenet\""
@@ -4790,6 +4791,12 @@
           ],
           "required": false
         },
+        "revision": {
+          "type": [
+            "string"
+          ],
+          "required": false
+        },
         "services": {
           "type": [
             "array[ref:PluginPlaced]"
@@ -4822,6 +4829,12 @@
         "removal": {
           "type": [
             "anyOf(null,ref:PluginRemoval)"
+          ],
+          "required": false
+        },
+        "sources": {
+          "type": [
+            "array[ref:PluginSource]"
           ],
           "required": false
         },
@@ -5107,6 +5120,52 @@
         }
       },
       "variants": []
+    },
+    "PluginSource": {
+      "fields": {
+        "from": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "plugin": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "standing": {
+          "type": [
+            "ref:PluginSourceStanding"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginSourceStanding": {
+      "fields": {
+        "standing": {
+          "type": [
+            "const:\"reachable\"",
+            "const:\"unasked\"",
+            "const:\"unreachable\""
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": [
+        "\"reachable\"",
+        "\"unasked\"",
+        "\"unreachable\""
+      ]
     },
     "PluginSubstituted": {
       "fields": {

@@ -153,7 +153,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@796122fb1eefb4a3467fd060c6c441ababdc76b2 # v1.0.21
+    uses: lemonfiber/spec/.github/workflows/sonar-gate.yml@578850cd7cc9c81ed1664ce7885c9b93aeeab564 # v1.0.23
     with:
       # What this repository carries, declared here so it can be read without a
       # SonarCloud login. A ceiling rather than an allowance: it may not rise past

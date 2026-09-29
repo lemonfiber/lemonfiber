@@ -211,6 +211,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         contributions: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         from: String::new(),
+        revision: String::new(),
         installed_at: String::new(),
     };
     lemonfiber_core::plugin::Installs {
@@ -251,6 +252,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         })),
         update: None,
         substituted: Vec::new(),
+        sources: Vec::new(),
     }
 }
 

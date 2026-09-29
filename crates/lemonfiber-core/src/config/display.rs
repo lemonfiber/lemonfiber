@@ -114,6 +114,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          a report that says it could not tell",
     ),
     (
+        super::REACH_PLUGIN_SOURCE_KEY,
+        "whether a plugin may be fetched from a git source you name, which explains an \
+         install from one that was refused before anything was fetched",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",
