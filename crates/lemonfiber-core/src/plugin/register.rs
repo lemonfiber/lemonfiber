@@ -35,6 +35,9 @@ pub struct Already {
     pub plugin: String,
     /// The version it holds for it.
     pub version: String,
+    /// The source it was installed from, as the operator named it then. Empty for a
+    /// record written before sources were kept.
+    pub from: String,
 }
 
 /// Every plugin this machine has installed.
@@ -197,6 +200,7 @@ impl Register {
             return Err(Already {
                 plugin: held.plugin.clone(),
                 version: held.version.clone(),
+                from: held.from.clone(),
             });
         }
         let at = self

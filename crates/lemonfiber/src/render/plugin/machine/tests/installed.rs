@@ -384,6 +384,31 @@ fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
     assert!(said.contains("Nothing was written."), "{said}");
 }
 
+/// A plugin nobody reviewed is said to be one by the install itself, in every tense,
+/// rather than only by the listing a rehearsal leaves it out of.
+#[test]
+fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
+    let one = Installed {
+        from: "/home/ana/komga".to_owned(),
+        ..recorded("komga", Some(household()))
+    };
+    for recorded in [false, true] {
+        let said = installs(&Installs {
+            removal: None,
+            installed: Vec::new(),
+            install: Some(Box::new(install(one.clone(), recorded))),
+            update: None,
+            substituted: Vec::new(),
+        })
+        .text();
+        let header = said.lines().nth(1).unwrap_or_default();
+        assert_eq!(
+            header, "    from /home/ana/komga — unreviewed: nobody vouched for it",
+            "{said}"
+        );
+    }
+}
+
 /// A rehearsal on a machine with nothing on it says so, rather than heading a
 /// list of none — and never counts the plugin it did not install.
 #[test]

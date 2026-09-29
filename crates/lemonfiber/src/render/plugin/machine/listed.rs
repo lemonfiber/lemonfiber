@@ -12,19 +12,28 @@ use lemonfiber_core::plugin::{Installed, Substituted};
 
 use super::super::super::Lines;
 
-/// Everything the record says a plugin is doing.
-pub(super) fn provenance(one: &Installed, substituted: &[Substituted]) -> Lines {
-    let mut lines = Lines::default();
-    let declared = &one.declared;
-    lines.put(format!(
-        "    from       {} — {}",
+/// Where a plugin came from, and whether anybody vouched for it.
+///
+/// One sentence for the listing and for an install, rehearsed or not, so a plugin
+/// nobody reviewed is said to be one at the moment it is installed and for as long as
+/// it is listed, in the same words.
+pub(super) fn origin(one: &Installed) -> String {
+    format!(
+        "{} — {}",
         or_unrecorded(&one.from),
-        if declared.reviewed {
+        if one.declared.reviewed {
             "reviewed"
         } else {
             "unreviewed: nobody vouched for it"
         }
-    ));
+    )
+}
+
+/// Everything the record says a plugin is doing.
+pub(super) fn provenance(one: &Installed, substituted: &[Substituted]) -> Lines {
+    let mut lines = Lines::default();
+    let declared = &one.declared;
+    lines.put(format!("    from       {}", origin(one)));
     lines.put(format!(
         "    installed  {}",
         if one.installed_at.is_empty() {
