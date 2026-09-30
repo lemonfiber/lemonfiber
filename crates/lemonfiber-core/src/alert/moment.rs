@@ -58,6 +58,12 @@ pub struct Alert {
     /// Every check this alert speaks for, the first being [`Self::check`]. More
     /// than one where the same event was grouped across several services.
     pub affected: Vec<String>,
+    /// How the service it is about exited, where it has and the engine said;
+    /// where several were grouped, how the first of them did.
+    ///
+    /// The technical half of what happened, kept out of the summary so the plain
+    /// words lead, and here for whoever wants the code.
+    pub exit: Option<i32>,
 }
 
 impl Alert {
@@ -83,6 +89,7 @@ impl Alert {
             meaning: condition.meaning.clone(),
             remedies: condition.remedies.clone(),
             affected: vec![condition.check.clone()],
+            exit: condition.exit,
         })
     }
 

@@ -56,6 +56,11 @@ pub struct Affected {
     pub remedies: Vec<String>,
     /// What is also wrong because of this, counted with it rather than again.
     pub downstream: Vec<String>,
+    /// How the service it is about exited, where it has and the engine said.
+    ///
+    /// The technical half of what happened, kept out of the summary so the plain
+    /// words lead, and here for whoever wants the code.
+    pub exit: Option<i32>,
 }
 
 impl Summary {
@@ -94,6 +99,7 @@ impl Summary {
                 meaning: condition.meaning.clone(),
                 remedies: condition.remedies.clone(),
                 downstream: Self::downstream_of(&condition.check, &steady),
+                exit: condition.exit,
             })
             .collect();
         // Worst first, and stably, so two things equally wrong keep the order the

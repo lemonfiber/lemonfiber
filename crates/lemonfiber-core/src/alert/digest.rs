@@ -210,6 +210,7 @@ fn alert_for(condition: &Condition, told: Option<u32>) -> Option<Alert> {
         meaning: condition.meaning.clone(),
         remedies: condition.remedies.clone(),
         affected: vec![condition.check.clone()],
+        exit: condition.exit,
     })
 }
 

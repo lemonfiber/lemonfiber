@@ -308,6 +308,7 @@ fn a_wordy_snapshot() -> Snapshot {
         meaning: a_long(4),
         remedies: vec!["start it".to_owned()],
         affected: vec!["service.sonarr".to_owned()],
+        exit: None,
     }];
     snapshot
 }

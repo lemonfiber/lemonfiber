@@ -141,3 +141,17 @@ fn only_a_critical_onset_interrupts_someone_who_asked_for_quiet() {
     // And a warning is not an emergency however new it is.
     assert!(Alert::of(&raised(), None).is_some_and(|a| !a.overrides_quiet()));
 }
+
+#[test]
+fn an_alert_carries_the_exit_code_beside_its_summary() {
+    let condition = Condition::raised(
+        "service.sonarr",
+        &wrong(Severity::Error, "sonarr stopped with an error").exited(Some(137)),
+        "1000",
+    );
+    let carried = Alert::of(&condition, None).map(|alert| (alert.summary, alert.exit));
+    assert_eq!(
+        carried,
+        Some(("sonarr stopped with an error".to_owned(), Some(137)))
+    );
+}

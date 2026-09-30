@@ -56,6 +56,12 @@ pub struct Fault {
     /// A disk that filled and the nine imports that then failed are one problem;
     /// naming the root is what lets a summary say so instead of counting ten.
     pub caused_by: Option<String>,
+    /// How the service it is about exited, where it has and the engine said.
+    ///
+    /// Beside the summary rather than written into it: the code is the detail an
+    /// operator reaches for once they know what happened, and a headline that leads
+    /// with it has lost everyone who does not know what `137` means.
+    pub exit: Option<i32>,
 }
 
 impl Fault {
@@ -70,6 +76,7 @@ impl Fault {
             meaning: withheld(meaning),
             remedies: vec![withheld(remedy)],
             caused_by: None,
+            exit: None,
         }
     }
 
@@ -84,6 +91,13 @@ impl Fault {
     #[must_use]
     pub fn caused_by(mut self, check: &str) -> Self {
         self.caused_by = Some(check.to_owned());
+        self
+    }
+
+    /// Carry how the service exited, where the engine said.
+    #[must_use]
+    pub const fn exited(mut self, code: Option<i32>) -> Self {
+        self.exit = code;
         self
     }
 }

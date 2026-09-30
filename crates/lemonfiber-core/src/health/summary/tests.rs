@@ -361,3 +361,26 @@ fn a_stopped_stack_with_something_wrong_still_reads_as_stopped() {
         Standing::Stopped
     );
 }
+
+#[test]
+fn an_affected_item_carries_the_exit_code_beside_its_summary() {
+    let stopped = Condition::raised(
+        "service.sonarr",
+        &Fault::new(
+            "service.stopped",
+            Severity::Error,
+            "sonarr stopped with an error",
+            "nothing that needs it is working",
+            "start sonarr again",
+        )
+        .exited(Some(137)),
+        RAISED,
+    );
+    let summary = Summary::of(Reach::Running, &[&stopped], SETTLED);
+    let carried: Vec<(&str, Option<i32>)> = summary
+        .affected
+        .iter()
+        .map(|item| (item.summary.as_str(), item.exit))
+        .collect();
+    assert_eq!(carried, vec![("sonarr stopped with an error", Some(137))]);
+}

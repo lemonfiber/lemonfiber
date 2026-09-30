@@ -182,7 +182,7 @@ fn each_bad_state_says_what_actually_happened() {
             State::Unhealthy,
             "sonarr is running but its own check is failing",
         ),
-        (State::Failed, "sonarr stopped on its own"),
+        (State::Failed, "sonarr stopped with an error"),
     ];
     for (state, expected) in cases {
         let services = [service("sonarr", state, Criticality::Core)];
@@ -194,19 +194,47 @@ fn each_bad_state_says_what_actually_happened() {
     }
 }
 
+/// What each service's fault says, and the exit code it carries beside that.
+fn said(services: &[Service]) -> Vec<(String, Option<i32>)> {
+    observed(services, Egress::NotApplicable)
+        .into_iter()
+        .filter_map(|(_, fault)| fault.map(|fault| (fault.summary, fault.exit)))
+        .collect()
+}
+
 #[test]
-fn an_exit_code_is_carried_where_the_engine_reported_one() {
+fn an_exit_code_is_carried_beside_the_summary_rather_than_in_it() {
     let failed = Service {
         exit: Some(137),
         ..service("sonarr", State::Failed, Criticality::Core)
     };
-    let summaries: Vec<String> = observed(&[failed], Egress::NotApplicable)
-        .into_iter()
-        .filter_map(|(_, fault)| fault.map(|fault| fault.summary))
-        .collect();
     assert_eq!(
-        summaries,
-        vec!["sonarr stopped on its own (exit 137)".to_owned()]
+        said(&[failed]),
+        vec![("sonarr stopped with an error".to_owned(), Some(137))]
+    );
+}
+
+#[test]
+fn a_clean_exit_says_it_stopped_without_an_error() {
+    let failed = Service {
+        exit: Some(0),
+        ..service("sonarr", State::Failed, Criticality::Core)
+    };
+    assert_eq!(
+        said(&[failed]),
+        vec![("sonarr stopped without an error".to_owned(), Some(0))]
+    );
+}
+
+#[test]
+fn a_service_restarting_on_a_loop_carries_the_code_it_last_left_with() {
+    let looping = Service {
+        exit: Some(1),
+        ..service("sonarr", State::CrashLooping, Criticality::Core)
+    };
+    assert_eq!(
+        said(&[looping]),
+        vec![("sonarr keeps restarting".to_owned(), Some(1))]
     );
 }
 

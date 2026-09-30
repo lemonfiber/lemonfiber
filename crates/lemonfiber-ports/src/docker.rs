@@ -134,9 +134,10 @@ pub enum Stream {
 
 /// One line of output from one service.
 ///
-/// Serialisable because a log stream is part of the machine-readable contract:
-/// `--json` renders one envelope per line, since a stream has no last element
-/// to close a document with.
+/// Serialisable because the line the machine-readable contract carries is built on
+/// it, with the severity the core reads from it beside these fields: `--json`
+/// renders one envelope per line, since a stream has no last element to close a
+/// document with.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct LogLine {
     /// The Compose service it came from.

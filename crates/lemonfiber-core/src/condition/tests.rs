@@ -214,3 +214,33 @@ fn a_condition_round_trips_through_its_serialised_form() {
         Some(condition)
     );
 }
+
+#[test]
+fn how_a_service_exited_is_kept_and_refreshed_with_the_fault() {
+    // A service that falls over again may fall over differently, and the code an
+    // operator is shown should be the one it left with last.
+    let mut condition = Condition::raised("service.sonarr", &raised_fault(Some(1)), "1000");
+    assert_eq!(condition.exit, Some(1));
+    condition.raise(&raised_fault(Some(137)), "2000");
+    assert_eq!(condition.exit, Some(137));
+}
+
+#[test]
+fn a_store_written_before_exit_codes_were_kept_still_loads() {
+    let older = r#"{"check":"service.sonarr","severity":"error","summary":"stopped",
+        "since":"1000","cleared":null,"recurrences":0,"declined":false}"#;
+    let parsed = serde_json::from_str::<Condition>(older).ok();
+    assert_eq!(parsed.map(|condition| condition.exit), Some(None));
+}
+
+/// A service's fault, carrying how it exited.
+fn raised_fault(exit: Option<i32>) -> Fault {
+    Fault::new(
+        "service.stopped",
+        Severity::Error,
+        "sonarr stopped with an error",
+        "the stack does not do what it is for without sonarr",
+        "start sonarr again",
+    )
+    .exited(exit)
+}

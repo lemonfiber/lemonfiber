@@ -23,11 +23,14 @@ pub mod viewer;
 /// How bad a line says it is.
 ///
 /// Ordered, so a filter can ask for "warnings and worse" without a table of which
-/// level outranks which. Deliberately coarse: five levels are what services agree
-/// on, and a sixth that only one of them writes would be a level nobody could filter
+/// level outranks which. Deliberately coarse: these six are what services agree
+/// on, and a seventh that only one of them writes would be a level nobody could filter
 /// by across the stack.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "LogLevel")]
 pub enum Level {
     /// Detail a developer asked for.
     Trace,
@@ -55,6 +58,37 @@ impl Level {
             Self::Warn => "warn",
             Self::Error => "error",
             Self::Fatal => "fatal",
+        }
+    }
+}
+
+/// One line of output from one service, and how bad it says it is.
+///
+/// What a machine-readable surface hands on, rather than the engine's line alone, so
+/// a consumer can mark the lines that say they failed, or find the first of them,
+/// without reading the text for itself — a second reading of severity would be a
+/// second answer, and the two would disagree about some service's spelling.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "LogLine")]
+pub struct Line {
+    /// The line as the engine handed it on.
+    #[serde(flatten)]
+    pub said: LogLine,
+    /// How bad the line says it is, in one lowercase word.
+    ///
+    /// Absent where the line says nothing about itself. It is never guessed from
+    /// the stream the line arrived on or from the words in it: most of this stack
+    /// writes ordinary progress to standard error, and a line saying it could not
+    /// find something is often a routine miss.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<Level>,
+}
+
+impl From<LogLine> for Line {
+    fn from(said: LogLine) -> Self {
+        Self {
+            level: declared(&said.line),
+            said,
         }
     }
 }

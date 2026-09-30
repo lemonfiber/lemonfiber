@@ -61,7 +61,7 @@ use lemonfiber_core::model::{
 
 use crate::admission::admitted::Admitted;
 use crate::jobs::started::Started;
-use lemonfiber_core::ports::docker::LogLine;
+use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::walkthrough::Line;
 
 pub use path::CONTRACT_PATH;
