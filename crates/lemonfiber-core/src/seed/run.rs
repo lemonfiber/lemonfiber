@@ -17,6 +17,8 @@ mod applications;
 mod arrs;
 mod baseline;
 mod clients;
+// Jellyfin's cross-origin allow-list, held to the front door's origin on every pass.
+mod cors;
 mod fulfilment;
 mod published;
 pub(crate) use published::published_as;
@@ -214,6 +216,11 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         seed_jellyfin_identity(ctx, &manifest.services, &baseline, &filled).await;
     wirings.extend(identity_wirings);
     baseline.merge(&identity_records);
+
+    // Which origins a browser may read the media server from: the front door's alone.
+    // After the identity step, because that is the run that records the administrator
+    // credential this is written with.
+    wirings.extend(cors::seed_cors(ctx, &manifest.services).await);
 
     // The *arrs the request service hands a request to. Without this the household
     // can ask and nothing downstream ever hears, and with it the request surface
