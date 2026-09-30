@@ -56,6 +56,8 @@ mod removing;
 mod standing;
 // Installing from a git source: the revision resolved, the commit fetched as data.
 mod fetching;
+// Installing by name: the catalogue's index verified, and the name resolved through it.
+mod cataloguing;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;
@@ -85,8 +87,8 @@ pub enum Asked {
     /// there is no flag by which an operator could be talked into installing
     /// something on terms the manifest did not declare.
     Install {
-        /// The plugin's source: its directory, the `plugin.toml` inside it, or a git
-        /// repository at a revision.
+        /// The plugin's source: its name in the catalogue, its directory, the
+        /// `plugin.toml` inside it, or a git repository at a revision.
         source: crate::plugin::Source,
     },
     /// Say what is installed, and what each install decided.
@@ -151,7 +153,17 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
         Asked::Install { source } => match source {
             crate::plugin::Source::Path(path) => Box::pin(install(ctx, held, path, None)).await,
             crate::plugin::Source::Git { url, revision } => {
-                Box::pin(fetching::installed(ctx, held, url, revision.as_deref())).await
+                Box::pin(fetching::installed(
+                    ctx,
+                    held,
+                    url,
+                    revision.as_deref(),
+                    None,
+                ))
+                .await
+            }
+            crate::plugin::Source::Name(name) => {
+                Box::pin(cataloguing::installed(ctx, held, name)).await
             }
         },
         Asked::Remove { plugin } => Box::pin(removing::remove(ctx, held, plugin)).await,
@@ -206,10 +218,16 @@ async fn install(
     let stamp = ctx.stamp();
     let settled = Installed::of(&manifest).installed(path, &stamp);
     let (would, named) = match from {
-        Some(fetched) => (
-            settled.fetched(fetched.url, fetched.commit),
-            PathBuf::from(fetched.url),
-        ),
+        Some(fetched) => {
+            let fetched_at = settled.fetched(fetched.url, fetched.commit);
+            (
+                match fetched.signed {
+                    Some(signed) => fetched_at.vouched(signed),
+                    None => fetched_at,
+                },
+                PathBuf::from(fetched.url),
+            )
+        }
         None => (settled, path.to_path_buf()),
     };
     let mut after = held.clone();

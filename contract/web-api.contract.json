@@ -9570,7 +9570,7 @@
           ]
         },
         "OutboundReach": {
-          "description": "One of the requests lemonfiber makes on its own account.\n\nEight, and the closed set is the claim. A ninth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.\n\nThe eighth goes where the operator points it and nowhere else: a plugin's git\nsource, named at install. It is the only entry whose destination nobody chose in\nadvance, which is why it is made only when somebody names one.",
+          "description": "One of the requests lemonfiber makes on its own account.\n\nNine, and the closed set is the claim. A tenth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.\n\nThe eighth goes where the operator points it and nowhere else: a plugin's git\nsource, named at install. It is the only entry whose destination nobody chose in\nadvance, which is why it is made only when somebody names one.\n\nThe ninth goes to one place this build names, and only when an operator installs a\nplugin by name: the catalogue's newest release, for its index and the signature over\nit.",
           "oneOf": [
             {
               "description": "Fetching the service images the stack runs.",
@@ -9611,6 +9611,11 @@
               "description": "Fetching a plugin from a git source the operator names.",
               "type": "string",
               "const": "plugin-source"
+            },
+            {
+              "description": "Reading the catalogue's index to resolve a plugin installed by name.",
+              "type": "string",
+              "const": "catalogue"
             }
           ]
         },
@@ -10762,7 +10767,7 @@
               }
             },
             "reviewed": {
-              "description": "Whether anybody reviewed it before it was installed.\n\nFalse for every install from a path an operator named — which is every install\nthis build makes. Carried rather than left implicit, because an unreviewed\nplugin is to be said to be one for as long as it is installed, and a field that\nis only ever false today is still the field a reviewed install will set.",
+              "description": "Whether anybody reviewed it before it was installed.\n\nTrue for a plugin installed by name through a catalogue index whose signature\nverified, and false for every install from a source an operator named. Carried\nrather than left implicit, because an unreviewed plugin is to be said to be one\nfor as long as it is installed.",
               "type": "boolean",
               "default": false
             },
@@ -11019,6 +11024,11 @@
               "items": {
                 "$ref": "#/$defs/PluginPlaced"
               }
+            },
+            "signed": {
+              "description": "What signed it: the key the catalogue index it was resolved through verified\nagainst, named with its fingerprint.\n\nEmpty for a plugin installed from a source the operator named, which nothing\nsigned, and for a record written before this was kept.",
+              "type": "string",
+              "default": ""
             },
             "version": {
               "description": "The plugin's own content version, as it stood when it was installed.",

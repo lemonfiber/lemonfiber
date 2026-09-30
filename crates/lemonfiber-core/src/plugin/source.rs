@@ -1,9 +1,12 @@
-//! Where a plugin to install is: a directory on this machine, or a git repository.
+//! Where a plugin to install is: a name in the catalogue, a directory on this machine,
+//! or a git repository.
 //!
 //! Told apart by how the operator wrote it, and by nothing that has to be asked: an
 //! address with a scheme git speaks, or git's own `user@host:path` form, is a
-//! repository, and anything else is a path. A path that happens to look like neither
-//! is still a path, and is refused as one if nothing is there.
+//! repository; a bare word shaped as a plugin's id is a name; and anything else is a
+//! path. A directory in the current one whose name is shaped as an id is written with
+//! `./` in front of it. A path that happens to look like none of these is still a path,
+//! and is refused as one if nothing is there.
 //!
 //! A repository may name a revision after its last `@` — a branch, a tag or a whole
 //! commit — and names none otherwise, which means whatever it serves as its default.
@@ -18,6 +21,8 @@ const GIT: &[&str] = &["https://", "http://", "ssh://", "git://", "git@"];
 /// Where the plugin to install is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Source {
+    /// A plugin's id, resolved through the catalogue's signed index.
+    Name(String),
     /// On this machine: its directory, or the `plugin.toml` inside it.
     Path(PathBuf),
     /// A git repository, and the revision named where one was.
@@ -34,6 +39,9 @@ impl Source {
     #[must_use]
     pub fn named(written: &str) -> Self {
         if !GIT.iter().any(|scheme| written.starts_with(scheme)) {
+            if is_id(written) {
+                return Self::Name(written.to_owned());
+            }
             return Self::Path(PathBuf::from(written));
         }
         // The revision is looked for only in the last step of the path, so neither the
@@ -62,6 +70,21 @@ impl Source {
     pub const fn is_git(&self) -> bool {
         matches!(self, Self::Git { .. })
     }
+}
+
+/// Whether a word is shaped as a plugin's id: lowercase letters and digits in words
+/// joined by single hyphens, beginning with a letter.
+///
+/// The shape the catalogue registers an id under, so a word of this shape is one the
+/// catalogue could hold and anything else could not.
+fn is_id(written: &str) -> bool {
+    written.starts_with(|letter: char| letter.is_ascii_lowercase())
+        && written.split('-').all(|word| {
+            !word.is_empty()
+                && word
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        })
 }
 
 #[cfg(test)]

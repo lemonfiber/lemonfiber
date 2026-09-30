@@ -241,6 +241,8 @@ It then says what container lemonfiber writes from that record, which is the que
 
 A git repository is installed at one commit: the branch, tag or commit named after its last `@`, or what it serves by default, resolved before anything is fetched. That commit is fetched as data, nothing of it is run, and the record keeps the repository and the commit.
 
+A plugin's name — a bare word such as `komga` — is resolved through the catalogue's newest index, and only once its signature verifies against the key this build carries. The plugin is installed from the origin that index names, at the commit it reviewed, and only if the manifest there is the one it reviewed; the record keeps it as reviewed, with the key that signed it. A directory whose name is a bare word is written `./komga`.
+
 Installing over an installation is refused naming it: that is an update, which puts one set of changes back before it applies another.
 
 `--dry-run` settles everything the real run settles, says the same account of it, and writes nothing.
@@ -249,7 +251,7 @@ Usage: lemonfiber plugin install [OPTIONS] <SOURCE>
 
 Arguments:
   <SOURCE>
-          The plugin's source: its directory, the `plugin.toml` inside it, or a git repository, at a branch, tag or commit named after its last `@`
+          The plugin's source: its name in the catalogue, its directory, the `plugin.toml` inside it, or a git repository, at a branch, tag or commit named after its last `@`
 
 Options:
       --json

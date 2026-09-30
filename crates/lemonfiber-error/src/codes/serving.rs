@@ -183,6 +183,21 @@ codes! {
         UNFETCHED = "PLUGIN-16",
         /// Raised when a git source holds no branch, tag or commit by the name given.
         NO_REVISION = "PLUGIN-17",
+        /// Raised when a plugin is installed by name and asking the catalogue is switched
+        /// off.
+        CATALOGUE_OFF = "PLUGIN-18",
+        /// Raised when the catalogue's index or its signature could not be fetched.
+        CATALOGUE_UNREACHABLE = "PLUGIN-19",
+        /// Raised when the catalogue's index has no signature, one that does not verify,
+        /// or none this build carries a key to check.
+        SIGNATURE_UNVERIFIED = "PLUGIN-20",
+        /// Raised when the catalogue's index verified and is not one this build reads.
+        CATALOGUE_UNREADABLE = "PLUGIN-21",
+        /// Raised when the catalogue holds no plugin by the name given.
+        NOT_CATALOGUED = "PLUGIN-22",
+        /// Raised when what the catalogue's origin served is not what the catalogue
+        /// reviewed.
+        NOT_AS_REVIEWED = "PLUGIN-23",
     }
     /// The `PROVIDER` codes.
     provider {

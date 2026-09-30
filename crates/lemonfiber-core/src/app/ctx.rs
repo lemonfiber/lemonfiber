@@ -116,6 +116,14 @@ pub struct Ctx {
     /// configuration home is has no backups directory, and the commands that need
     /// one refuse rather than guessing at a path to write over.
     pub archives: Option<Archiving>,
+    /// The key a catalogue index is verified against before a name is resolved
+    /// through it, or nothing where this build carries none.
+    ///
+    /// The one this build was compiled with, and no surface offers a way to set it: a
+    /// key an operator could replace would be a key anybody who can edit a file could.
+    /// A field rather than a constant read in place, so a test can sign an index with a
+    /// key it made.
+    pub catalogue_key: Option<Box<crate::plugin::Key>>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -185,6 +193,7 @@ impl Ctx {
             // home means asking the operating system, which is the surface's
             // half of this and not something a default could stand in for.
             archives: None,
+            catalogue_key: crate::plugin::catalogue::carried().map(Box::new),
         }
     }
 

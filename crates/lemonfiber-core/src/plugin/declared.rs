@@ -43,10 +43,10 @@ pub struct Declaration {
     pub license: String,
     /// Whether anybody reviewed it before it was installed.
     ///
-    /// False for every install from a path an operator named — which is every install
-    /// this build makes. Carried rather than left implicit, because an unreviewed
-    /// plugin is to be said to be one for as long as it is installed, and a field that
-    /// is only ever false today is still the field a reviewed install will set.
+    /// True for a plugin installed by name through a catalogue index whose signature
+    /// verified, and false for every install from a source an operator named. Carried
+    /// rather than left implicit, because an unreviewed plugin is to be said to be one
+    /// for as long as it is installed.
     #[serde(default)]
     pub reviewed: bool,
     /// Every capability it claims, core and its own, in the order it declares them.

@@ -358,11 +358,13 @@ fn the_listing_says_what_each_plugin_is_doing() {
     }
 }
 
-/// A reviewed plugin says so, and one row it adds is counted in the singular.
+/// A reviewed plugin says so and what signed it, and one row it adds is counted in the
+/// singular.
 #[test]
 fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
     let mut one = recorded("komga", None);
     one.declared.reviewed = true;
+    "the lemonfiber-plugins catalogue key (sha256:ab12)".clone_into(&mut one.signed);
     one.contributions = serde_json::from_str(
         r#"[{"at":"doctor.remedy","id":"komga:a","for":"komga:b","why":"w","action":"a"}]"#,
     )
@@ -376,7 +378,13 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
         sources: Vec::new(),
     })
     .text();
-    assert!(said.contains("— reviewed"), "{said}");
+    assert!(
+        said.contains(
+            "— reviewed: from the catalogue, signed by the lemonfiber-plugins catalogue key \
+             (sha256:ab12)"
+        ),
+        "{said}"
+    );
     assert!(said.contains("adds       1 row to registers"), "{said}");
 }
 

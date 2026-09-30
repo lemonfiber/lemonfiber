@@ -262,6 +262,13 @@ pub struct Installed {
     /// this was kept.
     #[serde(default)]
     pub revision: String,
+    /// What signed it: the key the catalogue index it was resolved through verified
+    /// against, named with its fingerprint.
+    ///
+    /// Empty for a plugin installed from a source the operator named, which nothing
+    /// signed, and for a record written before this was kept.
+    #[serde(default)]
+    pub signed: String,
     /// When it was installed, as the record stamps every change: whole seconds since
     /// the epoch.
     ///
@@ -309,6 +316,7 @@ impl Installed {
             declared: super::declared::Declaration::of(manifest),
             from: String::new(),
             revision: String::new(),
+            signed: String::new(),
             installed_at: String::new(),
         }
     }
@@ -333,6 +341,20 @@ impl Installed {
         Self {
             from: from.to_owned(),
             revision: revision.to_owned(),
+            ..self
+        }
+    }
+
+    /// The same record, as resolved through a catalogue index this key signed: reviewed,
+    /// and carrying what signed it.
+    #[must_use]
+    pub fn vouched(self, signed: &str) -> Self {
+        Self {
+            signed: signed.to_owned(),
+            declared: super::declared::Declaration {
+                reviewed: true,
+                ..self.declared
+            },
             ..self
         }
     }
