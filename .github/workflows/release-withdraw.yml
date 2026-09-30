@@ -1,0 +1,88 @@
+# Mark a published release withdrawn, on the release itself.
+#
+# A release taken back is never deleted: the record keeps it with why it was
+# withdrawn (E5-R8), and so does its page. What changes is the first line of that
+# page, which becomes
+#
+#     <!-- withdrawn: <why> -->
+#
+# above everything that was there. The first line is the one nobody else writes:
+# `release-changelog` writes the notes under it, and the notes are the commits'
+# own words, so a marker anywhere else could be a commit quoting it. A running
+# lemonfiber reads the page with the list of releases it already asks for, and
+# passes over one whose first line is this: it is not offered, not counted as
+# available, and nothing is said about what it changed or carries (N14-R3).
+#
+# Run by hand, from `main`, in the `release` environment, because it is the
+# maintainer's decision and nothing about a release should be able to take it.
+# Running it again replaces the first line rather than adding a second, so the
+# reason can be corrected.
+name: release-withdraw
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version withdrawn, as X.Y.Z with no leading v.
+        required: true
+        type: string
+      reason:
+        description: Why, in one plain sentence.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  withdraw:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Mark the release withdrawn
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          # A release, not a build cut ahead of one: a pre-release is never
+          # offered, so there is nothing to take back.
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The version must be a release version, X.Y.Z with no leading v."
+            exit 1
+          fi
+          # One line, and nothing that would end the comment early and leave the
+          # rest of the reason on the page as text.
+          case "$REASON" in
+            *$'\n'*|*$'\r'*|*'-->'*|'')
+              echo "::error::The reason must be one line of plain text, with no '-->' in it."
+              exit 1
+              ;;
+          esac
+
+          id=$(gh api "repos/${REPO}/releases/tags/v${VERSION}" --jq '.id // empty')
+          if [ -z "$id" ]; then
+            echo "::error::no published release for v${VERSION}."
+            exit 1
+          fi
+
+          gh api "repos/${REPO}/releases/${id}" --jq '.body // ""' > page.md
+          # A page already marked keeps everything under its first line, so a
+          # second run corrects the reason rather than stacking another marker.
+          first=$(head -n 1 page.md)
+          if [[ "$first" == '<!-- withdrawn:'* ]]; then
+            tail -n +2 page.md | sed '/./,$!d' > kept.md
+            mv kept.md page.md
+          fi
+          {
+            printf '<!-- withdrawn: %s -->\n\n' "$REASON"
+            cat page.md
+          } > body.md
+
+          jq -n --rawfile body body.md '{body: $body}' > payload.json
+          gh api --method PATCH "repos/${REPO}/releases/${id}" --input payload.json >/dev/null
+          echo "v${VERSION} is marked withdrawn: ${REASON}"

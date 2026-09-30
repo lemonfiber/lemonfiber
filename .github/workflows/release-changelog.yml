@@ -250,6 +250,10 @@ jobs:
           # is kept is always cargo-dist's half.
           marker='<!-- the changelog is above; cargo-dist wrote what follows -->'
           gh api "repos/${REPO}/releases/${id}" --jq '.body // ""' > installers.md
+          # A release `release-withdraw` marked keeps its mark on the first line,
+          # where a running lemonfiber looks for it: rewriting the notes of a
+          # withdrawn release must not put it back on offer.
+          withdrawn=$(head -n 1 installers.md | grep '^<!-- withdrawn:' || true)
           if grep -qxF "$marker" installers.md; then
             awk -v m="$marker" 'keep { print } $0 == m { keep = 1 }' installers.md \
               | sed '/./,$!d' > kept.md
@@ -261,6 +265,9 @@ jobs:
           # traceable to the version that shipped it — and a heading written here
           # would be a second opinion about which version that is.
           {
+            if [ -n "$withdrawn" ]; then
+              printf '%s\n\n' "$withdrawn"
+            fi
             cat notes/changelog.md
             printf '\n%s\n\n' "$marker"
             cat installers.md

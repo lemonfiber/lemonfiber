@@ -252,3 +252,96 @@ fn a_draft_declares_nothing_because_it_is_not_released() {
     let answered = r#"[{"tag_name":"v0.15.0","draft":true,"assets":[{"name":"stack-schema-2"}]}]"#;
     assert_eq!(schema(answered, "0.15.0"), None);
 }
+
+/// A page as `release-withdraw.yml` leaves it: the marker on the first line, above
+/// the page as it was.
+fn withdrawn(notes: &str) -> String {
+    format!(
+        "<!-- withdrawn: it deleted the media folder -->\n\n{}",
+        page(notes)
+    )
+}
+
+/// A withdrawn release is still in the list, and is passed over: the newest that
+/// still stands is the one offered.
+#[test]
+fn a_withdrawn_release_is_never_the_one_offered() {
+    let answered = published(&[
+        ("v0.15.0", &withdrawn("### New\n- Pulled")),
+        ("v0.14.0", &page("### New\n- Stands")),
+    ]);
+    assert_eq!(newest(&answered).as_deref(), Some("0.14.0"));
+}
+
+/// Nothing is said about what a withdrawn release changed or carries, so an operator
+/// is not told what software somebody pulled would bring.
+#[test]
+fn a_withdrawn_release_has_no_notes_and_declares_nothing() {
+    let body = serde_json::to_string(&withdrawn("### New\n- Pulled")).unwrap_or_default();
+    let answered = format!(
+        r#"[{{"tag_name":"v0.15.0","draft":false,"body":{body},"assets":[{{"name":"stack-schema-2"}}]}}]"#
+    );
+    assert_eq!(newest(&answered), None);
+    assert_eq!(changed(&answered, "0.15.0"), None);
+    assert_eq!(schema(&answered, "0.15.0"), None);
+}
+
+/// Only the first line marks a release. Notes that talk about withdrawing one — a
+/// commit about this very marker, quoted in the changelog — withdraw nothing.
+#[test]
+fn a_marker_anywhere_but_the_first_line_withdraws_nothing() {
+    for body in [
+        page("### Fixed\n- Pass over a page opening `<!-- withdrawn: why -->`"),
+        page("### Fixed\n<!-- withdrawn: quoted on a line of its own -->"),
+        format!(
+            "{}\n<!-- withdrawn: at the very end -->",
+            page("### New\n- Stands")
+        ),
+    ] {
+        let answered = published(&[("v0.15.0", &body)]);
+        assert_eq!(newest(&answered).as_deref(), Some("0.15.0"), "{body}");
+        assert!(changed(&answered, "0.15.0").is_some(), "{body}");
+    }
+}
+
+/// The first line is the first line with something on it: blank lines, a byte-order
+/// mark, carriage returns and spaces before it are how a page gets edited, and do not
+/// hide the marker.
+#[test]
+fn a_marker_behind_blank_lines_or_a_byte_order_mark_still_withdraws() {
+    for body in [
+        format!("\n\n{}", withdrawn("x")),
+        format!("\u{feff}{}", withdrawn("x")),
+        format!("   {}", withdrawn("x")),
+        withdrawn("x").replace('\n', "\r\n"),
+    ] {
+        let answered = published(&[("v0.15.0", &body)]);
+        assert_eq!(newest(&answered), None, "{body:?}");
+    }
+}
+
+/// A first line begun as a withdrawal and never finished is still one: a release
+/// somebody started to mark is not offered on the strength of a typo.
+#[test]
+fn an_unfinished_marker_on_the_first_line_still_withdraws() {
+    for body in ["<!-- withdrawn:", "<!-- withdrawn: no end to it\n\nnotes"] {
+        let answered = published(&[("v0.15.0", body)]);
+        assert_eq!(newest(&answered), None, "{body}");
+    }
+}
+
+/// What is not the marker does not withdraw: a comment of another kind, one wrapped in
+/// markup, or the word without the colon the withdrawal writes.
+#[test]
+fn a_first_line_that_only_looks_like_the_marker_withdraws_nothing() {
+    for body in [
+        "<!-- the changelog is above; cargo-dist wrote what follows -->",
+        "<p><!-- withdrawn: wrapped --></p>",
+        "<!-- withdrawn -->",
+        "<!--withdrawn: no space-->",
+        "withdrawn: not a comment",
+    ] {
+        let answered = published(&[("v0.15.0", body)]);
+        assert_eq!(newest(&answered).as_deref(), Some("0.15.0"), "{body}");
+    }
+}

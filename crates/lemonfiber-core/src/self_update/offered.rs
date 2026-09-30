@@ -11,6 +11,12 @@
 //! nothing at all. Reading the list and ordering it here is not a preference — it is
 //! the only reading that has an answer.
 //!
+//! **A withdrawn release is not there to be offered.** A release taken back is never
+//! deleted, so it is still in the list; what marks it is the first line of its page,
+//! which `release-withdraw.yml` writes. It is passed over for everything read here —
+//! the newest, what it changed and what it carries — so an operator is never pointed at
+//! software somebody pulled, and never told what it would bring.
+//!
 //! Ordering is [`crate::migration::version`]'s, which answers `Untellable` rather
 //! than guessing which of two strings is later. A wrong answer here would tell an
 //! operator to move to a version that is behind the one they have, so a tag this
@@ -46,6 +52,16 @@ const CALLED: &str = "lemonfiber";
 /// nothing rather than with the boilerplate.
 const BOUNDARY: &str = "<!-- the changelog is above; cargo-dist wrote what follows -->";
 
+/// How the first line of a withdrawn release's page begins.
+///
+/// Only the first line, because that is the one line of the page nobody but the
+/// withdrawal writes. The notes under it are the commits' own words, and a commit
+/// that talks about withdrawing a release — this one, say — would otherwise withdraw
+/// the release that carries it. The reason after the colon is the record's to keep
+/// and is not read here: a release marked withdrawn is passed over whatever it says,
+/// including where the line was left unfinished.
+const WITHDRAWN: &str = "<!-- withdrawn:";
+
 /// The prefix a release publishes its stack's manifest generation under.
 ///
 /// The declaration is the asset's *name*, and its contents are never read. That is
@@ -78,6 +94,24 @@ struct Release {
     body: Option<String>,
 }
 
+impl Release {
+    /// Whether it is out and still stands: published, and not taken back since.
+    fn offerable(&self) -> bool {
+        !self.draft && !self.withdrawn()
+    }
+
+    /// Whether the first line of its page marks it withdrawn.
+    fn withdrawn(&self) -> bool {
+        self.body.as_deref().is_some_and(|body| {
+            body.trim_start_matches('\u{feff}')
+                .trim_start()
+                .lines()
+                .next()
+                .is_some_and(|first| first.trim_end().starts_with(WITHDRAWN))
+        })
+    }
+}
+
 /// The request that asks what has been released.
 #[must_use]
 pub fn asking(at: &str) -> Request {
@@ -98,14 +132,14 @@ pub fn asking(at: &str) -> Request {
 /// The newest version in what the address answered, where one can be told.
 ///
 /// Nothing where the answer was not a list of releases, held none that was
-/// published, or held none whose tag this can order. Each of those is the same thing
+/// published and still stands, or held none whose tag this can order. Each of those is the same thing
 /// to a caller — availability could not be determined — and none of them is a
 /// failure the operator has to do anything about.
 #[must_use]
 pub fn newest(answered: &str) -> Option<String> {
     let released: Vec<Release> = serde_json::from_str(answered).ok()?;
     let mut best: Option<String> = None;
-    for release in released.into_iter().filter(|release| !release.draft) {
+    for release in released.into_iter().filter(Release::offerable) {
         let version = release.tag_name.trim_start_matches('v').to_owned();
         if cut_ahead(&version) {
             continue;
@@ -130,9 +164,9 @@ pub fn newest(answered: &str) -> Option<String> {
 #[must_use]
 pub fn changed(answered: &str, version: &str) -> Option<String> {
     let released: Vec<Release> = serde_json::from_str(answered).ok()?;
-    let release = released
-        .into_iter()
-        .find(|release| !release.draft && release.tag_name.trim_start_matches('v') == version)?;
+    let release = released.into_iter().find(|release| {
+        release.offerable() && release.tag_name.trim_start_matches('v') == version
+    })?;
     let body = release.body?;
     let (notes, _) = body.split_once(BOUNDARY)?;
     let notes = notes.trim();
@@ -152,9 +186,9 @@ pub fn changed(answered: &str, version: &str) -> Option<String> {
 #[must_use]
 pub fn schema(answered: &str, version: &str) -> Option<u32> {
     let released: Vec<Release> = serde_json::from_str(answered).ok()?;
-    let release = released
-        .into_iter()
-        .find(|release| !release.draft && release.tag_name.trim_start_matches('v') == version)?;
+    let release = released.into_iter().find(|release| {
+        release.offerable() && release.tag_name.trim_start_matches('v') == version
+    })?;
     release
         .assets
         .iter()
