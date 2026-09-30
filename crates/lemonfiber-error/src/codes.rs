@@ -129,6 +129,12 @@ pub fn every() -> Vec<Code> {
     every
 }
 
+/// Numbers no family declares and none may declare again.
+///
+/// Each was published with a meaning and nothing raises it. An operator who searches for
+/// one must never land on a different problem that was given its number.
+pub const RETIRED: &[&str] = &["QUOTA-3"];
+
 /// Where a code sorts: its family, then its number.
 fn ordering(code: &str) -> (&str, u32) {
     let (family, number) = code.rsplit_once('-').unwrap_or((code, ""));

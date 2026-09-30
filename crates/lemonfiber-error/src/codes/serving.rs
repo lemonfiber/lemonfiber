@@ -250,8 +250,6 @@ codes! {
         UNREACHABLE = "QUOTA-1",
         /// Raised where a policy that lives inside a limit was chosen without one.
         NO_LIMIT = "QUOTA-2",
-        /// Raised where no policy goes by the word that was given.
-        NO_SUCH_POLICY = "QUOTA-3",
         /// Raised where the request named is not one that is waiting on anybody.
         NOT_WAITING = "QUOTA-4",
         /// Raised where a request was turned down and the reason said nothing.

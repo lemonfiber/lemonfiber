@@ -12,6 +12,7 @@ mod spelling;
 
 mod a_latch_is_settled_once;
 mod each_requirement_is_claimed_once;
+mod every_declared_code_is_raised;
 mod how_long_a_file_may_be;
 mod modest_terminal;
 mod nothing_a_plugin_brings_gets_its_own_account;

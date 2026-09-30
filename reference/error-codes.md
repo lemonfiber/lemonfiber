@@ -148,7 +148,6 @@ what to do about it, is written for operators at
 - `QUAL-3`
 - `QUOTA-1`
 - `QUOTA-2`
-- `QUOTA-3`
 - `QUOTA-4`
 - `QUOTA-5`
 - `QUOTA-6`
