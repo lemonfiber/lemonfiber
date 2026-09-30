@@ -105,6 +105,25 @@ fn a_flapping_service_is_reported_as_flapping_rather_than_as_each_flap() {
 }
 
 #[test]
+fn a_flapping_service_carries_the_code_it_last_left_with() {
+    let fault = Fault::new(
+        "service.stopped",
+        Severity::Warning,
+        "it broke",
+        "nothing that needs it is working",
+        "look at it",
+    );
+    let mut condition = Condition::raised("service.health", &fault, "1000");
+    for n in 0..FLAPPING {
+        condition.clear("1100");
+        condition.raise(&fault.clone().exited(Some(137)), &format!("{}", 1200 + n));
+    }
+    let digest = Digest::of([&condition], &untold);
+    let exits: Vec<Option<i32>> = digest.alerts.iter().map(|alert| alert.exit).collect();
+    assert_eq!(exits, vec![Some(137)]);
+}
+
+#[test]
 fn a_flapping_service_already_reported_stays_quiet() {
     // The whole point: not one alert per flap, for ever.
     let condition = flapped("service.health", Severity::Warning, FLAPPING + 2);
@@ -130,7 +149,7 @@ fn stopped(check: &str, severity: Severity) -> Condition {
         &Fault::new(
             "service.stopped",
             severity,
-            &format!("{check} stopped on its own"),
+            &format!("{check} stopped with an error"),
             "nothing that needs it is working",
             "start it again",
         ),
@@ -147,7 +166,7 @@ fn stopped_costing(check: &str, means: &str) -> Condition {
         &Fault::new(
             "service.stopped",
             Severity::Error,
-            &format!("{check} stopped on its own"),
+            &format!("{check} stopped with an error"),
             means,
             "start it again",
         ),
@@ -171,7 +190,7 @@ fn a_grouped_alert_says_what_it_means_in_the_words_of_the_one_that_speaks() {
     assert_eq!(
         said,
         vec![(
-            "service.radarr stopped on its own",
+            "service.radarr stopped with an error",
             "no film is being fetched"
         )],
         "the earliest by check speaks, in both halves"
@@ -224,7 +243,7 @@ fn four_services_failing_the_same_way_are_one_alert_naming_them_all() {
     );
     assert_eq!(
         digest.headline().as_deref(),
-        Some("service.lidarr stopped on its own — started, and 2 other services")
+        Some("service.lidarr stopped with an error — started, and 2 other services")
     );
 }
 

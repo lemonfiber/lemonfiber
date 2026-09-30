@@ -137,7 +137,8 @@ fn service_fault(service: &Service, services: &[Service]) -> Option<Fault> {
         &meaning_of(service),
         &remedy_of(service),
     )
-    .or_else("read its logs for what it said before it stopped");
+    .or_else("read its logs for what it said before it stopped")
+    .exited(service.exit);
 
     // A service that cannot start because something it depends on is down is one
     // problem with the thing underneath, not two independent failures.
@@ -176,14 +177,18 @@ const fn severity_of(criticality: Criticality) -> Severity {
 
 /// What is wrong with one service, in the operator's words rather than the
 /// engine's — the same state renders differently depending on how it got there.
+///
+/// The exit code is not in it. Whether the service stopped with an error is what
+/// the operator needs first, and the code itself travels beside the summary on the
+/// fault, one step away rather than in the headline.
 fn summary_of(service: &Service) -> String {
     let name = &service.name;
     match service.state {
         State::CrashLooping => format!("{name} keeps restarting"),
         State::Unhealthy => format!("{name} is running but its own check is failing"),
         _ => match service.exit {
-            Some(code) => format!("{name} stopped on its own (exit {code})"),
-            None => format!("{name} stopped on its own"),
+            Some(0) => format!("{name} stopped without an error"),
+            _ => format!("{name} stopped with an error"),
         },
     }
 }

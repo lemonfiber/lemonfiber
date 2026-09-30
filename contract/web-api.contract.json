@@ -3323,6 +3323,14 @@
                 "type": "string"
               }
             },
+            "exit": {
+              "description": "How the service it is about exited, where it has and the engine said.\n\nThe technical half of what happened, kept out of the summary so the plain\nwords lead, and here for whoever wants the code.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
             "meaning": {
               "description": "What it costs the operator. The line expands to items an operator can act\non, and an item that states only the event leaves the judgement it was\nsupposed to save them.",
               "type": "string"
@@ -3366,6 +3374,14 @@
             "check": {
               "description": "The check this came from, so an alert and its condition cannot drift apart.\nWhere several were grouped, the first of them.",
               "type": "string"
+            },
+            "exit": {
+              "description": "How the service it is about exited, where it has and the engine said;\nwhere several were grouped, how the first of them did.\n\nThe technical half of what happened, kept out of the summary so the plain\nwords lead, and here for whoever wants the code.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
             },
             "kind": {
               "description": "What kind of event it is, shared by every instance of it.",
@@ -8842,8 +8858,43 @@
         "data"
       ],
       "$defs": {
+        "LogLevel": {
+          "description": "How bad a line says it is.\n\nOrdered, so a filter can ask for \"warnings and worse\" without a table of which\nlevel outranks which. Deliberately coarse: these six are what services agree\non, and a seventh that only one of them writes would be a level nobody could filter\nby across the stack.",
+          "oneOf": [
+            {
+              "description": "Detail a developer asked for.",
+              "type": "string",
+              "const": "trace"
+            },
+            {
+              "description": "Detail beyond the ordinary account of what happened.",
+              "type": "string",
+              "const": "debug"
+            },
+            {
+              "description": "The ordinary account of what happened.",
+              "type": "string",
+              "const": "info"
+            },
+            {
+              "description": "Something the operator may want to know about, that did not stop the service.",
+              "type": "string",
+              "const": "warn"
+            },
+            {
+              "description": "Something that failed.",
+              "type": "string",
+              "const": "error"
+            },
+            {
+              "description": "Something that failed and stopped the service.",
+              "type": "string",
+              "const": "fatal"
+            }
+          ]
+        },
         "LogLine": {
-          "description": "One line of output from one service.\n\nSerialisable because a log stream is part of the machine-readable contract:\n`--json` renders one envelope per line, since a stream has no last element\nto close a document with.",
+          "description": "One line of output from one service, and how bad it says it is.\n\nWhat a machine-readable surface hands on, rather than the engine's line alone, so\na consumer can mark the lines that say they failed, or find the first of them,\nwithout reading the text for itself — a second reading of severity would be a\nsecond answer, and the two would disagree about some service's spelling.",
           "type": "object",
           "properties": {
             "at": {
@@ -8851,6 +8902,17 @@
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "level": {
+              "description": "How bad the line says it is, in one lowercase word.\n\nAbsent where the line says nothing about itself. It is never guessed from\nthe stream the line arrived on or from the words in it: most of this stack\nwrites ordinary progress to standard error, and a line saying it could not\nfind something is often a routine miss.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "line": {

@@ -609,6 +609,7 @@ fn an_alert(summary: &str, moment: lemonfiber_core::alert::Moment) -> Alert {
         meaning: "nothing that needs it is working".to_owned(),
         remedies: vec!["start it".to_owned()],
         affected: vec!["service.sonarr".to_owned()],
+        exit: None,
     }
 }
 

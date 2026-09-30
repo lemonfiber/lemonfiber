@@ -7,8 +7,9 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{logs, Ctx};
+use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::{kind, Envelope};
-use lemonfiber_core::ports::docker::{LogLine, LogQuery};
+use lemonfiber_core::ports::docker::LogQuery;
 
 use crate::admission::Caller;
 use crate::read::table::{Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
@@ -108,7 +109,7 @@ async fn read_logs(ctx: &Ctx, forms: &[String], services: &[String], tail: u32) 
         Ok(mut opened) => {
             let mut said = Vec::new();
             while let Some(line) = opened.recv().await {
-                said.push(line);
+                said.push(Line::from(line));
             }
             enveloped(StatusCode::OK, one_per_line(&said))
         }
@@ -117,7 +118,7 @@ async fn read_logs(ctx: &Ctx, forms: &[String], services: &[String], tail: u32) 
 }
 
 /// Every line as its own envelope, or nothing where one could not be rendered.
-fn one_per_line(said: &[LogLine]) -> Option<String> {
+fn one_per_line(said: &[Line]) -> Option<String> {
     said.iter()
         .map(|line| {
             Envelope::new(kind::LOG, line)

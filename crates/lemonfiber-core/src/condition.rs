@@ -87,6 +87,9 @@ pub struct Condition {
     /// fills in.
     #[serde(default)]
     pub caused_by: Option<String>,
+    /// How the service it is about exited, where it has and the engine said.
+    #[serde(default)]
+    pub exit: Option<i32>,
 }
 
 impl Condition {
@@ -106,6 +109,7 @@ impl Condition {
             attempts: 0,
             remedies: fault.remedies.clone(),
             caused_by: fault.caused_by.clone(),
+            exit: fault.exit,
         }
     }
 
@@ -124,9 +128,10 @@ impl Condition {
     /// Cleared and coming back: a recurrence. It starts again from now, the count
     /// goes up, and a previously declined fix is offered afresh.
     ///
-    /// The remedies and the cause are refreshed either way: what to do about a
-    /// fault, and what it turns out to be downstream of, can both change as the
-    /// picture fills in, and the stale answer is the wrong one to keep.
+    /// The remedies, the cause and the exit code are refreshed either way: what to
+    /// do about a fault, what it turns out to be downstream of and how the service
+    /// last exited can all change as the picture fills in, and the stale answer is
+    /// the wrong one to keep.
     pub fn raise(&mut self, fault: &Fault, now: &str) {
         self.kind.clone_from(&fault.kind);
         self.severity = fault.severity;
@@ -134,6 +139,7 @@ impl Condition {
         self.meaning.clone_from(&fault.meaning);
         self.remedies.clone_from(&fault.remedies);
         self.caused_by.clone_from(&fault.caused_by);
+        self.exit = fault.exit;
         if self.is_raised() {
             return;
         }

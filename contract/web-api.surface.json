@@ -275,6 +275,12 @@
           ],
           "required": true
         },
+        "exit": {
+          "type": [
+            "integer|null/int32"
+          ],
+          "required": false
+        },
         "meaning": {
           "type": [
             "string"
@@ -315,6 +321,12 @@
             "string"
           ],
           "required": true
+        },
+        "exit": {
+          "type": [
+            "integer|null/int32"
+          ],
+          "required": false
         },
         "kind": {
           "type": [
@@ -3455,11 +3467,28 @@
       },
       "variants": []
     },
+    "LogLevel": {
+      "fields": {},
+      "variants": [
+        "\"debug\"",
+        "\"error\"",
+        "\"fatal\"",
+        "\"info\"",
+        "\"trace\"",
+        "\"warn\""
+      ]
+    },
     "LogLine": {
       "fields": {
         "at": {
           "type": [
             "null|string"
+          ],
+          "required": false
+        },
+        "level": {
+          "type": [
+            "anyOf(null,ref:LogLevel)"
           ],
           "required": false
         },

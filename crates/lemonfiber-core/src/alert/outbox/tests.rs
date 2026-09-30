@@ -13,6 +13,7 @@ fn alert(check: &str, moment: Moment) -> Alert {
         meaning: "nothing that needs it is working".to_owned(),
         remedies: vec!["start it again".to_owned()],
         affected: vec![check.to_owned()],
+        exit: None,
     }
 }
 

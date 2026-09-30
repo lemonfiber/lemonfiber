@@ -441,6 +441,7 @@ fn owed(condition: &Condition) -> Alert {
         meaning: condition.meaning.clone(),
         remedies: condition.remedies.clone(),
         affected: vec![CHECK.to_owned()],
+        exit: condition.exit,
     }
 }
 

@@ -28,6 +28,7 @@ fn alert(check: &str) -> Alert {
         meaning: "something came of it".to_owned(),
         remedies: vec!["do this".to_owned()],
         affected: vec![check.to_owned()],
+        exit: None,
     }
 }
 

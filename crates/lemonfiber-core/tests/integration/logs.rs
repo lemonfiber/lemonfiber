@@ -6,7 +6,7 @@
 //! integration one gets two coverage mappings, and merging them invents missed lines
 //! that no annotated report can localise.
 
-use lemonfiber_core::logs::{declared, interleaved, Level};
+use lemonfiber_core::logs::{declared, interleaved, Level, Line};
 use lemonfiber_core::ports::docker::{LogLine, Stream};
 
 /// One line as the engine hands it over.
@@ -253,4 +253,57 @@ fn a_level_publishes_the_word_a_script_reads() {
         serde_json::to_string(&Level::Warn).ok().as_deref(),
         Some("\"warn\"")
     );
+}
+
+#[test]
+fn a_line_handed_on_carries_the_level_it_declares_in_one_lowercase_word() {
+    let handed = serde_json::to_value(Line::from(line(
+        "sonarr",
+        Some("2026-08-21T19:04:11Z"),
+        "[Warn] disk is filling up",
+    )))
+    .ok();
+    assert_eq!(
+        handed,
+        Some(serde_json::json!({
+            "service": "sonarr",
+            "stream": "stdout",
+            "at": "2026-08-21T19:04:11Z",
+            "line": "[Warn] disk is filling up",
+            "level": "warn",
+        }))
+    );
+}
+
+#[test]
+fn a_line_that_declares_nothing_is_handed_on_without_a_level() {
+    // Absent rather than null or a guess: a consumer reading the field must not be
+    // told a line was classified when it was not.
+    let handed = serde_json::to_value(Line::from(line("sabnzbd", None, "Starting download"))).ok();
+    assert_eq!(
+        handed,
+        Some(serde_json::json!({
+            "service": "sabnzbd",
+            "stream": "stdout",
+            "at": null,
+            "line": "Starting download",
+        }))
+    );
+}
+
+#[test]
+fn every_level_is_handed_on_as_the_word_a_surface_shows() {
+    for (said, word) in [
+        ("TRACE x", "trace"),
+        ("DEBUG x", "debug"),
+        ("INFO x", "info"),
+        ("WARN x", "warn"),
+        ("ERROR x", "error"),
+        ("FATAL x", "fatal"),
+    ] {
+        let handed = Line::from(line("sonarr", None, said));
+        let level = serde_json::to_value(handed.level).ok();
+        assert_eq!(level, Some(serde_json::json!(word)), "{said}");
+        assert_eq!(handed.level.map(Level::word), Some(word), "{said}");
+    }
 }
