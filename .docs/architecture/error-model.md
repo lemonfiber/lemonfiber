@@ -203,6 +203,11 @@ Codes are never recycled. An operator who searches for one should find the same
 answer a year later, so a published code keeps its spelling even where two prefixes
 name one domain, as `WIRE` and `WIRING` do.
 
+The registry holds only codes something raises. An architecture test,
+`every_declared_code_is_raised`, fails when a declared code is named nowhere in the
+code a release is built from. A code nothing raises leaves the registry, and its number
+goes into `codes::RETIRED`, which no declaration may take again.
+
 `reference/error-codes.md` is rendered from `codes::every()`, and a test compares the
 committed bytes with a fresh rendering; `just codes` rewrites it. The binary's exit
 code for a problem is read from the same registry, through `codes::leaves`.

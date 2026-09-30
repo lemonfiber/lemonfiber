@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use super::{declared, every, leaves, Leaves};
+use super::{declared, every, leaves, Leaves, RETIRED};
 
 #[test]
 fn no_two_problems_answer_to_the_same_code() {
@@ -72,4 +72,17 @@ fn every_declared_code_is_published_with_a_name_and_a_line() {
             "{code}"
         );
     }
+}
+
+#[test]
+fn no_code_is_declared_under_a_retired_number() {
+    let reused: Vec<String> = every()
+        .iter()
+        .filter(|code| RETIRED.contains(&code.as_str()))
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        reused.is_empty(),
+        "a retired number is declared again: {reused:?}"
+    );
 }
