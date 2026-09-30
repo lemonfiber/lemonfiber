@@ -161,7 +161,7 @@ fn would_watch(
     forms: &[String],
     interval: Duration,
 ) -> Result<SupervisionReport, Box<Problem>> {
-    let (command, _) = invocation(ctx, forms, &Action::Stop(Vec::new()))?;
+    let command = invocation(ctx, forms, &Action::Stop(Vec::new()))?.command;
     Ok(SupervisionReport {
         forms: forms.to_vec(),
         reason: NOTHING_WAS_WATCHED.to_owned(),

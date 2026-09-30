@@ -145,6 +145,9 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
 /// take. Building the invocation a second time would be two accounts of where the
 /// stack is and which files were written to get there.
 ///
+/// The services it is aimed at come with it, from the same plan, so a caller that runs
+/// it can write down a stop or let go before a start without resolving the forms again.
+///
 /// # Errors
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be read,
@@ -153,9 +156,23 @@ pub(crate) fn invocation(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
-) -> Result<(Vec<String>, Vec<StackEdit>), Box<Problem>> {
+) -> Result<Invocation, Box<Problem>> {
     let composed = compose(ctx, forms, action)?;
-    Ok((composed.command, composed.stack_edits))
+    Ok(Invocation {
+        addressed: addressed(action, &composed.plan),
+        command: composed.command,
+        stack_edits: composed.stack_edits,
+    })
+}
+
+/// A Compose invocation built but not run, with what building it wrote and aimed at.
+pub(crate) struct Invocation {
+    /// The command to spawn.
+    pub command: Vec<String>,
+    /// The operator's own edits materialising the stack left in place.
+    pub stack_edits: Vec<StackEdit>,
+    /// The services the command is aimed at.
+    pub addressed: Vec<String>,
 }
 
 /// Whether this action brings services up, whichever way it was addressed.
