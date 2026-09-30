@@ -184,7 +184,7 @@ fn steps(ctx: &Ctx, taking: Vec<Change>) -> Result<Vec<Step>, Box<Problem>> {
         .into_iter()
         .map(|change| {
             let started = Action::Start(vec![change.service.clone()]);
-            let (argv, _) = engine::invocation(ctx, &[], &started)?;
+            let argv = engine::invocation(ctx, &[], &started)?.command;
             Ok(Step { change, argv })
         })
         .collect()
@@ -245,13 +245,15 @@ async fn moved(
 /// was established service by service for everything this run moved, and the rest is
 /// on the versions it was already running.
 async fn whole(ctx: &Ctx, action: &Action) -> Result<Vec<crate::model::StackEdit>, Box<Problem>> {
-    let (argv, edits) = engine::invocation(ctx, &[], action)?;
+    let invocation = engine::invocation(ctx, &[], action)?;
+    engine::halted::before(ctx, action, &invocation.addressed);
     ctx.seams
         .runner
-        .run(&argv)
+        .run(&invocation.command)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    Ok(edits)
+    engine::halted::after(ctx, action, &invocation.addressed).await;
+    Ok(invocation.stack_edits)
 }
 
 /// Why a run that met a service which would not come back stopped there, and where
@@ -308,6 +310,8 @@ async fn staged(ctx: &Ctx, manifest: &Manifest, taking: &[Step]) -> (Vec<Applied
 
 /// Move one service onto its pin, and find out whether it came back.
 async fn one(ctx: &Ctx, manifest: &Manifest, step: &Step) -> (Ending, Option<String>) {
+    let service = std::slice::from_ref(&step.change.service);
+    engine::halted::before(ctx, &Action::Start(service.to_vec()), service);
     match ctx.seams.runner.run(&step.argv).await {
         Err(failure) => (Ending::NotFetched, Some(failure.to_string())),
         Ok(output) if !output.succeeded() => (Ending::NotFetched, Some(refusal(&output))),
@@ -348,7 +352,13 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
                 Some("the container engine stopped answering".to_owned()),
             );
         };
-        let seen = survey(manifest, &profiles, &containers, ctx.settings.protocols);
+        let seen = survey(
+            manifest,
+            &profiles,
+            &containers,
+            &engine::halted::load(ctx),
+            ctx.settings.protocols,
+        );
         let state = seen
             .iter()
             .find(|one| one.id == service)

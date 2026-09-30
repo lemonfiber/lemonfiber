@@ -50,7 +50,13 @@ async fn settle(
             .list(&ctx.settings.project)
             .await
             .map_err(|err| Box::new(err.problem()))?;
-        let services = survey(manifest, profiles, &containers, ctx.settings.protocols);
+        let services = survey(
+            manifest,
+            profiles,
+            &containers,
+            &super::halted::load(ctx),
+            ctx.settings.protocols,
+        );
 
         let waiting: Vec<String> = unsettled(&services)
             .into_iter()
@@ -224,7 +230,13 @@ pub(crate) async fn fell_short_into(
         return;
     };
     let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
-    let read = survey(manifest, &profiles, &containers, ctx.settings.protocols);
+    let read = survey(
+        manifest,
+        &profiles,
+        &containers,
+        &super::halted::load(ctx),
+        ctx.settings.protocols,
+    );
     report.condition = Some(condition(&read));
     report.services = read;
 }

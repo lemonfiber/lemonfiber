@@ -101,6 +101,19 @@ impl Reporting {
         }
     }
 
+    /// The same engine, with every container having exited with this code.
+    ///
+    /// A code rather than a verdict, because the engine does not say why a container
+    /// exited: a stop the operator asked for and a service falling over can leave the
+    /// same number behind, and telling them apart is the reading's job.
+    #[must_use]
+    pub fn exiting(mut self, code: i32) -> Self {
+        for container in &mut self.containers {
+            container.exit = Some(code);
+        }
+        self
+    }
+
     /// The same engine, with these services answering on these host addresses.
     ///
     /// Named rather than derived from anything, because what a check about bindings

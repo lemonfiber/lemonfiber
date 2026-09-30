@@ -69,7 +69,7 @@ struct Machine {
     seen: Mutex<Vec<Vec<String>>>,
     /// The services started so far, in the order the run started them.
     started: Mutex<Vec<String>>,
-    /// How many times the engine has been asked what is running.
+    /// How many times the engine has been asked what is running once something was.
     asked: Mutex<usize>,
     /// How a started service comes back.
     coming: Coming,
@@ -208,14 +208,18 @@ impl Runner for Machine {
 #[async_trait]
 impl Engine for Machine {
     async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
-        let listings = self.asked.lock().map_or(0, |mut asked| {
-            *asked += 1;
-            *asked
-        });
+        // Counted only once something has been started, because what the count stands
+        // for is how long a started service has been coming up. A listing taken while
+        // the stack is down — the stop reading back what it stopped — is not a look at
+        // anything starting.
         let started = self.started();
         if started.is_empty() {
             return Ok(Vec::new());
         }
+        let listings = self.asked.lock().map_or(0, |mut asked| {
+            *asked += 1;
+            *asked
+        });
         if self.coming == Coming::Silent {
             return Err(EngineFailure::Unreachable {
                 reason: "the daemon went away".to_owned(),

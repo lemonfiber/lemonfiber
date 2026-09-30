@@ -2,7 +2,7 @@ use lemonfiber_manifest::{Criticality, Manifest};
 
 use super::{
     condition, condition_of_the_stack, read, stopping_order, survey, undeclared, unsettled,
-    Condition, Service, State, UNDESCRIBED,
+    Condition, Halted, Service, State, UNDESCRIBED,
 };
 use crate::config::Protocols;
 use crate::ports::docker::{Container, Health, Lifecycle};
@@ -27,6 +27,11 @@ fn container(service: &str, lifecycle: Lifecycle, health: Health) -> Container {
     }
 }
 
+/// A container read with nothing stopped by lemonfiber.
+fn read_bare(container: &Container) -> State {
+    read(container, &Halted::default())
+}
+
 #[test]
 fn a_probe_s_verdict_outranks_the_process_existing() {
     for (health, expected) in [
@@ -36,7 +41,7 @@ fn a_probe_s_verdict_outranks_the_process_existing() {
         (Health::None, State::Running),
     ] {
         let running = container("sonarr", Lifecycle::Running, health);
-        assert_eq!(read(&running), expected, "{health:?}");
+        assert_eq!(read(&running, &Halted::default()), expected, "{health:?}");
     }
 }
 
@@ -140,7 +145,7 @@ fn a_dependency_that_is_not_being_stopped_does_not_hold_anything_back() {
 
 #[test]
 fn a_service_that_cannot_be_asked_is_not_a_service_that_answered() {
-    let unprobed = read(&container("sonarr", Lifecycle::Running, Health::None));
+    let unprobed = read_bare(&container("sonarr", Lifecycle::Running, Health::None));
     assert_ne!(
         unprobed,
         State::Healthy,
@@ -153,15 +158,19 @@ fn a_service_that_cannot_be_asked_is_not_a_service_that_answered() {
 fn stopping_on_purpose_and_falling_over_are_told_apart() {
     let mut stopped = container("sonarr", Lifecycle::Exited, Health::None);
     stopped.exit = Some(0);
-    assert_eq!(read(&stopped), State::Stopped);
+    assert_eq!(read_bare(&stopped), State::Stopped);
 
     let mut killed = container("sonarr", Lifecycle::Exited, Health::None);
     killed.exit = Some(137);
-    assert_eq!(read(&killed), State::Failed);
+    assert_eq!(
+        read_bare(&killed),
+        State::Failed,
+        "nothing here stopped it, so a code that is not clean is a fault"
+    );
 
     let forgotten = container("sonarr", Lifecycle::Exited, Health::None);
     assert_eq!(
-        read(&forgotten),
+        read_bare(&forgotten),
         State::Stopped,
         "an engine that forgot the code is not evidence of a fault"
     );
@@ -178,14 +187,14 @@ fn every_lifecycle_the_engine_reports_has_a_state() {
         (Lifecycle::Removing, State::Stopped),
         (Lifecycle::Dead, State::Stopped),
     ] {
-        let found = read(&container("sonarr", lifecycle, Health::None));
+        let found = read_bare(&container("sonarr", lifecycle, Health::None));
         assert_eq!(found, expected, "{lifecycle:?}");
     }
 }
 
 #[test]
 fn a_looping_container_is_reported_as_looping_rather_than_as_starting() {
-    let looping = read(&container("sonarr", Lifecycle::Restarting, Health::None));
+    let looping = read_bare(&container("sonarr", Lifecycle::Restarting, Health::None));
     assert_eq!(looping, State::CrashLooping);
     assert!(looping.wants_attention());
     assert!(
@@ -231,7 +240,15 @@ fn only_the_states_an_operator_must_act_on_ask_for_attention() {
 #[test]
 fn a_service_that_was_never_started_is_absent_rather_than_missing_from_the_report() {
     let profiles = ["media".to_owned()];
-    let surveyed = manifest().map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()));
+    let surveyed = manifest().map(|manifest| {
+        survey(
+            &manifest,
+            &profiles,
+            &[],
+            &Halted::default(),
+            Protocols::both(),
+        )
+    });
 
     assert_eq!(
         surveyed.as_ref().map(|services| services
@@ -251,7 +268,15 @@ fn a_service_that_was_never_started_is_absent_rather_than_missing_from_the_repor
 fn a_survey_covers_the_named_profiles_and_nothing_else() {
     let profiles = ["media".to_owned()];
     let surveyed = manifest()
-        .map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &[],
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default();
 
     assert!(!surveyed.is_empty());
@@ -278,7 +303,15 @@ fn the_worst_state_is_reported_first() {
         .collect();
 
     let surveyed = manifest()
-        .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &containers,
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default();
     assert_eq!(
         surveyed.first().map(|service| service.id.clone()),
@@ -297,7 +330,15 @@ fn a_surveyed_service_names_the_form_it_is_running_for() {
         .collect();
     let profiles = ["media".to_owned(), "search".to_owned()];
     let surveyed = manifest()
-        .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &containers,
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default();
 
     assert!(!surveyed.is_empty());
@@ -378,7 +419,15 @@ fn a_service_the_operating_system_owns_is_never_reported_as_something_to_start()
     // mean absent — and absent is an invitation to start it.
     let surveyed = Manifest::from_toml(NATIVE)
         .ok()
-        .map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &[],
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default();
 
     assert_eq!(
@@ -408,7 +457,15 @@ fn media(state: Lifecycle, health: Health) -> Vec<super::Service> {
         .map(|id| container(id, state, health))
         .collect();
     manifest()
-        .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &containers,
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default()
 }
 
@@ -440,7 +497,15 @@ fn nothing_running_is_inactive_and_something_missing_is_partial() {
 
     let profiles = ["media".to_owned()];
     let absent = manifest()
-        .map(|manifest| survey(&manifest, &profiles, &[], Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &[],
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default();
     assert_eq!(condition(&absent), Condition::Inactive);
 
@@ -572,7 +637,7 @@ fn a_container_the_stack_never_declared_is_shown_rather_than_hidden() {
         container("something-of-their-own", Lifecycle::Running, Health::None),
     ];
     let strangers = manifest()
-        .map(|manifest| undeclared(&manifest, &containers))
+        .map(|manifest| undeclared(&manifest, &containers, &Halted::default()))
         .unwrap_or_default();
 
     assert_eq!(
@@ -602,7 +667,15 @@ fn a_container_the_stack_never_declared_is_no_part_of_the_survey() {
         Health::None,
     )];
     let surveyed = manifest()
-        .map(|manifest| survey(&manifest, &profiles, &containers, Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &containers,
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default();
 
     assert!(
@@ -629,7 +702,7 @@ fn two_containers_of_one_strange_service_are_named_once_and_in_order() {
         container("alpha", Lifecycle::Running, Health::None),
     ];
     let strangers = manifest()
-        .map(|manifest| undeclared(&manifest, &containers))
+        .map(|manifest| undeclared(&manifest, &containers, &Halted::default()))
         .unwrap_or_default();
 
     assert_eq!(
@@ -657,7 +730,15 @@ fn the_library_and_nothing_else() -> Vec<Service> {
         .map(|id| container(id, Lifecycle::Running, Health::Healthy))
         .collect();
     manifest()
-        .map(|manifest| survey(&manifest, &whole, &containers, Protocols::both()))
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &whole,
+                &containers,
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
         .unwrap_or_default()
 }
 
@@ -689,3 +770,5 @@ fn a_service_no_form_asked_for_still_counts_while_it_is_there() {
         Condition::Degraded
     );
 }
+
+mod halted;

@@ -185,3 +185,44 @@ async fn a_start_that_failed_reads_nothing_from_an_engine_that_is_not_there() {
     assert!(report.services.is_empty(), "{:?}", report.services);
     assert_eq!(report.condition, None);
 }
+
+/// What an action is aimed at is what it names, or everything its plan holds where it
+/// names nothing — the same reading Compose gives it, asked once for every action.
+#[test]
+fn an_action_is_aimed_at_what_it_names_or_else_at_its_plan() {
+    use crate::stack::compose::Action;
+
+    let plan = crate::stack::closure::Plan {
+        forms: Vec::new(),
+        profiles: std::collections::BTreeSet::new(),
+        services: vec!["gluetun".to_owned(), "qbittorrent".to_owned()],
+        dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
+    };
+    let one = vec!["gluetun".to_owned()];
+    for action in [
+        Action::Start(one.clone()),
+        Action::Stop(one.clone()),
+        Action::Remove(one.clone()),
+        Action::Restart(one.clone()),
+    ] {
+        assert_eq!(super::addressed(&action, &plan), one, "{action:?}");
+    }
+    for action in [
+        Action::Up,
+        Action::Down,
+        Action::Start(Vec::new()),
+        Action::Stop(Vec::new()),
+        Action::Remove(Vec::new()),
+        Action::Restart(Vec::new()),
+        Action::Pull,
+        Action::Config,
+    ] {
+        assert_eq!(
+            super::addressed(&action, &plan),
+            plan.services,
+            "{action:?}"
+        );
+    }
+}

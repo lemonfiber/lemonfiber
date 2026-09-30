@@ -152,7 +152,7 @@ pub async fn start_progress(
     services: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
     let action = aimed(services);
-    let (manifest, command, _) = readied(ctx, forms, &action).await?;
+    let (manifest, command, report) = readied(ctx, forms, &action).await?;
     // Refused where the data location is not there, after waiting for it. The
     // waited-on path asks the same thing at the same point, for the reason the
     // minting below is done on both: a start that went one way and not the other
@@ -163,6 +163,9 @@ pub async fn start_progress(
     // a start that went one way and not the other would leave that service holding a
     // key nothing else can present.
     super::mint_adopted_secrets(ctx, &manifest);
+    // Let go of what this start addresses, as the waited-on path does: a service that
+    // falls over on the way up fell over, whoever stopped it last.
+    super::halted::before(ctx, &action, &super::addressed(&action, &report.plan));
     ctx.seams
         .runner
         .stream(&command)

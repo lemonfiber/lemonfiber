@@ -142,13 +142,41 @@ pub enum Condition {
     Active,
 }
 
+/// The containers lemonfiber stopped itself, by the engine's id for each.
+///
+/// The engine records how a container exited and not who asked it to. A service stopped
+/// on purpose very often exits non-zero on the way out — a tunnel that treats the signal
+/// as an error, or anything killed when its grace period runs out — so its exit code alone
+/// would report the operator's own stop as a fault. What lemonfiber stopped it knows,
+/// because it did it, and this is that knowledge handed to the reading.
+///
+/// By container rather than by service: a container started again is the same container,
+/// and lemonfiber lets go of it before starting it, but one recreated is a different
+/// container and was stopped by nobody.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Halted(BTreeSet<String>);
+
+impl Halted {
+    /// The containers named, as the engine identifies them.
+    #[must_use]
+    pub fn new(containers: impl IntoIterator<Item = String>) -> Self {
+        Self(containers.into_iter().collect())
+    }
+
+    /// Whether lemonfiber stopped this one.
+    #[must_use]
+    pub fn holds(&self, container: &Container) -> bool {
+        self.0.contains(&container.id)
+    }
+}
+
 /// Read one container's state, given whether the service declares a probe.
 ///
 /// A container reaching `running` says nothing about whether the application
 /// inside it has finished starting, which is why a probe's verdict outranks the
 /// process existing. Where there is no probe, `Running` is the strongest claim
 /// available and is reported as exactly that.
-fn read(container: &Container) -> State {
+fn read(container: &Container, halted: &Halted) -> State {
     match container.lifecycle {
         Lifecycle::Running => match container.health {
             Health::Starting => State::Starting,
@@ -170,11 +198,13 @@ fn read(container: &Container) -> State {
         // container's last health verdict is a claim about a container that can no
         // longer answer.
         Lifecycle::Paused => State::Stopped,
-        // A clean exit is a service that was stopped; any other is one that
-        // fell over. An engine that has forgotten the code is not evidence of
-        // either, so it is reported as merely stopped.
+        // A clean exit is a service that was stopped, and so is any exit from a
+        // container lemonfiber stopped itself, whatever code it left with; any other
+        // is one that fell over. An engine that has forgotten the code is not
+        // evidence of either, so it is reported as merely stopped.
         Lifecycle::Exited | Lifecycle::Dead | Lifecycle::Removing => match container.exit {
             Some(0) | None => State::Stopped,
+            Some(_) if halted.holds(container) => State::Stopped,
             Some(_) => State::Failed,
         },
     }
@@ -195,9 +225,10 @@ pub fn survey(
     manifest: &Manifest,
     profiles: &[String],
     containers: &[Container],
+    halted: &Halted,
     protocols: crate::config::Protocols,
 ) -> Vec<Service> {
-    let mut whole = surveyed(manifest, containers);
+    let mut whole = surveyed(manifest, containers, halted);
     let brought = crate::stack::standing::brought(manifest, protocols, &whole);
     whole.retain(|service| profiles.iter().any(|profile| profile == &service.profile));
     for service in &mut whole {
@@ -211,7 +242,7 @@ pub fn survey(
 }
 
 /// What every service the stack declares is doing, worst first.
-fn surveyed(manifest: &Manifest, containers: &[Container]) -> Vec<Service> {
+fn surveyed(manifest: &Manifest, containers: &[Container], halted: &Halted) -> Vec<Service> {
     let found: BTreeMap<&str, &Container> = containers
         .iter()
         .map(|container| (container.service.as_str(), container))
@@ -231,7 +262,7 @@ fn surveyed(manifest: &Manifest, containers: &[Container]) -> Vec<Service> {
             } else {
                 found
                     .get(service.id.as_str())
-                    .map_or(State::Absent, |c| read(c))
+                    .map_or(State::Absent, |c| read(c, halted))
             },
             criticality: service.criticality,
             depends_on: service.depends_on.clone(),
@@ -292,7 +323,11 @@ pub struct Undeclared {
 /// Ordered by name and reduced to one entry per name: two containers of one scaled
 /// service are one thing the operator does not recognise, not two.
 #[must_use]
-pub fn undeclared(manifest: &Manifest, containers: &[Container]) -> Vec<Undeclared> {
+pub fn undeclared(
+    manifest: &Manifest,
+    containers: &[Container],
+    halted: &Halted,
+) -> Vec<Undeclared> {
     let declared: BTreeSet<&str> = manifest
         .services
         .iter()
@@ -302,7 +337,7 @@ pub fn undeclared(manifest: &Manifest, containers: &[Container]) -> Vec<Undeclar
     let strangers: BTreeMap<&str, State> = containers
         .iter()
         .filter(|container| !declared.contains(container.service.as_str()))
-        .map(|container| (container.service.as_str(), read(container)))
+        .map(|container| (container.service.as_str(), read(container, halted)))
         .collect();
 
     strangers
