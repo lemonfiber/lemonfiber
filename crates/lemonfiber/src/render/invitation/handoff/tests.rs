@@ -1,5 +1,5 @@
 use super::handoff;
-use lemonfiber_core::model::{HandedClient, HandedSession, Handoff, HandoffState};
+use lemonfiber_core::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
 
 const ADDRESS: &str = "http://192.168.1.20:8096";
 
@@ -8,6 +8,7 @@ fn issued() -> Handoff {
         name: "ana".to_owned(),
         state: HandoffState::Ready,
         reason: None,
+        remedy: None,
         address: Some(ADDRESS.to_owned()),
         caution: None,
         issued: Some("2026-09-29T10:00:00Z".to_owned()),
@@ -50,7 +51,10 @@ fn a_code_not_yet_used_is_waiting_rather_than_failed() {
     })
     .text();
 
-    assert!(said.contains("has not signed in on a device yet"), "{said}");
+    assert!(
+        said.contains("has not signed in on a new device yet"),
+        "{said}"
+    );
     assert!(said.contains("the next step is theirs"), "{said}");
     assert!(!said.contains("could not be handed over"), "{said}");
     assert!(said.contains('\u{2588}'), "{said}");
@@ -201,4 +205,37 @@ fn an_address_too_long_to_draw_still_gets_the_words() {
         "{}",
         &said[..said.len().min(200)]
     );
+}
+
+/// Each remedy is said as the command that takes it here, and none is said where there
+/// is none.
+#[test]
+fn a_remedy_is_said_as_the_command_that_takes_it() {
+    let said = |state, remedy| {
+        handoff(&Handoff {
+            state,
+            remedy,
+            ..issued()
+        })
+        .text()
+    };
+
+    let invite = said(HandoffState::Unprovisioned, Some(HandoffRemedy::Invite));
+    assert!(
+        invite.contains("`lemonfiber invite ana --confirm`"),
+        "{invite}"
+    );
+    let waiting = said(HandoffState::Ready, Some(HandoffRemedy::AskAgain));
+    assert!(
+        waiting.contains("`lemonfiber household handoff ana` again once they have"),
+        "{waiting}"
+    );
+    let unread = said(HandoffState::Failed, Some(HandoffRemedy::AskAgain));
+    assert!(unread.contains("again once the server answers"), "{unread}");
+    let silent = said(HandoffState::Failed, Some(HandoffRemedy::StartServer));
+    assert!(silent.contains("`lemonfiber status`"), "{silent}");
+    let nowhere = said(HandoffState::Failed, Some(HandoffRemedy::RecordAddress));
+    assert!(nowhere.contains("HOUSEHOLD_HOST <address>"), "{nowhere}");
+    let none = said(HandoffState::Connected, None);
+    assert!(!none.contains('`'), "{none}");
 }

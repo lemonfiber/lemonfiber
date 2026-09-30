@@ -44,6 +44,9 @@ pub(super) fn pairing(report: &Pairing) -> Lines {
          with the password this surface asks for. {}",
         report.replacing
     ));
+    lines.put(format!(
+        "Replacing it is `{PRODUCT} companion certificate --confirm`."
+    ));
     lines
 }
 

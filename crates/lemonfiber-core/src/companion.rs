@@ -100,7 +100,8 @@ pub struct Pairing {
     /// When it stops being good, as a date and a time of day.
     pub until: String,
     /// What would make every paired phone refuse this machine, said now rather than
-    /// discovered then.
+    /// discovered then. In words any surface can show: how the certificate is replaced
+    /// is each surface's own to say, so this names no command.
     pub replacing: String,
     /// What is worth knowing about the address itself, where anything is.
     pub caution: Option<String>,
@@ -161,8 +162,7 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
         until: crate::instant::written(expiring).unwrap_or_default(),
         replacing: format!(
             "The certificate this address presents was made by {PRODUCT} and nothing renews \
-             it. It changes only when somebody replaces it with `{PRODUCT} companion \
-             certificate --confirm`. {CONSEQUENCE}"
+             it. It changes only when somebody replaces it. {CONSEQUENCE}"
         ),
         caution: reached.caution,
     })

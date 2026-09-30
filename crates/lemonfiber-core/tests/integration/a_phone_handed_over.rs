@@ -19,7 +19,7 @@ use std::sync::Arc;
 use crate::common::household::{recorded_admin, stack_without};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::model::{HandedSession, Handoff, HandoffState};
+use lemonfiber_core::model::{HandedSession, Handoff, HandoffRemedy, HandoffState};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_core::stack::Source;
@@ -35,13 +35,21 @@ const HOUSEHOLD: &str = r#"[
 
 /// Ana on her phone, and the owner in a browser — whose session is not Ana's.
 const ANA_SIGNED_IN: &str = r#"[
-    {"UserId":"9","DeviceName":"Pixel 8","Client":"Jellyfin Android",
+    {"UserId":"9","DeviceId":"pixel-8","DeviceName":"Pixel 8","Client":"Jellyfin Android",
      "LastActivityDate":"2026-09-29T10:05:00Z"},
-    {"UserId":"1","DeviceName":"Firefox","Client":"Jellyfin Web"}
+    {"UserId":"1","DeviceId":"firefox","DeviceName":"Firefox","Client":"Jellyfin Web"}
+]"#;
+
+/// Ana on the phone she already had, and on the television she was just handed over to.
+const ANA_ON_BOTH: &str = r#"[
+    {"UserId":"9","DeviceId":"pixel-8","DeviceName":"Pixel 8","Client":"Jellyfin Android"},
+    {"UserId":"9","DeviceId":"living-room","DeviceName":"Living room","Client":"Jellyfin Android TV"},
+    {"UserId":"1","DeviceId":"firefox","DeviceName":"Firefox","Client":"Jellyfin Web"}
 ]"#;
 
 /// Only the owner, signed in in a browser.
-const NOBODY_ELSE: &str = r#"[{"UserId":"1","DeviceName":"Firefox","Client":"Jellyfin Web"}]"#;
+const NOBODY_ELSE: &str =
+    r#"[{"UserId":"1","DeviceId":"firefox","DeviceName":"Firefox","Client":"Jellyfin Web"}]"#;
 
 /// The address the household reaches the media server at, as recorded below.
 const ADDRESS: &str = "http://192.168.1.20:8096";
@@ -137,6 +145,16 @@ fn gone(env: &Path) {
 }
 
 /// Whether anything but a sign-in or a read went to the media server.
+/// Whether anything the hand-off says tells somebody to run a command, which only one
+/// surface could carry out.
+fn names_a_command(handoff: &Handoff) -> bool {
+    handoff
+        .reason
+        .iter()
+        .chain(&handoff.steps)
+        .any(|said| said.contains('`') || said.contains("un this"))
+}
+
 fn wrote(sent: &[Request]) -> bool {
     sent.iter().any(|request| {
         request.method != Method::Get && !request.url.contains("/Users/AuthenticateByName")
@@ -153,6 +171,8 @@ async fn the_first_run_issues_a_code_carrying_the_address() {
     gone(&env);
 
     assert_eq!(handoff.state, HandoffState::Ready);
+    assert_eq!(handoff.remedy, Some(HandoffRemedy::AskAgain));
+    assert!(!names_a_command(&handoff), "{handoff:?}");
     assert_eq!(
         handoff.name, "Ana",
         "the account's own spelling is the one handed back"
@@ -183,6 +203,8 @@ async fn a_code_not_yet_used_is_pending() {
     gone(&env);
 
     assert_eq!(second.state, HandoffState::Pending);
+    assert_eq!(second.remedy, Some(HandoffRemedy::AskAgain));
+    assert!(!names_a_command(&second), "{second:?}");
     assert_eq!(second.issued, first.issued, "the issue was dated again");
     assert!(second
         .reason
@@ -194,11 +216,16 @@ async fn a_code_not_yet_used_is_pending() {
 #[tokio::test]
 async fn a_device_signed_in_is_read_from_the_media_server() {
     let env = recorded_admin("handoff-connected");
+    let _ = handing(&env, "Ana", answering(NOBODY_ELSE), false).await;
     let ran = handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await;
     let handoff = answered(&ran);
     gone(&env);
 
     assert_eq!(handoff.state, HandoffState::Connected);
+    assert_eq!(
+        handoff.remedy, None,
+        "a device arrived, so nothing is left to do"
+    );
     assert_eq!(
         handoff.sessions,
         vec![HandedSession {
@@ -218,6 +245,7 @@ async fn a_device_signed_in_is_read_from_the_media_server() {
 #[tokio::test]
 async fn a_device_that_signed_out_is_no_longer_connected() {
     let env = recorded_admin("handoff-signed-out");
+    let _ = handing(&env, "Ana", answering(NOBODY_ELSE), false).await;
     let before = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
     let after = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
     gone(&env);
@@ -225,6 +253,54 @@ async fn a_device_that_signed_out_is_no_longer_connected() {
     assert_eq!(before.state, HandoffState::Connected);
     assert_eq!(after.state, HandoffState::Pending);
     assert!(after.sessions.is_empty());
+}
+
+/// A phone they already had when the code was given is not the device handed over: the
+/// hand-off waits for one that was not signed in then.
+#[tokio::test]
+async fn a_device_signed_in_before_the_code_is_not_the_one_handed_over() {
+    let env = recorded_admin("handoff-already-signed-in");
+    let given = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
+    let kept = std::fs::read_to_string(env.with_file_name("handoffs.json")).unwrap_or_default();
+    let again = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
+    let arrived = answered(&handing(&env, "Ana", answering(ANA_ON_BOTH), false).await);
+    gone(&env);
+
+    assert_eq!(given.state, HandoffState::Ready);
+    assert!(
+        kept.contains("pixel-8"),
+        "the devices signed in then were not kept: {kept}"
+    );
+    assert!(
+        !kept.contains("firefox"),
+        "somebody else's device was kept: {kept}"
+    );
+    assert_eq!(again.state, HandoffState::Pending);
+    assert_eq!(again.sessions.len(), 1, "the phone she had is still listed");
+    assert_eq!(arrived.state, HandoffState::Connected);
+    assert_eq!(arrived.issued, given.issued);
+}
+
+/// A record written before the devices were kept holds the moment alone, and reads as a
+/// code given while nothing was signed in.
+#[tokio::test]
+async fn a_record_of_the_moment_alone_reads_as_nothing_signed_in_then() {
+    let env = recorded_admin("handoff-dated-record");
+    let _ = std::fs::write(
+        env.with_file_name("handoffs.json"),
+        r#"{"9":"2026-09-29T10:00:00Z"}"#,
+    );
+    let signed_in = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
+    let _ = std::fs::write(
+        env.with_file_name("handoffs.json"),
+        r#"{"9":"2026-09-29T10:00:00Z"}"#,
+    );
+    let waiting = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    gone(&env);
+
+    assert_eq!(signed_in.state, HandoffState::Connected);
+    assert_eq!(signed_in.issued.as_deref(), Some("2026-09-29T10:00:00Z"));
+    assert_eq!(waiting.state, HandoffState::Pending);
 }
 
 /// The sign-in by short code is guided and never approved: nothing is written to the
@@ -313,7 +389,10 @@ async fn nobody_with_an_account_is_unprovisioned_and_none_is_made() {
     assert_eq!(handoff.state, HandoffState::Unprovisioned);
     assert!(handoff
         .reason
-        .is_some_and(|reason| reason.contains("lemonfiber invite bob")));
+        .as_ref()
+        .is_some_and(|reason| reason.contains("Invite them first")));
+    assert_eq!(handoff.remedy, Some(HandoffRemedy::Invite));
+    assert!(!names_a_command(&handoff), "{handoff:?}");
     assert!(!wrote(&ran.sent), "an account was made on the way");
     assert!(handoff.clients.is_empty());
 }
@@ -367,7 +446,10 @@ async fn a_silent_media_server_fails_as_the_server() {
     assert_eq!(handoff.state, HandoffState::Failed);
     assert!(handoff
         .reason
+        .as_ref()
         .is_some_and(|reason| reason.contains("not anybody's device or app")));
+    assert_eq!(handoff.remedy, Some(HandoffRemedy::StartServer));
+    assert!(!names_a_command(&handoff), "{handoff:?}");
 }
 
 /// A server that will not list who is signed in fails as not known, not as the device.
@@ -386,7 +468,10 @@ async fn sessions_that_cannot_be_read_fail_without_blaming_the_device() {
     assert_eq!(handoff.state, HandoffState::Failed);
     assert!(handoff
         .reason
+        .as_ref()
         .is_some_and(|reason| reason.contains("Nothing on their device is at fault")));
+    assert_eq!(handoff.remedy, Some(HandoffRemedy::AskAgain));
+    assert!(!names_a_command(&handoff), "{handoff:?}");
     assert!(
         !kept,
         "an issue was written down for a hand-off that failed"
@@ -406,7 +491,10 @@ async fn no_address_is_a_reachability_problem() {
     assert!(handoff.address.is_none());
     assert!(handoff
         .reason
+        .as_ref()
         .is_some_and(|reason| reason.contains("reaching the server rather than of any app")));
+    assert_eq!(handoff.remedy, Some(HandoffRemedy::RecordAddress));
+    assert!(!names_a_command(&handoff), "{handoff:?}");
     assert!(handoff.clients.is_empty());
 }
 

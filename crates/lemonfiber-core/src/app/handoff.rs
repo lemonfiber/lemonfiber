@@ -4,22 +4,30 @@
 //! apart because only one of them decides anything: what somebody may watch is chosen
 //! when the account is made, and a hand-off that made accounts on the way would make
 //! ones nobody chose anything for. So a name with no account behind it is answered as
-//! not provisioned, with the invitation to run, and nothing is made.
+//! not provisioned, with inviting them as the remedy, and nothing is made.
 //!
-//! **Whether a device arrived is asked of the media server every time.** The one thing
-//! written down here is when a code was first handed over, which the server has no
-//! record of and which is what tells somebody who has yet to sign in from somebody never
-//! handed anything. A device that signed in and then out is read as it is now, not as it
-//! was once.
+//! **Whether a device arrived is asked of the media server every time.** What is written
+//! down here is when a code was first handed over and which devices were signed in to
+//! the account at that moment, neither of which the server keeps. The first is what
+//! tells somebody who has yet to sign in from somebody never handed anything; the second
+//! is what tells the device just handed over from a phone they already had, which is the
+//! only one whose arrival proves anything. A device that signed in and then out is read
+//! as it is now, not as it was once.
 //!
 //! **The code is the server's address.** It is not a credential: it says where the
 //! server is, and whoever scans it still signs in as somebody.
+//!
+//! **What it says, every surface can show.** A reason and a step are words about the
+//! server and the device, and name no command; what to do next is a [`HandoffRemedy`],
+//! which a terminal answers with a command and an app with a control.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+use serde::{Deserialize, Serialize};
 
 use crate::app::Ctx;
 use crate::error::{Problem, Remedy, Severity};
-use crate::model::{HandedClient, HandedSession, Handoff, HandoffState};
+use crate::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
 use crate::ports::service::{Household as _, Member};
 
 /// What the record is called, beside the environment file.
@@ -28,8 +36,46 @@ use crate::ports::service::{Household as _, Member};
 /// name would read as nobody ever having been handed a code.
 const NAME: &str = "handoffs.json";
 
-/// When each account was first handed a code, by the identifier the media server gave it.
-type Issued = BTreeMap<String, String>;
+/// Each account's first code, by the identifier the media server gave the account.
+type Issued = BTreeMap<String, Kept>;
+
+/// One account's first code: when it was given, and which devices were signed in then.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Given {
+    /// When the code was first given, as an instant.
+    at: String,
+    /// The devices signed in to the account at that moment, by the identifier the media
+    /// server tells each apart by. None of them is the device being handed over.
+    #[serde(default)]
+    signed_in: BTreeSet<String>,
+}
+
+/// One account's entry as it was written.
+///
+/// A record written before the devices were kept holds the moment alone, and reads as a
+/// code given while nothing was signed in: every device signed in now counts as having
+/// arrived, which is what that record always claimed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum Kept {
+    /// The moment and the devices signed in then.
+    Given(Given),
+    /// The moment alone.
+    Dated(String),
+}
+
+impl Kept {
+    /// What was kept, with no devices where none were written down.
+    fn given(self) -> Given {
+        match self {
+            Self::Given(given) => given,
+            Self::Dated(at) => Given {
+                at,
+                signed_in: BTreeSet::new(),
+            },
+        }
+    }
+}
 
 /// Hand somebody's device the way onto the stack, or say where doing so stands.
 ///
@@ -73,6 +119,7 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
         name,
         state: HandoffState::Failed,
         reason: None,
+        remedy: None,
         address: reachable.as_ref().map(|at| at.url.clone()),
         caution: reachable.and_then(|at| at.caution),
         issued: None,
@@ -84,7 +131,7 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
     };
 
     let Ok(household) = server.household().await else {
-        return Ok(failed(report, SERVER_SILENT));
+        return Ok(failed(report, SERVER_SILENT, HandoffRemedy::StartServer));
     };
     let asked = report.name.to_lowercase();
     let Some(member) = household
@@ -93,6 +140,7 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
     else {
         report.state = HandoffState::Unprovisioned;
         report.reason = Some(unprovisioned(&report.name));
+        report.remedy = Some(HandoffRemedy::Invite);
         return Ok(report);
     };
     // Refused for the reason an invitation refuses it: this is the account the program
@@ -102,7 +150,11 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
     }
     report.name.clone_from(&member.name);
     let Some(address) = report.address.clone() else {
-        return Ok(failed(report, NOWHERE_TO_REACH));
+        return Ok(failed(
+            report,
+            NOWHERE_TO_REACH,
+            HandoffRemedy::RecordAddress,
+        ));
     };
 
     report.quick_connect = server.quick_connect().await.unwrap_or(false);
@@ -110,8 +162,12 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
     report.clients = clients(&address);
 
     let Ok(sessions) = server.sessions(&member.id).await else {
-        return Ok(failed(report, SESSIONS_UNREAD));
+        return Ok(failed(report, SESSIONS_UNREAD, HandoffRemedy::AskAgain));
     };
+    let now_signed_in: BTreeSet<String> = sessions
+        .iter()
+        .map(|session| session.device_id.clone())
+        .collect();
     report.sessions = sessions
         .into_iter()
         .map(|session| HandedSession {
@@ -121,29 +177,58 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
         })
         .collect();
 
+    (report.state, report.issued) = proved(ctx, &member.id, &now_signed_in);
+    if report.state == HandoffState::Pending {
+        report.reason = Some(STILL_THEIRS.to_owned());
+    }
+    // Until a device of theirs is signed in, the next thing anybody does here is ask
+    // again once they have.
+    if report.state != HandoffState::Connected {
+        report.remedy = Some(HandoffRemedy::AskAgain);
+    }
+    Ok(report)
+}
+
+/// Where the hand-off to one account stands, and when its code was first given.
+///
+/// The first code is written down here, with the devices signed in at that moment, and
+/// a rehearsal writes nothing. A device arrived where one is signed in now that was not
+/// then; a code given by this run is given while these devices are signed in, so none
+/// of them is the one it hands over.
+fn proved(
+    ctx: &Ctx,
+    account: &str,
+    now_signed_in: &BTreeSet<String>,
+) -> (HandoffState, Option<String>) {
     let mut issued: Issued = super::record::beside(ctx, NAME);
-    let before = issued.get(&member.id).cloned();
-    report.state = match (report.sessions.is_empty(), before.is_some()) {
-        (false, _) => HandoffState::Connected,
-        (true, true) => HandoffState::Pending,
-        (true, false) => HandoffState::Ready,
+    let before = issued.get(account).cloned().map(Kept::given);
+    let already = before
+        .as_ref()
+        .map_or_else(|| now_signed_in.clone(), |given| given.signed_in.clone());
+    let state = match (!now_signed_in.is_subset(&already), before.is_some()) {
+        (true, _) => HandoffState::Connected,
+        (false, true) => HandoffState::Pending,
+        (false, false) => HandoffState::Ready,
     };
-    report.issued = match before {
-        Some(at) => Some(at),
+    let at = match before {
+        Some(given) => Some(given.at),
         None if ctx.dry_run => None,
         None => {
             let now = ctx.hours_ago(0);
-            issued.insert(member.id.clone(), now.clone());
+            issued.insert(
+                account.to_owned(),
+                Kept::Given(Given {
+                    at: now.clone(),
+                    signed_in: already,
+                }),
+            );
             // Best effort: a record that would not write costs the next run the
             // difference between ready and pending, and never claims a device arrived.
             super::record::keep_beside(ctx, NAME, &issued);
             Some(now)
         }
     };
-    if report.state == HandoffState::Pending {
-        report.reason = Some(STILL_THEIRS.to_owned());
-    }
-    Ok(report)
+    (state, at)
 }
 
 /// Every app the guidance names, each with the code that points it at this server.
@@ -198,18 +283,14 @@ fn steps(member: &Member, address: &str, quick_connect: bool) -> Vec<String> {
             member.name
         ));
     }
-    steps.push(
-        "Run this again once they have: it asks the media server which of their devices \
-         are signed in."
-            .to_owned(),
-    );
     steps
 }
 
-/// A failed hand-off, with why.
-fn failed(mut report: Handoff, reason: &str) -> Handoff {
+/// A failed hand-off, with why and what to do about it.
+fn failed(mut report: Handoff, reason: &str, remedy: HandoffRemedy) -> Handoff {
     report.state = HandoffState::Failed;
     report.reason = Some(reason.to_owned());
+    report.remedy = Some(remedy);
     report
 }
 
@@ -217,30 +298,26 @@ fn failed(mut report: Handoff, reason: &str) -> Handoff {
 fn unprovisioned(name: &str) -> String {
     format!(
         "Nobody called {name} has an account yet, so there is nothing for a device to sign \
-         in to. Invite them first, which is where what they may watch is chosen: \
-         `lemonfiber invite {name} --confirm`."
+         in to. Invite them first, which is where what they may watch is chosen."
     )
 }
 
 /// Said where the media server does not answer at all.
 const SERVER_SILENT: &str = "The media server did not answer, so nothing could be checked or \
-    handed over. That is the server, not anybody's device or app: `lemonfiber status` says \
-    whether it is running.";
+    handed over. That is the server, not anybody's device or app.";
 
 /// Said where this machine has no address another device could reach it at.
 const NOWHERE_TO_REACH: &str = "This machine has no address another device could reach it \
     at, so there is nothing to put in a code. That is a question of reaching the server rather \
-    than of any app: record the address the household uses with `lemonfiber config set \
-    HOUSEHOLD_HOST <address>`.";
+    than of any app: the address the household uses has not been recorded.";
 
 /// Said where the media server answers but will not list who is signed in.
 const SESSIONS_UNREAD: &str = "The media server would not say which devices are signed in, so \
-    whether theirs arrived is not known. Nothing on their device is at fault for that; run \
-    this again once the server answers.";
+    whether theirs arrived is not known. Nothing on their device is at fault for that.";
 
-/// Said where a code went out and no device of theirs is signed in yet.
-const STILL_THEIRS: &str = "No device of theirs is signed in yet, and the next step is theirs, \
-    on the device. If the app cannot find the server, that is the way to the server rather \
+/// Said where a code went out and no device of theirs has signed in since.
+const STILL_THEIRS: &str = "No device of theirs has signed in since the code was given, and the \
+    next step is theirs, on the device. If the app cannot find the server, that is the way to the server rather \
     than the app: the address opens on the home network, so the device has to be on it.";
 
 /// Said where the hand-off is for nobody: the name is blank, or only spaces.

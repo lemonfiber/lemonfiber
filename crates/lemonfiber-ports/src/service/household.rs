@@ -246,6 +246,9 @@ pub trait Household: Send + Sync {
 /// One device signed in to an account, as the media server lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {
+    /// What the media server tells the device apart by, which stays the same while
+    /// what it calls itself may not.
+    pub device_id: String,
     /// What the device calls itself.
     pub device: String,
     /// The app it signed in with.

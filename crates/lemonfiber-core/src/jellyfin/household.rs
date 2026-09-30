@@ -99,6 +99,8 @@ impl UserResource {
 struct SessionResource {
     #[serde(rename = "UserId", default)]
     user: String,
+    #[serde(rename = "DeviceId", default)]
+    device_id: String,
     #[serde(rename = "DeviceName", default)]
     device: String,
     #[serde(rename = "Client", default)]
@@ -323,6 +325,7 @@ impl crate::ports::service::Household for Jellyfin {
             .into_iter()
             .filter(|session| session.user == member)
             .map(|session| Session {
+                device_id: session.device_id,
                 device: session.device,
                 client: session.client,
                 last_seen: session.last_activity,

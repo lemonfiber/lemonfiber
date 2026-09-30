@@ -88,7 +88,8 @@ async fn material_names_where_the_stack_is_and_the_certificate_it_presents() {
         pairing
             .as_ref()
             .is_ok_and(|made| made.replacing.contains("nothing renews it")
-                && made.replacing.contains("paired again")),
+                && made.replacing.contains("paired again")
+                && !made.replacing.contains('`')),
         "what would make a phone refuse this machine is said with the material: {pairing:?}"
     );
 }
