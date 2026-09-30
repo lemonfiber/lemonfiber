@@ -19,23 +19,24 @@ fn stack() -> Vec<lemonfiber_manifest::Service> {
 /// A context whose household is reached at a recorded address, with the media server's
 /// administrator recorded where `password` says, answering over `http`.
 fn cors_ctx(name: &str, password: bool, http: Arc<Fake>) -> Ctx {
-    let env = config_scratch(name);
-    if let Some(parent) = env.parent() {
-        let _ = std::fs::remove_dir_all(parent);
-        let _ = std::fs::create_dir_all(parent);
-    }
+    // Kept rather than scoped to this helper, because the context reads the file long
+    // after the helper returns and a scratch directory goes when its handle does.
+    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let _ = std::fs::remove_dir_all(&at);
+    let _ = std::fs::create_dir_all(&at);
+    let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     if password {
         let _ = store::set(
             &env,
             crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
-            "minted-earlier",
+            &lemonfiber_fixtures::support::a_password(),
         );
     }
     a_context()
         .environment(crate::platform::Environment::LinuxNative)
         .settings(Settings {
-            env_file: Some(env.to_path_buf()),
+            env_file: Some(env),
             household_host: Some("192.168.1.20".to_owned()),
             ..Settings::default()
         })
@@ -48,7 +49,7 @@ fn serving(first: &'static str, after: &'static str) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         (
             "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
+            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 4],
         ),
         (
             "/System/Configuration",
@@ -154,14 +155,16 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// Without the administrator's credential a real pass skips, a rehearsal says what it
-/// would write, and a stack with no media server has nothing to hold.
+/// A media server lemonfiber holds no account on is not configured; a rehearsal before
+/// the identity step has minted one says what the run would write; and a stack with no
+/// media server has nothing to hold.
 #[tokio::test]
 async fn without_a_credential_or_a_media_server_nothing_is_asked() {
     let http = serving(OPEN, CLOSED);
     let ctx = cors_ctx("cors-uncredentialled", false, http.clone());
-    let wiring = super::super::cors::seed_cors(&ctx, &stack()).await;
-    assert!(wiring.as_ref().is_some_and(is_skipped), "{wiring:?}");
+    assert!(super::super::cors::seed_cors(&ctx, &stack())
+        .await
+        .is_none());
 
     let mut rehearsing = cors_ctx("cors-uncredentialled-rehearsed", false, http.clone());
     rehearsing.dry_run = true;
@@ -174,6 +177,11 @@ async fn without_a_credential_or_a_media_server_nothing_is_asked() {
         })
     );
 
+    assert!(
+        super::super::cors::seed_cors(&rehearsing, &[published(jellyfin_svc())])
+            .await
+            .is_none()
+    );
     assert!(
         super::super::cors::seed_cors(&ctx, &[published(seerr_svc())])
             .await

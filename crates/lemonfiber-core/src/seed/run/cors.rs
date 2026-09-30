@@ -22,6 +22,16 @@ pub(super) async fn seed_cors(
     services: &[lemonfiber_manifest::Service],
 ) -> Option<Wiring> {
     let jellyfin = super::identity::jellyfin_service(services)?;
+    // No administrator of this media server is recorded where lemonfiber did not set it
+    // up — a stack with no request service, or one whose identity source is something
+    // else — and a server lemonfiber holds no account on is not one it configures. A
+    // rehearsal before the first run finds none recorded either, because the identity
+    // step mints it, so where that step would it says what the run would write.
+    let recorded = super::identity::recorded_jellyfin_password(ctx);
+    let minting = ctx.dry_run && super::identity::seerr_service(services).is_some();
+    if recorded.is_none() && !minting {
+        return None;
+    }
     let Some(origin) = front_door_origin(ctx, services).await else {
         let mut wiring = Wiring::settled(
             CONNECTION.to_owned(),
@@ -39,18 +49,14 @@ pub(super) async fn seed_cors(
         );
         return Some(wiring);
     };
-    let Some(password) = super::identity::recorded_jellyfin_password(ctx) else {
-        let state = if ctx.dry_run {
+    let Some(password) = recorded else {
+        return Some(Wiring::settled(
+            CONNECTION.to_owned(),
             State::WouldWire {
                 yours: None,
                 ours: Some(origin),
-            }
-        } else {
-            State::Skipped {
-                reason: "no administrator credential for Jellyfin is recorded yet".to_owned(),
-            }
-        };
-        return Some(Wiring::settled(CONNECTION.to_owned(), state));
+            },
+        ));
     };
     let client = crate::jellyfin::Jellyfin::authenticated(
         ctx.seams.http.clone(),
