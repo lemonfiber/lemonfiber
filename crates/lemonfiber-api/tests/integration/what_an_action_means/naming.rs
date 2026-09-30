@@ -4,6 +4,7 @@ use super::acting::*;
 use super::{command, naming, nothing, refusal};
 use axum::http::StatusCode;
 use lemonfiber_api::actions::{named, Arguments, Refused, OFFERED};
+use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
 
 /// A removal with none named has lost the only part of it that decides what goes.
@@ -253,5 +254,45 @@ fn a_name_that_is_not_an_action_is_absent_and_a_bad_argument_is_a_mistake() {
         .why()
         .status(),
         StatusCode::BAD_REQUEST
+    );
+}
+
+#[test]
+fn each_way_an_action_is_refused_carries_a_code_of_its_own() {
+    // One refusal per mistake, so a client reading the code knows which it made
+    // without reading the sentence: a name, a missing argument, a value naming
+    // nothing, an argument with nowhere to go, and two that ask different things.
+    let refused = [
+        Refused::Unknown {
+            name: "reticulate".to_owned(),
+        },
+        Refused::Missing {
+            action: "pull".to_owned(),
+            argument: "forms".to_owned(),
+        },
+        Refused::Unrecognised {
+            argument: "tier".to_owned(),
+            offered: "stop, services, configuration or media".to_owned(),
+        },
+        Refused::Unwanted {
+            action: "down".to_owned(),
+            argument: "confirm".to_owned(),
+        },
+        Refused::Together {
+            action: "restore".to_owned(),
+            argument: "archive".to_owned(),
+            alongside: "list".to_owned(),
+        },
+    ];
+    let why: Vec<Refusal> = refused.iter().map(Refused::why).collect();
+    assert_eq!(
+        why,
+        [
+            Refusal::NoSuchAction,
+            Refusal::MissingArgument,
+            Refusal::UnrecognisedArgument,
+            Refusal::UnwantedArgument,
+            Refusal::ArgumentsTogether,
+        ]
     );
 }

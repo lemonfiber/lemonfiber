@@ -63,6 +63,7 @@ mod warning;
 
 use lemonfiber_api::actions::{named, Arguments};
 use lemonfiber_api::read::table::{named as asked, Wanted as Asking, CHECKS};
+use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::repair::run::Report;
@@ -174,7 +175,9 @@ impl Mending {
     fn asking(&self) -> Result<Command, String> {
         match self.reads {
             Reads::Offer => named(self.action, Arguments::default()).map_err(|no| no.said()),
-            Reads::Warnings => asked(CHECKS, Asking::default()).map_err(|no| no.said().to_owned()),
+            Reads::Warnings => asked(CHECKS, Asking::default())
+                .map_err(Refusal::said)
+                .map_err(str::to_owned),
         }
     }
 }
