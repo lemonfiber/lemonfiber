@@ -204,3 +204,74 @@ async fn a_media_server_that_cannot_be_read_is_reported() {
     );
     assert!(written.is_empty(), "{written:?}");
 }
+
+/// A rehearsal over a list that names origins says which it would replace.
+#[tokio::test]
+async fn a_rehearsal_names_the_origins_it_would_replace() {
+    let http = serving(r#"{"CorsHosts":["*","http://elsewhere:80"]}"#, CLOSED);
+    let mut ctx = cors_ctx("cors-rehearsed-named", true, http.clone());
+    ctx.dry_run = true;
+
+    let (state, _) = seeded_cors(&ctx, &http).await;
+
+    assert_eq!(
+        state,
+        Some(State::WouldWire {
+            yours: Some("*, http://elsewhere:80".to_owned()),
+            ours: Some(DOOR.to_owned()),
+        })
+    );
+}
+
+/// A write the media server refuses is reported rather than called done.
+#[tokio::test]
+async fn a_write_the_media_server_refuses_is_reported() {
+    let http = Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
+        ),
+        (
+            "/System/Configuration",
+            vec![
+                Answer::reply(200, OPEN),
+                Answer::reply(200, OPEN),
+                Answer::reply(400, "refused"),
+            ],
+        ),
+    ]);
+    let ctx = cors_ctx("cors-refused", true, http.clone());
+
+    let (state, written) = seeded_cors(&ctx, &http).await;
+
+    assert!(
+        matches!(state, Some(State::Failed { .. } | State::Skipped { .. })),
+        "{state:?}"
+    );
+    assert_eq!(written.len(), 1, "{written:?}");
+}
+
+/// A stack that publishes nothing to the household, and a door that publishes no port,
+/// leave no origin to name, so nothing is written and the pass warns.
+#[tokio::test]
+async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
+    let mut portless = published(seerr_svc());
+    portless.port = None;
+    for (name, services) in [
+        ("cors-no-door", vec![jellyfin_svc(), seerr_svc()]),
+        ("cors-no-port", vec![jellyfin_svc(), portless]),
+    ] {
+        let http = serving(OPEN, CLOSED);
+        let ctx = cors_ctx(name, true, http.clone());
+
+        let wiring = super::super::cors::seed_cors(&ctx, &services).await;
+
+        assert!(
+            wiring
+                .as_ref()
+                .is_some_and(|one| is_skipped(one) && one.severity.is_warning()),
+            "{name}: {wiring:?}"
+        );
+        assert!(http.requests().is_empty(), "{name}: {:?}", http.requests());
+    }
+}
