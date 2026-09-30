@@ -25,6 +25,13 @@ pub(crate) struct Pair {
     pub gateway: String,
     /// The download client whose traffic must traverse it.
     pub client: String,
+    /// What the stack calls the gateway in front of an operator.
+    ///
+    /// Beside the id rather than instead of it: a finding's words name the service the
+    /// way the operator knows it, and the commands a remedy offers take the id.
+    pub gateway_name: String,
+    /// What the stack calls the client in front of an operator.
+    pub client_name: String,
 }
 
 /// The tunnel gateway and the download client contained by it, recognised by what
@@ -79,5 +86,7 @@ pub(crate) fn resolve_pair(manifest: &Manifest) -> Option<Pair> {
     Some(Pair {
         gateway: gateway.id.clone(),
         client: client.id.clone(),
+        gateway_name: gateway.name.clone(),
+        client_name: client.name.clone(),
     })
 }

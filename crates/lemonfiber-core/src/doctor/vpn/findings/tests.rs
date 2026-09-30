@@ -1,4 +1,6 @@
-use super::{unprotected, NO_TUNNEL, PORT_MISMATCH};
+use super::{assemble, unprotected, unreachable_engine, NO_TUNNEL, PORT_MISMATCH};
+use crate::doctor::vpn::leak::Reach;
+use crate::doctor::vpn::Pair;
 use crate::doctor::Verdict;
 
 #[test]
@@ -57,4 +59,75 @@ fn the_uncontained_warning_says_what_it_costs_and_how_to_answer_it() {
     // And a skip carries nothing to say, which is what makes the reading above
     // a total one rather than a match with somewhere to hide.
     assert!(problem_of(&super::skipped("nothing to contain".to_owned())).is_none());
+}
+
+/// The tunnel and the client, as the manifest names them.
+fn pair() -> Pair {
+    Pair {
+        gateway: "gluetun".to_owned(),
+        client: "qbittorrent".to_owned(),
+        gateway_name: "Gluetun".to_owned(),
+        client_name: "qBittorrent".to_owned(),
+    }
+}
+
+/// A tunnel that is down is written about as Gluetun and reported against gluetun: the
+/// words name the service as the operator knows it, the finding says which service it
+/// is about, and the command in the remedy keeps the id the command takes.
+#[test]
+fn a_down_tunnel_names_its_service_as_the_operator_knows_it() {
+    let findings = assemble(
+        &pair(),
+        &Reach::Down,
+        &Reach::Address("203.0.113.9".to_owned()),
+        None,
+        Vec::new(),
+    );
+    let titles: Vec<(&str, Option<&str>)> = findings
+        .iter()
+        .map(|finding| (finding.title.as_str(), finding.service.as_deref()))
+        .collect();
+    assert_eq!(
+        titles,
+        vec![
+            ("Gluetun tunnel", Some("gluetun")),
+            ("qBittorrent egress", Some("qbittorrent")),
+        ]
+    );
+
+    let tunnel = findings.first().and_then(problem_of);
+    assert_eq!(
+        tunnel.map(|problem| problem.summary.as_str()),
+        Some("The VPN container Gluetun is not running")
+    );
+    assert_eq!(
+        tunnel
+            .and_then(|problem| problem.remedies.first())
+            .and_then(|remedy| remedy.detail.as_deref()),
+        Some("lemonfiber logs gluetun")
+    );
+    let egress = findings.get(1).and_then(problem_of);
+    assert_eq!(
+        egress.map(|problem| problem.summary.as_str()),
+        Some("qBittorrent has connectivity the VPN does not")
+    );
+}
+
+/// Where the engine could not be asked, the two findings it could not settle still
+/// carry the names and the services they would have been about.
+#[test]
+fn an_unreachable_engine_still_names_both_services() {
+    let findings = unreachable_engine(&pair(), &crate::config::PortForward::default(), false);
+    let titles: Vec<(&str, Option<&str>)> = findings
+        .iter()
+        .take(2)
+        .map(|finding| (finding.title.as_str(), finding.service.as_deref()))
+        .collect();
+    assert_eq!(
+        titles,
+        vec![
+            ("Gluetun tunnel", Some("gluetun")),
+            ("qBittorrent egress", Some("qbittorrent")),
+        ]
+    );
 }

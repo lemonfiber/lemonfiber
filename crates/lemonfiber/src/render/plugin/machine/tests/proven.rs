@@ -128,6 +128,7 @@ fn found(check: &str, verdict: Checked) -> Finding {
         category: Category::Network,
         title: format!("what {check} establishes"),
         service: None,
+        service_name: None,
         caused_by: None,
         said: None,
         verdict,

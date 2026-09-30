@@ -24,14 +24,16 @@ pub(super) fn assemble(
     let mut findings = vec![
         finding(
             "vpn.tunnel",
-            &format!("{} tunnel", pair.gateway),
-            tunnel_verdict(gateway, &pair.gateway, note),
-        ),
+            &format!("{} tunnel", pair.gateway_name),
+            tunnel_verdict(gateway, pair, note),
+        )
+        .about(&pair.gateway),
         finding(
             "vpn.egress-match",
-            &format!("{} egress", pair.client),
+            &format!("{} egress", pair.client_name),
             egress_verdict(gateway, client, pair),
-        ),
+        )
+        .about(&pair.client),
     ];
     findings.extend(killswitch);
     findings
@@ -176,17 +178,19 @@ pub(super) fn unreachable_engine(
     vec![
         finding(
             "vpn.tunnel",
-            &format!("{} tunnel", pair.gateway),
+            &format!("{} tunnel", pair.gateway_name),
             Verdict::Unverified {
                 reason: reason.clone(),
                 remedy: remedy.clone(),
             },
-        ),
+        )
+        .about(&pair.gateway),
         finding(
             "vpn.egress-match",
-            &format!("{} egress", pair.client),
+            &format!("{} egress", pair.client_name),
             Verdict::Unverified { reason, remedy },
-        ),
+        )
+        .about(&pair.client),
         finding(
             "vpn.killswitch",
             "killswitch",

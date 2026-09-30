@@ -35,18 +35,18 @@ pub(super) enum Reach {
 /// not reach the endpoint is not, because that is indistinguishable from the
 /// endpoint being unreachable — and loss of the oracle is not evidence of a
 /// down tunnel any more than of a working one.
-pub(super) fn tunnel_verdict(gateway: &Reach, gateway_id: &str, note: Option<String>) -> Verdict {
+pub(super) fn tunnel_verdict(gateway: &Reach, pair: &Pair, note: Option<String>) -> Verdict {
     match gateway {
         Reach::Address(_) => Verdict::Pass { note },
         Reach::Down => Verdict::Fail(
             Problem::new(
                 VPN_CONTAINER_DOWN,
                 Severity::Error,
-                format!("The VPN container {gateway_id} is not running"),
+                format!("The VPN container {} is not running", pair.gateway_name),
                 "Nothing routes through a tunnel that is not up. Torrents cannot \
                  transfer, though nothing is leaking while it is down.",
                 Remedy::new("Start the form that includes it, then check its logs")
-                    .with_detail(format!("lemonfiber logs {gateway_id}")),
+                    .with_detail(format!("lemonfiber logs {}", pair.gateway)),
             )
             .in_state(crate::error::State::Guided),
         ),
@@ -55,7 +55,7 @@ pub(super) fn tunnel_verdict(gateway: &Reach, gateway_id: &str, note: Option<Str
                      being down and the check service being unreachable both produce"
                 .to_owned(),
             remedy: Remedy::new("Check the tunnel is up, then run this again")
-                .with_detail(format!("lemonfiber logs {gateway_id}")),
+                .with_detail(format!("lemonfiber logs {}", pair.gateway)),
         },
     }
 }
@@ -84,7 +84,7 @@ pub(super) fn egress_verdict(gateway: &Reach, client: &Reach, pair: &Pair) -> Ve
                 reason: format!(
                     "{} returned an address, but {}'s own address could not be read, so egress \
                      could not be compared",
-                    pair.client, pair.gateway
+                    pair.client_name, pair.gateway_name
                 ),
                 remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
             },
@@ -106,18 +106,18 @@ pub(super) fn egress_verdict(gateway: &Reach, client: &Reach, pair: &Pair) -> Ve
             reason: format!(
                 "{} answered from outside the container and the answer could not be read as an \
                  address, so where its traffic went was not established",
-                pair.client
+                pair.client_name
             ),
             remedy: Remedy::new("Check what the address service is returning, then run this again"),
         },
         Reach::Down => Verdict::Skipped {
             reason: format!(
                 "the download client {} is not running, so its egress could not be compared",
-                pair.client
+                pair.client_name
             ),
         },
         Reach::Unknown => Verdict::Unverified {
-            reason: format!("the check could not be run inside {}", pair.client),
+            reason: format!("the check could not be run inside {}", pair.client_name),
             remedy: Remedy::new("Confirm the client is running, then run this again"),
         },
     }
@@ -128,7 +128,10 @@ fn mismatch(pair: &Pair) -> Problem {
     Problem::new(
         LEAKING,
         Severity::Critical,
-        format!("{}'s traffic is not going through the VPN", pair.client),
+        format!(
+            "{}'s traffic is not going through the VPN",
+            pair.client_name
+        ),
         "Its public address does not match the tunnel's, so peers in every swarm \
          can see your home address. This is the one failure whose consequences \
          reach outside your machine.",
@@ -143,7 +146,7 @@ fn uncontained(pair: &Pair) -> Problem {
     Problem::new(
         LEAKING,
         Severity::Critical,
-        format!("{} has connectivity the VPN does not", pair.client),
+        format!("{} has connectivity the VPN does not", pair.client_name),
         "The client reached the internet while the tunnel did not, so its traffic \
          is not being carried by the VPN. Your home address is exposed to peers.",
         Remedy::new("Stop torrent transfers now, then confirm the client shares the VPN's network")
@@ -157,7 +160,7 @@ fn isolated(pair: &Pair) -> Problem {
     Problem::new(
         CLIENT_ISOLATED,
         Severity::Warning,
-        format!("{} has no connectivity", pair.client),
+        format!("{} has no connectivity", pair.client_name),
         "The tunnel is up but the client could not reach the internet through it. \
          Nothing is leaking, but torrents will not transfer until it can.",
         Remedy::new("Confirm the client uses the VPN container's network")

@@ -9,6 +9,7 @@ fn finding(check: &str, verdict: Verdict) -> Finding {
         category: Category::Network,
         title: format!("what {check} establishes"),
         service: None,
+        service_name: None,
         caused_by: None,
         said: None,
         verdict,

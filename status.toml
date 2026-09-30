@@ -2496,6 +2496,11 @@ rows = [
     "`N15-R3`",
     "**The core half is built; the app's is not.** The glossary carries the forms this product writes a word in, where a stage or standing is named by one, and `explain` finds the word by them: `grabbed` and `grabbing` resolve to `grab`, `seeding` to `seed`, and `hardlinked` to `hardlink` ([`glossary.rs`](crates/lemonfiber-core/src/glossary.rs)). A test requires every such form the contract sends to be listed. Explaining the word where it is used, with the short form in place and the longer one on request, is the companion's. No version locks it: `N15` requires `N1`, which no version schedules.",
   ] },
+  { state = "done", cells = [
+    "A finding names its service, and a bundle gives its code",
+    "`C1-R16`, `C4-R16`",
+    "A finding about a service carries `service_name` beside `service`: what the stack calls it in front of an operator, set after the run by [`named`](crates/lemonfiber-core/src/doctor/examining.rs) from the same manifest attribution reads, and absent where the finding is about no service or the stack declares none by that id, never the id standing in. The tunnel and egress findings are now about the gateway and the client, so they carry both and are attributed like any other, and their titles and summaries use the names the [`Pair`](crates/lemonfiber-core/src/doctor/vpn/pair.rs) carries (\"Gluetun tunnel\", \"The VPN container Gluetun is not running\") while a remedy's command keeps the id. A support bundle's `findings.txt` leads every warning and failure with its code ([`findings`](crates/lemonfiber-core/src/bundle/run.rs)); a pass, an unverified check and a skip carry none and read as before.",
+  ] },
 ]
 
 [[milestone.part]]
