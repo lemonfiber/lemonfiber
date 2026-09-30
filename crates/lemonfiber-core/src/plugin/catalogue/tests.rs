@@ -140,7 +140,7 @@ fn only_a_whole_commit_is_pinned() {
         "main",
         "v1.2.0",
         "8fa05ba7",
-        "8fa05ba718f70624f2c122f8c0371d47e6c90d0z",
+        "000000000000000000000000000000000000000g",
     ] {
         assert!(!entry(revision).pins_a_commit(), "{revision}");
     }

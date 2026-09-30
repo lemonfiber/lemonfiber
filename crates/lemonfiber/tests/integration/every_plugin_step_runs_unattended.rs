@@ -169,14 +169,14 @@ fn each_step_answers_with_a_status_and_nobody_at_the_terminal() {
             "rehearsing",
             MANIFEST,
             200,
-            &["plugin", "install", "--dry-run", "source"],
+            &["plugin", "install", "--dry-run", "./source"],
             true,
         ),
         (
             "rehearsing what the build refuses",
             &refused,
             200,
-            &["plugin", "install", "--dry-run", "source"],
+            &["plugin", "install", "--dry-run", "./source"],
             false,
         ),
     ];
@@ -204,7 +204,7 @@ fn a_rehearsed_install_leaves_the_machine_as_it_found_it() {
     let root = machine("rehearsed", MANIFEST, 200);
 
     assert_eq!(
-        unattended(&root, &["plugin", "install", "--dry-run", "source"]),
+        unattended(&root, &["plugin", "install", "--dry-run", "./source"]),
         Some(0)
     );
     assert_eq!(written(&root), Vec::<PathBuf>::new(), "nothing was written");
@@ -286,13 +286,13 @@ fn each_verb_runs_to_its_end_with_nobody_at_the_terminal() {
         ),
         (
             "rehearsing the install",
-            &["plugin", "install", "--dry-run", "source"],
+            &["plugin", "install", "--dry-run", "./source"],
             true,
         ),
-        ("installing", &["plugin", "install", "source"], true),
+        ("installing", &["plugin", "install", "./source"], true),
         (
             "installing it again",
-            &["plugin", "install", "source"],
+            &["plugin", "install", "./source"],
             false,
         ),
         (

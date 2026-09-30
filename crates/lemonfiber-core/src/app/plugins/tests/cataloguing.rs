@@ -173,6 +173,36 @@ async fn a_name_the_index_does_not_pin_is_refused() {
     }
 }
 
+/// A signed index of a shape this build does not read is refused as unreadable, and one
+/// whose signature cannot be fetched is refused as unreachable rather than unsigned.
+#[tokio::test]
+async fn an_unreadable_index_or_an_unfetchable_signature_resolves_nothing() {
+    let signing = Signing::new();
+    assert!(signing.is_some(), "no key pair could be made");
+    if let Some(signing) = signing {
+        let later = index(REVIEWED, MANIFEST).replace("\"schema\": 1", "\"schema\": 2");
+        let (ctx, serving) = cataloguing(
+            "catalogue-later",
+            release(&later, Some(signing.signed(&later))),
+            signing.key(),
+        );
+        assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-21");
+        assert!(serving.asked().is_empty(), "{:?}", serving.asked());
+
+        let listed = index(REVIEWED, MANIFEST);
+        let (ctx, serving) = cataloguing(
+            "catalogue-unsigned-down",
+            Fake::by_path(vec![
+                ("index.json.sig", Answer::reply(503, "")),
+                ("index.json", Answer::reply(200, listed)),
+            ]),
+            signing.key(),
+        );
+        assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-19");
+        assert!(serving.asked().is_empty(), "{:?}", serving.asked());
+    }
+}
+
 /// A commit holding a manifest other than the one the catalogue reviewed is refused
 /// before it is installed, and nothing is recorded.
 #[tokio::test]
