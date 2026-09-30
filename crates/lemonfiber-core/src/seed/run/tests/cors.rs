@@ -17,8 +17,8 @@ fn stack() -> Vec<lemonfiber_manifest::Service> {
 }
 
 /// A context whose household is reached at a recorded address, with the media server's
-/// administrator recorded where `password` says, answering over `http`.
-fn cors_ctx(name: &str, password: bool, http: Arc<Fake>) -> Ctx {
+/// administrator recorded where `administered` says, answering over `http`.
+fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     // Kept rather than scoped to this helper, because the context reads the file long
     // after the helper returns and a scratch directory goes when its handle does.
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
@@ -26,7 +26,7 @@ fn cors_ctx(name: &str, password: bool, http: Arc<Fake>) -> Ctx {
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    if password {
+    if administered {
         let _ = store::set(
             &env,
             crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
