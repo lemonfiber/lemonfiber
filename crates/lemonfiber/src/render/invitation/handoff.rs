@@ -7,8 +7,12 @@
 //!
 //! The code is the address again, for a camera. It signs nobody in, so it is drawn
 //! without a warning about who might see it.
+//!
+//! What to do next arrives as a remedy with no words of its own, and here it is the
+//! command that does it: this surface is a terminal, so that is how it is taken.
 
-use lemonfiber_core::model::{Handoff, HandoffState};
+use lemonfiber_core::model::{Handoff, HandoffRemedy, HandoffState};
+use lemonfiber_core::PRODUCT;
 
 use super::super::{qr, Lines};
 use crate::say;
@@ -31,7 +35,34 @@ pub(crate) fn handoff(report: &Handoff) -> Lines {
         (HandoffState::Connected, _) => signed_in(&mut lines, report),
         _ => {}
     }
+    if let Some(remedy) = report.remedy {
+        lines.spaced(remedied(remedy, report));
+    }
     lines
+}
+
+/// The command that takes the next step, said as this surface takes it.
+fn remedied(remedy: HandoffRemedy, report: &Handoff) -> String {
+    let name = &report.name;
+    match (remedy, report.state) {
+        (HandoffRemedy::Invite, _) => {
+            format!("Invite them with `{PRODUCT} invite {name} --confirm`.")
+        }
+        (HandoffRemedy::AskAgain, HandoffState::Failed) => {
+            format!("Run `{PRODUCT} household handoff {name}` again once the server answers.")
+        }
+        (HandoffRemedy::AskAgain, _) => format!(
+            "Run `{PRODUCT} household handoff {name}` again once they have: it asks the media \
+             server which of their devices are signed in."
+        ),
+        (HandoffRemedy::StartServer, _) => {
+            format!("`{PRODUCT} status` says whether it is running, and `{PRODUCT} up` starts it.")
+        }
+        (HandoffRemedy::RecordAddress, _) => format!(
+            "Record the address the household uses with `{PRODUCT} config set HOUSEHOLD_HOST \
+             <address>`."
+        ),
+    }
 }
 
 /// The sentence the answer opens on.
@@ -43,7 +74,7 @@ fn headline(report: &Handoff) -> String {
             format!("{name}'s code is ready — scan it on the device they will watch on")
         }
         HandoffState::Pending => {
-            format!("{name} has the code and has not signed in on a device yet")
+            format!("{name} has the code and has not signed in on a new device yet")
         }
         HandoffState::Connected => match report.sessions.len() {
             1 => format!("{name} is signed in on one device"),

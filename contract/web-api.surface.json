@@ -2387,6 +2387,15 @@
       },
       "variants": []
     },
+    "HandoffRemedy": {
+      "fields": {},
+      "variants": [
+        "\"ask-again\"",
+        "\"invite\"",
+        "\"record-address\"",
+        "\"start-server\""
+      ]
+    },
     "HandoffReport": {
       "fields": {
         "address": {
@@ -2436,6 +2445,12 @@
             "boolean"
           ],
           "required": true
+        },
+        "remedy": {
+          "type": [
+            "anyOf(null,ref:HandoffRemedy)"
+          ],
+          "required": false
         },
         "sessions": {
           "type": [

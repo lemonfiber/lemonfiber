@@ -35,6 +35,7 @@ fn pairing_leads_with_the_code_and_repeats_it_as_a_line_to_type() {
         "2026-10-01T00:10:00 UTC, 10 minutes from now",
         "holds no password",
         "It changes only when somebody replaces it.",
+        "Replacing it is `lemonfiber companion certificate --confirm`.",
     ] {
         assert!(said.contains(part), "{part} in {said}");
     }

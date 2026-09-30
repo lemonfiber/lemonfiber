@@ -205,6 +205,7 @@ fn serving() -> Vec<Outcome> {
             name: "ana".to_owned(),
             state: lemonfiber_core::model::HandoffState::Connected,
             reason: None,
+            remedy: None,
             address: Some("http://a-machine.local:8096".to_owned()),
             caution: None,
             issued: Some("2026-09-29T10:00:00Z".to_owned()),

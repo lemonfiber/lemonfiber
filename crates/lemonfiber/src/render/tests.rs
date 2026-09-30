@@ -416,6 +416,7 @@ fn a_handoff() -> Outcome {
         name: "ana".to_owned(),
         state: lemonfiber_core::model::HandoffState::Pending,
         reason: None,
+        remedy: None,
         address: Some("http://a-machine.local:8096".to_owned()),
         caution: None,
         issued: None,

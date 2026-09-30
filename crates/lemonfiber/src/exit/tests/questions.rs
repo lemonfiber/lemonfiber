@@ -446,6 +446,7 @@ fn a_hand_off_waiting_on_the_device_is_not_a_failure() {
                 name: "ana".to_owned(),
                 state,
                 reason: None,
+                remedy: None,
                 address: None,
                 caution: None,
                 issued: None,

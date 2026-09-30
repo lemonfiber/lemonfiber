@@ -5,8 +5,9 @@ use serde::Serialize;
 /// Where one person's hand-off stands.
 ///
 /// Read from the media server each time rather than remembered, apart from when a code
-/// was first issued: whether a device is signed in is the server's to say, and a copy
-/// kept here would go on saying it after the person signed out.
+/// was first issued and which devices were signed in then: whether a device is signed in
+/// is the server's to say, and a copy kept here would go on saying it after the person
+/// signed out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum HandoffState {
@@ -18,15 +19,40 @@ pub enum HandoffState {
     Unprovisioned,
     /// The account is there and the code was issued by this run.
     Ready,
-    /// The code went out on an earlier run and no device of theirs is signed in.
+    /// The code went out on an earlier run and no device of theirs has signed in since.
     ///
     /// Told apart from [`Failed`](Self::Failed) because nothing has gone wrong: the next
     /// step is on the person's device, and until they take it there is nothing to prove.
     Pending,
-    /// The media server lists at least one device signed in to their account now.
+    /// The media server lists a device signed in to their account now that was not
+    /// signed in when the code was first given.
+    ///
+    /// A phone they already had proves nothing about the one just handed over, so the
+    /// devices signed in at that moment are not counted.
     Connected,
     /// The hand-off could not go ahead, for the reason given beside it.
     Failed,
+}
+
+/// What there is to do next about a hand-off, which each surface says in its own words.
+///
+/// Carried as a name rather than as a sentence because the act is the same everywhere
+/// and the way to take it is not: a terminal names a command, and an app offers a
+/// control. A sentence written here would have to pick one of them, and every other
+/// surface would then be showing somebody an instruction it cannot carry out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "HandoffRemedy")]
+pub enum HandoffRemedy {
+    /// Invite them, which makes the account and is where what they may watch is chosen.
+    Invite,
+    /// Ask again: once they have signed in on the device, or once the media server
+    /// answers the question it would not.
+    AskAgain,
+    /// See whether the media server is running, and start it where it is not.
+    StartServer,
+    /// Record the address the household reaches this machine at.
+    RecordAddress,
 }
 
 /// One device the media server lists as signed in to the account.
@@ -71,9 +97,13 @@ pub struct Handoff {
     pub name: String,
     /// Where it stands.
     pub state: HandoffState,
-    /// Why it stands there, where that is not the state itself: what to do for an account
-    /// that is not there, and what stopped one that failed.
+    /// Why it stands there, where that is not the state itself: why an account that is not
+    /// there stops it, and what stopped one that failed. In words any surface can show, so
+    /// it names no command; what to do about it is [`remedy`](Self::remedy).
     pub reason: Option<String>,
+    /// What there is to do next, where there is anything: named rather than said, so
+    /// that each surface offers it in its own way.
+    pub remedy: Option<HandoffRemedy>,
     /// The address the code carries. Absent where there is no address to carry, which is
     /// one of the ways a hand-off fails.
     pub address: Option<String>,
@@ -86,6 +116,9 @@ pub struct Handoff {
     /// signed in approves another device.
     pub quick_connect: bool,
     /// How the person signs in on the new device, one step at a time.
+    ///
+    /// Every step is something the person does on their device, in words any surface can
+    /// show. Asking again afterwards is not one of them: that is [`remedy`](Self::remedy).
     ///
     /// **Guidance and never an approval.** Where the sign-in asks for a short code to be
     /// approved from a device they are already signed in on, that approval is theirs: it
