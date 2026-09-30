@@ -174,7 +174,7 @@ impl Mending {
     fn asking(&self) -> Result<Command, String> {
         match self.reads {
             Reads::Offer => named(self.action, Arguments::default()).map_err(|no| no.said()),
-            Reads::Warnings => asked(CHECKS, Asking::default()).map_err(str::to_owned),
+            Reads::Warnings => asked(CHECKS, Asking::default()).map_err(|no| no.said().to_owned()),
         }
     }
 }

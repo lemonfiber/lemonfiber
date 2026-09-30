@@ -23,11 +23,11 @@
 //! layer names this one path and nothing else, and a test holds the whole surface to
 //! exactly one path being reachable without a token.
 //!
-//! A wrong password answers `401` rather than the `403` every other refusal
-//! answers with, and the difference is the reason to have two: `403` means *nothing
-//! you could send would help*, which is true of a missing token and false of a
-//! wrong password. A client that cannot tell them apart cannot know whether
-//! offering a login is worth anything.
+//! A wrong password answers `401`, and nothing else does. It is answered where the
+//! password was offered, so a client reading it knows the password it just sent is
+//! the thing to change. A session this run no longer admits answers `403` with
+//! every other refusal of who is asking, and what tells a client that signing in
+//! again would help is the refusal's code rather than its status.
 
 pub mod admitted;
 pub mod attempts;
@@ -39,7 +39,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use axum::body::Body;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
@@ -55,8 +54,8 @@ use serde::Deserialize;
 
 use crate::guard::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER};
 use crate::read::enveloped;
+use crate::refusal::Refusal;
 use crate::router::Serving;
-use crate::serve::{carrying, refused, Refusal, SENTENCE};
 
 /// How many unpredictable bytes name one sign-in at the media server.
 const DEVICE_BYTES: usize = 16;
@@ -73,16 +72,6 @@ pub const SESSION: &str = "/api/session";
 
 /// The header a refusal for too many wrong answers says how long is left in.
 pub const RETRY_AFTER: &str = "Retry-After";
-
-/// What is said to a request whose body is not a password.
-const NOT_A_PASSWORD: &str = "The body of this request is not a password.";
-
-/// What is said to a wrong answer, and to a right one where nothing is set.
-///
-/// One sentence for both, because they are the same fact to whoever is knocking:
-/// what they sent did not open the door. Saying which of the two it was would tell
-/// somebody guessing whether there is anything here to guess at.
-const NOT_THE_PASSWORD: &str = "That is not the password for this machine.";
 
 /// What this run knows about who may come in.
 ///
@@ -293,7 +282,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Caller {
             .extensions
             .get::<Self>()
             .cloned()
-            .ok_or_else(|| refused(Refusal::Unknown))
+            .ok_or_else(|| Refusal::NotAdmitted.answered())
     }
 }
 
@@ -331,7 +320,7 @@ async fn opening(
     given: Result<Json<Given>, JsonRejection>,
 ) -> Response {
     let Ok(Json(given)) = given else {
-        return said(StatusCode::BAD_REQUEST, NOT_A_PASSWORD);
+        return Refusal::NotAPassword.answered();
     };
     let now = serving.ctx.seams.clock.now();
     if let Err(left) = serving.admitting.attempts.taken(now).await {
@@ -342,7 +331,7 @@ async fn opening(
         .whoever(&given, serving.ctx.seams.random.as_ref())
         .await
     else {
-        return said(StatusCode::UNAUTHORIZED, NOT_THE_PASSWORD);
+        return Refusal::NotThePassword.answered();
     };
     serving.admitting.attempts.right().await;
     let opened = serving
@@ -356,24 +345,15 @@ async fn opening(
     )
 }
 
-/// A sentence, at the status it is said under.
-fn said(status: StatusCode, sentence: &'static str) -> Response {
-    carrying(status, SENTENCE, Body::from(sentence))
-}
-
 /// Too many wrong answers, and how long is left.
 ///
 /// The wait is said in the header a client already knows to read and in the sentence
 /// a person reads, because both of them are here: the page shows one and the client
 /// behind it waits on the other.
 fn waiting(seconds: u64) -> Response {
-    let mut response = carrying(
-        StatusCode::TOO_MANY_REQUESTS,
-        SENTENCE,
-        Body::from(format!(
-            "Too many wrong passwords. Try again in {seconds} seconds."
-        )),
-    );
+    let mut response = Refusal::TooManyAttempts.saying(format!(
+        "Too many wrong passwords. Try again in {seconds} seconds."
+    ));
     response
         .headers_mut()
         .insert(RETRY_AFTER, axum::http::HeaderValue::from(seconds));

@@ -13,10 +13,11 @@ use lemonfiber_core::ports::docker::LogQuery;
 
 use crate::admission::Caller;
 use crate::read::table::{Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
+use crate::refusal::Refusal;
 use crate::router::Serving;
 use crate::serve::operator_only;
 
-use super::{enveloped, unreadable, went_wrong};
+use super::{enveloped, went_wrong};
 
 /// The most existing lines this read will begin with.
 ///
@@ -34,9 +35,6 @@ const AT_MOST: u32 = 10_000;
 fn not_a_count() -> String {
     format!("How many lines to begin with must be a number, and no more than {AT_MOST}.")
 }
-
-/// What is said to a request whose follow is neither yes nor no.
-const NOT_A_CHOICE: &str = "Whether to keep reading must be true or false.";
 
 /// The read of what the services are saying.
 pub(super) fn routes() -> Router<Serving> {
@@ -64,10 +62,10 @@ async fn log_lines(
         Err(problem) => return went_wrong(&problem),
     };
     let Some(tail) = counted(asked.one(TAIL)) else {
-        return unreadable(&not_a_count());
+        return Refusal::NotALineCount.saying(not_a_count());
     };
     let Some(follow) = told(asked.one(FOLLOW)) else {
-        return unreadable(NOT_A_CHOICE);
+        return Refusal::NotAChoice.answered();
     };
     let (forms, services) = (asked.every(FORM), asked.every(SERVICE));
     if follow {

@@ -28,9 +28,8 @@ mod refused;
 
 use std::sync::Arc;
 
-use axum::body::Body;
+use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
@@ -40,13 +39,9 @@ use lemonfiber_core::app::{Command, Setting, Waiting};
 use crate::admission::Caller;
 use crate::entitled::{may, Permitted};
 use crate::jobs::{accepted, Job};
-// Qualified where it is called, because this door has a module of its own by that
-// name. The sentence is the surface's rather than this door's: nothing about the
-// request was wrong, which is the whole of what `Refused` next door describes.
 use crate::read::carried_out;
+use crate::refusal::Refusal;
 use crate::router::Serving;
-use crate::serve::Refusal;
-use crate::serve::{carrying, SENTENCE};
 
 pub use asked::{
     Arguments, Disturbing, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
@@ -107,13 +102,10 @@ pub const fn answering(command: &Command) -> Answering {
     }
 }
 
-/// An action refused, said plainly rather than as a bare status.
-///
-/// Prose rather than an envelope, and labelled as prose, the way every other
-/// request this surface could not read is answered.
+/// An action refused, in the sentence that names what was asked for.
 #[must_use]
 pub fn declined(refused: &Refused) -> Response {
-    carrying(refused.status(), SENTENCE, Body::from(refused.said()))
+    refused.why().saying(refused.said())
 }
 
 /// The route every action is asked for through.
@@ -130,8 +122,18 @@ async fn taken(
     State(serving): State<Serving>,
     caller: Caller,
     Path(action): Path<String>,
-    Json(given): Json<Arguments>,
+    given: Result<Json<Arguments>, JsonRejection>,
 ) -> Response {
+    // What the reader could not take from the body is kept as the detail: which field
+    // it did not know, or where the text stopped being JSON. The sentence stays this
+    // surface's own, so a client reads one refusal whatever the parser tripped on.
+    let given = match given {
+        Ok(Json(given)) => given,
+        Err(rejection) => {
+            let why = Refusal::NotArguments;
+            return why.answer(why.problem(why.said()).with_detail(rejection.body_text()));
+        }
+    };
     let command = match named(&action, given) {
         Ok(command) => command,
         Err(why) => return declined(&why),
@@ -141,7 +143,7 @@ async fn taken(
     // in the immediate arm would leave the slow half of this door as the way round
     // the fast half.
     let Permitted::This(command) = may(&caller, command) else {
-        return crate::serve::refused(Refusal::NotYours);
+        return Refusal::NotYours.answered();
     };
     match answering(&command) {
         Answering::Now => carried_out(&serving.ctx, command).await,
@@ -164,9 +166,5 @@ async fn taken(
 /// nothing here to fall back to. Shared with the one long-running request that is
 /// asked for as a read, because a name it cannot mint stops it in the same way.
 pub(crate) fn unnameable() -> Response {
-    carrying(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        SENTENCE,
-        Body::from("This machine would not supply the randomness a job needs to be named."),
-    )
+    Refusal::NoJobName.answered()
 }

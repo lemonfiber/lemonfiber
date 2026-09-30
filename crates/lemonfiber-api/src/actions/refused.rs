@@ -13,7 +13,7 @@
 //! the other names — which is the same mistake as dropping an argument outright,
 //! made where it is harder to see.
 
-use axum::http::StatusCode;
+use crate::refusal::Refusal;
 
 /// Why an action was not carried out.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,15 +56,15 @@ pub enum Refused {
 }
 
 impl Refused {
-    /// The status a refusal answers with.
+    /// Which refusal this is, and so the code and status it answers with.
     #[must_use]
-    pub const fn status(&self) -> StatusCode {
+    pub const fn why(&self) -> Refusal {
         match self {
-            Self::Unknown { .. } => StatusCode::NOT_FOUND,
-            Self::Missing { .. }
-            | Self::Unrecognised { .. }
-            | Self::Unwanted { .. }
-            | Self::Together { .. } => StatusCode::BAD_REQUEST,
+            Self::Unknown { .. } => Refusal::NoSuchAction,
+            Self::Missing { .. } => Refusal::MissingArgument,
+            Self::Unrecognised { .. } => Refusal::UnrecognisedArgument,
+            Self::Unwanted { .. } => Refusal::UnwantedArgument,
+            Self::Together { .. } => Refusal::ArgumentsTogether,
         }
     }
 

@@ -14,6 +14,7 @@
 //! file in a day does not make that file easier to read.
 
 use lemonfiber_api::read::table::{named, Wanted as Asking};
+use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
 
 use crate::acting::chooser::Listed;
@@ -197,7 +198,7 @@ impl Question {
             Needed::Fixed(narrows, word) => narrows.fill(word, &mut given),
             Needed::Nothing | Needed::Picked { .. } => {}
         }
-        named(self.read, given)
+        named(self.read, given).map_err(Refusal::said)
     }
 
     /// What the line being typed at is asking for.

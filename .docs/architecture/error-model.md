@@ -38,6 +38,12 @@ each surface says it in its own terms: the web answers `404`, `400`, `409` or `5
 and the command line has its exit codes. Writing it into the document as well would
 be the same fact stated twice, which is two things to keep agreeing.
 
+A refusal the web surface makes before any command runs — who is asking, where
+from, what the request carried — is a problem as well, raised by
+[`Refusal`](../../crates/lemonfiber-api/src/refusal.rs) with its own status: four
+of them share `403`, and only the code tells a client which one it met. The contract
+lists those codes so that a client generates the list it branches on.
+
 Nothing else distinguishes those four. `severity` is how much a problem matters
 and `state` is whether a remedy exists — no such word and the engine being down
 agree on both, which is why every refused read once answered `500`.

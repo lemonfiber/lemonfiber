@@ -19,17 +19,15 @@
 //! drops the rest, and a request that named two things to follow and was answered
 //! about one of them has been answered about something it did not ask.
 
-use lemonfiber_core::error::{Amiss, Problem, Remedy, Severity};
+use lemonfiber_core::error::Problem;
+
+use crate::refusal::Refusal;
 
 use super::{
     Wanted, ALERTS, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS,
     EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, OUTBOUND, QUALITY, REQUESTS, SERVICES, SPACE,
     STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
 };
-
-use lemonfiber_core::error::codes::read::UNWANTED;
-
-use lemonfiber_core::error::codes::read::REPEATED;
 
 /// The parameter naming a form to narrow to.
 pub(crate) const FORM: &str = "form";
@@ -218,29 +216,16 @@ fn taken(read: &str) -> &'static [&'static str] {
 /// something and the list is short enough to be the answer rather than a pointer at
 /// one. What they wrote is repeated back so they can see which of the two it was.
 fn unwanted(read: &str, parameter: &str, takes: &[&str]) -> Problem {
-    Problem::new(
-        UNWANTED,
-        Severity::Error,
-        format!("The read `{read}` takes no `{parameter}`"),
-        "It is refused rather than dropped, because dropping it would answer a wider \
-         question than the one that was asked — and a wider answer reads like the answer.",
-        Remedy::new("Ask again, naming only what this read takes"),
-    )
-    .lies_in(Amiss::Asking)
-    .with_detail(taking(takes))
+    Refusal::Unwanted
+        .problem(format!("The read `{read}` takes no `{parameter}`"))
+        .with_detail(taking(takes))
 }
 
 /// A parameter that names one thing, given more than once.
 fn repeated(read: &str, parameter: &str) -> Problem {
-    Problem::new(
-        REPEATED,
-        Severity::Error,
-        format!("The read `{read}` takes one `{parameter}`, and it was given more than once"),
-        "Which of them was meant is not something this can work out, and answering for \
-         one of them would drop the others without saying so.",
-        Remedy::new("Ask again, naming it once"),
-    )
-    .lies_in(Amiss::Asking)
+    Refusal::Repeated.problem(format!(
+        "The read `{read}` takes one `{parameter}`, and it was given more than once"
+    ))
 }
 
 /// What a read takes, said as a sentence.

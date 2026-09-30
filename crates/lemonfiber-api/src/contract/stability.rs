@@ -128,6 +128,9 @@ pub struct Surface {
     /// Every type the shapes are made of.
     #[serde(default)]
     pub types: BTreeMap<String, Shape>,
+    /// Every code a refusal may carry, and the status it is answered with.
+    #[serde(default)]
+    pub refusals: BTreeMap<String, u16>,
     /// The definitions that are nothing but string constants, read off their schemas.
     ///
     /// Held in memory and never committed. It is only ever asked of the surface a build
@@ -201,6 +204,7 @@ impl Surface {
         let mut found = Vec::new();
         kinds_kept(before, after, &mut found);
         types_kept(before, after, &mut found);
+        refusals_kept(before, after, &mut found);
         found
     }
 }
@@ -217,6 +221,28 @@ fn kinds_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
             Some(now) if now != was => found.push(Break::new(
                 kind.clone(),
                 &format!("the payload this kind carries was {was} and is now {now}"),
+            )),
+            Some(_) => {}
+        }
+    }
+}
+
+/// Every refusal `before` listed, still listed and still answered at the same status.
+///
+/// A code keeps its spelling for good, so one that leaves the list is a value a
+/// client's generated list loses — and a client meeting it from an older server reads
+/// it as unknown rather than as the refusal it is.
+fn refusals_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
+    for (code, was) in &before.refusals {
+        match after.refusals.get(code) {
+            None => found.push(Break::new(
+                code.clone(),
+                "this refusal is no longer listed, so a client generating its codes loses \
+                 one it may still be answered with",
+            )),
+            Some(now) if now != was => found.push(Break::new(
+                code.clone(),
+                &format!("this refusal was answered with {was} and is now answered with {now}"),
             )),
             Some(_) => {}
         }
@@ -335,10 +361,21 @@ fn read(described: &Value, api_version: u32) -> Surface {
             }
         }
     }
+    let refusals = described
+        .get("refusals")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(code, listed)| {
+            let status = listed.get("status").and_then(Value::as_u64)?;
+            Some((code.clone(), u16::try_from(status).ok()?))
+        })
+        .collect();
     Surface {
         api_version,
         kinds,
         types,
+        refusals,
         strings,
     }
 }

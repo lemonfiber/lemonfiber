@@ -395,5 +395,5 @@ async fn a_name_the_carrier_does_not_hold_is_refused_before_anything_else() {
     // here, and a caller that sent the flag's name is told rather than having a
     // whole request quietly mean something else.
     let (status, _) = said("repair", r#"{"fix":true}"#).await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY.as_u16());
+    assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
 }

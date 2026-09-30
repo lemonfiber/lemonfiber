@@ -14,54 +14,7 @@ use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 
 use crate::admission::here;
 use crate::guard::{Binding, TOKEN_HEADER};
-
-/// Why a request was not answered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Refusal {
-    /// It carried no secret this run admits.
-    Unknown,
-    /// It said it came from somewhere this server is not.
-    Elsewhere,
-    /// It proved who it is, and this is not theirs.
-    NotYours,
-    /// Whether it is still anybody could not be established.
-    Unconfirmed,
-}
-
-impl Refusal {
-    /// The status a refusal answers with.
-    ///
-    /// Both are 403 rather than 401: 401 invites a browser to ask for
-    /// credentials it has no way to supply, and there is nothing to prompt for.
-    #[must_use]
-    pub const fn status(self) -> StatusCode {
-        StatusCode::FORBIDDEN
-    }
-
-    /// What the refusal says, in the one line a reader gets.
-    #[must_use]
-    pub const fn said(self) -> &'static str {
-        match self {
-            Self::Unknown => "This request carried no token or session this run admits.",
-            Self::Elsewhere => "This request said it came from somewhere this server is not.",
-            // Said plainly, where the two above are deliberately vague. Those answer
-            // somebody who has proved nothing, and naming what was wrong would help
-            // them guess again. This one answers somebody who proved who they are, so
-            // there is nothing left to guess and a household member reading it is owed
-            // the actual reason rather than a silence that reads as a fault.
-            Self::NotYours => "This is not something this account may ask for.",
-            // Neither of the two above, and it must not be said as either. A session
-            // whose account could not be checked has not been turned away and has
-            // not been found missing — it has not been asked about, and the person
-            // holding it needs to know that the thing to fix is the media server
-            // rather than their own account.
-            Self::Unconfirmed => {
-                "This account could not be checked with the media server, so nobody \
-                 was identified. Nothing about the account has changed."
-            }
-        }
-    }
-}
+use crate::refusal::Refusal;
 
 /// Whether a request may be answered at all.
 ///
@@ -81,7 +34,7 @@ impl Refusal {
 /// Returns the refusal a caller should answer with.
 pub fn admitted(known: bool, headers: &HeaderMap, at: &Binding) -> Result<(), Refusal> {
     if !known {
-        return Err(Refusal::Unknown);
+        return Err(Refusal::NotAdmitted);
     }
     if !here(headers, at) {
         return Err(Refusal::Elsewhere);
@@ -97,9 +50,10 @@ pub(crate) const STREAM: &str = "text/event-stream";
 
 /// What a sentence this surface says in its own words is served as.
 ///
-/// A refusal and a request that could not be read are prose, not payloads. They
-/// are labelled as prose so that a caller parsing what it was told it was given
-/// is not handed a sentence to parse as an envelope.
+/// Only the page's own absences are said this way — a file the app does not hold,
+/// or a build carrying no app — because they answer a browser rather than a
+/// client. They are labelled as prose so that nothing parsing what it was told it
+/// was given is handed a sentence to parse as an envelope.
 pub(crate) const SENTENCE: &str = "text/plain; charset=utf-8";
 
 /// The envelope, as the contract states it.
@@ -109,12 +63,6 @@ pub(crate) const SENTENCE: &str = "text/plain; charset=utf-8";
 #[must_use]
 pub fn answered(rendered: String) -> Response<Body> {
     carrying(StatusCode::OK, JSON, Body::from(rendered))
-}
-
-/// A refusal, said plainly rather than as a bare status.
-#[must_use]
-pub fn refused(refusal: Refusal) -> Response<Body> {
-    carrying(refusal.status(), SENTENCE, Body::from(refusal.said()))
 }
 
 /// The refusal a member gets at a door that answers the operator alone, or nothing
@@ -127,7 +75,7 @@ pub fn refused(refusal: Refusal) -> Response<Body> {
 /// a member is refused outright rather than handed the operator's copy.
 #[must_use]
 pub fn operator_only(caller: &crate::admission::Caller) -> Option<Response<Body>> {
-    matches!(caller, crate::admission::Caller::Member(_)).then(|| refused(Refusal::NotYours))
+    matches!(caller, crate::admission::Caller::Member(_)).then(|| Refusal::NotYours.answered())
 }
 
 /// Every response this surface produces, wearing the headers all of them carry.

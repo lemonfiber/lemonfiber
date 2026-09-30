@@ -1,7 +1,6 @@
 use super::{all, asked_at, every, Narrows, Needed, Question, CONFIG, FORMS, OPENS_ON, TRACE};
-use lemonfiber_api::read::table::{
-    NO_MEMBER, NO_SETTING, NO_SUCH_REMOVAL, NO_TERM, OFFERED as SERVED,
-};
+use lemonfiber_api::read::table::OFFERED as SERVED;
+use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
 use lemonfiber_core::uninstall::Tier;
 use std::collections::BTreeSet;
@@ -156,7 +155,7 @@ fn a_removal_this_build_does_not_know_is_refused_rather_than_guessed_at() {
             called("what removing lemonfiber would take"),
             &["everything"]
         ),
-        Err(NO_SUCH_REMOVAL)
+        Err(Refusal::NoSuchRemoval.said())
     );
 }
 
@@ -169,17 +168,17 @@ fn a_removal_this_build_does_not_know_is_refused_rather_than_guessed_at() {
 fn a_question_that_takes_a_word_is_refused_until_it_has_one() {
     assert_eq!(
         asking(called("where one thing is"), &[""]),
-        Err(NO_TERM),
+        Err(Refusal::NoTerm.said()),
         "a trace with nothing typed"
     );
     assert_eq!(
         asking(called("one setting"), &[""]),
-        Err(NO_SETTING),
+        Err(Refusal::NoSetting.said()),
         "a setting with nothing typed"
     );
     assert_eq!(
         asking(called("what one person asked for"), &[""]),
-        Err(NO_MEMBER),
+        Err(Refusal::NoMember.said()),
         "a member with nothing typed"
     );
 }
@@ -250,7 +249,10 @@ fn taking_a_listed_entry_asks_the_read_it_names() {
 /// of everything — which is what keeps it off the list offered to the operator.
 #[test]
 fn a_listed_entry_naming_nothing_is_refused_rather_than_followed() {
-    assert_eq!(asked_at(TRACE, Narrows::Term, ""), Err(NO_TERM));
+    assert_eq!(
+        asked_at(TRACE, Narrows::Term, ""),
+        Err(Refusal::NoTerm.said())
+    );
 }
 
 /// What is asked for above the line is asked for only where there is a line, and

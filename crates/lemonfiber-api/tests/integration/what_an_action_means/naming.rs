@@ -232,6 +232,7 @@ fn a_name_that_is_not_an_action_is_absent_and_a_bad_argument_is_a_mistake() {
         Refused::Unknown {
             name: "reticulate".to_owned()
         }
+        .why()
         .status(),
         StatusCode::NOT_FOUND
     );
@@ -240,6 +241,7 @@ fn a_name_that_is_not_an_action_is_absent_and_a_bad_argument_is_a_mistake() {
             action: "pull".to_owned(),
             argument: "forms".to_owned()
         }
+        .why()
         .status(),
         StatusCode::BAD_REQUEST
     );
@@ -248,6 +250,7 @@ fn a_name_that_is_not_an_action_is_absent_and_a_bad_argument_is_a_mistake() {
             action: "down".to_owned(),
             argument: "confirm".to_owned()
         }
+        .why()
         .status(),
         StatusCode::BAD_REQUEST
     );

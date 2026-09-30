@@ -1,0 +1,530 @@
+//! Every refusal this surface answers with, and the code that says which it is.
+//!
+//! A status groups refusals and cannot tell them apart. Four of them answer `403` —
+//! a secret this run does not admit, a request from somewhere else, an account asking
+//! for what is not its own, and an account the media server could not vouch for — and
+//! each has a different remedy: sign in again, reach the right address, leave it be,
+//! try later. A client left with the status and a sentence would have to parse English
+//! to choose between them, so every refusal is a problem document, and its code is the
+//! answer.
+//!
+//! **One list, and everything answers through it.** The contract publishes the codes a
+//! refusal may carry so that a client generates its list rather than copying one, and
+//! a list assembled from wherever refusals happen to be raised is a list that misses
+//! the one added next. [`Refusal::EVERY`] is what the contract reads, and a refusal's
+//! problem is only ever built by [`Refusal::problem`], so the code a client is sent and
+//! the code the contract lists come from one place.
+//!
+//! **The sentence is still the surface's own.** Each refusal carries the one plain line
+//! a reader gets, and the few whose line names what was asked for — an action, an
+//! argument, how long to wait — are answered with that line instead. The code is what
+//! a client branches on; the sentence is what a person reads, and may be reworded.
+
+use axum::body::Body;
+use axum::http::{Response, StatusCode};
+use lemonfiber_core::error::codes::{admit, ask, read, serve};
+use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
+use lemonfiber_core::model::{kind, Envelope};
+
+use crate::read::enveloped;
+
+/// Why a request was not answered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refusal {
+    /// It carried no secret this run admits.
+    NotAdmitted,
+    /// It said it came from somewhere this server is not.
+    Elsewhere,
+    /// It proved who it is, and this is not theirs.
+    NotYours,
+    /// Whether it is still anybody could not be established.
+    Unconfirmed,
+    /// The password offered at the door was not this machine's.
+    NotThePassword,
+    /// The door has had too many wrong passwords lately.
+    TooManyAttempts,
+    /// What was offered at the door is not a password.
+    NotAPassword,
+    /// A read was given a parameter its answer has nowhere to put.
+    Unwanted,
+    /// A parameter carrying one value was given more than once.
+    Repeated,
+    /// No read goes by the name that was asked for.
+    NoSuchRead,
+    /// A trace was asked for with nothing to follow.
+    NoTerm,
+    /// The season to narrow a trace to is not a number.
+    NotASeason,
+    /// A setting was asked for by an empty name.
+    NoSetting,
+    /// A household member was asked for by an empty name.
+    NoMember,
+    /// A shelf was asked for and nobody named whose it is.
+    NoShelfWithoutAMember,
+    /// How many holdings to answer with is not a whole number.
+    NotACount,
+    /// More holdings were asked for than one read answers with.
+    TooManyAtOnce,
+    /// A diagnosis was narrowed to a group or check that is not one.
+    NoSuchGroup,
+    /// A removal was named that is none of the four.
+    NoSuchRemoval,
+    /// Moving forward was asked about and neither object was named.
+    NoUpdateObject,
+    /// How many log lines to begin with is not a number within the ceiling.
+    NotALineCount,
+    /// Whether to keep reading is neither true nor false.
+    NotAChoice,
+    /// No action goes by the name that was asked for.
+    NoSuchAction,
+    /// An action was not given an argument it needs.
+    MissingArgument,
+    /// An argument was given a value that names nothing.
+    UnrecognisedArgument,
+    /// An argument was given to an action whose command has nowhere to put it.
+    UnwantedArgument,
+    /// Two arguments arrived together that each name a different request.
+    ArgumentsTogether,
+    /// The body of an action is not arguments it can read.
+    NotArguments,
+    /// A job was asked about that this run did not start.
+    NoSuchJob,
+    /// The body of a setup step is not an answer it can read.
+    NotAnAnswer,
+    /// A path under the endpoints that no endpoint answers.
+    NoEndpoint,
+    /// An endpoint asked with a method it does not answer.
+    WrongMethod,
+    /// An answer that could not be rendered.
+    Unrenderable,
+    /// Work that could not be named, and so was not begun.
+    NoJobName,
+}
+
+/// The one refusal whose own rendering is the thing that failed, already rendered.
+///
+/// Written out rather than rendered at the moment it is needed, because it is needed
+/// exactly when rendering has just failed, and rendering it again could fail the same
+/// way. A test renders it and compares, so the text cannot drift from what
+/// [`Refusal::answer`] would have written.
+pub(crate) const UNRENDERED: &str = r#"{"api_version":1,"kind":"error","data":{"code":"SERVE-6","severity":"error","state":"actionable","summary":"This answer could not be rendered.","meaning":"The request was understood and carried out, and what it came to could not be written down as an answer. Nothing about the request was wrong.","remedies":[{"action":"Ask again, and send a diagnostic bundle if it keeps happening","detail":"lemonfiber support"}],"detail":null,"cause":null}}"#;
+
+impl Refusal {
+    /// Every refusal, in the order the codes are declared.
+    ///
+    /// What the contract lists, so a variant added above and not here is a code no
+    /// client can name. A test holds the two together.
+    pub const EVERY: [Self; 34] = [
+        Self::NotAdmitted,
+        Self::Elsewhere,
+        Self::NotYours,
+        Self::Unconfirmed,
+        Self::NotThePassword,
+        Self::TooManyAttempts,
+        Self::NotAPassword,
+        Self::Unwanted,
+        Self::Repeated,
+        Self::NoSuchRead,
+        Self::NoTerm,
+        Self::NotASeason,
+        Self::NoSetting,
+        Self::NoMember,
+        Self::NoShelfWithoutAMember,
+        Self::NotACount,
+        Self::TooManyAtOnce,
+        Self::NoSuchGroup,
+        Self::NoSuchRemoval,
+        Self::NoUpdateObject,
+        Self::NotALineCount,
+        Self::NotAChoice,
+        Self::NoSuchAction,
+        Self::MissingArgument,
+        Self::UnrecognisedArgument,
+        Self::UnwantedArgument,
+        Self::ArgumentsTogether,
+        Self::NotArguments,
+        Self::NoSuchJob,
+        Self::NotAnAnswer,
+        Self::NoEndpoint,
+        Self::WrongMethod,
+        Self::Unrenderable,
+        Self::NoJobName,
+    ];
+
+    /// The code a client branches on.
+    #[must_use]
+    pub const fn code(self) -> Code {
+        match self {
+            Self::NotAdmitted => admit::NOT_ADMITTED,
+            Self::Elsewhere => admit::ELSEWHERE,
+            Self::NotYours => admit::NOT_YOURS,
+            Self::Unconfirmed => admit::UNCONFIRMED,
+            Self::NotThePassword => admit::NOT_THE_PASSWORD,
+            Self::TooManyAttempts => admit::TOO_MANY_ATTEMPTS,
+            Self::NotAPassword => admit::NOT_A_PASSWORD,
+            Self::Unwanted => read::UNWANTED,
+            Self::Repeated => read::REPEATED,
+            Self::NoSuchRead => read::NO_SUCH_READ,
+            Self::NoTerm => read::NO_TERM,
+            Self::NotASeason => read::NOT_A_SEASON,
+            Self::NoSetting => read::NO_SETTING,
+            Self::NoMember => read::NO_MEMBER,
+            Self::NoShelfWithoutAMember => read::NO_SHELF_WITHOUT_A_MEMBER,
+            Self::NotACount => read::NOT_A_COUNT,
+            Self::TooManyAtOnce => read::TOO_MANY_AT_ONCE,
+            Self::NoSuchGroup => read::NO_SUCH_GROUP,
+            Self::NoSuchRemoval => read::NO_SUCH_REMOVAL,
+            Self::NoUpdateObject => read::NO_UPDATE_OBJECT,
+            Self::NotALineCount => read::NOT_A_LINE_COUNT,
+            Self::NotAChoice => read::NOT_A_CHOICE,
+            Self::NoSuchAction => ask::NO_SUCH_ACTION,
+            Self::MissingArgument => ask::MISSING_ARGUMENT,
+            Self::UnrecognisedArgument => ask::UNRECOGNISED_ARGUMENT,
+            Self::UnwantedArgument => ask::UNWANTED_ARGUMENT,
+            Self::ArgumentsTogether => ask::ARGUMENTS_TOGETHER,
+            Self::NotArguments => ask::NOT_ARGUMENTS,
+            Self::NoSuchJob => ask::NO_SUCH_JOB,
+            Self::NotAnAnswer => ask::NOT_AN_ANSWER,
+            Self::NoEndpoint => ask::NO_ENDPOINT,
+            Self::WrongMethod => ask::WRONG_METHOD,
+            Self::Unrenderable => serve::UNRENDERABLE,
+            Self::NoJobName => serve::NO_JOB_NAME,
+        }
+    }
+
+    /// The status a refusal answers with.
+    ///
+    /// `401` is the door's alone, and only for the password it was just offered. A
+    /// session this run no longer admits is `403` like every other refusal of who is
+    /// asking: `401` invites a browser to ask for credentials it has no way to supply,
+    /// and whether signing in again would help is what the code says.
+    #[must_use]
+    pub const fn status(self) -> StatusCode {
+        match self {
+            Self::NotAdmitted | Self::Elsewhere | Self::NotYours | Self::Unconfirmed => {
+                StatusCode::FORBIDDEN
+            }
+            Self::NotThePassword => StatusCode::UNAUTHORIZED,
+            Self::TooManyAttempts => StatusCode::TOO_MANY_REQUESTS,
+            Self::NoSuchRead | Self::NoSuchAction | Self::NoSuchJob | Self::NoEndpoint => {
+                StatusCode::NOT_FOUND
+            }
+            Self::WrongMethod => StatusCode::METHOD_NOT_ALLOWED,
+            Self::Unrenderable | Self::NoJobName => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NotAPassword
+            | Self::Unwanted
+            | Self::Repeated
+            | Self::NoTerm
+            | Self::NotASeason
+            | Self::NoSetting
+            | Self::NoMember
+            | Self::NoShelfWithoutAMember
+            | Self::NotACount
+            | Self::TooManyAtOnce
+            | Self::NoSuchGroup
+            | Self::NoSuchRemoval
+            | Self::NoUpdateObject
+            | Self::NotALineCount
+            | Self::NotAChoice
+            | Self::MissingArgument
+            | Self::UnrecognisedArgument
+            | Self::UnwantedArgument
+            | Self::ArgumentsTogether
+            | Self::NotArguments
+            | Self::NotAnAnswer => StatusCode::BAD_REQUEST,
+        }
+    }
+
+    /// What the refusal says, in the one line a reader gets.
+    ///
+    /// Where the line names what was asked for, the caller answers with its own line
+    /// instead, and this is the same fact said without the particulars.
+    #[must_use]
+    pub const fn said(self) -> &'static str {
+        match self {
+            // Deliberately vague, as is the one below it. Both answer somebody who has
+            // proved nothing, and naming what was wrong — which secret, which header —
+            // would tell them what to keep guessing at.
+            Self::NotAdmitted => "This request carried no token or session this run admits.",
+            Self::Elsewhere => "This request said it came from somewhere this server is not.",
+            // Said plainly: this answers somebody who proved who they are, so there is
+            // nothing left to guess, and a household member reading it is owed the
+            // actual reason rather than a silence that reads as a fault.
+            Self::NotYours => "This is not something this account may ask for.",
+            // Neither of the refusals above, and it must not be said as either. The
+            // account has not been turned away or found missing — it has not been asked
+            // about — so the thing to fix is the media server, not the account.
+            Self::Unconfirmed => {
+                "This account could not be checked with the media server, so nobody \
+                 was identified. Nothing about the account has changed."
+            }
+            // One sentence for a wrong password and for a right one where nothing is
+            // set: to whoever is knocking they are the same fact, and saying which
+            // would tell somebody guessing whether there is anything here to guess at.
+            Self::NotThePassword => "That is not the password for this machine.",
+            Self::TooManyAttempts => "Too many wrong passwords. Try again later.",
+            Self::NotAPassword => "The body of this request is not a password.",
+            Self::Unwanted => "This read takes no such parameter.",
+            Self::Repeated => {
+                "This read takes that parameter once, and it was given more than once."
+            }
+            Self::NoSuchRead => "There is no read by that name.",
+            Self::NoTerm => "What to follow must be named.",
+            Self::NotASeason => "Which season to narrow to must be a number.",
+            Self::NoSetting => "Which setting to read must be named.",
+            Self::NoMember => "Which member to narrow to must be named.",
+            // Apart from the one above because they refuse different things: that one is
+            // said where naming nobody would have meant everybody, and this where there
+            // is no everybody to fall back to.
+            Self::NoShelfWithoutAMember => "Whose shelf to read must be named.",
+            Self::NotACount => "How many holdings to answer with must be a whole number.",
+            Self::TooManyAtOnce => "That is more holdings than one read answers with.",
+            Self::NoSuchGroup => "There is no group of checks and no check by that name.",
+            Self::NoSuchRemoval => {
+                "Which removal must be one of stop, services, configuration or media."
+            }
+            // Refused rather than answered with either. Neither object is the smaller case
+            // of the other — one moves somebody's services and the other this program —
+            // so a page asking about one and handed the other was answered wrongly.
+            Self::NoUpdateObject => "Which of stack or self to move forward must be named.",
+            Self::NotALineCount => "How many lines to begin with must be a number.",
+            Self::NotAChoice => "Whether to keep reading must be true or false.",
+            Self::NoSuchAction => {
+                "There is no action by that name. \
+                 This surface offers what the command line offers, and nothing else."
+            }
+            Self::MissingArgument => "This action needs an argument that was not given.",
+            Self::UnrecognisedArgument => "An argument given is not one this stack knows.",
+            Self::UnwantedArgument => "This action takes an argument that was given to it.",
+            Self::ArgumentsTogether => {
+                "This action was given two arguments that ask different things."
+            }
+            Self::NotArguments => "The body of this request is not arguments this action can read.",
+            // What was asked for is not repeated back, and nothing tells a name never
+            // minted from one another run minted: this run knows only its own.
+            Self::NoSuchJob => "No work in this run goes by that name.",
+            // What arrived is not quoted back. An answer carries a credential, and a
+            // sentence repeating the body would carry it wherever the sentence goes.
+            Self::NotAnAnswer => {
+                "The body of this request is not one of setup's answers, nor a way out of \
+                 an interrupted apply."
+            }
+            Self::NoEndpoint => "No endpoint answers this path.",
+            Self::WrongMethod => "This endpoint does not answer that method.",
+            Self::Unrenderable => "This answer could not be rendered.",
+            Self::NoJobName => {
+                "This machine would not supply the randomness a job needs to be named."
+            }
+        }
+    }
+
+    /// What the refusal means for whoever asked.
+    const fn meaning(self) -> &'static str {
+        match self {
+            Self::NotAdmitted => {
+                "This run of lemonfiber does not let in what this request carried, and \
+                 nothing was answered."
+            }
+            Self::Elsewhere => {
+                "The address this request named, or the page it came from, is not the one \
+                 this server is listening on, and nothing was answered."
+            }
+            Self::NotYours => {
+                "Nothing is wrong with the account. What was asked for belongs to somebody \
+                 else, or to whoever looks after this machine."
+            }
+            Self::Unconfirmed => {
+                "Nobody was identified, so nothing was answered. The account has not been \
+                 removed and the session has not ended."
+            }
+            Self::NotThePassword => "Nothing was opened, and no session was begun.",
+            Self::TooManyAttempts => {
+                "The door has stopped looking at passwords for a while. Another attempt \
+                 now makes the wait longer."
+            }
+            Self::NotAPassword => {
+                "The door reads a password, and a household member's name beside it, and \
+                 this body carried neither in a form it can read."
+            }
+            Self::Unwanted => {
+                "It is refused rather than dropped, because dropping it would answer a \
+                 wider question than the one that was asked — and a wider answer reads \
+                 like the answer."
+            }
+            Self::Repeated => {
+                "Which of them was meant is not something this can work out, and answering \
+                 for one of them would drop the others without saying so."
+            }
+            Self::NoSuchRead => {
+                "Every read this surface answers is named in the contract, and this name \
+                 is not one of them."
+            }
+            Self::NoTerm
+            | Self::NotASeason
+            | Self::NoSetting
+            | Self::NoMember
+            | Self::NoShelfWithoutAMember
+            | Self::NotACount
+            | Self::NoUpdateObject
+            | Self::NotALineCount
+            | Self::NotAChoice => {
+                "The read cannot be answered as it was asked, and answering a different \
+                 question in its place would read like the answer to this one."
+            }
+            // Refused rather than quietly cut down to the ceiling: a caller that asked for
+            // five thousand and was handed five hundred has been told it has the whole
+            // shelf, which is the same failure as a wider answer than was asked for.
+            Self::TooManyAtOnce => {
+                "It is refused rather than cut down, because a shorter answer wearing the \
+                 shape of the whole one reads as the whole shelf."
+            }
+            Self::NoSuchGroup | Self::NoSuchRemoval => {
+                "The word names none of the things there are, and reading it as the \
+                 nearest one would answer something that was not asked."
+            }
+            Self::NoSuchAction => {
+                "An action here is a command the command line offers, and nothing by this \
+                 name is one."
+            }
+            Self::MissingArgument
+            | Self::UnrecognisedArgument
+            | Self::UnwantedArgument
+            | Self::ArgumentsTogether
+            | Self::NotArguments => {
+                "The action was not carried out, and nothing was changed. Carrying out \
+                 a different request from the one asked for would be worse than none."
+            }
+            Self::NoSuchJob => {
+                "Jobs are named by the run that starts them, and nothing this run started \
+                 goes by this name. Work from an earlier run is not tracked here."
+            }
+            Self::NotAnAnswer => "Setup did not move, and nothing was changed.",
+            Self::NoEndpoint => {
+                "Every endpoint this surface answers is named in the contract, and this \
+                 path is not one of them."
+            }
+            Self::WrongMethod => {
+                "The path is one this surface answers, asked in a way it does not answer \
+                 it, and nothing was done."
+            }
+            Self::Unrenderable => {
+                "The request was understood and carried out, and what it came to could not \
+                 be written down as an answer. Nothing about the request was wrong."
+            }
+            Self::NoJobName => {
+                "A job with no name is work nothing could ever be told about, so it was \
+                 not begun, and nothing was changed."
+            }
+        }
+    }
+
+    /// What to do about it, most likely first.
+    fn remedy(self) -> Remedy {
+        match self {
+            Self::NotAdmitted => Remedy::new(
+                "Sign in again, or open lemonfiber from the address it printed when it started",
+            ),
+            Self::Elsewhere => Remedy::new("Reach lemonfiber at the address it is listening on"),
+            Self::NotYours => Remedy::new("Ask whoever looks after this machine if you need it"),
+            Self::Unconfirmed => Remedy::new("Try again once the media server is running"),
+            Self::NotThePassword => Remedy::new("Check the password and try again"),
+            Self::TooManyAttempts => {
+                Remedy::new("Wait as long as the refusal says, then try once more")
+                    .with_detail("Retry-After")
+            }
+            Self::NotAPassword => Remedy::new("Send the password as the body's `password`"),
+            Self::Unwanted => Remedy::new("Ask again, naming only what this read takes"),
+            Self::Repeated => Remedy::new("Ask again, naming it once"),
+            Self::NoSuchRead => Remedy::new("Ask for one of the reads the contract names"),
+            Self::NoEndpoint => Remedy::new("Ask for one of the endpoints the contract names"),
+            Self::NoTerm
+            | Self::NotASeason
+            | Self::NoSetting
+            | Self::NoMember
+            | Self::NoShelfWithoutAMember
+            | Self::NotACount
+            | Self::TooManyAtOnce
+            | Self::NoSuchGroup
+            | Self::NoSuchRemoval
+            | Self::NoUpdateObject
+            | Self::NotALineCount
+            | Self::NotAChoice => Remedy::new("Ask again as the sentence says"),
+            Self::NoSuchAction => Remedy::new("Ask for one of the actions the contract names"),
+            Self::MissingArgument
+            | Self::UnrecognisedArgument
+            | Self::UnwantedArgument
+            | Self::ArgumentsTogether
+            | Self::NotArguments => Remedy::new("Ask again with the arguments the action takes"),
+            Self::NoSuchJob => Remedy::new("Ask about a job this run started"),
+            Self::NotAnAnswer => Remedy::new("Answer the question setup is asking"),
+            Self::WrongMethod => Remedy::new("Ask again with the method the contract names"),
+            Self::Unrenderable | Self::NoJobName => {
+                Remedy::new("Ask again, and send a diagnostic bundle if it keeps happening")
+                    .with_detail("lemonfiber support")
+            }
+        }
+    }
+
+    /// How much it matters.
+    ///
+    /// Three of these are the system working rather than failing: a door that has
+    /// stopped listening for a while, an account refused what is not its own, and a
+    /// media server that could not be asked. Raising any of them as an error would have
+    /// somebody looking for a fault that is not there.
+    const fn severity(self) -> Severity {
+        match self {
+            Self::NotYours | Self::Unconfirmed | Self::TooManyAttempts => Severity::Warning,
+            _ => Severity::Error,
+        }
+    }
+
+    /// Where the refusal lies, as a problem records it.
+    ///
+    /// Read by the one door that answers a problem at the status its origin warrants,
+    /// which must agree with [`Self::status`] for the two refusals raised as problems
+    /// before they are answered.
+    const fn amiss(self) -> Amiss {
+        match self.status() {
+            StatusCode::NOT_FOUND => Amiss::Naming,
+            StatusCode::INTERNAL_SERVER_ERROR => Amiss::Answering,
+            _ => Amiss::Asking,
+        }
+    }
+
+    /// The refusal as a problem, saying `summary` as its one line.
+    #[must_use]
+    pub fn problem(self, summary: impl Into<String>) -> Problem {
+        Problem::new(
+            self.code(),
+            self.severity(),
+            summary,
+            self.meaning(),
+            self.remedy(),
+        )
+        .lies_in(self.amiss())
+    }
+
+    /// The refusal as a response, in its own words.
+    #[must_use]
+    pub fn answered(self) -> Response<Body> {
+        self.answer(self.problem(self.said()))
+    }
+
+    /// The refusal as a response, saying `summary` instead of its own line.
+    ///
+    /// For the refusals whose line names what was asked for — an action, an argument,
+    /// how long is left — so the particulars reach whoever asked.
+    #[must_use]
+    pub fn saying(self, summary: impl Into<String>) -> Response<Body> {
+        self.answer(self.problem(summary))
+    }
+
+    /// A problem this refusal raised, answered at this refusal's status.
+    #[must_use]
+    pub fn answer(self, problem: Problem) -> Response<Body> {
+        enveloped(self.status(), Envelope::new(kind::ERROR, problem).to_json())
+    }
+}
+
+#[cfg(test)]
+mod tests;

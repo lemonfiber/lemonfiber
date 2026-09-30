@@ -277,6 +277,8 @@ async fn the_flag_the_command_line_spells_is_not_a_name_this_carrier_holds() {
     // `--only` and `--disruptive` are the flags; `only` and `disruptive` are the
     // fields. A caller that sent `disruptive_checks` is told, rather than having a
     // whole request quietly mean the plain diagnosis.
-    let (status, _) = said(r#"{"disruptive_checks":true}"#).await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY.as_u16());
+    let (status, answered) = said(r#"{"disruptive_checks":true}"#).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
+    assert!(answered.contains(r#""code":"ASK-6""#), "{answered}");
+    assert!(answered.contains("disruptive_checks"), "{answered}");
 }

@@ -92,7 +92,7 @@ fn a_question_asked_with_no_word_says_what_is_missing() {
 
     let said = showing(&acting);
     assert!(
-        said.contains(lemonfiber_api::read::table::NO_TERM),
+        said.contains(lemonfiber_api::refusal::Refusal::NoTerm.said()),
         "{said}"
     );
 }
@@ -340,7 +340,7 @@ fn naming_no_setting_and_naming_no_member_are_each_refused_in_their_own_words() 
     assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
     let said = showing(&acting);
     assert!(
-        said.contains(lemonfiber_api::read::table::NO_SETTING),
+        said.contains(lemonfiber_api::refusal::Refusal::NoSetting.said()),
         "{said}"
     );
 
@@ -348,7 +348,7 @@ fn naming_no_setting_and_naming_no_member_are_each_refused_in_their_own_words() 
     assert_eq!(acting.pressed(&Press::Accept), Wanted::Nothing);
     let said = showing(&acting);
     assert!(
-        said.contains(lemonfiber_api::read::table::NO_MEMBER),
+        said.contains(lemonfiber_api::refusal::Refusal::NoMember.said()),
         "{said}"
     );
 }

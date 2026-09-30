@@ -7,7 +7,8 @@ use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::read::enveloped;
-use lemonfiber_api::serve::{admitted, answered, refused, token_header, Refusal};
+use lemonfiber_api::refusal::Refusal;
+use lemonfiber_api::serve::{admitted, answered, token_header};
 use lemonfiber_fixtures::ports::Chance;
 
 /// Bytes the test chose, so a token is the same one twice.
@@ -54,7 +55,7 @@ fn this_runs(headers: &HeaderMap, token: &Token) -> bool {
 
 /// The verdict on a request saying exactly what the test states, and nothing more.
 fn verdict(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
-    Token::mint(&given()).map_or(Err(Refusal::Unknown), |token| {
+    Token::mint(&given()).map_or(Err(Refusal::NotAdmitted), |token| {
         let headers = saying(pairs);
         admitted(this_runs(&headers, &token), &headers, &bound())
     })
@@ -67,7 +68,7 @@ fn verdict(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
 /// file has to be kept in step with how a secret is written.
 fn carrying_the_token(pairs: &[(&str, &str)]) -> Result<(), Refusal> {
     let Some(token) = Token::mint(&given()) else {
-        return Err(Refusal::Unknown);
+        return Err(Refusal::NotAdmitted);
     };
     let mut every = vec![(TOKEN_HEADER, token.as_str())];
     every.extend_from_slice(pairs);
@@ -95,7 +96,7 @@ fn a_browser_that_states_no_origin_is_still_answered() {
 fn a_request_carrying_no_token_is_not() {
     assert_eq!(
         verdict(&[("host", "localhost:8471")]),
-        Err(Refusal::Unknown)
+        Err(Refusal::NotAdmitted)
     );
 }
 
@@ -109,7 +110,7 @@ fn a_request_carrying_another_token_of_the_same_width_is_not() {
     assert_eq!(other.len(), token.as_str().len());
     assert_eq!(
         verdict(&[(TOKEN_HEADER, &other), ("host", "localhost:8471")]),
-        Err(Refusal::Unknown)
+        Err(Refusal::NotAdmitted)
     );
 }
 
@@ -158,18 +159,36 @@ async fn an_answer_carries_the_envelope_it_was_given() {
 
 #[tokio::test]
 async fn a_refusal_says_which_of_the_two_it_was() {
-    for refusal in [Refusal::Unknown, Refusal::Elsewhere] {
-        let response = refused(refusal);
+    for refusal in [Refusal::NotAdmitted, Refusal::Elsewhere] {
+        let response = refusal.answered();
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
         let body = to_bytes(response.into_body(), usize::MAX).await;
-        assert_eq!(body.ok().as_deref(), Some(refusal.said().as_bytes()));
+        let read: serde_json::Value = body
+            .ok()
+            .and_then(|body| serde_json::from_slice(&body).ok())
+            .unwrap_or_default();
+        assert_eq!(
+            read.pointer("/kind").and_then(serde_json::Value::as_str),
+            Some("error")
+        );
+        assert_eq!(
+            read.pointer("/data/code")
+                .and_then(serde_json::Value::as_str),
+            Some(refusal.code().as_str())
+        );
+        assert_eq!(
+            read.pointer("/data/summary")
+                .and_then(serde_json::Value::as_str),
+            Some(refusal.said())
+        );
     }
 }
 
 #[test]
 fn the_two_refusals_do_not_say_the_same_thing() {
-    assert_ne!(Refusal::Unknown.said(), Refusal::Elsewhere.said());
+    assert_ne!(Refusal::NotAdmitted.said(), Refusal::Elsewhere.said());
+    assert_ne!(Refusal::NotAdmitted.code(), Refusal::Elsewhere.code());
 }
 
 #[test]
@@ -184,7 +203,7 @@ fn the_header_a_caller_must_use_is_the_one_the_contract_names() {
 fn each_response() -> [(&'static str, Response<Body>); 3] {
     [
         ("an answer", answered(r#"{"api_version":1}"#.to_owned())),
-        ("a refusal", refused(Refusal::Unknown)),
+        ("a refusal", Refusal::NotAdmitted.answered()),
         (
             "an answer that would not render",
             enveloped(StatusCode::OK, None),
@@ -215,13 +234,16 @@ fn nothing_this_surface_says_may_be_kept() {
 }
 
 #[test]
-fn what_this_surface_says_in_its_own_words_is_labelled_as_prose() {
-    // Not as an envelope: a caller that parses what it was told it was given
-    // would otherwise be handed a sentence to read as JSON.
-    for response in [refused(Refusal::Elsewhere), enveloped(StatusCode::OK, None)] {
+fn a_refusal_is_labelled_as_the_envelope_it_is() {
+    // A refusal is the error envelope, so a caller parsing what it was told it was given
+    // reads the code it branches on rather than being handed a sentence to parse.
+    for response in [
+        Refusal::Elsewhere.answered(),
+        enveloped(StatusCode::OK, None),
+    ] {
         assert_eq!(
             response.headers().get(header::CONTENT_TYPE),
-            Some(&HeaderValue::from_static("text/plain; charset=utf-8"))
+            Some(&HeaderValue::from_static("application/json"))
         );
     }
 }

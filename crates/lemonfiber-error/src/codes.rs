@@ -44,8 +44,12 @@ macro_rules! codes {
             }
         )*
 
-        /// Every code this file declares.
-        pub(super) const DECLARED: &[crate::Code] = &[$($($family::$name,)*)*];
+        /// Every code this file declares, with the name and the line it is declared under.
+        pub(super) const DECLARED: &[super::Declared] = &[$($(super::Declared {
+            code: $family::$name,
+            name: stringify!($name),
+            said: concat!($($doc),*),
+        },)*)*];
 
         /// What a run ending on `code` leaves with, where this file says.
         pub(super) fn leaving(code: crate::Code) -> Option<super::Leaves> {
@@ -61,7 +65,7 @@ mod operating;
 mod serving;
 
 pub use operating::{
-    ack, bind, config, diag, docker, env, form, host, life, pair, proc, read, rehearse, serve,
+    ack, ask, bind, config, diag, docker, env, form, host, life, pair, proc, read, rehearse, serve,
     setup, stack, telling, tui, update, watch, word,
 };
 pub use serving::{
@@ -69,13 +73,57 @@ pub use serving::{
     reissue, remove, repair, restore, seed, space, storage, undo, vpn, wire, wiring,
 };
 
+/// One code as this file declares it: the code, the name it is declared under and
+/// the line written above it.
+///
+/// Read by whatever has to publish a code rather than only raise it. The contract
+/// lists the codes a refusal carries, and a client generating a value per code needs
+/// a name to give each value and a sentence to document it with — the ones written
+/// here, so that a published name cannot drift from the declared one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Declared {
+    code: Code,
+    name: &'static str,
+    said: &'static str,
+}
+
+impl Declared {
+    /// The code itself.
+    #[must_use]
+    pub const fn code(self) -> Code {
+        self.code
+    }
+
+    /// The name it is declared under, as a constant is spelled.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        self.name
+    }
+
+    /// The line written above it, as one sentence.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        self.said.trim()
+    }
+}
+
+/// How one code is declared, or nothing where no family declares it.
+#[must_use]
+pub fn declared(code: Code) -> Option<Declared> {
+    operating::DECLARED
+        .iter()
+        .chain(serving::DECLARED)
+        .find(|declared| declared.code == code)
+        .copied()
+}
+
 /// Every code there is, family by family, in number order.
 #[must_use]
 pub fn every() -> Vec<Code> {
     let mut every: Vec<Code> = operating::DECLARED
         .iter()
         .chain(serving::DECLARED)
-        .copied()
+        .map(|declared| declared.code)
         .collect();
     every.sort_by_key(|code| ordering(code.as_str()));
     every

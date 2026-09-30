@@ -22,7 +22,8 @@ use crate::events::live::Live;
 use crate::events::Streaming;
 use crate::guard::{Binding, Token};
 use crate::jobs::Jobs;
-use crate::serve::{admitted, refused, Refusal};
+use crate::refusal::Refusal;
+use crate::serve::admitted;
 
 /// What every handler is given.
 ///
@@ -93,7 +94,11 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::setup::routes())
         .merge(crate::admission::routes())
         .with_state(serving.clone())
-        .merge(crate::events::routes(streaming));
+        .merge(crate::events::routes(streaming))
+        // Set after every route is merged, because it reaches only the routes already
+        // declared: a path this surface answers, asked with a method it does not, is a
+        // refusal like any other and carries its code rather than an empty body.
+        .method_not_allowed_fallback(|| async { Refusal::WrongMethod.answered() });
     endpoints.layer(middleware::from_fn_with_state(serving, guarded))
 }
 
@@ -115,7 +120,7 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
     // account is gone.
     let at_the_door = request.uri().path() == crate::admission::SESSION;
     if matches!(knocking, Knocking::Unconfirmed) && !at_the_door {
-        return refused(Refusal::Unconfirmed);
+        return Refusal::Unconfirmed.answered();
     }
     let caller = match knocking {
         Knocking::Known(caller) => Some(caller),
@@ -133,6 +138,6 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
             }
             next.run(request).await
         }
-        Err(refusal) => refused(refusal),
+        Err(refusal) => refusal.answered(),
     }
 }

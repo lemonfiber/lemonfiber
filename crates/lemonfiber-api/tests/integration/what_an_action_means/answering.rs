@@ -96,7 +96,20 @@ async fn a_declined_action_says_why_rather_than_answering_with_a_status_alone() 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     let body = to_bytes(response.into_body(), usize::MAX).await;
-    assert_eq!(body.ok().as_deref(), Some(refusal.said().as_bytes()));
+    let read: serde_json::Value = body
+        .ok()
+        .and_then(|body| serde_json::from_slice(&body).ok())
+        .unwrap_or_default();
+    assert_eq!(
+        read.pointer("/data/summary")
+            .and_then(serde_json::Value::as_str),
+        Some(refusal.said().as_str())
+    );
+    assert_eq!(
+        read.pointer("/data/code")
+            .and_then(serde_json::Value::as_str),
+        Some(refusal.why().code().as_str())
+    );
 }
 
 #[tokio::test]
