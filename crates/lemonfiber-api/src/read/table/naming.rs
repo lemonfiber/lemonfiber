@@ -15,22 +15,19 @@ use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
 
-use super::{
-    NOT_A_COUNT, NOT_A_SEASON, NO_MEMBER, NO_SETTING, NO_SHELF_WITHOUT_A_MEMBER, NO_SUCH_REMOVAL,
-    NO_TERM, NO_UPDATE_OBJECT, TOO_MANY_AT_ONCE,
-};
+use crate::refusal::Refusal;
 
 /// The removal a name asks for, read and nothing more.
 ///
 /// Naming none reads the one that removes nothing, which is the safe reading and the
 /// one a browser opening the page has not chosen anything by.
-pub(super) fn removing(tier: Option<String>) -> Result<Command, &'static str> {
+pub(super) fn removing(tier: Option<String>) -> Result<Command, Refusal> {
     let Some(named) = tier else {
         return Ok(Command::Uninstall(Removing::surveying(Tier::Stop)));
     };
     Tier::named(&named)
         .map(|tier| Command::Uninstall(Removing::surveying(tier)))
-        .ok_or(NO_SUCH_REMOVAL)
+        .ok_or(Refusal::NoSuchRemoval)
 }
 
 /// Which of the two things that can be moved forward was asked about.
@@ -38,7 +35,7 @@ pub(super) fn removing(tier: Option<String>) -> Result<Command, &'static str> {
 /// Naming a version asks the binary about that one and naming none asks about whatever
 /// is newest, which is the fork the command line takes on the same word. Neither half
 /// replaces anything, so both are reads.
-pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, &'static str> {
+pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, Refusal> {
     match what {
         Some("self") => Ok(Command::SelfUpdate { to }),
         Some("stack") => Ok(Command::Update(update::Asked {
@@ -46,7 +43,7 @@ pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, 
             confirm: false,
             wait: Waiting::Never,
         })),
-        _ => Err(NO_UPDATE_OBJECT),
+        _ => Err(Refusal::NoUpdateObject),
     }
 }
 
@@ -83,10 +80,10 @@ pub(super) fn narrowed(only: Option<&str>) -> Option<Command> {
 /// What the refusal is worth is the reading it keeps out: an empty name carried to the
 /// core matches nothing and comes back as a listing of no settings, which reads as
 /// "there is no such setting" about a setting nobody named.
-pub(super) fn setting(key: Option<String>) -> Result<Command, &'static str> {
+pub(super) fn setting(key: Option<String>) -> Result<Command, Refusal> {
     match key {
         None => Ok(Command::ConfigShow),
-        Some(key) if key.is_empty() => Err(NO_SETTING),
+        Some(key) if key.is_empty() => Err(Refusal::NoSetting),
         Some(key) => Ok(Command::ConfigGet { key }),
     }
 }
@@ -98,10 +95,10 @@ pub(super) fn setting(key: Option<String>) -> Result<Command, &'static str> {
 /// anything" — which is exactly the reading
 /// [`lemonfiber_core::app`]'s own household reader refuses to produce when it cannot
 /// reach the request service.
-pub(super) fn household(member: Option<String>) -> Result<Command, &'static str> {
+pub(super) fn household(member: Option<String>) -> Result<Command, Refusal> {
     match member {
         None => Ok(Command::Household { member: None }),
-        Some(member) if member.is_empty() => Err(NO_MEMBER),
+        Some(member) if member.is_empty() => Err(Refusal::NoMember),
         Some(member) => Ok(Command::Household {
             member: Some(member),
         }),
@@ -126,18 +123,18 @@ pub const MOST_AT_ONCE: u32 = 500;
 /// Naming nobody is refused rather than read as everybody, because there is no
 /// everybody: the shelf is what one account may watch and no two accounts need have
 /// the same one.
-pub(super) fn shelf(member: Option<String>, most: Option<String>) -> Result<Command, &'static str> {
+pub(super) fn shelf(member: Option<String>, most: Option<String>) -> Result<Command, Refusal> {
     let Some(member) = member.filter(|member| !member.is_empty()) else {
-        return Err(NO_SHELF_WITHOUT_A_MEMBER);
+        return Err(Refusal::NoShelfWithoutAMember);
     };
     let most = match most.map(|most| most.parse::<u32>()) {
         None => A_SHELF,
-        Some(Ok(most)) if most > MOST_AT_ONCE => return Err(TOO_MANY_AT_ONCE),
+        Some(Ok(most)) if most > MOST_AT_ONCE => return Err(Refusal::TooManyAtOnce),
         Some(Ok(most)) if most > 0 => most,
         // Nought and anything that is not a number at all. A shelf of no holdings is a
         // request for an answer that says nothing, and an empty shelf is a fact about a
         // household rather than a thing a count should be able to manufacture.
-        Some(_) => return Err(NOT_A_COUNT),
+        Some(_) => return Err(Refusal::NotACount),
     };
     Ok(Command::Held { member, most })
 }
@@ -151,15 +148,12 @@ pub(super) fn shelf(member: Option<String>, most: Option<String>) -> Result<Comm
 /// Nothing is searched. A read looks and does not touch, and asking the indexers what
 /// they carry spends a live search against the allowance they hold the operator to —
 /// so the widened form of this is an action, at the door changes are asked for.
-pub(super) fn following(
-    term: Option<String>,
-    season: Option<&str>,
-) -> Result<Command, &'static str> {
+pub(super) fn following(term: Option<String>, season: Option<&str>) -> Result<Command, Refusal> {
     let Some(term) = term.filter(|term| !term.is_empty()) else {
-        return Err(NO_TERM);
+        return Err(Refusal::NoTerm);
     };
     let Ok(season) = season.map(str::parse::<u32>).transpose() else {
-        return Err(NOT_A_SEASON);
+        return Err(Refusal::NotASeason);
     };
     Ok(Command::Trace {
         term,

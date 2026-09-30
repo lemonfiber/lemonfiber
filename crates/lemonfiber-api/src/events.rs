@@ -30,7 +30,8 @@ use lemonfiber_core::ports::time::Clock;
 
 use crate::admission::Knocking;
 use crate::guard::{Binding, Token};
-use crate::serve::{admitted, carrying, refused, Refusal, STREAM};
+use crate::refusal::Refusal;
+use crate::serve::{admitted, carrying, STREAM};
 
 use self::live::{Listening, Live};
 
@@ -91,7 +92,7 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
         .carried(&headers, &streaming.token, now)
         .await;
     if matches!(knocking, Knocking::Unconfirmed) {
-        return refused(Refusal::Unconfirmed);
+        return Refusal::Unconfirmed.answered();
     }
     // The stream carries the operator's whole view — the dashboard, every log line
     // the operator follows, what setup is doing — and nothing on it is narrowed to a
@@ -106,7 +107,7 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
         &headers,
         &streaming.bound,
     ) {
-        return refused(refusal);
+        return refusal.answered();
     }
     let seen = headers
         .get(LAST_EVENT_ID)

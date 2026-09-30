@@ -184,7 +184,7 @@ async fn a_request_carrying_no_token_is_refused_here_as_anywhere() {
     );
     assert_eq!(
         typed(answer.as_ref()),
-        Some(&HeaderValue::from_static("text/plain; charset=utf-8")),
+        Some(&HeaderValue::from_static("application/json")),
         "a refusal is answered with, not streamed"
     );
 }

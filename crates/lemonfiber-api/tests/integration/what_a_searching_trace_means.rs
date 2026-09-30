@@ -293,5 +293,5 @@ async fn the_flag_the_command_line_spells_is_not_a_name_this_carrier_holds() {
     // the flag's own spelling is told, rather than having a whole request quietly
     // mean the plain trace.
     let (status, _) = said(r#"{"search":true,"term":"The Expanse"}"#).await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY.as_u16());
+    assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
 }

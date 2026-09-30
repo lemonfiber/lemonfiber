@@ -13,6 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::reading::{refused, Refusal};
 use axum::body::to_bytes;
 use axum::http::StatusCode;
 use lemonfiber_api::events::live::Live;
@@ -191,10 +192,10 @@ async fn a_follow_that_is_neither_yes_nor_no_is_refused_rather_than_read_as_eith
     };
     assert_eq!(
         run.asked("/api/logs?follow=maybe").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "Whether to keep reading must be true or false.".to_owned()
-        ))
+        refused(
+            Refusal::NotAChoice,
+            "Whether to keep reading must be true or false."
+        )
     );
 }
 

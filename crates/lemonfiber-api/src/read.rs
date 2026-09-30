@@ -36,17 +36,15 @@ use lemonfiber_core::model::{kind, Envelope};
 use crate::admission::Caller;
 use crate::entitled::{may, Permitted};
 use crate::read::table::{named, wanted, OFFERED};
+use crate::refusal::{Refusal, UNRENDERED};
 use crate::router::Serving;
-use crate::serve::{answered, carrying, refused, Refusal, SENTENCE};
+use crate::serve::{answered, carrying, JSON};
 
 /// The status a read that this machine could not answer is refused with.
 ///
 /// The body is still the envelope, because a caller that asked for something it
 /// could parse asked about the failures most of all.
 const FAILED: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
-
-/// What is said where a payload could not be rendered.
-const UNRENDERABLE: &str = "This answer could not be rendered.";
 
 /// The reads this surface answers: every read [`OFFERED`] names, each carried out by
 /// [`reading`] under its own name, and the two that answer with something other than
@@ -92,9 +90,9 @@ pub(crate) async fn reading(
         // part of it, and nothing where it is not theirs at all.
         Ok(command) => match may(caller, command) {
             Permitted::This(command) => carried_out(ctx, command).await,
-            Permitted::Nothing => refused(Refusal::NotYours),
+            Permitted::Nothing => Refusal::NotYours.answered(),
         },
-        Err(said) => unreadable(said),
+        Err(why) => why.answered(),
     }
 }
 
@@ -154,32 +152,15 @@ pub(crate) const fn refusing(problem: &Problem) -> StatusCode {
 /// its headers; only the status differs, since a command that could not be
 /// carried out is not a successful read.
 ///
-/// Nothing is invented for a payload that could not be rendered. The absent arm
-/// is reachable only by being called with one, because these payloads are plain
-/// data — which is why this is offered rather than kept private.
+/// A payload that could not be rendered is answered as the refusal saying so. The
+/// absent arm is reachable only by being called with one, because these payloads are
+/// plain data — which is why this is offered rather than kept private.
 #[must_use]
 pub fn enveloped(status: StatusCode, rendered: Option<String>) -> Response {
     let Some(body) = rendered else {
-        return carrying(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            SENTENCE,
-            Body::from(UNRENDERABLE),
-        );
+        return carrying(Refusal::Unrenderable.status(), JSON, Body::from(UNRENDERED));
     };
     let mut response = answered(body);
     *response.status_mut() = status;
     response
-}
-
-/// A request this surface could not read, said plainly.
-///
-/// What was asked for is not repeated back. A name lemonfiber does not know is a
-/// mistake to correct rather than a request to answer with everything, which is
-/// the judgement the command line makes before the core is reached.
-pub(crate) fn unreadable(said: &str) -> Response {
-    carrying(
-        StatusCode::BAD_REQUEST,
-        SENTENCE,
-        Body::from(said.to_owned()),
-    )
 }

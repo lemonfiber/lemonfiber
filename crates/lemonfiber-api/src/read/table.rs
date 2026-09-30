@@ -47,6 +47,8 @@ use lemonfiber_core::app::{
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
 
+use crate::refusal::Refusal;
+
 pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
@@ -259,53 +261,6 @@ pub const OFFERED: &[&str] = &[
     UPDATE,
 ];
 
-/// What is said to a request that named nothing to follow.
-pub const NO_TERM: &str = "What to follow must be named.";
-
-/// What is said to a request whose season is not a number.
-pub(crate) const NOT_A_SEASON: &str = "Which season to narrow to must be a number.";
-
-/// What is said to a request that named no setting to read.
-pub const NO_SETTING: &str = "Which setting to read must be named.";
-
-/// What is said to a request that named no household member to narrow to.
-pub const NO_MEMBER: &str = "Which member to narrow to must be named.";
-
-/// What is said to a request asking for a shelf and naming nobody whose it is.
-///
-/// Apart from [`NO_MEMBER`] because the two refuse different things: that one is said
-/// where naming nobody would have meant everybody, and this is said where there is no
-/// everybody to fall back to.
-pub(crate) const NO_SHELF_WITHOUT_A_MEMBER: &str = "Whose shelf to read must be named.";
-
-/// What is said to a request asking for a number of holdings that is not one.
-pub(crate) const NOT_A_COUNT: &str = "How many holdings to answer with must be a whole number.";
-
-/// What is said to a request asking for more holdings than this answers in one go.
-///
-/// Refused rather than quietly cut down to the ceiling. A caller that asked for five
-/// thousand and was handed five hundred has been told it has the whole shelf, and a
-/// narrower answer wearing the shape of the answer is the same failure as a wider one.
-pub(crate) const TOO_MANY_AT_ONCE: &str = "That is more holdings than one read answers with.";
-
-/// What is said to a request naming a group of checks that is not one.
-pub(crate) const NO_SUCH_GROUP: &str = "There is no group of checks and no check by that name.";
-
-/// What is said where no read goes by the name that was asked for.
-pub const NO_SUCH_READ: &str = "There is no read by that name.";
-
-/// What is said to a request naming a removal that is none of the four.
-pub const NO_SUCH_REMOVAL: &str =
-    "Which removal must be one of stop, services, configuration or media.";
-
-/// What is said to a request that asked to move something forward and named no object.
-///
-/// Refused rather than answered with either. Neither object is the smaller case of the
-/// other — one moves somebody's services and the other moves this program — so a page
-/// that asked about the stack and was handed the binary has been answered a question it
-/// did not ask.
-pub(crate) const NO_UPDATE_OBJECT: &str = "Which of stack or self to move forward must be named.";
-
 /// What a read was given, mirroring the flags its command takes.
 ///
 /// One carrier rather than one shape per read, so a caller fills the field the read
@@ -356,8 +311,8 @@ pub fn wanted(read: &str, query: Option<&str>) -> Result<Wanted, Box<Problem>> {
 ///
 /// # Errors
 ///
-/// Returns the one line a caller is answered with.
-pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
+/// Returns the refusal a caller is answered with.
+pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
     let Wanted {
         forms,
         member,
@@ -380,7 +335,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         FORMS => Ok(Command::Preview { forms }),
         STATUS => Ok(Command::Status { forms: Vec::new() }),
         SERVICES => Ok(Command::Status { forms }),
-        CHECKS => narrowed(only.as_deref()).ok_or(NO_SUCH_GROUP),
+        CHECKS => narrowed(only.as_deref()).ok_or(Refusal::NoSuchGroup),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
         REQUESTS => household(member),
         HELD => shelf(member, most),
@@ -431,6 +386,6 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, &'static str> {
         // declared.
         BANDWIDTH => Ok(Command::Bandwidth(BandwidthAsked::default())),
         CLIENTS => Ok(Command::Clients),
-        _ => Err(NO_SUCH_READ),
+        _ => Err(Refusal::NoSuchRead),
     }
 }

@@ -153,10 +153,10 @@ async fn a_group_of_checks_that_is_not_one_is_not_run() {
     // answer with everything — the judgement the command line makes too.
     assert_eq!(
         asked(world(running(), stack()), "/api/checks?only=nonsense").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "There is no group of checks and no check by that name.".to_owned()
-        ))
+        refused(
+            Refusal::NoSuchGroup,
+            "There is no group of checks and no check by that name."
+        )
     );
 }
 
@@ -198,10 +198,10 @@ async fn naming_a_member_narrows_what_the_household_read_reports() {
 async fn a_member_given_and_left_empty_narrowed_to_nobody() {
     assert_eq!(
         asked(world(running(), stack()), "/api/requests?member=").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "Which member to narrow to must be named.".to_owned()
-        ))
+        refused(
+            Refusal::NoMember,
+            "Which member to narrow to must be named."
+        )
     );
 }
 
@@ -262,9 +262,9 @@ async fn a_form_narrows_a_log_read_the_way_it_narrows_the_command() {
 async fn a_line_count_that_is_not_a_number_is_refused() {
     assert_eq!(
         asked(world(running(), stack()), "/api/logs?tail=plenty").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "How many lines to begin with must be a number, and no more than 10000.".to_owned()
-        ))
+        refused(
+            Refusal::NotALineCount,
+            "How many lines to begin with must be a number, and no more than 10000."
+        )
     );
 }

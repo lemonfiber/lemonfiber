@@ -11,6 +11,7 @@ pub(crate) use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 pub(crate) use lemonfiber_api::jobs::Jobs;
 pub(crate) use lemonfiber_api::read::enveloped;
 pub(crate) use lemonfiber_api::read::table;
+pub(crate) use lemonfiber_api::refusal::Refusal;
 pub(crate) use lemonfiber_api::router::{routes, Serving};
 pub(crate) use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
 pub(crate) use lemonfiber_core::config::store::REDACTED;
@@ -114,6 +115,20 @@ pub(crate) fn running() -> Reporting {
     Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy)
 }
 
+/// The status and body a refusal answers with, saying `summary` as its one line.
+///
+/// Built from the refusal rather than spelled out, so a test says which refusal it
+/// expects and the sentence it expects to be told; the envelope around the two is the
+/// one every refusal wears.
+pub(crate) fn refused(refusal: Refusal, summary: &str) -> Option<(StatusCode, String)> {
+    let body = lemonfiber_core::model::Envelope::new(
+        lemonfiber_core::model::kind::ERROR,
+        refusal.problem(summary),
+    )
+    .to_json()?;
+    Some((refusal.status(), body))
+}
+
 /// The status and body a request to this path is answered with.
 pub(crate) async fn asked(ctx: Ctx, path: &str) -> Option<(StatusCode, String)> {
     let carried = written()?;
@@ -128,6 +143,16 @@ pub(crate) async fn asked(ctx: Ctx, path: &str) -> Option<(StatusCode, String)> 
 /// The same, for a request that says something else about itself.
 pub(crate) async fn answered(
     ctx: Ctx,
+    path: &str,
+    said: &[(&str, &str)],
+) -> Option<(StatusCode, String)> {
+    sent(ctx, "GET", path, said).await
+}
+
+/// The same, asked with a method of the caller's choosing.
+pub(crate) async fn sent(
+    ctx: Ctx,
+    method: &str,
     path: &str,
     said: &[(&str, &str)],
 ) -> Option<(StatusCode, String)> {
@@ -151,7 +176,7 @@ pub(crate) async fn answered(
         }),
     );
 
-    let mut building = Request::builder().uri(path);
+    let mut building = Request::builder().method(method).uri(path);
     for (name, value) in said {
         building = building.header(*name, *value);
     }

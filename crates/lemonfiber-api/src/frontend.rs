@@ -21,6 +21,7 @@ use axum::routing::any;
 use axum::Router;
 use lemonfiber_core::frontend::{Asset, Source};
 
+use crate::refusal::Refusal;
 use crate::serve::{carrying, SENTENCE};
 
 /// What this page may load, and what may load it.
@@ -103,7 +104,7 @@ const ENDPOINTS: &str = "/api/";
 /// the endpoint not existing.
 #[must_use]
 pub fn unanswered() -> Response<Body> {
-    plainly(StatusCode::NOT_FOUND, "No endpoint answers this path.")
+    Refusal::NoEndpoint.answered()
 }
 
 /// What a path is answered with, whichever of the four it is.

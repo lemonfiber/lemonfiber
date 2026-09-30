@@ -44,7 +44,6 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
@@ -61,8 +60,9 @@ use tokio::task::AbortHandle;
 
 use crate::admission::Caller;
 use crate::read::enveloped;
+use crate::refusal::Refusal;
 use crate::router::Serving;
-use crate::serve::{carrying, operator_only, SENTENCE};
+use crate::serve::operator_only;
 
 /// Bytes of name. Wide enough that two runs never mint the same one.
 const WIDTH: usize = 8;
@@ -75,12 +75,6 @@ const WIDTH: usize = 8;
 /// not treated as gone, short enough that a guard nobody remembers starting does
 /// not outlive the day.
 pub const LEASE: Duration = Duration::from_secs(30 * 60);
-
-/// What is said about a name this run never handed out.
-///
-/// What was asked for is not repeated back, and nothing distinguishes a name that
-/// was never minted from one another run minted: this run knows only its own.
-const NO_SUCH_JOB: &str = "No work in this run goes by that name.";
 
 /// A name for work that outlives the request that started it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -442,7 +436,7 @@ fn over(job: &str, action: &str, status: StatusCode) -> Response {
     enveloped(status, Envelope::new(kind::JOB, started).to_json())
 }
 
-/// A name this run never handed out, said plainly.
+/// A name this run never handed out.
 fn unknown() -> Response {
-    carrying(StatusCode::NOT_FOUND, SENTENCE, Body::from(NO_SUCH_JOB))
+    Refusal::NoSuchJob.answered()
 }

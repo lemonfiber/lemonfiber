@@ -88,10 +88,7 @@ async fn a_trace_that_named_nothing_to_follow_is_refused() {
     // smaller request than a trace of one thing; it is a different one.
     assert_eq!(
         asked(world(running(), stack()), "/api/trace").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "What to follow must be named.".to_owned()
-        ))
+        refused(Refusal::NoTerm, "What to follow must be named.")
     );
 }
 
@@ -99,10 +96,7 @@ async fn a_trace_that_named_nothing_to_follow_is_refused() {
 async fn a_term_given_and_left_empty_named_nothing_to_follow() {
     assert_eq!(
         asked(world(running(), stack()), "/api/trace?term=").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "What to follow must be named.".to_owned()
-        ))
+        refused(Refusal::NoTerm, "What to follow must be named.")
     );
 }
 
@@ -114,10 +108,10 @@ async fn a_season_that_is_not_a_number_is_refused() {
             "/api/trace?term=the+expanse&season=latest"
         )
         .await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "Which season to narrow to must be a number.".to_owned()
-        ))
+        refused(
+            Refusal::NotASeason,
+            "Which season to narrow to must be a number."
+        )
     );
 }
 

@@ -10,6 +10,7 @@
 //! of them crossed it alone.
 
 use crate::reading;
+use lemonfiber_api::refusal::Refusal;
 use reading::*;
 #[tokio::test]
 async fn a_form_this_stack_does_not_declare_is_refused_as_missing() {
@@ -71,10 +72,10 @@ async fn a_request_carrying_no_token_never_reaches_a_read() {
             &[("host", "127.0.0.1:8471")]
         )
         .await,
-        Some((
-            StatusCode::FORBIDDEN,
-            "This request carried no token or session this run admits.".to_owned()
-        ))
+        refused(
+            Refusal::NotAdmitted,
+            "This request carried no token or session this run admits."
+        )
     );
 }
 
@@ -109,9 +110,19 @@ async fn an_answer_that_could_not_be_rendered_is_not_invented() {
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     let body = to_bytes(response.into_body(), usize::MAX).await;
+    let read: serde_json::Value = body
+        .ok()
+        .and_then(|body| serde_json::from_slice(&body).ok())
+        .unwrap_or_default();
     assert_eq!(
-        body.ok().as_deref(),
-        Some("This answer could not be rendered.".as_bytes())
+        read.pointer("/data/summary")
+            .and_then(serde_json::Value::as_str),
+        Some("This answer could not be rendered.")
+    );
+    assert_eq!(
+        read.pointer("/data/code")
+            .and_then(serde_json::Value::as_str),
+        Some(Refusal::Unrenderable.code().as_str())
     );
 }
 
@@ -123,7 +134,7 @@ fn a_read_no_name_reaches_is_refused_rather_than_invented() {
     // be told so rather than quietly answered with something else.
     assert_eq!(
         table::named("/api/secrets", table::Wanted::default()),
-        Err(table::NO_SUCH_READ)
+        Err(Refusal::NoSuchRead)
     );
 }
 
@@ -334,10 +345,10 @@ async fn a_line_count_past_what_this_read_will_gather_is_refused() {
     // asked for here is the number of lines this machine holds at once.
     assert_eq!(
         asked(world(running(), stack()), "/api/logs?tail=4294967295").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "How many lines to begin with must be a number, and no more than 10000.".to_owned()
-        ))
+        refused(
+            Refusal::NotALineCount,
+            "How many lines to begin with must be a number, and no more than 10000."
+        )
     );
 }
 
@@ -422,10 +433,10 @@ async fn asking_where_this_copy_stands_about_two_versions_at_once_is_refused() {
 async fn a_shelf_asked_for_with_nobody_whose_it_is_is_refused() {
     assert_eq!(
         asked(world(running(), stack()), "/api/held").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "Whose shelf to read must be named.".to_owned()
-        ))
+        refused(
+            Refusal::NoShelfWithoutAMember,
+            "Whose shelf to read must be named."
+        )
     );
 }
 
@@ -433,10 +444,10 @@ async fn a_shelf_asked_for_with_nobody_whose_it_is_is_refused() {
 async fn a_shelf_asked_for_by_nobody_at_all_is_refused_the_same_way() {
     assert_eq!(
         asked(world(running(), stack()), "/api/held?member=").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "Whose shelf to read must be named.".to_owned()
-        ))
+        refused(
+            Refusal::NoShelfWithoutAMember,
+            "Whose shelf to read must be named."
+        )
     );
 }
 
@@ -444,10 +455,10 @@ async fn a_shelf_asked_for_by_nobody_at_all_is_refused_the_same_way() {
 async fn a_count_of_holdings_that_is_not_a_number_is_refused() {
     assert_eq!(
         asked(world(running(), stack()), "/api/held?member=ada&most=lots").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "How many holdings to answer with must be a whole number.".to_owned()
-        ))
+        refused(
+            Refusal::NotACount,
+            "How many holdings to answer with must be a whole number."
+        )
     );
 }
 
@@ -458,10 +469,10 @@ async fn a_count_of_holdings_that_is_not_a_number_is_refused() {
 async fn a_shelf_of_no_holdings_at_all_is_refused_rather_than_answered_empty() {
     assert_eq!(
         asked(world(running(), stack()), "/api/held?member=ada&most=0").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "How many holdings to answer with must be a whole number.".to_owned()
-        ))
+        refused(
+            Refusal::NotACount,
+            "How many holdings to answer with must be a whole number."
+        )
     );
 }
 
@@ -472,10 +483,10 @@ async fn a_shelf_of_no_holdings_at_all_is_refused_rather_than_answered_empty() {
 async fn more_holdings_than_one_read_answers_with_is_refused_not_quietly_cut_down() {
     assert_eq!(
         asked(world(running(), stack()), "/api/held?member=ada&most=5000").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "That is more holdings than one read answers with.".to_owned()
-        ))
+        refused(
+            Refusal::TooManyAtOnce,
+            "That is more holdings than one read answers with."
+        )
     );
 }
 
@@ -506,5 +517,22 @@ async fn a_shelf_at_the_ceiling_is_still_asked_for() {
         seen.as_ref()
             .is_some_and(|(status, _)| *status != StatusCode::BAD_REQUEST),
         "the ceiling is the last count this answers, not the first it refuses: {seen:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_read_asked_with_a_method_it_does_not_answer_is_refused_by_its_code() {
+    // A path this surface answers, asked the wrong way, used to come back empty; it is
+    // a refusal like any other and carries the code a client branches on.
+    let carried = written().unwrap_or_default();
+    assert_eq!(
+        sent(
+            world(running(), stack()),
+            "POST",
+            "/api/status",
+            &[("host", "127.0.0.1:8471"), (TOKEN_HEADER, &carried)],
+        )
+        .await,
+        refused(Refusal::WrongMethod, Refusal::WrongMethod.said())
     );
 }

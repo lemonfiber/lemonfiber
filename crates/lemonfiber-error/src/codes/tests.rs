@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use super::{every, leaves, Leaves};
+use super::{declared, every, leaves, Leaves};
 
 #[test]
 fn no_two_problems_answer_to_the_same_code() {
@@ -26,4 +26,50 @@ fn codes_sort_by_family_and_then_by_number() {
         ninth < tenth,
         "a family reaching ten extends rather than reshuffles"
     );
+}
+
+#[test]
+fn a_code_is_published_by_the_name_and_line_it_is_declared_with() {
+    let found = declared(super::admit::NOT_ADMITTED);
+    assert_eq!(
+        found.map(super::Declared::code),
+        Some(super::admit::NOT_ADMITTED)
+    );
+    assert_eq!(found.map(super::Declared::name), Some("NOT_ADMITTED"));
+    assert_eq!(
+        found.map(super::Declared::description),
+        Some("Raised when a request carried no token or session this run admits.")
+    );
+}
+
+#[test]
+fn a_line_written_over_two_lines_is_published_as_one_sentence() {
+    let found = declared(super::bind::AROUND_THE_FIREWALL).map(super::Declared::description);
+    assert_eq!(
+        found,
+        Some(
+            "Raised where a published port is reached without the host's own firewall rules \
+             being consulted."
+        )
+    );
+}
+
+#[test]
+fn a_code_nothing_declares_is_not_published() {
+    assert_eq!(declared(crate::Code::new("NOWHERE-1")), None);
+}
+
+#[test]
+fn every_declared_code_is_published_with_a_name_and_a_line() {
+    for code in every() {
+        let found = declared(code);
+        assert!(
+            found.is_some_and(|found| !found.name().is_empty()),
+            "{code}"
+        );
+        assert!(
+            found.is_some_and(|found| !found.description().is_empty()),
+            "{code}"
+        );
+    }
 }

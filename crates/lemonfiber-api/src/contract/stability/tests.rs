@@ -32,6 +32,7 @@ fn one_field(name: &str, spelled: &str, required: bool) -> Surface {
         api_version: 1,
         kinds: BTreeMap::new(),
         types,
+        refusals: BTreeMap::new(),
         strings: BTreeSet::new(),
     }
 }
@@ -44,7 +45,16 @@ fn one_kind(kind: &str, carries: &str) -> Surface {
         api_version: 1,
         kinds,
         types: BTreeMap::new(),
+        refusals: BTreeMap::new(),
         strings: BTreeSet::new(),
+    }
+}
+
+/// A surface listing one refusal at one status.
+fn one_refusal(code: &str, status: u16) -> Surface {
+    Surface {
+        refusals: [(code.to_owned(), status)].into_iter().collect(),
+        ..Surface::default()
     }
 }
 
@@ -590,4 +600,46 @@ fn a_surface_round_trips_through_the_form_it_is_committed_in() {
     // And anything that is not one reads as nothing to compare against, rather
     // than as an empty surface that would silently pass every comparison.
     assert_eq!(Surface::parse("not a surface at all"), None);
+}
+
+#[test]
+fn a_refusal_that_is_added_is_not_a_break() {
+    assert!(Surface::broken(&Surface::default(), &one_refusal("ADMIT-4", 403)).is_empty());
+}
+
+#[test]
+fn a_refusal_no_longer_listed_is_named() {
+    let breaks = Surface::broken(&one_refusal("ADMIT-4", 403), &Surface::default());
+    assert_eq!(breaks.len(), 1);
+    let only = breaks.first();
+    assert_eq!(only.map(|found| found.what.as_str()), Some("ADMIT-4"));
+    assert!(
+        only.is_some_and(|found| found.because.contains("no longer listed")),
+        "{breaks:?}"
+    );
+}
+
+#[test]
+fn a_refusal_answered_at_another_status_is_named_with_both() {
+    let breaks = Surface::broken(&one_refusal("ADMIT-4", 403), &one_refusal("ADMIT-4", 401));
+    assert_eq!(breaks.len(), 1);
+    let because = breaks.first().map(|found| found.because.as_str());
+    assert!(
+        because.is_some_and(|because| because.contains("403") && because.contains("401")),
+        "{because:?}"
+    );
+}
+
+#[test]
+fn a_refusal_is_read_off_the_artefact_by_its_code_and_status() {
+    let described = json!({
+        "kinds": {},
+        "refusals": {
+            "ADMIT-4": {"name": "NOT_ADMITTED", "status": 403, "description": "…"},
+            "BROKEN-1": {"name": "NO_STATUS", "description": "…"},
+            "BROKEN-2": {"name": "PAST_A_STATUS", "status": 70000, "description": "…"}
+        }
+    });
+    let surface = read(&described, 1);
+    assert_eq!(surface.refusals, one_refusal("ADMIT-4", 403).refusals);
 }

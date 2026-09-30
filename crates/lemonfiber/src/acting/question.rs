@@ -52,6 +52,7 @@ use lemonfiber_api::read::table::{
     HELD, HISTORY, HOSTING, MIGRATION, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED, STUCK,
     TRACE, UNINSTALL, UPDATE, VERSION,
 };
+use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
 
 use super::chooser::Chooser;
@@ -317,7 +318,7 @@ pub(super) fn asked_at(
     narrows: Narrows,
     names: &str,
 ) -> Result<Command, &'static str> {
-    named(at, narrows.given(names))
+    named(at, narrows.given(names)).map_err(Refusal::said)
 }
 
 /// The questions, the one the list opens on apart from the rest.

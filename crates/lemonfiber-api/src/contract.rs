@@ -53,6 +53,7 @@ use serde::Serialize;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
+use lemonfiber_core::error::codes::declared;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{
     kind::{self, Kind},
@@ -61,6 +62,7 @@ use lemonfiber_core::model::{
 
 use crate::admission::admitted::Admitted;
 use crate::jobs::started::Started;
+use crate::refusal::Refusal;
 use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::walkthrough::Line;
 
@@ -77,6 +79,24 @@ pub struct Contract {
     pub api_version: u32,
     /// `kind` to the schema of the envelope carrying it.
     pub kinds: BTreeMap<String, Schema>,
+    /// Every code a refusal may carry, to what the registry says of it.
+    ///
+    /// Beside the kinds rather than inside one, because a refusal is the `error` kind
+    /// the artefact already describes and a code is a string there. What a client
+    /// branches on is which of these a refusal is, so they are listed where a
+    /// generator can give each one a name rather than copy it.
+    pub refusals: BTreeMap<String, Listed>,
+}
+
+/// One refusal as the contract lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Listed {
+    /// The name the code is declared under, which a generator names its value after.
+    pub name: &'static str,
+    /// The one status the refusal is answered with.
+    pub status: u16,
+    /// The line the registry writes above it.
+    pub description: &'static str,
 }
 
 impl Contract {
@@ -90,6 +110,7 @@ impl Contract {
         Self {
             api_version: API_VERSION,
             kinds,
+            refusals: refusals(),
         }
     }
 
@@ -129,6 +150,27 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
     describing(kinds, kind::START, schema_for!(Envelope<String>));
     describing(kinds, kind::STEP, schema_for!(Envelope<Line>));
+}
+
+/// Every refusal this surface answers with, keyed by its code.
+///
+/// A code the registry does not declare cannot be built, so every refusal is found;
+/// one missing here would be a code no client can name, and a test counts them.
+fn refusals() -> BTreeMap<String, Listed> {
+    Refusal::EVERY
+        .iter()
+        .filter_map(|refusal| {
+            let declared = declared(refusal.code())?;
+            Some((
+                declared.code().as_str().to_owned(),
+                Listed {
+                    name: declared.name(),
+                    status: refusal.status().as_u16(),
+                    description: declared.description(),
+                },
+            ))
+        })
+        .collect()
 }
 
 /// One kind, and the shape of the envelope carrying it.

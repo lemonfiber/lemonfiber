@@ -27,7 +27,6 @@
 //! log; the report says what was decided and withholds every value nobody has
 //! written down a reason for showing, exactly as `config show` does.
 
-use axum::body::Body;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -42,13 +41,8 @@ use serde::Deserialize;
 use crate::admission::Caller;
 use crate::entitled::{may, Permitted};
 use crate::read::{enveloped, refusing};
+use crate::refusal::Refusal;
 use crate::router::Serving;
-use crate::serve::{carrying, refused, Refusal, SENTENCE};
-
-/// What is said to a request whose body is not one setup takes.
-const NOT_AN_ANSWER: &str =
-    "The body of this request is not one of setup's answers, nor a way out of an \
-     interrupted apply.";
 
 /// The six requests setup is walked with.
 pub fn routes() -> Router<Serving> {
@@ -73,7 +67,7 @@ async fn answered(
     given: Result<Json<Answer>, JsonRejection>,
 ) -> Response {
     let Ok(Json(answer)) = given else {
-        return unreadable();
+        return Refusal::NotAnAnswer.answered();
     };
     walked(&serving, &caller, SetupAction::Answer(answer)).await
 }
@@ -112,7 +106,7 @@ async fn recovered(
     given: Result<Json<Chosen>, JsonRejection>,
 ) -> Response {
     let Ok(Json(chosen)) = given else {
-        return unreadable();
+        return Refusal::NotAnAnswer.answered();
     };
     walked(&serving, &caller, SetupAction::Recover(chosen.choice)).await
 }
@@ -132,7 +126,7 @@ struct Chosen {
 /// One step of the walk, carried out and answered with where it left setup.
 async fn walked(serving: &Serving, caller: &Caller, action: SetupAction) -> Response {
     let Permitted::This(command) = may(caller, Command::Setup(action)) else {
-        return refused(Refusal::NotYours);
+        return Refusal::NotYours.answered();
     };
     match dispatch(command, &serving.ctx).await {
         Ok(outcome) => enveloped(StatusCode::OK, outcome.envelope().to_json()),
@@ -141,12 +135,4 @@ async fn walked(serving: &Serving, caller: &Caller, action: SetupAction) -> Resp
             Envelope::new(kind::ERROR, &*problem).to_json(),
         ),
     }
-}
-
-/// A body this surface could not read, said plainly.
-///
-/// What arrived is not quoted back. An answer carries a credential, and a message
-/// repeating the body would carry it wherever the message goes.
-fn unreadable() -> Response {
-    carrying(StatusCode::BAD_REQUEST, SENTENCE, Body::from(NOT_AN_ANSWER))
 }

@@ -17,6 +17,8 @@ use std::time::Duration;
 use crate::idle::ctx;
 use async_trait::async_trait;
 use axum::body::to_bytes;
+
+use crate::reading::{refused, Refusal};
 use axum::http::{header, StatusCode};
 use axum::Extension;
 use lemonfiber_api::admission::Caller;
@@ -357,7 +359,10 @@ async fn a_name_this_run_never_handed_out_is_absent_rather_than_unfinished() {
     // which is worse than the four hundred and four it would be hiding.
     let (status, body) = asked(Jobs::default(), "0badc0de").await;
     assert_eq!(status, StatusCode::NOT_FOUND.as_u16(), "{body}");
-    assert_eq!(body, "No work in this run goes by that name.");
+    assert_eq!(
+        Some(body),
+        refused(Refusal::NoSuchJob, "No work in this run goes by that name.").map(|(_, body)| body)
+    );
 }
 
 #[tokio::test]
@@ -466,7 +471,10 @@ async fn releasing_a_name_over_the_route_says_where_the_work_now_stands() {
 async fn releasing_a_name_the_route_never_handed_out_is_absent_there_too() {
     let (status, body) = released(Jobs::default(), "0badc0de").await;
     assert_eq!(status, StatusCode::NOT_FOUND.as_u16(), "{body}");
-    assert_eq!(body, "No work in this run goes by that name.");
+    assert_eq!(
+        Some(body),
+        refused(Refusal::NoSuchJob, "No work in this run goes by that name.").map(|(_, body)| body)
+    );
 }
 
 // ── The lease on work with no ending of its own ──────────────────────────────

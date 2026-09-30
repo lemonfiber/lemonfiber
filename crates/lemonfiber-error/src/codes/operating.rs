@@ -7,6 +7,29 @@ codes! {
         /// Raised when an answer names something nothing is warning about.
         NOT_WARNED = "ACK-1",
     }
+    /// The `ASK` codes: a request the web API could not answer as it was asked.
+    ask {
+        /// Raised where no action goes by the name that was asked for.
+        NO_SUCH_ACTION = "ASK-1",
+        /// Raised where an action was not given an argument it needs.
+        MISSING_ARGUMENT = "ASK-2",
+        /// Raised where an argument was given a value that names nothing.
+        UNRECOGNISED_ARGUMENT = "ASK-3",
+        /// Raised where an action was given an argument its command has nowhere to put.
+        UNWANTED_ARGUMENT = "ASK-4",
+        /// Raised where two arguments that each name a different request arrived together.
+        ARGUMENTS_TOGETHER = "ASK-5",
+        /// Raised where the body of an action is not arguments it can read.
+        NOT_ARGUMENTS = "ASK-6",
+        /// Raised where a job was asked about that this run did not start.
+        NO_SUCH_JOB = "ASK-7",
+        /// Raised where the body of a setup step is not an answer it can read.
+        NOT_AN_ANSWER = "ASK-8",
+        /// Raised where a path under the endpoints is one no endpoint answers.
+        NO_ENDPOINT = "ASK-9",
+        /// Raised where an endpoint was asked with a method it does not answer.
+        WRONG_METHOD = "ASK-10",
+    }
     /// The `BIND` codes.
     bind {
         /// Raised when a service the stack calls admin answers somewhere off this machine.
@@ -143,6 +166,32 @@ codes! {
         UNWANTED = "READ-1",
         /// Raised where a parameter carrying one value was given more than once.
         REPEATED = "READ-2",
+        /// Raised where no read goes by the name that was asked for.
+        NO_SUCH_READ = "READ-3",
+        /// Raised where a trace was asked for and named nothing to follow.
+        NO_TERM = "READ-4",
+        /// Raised where the season to narrow a trace to is not a number.
+        NOT_A_SEASON = "READ-5",
+        /// Raised where a setting was asked for by an empty name.
+        NO_SETTING = "READ-6",
+        /// Raised where a household member was asked for by an empty name.
+        NO_MEMBER = "READ-7",
+        /// Raised where a shelf was asked for and nobody was named whose it is.
+        NO_SHELF_WITHOUT_A_MEMBER = "READ-8",
+        /// Raised where how many holdings to answer with is not a whole number.
+        NOT_A_COUNT = "READ-9",
+        /// Raised where more holdings were asked for than one read answers with.
+        TOO_MANY_AT_ONCE = "READ-10",
+        /// Raised where a diagnosis was narrowed to a group or check that is not one.
+        NO_SUCH_GROUP = "READ-11",
+        /// Raised where a removal was named that is none of the four there are.
+        NO_SUCH_REMOVAL = "READ-12",
+        /// Raised where moving forward was asked about and neither stack nor self named.
+        NO_UPDATE_OBJECT = "READ-13",
+        /// Raised where how many log lines to begin with is not a number within the ceiling.
+        NOT_A_LINE_COUNT = "READ-14",
+        /// Raised where whether to keep reading is neither true nor false.
+        NOT_A_CHOICE = "READ-15",
     }
     /// The `REHEARSE` codes.
     rehearse {
@@ -163,6 +212,10 @@ codes! {
         UNSETTLED_PORT = "SERVE-4",
         /// Raised when the certificate to serve encrypted with cannot be read or made.
         NO_CERTIFICATE = "SERVE-5",
+        /// Raised when an answer could not be rendered.
+        UNRENDERABLE = "SERVE-6",
+        /// Raised when this machine will not supply the randomness a job is named with.
+        NO_JOB_NAME = "SERVE-7",
     }
     /// The `SETUP` codes.
     setup {

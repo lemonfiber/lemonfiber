@@ -52,10 +52,7 @@ async fn naming_a_setting_reads_that_one_rather_than_all_of_them() {
 async fn a_setting_given_and_left_empty_named_no_setting() {
     assert_eq!(
         asked(configured("no-setting", &kept()), "/api/config?key=").await,
-        Some((
-            StatusCode::BAD_REQUEST,
-            "Which setting to read must be named.".to_owned()
-        ))
+        refused(Refusal::NoSetting, "Which setting to read must be named.")
     );
 }
 

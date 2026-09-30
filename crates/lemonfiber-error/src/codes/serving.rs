@@ -10,6 +10,20 @@ codes! {
         NO_SALT = "ADMIT-2",
         /// Raised when the two answers were not the same word.
         MISTYPED = "ADMIT-3",
+        /// Raised when a request carried no token or session this run admits.
+        NOT_ADMITTED = "ADMIT-4",
+        /// Raised when a request said it came from somewhere this server is not.
+        ELSEWHERE = "ADMIT-5",
+        /// Raised when an account asked for something that is not its to ask for.
+        NOT_YOURS = "ADMIT-6",
+        /// Raised when the media server could not say whether an account is still one.
+        UNCONFIRMED = "ADMIT-7",
+        /// Raised when the password offered at the door was wrong, or none is set.
+        NOT_THE_PASSWORD = "ADMIT-8",
+        /// Raised when the door has been given too many wrong passwords lately.
+        TOO_MANY_ATTEMPTS = "ADMIT-9",
+        /// Raised when what was offered at the door is not a password.
+        NOT_A_PASSWORD = "ADMIT-10",
     }
     /// The `BACKUP` codes.
     backup {
