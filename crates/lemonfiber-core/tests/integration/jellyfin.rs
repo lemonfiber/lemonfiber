@@ -68,6 +68,7 @@ const A_SHELF: &str = r#"{"Items":[
 ]}"#;
 
 mod accounts;
+mod cors;
 mod keys;
 mod library;
 /// **The design claim, asserted rather than described.** The account whose shelf this

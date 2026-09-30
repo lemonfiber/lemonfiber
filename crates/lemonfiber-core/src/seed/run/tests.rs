@@ -349,6 +349,7 @@ mod aggregators;
 mod applications;
 mod arrs;
 mod baseline;
+mod cors;
 mod identity;
 mod passwords;
 mod publishing;
