@@ -1,4 +1,5 @@
 use super::reported;
+use lemonfiber_core::error::codes::life::ALREADY_WORKING;
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 
 /// A failure carries text this product did not write, and a terminal is not a
@@ -76,5 +77,35 @@ fn a_failure_a_script_asked_for_is_one_document_it_can_parse() {
     assert!(
         !said.contains("Words used here:"),
         "and nothing a person would want in it: {said}"
+    );
+}
+
+/// The core words a refusal for other work so that any surface can show it, and the
+/// command line adds the one way round it that is its own flag. Every other failure
+/// is left as the core wrote it.
+#[test]
+fn a_stack_held_by_another_run_is_told_the_flag_that_takes_it() {
+    let held = Problem::new(
+        ALREADY_WORKING,
+        Severity::Error,
+        "another lemonfiber run is still working on this stack",
+        "this one stopped without doing anything.",
+        Remedy::new("Wait for it to finish, then try again"),
+    )
+    .with_detail("The claim is at /tmp/stack.lock.");
+    let other = Problem::new(
+        Code::new("WORD-7"),
+        Severity::Error,
+        "something else went wrong",
+        "nothing was done.",
+        Remedy::new("Try again"),
+    );
+
+    let said = reported(&held, false).text();
+
+    assert!(said.contains("`--force` takes the stack from it"), "{said}");
+    assert!(
+        !reported(&other, false).text().contains("--force"),
+        "only a held stack is told about the flag"
     );
 }
