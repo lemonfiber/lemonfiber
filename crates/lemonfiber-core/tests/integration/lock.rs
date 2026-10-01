@@ -265,7 +265,11 @@ async fn a_run_whose_turn_never_comes_is_told_what_is_in_the_way() {
     );
     assert!(
         said.contains(&format!("written by process {}", somebody_else())),
-        "and the process is in the detail, where `--force` is: {said}"
+        "and the process is in the detail: {said}"
+    );
+    assert!(
+        !said.contains("--force") && !said.contains("run this again"),
+        "and no word of it is one surface's own: {said}"
     );
 }
 

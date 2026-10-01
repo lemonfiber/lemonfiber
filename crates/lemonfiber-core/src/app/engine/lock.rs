@@ -299,6 +299,10 @@ async fn meanwhile(ctx: &Ctx, path: &Path) -> String {
 /// been going, and how long this run gave it before saying so. Without the last one a
 /// refusal that arrived five minutes after the command reads as a hang that eventually
 /// admitted it, rather than as a wait that ran out.
+///
+/// Every word is one any surface can show. Taking the stack from a run that is gone
+/// is a flag of the command line, so that surface says it beside the remedy, and the
+/// remedy here is the one every surface can offer.
 async fn refusal(ctx: &Ctx, path: &Path, waited: Duration) -> Problem {
     let held = holder(ctx, path).await;
 
@@ -317,12 +321,11 @@ async fn refusal(ctx: &Ctx, path: &Path, waited: Duration) -> Problem {
             counted(waited.as_secs(), "second"),
             aged(ctx, held.since)
         ),
-        Remedy::new("Wait for it to finish, then run this again"),
+        Remedy::new("Wait for it to finish, then try again"),
     )
     .lies_in(Amiss::Held)
     .with_detail(format!(
-        "The claim is at {}{}. If you are sure that run is gone, `--force` takes the \
-         stack from it.",
+        "The claim is at {}{}.",
         path.display(),
         written_by(&held.pid)
     ))

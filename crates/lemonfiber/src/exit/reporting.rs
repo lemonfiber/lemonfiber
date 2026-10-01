@@ -9,6 +9,7 @@ use std::process::ExitCode;
 
 use crate::render::Lines;
 use crate::say::complain;
+use lemonfiber_core::error::codes::life::ALREADY_WORKING;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
 
@@ -59,6 +60,10 @@ pub(crate) fn reported(problem: &Problem, parsed: bool) -> Lines {
         lines.remedy(remedy, "  ");
     }
 
+    if let Some(said) = on_the_command_line(problem) {
+        lines.put(format!("  {said}"));
+    }
+
     // Last, and indented: available to whoever wants it, and never the first
     // thing the operator has to read.
     if let Some(detail) = &problem.detail {
@@ -75,6 +80,18 @@ pub(crate) fn reported(problem: &Problem, parsed: bool) -> Lines {
     );
     lines.extend(notes);
     lines
+}
+
+/// What only this surface can add to a failure: a way round it that is one of its own flags.
+///
+/// The core words a failure so that every surface can show it, so a flag of this
+/// program is never in its remedy or its detail. Where the way round a refusal is
+/// such a flag, it is said here, beside the remedy, and nowhere else. A claim on
+/// the stack held by a run that is gone is the one so far: waiting is the remedy
+/// every surface offers, and taking the stack is this one's.
+fn on_the_command_line(problem: &Problem) -> Option<&'static str> {
+    (problem.code == ALREADY_WORKING)
+        .then_some("If you are sure that run is gone, `--force` takes the stack from it.")
 }
 
 /// The same failure, for something that will parse it.
