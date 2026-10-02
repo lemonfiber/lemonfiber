@@ -259,16 +259,23 @@ fn carrying_records_across_carries_its_confirmation_through() {
     );
 }
 
-/// Standing in place of it carries its confirmation through the same way.
+/// Standing in place of it carries the offer answered, and asked with none it only
+/// reads: its yes is the name of what it would stop, never a confirmation.
 #[test]
-fn standing_in_place_carries_its_confirmation_through() {
-    let asked = lemonfiber::cli::MigrateCommand::Replace { confirm: true };
+fn standing_in_place_carries_the_offer_it_answers() {
+    let answered = lemonfiber::cli::MigrateCommand::Replace {
+        offer: Some("5c3a1d20".to_owned()),
+    };
+    assert_eq!(
+        super::super::migrating(Some(&answered)),
+        lemonfiber_core::app::MigrateAction::Replace {
+            offer: Some("5c3a1d20".to_owned()),
+        }
+    );
+    let asked = lemonfiber::cli::MigrateCommand::Replace { offer: None };
     assert_eq!(
         super::super::migrating(Some(&asked)),
-        lemonfiber_core::app::MigrateAction::Act {
-            mode: lemonfiber_core::migration::mode::Mode::Replace,
-            confirmed: true,
-        }
+        lemonfiber_core::app::MigrateAction::Replace { offer: None }
     );
 }
 

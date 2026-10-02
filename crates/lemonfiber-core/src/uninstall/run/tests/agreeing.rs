@@ -36,7 +36,9 @@ async fn an_agreement_given_for_another_reading_is_refused() {
         .agreeing(Some("deadbeef".to_owned()));
     let refused = uninstall(&a_machine(), asked).await;
 
-    assert!(refused.is_err_and(|problem| problem.code == ANOTHER_READING));
+    assert!(refused
+        .is_err_and(|problem| problem.code == ANOTHER_READING
+            && problem.amiss == crate::agreement::MOVED_AMISS));
 }
 
 /// And a stale answer is refused on a tier that needed none either, so no
@@ -48,7 +50,9 @@ async fn a_stale_agreement_is_refused_on_a_tier_that_did_not_need_one() {
         .agreeing(Some("deadbeef".to_owned()));
     let refused = uninstall(&a_machine(), asked).await;
 
-    assert!(refused.is_err_and(|problem| problem.code == ANOTHER_READING));
+    assert!(refused
+        .is_err_and(|problem| problem.code == ANOTHER_READING
+            && problem.amiss == crate::agreement::MOVED_AMISS));
 }
 
 /// Answered by the name the reading printed, the library goes.

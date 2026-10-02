@@ -6456,6 +6456,12 @@
     },
     "ReplaceReport": {
       "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
         "project": {
           "type": [
             "null|string"
@@ -9673,6 +9679,8 @@
     "ASK-7": 404,
     "ASK-8": 400,
     "ASK-9": 404,
+    "GONE-2": 400,
+    "MIGRATE-1": 400,
     "READ-1": 400,
     "READ-10": 400,
     "READ-11": 400,
@@ -9688,7 +9696,10 @@
     "READ-7": 400,
     "READ-8": 400,
     "READ-9": 400,
+    "REPAIR-1": 400,
+    "RESTORE-11": 400,
     "SERVE-6": 500,
-    "SERVE-7": 500
+    "SERVE-7": 500,
+    "SPACE-6": 400
   }
 }

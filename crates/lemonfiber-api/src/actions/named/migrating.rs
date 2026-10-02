@@ -7,8 +7,10 @@
 //! somebody's are not the same act under a flag.
 //!
 //! Unconfirmed, each says what it would come to and changes nothing, so what a browser
-//! agrees to is what it was shown; `confirm` is the agreement, carried into the command
-//! as the core's `confirmed`.
+//! agrees to is what it was shown. For adopting, importing and standing beside, `confirm`
+//! is the agreement, carried into the command as the core's `confirmed`. Replacing stops
+//! somebody's running services, so its agreement is `offer`: the name the reading of what
+//! it would stop gave itself, and nothing else is a yes to it.
 
 use lemonfiber_core::app::{Command, MigrateAction};
 use lemonfiber_core::migration::mode::{Mode, EVERY};
@@ -29,14 +31,18 @@ fn named(action: &str) -> Option<Mode> {
 
 /// What the action asks the core for.
 ///
-/// Nothing here can be missing: the one field it reads is a confirmation, and not
-/// having confirmed is an answer rather than an omission.
+/// Nothing here can be missing: the one field it reads is the agreement, and not having
+/// agreed is an answer rather than an omission.
 pub(super) fn asked_for(action: &str, given: &Arguments) -> Command {
-    let mode = named(action).unwrap_or_default();
-    Command::Migrate(MigrateAction::Act {
-        mode,
-        confirmed: given.confirm,
-    })
+    match named(action).unwrap_or_default() {
+        Mode::Replace => Command::Migrate(MigrateAction::Replace {
+            offer: given.offer.clone(),
+        }),
+        mode => Command::Migrate(MigrateAction::Act {
+            mode,
+            confirmed: given.confirm,
+        }),
+    }
 }
 
 #[cfg(test)]

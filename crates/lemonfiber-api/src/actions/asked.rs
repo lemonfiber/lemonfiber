@@ -82,7 +82,7 @@ pub struct Arguments {
     /// Whether the checks that disturb the running system are included.
     pub disruptive: Disturbing,
     /// What was read before answering — the offer a repair's yes was read in, the
-    /// listing a restore's was — as it named itself.
+    /// listing a restore's was, what a replacement would stop — as it named itself.
     pub offer: Option<String>,
     /// The checks whose repairs were agreed to, as that offer names them.
     pub agreed: Vec<String>,

@@ -247,6 +247,7 @@ async fn an_answer_to_another_reading_is_refused_and_takes_nothing() {
     assert!(erasing.asked().is_empty(), "nothing was taken");
     assert!(refused.is_err_and(|problem| {
         problem.code == crate::error::codes::space::ANOTHER_OFFER
+            && problem.amiss == crate::agreement::MOVED_AMISS
             && problem
                 .remedies
                 .first()

@@ -316,19 +316,25 @@ fn a_refusal_to_stand_beside_is_the_only_thing_said() {
     assert!(!text.contains("8990"), "{text}");
 }
 
-/// What it would stop, before it stops anything.
+/// What it would stop, before it stops anything, and the answer that stops it: the
+/// offer's own name, never a bare confirmation.
 #[test]
-fn a_rehearsal_names_what_would_stop_and_stops_nothing() {
+fn a_rehearsal_names_what_would_stop_and_the_offer_that_stops_it() {
     let rehearsed = ReplaceReport {
         project: Some("media".to_owned()),
         would_stop: vec!["sonarr".to_owned()],
+        agreement: "5c3a1d20".to_owned(),
         stance: Stance::Pending,
         ..ReplaceReport::default()
     };
     let text = replacement(&rehearsed).text();
     assert!(text.contains("would stop:"), "{text}");
     assert!(text.contains("  sonarr"), "{text}");
-    assert!(text.contains("--confirm"), "{text}");
+    assert!(
+        text.contains("lemonfiber migrate replace --offer 5c3a1d20"),
+        "{text}"
+    );
+    assert!(!text.contains("--confirm"), "{text}");
 }
 
 /// The sentence that makes it reversible is the one an operator needs last.

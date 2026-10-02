@@ -409,6 +409,9 @@ fn unconfirmed(command: Command) -> Command {
             mode,
             confirmed: false,
         }),
+        Command::Migrate(MigrateAction::Replace { .. }) => {
+            Command::Migrate(MigrateAction::Replace { offer: None })
+        }
         Command::Update(asked) => Command::Update(update::Asked {
             confirm: false,
             ..asked

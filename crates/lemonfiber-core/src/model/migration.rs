@@ -173,6 +173,11 @@ pub struct ReplaceReport {
     pub project: Option<String>,
     /// The services that would be stopped, by name.
     pub would_stop: Vec<String>,
+    /// What this offer names itself: the project and every service it would stop.
+    ///
+    /// The answer to it is this name, and nothing else is a yes to a replacement. Empty
+    /// where there is nothing to stand in place of, because there is nothing to agree to.
+    pub agreement: String,
     /// The services that were stopped.
     pub stopped: Vec<String>,
     /// The services that would not stop and are still up.

@@ -418,6 +418,9 @@ fn answering_twice() -> Vec<Command> {
             mode: crate::migration::mode::Mode::Adopt,
             confirmed: true,
         }),
+        Command::Migrate(MigrateAction::Replace {
+            offer: Some("5c3a1d20".to_owned()),
+        }),
         Command::Remove {
             name: "ana".to_owned(),
             confirm: true,
@@ -522,6 +525,20 @@ fn a_rehearsal_carries_the_confirmable_commands_without_their_yes() {
         let carried = carried(asked.clone(), &rehearsing);
         assert_ne!(carried, asked, "{asked:?} kept the yes it was given");
     }
+}
+
+/// And a rehearsal of a replacement answering its offer is the reading that names
+/// one: the offer is its yes, so it is the offer that is taken back.
+#[test]
+fn a_rehearsed_replacement_is_the_reading_of_what_it_would_stop() {
+    let rehearsing = crate::test_support::a_context().build().rehearsing();
+    let answering = Command::Migrate(MigrateAction::Replace {
+        offer: Some("5c3a1d20".to_owned()),
+    });
+    assert_eq!(
+        carried(answering, &rehearsing),
+        Command::Migrate(MigrateAction::Replace { offer: None })
+    );
 }
 
 /// And what a rehearsal of a support bundle carries is the read beside it, rather

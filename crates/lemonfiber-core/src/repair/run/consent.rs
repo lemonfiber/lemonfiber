@@ -97,7 +97,7 @@ impl Confirm for Consent {
 /// tell a repair whose effects were rewritten from a fault that has cleared, and
 /// the two ask for opposite things next.
 fn stale(agreed: &str, stands: &str) -> Problem {
-    Problem::new(
+    crate::agreement::moved(Problem::new(
         STALE,
         Severity::Warning,
         "What you agreed to is not what is offered now",
@@ -106,7 +106,7 @@ fn stale(agreed: &str, stands: &str) -> Problem {
              Something has changed since you read it, so nothing was carried out."
         ),
         Remedy::new("Ask what could be put right again, and read what it says now"),
-    )
+    ))
 }
 
 #[cfg(test)]

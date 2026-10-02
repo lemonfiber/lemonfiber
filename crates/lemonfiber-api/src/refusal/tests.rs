@@ -173,7 +173,12 @@ async fn nothing_rendered_is_answered_as_the_refusal_saying_so() {
 #[test]
 fn the_contract_lists_every_refusal_at_the_status_it_is_answered_with() {
     let listed = Contract::describe().refusals;
-    assert_eq!(listed.len(), Refusal::EVERY.len());
+    // This surface's own, and the core's refusals of an offer that has moved, which
+    // `contract/refusals` holds to their status.
+    assert_eq!(
+        listed.len(),
+        Refusal::EVERY.len() + lemonfiber_core::agreement::MOVED.len()
+    );
     for refusal in Refusal::EVERY {
         let entry = listed.get(refusal.code().as_str());
         assert_eq!(

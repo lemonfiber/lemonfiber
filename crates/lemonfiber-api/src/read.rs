@@ -138,7 +138,15 @@ pub(crate) fn went_wrong(problem: &Problem) -> Response {
 /// reads this one, so a single refusal cannot carry two statuses depending on
 /// which door it arrived through.
 pub(crate) const fn refusing(problem: &Problem) -> StatusCode {
-    match problem.amiss {
+    answering(problem.amiss)
+}
+
+/// The status a refusal whose fault lies in `amiss` is answered with.
+///
+/// Apart from [`refusing`] so that what publishes a refusal before any is raised —
+/// the contract, listing the codes a client branches on — reads the same answer.
+pub(crate) const fn answering(amiss: Amiss) -> StatusCode {
+    match amiss {
         Amiss::Naming => StatusCode::NOT_FOUND,
         Amiss::Asking => StatusCode::BAD_REQUEST,
         Amiss::Held => StatusCode::CONFLICT,

@@ -31,6 +31,9 @@ pub async fn migrate(ctx: &Ctx, action: MigrateAction) -> Result<Outcome, Box<Pr
     match action {
         MigrateAction::Survey => Ok(Outcome::Migration(looked(ctx).await.survey)),
         MigrateAction::Act { mode, confirmed } => acting(ctx, mode, confirmed).await,
+        MigrateAction::Replace { offer } => replacing(ctx, &looked(ctx).await, offer.as_deref())
+            .await
+            .map(Outcome::Replacement),
     }
 }
 
@@ -51,12 +54,18 @@ async fn acting(ctx: &Ctx, mode: Mode, confirmed: bool) -> Result<Outcome, Box<P
         Mode::Beside => crate::app::beside::stand(ctx, &found.survey, confirmed)
             .await
             .map(Outcome::Beside),
-        Mode::Replace => {
-            crate::app::replace::instead(ctx, &found.survey, &found.running, confirmed)
-                .await
-                .map(Outcome::Replacement)
-        }
+        // A confirmation is no yes to a replacement, so asked this way it only reads.
+        Mode::Replace => replacing(ctx, &found, None).await.map(Outcome::Replacement),
     }
+}
+
+/// Stand in place of what one look found, answering `offer` where one was given.
+async fn replacing(
+    ctx: &Ctx,
+    found: &Looked,
+    offer: Option<&str>,
+) -> Result<crate::model::ReplaceReport, Box<Problem>> {
+    crate::app::replace::instead(ctx, &found.survey, &found.running, offer).await
 }
 
 /// What filesystem each path the existing setup mounts actually sits on.

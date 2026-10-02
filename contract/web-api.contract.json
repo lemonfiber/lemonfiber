@@ -13511,6 +13511,10 @@
           "description": "What standing in place of a setup already here came to, or would come to.",
           "type": "object",
           "properties": {
+            "agreement": {
+              "description": "What this offer names itself: the project and every service it would stop.\n\nThe answer to it is this name, and nothing else is a yes to a replacement. Empty\nwhere there is nothing to stand in place of, because there is nothing to agree to.",
+              "type": "string"
+            },
             "project": {
               "description": "The project that would be stood in place of.",
               "type": [
@@ -13557,6 +13561,7 @@
           },
           "required": [
             "would_stop",
+            "agreement",
             "stopped",
             "still_running",
             "stance",
@@ -20278,6 +20283,16 @@
       "status": 404,
       "description": "Raised where a path under the endpoints is one no endpoint answers."
     },
+    "GONE-2": {
+      "name": "ANOTHER_READING",
+      "status": 400,
+      "description": "Raised when an agreement names a reading of this machine that is not the one standing now."
+    },
+    "MIGRATE-1": {
+      "name": "OFFER_MOVED",
+      "status": 400,
+      "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
+    },
     "READ-1": {
       "name": "UNWANTED",
       "status": 400,
@@ -20353,6 +20368,16 @@
       "status": 400,
       "description": "Raised where how many holdings to answer with is not a whole number."
     },
+    "REPAIR-1": {
+      "name": "STALE",
+      "status": 400,
+      "description": "Raised when consent was given for an offer that no longer stands."
+    },
+    "RESTORE-11": {
+      "name": "MOVED_ON",
+      "status": 400,
+      "description": "Raised when consent was given for a listing that no longer stands."
+    },
     "SERVE-6": {
       "name": "UNRENDERABLE",
       "status": 500,
@@ -20362,6 +20387,11 @@
       "name": "NO_JOB_NAME",
       "status": 500,
       "description": "Raised when this machine will not supply the randomness a job is named with."
+    },
+    "SPACE-6": {
+      "name": "ANOTHER_OFFER",
+      "status": 400,
+      "description": "Raised when an agreement names an offer that is not the one standing now."
     }
   }
 }

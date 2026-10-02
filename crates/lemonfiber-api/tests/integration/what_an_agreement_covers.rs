@@ -117,9 +117,18 @@ fn a_reset_an_upgrade_and_a_restore_carry_the_agreement_into_the_command() {
 #[test]
 fn a_migration_carries_the_agreement_into_the_command_and_is_the_account_without_it() {
     use lemonfiber_core::app::MigrateAction;
-    use lemonfiber_core::migration::mode::EVERY;
+    use lemonfiber_core::migration::mode::{Mode, EVERY};
 
-    for mode in EVERY {
+    let confirmable: Vec<Mode> = EVERY
+        .into_iter()
+        .filter(|mode| *mode != Mode::Replace)
+        .collect();
+    assert_eq!(
+        confirmable.len(),
+        EVERY.len() - 1,
+        "only replacing is set apart"
+    );
+    for mode in confirmable {
         let action = format!("migrate-{}", mode.slug());
         let asked = |confirm: bool| {
             command(
@@ -143,6 +152,43 @@ fn a_migration_carries_the_agreement_into_the_command_and_is_the_account_without
             "{action} unagreed is the account"
         );
     }
+}
+
+#[test]
+fn a_replacement_is_agreed_to_by_its_offer_and_by_nothing_else() {
+    use lemonfiber_core::app::MigrateAction;
+
+    assert_eq!(
+        command("migrate-replace", Arguments::default()),
+        Some(Command::Migrate(MigrateAction::Replace { offer: None })),
+        "asked without an offer, it is the account of what would stop"
+    );
+    assert_eq!(
+        command(
+            "migrate-replace",
+            Arguments {
+                offer: Some("5c3a1d20".to_owned()),
+                ..Arguments::default()
+            }
+        ),
+        Some(Command::Migrate(MigrateAction::Replace {
+            offer: Some("5c3a1d20".to_owned())
+        })),
+        "the offer is carried into the command, where it is built again and compared"
+    );
+    assert!(
+        matches!(
+            refusal(
+                "migrate-replace",
+                Arguments {
+                    confirm: true,
+                    ..Arguments::default()
+                }
+            ),
+            Some(Refused::Unwanted { .. })
+        ),
+        "a bare yes is refused rather than read as one"
+    );
 }
 
 // ── A repair's agreement is the yes to an offer, which is its own group ────────

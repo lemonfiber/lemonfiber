@@ -163,7 +163,11 @@ pub(super) fn replacement(report: &ReplaceReport) -> Lines {
     if report.stance == Stance::Applied {
         lines.put("nothing was deleted; start them again whenever you like".to_owned());
     } else {
-        lines.put("nothing has been stopped; add --confirm to go ahead".to_owned());
+        lines.put("nothing has been stopped; to stop them, answer this offer by name:".to_owned());
+        lines.put(format!(
+            "  lemonfiber migrate replace --offer {}",
+            report.agreement
+        ));
     }
     lines
 }

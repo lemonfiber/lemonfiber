@@ -174,8 +174,8 @@ fn carries_disruption(command: &Command) -> bool {
 
 /// Whether the command has what the consent was read in.
 ///
-/// Two actions, and each names its own half: a repair's yes names the offer it was
-/// read in, a restore's names the listing.
+/// Each names its own half: a repair's yes names the offer it was read in, a
+/// restore's names the listing.
 fn carries_offer(command: &Command) -> bool {
     match command {
         Command::Repair {
@@ -201,6 +201,10 @@ fn carries_offer(command: &Command) -> bool {
         // only yes it takes: dropped, it is a removal nobody could ask for; kept
         // silently, one nobody read the cost of.
         Command::Uninstall(asked) => asked.agreement.as_deref() == Some(OFFER),
+        // And standing in place of a setup, where the offer's own name is the only yes:
+        // dropped, nothing could be stopped; kept silently, what stopped is something
+        // nobody read the list of.
+        Command::Migrate(MigrateAction::Replace { offer }) => offer.as_deref() == Some(OFFER),
         _ => false,
     }
 }

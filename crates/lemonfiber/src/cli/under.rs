@@ -123,12 +123,14 @@ pub enum MigrateCommand {
     },
     /// Stand in place of the setup already here, stopping it and deleting none of it.
     ///
-    /// Without `--confirm` it names what it would stop and stops nothing. Nothing is
+    /// Named on its own it says what it would stop, stops nothing, and prints a name
+    /// for that offer; answering with that name is the yes. What is running is read
+    /// again first, and an answer given for a different reading is refused. Nothing is
     /// deleted either way, so the old stack can be started again.
     Replace {
-        /// Go ahead, having seen what would stop.
-        #[arg(long)]
-        confirm: bool,
+        /// The offer being answered, as the run that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
 }
 

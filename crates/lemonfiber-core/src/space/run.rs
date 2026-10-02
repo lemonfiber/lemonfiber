@@ -329,17 +329,19 @@ async fn reclaim(ctx: &Ctx, reckoned: &Reckoning, measured: &Measured) -> Reclai
 
 /// The answer names an offer that is not the one standing now.
 fn another_offer(standing: &str) -> Problem {
-    Problem::new(
-        ANOTHER_OFFER,
-        Severity::Error,
-        "That answer was given for a different reading of the disk",
-        "Every path a cleanup would take, and what each occupies, is in the name an \
-         offer goes by, so an offer that has moved since it was read is a different \
-         offer. Taking this one would be taking something nobody saw.",
-        Remedy::new("Read the offer again, and answer the name it prints")
-            .with_detail(format!("the offer standing now is {standing}")),
+    crate::agreement::moved(
+        Problem::new(
+            ANOTHER_OFFER,
+            Severity::Error,
+            "That answer was given for a different reading of the disk",
+            "Every path a cleanup would take, and what each occupies, is in the name an \
+             offer goes by, so an offer that has moved since it was read is a different \
+             offer. Taking this one would be taking something nobody saw.",
+            Remedy::new("Read the offer again, and answer the name it prints")
+                .with_detail(format!("the offer standing now is {standing}")),
+        )
+        .in_state(State::Guided),
     )
-    .in_state(State::Guided)
 }
 
 /// There is nowhere to measure.

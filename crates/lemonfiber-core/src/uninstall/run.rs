@@ -156,18 +156,20 @@ fn needs_agreeing(agreement: &str, bytes: u64) -> Problem {
 
 /// The agreement names a reading that is not the one standing now.
 fn another_reading(agreement: &str) -> Problem {
-    Problem::new(
-        ANOTHER_READING,
-        Severity::Error,
-        "That agreement was given for a different reading of this machine",
-        "Everything you read before answering is in the name a reading goes by — the \
-         list, what each line occupies, what was found beside the library, and what \
-         sort of drive it is on. Something has changed since, so acting on this answer \
-         would be acting on something nobody saw.",
-        Remedy::new("Read it again, and answer the name it prints")
-            .with_detail(format!("the reading standing now is {agreement}")),
+    crate::agreement::moved(
+        Problem::new(
+            ANOTHER_READING,
+            Severity::Error,
+            "That agreement was given for a different reading of this machine",
+            "Everything you read before answering is in the name a reading goes by — the \
+             list, what each line occupies, what was found beside the library, and what \
+             sort of drive it is on. Something has changed since, so acting on this answer \
+             would be acting on something nobody saw.",
+            Remedy::new("Read it again, and answer the name it prints")
+                .with_detail(format!("the reading standing now is {agreement}")),
+        )
+        .in_state(State::Guided),
     )
-    .in_state(State::Guided)
 }
 
 #[cfg(test)]

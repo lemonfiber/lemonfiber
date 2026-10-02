@@ -153,7 +153,9 @@ async fn an_agreement_given_for_another_reading_is_refused() {
         Some("deadbeef".to_owned()),
     )
     .await;
-    assert!(refused.is_err_and(|problem| problem.code == ANOTHER_OFFER));
+    assert!(refused
+        .is_err_and(|problem| problem.code == ANOTHER_OFFER
+            && problem.amiss == crate::agreement::MOVED_AMISS));
 }
 
 #[tokio::test]
