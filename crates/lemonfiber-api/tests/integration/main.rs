@@ -15,6 +15,7 @@ mod what_a_listener_hears;
 mod what_a_member_may_ask_for;
 mod what_a_read_answers;
 mod what_a_read_refuses;
+mod what_a_rehearsal_answers;
 mod what_a_repair_action_means;
 mod what_a_request_meets;
 mod what_a_searching_trace_means;

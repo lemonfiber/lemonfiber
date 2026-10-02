@@ -50,6 +50,7 @@ pub(crate) fn a_snapshot() -> Snapshot {
             beside: Vec::new(),
         }),
         household: Panel::Ready(lemonfiber_core::model::HouseholdReport {
+            rehearsed: false,
             members: Vec::new(),
             available: true,
             findings: Vec::new(),

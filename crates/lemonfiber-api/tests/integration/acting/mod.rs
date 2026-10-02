@@ -120,6 +120,9 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         cap: takes(TAKES_SHARING).then(|| MONTHLY.to_owned()),
         exceeded: takes(TAKES_SHARING).then(|| AT_THE_CAP.to_owned()),
         unrestricted_for: takes(TAKES_SHARING).then_some(MINUTES),
+        // Never handed here: a rehearsal is carried on the run rather than on the
+        // command, so it changes no command these sweeps could compare.
+        dry_run: false.into(),
     }
 }
 

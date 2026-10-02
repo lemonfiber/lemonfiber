@@ -73,6 +73,11 @@ pub struct QualityReport {
     pub overwritten: Option<crate::model::StackEdit>,
     /// What became of the choice.
     pub disposition: Disposition,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What choosing an audio format for music did: the choice, whether it was recorded
@@ -91,4 +96,9 @@ pub struct MusicReport {
     /// What became of applying it to the music service, or `None` for a rehearsal
     /// that applied nothing.
     pub outcome: Option<Triggered>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }

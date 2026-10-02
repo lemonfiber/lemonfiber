@@ -141,6 +141,11 @@ pub struct AdoptReport {
     /// mounted nothing worth capturing. Present on an adoption that went through,
     /// because an operator told a backup was taken is owed the path to it.
     pub backed_up: Option<std::path::PathBuf>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What standing lemonfiber beside an existing setup came to, or would come to.
@@ -154,6 +159,11 @@ pub struct BesideReport {
     pub stance: Stance,
     /// Why nothing was written, where nothing was.
     pub refusal: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What standing in place of a setup already here came to, or would come to.
@@ -171,6 +181,11 @@ pub struct ReplaceReport {
     pub stance: Stance,
     /// Why nothing was stopped, where nothing was.
     pub refusal: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// One record carried across, or that would be.
@@ -199,6 +214,11 @@ pub struct ImportReport {
     pub stance: Stance,
     /// Why nothing was carried, where nothing was.
     pub refusal: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What is already on this machine, before anything is proposed.

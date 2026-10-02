@@ -43,4 +43,9 @@ pub struct SubstitutionReport {
     /// answer, so the two are told apart here rather than by the caller remembering
     /// which flags it passed.
     pub applied: bool,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }

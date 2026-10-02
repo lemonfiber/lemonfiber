@@ -214,4 +214,42 @@ pub struct WizardReport {
     /// they are entered, and this is what the service answered — never what was
     /// entered. Absent for every other answer, and for a step that gave none.
     pub proof: Option<crate::validate::Validation>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: Ran,
+}
+
+/// Whether a walk through setup was carried out or rehearsed, written as the bare
+/// `true` or `false` every other report writes its `rehearsed` as.
+///
+/// Two words rather than a fourth switch on a report that already holds three, which
+/// is a report somebody reads by remembering which `true` means what. On the wire it
+/// is the same boolean every report carries, so a client reads one shape.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(into = "bool")]
+#[schemars(with = "bool")]
+pub enum Ran {
+    /// Carried out.
+    #[default]
+    ForReal,
+    /// Rehearsed: none of it was done.
+    AsARehearsal,
+}
+
+impl From<bool> for Ran {
+    fn from(rehearsed: bool) -> Self {
+        if rehearsed {
+            Self::AsARehearsal
+        } else {
+            Self::ForReal
+        }
+    }
+}
+
+impl From<Ran> for bool {
+    fn from(ran: Ran) -> Self {
+        matches!(ran, Ran::AsARehearsal)
+    }
 }

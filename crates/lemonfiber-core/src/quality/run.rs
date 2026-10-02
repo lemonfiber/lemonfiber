@@ -232,6 +232,7 @@ fn report(
         .music_chosen()
         .then(|| music_choice(selection.music()));
     QualityReport {
+        rehearsed: false,
         choices,
         music,
         customised,

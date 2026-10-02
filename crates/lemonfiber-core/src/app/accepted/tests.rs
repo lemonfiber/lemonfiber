@@ -91,6 +91,7 @@ fn a_record_with_nowhere_to_go_is_reported_rather_than_swallowed() {
 /// A report carrying one finding.
 fn reporting(finding: crate::doctor::Finding) -> crate::model::DoctorReport {
     crate::model::DoctorReport {
+        rehearsed: false,
         overall: crate::doctor::Overall::Degraded,
         findings: vec![finding],
     }
@@ -246,6 +247,7 @@ fn a_run_that_answers_nothing_is_left_exactly_as_it_came() {
 fn a_refusal_with_nothing_answerable_says_so_rather_than_offering_an_empty_list() {
     let ctx = ctx_at("nothing-answerable");
     let quiet = crate::model::DoctorReport {
+        rehearsed: false,
         overall: crate::doctor::Overall::Healthy,
         findings: Vec::new(),
     };

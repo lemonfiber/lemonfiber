@@ -17,6 +17,7 @@ fn a_command(name: &str, standing: Hosting) -> HostedCommand {
 
 fn a_report(manager: Manager, commands: Vec<HostedCommand>) -> HostingReport {
     HostingReport {
+        rehearsed: false,
         manager,
         commands,
         changed: None,

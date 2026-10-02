@@ -59,7 +59,11 @@ pub(crate) async fn uninstall(ctx: &Ctx, asked: Removing) -> Result<Uninstall, B
 
 /// The manifest and what became of it, as one answer.
 fn answered(manifest: Manifest, removal: Removal) -> Uninstall {
-    Uninstall { manifest, removal }
+    Uninstall {
+        manifest,
+        removal,
+        rehearsed: false,
+    }
 }
 
 /// Whether this run holds what it takes to act.

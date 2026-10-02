@@ -57,6 +57,25 @@ something nobody has yet taught to report — the alternative is an author havin
 choose between teaching it in the same afternoon and quietly reading the flag and
 ignoring it, which is the failure this file exists to describe.
 
+## Over the web
+
+The web API's actions take the same flag as `dry_run`, and it means the same thing
+because it is the same decision: the route runs the command in a copy of its context
+with `rehearsing()` set, and `dispatch` refuses or reports exactly as it does for a
+terminal. Nothing in the web surface decides which actions may rehearse.
+
+A rehearsal is owed an answer that says it was one in a field of its own, apart from
+`confirmed`, so that a rehearsal and an unconfirmed reading are not told apart by their
+wording. So each `reports` arm in [`app/rehearsal.rs`](../../crates/lemonfiber-core/src/app/rehearsal.rs)
+names the kinds its report is written under, every one of those kinds is marked
+`[rehearsed]` in the outcome list ([`app/outcome.rs`](../../crates/lemonfiber-core/src/app/outcome.rs)),
+and the generated `said_as_a_rehearsal` sets `rehearsed` on the way out of `dispatch`.
+Setting it there rather than in each handler is the point: a report is often built by a
+function that never sees the run, and a field every builder had to remember would be
+the field one of them forgot. The test that holds it reads the kinds off the table's
+own text, so a command taught to report under a new kind fails until that kind is
+marked.
+
 ## Why forgetting is not possible
 
 Three things, each catching what the other two cannot.

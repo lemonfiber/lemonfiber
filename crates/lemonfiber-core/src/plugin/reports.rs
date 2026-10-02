@@ -246,6 +246,11 @@ pub struct Installs {
     /// run that installs, updates or removes one leaves it empty.
     #[serde(default)]
     pub sources: Vec<Sourced>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// Whether one installed plugin's source can still be fetched.

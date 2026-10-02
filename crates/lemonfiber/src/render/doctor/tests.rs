@@ -24,6 +24,7 @@ fn a_failing_finding() -> Finding {
 #[test]
 fn a_failing_finding_quotes_what_the_service_said() {
     let report = DoctorReport {
+        rehearsed: false,
         overall: Overall::Broken,
         findings: vec![Finding {
             said: Some("Database is locked\nRetrying in 30s\n".to_owned()),
@@ -60,6 +61,7 @@ fn a_plugin_s_check_says_whose_it_is_beside_its_title() {
         ..a_failing_finding()
     };
     let mixed = diagnosis(&DoctorReport {
+        rehearsed: false,
         overall: Overall::Broken,
         findings: vec![a_failing_finding(), theirs, unknown],
     })
@@ -73,6 +75,7 @@ fn a_plugin_s_check_says_whose_it_is_beside_its_title() {
     assert!(mixed.contains("every other is"), "{mixed}");
 
     let ours = diagnosis(&DoctorReport {
+        rehearsed: false,
         overall: Overall::Broken,
         findings: vec![a_failing_finding()],
     })
@@ -85,6 +88,7 @@ fn a_plugin_s_check_says_whose_it_is_beside_its_title() {
 fn a_finding_with_nothing_said_shows_no_heading() {
     for said in [None, Some(String::new()), Some("   \n".to_owned())] {
         let report = DoctorReport {
+            rehearsed: false,
             overall: Overall::Broken,
             findings: vec![Finding {
                 said,
@@ -197,6 +201,7 @@ fn every_verdict_reads_with_its_own_mark() {
         },
     ];
     let report = DoctorReport {
+        rehearsed: false,
         overall: Overall::Degraded,
         findings,
     };
@@ -215,6 +220,7 @@ fn every_verdict_reads_with_its_own_mark() {
 #[test]
 fn an_unverified_finding_without_detail_still_carries_its_remedy() {
     let report = DoctorReport {
+        rehearsed: false,
         overall: Overall::Unknown,
         findings: vec![Finding {
             check: "a".to_owned(),
@@ -267,6 +273,7 @@ fn an_answered_choice_stops_leading_without_disappearing() {
     // screen, still saying what it costs, and no longer putting a remedy for
     // something the operator has already decided against.
     let report = DoctorReport {
+        rehearsed: false,
         overall: Overall::Degraded,
         findings: vec![Finding {
             check: "vpn.unprotected".to_owned(),

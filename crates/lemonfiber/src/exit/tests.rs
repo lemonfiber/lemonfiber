@@ -38,6 +38,7 @@ fn problem(severity: Severity, state: State) -> Problem {
 
 fn a_wizard() -> WizardReport {
     WizardReport {
+        rehearsed: false.into(),
         offered: true,
         phase: Phase::InProgress,
         at: Step::DataLocation,
@@ -112,6 +113,7 @@ fn a_diagnosis_exits_on_what_it_found_rather_than_on_having_run() {
         (Overall::Unknown, false),
     ] {
         let code = settled(&Outcome::Doctor(DoctorReport {
+            rehearsed: false,
             overall,
             findings: Vec::new(),
         }));
@@ -178,6 +180,7 @@ fn a_held_quality_choice_is_a_validation_result_rather_than_a_failure() {
     // Held means the operator has to say so explicitly, which is something they
     // can act on rather than something that went wrong.
     let held = QualityReport {
+        rehearsed: false,
         choices: Vec::new(),
         music: None,
         customised: false,
@@ -186,6 +189,7 @@ fn a_held_quality_choice_is_a_validation_result_rather_than_a_failure() {
     };
     assert_ne!(format!("{:?}", settled(&Outcome::Quality(held))), success());
     let shown = QualityReport {
+        rehearsed: false,
         choices: Vec::new(),
         music: None,
         customised: false,
@@ -201,6 +205,7 @@ fn a_held_quality_choice_is_a_validation_result_rather_than_a_failure() {
 #[test]
 fn an_upgrade_that_no_service_started_is_not_a_success() {
     let started = UpgradeReport {
+        rehearsed: false,
         confirmed: true,
         media: vec![UpgradeMedia {
             media_type: "tv".to_owned(),
@@ -214,6 +219,7 @@ fn an_upgrade_that_no_service_started_is_not_a_success() {
         success()
     );
     let refused = UpgradeReport {
+        rehearsed: false,
         confirmed: true,
         media: vec![UpgradeMedia {
             media_type: "tv".to_owned(),
@@ -233,6 +239,7 @@ fn an_upgrade_that_no_service_started_is_not_a_success() {
 /// A removal that would take somebody, as it stands before it is confirmed.
 fn removal(revoked: lemonfiber_core::model::Revoked) -> lemonfiber_core::model::HouseholdRemoval {
     lemonfiber_core::model::HouseholdRemoval {
+        rehearsed: false,
         name: "ana".to_owned(),
         confirmed: !matches!(revoked, Revoked::Nothing),
         requests: 1,

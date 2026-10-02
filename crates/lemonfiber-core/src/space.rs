@@ -159,6 +159,11 @@ pub struct Reckoning {
     pub agreement: String,
     /// What became of an answered cleanup, where the offer was answered.
     pub reclaimed: Option<Reclaimed>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 impl Reckoning {
@@ -213,6 +218,7 @@ pub fn reckon(measured: &Measured) -> Reckoning {
     );
     let level = Level::worst(measured.volumes.iter().map(|volume| volume.level));
     let mut reckoned = Reckoning {
+        rehearsed: false,
         volumes: measured.volumes.clone(),
         halted: level.halts(),
         level,

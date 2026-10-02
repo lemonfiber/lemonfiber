@@ -49,6 +49,7 @@ fn a_name_lemonfiber_does_not_know_is_not_a_category() {
 fn every_outcome_has_a_name_on_the_wire() {
     use crate::model::DoctorReport;
     let report = DoctorReport {
+        rehearsed: false,
         overall: Overall::Broken,
         findings: vec![
             finding(

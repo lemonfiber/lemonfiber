@@ -34,7 +34,7 @@ use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::app::restore::Consent as RestoreConsent;
-use lemonfiber_core::app::{Command, Setting, Waiting};
+use lemonfiber_core::app::{Command, Ctx, Setting, Waiting};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Permitted};
@@ -44,7 +44,7 @@ use crate::refusal::Refusal;
 use crate::router::Serving;
 
 pub use asked::{
-    Arguments, Disturbing, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
+    Arguments, Disturbing, Running, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
     TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
     TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
     TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
@@ -134,6 +134,7 @@ async fn taken(
             return why.answer(why.problem(why.said()).with_detail(rejection.body_text()));
         }
     };
+    let ctx = asked_of(&serving.ctx, given.dry_run.rehearses());
     let command = match named(&action, given) {
         Ok(command) => command,
         Err(why) => return declined(&why),
@@ -146,17 +147,28 @@ async fn taken(
         return Refusal::NotYours.answered();
     };
     match answering(&command) {
-        Answering::Now => carried_out(&serving.ctx, command).await,
+        Answering::Now => carried_out(&ctx, command).await,
         Answering::Later => {
             let Some(job) = Job::mint(serving.ctx.seams.random.as_ref()) else {
                 return unnameable();
             };
-            serving
-                .jobs
-                .start(&job, &action, command, Arc::clone(&serving.ctx))
-                .await;
+            serving.jobs.start(&job, &action, command, ctx).await;
             accepted(&job, &action)
         }
+    }
+}
+
+/// The run an action is carried out in: the surface's own, or a rehearsal of it.
+///
+/// A rehearsal is the same run with one thing changed, so it is a copy of the
+/// surface's context rather than a second one built beside it: every port is shared,
+/// and what the command reports and what it refuses to rehearse is decided by the
+/// core exactly as it is for the command line's `--dry-run`.
+fn asked_of(serving: &Arc<Ctx>, rehearsing: bool) -> Arc<Ctx> {
+    if rehearsing {
+        Arc::new(serving.as_ref().clone().rehearsing())
+    } else {
+        Arc::clone(serving)
     }
 }
 

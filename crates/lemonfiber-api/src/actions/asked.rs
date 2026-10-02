@@ -144,6 +144,46 @@ pub struct Arguments {
     pub exceeded: Option<String>,
     /// How many minutes to lift the limits for, and no longer.
     pub unrestricted_for: Option<u64>,
+    /// Whether to say what the action would do and do none of it.
+    ///
+    /// The command line's `--dry-run`, taken by every action. It is carried on the
+    /// run rather than on the command, so no command gains a field for it: an action
+    /// whose command reports a rehearsal answers with that report, and one whose
+    /// command cannot be rehearsed is refused with the reason the command gives.
+    pub dry_run: Running,
+}
+
+/// Whether an action is carried out, or rehearsed.
+///
+/// A reading of the bare word a request carries, for the reason [`Disturbing`] is
+/// one: `--dry-run` on a command line and `dry_run` in a request body are one word
+/// that is there or is not, and which way round it reads is decided here, once.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(from = "bool")]
+pub enum Running {
+    /// Carried out, which is what an action does unless asked otherwise.
+    #[default]
+    ForReal,
+    /// Rehearsed: what it would do is said, and none of it is done.
+    AsARehearsal,
+}
+
+impl From<bool> for Running {
+    fn from(asked: bool) -> Self {
+        if asked {
+            Self::AsARehearsal
+        } else {
+            Self::ForReal
+        }
+    }
+}
+
+impl Running {
+    /// Whether the run this reaches is a rehearsal.
+    #[must_use]
+    pub const fn rehearses(self) -> bool {
+        matches!(self, Self::AsARehearsal)
+    }
 }
 
 /// Whether a run includes the checks that disturb a running system.

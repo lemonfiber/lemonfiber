@@ -22,6 +22,7 @@ fn aiming(about: &str) -> Acting {
 fn a_quality(disposition: Disposition) -> QualityReport {
     let cost = Preset::Maximum.consequence();
     QualityReport {
+        rehearsed: false,
         choices: vec![PresetChoice {
             scope: "everything".to_owned(),
             preset: Preset::Maximum.label().to_owned(),
@@ -41,6 +42,7 @@ fn a_quality(disposition: Disposition) -> QualityReport {
 /// What an upgrade would cost, having triggered nothing.
 fn an_upgrade() -> UpgradeReport {
     UpgradeReport {
+        rehearsed: false,
         confirmed: false,
         media: vec![UpgradeMedia {
             media_type: "television".to_owned(),
@@ -117,6 +119,7 @@ fn what_an_upgrade_would_cost_is_read_before_it_is_agreed_to() {
     );
 
     acting.came_to(Ok(Outcome::Upgrade(UpgradeReport {
+        rehearsed: false,
         confirmed: true,
         media: an_upgrade().media,
     })));

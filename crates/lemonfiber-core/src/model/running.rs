@@ -121,4 +121,9 @@ pub struct ResetReport {
     pub reverted_connections: Vec<String>,
     /// Whether the reset was carried out, or only previewed pending confirmation.
     pub confirmed: bool,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }

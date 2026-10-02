@@ -52,6 +52,11 @@ pub struct Letting {
     pub agreement: String,
     /// What became of an answered offer, and nothing where the offer is all this is.
     pub gone: Option<Gone>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What became of a download the client was asked to let go.
@@ -70,6 +75,7 @@ pub struct Gone {
 pub fn offering(download: Candidate) -> Letting {
     let agreement = agreement(&download);
     Letting {
+        rehearsed: false,
         download,
         goes: WHAT_GOES.to_owned(),
         agreement,

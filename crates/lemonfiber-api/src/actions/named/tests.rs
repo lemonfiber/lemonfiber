@@ -51,6 +51,7 @@ fn everything(confirm: bool) -> Arguments {
         cap: Some("1TiB".to_owned()),
         exceeded: Some("pause".to_owned()),
         unrestricted_for: Some(37),
+        dry_run: true.into(),
     }
 }
 

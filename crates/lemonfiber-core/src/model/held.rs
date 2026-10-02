@@ -41,4 +41,9 @@ pub struct HeldReport {
     /// sometimes omits is one a reader has to guess about, and an empty list already
     /// says the thing it would say: there is nothing to report about this shelf.
     pub findings: Vec<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }

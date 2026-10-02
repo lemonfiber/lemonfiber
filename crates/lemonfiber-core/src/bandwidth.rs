@@ -316,6 +316,11 @@ pub struct Sharing {
     pub untouched: Vec<&'static str>,
     /// Whether this run wrote the limits to the clients or only read them.
     pub applied: bool,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// Judge what was measured.
@@ -350,6 +355,7 @@ pub fn weigh(measured: &Measured) -> Sharing {
     );
 
     Sharing {
+        rehearsed: false,
         restraint,
         means: restraint.means().to_owned(),
         capacity,

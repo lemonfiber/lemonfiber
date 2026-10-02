@@ -50,6 +50,7 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
     // findings that are no longer here is not a word about these.
     let findings = gating(report.findings);
     let report = DoctorReport {
+        rehearsed: false,
         overall: overall(&findings),
         findings,
     };

@@ -137,6 +137,7 @@ pub async fn supervise(
     );
 
     Ok(SupervisionReport {
+        rehearsed: false,
         forms: forms.to_vec(),
         reason: describe_loss(&loss),
         stopped,
@@ -163,6 +164,7 @@ fn would_watch(
 ) -> Result<SupervisionReport, Box<Problem>> {
     let command = invocation(ctx, forms, &Action::Stop(Vec::new()))?.command;
     Ok(SupervisionReport {
+        rehearsed: false,
         forms: forms.to_vec(),
         reason: NOTHING_WAS_WATCHED.to_owned(),
         stopped: false,

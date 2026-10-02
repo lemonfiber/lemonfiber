@@ -55,4 +55,9 @@ pub struct UpgradeReport {
     pub confirmed: bool,
     /// Per media type: its preset, that preset's cost, and — confirmed — the outcome.
     pub media: Vec<UpgradeMedia>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }

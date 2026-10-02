@@ -202,6 +202,7 @@ fn a_stack_that_declares_no_wiring_says_so_rather_than_showing_an_empty_list() {
 /// One substitution, and what it left behind.
 fn substituting(applied: bool, leaves: Vec<Unfilled>) -> SubstitutionReport {
     SubstitutionReport {
+        rehearsed: false,
         substitution: Substitution {
             capability: "indexer.search".to_owned(),
             was: Some("prowlarr".to_owned()),

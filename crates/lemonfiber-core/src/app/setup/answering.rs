@@ -193,6 +193,7 @@ fn open(saved: Option<&Progress>, paths: &Paths) -> bool {
 fn reported(wizard: &Wizard, paths: &Paths, proof: Option<Validation>) -> WizardReport {
     let saved = super::progress_at(&paths.setup_progress());
     WizardReport {
+        rehearsed: crate::model::Ran::ForReal,
         // Withheld here as well as where the outcome was made, because a validator is a
         // port and whoever supplies one decides what it says. This is first-run setup —
         // the minutes in which the credentials are entered — and what it answers is

@@ -340,6 +340,7 @@ fn what_a_guard_came_to_is_the_whole_of_its_box() {
 
     let mut ended = guarding();
     ended.came_to(Ok(Outcome::Watch(SupervisionReport {
+        rehearsed: false,
         forms: vec!["full".to_owned()],
         reason: "the data location is no longer present".to_owned(),
         stopped: true,

@@ -83,6 +83,11 @@ pub struct Report {
     /// stack update is weighing that, and being shown only which image numbers go up
     /// is being shown the arithmetic rather than the reason.
     pub changelog: crate::changelog::Notes,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What the release carrying this build changed, as every update report says it.
@@ -99,6 +104,7 @@ impl Report {
     #[must_use]
     fn proposed(changes: Vec<Change>, in_flight: Vec<String>, confirmed: bool) -> Self {
         Self {
+            rehearsed: false,
             state: update::state(&changes, &[]),
             changes,
             in_flight,

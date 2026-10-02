@@ -196,6 +196,7 @@ fn an_offer(offered: Vec<Repair>) -> RepairReport {
 /// first of the two can be answered.
 fn a_warning() -> DoctorReport {
     DoctorReport {
+        rehearsed: false,
         overall: Overall::Degraded,
         findings: vec![
             Finding::in_category(

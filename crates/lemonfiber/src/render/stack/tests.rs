@@ -9,6 +9,7 @@ use lemonfiber_core::stack::closure::{Dropped, Filtered, Footprint};
 #[test]
 fn a_reset_names_every_change_it_would_revert() {
     let report = ResetReport {
+        rehearsed: false,
         reverted: vec![StackEdit {
             path: "compose.yml".to_owned(),
             diff: "-yours\n+ours\n".to_owned(),
@@ -29,6 +30,7 @@ fn a_reset_names_every_change_it_would_revert() {
     assert!(reset(&done).text().contains("Reverted 2 change(s)"));
     // Nothing to revert is not an empty list.
     let clean = ResetReport {
+        rehearsed: false,
         reverted: Vec::new(),
         reverted_connections: Vec::new(),
         confirmed: false,

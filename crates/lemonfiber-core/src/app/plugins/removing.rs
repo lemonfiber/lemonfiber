@@ -169,6 +169,7 @@ pub(crate) async fn remove(
 /// The report, which is the listing as it stands plus what this run came to.
 fn answering(installed: Vec<Installed>, removal: Removal) -> crate::plugin::Installs {
     crate::plugin::Installs {
+        rehearsed: false,
         installed,
         install: None,
         removal: Some(removal),

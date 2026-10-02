@@ -168,6 +168,7 @@ fn a_bundle_is_asked_how_much_log_and_what_becomes_of_filenames() {
 /// What a bundle would hold, as the run that writes nothing answers.
 fn a_bundle() -> Bundle {
     Bundle {
+        rehearsed: false,
         contents: Contents::default(),
         bytes: 4096,
         path: None,

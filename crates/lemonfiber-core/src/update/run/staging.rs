@@ -102,6 +102,7 @@ pub(super) async fn apply(
     }
 
     Ok(Report {
+        rehearsed: false,
         state: update::state(&changes, &applied),
         changes,
         in_flight: active,

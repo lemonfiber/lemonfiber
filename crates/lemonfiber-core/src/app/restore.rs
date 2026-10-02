@@ -100,6 +100,11 @@ pub struct Restoration {
     pub would: Preview,
     /// What was put back, or nothing where nothing was.
     pub done: Option<Report>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// Carry out a restore, or say what one would overwrite.
@@ -146,7 +151,11 @@ pub async fn run(
     )
     .await?;
     if !consent.overwrites() {
-        return Ok(Restoration { would, done: None });
+        return Ok(Restoration {
+            would,
+            done: None,
+            rehearsed: false,
+        });
     }
     // Before anything is stopped, let alone overwritten: a yes given for a listing
     // this run no longer offers costs nothing to refuse here, and would cost the
@@ -177,6 +186,7 @@ pub async fn run(
         .map_err(|failure| Box::new(not_repointed(&failure.problem())))?;
     }
     Ok(Restoration {
+        rehearsed: false,
         would,
         done: Some(report),
     })

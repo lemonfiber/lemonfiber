@@ -28,12 +28,17 @@ fn an_argument_is_taken_exactly_where_the_command_it_reaches_carries_it() {
     assert!(wrong.is_empty(), "{wrong:?}");
 }
 
-/// The one field the sweeps leave out, and why.
+/// The two fields the sweeps leave out, and why.
 ///
 /// Every action that takes a name is handed one by `exactly_what`, and the tests that
 /// are about a name are the ones that refuse an action without one. A sweep for it
 /// would be a sweep every action passes.
-const NOT_SWEPT: [&str; 1] = ["name"];
+///
+/// A rehearsal reaches no command at all. Every action takes it and it is carried on
+/// the run the command is dispatched in, so a sweep asking which command carries it
+/// would find none and be wrong to call that a drop; `what_a_rehearsal_answers` holds
+/// what it does instead.
+const NOT_SWEPT: [&str; 2] = ["name", "dry_run"];
 
 /// Where the carrier is declared, read rather than transcribed.
 const CARRIER: &str = "src/actions/asked.rs";

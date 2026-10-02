@@ -25,6 +25,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
         because: "it migrates its state on first start".to_owned(),
     };
     lemonfiber_core::update::run::Report {
+        rehearsed: false,
         state: lemonfiber_core::update::State::Partial,
         applied: vec![lemonfiber_core::update::Applied::ended(
             &change,
@@ -164,6 +165,7 @@ pub(super) fn what_is_wired() -> WiringReport {
 /// replaces, and something it leaves with nothing filling it.
 pub(super) fn a_substitution() -> SubstitutionReport {
     SubstitutionReport {
+        rehearsed: false,
         substitution: Substitution {
             capability: "indexer.search".to_owned(),
             was: Some("prowlarr".to_owned()),
@@ -216,6 +218,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         installed_at: String::new(),
     };
     lemonfiber_core::plugin::Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![one.clone()],
         install: Some(Box::new(lemonfiber_core::plugin::Install {
@@ -340,6 +343,7 @@ pub(super) fn a_removal() -> lemonfiber_core::uninstall::Uninstall {
     };
 
     Uninstall {
+        rehearsed: false,
         manifest: Manifest {
             tier: Tier::Media,
             removes: Tier::Media.removes().to_owned(),
@@ -456,6 +460,7 @@ pub(super) fn a_shared_line() -> lemonfiber_core::bandwidth::Sharing {
 /// answered to the credential just given.
 pub(super) fn a_setup_part_way() -> WizardReport {
     WizardReport {
+        rehearsed: false.into(),
         offered: true,
         phase: lemonfiber_core::wizard::Phase::InProgress,
         at: lemonfiber_core::wizard::Step::Credentials,

@@ -101,12 +101,18 @@ pub struct Stored {
     pub beside: Vec<Beside>,
     /// Whether this run removed any of it.
     pub removal: Removal,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What lemonfiber keeps beneath this layout.
 #[must_use]
 pub fn stored(paths: &Paths, removal: Removal) -> Stored {
     Stored {
+        rehearsed: false,
         roots: kept::roots(paths),
         kept: EVERY.iter().map(|entry| entry.against(paths)).collect(),
         beside: beside(),

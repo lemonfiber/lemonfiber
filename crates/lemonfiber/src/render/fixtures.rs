@@ -186,6 +186,7 @@ pub(super) fn a_term() -> Term {
 /// A watch that ended having stopped its forms.
 pub(super) fn a_watch() -> SupervisionReport {
     SupervisionReport {
+        rehearsed: false,
         forms: vec!["media".to_owned()],
         reason: "the data location went away".to_owned(),
         stopped: true,

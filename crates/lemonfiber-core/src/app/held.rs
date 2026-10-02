@@ -70,6 +70,7 @@ pub(crate) async fn held(ctx: &Ctx, member: &str, most: u32) -> Result<HeldRepor
     };
 
     Ok(HeldReport {
+        rehearsed: false,
         member: whose.name.clone(),
         id: whose.id.clone(),
         holdings,

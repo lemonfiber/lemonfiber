@@ -32,6 +32,10 @@ use crate::walkthrough::{Narrator as Stepwise, Unheard};
 mod moment;
 
 /// Everything a command needs that is not part of the command itself.
+///
+/// Cloned where one request asks for a rehearsal of what another surface runs for
+/// real: the copy shares every port and differs only in what it was asked to do.
+#[derive(Clone)]
 pub struct Ctx {
     /// Whether to report what would happen and change nothing.
     pub dry_run: bool,

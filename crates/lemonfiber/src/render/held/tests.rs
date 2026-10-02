@@ -17,6 +17,7 @@ fn shown(report: &HeldReport) -> String {
 
 fn a_shelf() -> HeldReport {
     HeldReport {
+        rehearsed: false,
         member: "Ada".to_owned(),
         id: "a7f3".to_owned(),
         holdings: vec![

@@ -13,6 +13,7 @@ fn override_of() -> Overriding {
 #[test]
 fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: Vec::new(),
         install: None,
@@ -29,6 +30,7 @@ fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
 #[test]
 fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![recorded("komga", Some(household()))],
         install: None,
@@ -52,6 +54,7 @@ fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
 #[test]
 fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![recorded("komga", Some(household())), recorded("plex", None)],
         install: None,
@@ -74,6 +77,7 @@ fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
 #[test]
 fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![recorded(
             "komga",
@@ -99,6 +103,7 @@ fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
 #[test]
 fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![recorded(
             "komga",
@@ -121,6 +126,7 @@ fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
 fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![one.clone()],
         install: Some(Box::new(install(one, true))),
@@ -146,6 +152,7 @@ fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
 fn the_install_shows_the_container_that_is_written_for_it() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![one.clone()],
         install: Some(Box::new(install(one.clone(), true))),
@@ -174,6 +181,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
     let one = recorded("komga", Some(household()));
     let shown = |recorded: bool| {
         installs(&Installs {
+            rehearsed: false,
             removal: None,
             installed: Vec::new(),
             install: Some(Box::new(install(one.clone(), recorded))),
@@ -198,6 +206,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
 fn a_rehearsal_states_every_change_every_proof_and_every_override() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(Install {
@@ -246,6 +255,7 @@ fn a_rehearsal_states_every_change_every_proof_and_every_override() {
 fn an_install_states_the_same_three_in_the_past_tense() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![one.clone()],
         install: Some(Box::new(Install {
@@ -273,6 +283,7 @@ fn an_install_states_the_same_three_in_the_past_tense() {
 #[test]
 fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(Install {
@@ -326,6 +337,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
         }],
     };
     let said = installs(&Installs {
+        rehearsed: false,
         installed: vec![full, recorded("bare", None)],
         install: None,
         removal: None,
@@ -370,6 +382,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
     )
     .unwrap_or_default();
     let said = installs(&Installs {
+        rehearsed: false,
         installed: vec![one],
         install: None,
         removal: None,
@@ -394,6 +407,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
 fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![one.clone()],
         install: Some(Box::new(install(one, false))),
@@ -416,6 +430,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
     };
     for recorded in [false, true] {
         let said = installs(&Installs {
+            rehearsed: false,
             removal: None,
             installed: Vec::new(),
             install: Some(Box::new(install(one.clone(), recorded))),
@@ -437,6 +452,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
 #[test]
 fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(install(
@@ -458,6 +474,7 @@ fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
 #[test]
 fn the_printer_reaches_this_renderer_for_this_outcome() {
     let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Plugins(Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![recorded("komga", Some(household()))],
         install: None,
@@ -478,6 +495,7 @@ fn a_plugin_from_a_git_source_is_said_with_its_commit() {
         ..recorded("komga", Some(household()))
     };
     let said = installs(&Installs {
+        rehearsed: false,
         removal: None,
         installed: vec![one],
         install: None,
@@ -503,6 +521,7 @@ fn a_source_that_cannot_be_fetched_is_said_to_leave_the_plugin_unupdatable() {
         standing,
     };
     let said = installs(&Installs {
+        rehearsed: false,
         installed: vec![
             recorded("komga", None),
             recorded("kuma", None),

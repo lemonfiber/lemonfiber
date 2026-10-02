@@ -63,6 +63,7 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
         });
     }
     Ok(UpgradeReport {
+        rehearsed: false,
         confirmed: confirm,
         media,
     })

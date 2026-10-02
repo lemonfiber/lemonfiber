@@ -37,6 +37,7 @@ fn only_the_warnings_are_offered_to_be_answered() {
 #[test]
 fn a_diagnosis_warning_about_nothing_is_read_rather_than_offered() {
     let nothing = DoctorReport {
+        rehearsed: false,
         overall: Overall::Healthy,
         findings: Vec::new(),
     };

@@ -175,6 +175,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             rehearsed: false,
         }),
         Outcome::Quality(QualityReport {
+            rehearsed: false,
             choices: vec![preset(false)],
             music: None,
             customised: false,
@@ -182,16 +183,19 @@ fn the_first_of_them() -> Vec<Outcome> {
             disposition: Disposition::Shown,
         }),
         Outcome::Upgrade(UpgradeReport {
+            rehearsed: false,
             confirmed: true,
             media: Vec::new(),
         }),
         Outcome::Music(MusicReport {
+            rehearsed: false,
             choice: music_pick(),
             disposition: Disposition::Recorded,
             outcome: None,
         }),
         Outcome::Trace(a_trace()),
         Outcome::Household(HouseholdReport {
+            rehearsed: false,
             members: Vec::new(),
             available: true,
             findings: Vec::new(),
@@ -200,6 +204,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             allows: None,
         }),
         Outcome::Held(HeldReport {
+            rehearsed: false,
             member: "Ada".to_owned(),
             id: "a7f3".to_owned(),
             holdings: Vec::new(),
@@ -239,12 +244,14 @@ fn the_rest_of_them() -> Vec<Outcome> {
             unsupported: Vec::new(),
         }),
         Outcome::Doctor(DoctorReport {
+            rehearsed: false,
             overall: Overall::Healthy,
             findings: Vec::new(),
         }),
         Outcome::Seed(seed_report(Vec::new())),
         Outcome::Hosting(lemonfiber_core::model::HostingReport::default()),
         Outcome::Reset(ResetReport {
+            rehearsed: false,
             reverted: Vec::new(),
             reverted_connections: Vec::new(),
             confirmed: false,
@@ -264,12 +271,14 @@ fn the_rest_of_them() -> Vec<Outcome> {
         // Nothing gathered, nothing revealed and nothing written: the answer a
         // bare run gives, which is the one with every optional paragraph absent.
         Outcome::Bundle(Bundle {
+            rehearsed: false,
             contents: Contents::default(),
             bytes: 0,
             path: None,
             would_go: None,
         }),
         Outcome::Restore(Restoration {
+            rehearsed: false,
             would: Preview {
                 manifest: an_archive(),
                 downgrade: false,
@@ -299,6 +308,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
         }),
         a_handoff(),
         Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
+            rehearsed: false,
             name: "ana".to_owned(),
             confirmed: false,
             requests: 1,
@@ -343,6 +353,7 @@ fn a_removal() -> lemonfiber_core::uninstall::Uninstall {
     };
 
     Uninstall {
+        rehearsed: false,
         manifest: Manifest {
             tier: Tier::Media,
             removes: Tier::Media.removes().to_owned(),

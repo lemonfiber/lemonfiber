@@ -42,6 +42,7 @@ fn a_restore_that_overwrote_nothing_is_not_reported_as_a_restore() {
     };
     assert_eq!(
         shown(settled(&Outcome::Restore(Restoration {
+            rehearsed: false,
             would: would.clone(),
             done: None,
         }))),
@@ -49,6 +50,7 @@ fn a_restore_that_overwrote_nothing_is_not_reported_as_a_restore() {
     );
     assert_eq!(
         shown(settled(&Outcome::Restore(Restoration {
+            rehearsed: false,
             would,
             done: Some(Restored {
                 scope: Scope::WholeStack,
@@ -80,6 +82,7 @@ fn a_capture_and_a_bundle_succeed_by_having_arrived() {
     );
     assert_eq!(
         shown(settled(&Outcome::Bundle(Bundle {
+            rehearsed: false,
             contents: Contents::default(),
             bytes: 0,
             path: None,
@@ -98,6 +101,7 @@ fn only_an_update_that_stopped_part_way_is_a_failure() {
 
     let moving = |state| {
         shown(settled(&Outcome::Update(Moving {
+            rehearsed: false,
             state,
             changes: Vec::new(),
             in_flight: Vec::new(),
@@ -130,6 +134,7 @@ fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
     use lemonfiber_core::update::State;
 
     let left_down = shown(settled(&Outcome::Update(Moving {
+        rehearsed: false,
         state: State::Updated,
         changes: Vec::new(),
         in_flight: Vec::new(),
@@ -161,6 +166,7 @@ fn a_guard_that_ended_is_a_report_rather_than_a_failure() {
     // It ended because the data location went, which is what it was watching
     // for, and it says whether it got the services stopped.
     let stranded = Outcome::Watch(lemonfiber_core::model::SupervisionReport {
+        rehearsed: false,
         forms: vec!["library".to_owned()],
         reason: "the data location is no longer present".to_owned(),
         stopped: false,
@@ -174,6 +180,7 @@ fn a_removal(
     removal: lemonfiber_core::uninstall::Removal,
 ) -> lemonfiber_core::uninstall::Uninstall {
     lemonfiber_core::uninstall::Uninstall {
+        rehearsed: false,
         manifest: lemonfiber_core::uninstall::Manifest {
             tier: lemonfiber_core::uninstall::Tier::Stop,
             removes: String::new(),
@@ -334,6 +341,7 @@ fn installed(
     reversed: Option<lemonfiber_core::app::putting_back::Reversal>,
 ) -> Outcome {
     Outcome::Plugins(lemonfiber_core::plugin::Installs {
+        rehearsed: false,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(lemonfiber_core::plugin::Install {
@@ -385,6 +393,7 @@ fn an_install_that_was_put_back_exits_as_a_refusal_rather_than_a_report() {
 fn a_removal_that_left_something_standing_exits_as_a_refusal() {
     let taking = |removed: bool, left: Vec<lemonfiber_core::app::putting_back::Left>| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            rehearsed: false,
             installed: Vec::new(),
             install: None,
             removal: Some(lemonfiber_core::plugin::Removal {
@@ -439,6 +448,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
 fn an_update_that_did_not_hold_exits_as_a_refusal() {
     let moving = |recorded: bool, restored: bool| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            rehearsed: false,
             installed: Vec::new(),
             install: None,
             removal: None,
@@ -493,6 +503,7 @@ fn reading_what_is_installed_always_succeeds() {
     assert_eq!(
         shown(settled(&Outcome::Plugins(
             lemonfiber_core::plugin::Installs {
+                rehearsed: false,
                 removal: None,
                 installed: vec![komga()],
                 install: None,
@@ -535,6 +546,7 @@ fn a_listing_with_an_ask_nothing_fills_exits_as_a_configuration_problem() {
 fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out() {
     let made = |applied| {
         Outcome::Substitution(lemonfiber_core::model::SubstitutionReport {
+            rehearsed: false,
             substitution: lemonfiber_core::wiring::Substitution {
                 capability: "indexer.search".to_owned(),
                 was: Some("prowlarr".to_owned()),

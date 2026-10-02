@@ -347,7 +347,15 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // costs. The line above is news from a run nobody saw; this one is about the
     // run the operator is in the middle of asking for.
     disturbance::said(&command, ctx).await;
-    routed(rehearsal::carried(command, ctx), ctx).await
+    routed(rehearsal::carried(command, ctx), ctx)
+        .await
+        .map(|outcome| {
+            if ctx.dry_run {
+                outcome.said_as_a_rehearsal()
+            } else {
+                outcome
+            }
+        })
 }
 
 /// What this product's own vocabulary answers: one word, or all of them.

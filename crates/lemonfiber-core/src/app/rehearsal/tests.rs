@@ -29,6 +29,7 @@ fn a_command_nobody_has_taught_to_rehearse_is_refused_under_its_own_code() {
         named: "invent",
         rehearsal: Rehearsal::Untaught,
         disturbs: None,
+        answers: &[],
     };
 
     // Carried as a `Result` rather than opened with a `let ... else`. The else
@@ -567,4 +568,88 @@ fn every_command_that_carries_both_is_split_on_which_it_is() {
             "{command:?} was read as the wrong half of what it carries"
         );
     }
+}
+
+/// The table, as written, so the kinds it names are read off it rather than off a
+/// list of commands typed out beside it — a command missing from that list would be a
+/// kind this never looked at.
+const TABLE: &str = include_str!("../rehearsal.rs");
+
+/// Every kind the table says a rehearsal is reported under, as it is written on the wire.
+fn reported_under() -> Vec<String> {
+    let mut kinds: Vec<String> = Vec::new();
+    for arm in TABLE.split("reports(\"").skip(1) {
+        let named = arm.split_once("])").map_or("", |(named, _)| named);
+        for mention in named.split("kind::").skip(1) {
+            let ident: String = mention
+                .chars()
+                .take_while(|letter| letter.is_ascii_uppercase() || *letter == '_')
+                .collect();
+            kinds.push(ident.to_ascii_lowercase().replace('_', "-"));
+        }
+    }
+    kinds.sort();
+    kinds.dedup();
+    kinds
+}
+
+/// Every kind a rehearsal can be reported under says, in a field of its own, that it
+/// was one: a surface that asked for a rehearsal is owed an answer it can tell from
+/// the real run without reading the sentences.
+#[test]
+fn every_kind_a_rehearsal_is_reported_under_says_it_was_one() {
+    let reported = reported_under();
+    let known: Vec<&str> = crate::model::kind::ALL
+        .iter()
+        .map(|kind| kind.as_str())
+        .collect();
+    assert!(
+        reported.len() > 20,
+        "the table could not be read: {reported:?}"
+    );
+    for kind in &reported {
+        assert!(
+            known.contains(&kind.as_str()),
+            "the table names no kind `{kind}`"
+        );
+    }
+    // Marked, the outcome sets its own field when the run was a rehearsal, and a
+    // marked payload without the field does not compile — so being on this list is
+    // both halves of saying so.
+    let saying: Vec<&str> = crate::app::outcome::SAID_AS_A_REHEARSAL
+        .iter()
+        .map(|kind| kind.as_str())
+        .collect();
+    let silent: Vec<&String> = reported
+        .iter()
+        .filter(|kind| !saying.contains(&kind.as_str()))
+        .collect();
+    assert!(
+        silent.is_empty(),
+        "these never say a rehearsal was one: {silent:?}"
+    );
+}
+
+/// A command that reports a rehearsal names the kinds it reports under.
+#[test]
+fn every_command_that_reports_names_what_it_reports_under() {
+    for command in reports() {
+        let answer = asked(&command);
+        assert!(
+            !answer.answers.is_empty(),
+            "{} reports under no kind",
+            answer.named
+        );
+    }
+}
+
+/// A rehearsed run's outcome says it was one, and a reading's is left as it was.
+#[test]
+fn an_outcome_is_said_as_a_rehearsal_only_where_one_can_be() {
+    let reset = crate::app::Outcome::Reset(crate::model::ResetReport::default());
+    let said = reset.said_as_a_rehearsal();
+    assert!(matches!(said, crate::app::Outcome::Reset(ref report) if report.rehearsed));
+
+    let read = crate::app::Outcome::Glossary(crate::glossary::vocabulary());
+    assert_eq!(read.clone().said_as_a_rehearsal(), read);
 }

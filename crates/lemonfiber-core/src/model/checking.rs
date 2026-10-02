@@ -15,6 +15,11 @@ pub struct DoctorReport {
     pub overall: crate::doctor::Overall,
     /// Each finding, in the order the checks produced them.
     pub findings: Vec<crate::doctor::Finding>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What a watch saw, once the data root it was guarding was lost.
@@ -36,6 +41,11 @@ pub struct SupervisionReport {
     /// then describe a watch that never began: nothing ended, and nothing was
     /// stopped. Absent on every watch that actually ran.
     pub would: Option<Vigil>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// The watch a run would keep, and what it would do at the end of it.

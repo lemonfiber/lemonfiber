@@ -5,6 +5,7 @@ use super::*;
 /// What a reset would revert, or did.
 fn a_reset(confirmed: bool) -> ResetReport {
     ResetReport {
+        rehearsed: false,
         reverted: vec![StackEdit {
             path: "compose.yaml".to_owned(),
             diff: "-yours\n+ours".to_owned(),
@@ -323,6 +324,7 @@ fn naming_an_archive() -> Acting {
 /// What an archive says about itself before anything is overwritten, moved or not.
 fn a_restoration(relocation: Option<Relocation>) -> Restoration {
     Restoration {
+        rehearsed: false,
         would: Preview {
             manifest: Manifest {
                 schema: SCHEMA,

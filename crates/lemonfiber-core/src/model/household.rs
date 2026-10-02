@@ -234,6 +234,11 @@ pub struct HouseholdReport {
     /// Absent where nothing limits the household, which is not the same as a policy
     /// that could not be read: that one leaves [`Self::policy`] absent too.
     pub allows: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 #[cfg(test)]

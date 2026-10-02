@@ -213,4 +213,9 @@ pub struct HouseholdRemoval {
     pub revoked: Revoked,
     /// What could not be done, and anything else worth the operator's attention.
     pub findings: Vec<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
