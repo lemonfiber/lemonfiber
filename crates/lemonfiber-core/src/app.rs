@@ -238,7 +238,11 @@ async fn diagnosed(
     accept: Option<String>,
 ) -> Result<Outcome, Box<Problem>> {
     let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
-    accepted::acknowledge(ctx, accept.as_deref(), report).map(Outcome::Doctor)
+    let mut report = accepted::acknowledge(ctx, accept.as_deref(), report)?;
+    // Dated after an acceptance is applied, so a warning the operator has just
+    // accepted is not remembered as wrong.
+    report.findings = conditions::dated(ctx, report.findings);
+    Ok(Outcome::Doctor(report))
 }
 
 /// What letting one completed download go costs, and what became of letting it.
@@ -436,6 +440,9 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // definition is not a running command and this exists to tell the two apart.
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
+        // A read that cannot fail: a kind that could not be read is named in the
+        // answer rather than failing the rest.
+        Command::News => Ok(Outcome::News(crate::news::run::news(ctx).await)),
         Command::Companion(asked) => crate::companion::asked(ctx, asked).await,
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Explain { word } => worded(Some(&word)),

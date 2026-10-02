@@ -11,7 +11,7 @@
 //! "it is fine", and a store that forgot a fault because the checker was offline
 //! would be the comfortable falsehood the trust features exist to remove.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,30 @@ pub struct Conditions {
     /// shows what changed rather than what moved.
     #[serde(default)]
     by_check: BTreeMap<String, Condition>,
+    /// The checks this copy has changed since it was read.
+    ///
+    /// Not written down: it is a fact about one copy rather than about the machine.
+    /// It is what lets a write put back only what this copy changed, so a dashboard
+    /// that held the store across a refresh does not overwrite what a diagnosis
+    /// wrote in the meantime — which would make that diagnosis's fault read as new
+    /// the next time it was seen.
+    #[serde(skip)]
+    touched: Touched,
 }
+
+/// Which checks a copy has changed, which no two copies are compared by.
+#[derive(Debug, Clone, Default)]
+struct Touched(BTreeSet<String>);
+
+impl PartialEq for Touched {
+    /// Two stores holding the same conditions are the same store, whatever each copy
+    /// changed on the way.
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for Touched {}
 
 impl Conditions {
     /// An empty store — a machine nothing has ever been wrong on.
@@ -39,6 +62,7 @@ impl Conditions {
     /// A check that could not be run does not call this at all. Passing `None` for
     /// an unrunnable check would clear a fault nobody proved was gone.
     pub fn observe(&mut self, check: &str, wrong: Option<&Fault>, now: &str) {
+        self.touched.0.insert(check.to_owned());
         match (wrong, self.by_check.get_mut(check)) {
             (Some(fault), Some(condition)) => condition.raise(fault, now),
             (Some(fault), None) => {
@@ -88,6 +112,7 @@ impl Conditions {
     /// Record that the operator declined a fix for this, so it stops being
     /// offered until the condition clears and genuinely comes back.
     pub fn decline(&mut self, check: &str) {
+        self.touched.0.insert(check.to_owned());
         if let Some(condition) = self.by_check.get_mut(check) {
             condition.declined = true;
         }
@@ -99,6 +124,7 @@ impl Conditions {
     /// recurrence, which says the problem came back on its own: this one says lemonfiber
     /// was wrong about the cause, and those want different answers.
     pub fn attempted(&mut self, check: &str) {
+        self.touched.0.insert(check.to_owned());
         if let Some(condition) = self.by_check.get_mut(check) {
             condition.attempts = condition.attempts.saturating_add(1);
         }
@@ -109,6 +135,7 @@ impl Conditions {
     /// The fault going away is what earns this rather than the repair having run: a count
     /// cleared on the strength of an attempt would never reach the limit it exists for.
     pub fn mended(&mut self, check: &str) {
+        self.touched.0.insert(check.to_owned());
         if let Some(condition) = self.by_check.get_mut(check) {
             condition.attempts = 0;
         }
@@ -117,7 +144,29 @@ impl Conditions {
     /// Forget a check entirely — what removing the thing it watched over means.
     /// A provider that is gone should not keep reporting that it is unreachable.
     pub fn forget(&mut self, check: &str) {
+        self.touched.0.insert(check.to_owned());
         self.by_check.remove(check);
+    }
+
+    /// What this copy changed, laid over `current`: every check it changed as it has
+    /// it, a check it forgot gone, and every other check as `current` has it.
+    ///
+    /// What a write is made of. Another run may have written the store since this
+    /// copy was read, and a write of the whole copy would put back what that run
+    /// changed as it was before.
+    #[must_use]
+    pub fn over(&self, mut current: Self) -> Self {
+        for check in &self.touched.0 {
+            match self.by_check.get(check) {
+                Some(condition) => {
+                    current.by_check.insert(check.clone(), condition.clone());
+                }
+                None => {
+                    current.by_check.remove(check);
+                }
+            }
+        }
+        current
     }
 
     /// Whether anything has ever been recorded.

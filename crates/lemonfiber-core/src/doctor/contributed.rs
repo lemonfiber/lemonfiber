@@ -270,6 +270,7 @@ impl Contributed {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             origin: self.origin(),
         }
     }

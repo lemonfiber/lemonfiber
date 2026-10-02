@@ -13,6 +13,7 @@ mod removing;
 mod repair;
 mod serving;
 mod setup;
+mod trace;
 
 use std::path::PathBuf;
 
@@ -39,6 +40,7 @@ pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
+pub use trace::RawTrace;
 
 // Re-exported so that `cli::Request` still names it: where the subcommands are
 // written down is this file's business, and moving them would otherwise be a change

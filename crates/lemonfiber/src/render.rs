@@ -30,6 +30,7 @@ pub(crate) mod host;
 mod hosting;
 mod invitation;
 mod migration;
+mod news;
 mod outbound;
 pub(crate) mod plugin;
 mod provenance;
@@ -243,6 +244,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Held(report) => held::held(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
+        Outcome::News(report) => news::news(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
@@ -499,9 +501,8 @@ fn unsettled(settings: &[SettingReport]) -> Lines {
 
 /// What a setting that has never been written reads as on the left of a difference.
 ///
-/// Named rather than blank, because a blank left-hand side reads as a setting whose
-/// value is the empty string — which is a different thing, and one the operator would
-/// act on differently.
+/// Named rather than blank, because a blank left-hand side reads as a setting whose value is the
+/// empty string — which is a different thing, and one the operator would act on differently.
 const UNSET: &str = "(not set)";
 
 /// What became of a proposed change, said in the words that follow from it.
@@ -529,11 +530,10 @@ fn verdict(review: &Review, rehearsed: bool) -> Vec<String> {
 
 /// One log line, as it should reach a terminal.
 ///
-/// A log line is the least trustworthy text this product shows: it is written by
-/// somebody else's container, verbatim, and a container that emits `\x1b[2J` clears
-/// the operator's screen. Everything else rendered here goes through [`Lines::put`]
-/// and is made plain on the way; a stream has no report to build, so it would
-/// otherwise be the one line that skipped it.
+/// A log line is the least trustworthy text this product shows: it is written by somebody else's
+/// container, verbatim, and a container that emits `\x1b[2J` clears the operator's screen.
+/// Everything else rendered here goes through [`Lines::put`] and is made plain on the way; a stream
+/// has no report to build, so it would otherwise be the one line that skipped it.
 ///
 /// The service is made plain before it is padded rather than after, so a container
 /// whose name carries control characters cannot push the column out of true — the

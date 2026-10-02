@@ -151,6 +151,25 @@ fn diagnosing() -> Vec<Outcome> {
                 replaced_by: Some("bindery".to_owned()),
             }],
         }),
+        // One of each kind, with every optional field filled, which is all the shape
+        // comparison reads.
+        Outcome::News(lemonfiber_core::news::News {
+            updates: vec![lemonfiber_core::news::NewsUpdate {
+                version: "0.17.1".to_owned(),
+                delivers: Some("Fixes".to_owned()),
+            }],
+            requests: vec![lemonfiber_core::news::NewsRequest {
+                number: 12,
+                title: Some("Dune".to_owned()),
+                by: "Anna".to_owned(),
+            }],
+            problems: vec![lemonfiber_core::news::NewsProblem {
+                check: "service.sonarr".to_owned(),
+                onset: "1759400000".to_owned(),
+                summary: "Sonarr is stopped".to_owned(),
+            }],
+            unread: vec![lemonfiber_core::news::NewsKind::Requests],
+        }),
         Outcome::Provenance(ProvenanceReport {
             services: vec![ServiceProvenance {
                 id: "sonarr".to_owned(),

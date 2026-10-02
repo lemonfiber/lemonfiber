@@ -6,6 +6,7 @@
 //! words. A second listener costs another subscriber, never another gather.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -34,11 +35,13 @@ const CARRIED: usize = 64;
 /// in a run, something a test wrote in a test — without there being two gathers.
 #[async_trait]
 pub trait Gathers: Send + Sync {
-    /// Gather once.
+    /// Gather once, and answer with what there is to say, in the order to say it.
     ///
-    /// `None` where there is nothing to say, which leaves the stream silent
-    /// rather than saying something it did not gather.
-    async fn gather(&self) -> Option<Rendered>;
+    /// Empty where there is nothing to say, which leaves the stream silent rather
+    /// than saying something it did not gather. `joined` is whether a listener has
+    /// opened since the last gather: a source that says something only when it
+    /// changes owes a listener that has just arrived the current value all the same.
+    async fn gather(&self, joined: bool) -> Vec<Rendered>;
 }
 
 /// What every listener hears, and what a returning one is caught up with.
@@ -49,6 +52,8 @@ pub struct Live {
     backlog: Mutex<Backlog>,
     /// A listener asking for a gather now rather than at the next tick.
     wanted: Notify,
+    /// Whether a listener has opened since the last gather.
+    joined: AtomicBool,
     /// How many times every stream open has been told to end. A listener remembers
     /// the count it opened at and ends when it moves.
     ended: watch::Sender<u64>,
@@ -63,6 +68,7 @@ impl Live {
             said,
             backlog: Mutex::new(Backlog::opening(clock)),
             wanted: Notify::new(),
+            joined: AtomicBool::new(false),
             ended: watch::channel(0).0,
         }
     }
@@ -97,6 +103,7 @@ impl Live {
     pub async fn listening(&self, seen: Option<&str>) -> Listening {
         let backlog = self.backlog.lock().await;
         let said = self.said.subscribe();
+        self.joined.store(true, Ordering::SeqCst);
         Listening {
             missed: backlog.since(seen).into(),
             said,
@@ -126,7 +133,8 @@ impl Live {
 
     /// One gather, said to everyone listening.
     pub async fn refresh(&self, source: &dyn Gathers) {
-        if let Some(said) = source.gather().await {
+        let joined = self.joined.swap(false, Ordering::SeqCst);
+        for said in source.gather(joined).await {
             self.say(said).await;
         }
     }

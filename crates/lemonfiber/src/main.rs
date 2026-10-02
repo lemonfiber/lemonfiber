@@ -289,11 +289,7 @@ async fn main() -> ExitCode {
             translate::Under::Dispatched(command) => command,
             translate::Under::Published(read) => return for_an_author(&read, cli.json).await,
         },
-        Request::Trace {
-            term,
-            season,
-            search,
-        } => traced(&term, season, search),
+        Request::Trace(asked) => traced(&asked.term, asked.season, asked.search),
         // Narrated for minutes and then one report, so the report goes through
         // dispatch and the narration goes wherever the surface is listening. A run
         // whose whole answer is a JSON document must not have prose interleaved
@@ -317,6 +313,7 @@ async fn main() -> ExitCode {
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
+        Request::News => Command::News,
         Request::Companion(asked) => Command::Companion(match asked.action {
             CompanionCommand::Pair => Paired::Pair,
             CompanionCommand::Certificate { confirm } => Paired::Certificate { confirm },

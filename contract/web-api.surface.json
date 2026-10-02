@@ -32,6 +32,8 @@
     "log": "ref:LogLine",
     "migration": "ref:MigrationReport",
     "music": "ref:MusicReport",
+    "news": "ref:Newest",
+    "news-items": "ref:News",
     "outbound": "ref:Leaving",
     "pairing": "ref:Pairing",
     "plugins": "ref:PluginInstalls",
@@ -282,6 +284,12 @@
           "required": false
         },
         "meaning": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "onset": {
           "type": [
             "string"
           ],
@@ -2009,6 +2017,12 @@
             "string"
           ],
           "required": true
+        },
+        "onset": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
         },
         "origin": {
           "type": [
@@ -3935,6 +3949,152 @@
             "anyOf(null,ref:Triggered)"
           ],
           "required": false
+        }
+      },
+      "variants": []
+    },
+    "Newest": {
+      "fields": {
+        "problems": {
+          "type": [
+            "array[ref:NewsCheck]"
+          ],
+          "required": true
+        },
+        "requests": {
+          "type": [
+            "array[integer/int64]"
+          ],
+          "required": true
+        },
+        "unread": {
+          "type": [
+            "array[ref:NewsKind]"
+          ],
+          "required": true
+        },
+        "updates": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "News": {
+      "fields": {
+        "problems": {
+          "type": [
+            "array[ref:NewsProblem]"
+          ],
+          "required": true
+        },
+        "requests": {
+          "type": [
+            "array[ref:NewsRequest]"
+          ],
+          "required": true
+        },
+        "unread": {
+          "type": [
+            "array[ref:NewsKind]"
+          ],
+          "required": true
+        },
+        "updates": {
+          "type": [
+            "array[ref:NewsUpdate]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "NewsCheck": {
+      "fields": {
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "onset": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "NewsKind": {
+      "fields": {},
+      "variants": [
+        "\"problems\"",
+        "\"requests\"",
+        "\"updates\""
+      ]
+    },
+    "NewsProblem": {
+      "fields": {
+        "check": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "onset": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "summary": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "NewsRequest": {
+      "fields": {
+        "by": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "number": {
+          "type": [
+            "integer/int64"
+          ],
+          "required": true
+        },
+        "title": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "NewsUpdate": {
+      "fields": {
+        "delivers": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "version": {
+          "type": [
+            "string"
+          ],
+          "required": true
         }
       },
       "variants": []

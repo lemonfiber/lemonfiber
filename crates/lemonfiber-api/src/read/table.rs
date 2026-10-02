@@ -91,6 +91,9 @@ pub const HOSTING: &str = "/api/hosting";
 /// The one address to hand somebody who lives here.
 pub const FRONT_DOOR: &str = "/api/front-door";
 
+/// What a surface can mark as new, newest first within each kind.
+pub const NEWS: &str = "/api/news";
+
 /// Where one item is, followed by the words a person would name it with.
 pub const TRACE: &str = "/api/trace";
 
@@ -240,6 +243,7 @@ pub const OFFERED: &[&str] = &[
     HELD,
     HOSTING,
     FRONT_DOOR,
+    NEWS,
     TRACE,
     STUCK,
     CONFIG,
@@ -345,6 +349,10 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         // answer from another.
         HOSTING => Ok(Command::Hosting(Keeping::Read)),
         FRONT_DOOR => Ok(Command::FrontDoor),
+        // Nothing asked of it, because what is new is decided by whoever reads it: the
+        // stack answers with everything it orders, and a parameter here would be a way
+        // for one surface to be told less than another.
+        NEWS => Ok(Command::News),
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),
         CONFIG => setting(key),

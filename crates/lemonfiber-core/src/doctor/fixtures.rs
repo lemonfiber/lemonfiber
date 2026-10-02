@@ -20,6 +20,7 @@ pub(super) fn finding(title: &str, verdict: Verdict) -> Finding {
         service_name: None,
         caused_by: None,
         said: None,
+        onset: None,
         verdict,
         origin: crate::origin::Origin::Bundled,
     }

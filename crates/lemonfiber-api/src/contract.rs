@@ -64,6 +64,7 @@ use crate::admission::admitted::Admitted;
 use crate::jobs::started::Started;
 use crate::refusal::Refusal;
 use lemonfiber_core::logs::Line as LogLine;
+use lemonfiber_core::news::Newest;
 use lemonfiber_core::walkthrough::Line;
 
 pub use path::CONTRACT_PATH;
@@ -146,6 +147,7 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, kind::JOB, schema_for!(Envelope<Started>));
     describing(kinds, kind::LOG, schema_for!(Envelope<LogLine>));
+    describing(kinds, kind::NEWS, schema_for!(Envelope<Newest>));
     describing(kinds, kind::PULL, schema_for!(Envelope<String>));
     describing(kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
     describing(kinds, kind::START, schema_for!(Envelope<String>));

@@ -44,6 +44,12 @@ pub struct Summary {
 pub struct Affected {
     /// The check that raised it.
     pub check: String,
+    /// When the stack first saw it wrong since it last saw it right, in whole
+    /// seconds since the epoch.
+    ///
+    /// The condition's own stamp, kept between runs, so every surface that reports
+    /// the check names the same moment and a restart does not make an old fault new.
+    pub onset: String,
     /// How bad it is.
     pub severity: Severity,
     /// What is wrong, in one line.
@@ -78,6 +84,24 @@ impl Summary {
     /// than of symptoms.
     #[must_use]
     pub fn of(reach: Reach, known: &[&Condition], now: &str) -> Self {
+        let affected = Self::affected(known, now);
+        let worst = affected.first().map(|first| first.severity);
+        let standing = Self::standing(reach, worst);
+        Self {
+            standing,
+            wanting_attention: affected.len(),
+            worst: affected.first().map(|first| first.summary.clone()),
+            affected,
+        }
+    }
+
+    /// Everything that is wrong, worst first, as the summary expands to it.
+    ///
+    /// Apart from [`Self::of`] because what is wrong does not turn on how far the
+    /// stack got, and a reader that wants only the items — what is new among them,
+    /// say — should not have to claim a reach it never read.
+    #[must_use]
+    pub fn affected(known: &[&Condition], now: &str) -> Vec<Affected> {
         let steady: Vec<&&Condition> = known
             .iter()
             .filter(|condition| Self::counts(condition, now))
@@ -94,6 +118,7 @@ impl Summary {
             .filter(|condition| !Self::is_folded(condition, &roots, &steady))
             .map(|condition| Affected {
                 check: condition.check.clone(),
+                onset: condition.since.clone(),
                 severity: condition.severity,
                 summary: condition.summary.clone(),
                 meaning: condition.meaning.clone(),
@@ -105,15 +130,7 @@ impl Summary {
         // Worst first, and stably, so two things equally wrong keep the order the
         // checks raised them in rather than an arbitrary one that moves each refresh.
         affected.sort_by_key(|item| Reverse(item.severity));
-
-        let worst = affected.first().map(|first| first.severity);
-        let standing = Self::standing(reach, worst);
-        Self {
-            standing,
-            wanting_attention: affected.len(),
-            worst: affected.first().map(|first| first.summary.clone()),
-            affected,
-        }
+        affected
     }
 
     /// Whether a condition still counts towards the summary.

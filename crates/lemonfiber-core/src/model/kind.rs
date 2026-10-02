@@ -109,6 +109,10 @@ kinds! {
     MIGRATION = "migration",
     /// The music format chosen, and what became of applying it.
     MUSIC = "music",
+    /// The newest few of each kind a surface can mark as new, by what names them.
+    NEWS = "news",
+    /// Every item a surface can mark as new, newest first within each kind.
+    NEWS_ITEMS = "news-items",
     /// Everything that leaves this machine, and what the stack's own services reach.
     OUTBOUND = "outbound",
     /// What a phone is handed to pair with this stack.

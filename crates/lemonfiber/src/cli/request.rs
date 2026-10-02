@@ -16,7 +16,7 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawRemoving, RawSetup, RawUi, UpdateCommand,
+    RawDoctor, RawRemoving, RawSetup, RawTrace, RawUi, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -208,18 +208,7 @@ pub enum Request {
     /// Something monitored that has never been grabbed stopped for one of two reasons,
     /// and nothing on this machine can tell them apart: the indexers carry nothing for
     /// it, or they carry releases the quality you chose rejects. `--search` asks them.
-    Trace {
-        /// The show or film to follow, named as you would say it.
-        #[arg(required = true)]
-        term: Vec<String>,
-        /// Narrow to one season, instead of every season of the show.
-        #[arg(long)]
-        season: Option<u32>,
-        /// Ask the indexers what they carry, to tell "nothing at your quality" from
-        /// "nothing at all". Spends one real search against their daily allowance.
-        #[arg(long)]
-        search: bool,
-    },
+    Trace(RawTrace),
     /// Show who is in the household, what each may watch and ask for, and what each
     /// asked for.
     ///
@@ -309,6 +298,12 @@ pub enum Request {
     /// stack runs nothing anybody could begin at — that there is no address to send
     /// rather than naming the nearest thing that would open.
     FrontDoor,
+    /// List lemonfiber's releases, what the household has asked for, and the checks
+    /// found wrong, each newest first.
+    ///
+    /// Each carries what names it, so a screen that remembers the newest it has shown
+    /// can mark what came after. The stack keeps nothing of what anybody has seen.
+    News,
     /// Say what each service in this stack is for, and what became of any it dropped.
     ///
     /// Twenty names convey nothing on their own. This gives each of them a sentence

@@ -13,6 +13,7 @@ fn a_failing_finding() -> Finding {
         service_name: None,
         caused_by: None,
         said: None,
+        onset: None,
         verdict: Verdict::Fail(a_problem()),
         origin: lemonfiber_core::origin::Origin::Bundled,
     }
@@ -123,6 +124,7 @@ fn every_verdict_reads_with_its_own_mark() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Pass {
                 note: Some("plenty of room".to_owned()),
             },
@@ -136,6 +138,7 @@ fn every_verdict_reads_with_its_own_mark() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Pass { note: None },
             origin: lemonfiber_core::origin::Origin::Bundled,
         },
@@ -147,6 +150,7 @@ fn every_verdict_reads_with_its_own_mark() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Warn(a_problem()),
             origin: lemonfiber_core::origin::Origin::Bundled,
         },
@@ -158,6 +162,7 @@ fn every_verdict_reads_with_its_own_mark() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Fail(a_problem()),
             origin: lemonfiber_core::origin::Origin::Bundled,
         },
@@ -169,6 +174,7 @@ fn every_verdict_reads_with_its_own_mark() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Unverified {
                 reason: "nothing answered".to_owned(),
                 remedy: Remedy::new("start it").with_detail("compose up"),
@@ -183,6 +189,7 @@ fn every_verdict_reads_with_its_own_mark() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Skipped {
                 reason: "not applicable".to_owned(),
             },
@@ -217,6 +224,7 @@ fn an_unverified_finding_without_detail_still_carries_its_remedy() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Unverified {
                 reason: "nothing answered".to_owned(),
                 remedy: Remedy::new("start it"),
@@ -268,6 +276,7 @@ fn an_answered_choice_stops_leading_without_disappearing() {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             verdict: Verdict::Warn(a_problem().in_state(State::Suppressed)),
             origin: lemonfiber_core::origin::Origin::Bundled,
         }],

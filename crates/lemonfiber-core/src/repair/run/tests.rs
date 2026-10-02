@@ -1,6 +1,6 @@
 use super::proving::{judged, proved};
-use super::remembering::wrong;
 use super::{beyond, putting_right, reversing, Beyond, Consent, NOWHERE_TO_LOOK};
+use crate::app::conditions::wrong;
 use crate::app::fixtures::ctx_at;
 use crate::condition::{Conditions, Fault};
 use crate::doctor::{Category, Finding, Verdict};

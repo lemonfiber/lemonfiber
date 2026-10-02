@@ -46,9 +46,11 @@ struct Counting(AtomicUsize);
 
 #[async_trait]
 impl Gathers for Counting {
-    async fn gather(&self) -> Option<Rendered> {
+    async fn gather(&self, _joined: bool) -> Vec<Rendered> {
         let at = self.0.fetch_add(1, Ordering::SeqCst);
         Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, at))
+            .into_iter()
+            .collect()
     }
 }
 
@@ -58,8 +60,8 @@ struct Mute;
 
 #[async_trait]
 impl Gathers for Mute {
-    async fn gather(&self) -> Option<Rendered> {
-        None
+    async fn gather(&self, _joined: bool) -> Vec<Rendered> {
+        Vec::new()
     }
 }
 
@@ -380,6 +382,56 @@ async fn the_stream_is_fed_by_the_gather_that_answers_the_dashboard() {
     assert!(heard.contains(r#""telemetry":"#), "{heard}");
     assert!(heard.contains(r#""health":"#), "{heard}");
     assert!(listening.next().await.is_some(), "and the one after it");
+}
+
+/// The name an event goes by on the wire, or nothing where it is a beat.
+fn named(said: &str) -> Option<&str> {
+    said.lines().find_map(|line| line.strip_prefix("event: "))
+}
+
+/// What is new is said to a listener when it arrives, and to everyone when it
+/// changes, and not on every tick: a phone marks a tab from it, and an unchanged mark
+/// is nothing to wake it for.
+#[tokio::test]
+async fn what_is_new_is_said_to_a_listener_arriving_and_not_on_every_tick() {
+    let live = Live::opening(Stopped::at(0).as_ref());
+    let dashboard = Dashboard::against(Arc::new(nowhere()));
+
+    let mut first = live.listening(None).await;
+    live.refresh(&dashboard).await;
+    live.refresh(&dashboard).await;
+    let mut second = live.listening(None).await;
+    live.refresh(&dashboard).await;
+
+    let mut heard_first = Vec::new();
+    for _ in 0..5 {
+        heard_first.push(first.next().await.unwrap_or_default());
+    }
+    let mut heard_second = Vec::new();
+    for _ in 0..2 {
+        heard_second.push(second.next().await.unwrap_or_default());
+    }
+
+    let names: Vec<Option<&str>> = heard_first.iter().map(|said| named(said)).collect();
+    assert_eq!(
+        names,
+        vec![
+            Some("dashboard"),
+            Some("news"),
+            Some("dashboard"),
+            Some("dashboard"),
+            Some("news"),
+        ]
+    );
+    let names: Vec<Option<&str>> = heard_second.iter().map(|said| named(said)).collect();
+    assert_eq!(names, vec![Some("dashboard"), Some("news")]);
+    assert!(
+        heard_second
+            .last()
+            .is_some_and(|said| said.contains(r#""kind":"news""#)
+                && said.contains(r#""unread":["requests"]"#)),
+        "the newest of each kind by what names them: {heard_second:?}"
+    );
 }
 
 /// A wait says what it is waiting for, and a browser hears it.
