@@ -5,7 +5,10 @@ use lemonfiber_fixtures::ports::Renamed;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::FixedRandom;
 
-use super::{answers_to, certificate, comparable, encrypted, paired, replacing, served, Material};
+use super::{
+    answers_to, certificate, comparable, encrypted, no_address, no_certificate, not_served,
+    nowhere, paired, replacing, served, unnamed, Material,
+};
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
@@ -374,4 +377,31 @@ fn a_fingerprint_is_compared_in_four_groups_of_four() {
         comparable("5adc06f2b08ee084fa1134edd9afda47c36b6441b1d0ea3d6b1a7401ffe63aea"),
         "WJC8-PK8N-WX3E-8T6S"
     );
+}
+
+/// A refusal of pairing is shown by the web interface and the companion as well as at the
+/// machine, so none of its words is a command of one surface.
+#[test]
+fn a_refusal_of_pairing_names_no_command() {
+    for (which, refusal) in [
+        ("nowhere", nowhere()),
+        ("not served", not_served()),
+        ("no certificate", no_certificate("it could not be read")),
+        ("no address", no_address()),
+        ("unnamed", unnamed("it could not be written")),
+    ] {
+        let said: Vec<&str> = [refusal.summary.as_str(), refusal.meaning.as_str()]
+            .into_iter()
+            .chain(refusal.remedies.iter().flat_map(|remedy| {
+                std::iter::once(remedy.action.as_str()).chain(remedy.detail.as_deref())
+            }))
+            .chain(refusal.detail.as_deref())
+            .collect();
+
+        let marked = ["`", "--", "<"]
+            .into_iter()
+            .find(|mark| said.iter().any(|words| words.contains(mark)));
+
+        assert!(marked.is_none(), "the {which} refusal names a command");
+    }
 }

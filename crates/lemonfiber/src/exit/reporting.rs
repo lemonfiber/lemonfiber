@@ -9,9 +9,10 @@ use std::process::ExitCode;
 
 use crate::render::Lines;
 use crate::say::complain;
-use lemonfiber_core::error::codes::life::ALREADY_WORKING;
+use lemonfiber_core::error::codes::{handoff, life, pair};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::PRODUCT;
 
 use super::exit_code;
 
@@ -82,16 +83,26 @@ pub(crate) fn reported(problem: &Problem, parsed: bool) -> Lines {
     lines
 }
 
-/// What only this surface can add to a failure: a way round it that is one of its own flags.
+/// What only this surface can add to a failure: the command or flag that takes its remedy.
 ///
-/// The core words a failure so that every surface can show it, so a flag of this
-/// program is never in its remedy or its detail. Where the way round a refusal is
-/// such a flag, it is said here, beside the remedy, and nowhere else. A claim on
-/// the stack held by a run that is gone is the one so far: waiting is the remedy
-/// every surface offers, and taking the stack is this one's.
-fn on_the_command_line(problem: &Problem) -> Option<&'static str> {
-    (problem.code == ALREADY_WORKING)
-        .then_some("If you are sure that run is gone, `--force` takes the stack from it.")
+/// The core words a failure so that every surface can show it, so a command or flag
+/// of this program is never in its remedy or its detail. Where the way to take a
+/// remedy is one of them, it is said here, beside the remedy, and nowhere else.
+fn on_the_command_line(problem: &Problem) -> Option<String> {
+    let said = match problem.code {
+        life::ALREADY_WORKING => {
+            "If you are sure that run is gone, `--force` takes the stack from it.".to_owned()
+        }
+        handoff::NOBODY_NAMED => format!("For example: `{PRODUCT} household handoff ana`."),
+        handoff::NOT_SET_UP => format!("`{PRODUCT} setup` makes and records it."),
+        pair::NOT_SERVED => format!("`{PRODUCT} ui --lan --tls --port <port>` serves it so."),
+        pair::NO_CERTIFICATE => format!("`{PRODUCT} companion certificate --confirm` replaces it."),
+        pair::NO_ADDRESS => {
+            format!("`{PRODUCT} config set HOUSEHOLD_HOST <address>` records it.")
+        }
+        _ => return None,
+    };
+    Some(said)
 }
 
 /// The same failure, for something that will parse it.
