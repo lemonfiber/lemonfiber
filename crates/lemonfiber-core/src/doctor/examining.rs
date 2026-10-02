@@ -146,6 +146,7 @@ fn timed_out(check: &dyn Check) -> Finding {
         service_name: None,
         caused_by: None,
         said: None,
+        onset: None,
         title: "Check timed out".to_owned(),
         verdict: Verdict::Unverified {
             reason: format!("did not finish within {seconds} seconds"),

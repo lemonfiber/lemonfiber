@@ -93,6 +93,7 @@ pub mod outbound;
 pub mod platform;
 pub use crate::error::plural;
 pub mod network;
+pub mod news;
 pub mod plugin;
 pub mod prerequisites;
 pub mod provider;

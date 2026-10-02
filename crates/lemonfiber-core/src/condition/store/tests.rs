@@ -167,3 +167,34 @@ fn the_store_round_trips_through_its_serialised_form() {
         Some(Conditions::new())
     );
 }
+
+#[test]
+fn a_copy_lays_only_what_it_changed_over_the_store_as_it_stands() {
+    let read = stalled();
+    let mut copy = read.clone();
+    copy.observe("queue.stalled", None, "2000");
+    copy.forget("never.there");
+
+    let mut meanwhile = read;
+    meanwhile.observe(
+        "storage.space",
+        Some(&wrong(Severity::Error, "the volume is full")),
+        "1500",
+    );
+    let written = copy.over(meanwhile);
+
+    assert!(written
+        .get("queue.stalled")
+        .is_some_and(|condition| condition.cleared.as_deref() == Some("2000")));
+    assert!(written
+        .get("storage.space")
+        .is_some_and(|condition| condition.since == "1500"));
+}
+
+#[test]
+fn a_check_a_copy_forgot_is_gone_from_what_it_writes() {
+    let mut copy = stalled();
+    copy.forget("queue.stalled");
+
+    assert!(copy.over(stalled()).get("queue.stalled").is_none());
+}

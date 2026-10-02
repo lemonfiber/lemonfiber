@@ -384,3 +384,34 @@ fn an_affected_item_carries_the_exit_code_beside_its_summary() {
         .collect();
     assert_eq!(carried, vec![("sonarr stopped with an error", Some(137))]);
 }
+
+#[test]
+fn an_affected_item_carries_when_its_check_went_wrong() {
+    // The condition's own stamp, so the summary and the doctor name one moment for
+    // one check, and a later run does not make an old fault look new.
+    let mut stopped = wrong("service.sonarr", Severity::Error, "Sonarr is stopped");
+    stopped.clear("2000");
+    stopped.raise(
+        &Fault::new(
+            "service.sonarr",
+            Severity::Error,
+            "Sonarr is stopped",
+            "nothing that needs it is working",
+            "look at it",
+        ),
+        "3000",
+    );
+    let standing = wrong("vpn.egress", Severity::Error, "the tunnel is down");
+
+    let summary = Summary::of(Reach::Running, &[&stopped, &standing], SETTLED);
+    let onsets: Vec<(&str, &str)> = summary
+        .affected
+        .iter()
+        .map(|item| (item.check.as_str(), item.onset.as_str()))
+        .collect();
+
+    assert_eq!(
+        onsets,
+        vec![("service.sonarr", "3000"), ("vpn.egress", RAISED)]
+    );
+}

@@ -153,6 +153,26 @@ async fn the_one_address_for_the_household_is_answered_under_its_own_kind() {
     );
 }
 
+#[tokio::test]
+async fn what_is_new_is_the_envelope_the_command_renders() {
+    // The read a phone marks its tabs from: the same document `lemonfiber news --json`
+    // prints, each kind newest first, and a kind that could not be read named as such.
+    let expected = as_the_command_renders_it(&world(running(), stack()), Command::News).await;
+
+    assert!(expected.is_some(), "the command answered");
+    assert_eq!(
+        asked(world(running(), stack()), table::NEWS).await,
+        expected.map(|body| (StatusCode::OK, body))
+    );
+    let seen = asked(world(running(), stack()), table::NEWS).await;
+    assert!(
+        seen.is_some_and(|(status, body)| status == StatusCode::OK
+            && body.starts_with(r#"{"api_version":1,"kind":"news-items","data":{"updates":["#)
+            && body.contains(r#""problems":[]"#)),
+        "what is new is answered in the news-items envelope"
+    );
+}
+
 /// The survey a migration opens with, reachable without asking for anything to change.
 #[tokio::test]
 async fn what_is_already_here_is_answered_under_its_own_kind() {

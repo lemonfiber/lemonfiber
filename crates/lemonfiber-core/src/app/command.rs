@@ -57,13 +57,11 @@ pub enum Command {
     },
     /// Bring back what this machine was running, because it has just restarted.
     ///
-    /// Apart from [`Command::Up`] because almost nothing about it is the same
-    /// request: which forms it starts is the record's answer rather than the
-    /// caller's, it declines where the operator stopped the stack on purpose or the
-    /// machine is on its battery, it waits for an engine that is still starting, and
-    /// it reports what it found to a condition store rather than to somebody
-    /// watching. What it shares with `Up` is the start in the middle, which it runs
-    /// by calling it.
+    /// Apart from [`Command::Up`] because almost nothing about it is the same request: which forms
+    /// it starts is the record's answer rather than the caller's, it declines where the operator
+    /// stopped the stack on purpose or the machine is on its battery, it waits for an engine that
+    /// is still starting, and it reports what it found to a condition store rather than to somebody
+    /// watching. What it shares with `Up` is the start in the middle, which it runs by calling it.
     AtBoot,
     /// Start named services, leaving the rest of the form where it is.
     ///
@@ -269,6 +267,9 @@ pub enum Command {
     /// Name the one address to hand somebody who lives here, and say where it stands —
     /// including that there is none, where this stack runs nothing they could begin at.
     FrontDoor,
+    /// List the releases in this build's record, what the household has asked for, and
+    /// the checks found wrong, each newest first, for a surface to mark what is new.
+    News,
     /// Pair a phone with this stack, or replace the certificate a paired phone pins.
     Companion(crate::companion::Asked),
     /// Say what one of this product's words means, at length.
@@ -463,13 +464,11 @@ pub enum Command {
     },
     /// Say what this machine keeps running for lemonfiber, or change it.
     ///
-    /// The short command that decides what happens to the long ones. Asked
-    /// nothing it reports what stands between each of them and this machine —
-    /// installed or not, running or not, and what to do where this is a platform
-    /// lemonfiber configures nothing on. Asked to install one, it hands the
-    /// operating system's own service manager the command that would otherwise
-    /// have needed a terminal held open; asked to remove it, it takes back
-    /// everything installing made.
+    /// The short command that decides what happens to the long ones. Asked nothing it reports what
+    /// stands between each of them and this machine — installed or not, running or not, and what to
+    /// do where this is a platform lemonfiber configures nothing on. Asked to install one, it hands
+    /// the operating system's own service manager the command that would otherwise have needed a
+    /// terminal held open; asked to remove it, it takes back everything installing made.
     ///
     /// Never reached from anywhere else. Installation is an act of its own,
     /// because something that starts at every login is not a thing to acquire as
@@ -542,9 +541,8 @@ pub enum Command {
     /// Walk first-run setup: read where it stands, answer one question, move
     /// between them, or apply what has been answered.
     ///
-    /// One step per command rather than the whole conversation, because a surface
-    /// that cannot hold a conversation must still be able to have one — and the
-    /// answers gathered so far live in the resumable progress file between them,
-    /// which is where a terminal run keeps them too.
+    /// One step per command rather than the whole conversation, because a surface that cannot hold
+    /// a conversation must still be able to have one — and the answers gathered so far live in the
+    /// resumable progress file between them, which is where a terminal run keeps them too.
     Setup(SetupAction),
 }

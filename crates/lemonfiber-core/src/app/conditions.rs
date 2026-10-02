@@ -15,7 +15,8 @@
 //! costs the next run its history and nothing else. Neither is worth failing a
 //! command over.
 
-use crate::condition::Conditions;
+use crate::condition::{Conditions, Fault};
+use crate::doctor::{Finding, Verdict};
 
 use super::Ctx;
 
@@ -30,12 +31,83 @@ pub fn load(ctx: &Ctx) -> Conditions {
     super::record::kept(path(ctx).as_deref())
 }
 
-/// Write the store where the next run will read it.
+/// Write what this run changed in the store where the next run will read it.
+///
+/// Laid over the store as it stands rather than written whole, so a run that held
+/// the store for a while leaves what another run wrote meanwhile as it found it.
 pub fn save(ctx: &Ctx, conditions: &Conditions) {
     // Best effort on the way out, unlike the records an operator decided: a
     // refresh that could not write its history is one the next refresh starts
     // afresh from, which is a worse picture rather than a wrong claim.
-    let _ = super::record::keep(path(ctx).as_deref(), conditions);
+    let _ = super::record::keep(path(ctx).as_deref(), &conditions.over(load(ctx)));
+}
+
+/// Fold what this run found into the store, and answer with it.
+///
+/// A diagnosis and a repair both fold through here: the same folding the dashboard
+/// does for services, for the same reason. How long a fault has stood, whether it
+/// flaps, whether a fix was declined and how often one has failed are all comparisons
+/// against previous runs, and none of them can be made by a store that has never heard
+/// of the check.
+pub(crate) fn remembered(ctx: &Ctx, found: &[Finding]) -> Conditions {
+    let mut conditions = load(ctx);
+    let now = ctx.stamp();
+    for finding in found {
+        conditions.observe(&finding.check, wrong(finding).as_ref(), &now);
+    }
+    // Written down only by a run that is really happening. What this file holds is how
+    // often a fault has been seen and how often a fix for it was tried and left it
+    // standing, which is how the offer decides what is worth offering again — and a
+    // rehearsal that recorded a sighting would move that count without anybody having
+    // asked it to. The reading above still happens, because the report a rehearsal
+    // gives is built from it.
+    if !ctx.dry_run {
+        save(ctx, &conditions);
+    }
+    conditions
+}
+
+/// What a finding is remembered as, where it says something is wrong.
+///
+/// A pass says nothing is wrong and a skip says there was nothing to look at, so neither
+/// raises anything. Unverified is the careful one: it means the check could not be
+/// established, which is not the same as finding it broken — claiming a fault from it would
+/// have lemonfiber remember trouble it never actually saw.
+pub(crate) fn wrong(finding: &Finding) -> Option<Fault> {
+    let problem = match &finding.verdict {
+        Verdict::Warn(problem) | Verdict::Fail(problem) => problem,
+        Verdict::Pass { .. } | Verdict::Skipped { .. } | Verdict::Unverified { .. } => return None,
+    };
+    Some(Fault::new(
+        problem.code.as_str(),
+        problem.severity,
+        &problem.summary,
+        &problem.meaning,
+        problem
+            .remedies
+            .first()
+            .map_or("", |remedy| remedy.action.as_str()),
+    ))
+}
+
+/// Every finding, the ones in trouble carrying when the stack first saw them so.
+///
+/// Remembered first, so a fault this run is the first to see is dated by this run and
+/// the next one reads the same moment back. The onset is the condition's own stamp
+/// rather than the time of the run, because what an operator asks of a finding is how
+/// long it has been wrong, and the health summary names the same moment for it.
+#[must_use]
+pub(crate) fn dated(ctx: &Ctx, found: Vec<Finding>) -> Vec<Finding> {
+    let conditions = remembered(ctx, &found);
+    found
+        .into_iter()
+        .map(|finding| {
+            let onset = wrong(&finding)
+                .and(conditions.get(&finding.check))
+                .map(|condition| condition.since.clone());
+            Finding { onset, ..finding }
+        })
+        .collect()
 }
 
 /// Where the store is kept: beside the environment file, or nowhere on a machine

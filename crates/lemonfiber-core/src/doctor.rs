@@ -213,6 +213,15 @@ pub struct Finding {
     /// things.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub said: Option<String>,
+    /// When the stack first saw this check wrong since it last saw it right, in whole
+    /// seconds since the epoch.
+    ///
+    /// Set after the run from the store of conditions, like [`Self::said`], so it is
+    /// the moment the health summary names for the same check and a restart does not
+    /// move it. Absent where the finding says nothing is wrong, and where the checks
+    /// ran for something other than a diagnosis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onset: Option<String>,
     /// Whose check this is: one this build ships, or one a named plugin contributed.
     ///
     /// Carried rather than read off the identifier. A contributed check's id is
@@ -237,6 +246,7 @@ impl Finding {
             service_name: None,
             caused_by: None,
             said: None,
+            onset: None,
             origin: crate::origin::Origin::Bundled,
         }
     }

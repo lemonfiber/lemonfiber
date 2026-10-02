@@ -10,58 +10,12 @@
 use super::attempts;
 use super::attempts::Entry;
 use crate::app::{conditions, Ctx};
-use crate::condition::{Condition, Fault};
-use crate::doctor::{Finding, Verdict};
+use crate::condition::Condition;
 use crate::repair::{self, Outcome, Repair};
 
+pub(super) use crate::app::conditions::remembered;
+
 use super::Beyond;
-
-/// Fold what this run found into the store, and answer with it.
-///
-/// The same folding the dashboard does for services, for the same reason: how long a fault
-/// has stood, whether it flaps, whether a fix was declined and how often one has failed are
-/// all comparisons against previous runs, and none of them can be made by a store that has
-/// never heard of the check.
-pub(super) fn remembered(ctx: &Ctx, found: &[Finding]) -> crate::condition::Conditions {
-    let mut conditions = conditions::load(ctx);
-    let now = ctx.stamp();
-    for finding in found {
-        conditions.observe(&finding.check, wrong(finding).as_ref(), &now);
-    }
-    // Written down only by a run that is really happening. What this file holds is how
-    // often a fault has been seen and how often a fix for it was tried and left it
-    // standing, which is how the offer decides what is worth offering again — and a
-    // rehearsal that recorded a sighting would move that count without anybody having
-    // asked it to. The reading above still happens, because the report a rehearsal
-    // gives is built from it.
-    if !ctx.dry_run {
-        conditions::save(ctx, &conditions);
-    }
-    conditions
-}
-
-/// What a finding is remembered as, where it says something is wrong.
-///
-/// A pass says nothing is wrong and a skip says there was nothing to look at, so neither
-/// raises anything. Unverified is the careful one: it means the check could not be
-/// established, which is not the same as finding it broken — claiming a fault from it would
-/// have lemonfiber remember trouble it never actually saw.
-pub(super) fn wrong(finding: &Finding) -> Option<Fault> {
-    let problem = match &finding.verdict {
-        Verdict::Warn(problem) | Verdict::Fail(problem) => problem,
-        Verdict::Pass { .. } | Verdict::Skipped { .. } | Verdict::Unverified { .. } => return None,
-    };
-    Some(Fault::new(
-        problem.code.as_str(),
-        problem.severity,
-        &problem.summary,
-        &problem.meaning,
-        problem
-            .remedies
-            .first()
-            .map_or("", |remedy| remedy.action.as_str()),
-    ))
-}
 
 /// The faults a repair could answer and has stopped being offered for.
 ///
@@ -123,6 +77,3 @@ pub(super) fn recorded(ctx: &Ctx, repair: &Repair, outcome: &Outcome) {
     });
     attempts::save(ctx, &history);
 }
-
-#[cfg(test)]
-mod tests;

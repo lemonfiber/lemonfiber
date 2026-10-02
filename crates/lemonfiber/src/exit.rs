@@ -213,6 +213,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // arrived, whatever it says stands.
         | Outcome::Hosting(_)
         | Outcome::FrontDoor(_)
+        // A kind that could not be read is named in the answer, which still arrived.
+        | Outcome::News(_)
         | Outcome::Stuck(_)
         | Outcome::Status(_)
         | Outcome::Word(_)

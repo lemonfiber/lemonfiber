@@ -233,6 +233,7 @@ fn reads() -> Vec<Command> {
         Command::Status { forms: Vec::new() },
         Command::Stuck,
         Command::FrontDoor,
+        Command::News,
         Command::Explain {
             word: "seeding".to_owned(),
         },

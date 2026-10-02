@@ -28,4 +28,4 @@ mod summary;
 pub use observed::{observed, Egress};
 pub use reach::Reach;
 pub use standing::Standing;
-pub use summary::Summary;
+pub use summary::{Affected, Summary};

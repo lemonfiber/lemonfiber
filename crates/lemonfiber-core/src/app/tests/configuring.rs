@@ -45,6 +45,7 @@ fn settings_of(
             | Outcome::Household(_)
             | Outcome::Held(_)
             | Outcome::FrontDoor(_)
+            | Outcome::News(_)
             | Outcome::Stuck(_)
             | Outcome::Word(_)
             | Outcome::Glossary(_)
