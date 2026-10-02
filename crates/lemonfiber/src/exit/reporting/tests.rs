@@ -1,5 +1,7 @@
 use super::reported;
+use lemonfiber_core::error::codes::handoff::{NOBODY_NAMED, NOT_SET_UP};
 use lemonfiber_core::error::codes::life::ALREADY_WORKING;
+use lemonfiber_core::error::codes::pair::{NOT_SERVED, NO_ADDRESS, NO_CERTIFICATE};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 
 /// A failure carries text this product did not write, and a terminal is not a
@@ -108,4 +110,62 @@ fn a_stack_held_by_another_run_is_told_the_flag_that_takes_it() {
         !reported(&other, false).text().contains("--force"),
         "only a held stack is told about the flag"
     );
+}
+
+/// A hand-off refused for a blank name, or for a machine never set up, is worded for
+/// every surface by the core. The command line adds the command that takes the remedy.
+#[test]
+fn a_refused_hand_off_is_told_the_command_that_takes_its_remedy() {
+    let blank = Problem::new(
+        NOBODY_NAMED,
+        Severity::Error,
+        "a hand-off needs somebody to be for",
+        "The name is the account their device signs in to.",
+        Remedy::new("Give the name they sign in as"),
+    );
+    let unset = Problem::new(
+        NOT_SET_UP,
+        Severity::Error,
+        "the media server's own account has not been set up yet",
+        "This machine has not recorded one.",
+        Remedy::new("Run setup so the media server's account is made and recorded"),
+    );
+
+    let blank = reported(&blank, false).text();
+    let unset = reported(&unset, false).text();
+
+    assert!(
+        blank.contains("`lemonfiber household handoff ana`"),
+        "{blank}"
+    );
+    assert!(unset.contains("`lemonfiber setup`"), "{unset}");
+}
+
+/// Pairing is refused in words every surface can show, and the command line adds the
+/// command that takes each remedy.
+#[test]
+fn a_refused_pairing_is_told_the_command_that_takes_its_remedy() {
+    for (code, command) in [
+        (NOT_SERVED, "`lemonfiber ui --lan --tls --port <port>`"),
+        (
+            NO_CERTIFICATE,
+            "`lemonfiber companion certificate --confirm`",
+        ),
+        (
+            NO_ADDRESS,
+            "`lemonfiber config set HOUSEHOLD_HOST <address>`",
+        ),
+    ] {
+        let refused = Problem::new(
+            code,
+            Severity::Error,
+            "a phone has nothing to reach",
+            "Pairing needs it.",
+            Remedy::new("Put it right"),
+        );
+
+        let said = reported(&refused, false).text();
+
+        assert!(said.contains(command), "{said}");
+    }
 }

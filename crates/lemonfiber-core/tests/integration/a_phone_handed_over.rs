@@ -102,6 +102,8 @@ struct Ran {
     handoff: Option<Handoff>,
     /// The code it refused with, where it refused.
     refusal: Option<String>,
+    /// Every word of the refusal, where it refused: what is said and what to do about it.
+    refused_in: Vec<String>,
     /// Everything that went to the media server.
     sent: Vec<Request>,
 }
@@ -127,7 +129,22 @@ async fn ran(ctx: &Ctx, name: &str, http: &Fake) -> Ran {
             Some(Outcome::Handoff(handoff)) => Some(handoff.clone()),
             _ => None,
         },
-        refusal: said.err().map(|problem| problem.code.as_str().to_owned()),
+        refusal: said
+            .as_ref()
+            .err()
+            .map(|problem| problem.code.as_str().to_owned()),
+        refused_in: said.err().map_or_else(Vec::new, |problem| {
+            [problem.summary, problem.meaning]
+                .into_iter()
+                .chain(
+                    problem
+                        .remedies
+                        .into_iter()
+                        .flat_map(|remedy| std::iter::once(remedy.action).chain(remedy.detail)),
+                )
+                .chain(problem.detail)
+                .collect()
+        }),
         sent: http.requests(),
     }
 }
@@ -144,7 +161,6 @@ fn gone(env: &Path) {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(Path::new("/")));
 }
 
-/// Whether anything but a sign-in or a read went to the media server.
 /// Whether anything the hand-off says tells somebody to run a command, which only one
 /// surface could carry out.
 fn names_a_command(handoff: &Handoff) -> bool {
@@ -152,9 +168,21 @@ fn names_a_command(handoff: &Handoff) -> bool {
         .reason
         .iter()
         .chain(&handoff.steps)
-        .any(|said| said.contains('`') || said.contains("un this"))
+        .any(|said| commands(said))
 }
 
+/// Whether a refusal tells somebody to run a command, which only one surface could carry out.
+fn refuses_with_a_command(ran: &Ran) -> bool {
+    ran.refused_in.iter().any(|said| commands(said))
+}
+
+/// Whether `said` names a command of the terminal: quoted, asked to be run again, or
+/// standing alone as one, the way a remedy's detail would hold it.
+fn commands(said: &str) -> bool {
+    said.contains('`') || said.contains("un this") || said.starts_with("lemonfiber ")
+}
+
+/// Whether anything but a sign-in or a read went to the media server.
 fn wrote(sent: &[Request]) -> bool {
     sent.iter().any(|request| {
         request.method != Method::Get && !request.url.contains("/Users/AuthenticateByName")
@@ -506,6 +534,7 @@ async fn the_administrator_is_not_handed_over() {
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-4"));
+    assert!(!refuses_with_a_command(&ran));
 }
 
 /// A hand-off for nobody is refused before anything is asked.
@@ -516,6 +545,7 @@ async fn a_hand_off_for_nobody_is_refused() {
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-1"));
+    assert!(!refuses_with_a_command(&ran));
     assert!(ran.sent.is_empty());
 }
 
@@ -529,6 +559,7 @@ async fn nothing_recorded_is_refused_as_not_set_up() {
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-3"));
+    assert!(!refuses_with_a_command(&ran));
 }
 
 /// A hand-off over `stack`, with everything else answering.
@@ -554,6 +585,7 @@ async fn a_stack_with_no_media_server_hands_nothing_over() {
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-2"));
+    assert!(!refuses_with_a_command(&ran));
     assert!(ran.sent.is_empty());
 }
 

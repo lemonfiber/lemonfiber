@@ -297,8 +297,7 @@ fn not_served() -> Problem {
         "A phone refuses an address that presents no certificate, and reaches this machine \
          from the network rather than from here. The material names the port the surface \
          was last served on in that way, and it has not been.",
-        Remedy::new("Serve the web interface encrypted and on your network, on a port that stays the same")
-            .with_detail(format!("{PRODUCT} ui --lan --tls --port <port>")),
+        Remedy::new("Serve the web interface encrypted and on your network, on a port that stays the same"),
     )
     .in_state(State::Guided)
 }
@@ -313,8 +312,7 @@ fn no_certificate(why: &str) -> Problem {
             "A phone pins the certificate the surface presents, and {why}. It is not made \
              again on its own, because a new one is one every paired phone refuses."
         ),
-        Remedy::new("Replace it, knowing every paired phone will need pairing again")
-            .with_detail(format!("{PRODUCT} companion certificate --confirm")),
+        Remedy::new("Replace it, knowing every paired phone will need pairing again"),
     )
 }
 
@@ -326,8 +324,7 @@ fn no_address() -> Problem {
         "this machine has no address a phone could reach it at",
         "Pairing material names the address a phone reaches, and this machine answers to no \
          name on the network and has none written down.",
-        Remedy::new("Record the address your household reaches this machine at")
-            .with_detail(format!("{PRODUCT} config set HOUSEHOLD_HOST <address>")),
+        Remedy::new("Record the address your household reaches this machine at"),
     )
 }
 

@@ -327,8 +327,7 @@ fn nobody_named() -> Problem {
         Severity::Error,
         "a hand-off needs somebody to be for",
         "The name is the account their device signs in to, so a blank one leads nowhere",
-        Remedy::new("Give the name they sign in as")
-            .with_detail("lemonfiber household handoff ana"),
+        Remedy::new("Give the name they sign in as"),
     )
 }
 
@@ -351,8 +350,7 @@ fn not_set_up() -> Problem {
         "the media server's own account has not been set up yet",
         "Finding somebody's account and the devices signed in to it is done as the \
          administrator, and this machine has not recorded one",
-        Remedy::new("Run setup so the media server's account is made and recorded")
-            .with_detail("lemonfiber setup"),
+        Remedy::new("Run setup so the media server's account is made and recorded"),
     )
 }
 
