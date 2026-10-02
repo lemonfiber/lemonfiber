@@ -32,6 +32,7 @@ fn every_quality_disposition_says_what_became_of_the_choice() {
         (Disposition::Shown, true, "no longer authoritative"),
     ] {
         let report = QualityReport {
+            rehearsed: false,
             choices: vec![preset(false)],
             music: Some(music_pick()),
             customised,
@@ -43,6 +44,7 @@ fn every_quality_disposition_says_what_became_of_the_choice() {
     }
     // Shown with an untouched config says nothing extra.
     let plain = QualityReport {
+        rehearsed: false,
         choices: vec![preset(false)],
         music: None,
         customised: false,
@@ -57,6 +59,7 @@ fn every_quality_disposition_says_what_became_of_the_choice() {
 fn a_reapply_that_replaced_an_edit_shows_which_lines_went() {
     for disposition in [Disposition::Reapplied, Disposition::WouldReapply] {
         let report = QualityReport {
+            rehearsed: false,
             choices: vec![preset(false)],
             music: None,
             customised: true,
@@ -78,6 +81,7 @@ fn a_reapply_that_replaced_an_edit_shows_which_lines_went() {
 #[test]
 fn a_reapply_with_nothing_to_replace_shows_no_lines() {
     let report = QualityReport {
+        rehearsed: false,
         choices: vec![preset(false)],
         music: None,
         customised: false,
@@ -101,6 +105,7 @@ fn the_music_choice_reports_what_became_of_applying_it() {
         ),
     ] {
         let report = MusicReport {
+            rehearsed: false,
             choice: music_pick(),
             disposition: Disposition::Recorded,
             outcome,
@@ -109,6 +114,7 @@ fn the_music_choice_reports_what_became_of_applying_it() {
     }
     // A rehearsal stops at "would save" and never claims it applied anything.
     let rehearsed = MusicReport {
+        rehearsed: false,
         choice: music_pick(),
         disposition: Disposition::Rehearsed,
         outcome: None,
@@ -127,6 +133,7 @@ fn an_upgrade_states_its_cost_before_it_is_confirmed() {
         outcome: None,
     }];
     let unconfirmed = UpgradeReport {
+        rehearsed: false,
         confirmed: false,
         media: media.clone(),
     };
@@ -135,6 +142,7 @@ fn an_upgrade_states_its_cost_before_it_is_confirmed() {
     assert!(text.contains("Nothing has been changed."));
     // Nothing to upgrade is said plainly rather than shown as an empty list.
     let nothing = UpgradeReport {
+        rehearsed: false,
         confirmed: false,
         media: Vec::new(),
     };
@@ -154,6 +162,7 @@ fn a_confirmed_upgrade_reports_each_services_answer() {
         ),
     ] {
         let report = UpgradeReport {
+            rehearsed: false,
             confirmed: true,
             media: vec![UpgradeMedia {
                 media_type: "tv".to_owned(),

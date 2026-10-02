@@ -128,6 +128,10 @@
                 "null"
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "stance": {
               "description": "Where the act stands.",
               "$ref": "#/$defs/Stance"
@@ -143,7 +147,8 @@
           "required": [
             "stance",
             "upgrades",
-            "back_up"
+            "back_up",
+            "rehearsed"
           ]
         },
         "CarryingReport": {
@@ -1213,6 +1218,10 @@
                 }
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "respite": {
               "description": "The override, where one is running or has just run out.",
               "$ref": "#/$defs/RespiteStanding"
@@ -1267,7 +1276,8 @@
             "respite",
             "clients",
             "untouched",
-            "applied"
+            "applied",
+            "rehearsed"
           ]
         },
         "Source": {
@@ -1359,6 +1369,10 @@
                 "null"
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "stance": {
               "description": "Where the act stands.",
               "$ref": "#/$defs/Stance"
@@ -1373,7 +1387,8 @@
           },
           "required": [
             "ports",
-            "stance"
+            "stance",
+            "rehearsed"
           ]
         },
         "MovedReport": {
@@ -1487,6 +1502,10 @@
                 "null"
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "would_go": {
               "description": "Where it would be written, on the run that only describes one.\n\nThe other half of what a description is for. What goes in the file and how\nlarge it is answer *whether* to make it; where it lands answers *where to find\nit*, and an operator deciding at a shell needs both at the one moment the\nanswer can still change what they do. Resolved by the same function the run\nthat writes resolves it with, so the path shown and the path written are one.\n\nAbsent on a run that wrote one — `path` is then where it went — and absent on a\nmachine that would not say where lemonfiber keeps its own files, which is the\none destination of the three that needs that answer.",
               "type": [
@@ -1497,7 +1516,8 @@
           },
           "required": [
             "contents",
-            "bytes"
+            "bytes",
+            "rehearsed"
           ]
         },
         "Contents": {
@@ -1809,6 +1829,10 @@
                 "null"
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "replaced": {
               "description": "Whether it was replaced. Unconfirmed, it is not, and what replacing it costs is\nwhat is said.",
               "type": "boolean"
@@ -1816,7 +1840,8 @@
           },
           "required": [
             "replaced",
-            "consequence"
+            "consequence",
+            "rehearsed"
           ]
         }
       }
@@ -2844,6 +2869,10 @@
               "description": "What keeping them in files does and does not protect against.",
               "$ref": "#/$defs/Protection"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "revealed": {
               "description": "One value, where one was asked for.",
               "anyOf": [
@@ -2869,7 +2898,8 @@
           },
           "required": [
             "held",
-            "protection"
+            "protection",
+            "rehearsed"
           ]
         },
         "Origin": {
@@ -4051,12 +4081,17 @@
                   "type": "null"
                 }
               ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "members",
             "available",
-            "findings"
+            "findings",
+            "rehearsed"
           ]
         },
         "MemberAccess": {
@@ -5378,11 +5413,16 @@
             "overall": {
               "description": "What the findings amount to, as one word.",
               "$ref": "#/$defs/Overall"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "overall",
-            "findings"
+            "findings",
+            "rehearsed"
           ]
         },
         "DoctorVerdict": {
@@ -6909,6 +6949,10 @@
             "member": {
               "description": "The member this was asked for, by the name they are known by.",
               "type": "string"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -6916,7 +6960,8 @@
             "id",
             "holdings",
             "available",
-            "findings"
+            "findings",
+            "rehearsed"
           ]
         },
         "Medium": {
@@ -7273,11 +7318,16 @@
             "manager": {
               "description": "The service manager this platform has, or the absence of one.",
               "$ref": "#/$defs/Manager"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "manager",
-            "commands"
+            "commands",
+            "rehearsed"
           ]
         },
         "Manager": {
@@ -7529,12 +7579,17 @@
                   "type": "null"
                 }
               ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "members",
             "available",
-            "findings"
+            "findings",
+            "rehearsed"
           ]
         },
         "MemberAccess": {
@@ -7990,6 +8045,10 @@
                 "null"
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "stance": {
               "description": "Where the act stands.",
               "$ref": "#/$defs/Stance"
@@ -8006,7 +8065,8 @@
             "carried",
             "would_carry",
             "not_carried",
-            "stance"
+            "stance",
+            "rehearsed"
           ]
         },
         "RecordReport": {
@@ -9484,11 +9544,16 @@
                   "type": "null"
                 }
               ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "choice",
-            "disposition"
+            "disposition",
+            "rehearsed"
           ]
         },
         "Triggered": {
@@ -11461,6 +11526,10 @@
                 "$ref": "#/$defs/PluginInstalled"
               }
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "removal": {
               "description": "What this run's removal came to, or nothing where it removed nothing.\n\nBeside the install rather than in place of it, and never both at once: an\ninstall and a removal are two verbs with two accounts, and a field that held\nwhichever happened would make a reader ask which one this was before they could\nread it.",
               "anyOf": [
@@ -11501,7 +11570,8 @@
             }
           },
           "required": [
-            "installed"
+            "installed",
+            "rehearsed"
           ]
         },
         "PluginOverriding": {
@@ -13008,12 +13078,17 @@
                   "type": "null"
                 }
               ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "choices",
             "customised",
-            "disposition"
+            "disposition",
+            "rehearsed"
           ]
         },
         "StackEdit": {
@@ -13093,6 +13168,10 @@
               "description": "The name their account is held under, as the media server spells it rather than\nas the operator typed it.",
               "type": "string"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "requests": {
               "description": "How many of their requests go with them.\n\n**They are destroyed, not reassigned.** The request service removes them by hand\nso that a title still waiting goes back to being unrequested rather than pointing\nat nobody — so this is a count of things that will stop existing.",
               "type": "integer",
@@ -13110,7 +13189,8 @@
             "requests",
             "asks-through-the-request-service",
             "revoked",
-            "findings"
+            "findings",
+            "rehearsed"
           ]
         },
         "Revoked": {
@@ -13376,6 +13456,10 @@
               "items": {
                 "$ref": "#/$defs/Repair"
               }
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -13383,7 +13467,8 @@
             "agreement",
             "mended",
             "beyond",
-            "acted"
+            "acted",
+            "rehearsed"
           ]
         }
       }
@@ -13426,6 +13511,10 @@
           "description": "What standing in place of a setup already here came to, or would come to.",
           "type": "object",
           "properties": {
+            "agreement": {
+              "description": "What this offer names itself: the project and every service it would stop.\n\nThe answer to it is this name, and nothing else is a yes to a replacement. Empty\nwhere there is nothing to stand in place of, because there is nothing to agree to.",
+              "type": "string"
+            },
             "project": {
               "description": "The project that would be stood in place of.",
               "type": [
@@ -13439,6 +13528,10 @@
                 "string",
                 "null"
               ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             },
             "stance": {
               "description": "Where the act stands.",
@@ -13468,9 +13561,11 @@
           },
           "required": [
             "would_stop",
+            "agreement",
             "stopped",
             "still_running",
-            "stance"
+            "stance",
+            "rehearsed"
           ]
         },
         "Stance": {
@@ -13542,6 +13637,10 @@
               "description": "Whether the reset was carried out, or only previewed pending confirmation.",
               "type": "boolean"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "reverted": {
               "description": "The operator's edits that were reverted — or, unconfirmed, that a reset would\nrevert — each with the diff of what is lost against what lemonfiber restores.",
               "type": "array",
@@ -13560,7 +13659,8 @@
           "required": [
             "reverted",
             "reverted_connections",
-            "confirmed"
+            "confirmed",
+            "rehearsed"
           ]
         },
         "StackEdit": {
@@ -13750,13 +13850,18 @@
                 }
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "would": {
               "description": "What the archive holds and what restoring it would come to, read before\nanything was touched.",
               "$ref": "#/$defs/Preview"
             }
           },
           "required": [
-            "would"
+            "would",
+            "rehearsed"
           ]
         },
         "RestoreReport": {
@@ -14847,6 +14952,10 @@
                 }
               ]
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "volumes": {
               "description": "The volumes watched. Either filling stops the stack, so both are reported\nwhether or not they are the same drive.",
               "type": "array",
@@ -14864,7 +14973,8 @@
             "candidates",
             "outsized",
             "interrupted",
-            "agreement"
+            "agreement",
+            "rehearsed"
           ]
         },
         "Reclaim": {
@@ -15929,12 +16039,17 @@
                   "type": "null"
                 }
               ]
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "download",
             "goes",
-            "agreement"
+            "agreement",
+            "rehearsed"
           ]
         },
         "SeedingStanding": {
@@ -16088,6 +16203,10 @@
                 "$ref": "#/$defs/Kept"
               }
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "removal": {
               "description": "Whether this run removed any of it.",
               "$ref": "#/$defs/StoredRemoval"
@@ -16104,7 +16223,8 @@
             "roots",
             "kept",
             "beside",
-            "removal"
+            "removal",
+            "rehearsed"
           ]
         },
         "StoredBeside": {
@@ -16454,6 +16574,10 @@
               "description": "Whether it was written, or only worked out.\n\nA run that only says what it would do writes nothing and reports the same\nanswer, so the two are told apart here rather than by the caller remembering\nwhich flags it passed.",
               "type": "boolean"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "substitution": {
               "description": "The change itself, and what it would leave with nothing filling it.",
               "$ref": "#/$defs/Substitution"
@@ -16461,7 +16585,8 @@
           },
           "required": [
             "substitution",
-            "applied"
+            "applied",
+            "rehearsed"
           ]
         },
         "Unfilled": {
@@ -17349,6 +17474,10 @@
               "description": "What removing would come to, or what it came to.",
               "$ref": "#/$defs/UninstallManifest"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "removal": {
               "description": "Whether anything was removed on this run.",
               "$ref": "#/$defs/UninstallRemoval"
@@ -17356,7 +17485,8 @@
           },
           "required": [
             "manifest",
-            "removal"
+            "removal",
+            "rehearsed"
           ]
         },
         "UninstallConfidence": {
@@ -17996,6 +18126,10 @@
                 "type": "string"
               }
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "stack_edits": {
               "description": "Stack files the operator had edited, left as they set them rather than\noverwritten with this build's own, each with the change that was held back.",
               "type": "array",
@@ -18015,7 +18149,8 @@
             "confirmed",
             "stack_edits",
             "applied",
-            "changelog"
+            "changelog",
+            "rehearsed"
           ]
         },
         "UpdateApplied": {
@@ -18279,11 +18414,16 @@
               "items": {
                 "$ref": "#/$defs/UpgradeMedia"
               }
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
             }
           },
           "required": [
             "confirmed",
-            "media"
+            "media",
+            "rehearsed"
           ]
         }
       }
@@ -19062,6 +19202,10 @@
               "description": "Why the watch ended: the data root vanished, or a different volume took\nits place — or, on a run that only said what a watch would do, that nothing\nwas watched at all.",
               "type": "string"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "type": "boolean"
+            },
             "stopped": {
               "description": "Whether stopping the services succeeded.",
               "type": "boolean"
@@ -19081,7 +19225,8 @@
           "required": [
             "forms",
             "reason",
-            "stopped"
+            "stopped",
+            "rehearsed"
           ]
         },
         "Vigil": {
@@ -19582,6 +19727,10 @@
             }
           ]
         },
+        "Ran": {
+          "description": "Whether a walk through setup was carried out or rehearsed, written as the bare\n`true` or `false` every other report writes its `rehearsed` as.\n\nTwo words rather than a fourth switch on a report that already holds three, which\nis a report somebody reads by remembering which `true` means what. On the wire it\nis the same boolean every report carries, so a client reads one shape.",
+          "type": "boolean"
+        },
         "SettingReport": {
           "description": "One setting, as it is safe to show.",
           "type": "object",
@@ -19862,6 +20011,10 @@
               "description": "Whether every applicable question is answered, so the plan can be applied.",
               "type": "boolean"
             },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+              "$ref": "#/$defs/Ran"
+            },
             "unanswered": {
               "description": "Every question that applies on this machine and has no answer yet, in the\norder they are put.",
               "type": "array",
@@ -19885,7 +20038,8 @@
             "unanswered",
             "ready_for_review",
             "plan",
-            "written"
+            "written",
+            "rehearsed"
           ]
         },
         "WizardStep": {
@@ -20129,6 +20283,16 @@
       "status": 404,
       "description": "Raised where a path under the endpoints is one no endpoint answers."
     },
+    "GONE-2": {
+      "name": "ANOTHER_READING",
+      "status": 400,
+      "description": "Raised when an agreement names a reading of this machine that is not the one standing now."
+    },
+    "MIGRATE-1": {
+      "name": "OFFER_MOVED",
+      "status": 400,
+      "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
+    },
     "READ-1": {
       "name": "UNWANTED",
       "status": 400,
@@ -20204,6 +20368,16 @@
       "status": 400,
       "description": "Raised where how many holdings to answer with is not a whole number."
     },
+    "REPAIR-1": {
+      "name": "STALE",
+      "status": 400,
+      "description": "Raised when consent was given for an offer that no longer stands."
+    },
+    "RESTORE-11": {
+      "name": "MOVED_ON",
+      "status": 400,
+      "description": "Raised when consent was given for a listing that no longer stands."
+    },
     "SERVE-6": {
       "name": "UNRENDERABLE",
       "status": 500,
@@ -20213,6 +20387,11 @@
       "name": "NO_JOB_NAME",
       "status": 500,
       "description": "Raised when this machine will not supply the randomness a job is named with."
+    },
+    "SPACE-6": {
+      "name": "ANOTHER_OFFER",
+      "status": 400,
+      "description": "Raised when an agreement names an offer that is not the one standing now."
     }
   }
 }

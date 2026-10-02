@@ -253,9 +253,15 @@ async fn consent_given_for_an_offer_that_has_moved_on_is_refused() {
     let refused = putting_right(&ctx_at("repair-stale"), &consent, false)
         .await
         .err()
-        .map(|problem| problem.code);
+        .map(|problem| (problem.code, problem.amiss));
 
-    assert_eq!(refused, Some(crate::error::codes::repair::STALE));
+    assert_eq!(
+        refused,
+        Some((
+            crate::error::codes::repair::STALE,
+            crate::agreement::MOVED_AMISS
+        ))
+    );
 }
 
 /// A run that cannot say where lemonfiber keeps its own files has nothing to

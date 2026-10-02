@@ -230,6 +230,7 @@ fn removing_somebody_earns_success_only_where_both_accounts_went() {
 #[test]
 fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
     let pending = ResetReport {
+        rehearsed: false,
         reverted: vec![StackEdit {
             path: "compose.yml".to_owned(),
             diff: String::new(),
@@ -242,6 +243,7 @@ fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
         success()
     );
     let nothing = ResetReport {
+        rehearsed: false,
         reverted: Vec::new(),
         reverted_connections: Vec::new(),
         confirmed: false,
@@ -299,6 +301,7 @@ fn a_music_choice_still_recorded_is_a_success_however_the_service_answered() {
     };
     for outcome in [None, Some(Triggered::Started), Some(Triggered::NotStarted)] {
         let report = MusicReport {
+            rehearsed: false,
             choice: choice.clone(),
             disposition: Disposition::Recorded,
             outcome,
@@ -359,6 +362,7 @@ fn an_upgrade_nobody_confirmed_and_one_nothing_answered_are_both_unfinished() {
     };
     // Stated but not done.
     let unconfirmed = UpgradeReport {
+        rehearsed: false,
         confirmed: false,
         media: vec![media(None)],
     };
@@ -368,6 +372,7 @@ fn an_upgrade_nobody_confirmed_and_one_nothing_answered_are_both_unfinished() {
     );
     // Confirmed, but no service was up to start anything.
     let silent = UpgradeReport {
+        rehearsed: false,
         confirmed: true,
         media: vec![media(Some(Triggered::NotStarted))],
     };
@@ -380,6 +385,7 @@ fn an_upgrade_nobody_confirmed_and_one_nothing_answered_are_both_unfinished() {
 #[test]
 fn a_music_choice_is_recorded_even_where_the_service_refused_it() {
     let refused = MusicReport {
+        rehearsed: false,
         choice: MusicChoice {
             scope: "music".to_owned(),
             format: "FLAC".to_owned(),

@@ -285,6 +285,7 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 /// The report: the listing as the record stands, and this run's one account.
 fn answering(installed: Vec<Installed>, update: Update) -> Installs {
     Installs {
+        rehearsed: false,
         installed,
         install: None,
         removal: None,

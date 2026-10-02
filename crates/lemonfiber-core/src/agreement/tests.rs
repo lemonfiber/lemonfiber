@@ -30,3 +30,29 @@ fn a_boundary_that_moved_names_something_else() {
 fn nothing_read_still_names_itself() {
     assert_eq!(over(&[]).len(), 8);
 }
+
+/// Every code an answer that named what has moved is refused with is one of its own,
+/// and none is listed twice, so the list a client is given is the set it branches on.
+#[test]
+fn every_moved_offer_code_is_listed_once() {
+    let listed: std::collections::BTreeSet<&str> =
+        super::MOVED.iter().map(|code| code.as_str()).collect();
+    assert_eq!(listed.len(), super::MOVED.len(), "{listed:?}");
+}
+
+/// A refusal raised as an answer that named what has moved lies in how it asked, so
+/// it is answered as one a caller corrects rather than as a failure of the machine.
+#[test]
+fn a_moved_offer_lies_in_how_it_was_asked() {
+    use crate::error::{Amiss, Problem, Remedy, Severity};
+
+    let raised = super::moved(Problem::new(
+        crate::error::codes::repair::STALE,
+        Severity::Warning,
+        "moved",
+        "moved",
+        Remedy::new("read again"),
+    ));
+    assert_eq!(raised.amiss, Amiss::Asking);
+    assert_eq!(super::MOVED_AMISS, Amiss::Asking);
+}

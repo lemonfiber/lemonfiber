@@ -5,6 +5,7 @@ use super::*;
 #[test]
 fn the_household_view_names_each_member_and_links_what_it_can_trace() {
     let report = HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Alex".to_owned(),
             to_hand_over: Vec::new(),
@@ -122,6 +123,7 @@ fn a_household(
     allows: Option<&str>,
 ) -> HouseholdReport {
     HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Alex".to_owned(),
             to_hand_over: Vec::new(),
@@ -223,6 +225,7 @@ fn what_a_member_may_ask_for_reads_beside_what_they_may_watch() {
 #[test]
 fn the_answer_for_whoever_asked_is_drawn_under_their_own_list() {
     let report = HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Ana".to_owned(),
             to_hand_over: vec![
@@ -267,6 +270,7 @@ fn a_whole_household_is_handed_nothing_to_pass_on() {
         ..HouseholdMember::default()
     };
     let report = |members: Vec<HouseholdMember>| HouseholdReport {
+        rehearsed: false,
         members,
         available: true,
         findings: Vec::new(),
@@ -294,6 +298,7 @@ fn a_whole_household_is_handed_nothing_to_pass_on() {
 #[test]
 fn an_invitation_nobody_took_up_says_so_rather_than_never_signed_in() {
     let report = HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Ana".to_owned(),
             access: MemberAccess {
@@ -347,6 +352,7 @@ fn a_limit_reads_in_the_words_it_was_chosen_in() {
 
     for step in offered {
         let report = HouseholdReport {
+            rehearsed: false,
             members: vec![HouseholdMember {
                 name: "Ana".to_owned(),
                 access: MemberAccess {
@@ -380,6 +386,7 @@ fn a_limit_reads_in_the_words_it_was_chosen_in() {
 #[test]
 fn a_limit_that_is_no_step_offered_still_says_what_it_is() {
     let report = HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Ana".to_owned(),
             access: MemberAccess {
@@ -408,6 +415,7 @@ fn a_limit_that_is_no_step_offered_still_says_what_it_is() {
 #[test]
 fn the_account_that_runs_the_server_says_so() {
     let report = HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "owner".to_owned(),
             access: MemberAccess {
@@ -443,6 +451,7 @@ fn the_account_that_runs_the_server_says_so() {
 #[test]
 fn an_account_switched_off_says_so_and_does_not_invent_a_last_visit() {
     let report = HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Sam".to_owned(),
             access: MemberAccess {
@@ -479,6 +488,7 @@ fn an_account_switched_off_says_so_and_does_not_invent_a_last_visit() {
 #[test]
 fn an_empty_household_says_whether_it_was_read() {
     let asked_nothing = HouseholdReport {
+        rehearsed: false,
         members: Vec::new(),
         available: true,
         findings: Vec::new(),
@@ -493,6 +503,7 @@ fn an_empty_household_says_whether_it_was_read() {
         .contains("The media server holds no accounts yet."));
     // Unread is not the same as empty: no such claim is made.
     let unread = HouseholdReport {
+        rehearsed: false,
         members: Vec::new(),
         available: false,
         findings: vec!["could not be read".to_owned()],
@@ -557,6 +568,7 @@ fn held(
     restriction: Restriction,
 ) -> HouseholdReport {
     HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Ana".to_owned(),
             claimed: true,

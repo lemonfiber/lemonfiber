@@ -31,6 +31,7 @@
 //! step. See `.docs/architecture/rehearsal.md`.
 
 use crate::error::{Amiss, Problem, Remedy, Severity, State};
+use crate::model::kind::{self, Kind};
 
 use super::command::{Asking, Keeping, Linking, MigrateAction};
 use super::disturbance::Situation;
@@ -100,6 +101,13 @@ pub struct Asked {
     /// and a restore take something away too, and what bounds each of them is a
     /// different subsystem's answer.
     pub disturbs: Option<Situation>,
+    /// The kinds a report of it is written under, where it reports one.
+    ///
+    /// Every one of them says whether it was a rehearsal, because a surface that
+    /// asked for one is owed an answer that says so in a field of its own — and this
+    /// is the list that is held to that, kind by kind. Empty for a command that reads
+    /// or refuses, which has no rehearsal to report.
+    pub answers: &'static [Kind],
 }
 
 impl Asked {
@@ -113,21 +121,43 @@ impl Asked {
     }
 }
 
+/// What a verb that starts or stops services reports under.
+const LIFECYCLE: &[Kind] = &[kind::LIFECYCLE];
+
+/// What putting a plugin on, taking one off or moving one along reports under.
+const PLUGINS: &[Kind] = &[kind::PLUGINS];
+
+/// What changing what the household may ask for, or deciding what it asked, reports under.
+const HOUSEHOLD: &[Kind] = &[kind::HOUSEHOLD];
+
+/// What each way of moving in beside a setup already here reports under.
+const MOVING_IN: &[Kind] = &[
+    kind::ADOPTION,
+    kind::IMPORT,
+    kind::BESIDE,
+    kind::REPLACEMENT,
+];
+
+/// What replacing the certificate a paired phone pins reports under.
+const CERTIFICATE: &[Kind] = &[kind::CERTIFICATE];
+
 /// A command that changes nothing, so the rehearsal is the command.
 const fn reads(named: &'static str) -> Asked {
     Asked {
         named,
         rehearsal: Rehearsal::Reads,
         disturbs: None,
+        answers: &[],
     }
 }
 
-/// A command that reports what it would do and stops short of doing it.
-const fn reports(named: &'static str) -> Asked {
+/// A command that reports what it would do and stops short of doing it, under these kinds.
+const fn reports(named: &'static str, answers: &'static [Kind]) -> Asked {
     Asked {
         named,
         rehearsal: Rehearsal::Reports,
         disturbs: None,
+        answers,
     }
 }
 
@@ -137,6 +167,7 @@ const fn cannot(named: &'static str, why: &'static str) -> Asked {
         named,
         rehearsal: Rehearsal::Cannot(why),
         disturbs: None,
+        answers: &[],
     }
 }
 
@@ -170,7 +201,7 @@ pub const fn asked(command: &Command) -> Asked {
         // Unconfirmed it already is the rehearsal: what replacing costs, and nothing
         // replaced.
         Command::Companion(crate::companion::Asked::Certificate { .. }) => {
-            reports("companion certificate")
+            reports("companion certificate", CERTIFICATE)
         }
         Command::Explain { .. } => reads("explain"),
         Command::Glossary => reads("glossary"),
@@ -213,7 +244,7 @@ pub const fn asked(command: &Command) -> Asked {
             disruptive: true, ..
         } => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
         Command::Doctor { accept: None, .. } => reads("doctor"),
-        Command::Doctor { .. } => reports("doctor --accept"),
+        Command::Doctor { .. } => reports("doctor --accept", &[kind::DOCTOR]),
 
         // Same shape, for the same reason: a walk adds an item, waits for the stack to
         // do something with it, and reports what actually happened at each stage. What
@@ -223,28 +254,28 @@ pub const fn asked(command: &Command) -> Asked {
 
         // Reports. Each of these builds the report it would have filled in and stops
         // before the step it cannot take back.
-        Command::Up { .. } => reports("up").disturbing(Situation::Starting),
+        Command::Up { .. } => reports("up", LIFECYCLE).disturbing(Situation::Starting),
         // A boot runs the same start in the middle by calling it, and is held to the same
         // clock: what it was prepared to wait is what somebody reads back afterwards to
         // understand why a four-in-the-morning start gave up when it did.
-        Command::AtBoot => reports("up --at-boot").disturbing(Situation::Starting),
-        Command::Start { .. } => reports("start").disturbing(Situation::Starting),
+        Command::AtBoot => reports("up --at-boot", LIFECYCLE).disturbing(Situation::Starting),
+        Command::Start { .. } => reports("start", LIFECYCLE).disturbing(Situation::Starting),
         Command::Down {
             wait: Waiting::ForTheDownloads,
             ..
-        } => reports("down").disturbing(Situation::StoppingAfterDownloads),
-        Command::Down { .. } => reports("down").disturbing(Situation::Stopping),
-        Command::Halt { .. } => reports("stop").disturbing(Situation::Stopping),
-        Command::Switch { .. } => reports("switch").disturbing(Situation::Switching),
-        Command::Restart { .. } => reports("restart").disturbing(Situation::Restarting),
-        Command::Pull { .. } => reports("pull"),
-        Command::ConfigSet(_) => reports("config set"),
+        } => reports("down", LIFECYCLE).disturbing(Situation::StoppingAfterDownloads),
+        Command::Down { .. } => reports("down", LIFECYCLE).disturbing(Situation::Stopping),
+        Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
+        Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
+        Command::Restart { .. } => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
+        Command::Pull { .. } => reports("pull", LIFECYCLE),
+        Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         // Everything it changes is settled before anything is touched: the manifest
         // is read, what the install decides is settled, and where every one of its
         // writes lands is derived without a disk under it. A rehearsal does all of
         // that, states it, and stops short of carrying it out — so what it reports is
         // what the real run reports rather than a summary of it.
-        Command::Plugins(plugins::Asked::Install { .. }) => reports("plugin install"),
+        Command::Plugins(plugins::Asked::Install { .. }) => reports("plugin install", PLUGINS),
         // The same, read backwards. What a removal puts back is judged before a byte of
         // it is touched — the rollback layer's own judgement, which is the whole of
         // what can be known without acting — and what it would leave with nothing
@@ -252,7 +283,7 @@ pub const fn asked(command: &Command) -> Asked {
         // Taking a plugin off stops its containers through the same engine stop, held to
         // the same grace.
         Command::Plugins(plugins::Asked::Remove { .. }) => {
-            reports("plugin remove").disturbing(Situation::Stopping)
+            reports("plugin remove", PLUGINS).disturbing(Situation::Stopping)
         }
         // Both of those at once, as the one account the update is. What goes back is the
         // rollback layer's judgement and what comes on is the install's settled writes
@@ -260,60 +291,60 @@ pub const fn asked(command: &Command) -> Asked {
         // The version installed comes off and another comes on in its place, held to the
         // same settle wait a switch is.
         Command::Plugins(plugins::Asked::Update { .. }) => {
-            reports("plugin update").disturbing(Situation::Switching)
+            reports("plugin update", PLUGINS).disturbing(Situation::Switching)
         }
-        Command::Wiring(Linking::Fill(_)) => reports("wiring fill"),
-        Command::Quality(_) => reports("quality"),
-        Command::Alerts(_) => reports("alerts"),
-        Command::QualityMusic { .. } => reports("quality music"),
-        Command::Household { .. } => reports("household"),
-        Command::Held { .. } => reports("held"),
-        Command::Allowing(_) => reports("allow"),
-        Command::Deciding(_) => reports("decide"),
-        Command::Expiring(_) => reports("expiring"),
-        Command::Hosting(_) => reports("hosting"),
-        Command::Invite { .. } => reports("invite"),
-        Command::Reissue { .. } => reports("reissue"),
-        Command::Handoff { .. } => reports("household handoff"),
-        Command::Forget { .. } => reports("forget"),
-        Command::Space { .. } => reports("space"),
-        Command::StopSeeding { .. } => reports("stop-seeding"),
-        Command::Bandwidth(_) => reports("bandwidth"),
-        Command::Uninstall(_) => reports("uninstall"),
+        Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
+        Command::Quality(_) => reports("quality", &[kind::QUALITY]),
+        Command::Alerts(_) => reports("alerts", &[kind::ALERTS]),
+        Command::QualityMusic { .. } => reports("quality music", &[kind::MUSIC]),
+        Command::Household { .. } => reports("household", HOUSEHOLD),
+        Command::Held { .. } => reports("held", &[kind::HELD]),
+        Command::Allowing(_) => reports("allow", HOUSEHOLD),
+        Command::Deciding(_) => reports("decide", HOUSEHOLD),
+        Command::Expiring(_) => reports("expiring", HOUSEHOLD),
+        Command::Hosting(_) => reports("hosting", &[kind::HOSTING]),
+        Command::Invite { .. } => reports("invite", &[kind::INVITATION]),
+        Command::Reissue { .. } => reports("reissue", &[kind::INVITATION]),
+        Command::Handoff { .. } => reports("household handoff", &[kind::HANDOFF]),
+        Command::Forget { .. } => reports("forget", &[kind::STORED]),
+        Command::Space { .. } => reports("space", &[kind::SPACE]),
+        Command::StopSeeding { .. } => reports("stop-seeding", &[kind::STOP_SEEDING]),
+        Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
+        Command::Uninstall(_) => reports("uninstall", &[kind::UNINSTALL]),
         // A guard is the one command with no ending of its own, so a rehearsal of it
         // cannot be the command run with the last step left out — it would hold the
         // terminal until the drive was pulled. What it reports instead is the watch it
         // would keep: the location, how often it would look, and the invocation it
         // would run the moment that location went. The invocation is the lifecycle
         // stop's own, built by the same path a real watch builds it with.
-        Command::Watch { .. } => reports("watch"),
+        Command::Watch { .. } => reports("watch", &[kind::WATCH]),
         // Which changes would go back, and which of them need a service that is
         // answering. The judgement is already made before anything is touched, because
         // a run goes back whole or not at all — so the report a rehearsal wants is the
         // one this command has already formed by the time it would act.
-        Command::Undo { .. } => reports("undo"),
+        Command::Undo { .. } => reports("undo", &[kind::UNDO]),
         // Which credential would be replaced, where its value lives, and what would
         // still need doing before every consumer held the new one. No replacement is
         // generated: a value minted to describe a rotation is a secret that exists
         // because somebody asked a question, and it would have to go somewhere.
-        Command::Credentials(_) => reports("credentials --rotate"),
+        Command::Credentials(_) => reports("credentials --rotate", &[kind::CREDENTIALS]),
         // What a capture would hold, how large it would be, and the exact path it
         // would be written to — read off the same room check a real capture makes
         // before it writes anything.
-        Command::Backup { .. } => reports("backup"),
+        Command::Backup { .. } => reports("backup", &[kind::BACKUP]),
 
         // The eight whose yes a rehearsal takes back. Each already answers twice —
         // unconfirmed it says what it would do, confirmed it does it — so the report a
         // rehearsal wants is the one it already gives, in the same words. See
         // [`unconfirmed`].
-        Command::Migrate(_) => reports("migrate"),
-        Command::Remove { .. } => reports("remove"),
-        Command::QualityUpgrade { .. } => reports("quality upgrade"),
-        Command::Repair { .. } => reports("doctor --fix"),
-        Command::Reset { .. } => reports("reset"),
-        Command::Update(_) => reports("update"),
-        Command::Restore { .. } => reports("restore"),
-        Command::Support { .. } => reports("support --write"),
+        Command::Migrate(_) => reports("migrate", MOVING_IN),
+        Command::Remove { .. } => reports("remove", &[kind::REMOVAL]),
+        Command::QualityUpgrade { .. } => reports("quality upgrade", &[kind::UPGRADE]),
+        Command::Repair { .. } => reports("doctor --fix", &[kind::REPAIR]),
+        Command::Reset { .. } => reports("reset", &[kind::RESET]),
+        Command::Update(_) => reports("update", &[kind::UPDATE]),
+        Command::Restore { .. } => reports("restore", &[kind::RESTORE]),
+        Command::Support { .. } => reports("support --write", &[kind::BUNDLE]),
 
         // Setup is split where the split is real, the way `credentials` and `doctor`
         // are. Reading where the walk stands changes nothing; every other step records
@@ -321,7 +352,7 @@ pub const fn asked(command: &Command) -> Asked {
         // configuration — and each reports what it would record instead of recording
         // it. The answers gathered so far are the report either way, so a rehearsal is
         // the same walk with the file left alone.
-        Command::Setup(_) => reports("setup"),
+        Command::Setup(_) => reports("setup", &[kind::WIZARD]),
 
         // One pass over one graph, reported per connection: the field, what the service
         // holds now, and what would be pushed. The three-way reconcile every driver
@@ -333,8 +364,8 @@ pub const fn asked(command: &Command) -> Asked {
         // Adopting is the same survey in the other direction: nothing is written to any
         // service, and what a real run would move is lemonfiber's record of what it
         // expects, so a rehearsal of it names the values that would be taken on.
-        Command::Seed => reports("seed"),
-        Command::Adopt => reports("adopt"),
+        Command::Seed => reports("seed", &[kind::SEED]),
+        Command::Adopt => reports("adopt", &[kind::SEED]),
     }
 }
 
@@ -378,6 +409,9 @@ fn unconfirmed(command: Command) -> Command {
             mode,
             confirmed: false,
         }),
+        Command::Migrate(MigrateAction::Replace { .. }) => {
+            Command::Migrate(MigrateAction::Replace { offer: None })
+        }
         Command::Update(asked) => Command::Update(update::Asked {
             confirm: false,
             ..asked

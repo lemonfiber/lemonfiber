@@ -84,6 +84,7 @@ fn running() -> Vec<Outcome> {
         }),
         Outcome::Wizard(a_setup_part_way()),
         Outcome::Watch(SupervisionReport {
+            rehearsed: false,
             forms: vec!["media".to_owned()],
             reason: "the data location went away".to_owned(),
             stopped: true,
@@ -103,10 +104,12 @@ fn running() -> Vec<Outcome> {
 fn diagnosing() -> Vec<Outcome> {
     vec![
         Outcome::Doctor(DoctorReport {
+            rehearsed: false,
             overall: lemonfiber_core::doctor::Overall::Healthy,
             findings: Vec::new(),
         }),
         Outcome::Repair(lemonfiber_core::repair::run::Report {
+            rehearsed: false,
             offered: vec![a_repair()],
             agreement: lemonfiber_core::repair::agreement(&[a_repair()]),
             mended: vec![lemonfiber_core::repair::run::Mended {
@@ -245,6 +248,7 @@ fn serving() -> Vec<Outcome> {
             rehearsed: false,
         }),
         Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
+            rehearsed: false,
             name: "ana".to_owned(),
             confirmed: false,
             requests: 1,
@@ -255,6 +259,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::FrontDoor(a_front_door()),
         Outcome::Pairing(a_pairing()),
         Outcome::Certificate(lemonfiber_core::companion::Replacement {
+            rehearsed: false,
             replaced: false,
             fingerprint: Some("ab".repeat(32)),
             consequence: "Every paired phone refuses this machine until paired again.".to_owned(),
@@ -292,12 +297,14 @@ fn keeping() -> Vec<Outcome> {
             rehearsed: false,
         }),
         Outcome::Bundle(lemonfiber_core::app::support::Bundle {
+            rehearsed: false,
             contents: lemonfiber_core::bundle::Contents::default(),
             bytes: 0,
             path: None,
             would_go: None,
         }),
         Outcome::Restore(lemonfiber_core::app::restore::Restoration {
+            rehearsed: false,
             would: lemonfiber_core::app::restore::Preview {
                 manifest: manifest(),
                 downgrade: false,

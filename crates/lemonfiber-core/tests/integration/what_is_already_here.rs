@@ -16,6 +16,7 @@ use crate::common;
 use common::stack::project;
 use lemonfiber_core::app::{dispatch, Command, Ctx, MigrateAction, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::error::Problem;
 use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::model::{AdoptReport, BesideReport, ReplaceReport};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -147,20 +148,29 @@ async fn standing(ctx: &Ctx, confirmed: bool) -> Option<BesideReport> {
     }
 }
 
-/// What standing in place of it answered.
-async fn replacing(ctx: &Ctx, confirmed: bool) -> Option<ReplaceReport> {
-    match dispatch(
-        Command::Migrate(MigrateAction::Act {
-            mode: Mode::Replace,
-            confirmed,
-        }),
+/// What standing in place of it answered, asked as `asked`, or the problem it was
+/// refused with.
+async fn replacing_as(
+    ctx: &Ctx,
+    asked: MigrateAction,
+) -> Result<Option<ReplaceReport>, Box<Problem>> {
+    dispatch(Command::Migrate(asked), ctx)
+        .await
+        .map(|outcome| match outcome {
+            Outcome::Replacement(report) => Some(report),
+            _ => None,
+        })
+}
+
+/// What standing in place of it answered `offer` with, or the problem it was refused with.
+async fn replacing(ctx: &Ctx, offer: Option<&str>) -> Result<Option<ReplaceReport>, Box<Problem>> {
+    replacing_as(
         ctx,
+        MigrateAction::Replace {
+            offer: offer.map(str::to_owned),
+        },
     )
     .await
-    {
-        Ok(Outcome::Replacement(report)) => Some(report),
-        _ => None,
-    }
 }
 
 /// Their sonarr, on a port of its own so the two stacks can be told apart.

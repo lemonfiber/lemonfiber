@@ -248,6 +248,12 @@
           ],
           "required": false
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "stance": {
           "type": [
             "ref:Stance"
@@ -635,6 +641,12 @@
           ],
           "required": false
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "stance": {
           "type": [
             "ref:Stance"
@@ -686,6 +698,12 @@
             "null|string"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         },
         "would_go": {
           "type": [
@@ -912,6 +930,12 @@
             "null|string"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         },
         "replaced": {
           "type": [
@@ -1624,6 +1648,12 @@
         "overall": {
           "type": [
             "ref:Overall"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
           ],
           "required": true
         }
@@ -2641,6 +2671,12 @@
             "string"
           ],
           "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
@@ -2780,6 +2816,12 @@
             "ref:Manager"
           ],
           "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
@@ -2863,6 +2905,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "requests": {
           "type": [
             "integer/uint"
@@ -2915,6 +2963,12 @@
             "anyOf(null,ref:Policy)"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
@@ -2944,6 +2998,12 @@
             "null|string"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         },
         "stance": {
           "type": [
@@ -3007,6 +3067,12 @@
         "protection": {
           "type": [
             "ref:Protection"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
           ],
           "required": true
         },
@@ -3255,6 +3321,12 @@
             "anyOf(null,ref:Gone)"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
@@ -3949,6 +4021,12 @@
             "anyOf(null,ref:Triggered)"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
@@ -5043,6 +5121,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "removal": {
           "type": [
             "anyOf(null,ref:PluginRemoval)"
@@ -5793,6 +5877,12 @@
             "anyOf(null,ref:StackEdit)"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
@@ -5818,6 +5908,10 @@
           "required": true
         }
       },
+      "variants": []
+    },
+    "Ran": {
+      "fields": {},
       "variants": []
     },
     "Rated": {
@@ -5972,6 +6066,12 @@
             "anyOf(null,ref:Reclaimed)"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         },
         "volumes": {
           "type": [
@@ -6344,12 +6444,24 @@
             "array[ref:Repair]"
           ],
           "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         }
       },
       "variants": []
     },
     "ReplaceReport": {
       "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
         "project": {
           "type": [
             "null|string"
@@ -6361,6 +6473,12 @@
             "null|string"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         },
         "stance": {
           "type": [
@@ -6438,6 +6556,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "reverted": {
           "type": [
             "array[ref:StackEdit]"
@@ -6506,6 +6630,12 @@
             "anyOf(null,ref:RestoreReport)"
           ],
           "required": false
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
         },
         "would": {
           "type": [
@@ -7225,6 +7355,12 @@
           ],
           "required": false
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "respite": {
           "type": [
             "ref:RespiteStanding"
@@ -7473,6 +7609,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "stack_edits": {
           "type": [
             "array[ref:StackEdit]"
@@ -7674,6 +7816,12 @@
         "kept": {
           "type": [
             "array[ref:Kept]"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
           ],
           "required": true
         },
@@ -7915,6 +8063,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "substitution": {
           "type": [
             "ref:Substitution"
@@ -7935,6 +8089,12 @@
         "reason": {
           "type": [
             "string"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
           ],
           "required": true
         },
@@ -8482,6 +8642,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
         "removal": {
           "type": [
             "ref:UninstallRemoval"
@@ -8909,6 +9075,12 @@
         "media": {
           "type": [
             "array[ref:UpgradeMedia]"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
           ],
           "required": true
         }
@@ -9448,6 +9620,12 @@
           ],
           "required": true
         },
+        "rehearsed": {
+          "type": [
+            "ref:Ran"
+          ],
+          "required": true
+        },
         "unanswered": {
           "type": [
             "array[ref:WizardStep]"
@@ -9501,6 +9679,8 @@
     "ASK-7": 404,
     "ASK-8": 400,
     "ASK-9": 404,
+    "GONE-2": 400,
+    "MIGRATE-1": 400,
     "READ-1": 400,
     "READ-10": 400,
     "READ-11": 400,
@@ -9516,7 +9696,10 @@
     "READ-7": 400,
     "READ-8": 400,
     "READ-9": 400,
+    "REPAIR-1": 400,
+    "RESTORE-11": 400,
     "SERVE-6": 500,
-    "SERVE-7": 500
+    "SERVE-7": 500,
+    "SPACE-6": 400
   }
 }

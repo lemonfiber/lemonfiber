@@ -20,6 +20,7 @@ fn change(jump: Jump, refused: bool) -> Change {
 /// A report carrying `changes` and `applied`, agreed to or not.
 fn report(changes: Vec<Change>, applied: Vec<Applied>, confirmed: bool) -> Report {
     Report {
+        rehearsed: false,
         state: lemonfiber_core::update::state(&changes, &applied),
         changes,
         in_flight: Vec::new(),

@@ -63,6 +63,7 @@ async fn reading(ctx: &Ctx, changed: Option<Changed>) -> HostingReport {
         commands.push(described(ctx, what).await);
     }
     HostingReport {
+        rehearsed: false,
         manager,
         commands,
         changed,

@@ -76,6 +76,7 @@ fn repair(reversible: bool) -> Repair {
 
 fn report(outcomes: Vec<Outcome>) -> Report {
     Report {
+        rehearsed: false,
         offered: Vec::new(),
         agreement: String::new(),
         beyond: Vec::new(),

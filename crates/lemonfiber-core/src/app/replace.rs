@@ -10,26 +10,34 @@
 //! than through their Compose file: lemonfiber has never seen that file, and a stop
 //! aimed at a project it cannot read would be a stop aimed at a guess.
 //!
-//! Unconfirmed it names what it would stop and stops nothing.
+//! **The yes is the offer, and nothing else is.** Asked without one it names what it
+//! would stop, names that offer, and stops nothing. Answered with the name, it builds
+//! the offer again from what is running now and stops only where the two are the same
+//! — so a container started, or a project changed, between reading and agreeing is
+//! refused by name rather than stopped unseen. A bare confirmation would be agreement
+//! from somebody who had not read what would stop, which is the one thing this mode
+//! cannot afford.
 
-use crate::error::Problem;
+use crate::error::codes::migrate::OFFER_MOVED;
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::model::{MigrationReport, ReplaceReport};
 use crate::ports::docker::Container;
 use crate::reconfigure::Stance;
 
 use super::Ctx;
 
-/// Stand in place of what is already here, or say why that cannot happen.
+/// Stand in place of what is already here, or say what that would stop.
 ///
 /// # Errors
 ///
-/// Never in practice: what could not be stopped is reported rather than refused, so the
-/// operator can see which half of their stack is still up.
+/// Returns a [`Problem`] where the offer answered is not the one standing now. What
+/// could not be stopped is reported rather than refused, so the operator can see which
+/// half of their stack is still up.
 pub async fn instead(
     ctx: &Ctx,
     survey: &MigrationReport,
     running: &[Container],
-    confirmed: bool,
+    offer: Option<&str>,
 ) -> Result<ReplaceReport, Box<Problem>> {
     let Some(project) = crate::migration::one_setup(survey) else {
         return Ok(refused(survey));
@@ -47,14 +55,19 @@ pub async fn instead(
         .map(|container| container.service.clone())
         .collect();
     names.sort();
+    let agreement = agreement(&project, &names);
 
-    if !confirmed {
+    let Some(given) = offer else {
         return Ok(ReplaceReport {
             project: Some(project),
             would_stop: names,
+            agreement,
             stance: Stance::Pending,
             ..ReplaceReport::default()
         });
+    };
+    if given != agreement {
+        return Err(Box::new(another_offer(given, &agreement, &project, &names)));
     }
 
     let mut stopped = Vec::new();
@@ -70,11 +83,24 @@ pub async fn instead(
     Ok(ReplaceReport {
         project: Some(project),
         would_stop: names,
+        agreement,
         stopped,
         still_running: left,
         stance: Stance::Applied,
         ..ReplaceReport::default()
     })
+}
+
+/// The name an offer to stand in place of `project` goes by.
+///
+/// Over the project and every service it would stop, in the order they are read, so
+/// a service started or gone, or a different project standing here, is a different
+/// offer.
+#[must_use]
+pub fn agreement(project: &str, would_stop: &[String]) -> String {
+    let mut words = vec![project];
+    words.extend(would_stop.iter().map(String::as_str));
+    crate::agreement::over(&words)
 }
 
 /// What is answered where there is no one setup to stand in place of.
@@ -91,6 +117,33 @@ fn refused(survey: &MigrationReport) -> ReplaceReport {
         refusal: Some(why.to_owned()),
         ..ReplaceReport::default()
     }
+}
+
+/// The refusal for an answer to an offer that is not the one standing now.
+///
+/// Names what replacing would stop now, because the answer carries only the name of
+/// what was read and an operator told only that something moved cannot tell a service
+/// started since from a different project standing here. Both names are said, for
+/// the reason a stale repair offer says both.
+fn another_offer(agreed: &str, stands: &str, project: &str, would_stop: &[String]) -> Problem {
+    crate::agreement::moved(
+        Problem::new(
+            OFFER_MOVED,
+            Severity::Warning,
+            "What you agreed to is not what standing in place of this setup would stop now",
+            format!(
+                "The offer you answered was {agreed}, and a fresh look offers {stands}. \
+                 Something has started, stopped or changed since you read it, so nothing \
+                 was stopped."
+            ),
+            Remedy::new("Ask what replacing would stop again, and read what it says now"),
+        )
+        .in_state(State::Guided)
+        .with_detail(format!(
+            "standing in place of {project} would now stop {}",
+            would_stop.join(", ")
+        )),
+    )
 }
 
 #[cfg(test)]

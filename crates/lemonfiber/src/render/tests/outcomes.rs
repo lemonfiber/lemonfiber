@@ -5,6 +5,7 @@ use super::*;
 /// A setup part-way through, which is what most of these vary from.
 fn part_way() -> WizardReport {
     WizardReport {
+        rehearsed: false.into(),
         offered: true,
         phase: Phase::InProgress,
         at: Step::DataLocation,
@@ -34,6 +35,7 @@ fn every_state_a_removal_ends_in_renders() {
     ] {
         let rendered = answer(
             &Outcome::Uninstall(Uninstall {
+                rehearsed: false,
                 manifest: one.manifest.clone(),
                 removal,
             }),
@@ -52,6 +54,7 @@ fn a_removal_that_keeps_none_of_what_it_lists_counts_only_what_goes() {
 
     let one = a_removal();
     let whole = Uninstall {
+        rehearsed: false,
         manifest: Manifest {
             items: one
                 .manifest
@@ -79,6 +82,7 @@ fn a_removal_that_found_nothing_says_so() {
     use lemonfiber_core::uninstall::{Confidence, Manifest, Removal, Tier, Uninstall};
 
     let nothing = Uninstall {
+        rehearsed: false,
         manifest: Manifest {
             tier: Tier::Stop,
             removes: Tier::Stop.removes().to_owned(),

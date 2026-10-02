@@ -56,6 +56,7 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         .collect();
 
     Ok(ResetReport {
+        rehearsed: false,
         reverted,
         reverted_connections,
         confirmed: confirm,

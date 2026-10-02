@@ -56,6 +56,7 @@ fn the_decision_refuses_it_under_the_code_that_says_it_is_a_gap() {
         named: "invent",
         rehearsal: Rehearsal::Untaught,
         disturbs: None,
+        answers: &[],
     };
 
     let answer = verdict(&untaught).map_err(|refusal| refusal.code);
@@ -75,6 +76,7 @@ fn a_command_that_cannot_be_rehearsed_is_refused_under_another() {
         named: "walkthrough",
         rehearsal: Rehearsal::Cannot("a walkthrough is the observation"),
         disturbs: None,
+        answers: &[],
     };
 
     let answer = verdict(&never).map_err(|refusal| refusal.code);

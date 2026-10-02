@@ -93,6 +93,7 @@ impl Cost {
     /// The same cost as the answer a surface renders, once its fate is known.
     fn into_report(self, name: String, confirmed: bool, revoked: Revoked) -> HouseholdRemoval {
         HouseholdRemoval {
+            rehearsed: false,
             name,
             confirmed,
             requests: self.requests,

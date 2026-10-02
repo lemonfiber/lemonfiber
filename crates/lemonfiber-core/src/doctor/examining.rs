@@ -47,6 +47,7 @@ pub async fn examine(checks: &[Box<dyn Check>], narrowing: &Narrowing) -> Doctor
     .filter(|finding| narrowing.keeps(finding))
     .collect();
     DoctorReport {
+        rehearsed: false,
         overall: overall(&findings),
         findings,
     }

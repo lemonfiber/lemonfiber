@@ -33,6 +33,7 @@ pub(crate) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<
 
     if ctx.dry_run {
         return Ok(MusicReport {
+            rehearsed: false,
             choice,
             disposition: Disposition::Rehearsed,
             outcome: None,
@@ -42,6 +43,7 @@ pub(crate) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<
     super::quality::save_selection(ctx, &selection)?;
     let outcome = apply(ctx, format).await;
     Ok(MusicReport {
+        rehearsed: false,
         choice,
         disposition: Disposition::Recorded,
         outcome: Some(outcome),

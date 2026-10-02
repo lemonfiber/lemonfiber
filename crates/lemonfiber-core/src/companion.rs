@@ -119,6 +119,11 @@ pub struct Replacement {
     pub fingerprint: Option<String>,
     /// What replacing it means for every phone already paired.
     pub consequence: String,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What every phone paired with this machine is told when the certificate changes.
@@ -245,6 +250,7 @@ pub fn replacing(ctx: &Ctx, confirm: bool) -> Result<Replacement, Box<Problem>> 
     .transpose()
     .map_err(|why| Box::new(no_certificate(&why.to_string())))?;
     Ok(Replacement {
+        rehearsed: false,
         replaced: confirm,
         fingerprint: held.map(|held| held.fingerprint),
         consequence: CONSEQUENCE.to_owned(),

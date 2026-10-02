@@ -106,6 +106,11 @@ pub struct HostingReport {
     pub instruction: Option<String>,
     /// What is true of this manager and worth knowing before it is relied on.
     pub caveat: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 #[cfg(test)]

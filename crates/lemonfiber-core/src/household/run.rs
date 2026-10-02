@@ -385,6 +385,7 @@ fn assemble(
     ));
 
     HouseholdReport {
+        rehearsed: false,
         policy: naming.asked.household.as_ref().map(Policy::of),
         allows: naming
             .asked
@@ -417,6 +418,7 @@ struct Theirs {
 /// empty list is never mistaken for a household that has asked for nothing.
 fn unavailable(reason: &str) -> HouseholdReport {
     HouseholdReport {
+        rehearsed: false,
         members: Vec::new(),
         findings: vec![reason.to_owned()],
         available: false,

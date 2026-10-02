@@ -177,9 +177,17 @@ async fn work_that_cannot_be_named_is_not_started() {
 /// command, and the command reaches the core as a job.
 #[tokio::test]
 async fn a_migration_agreed_to_over_the_web_is_named_and_left_to_run() {
-    for mode in lemonfiber_core::migration::mode::EVERY {
+    use lemonfiber_core::migration::mode::{Mode, EVERY};
+
+    for mode in EVERY {
         let action = format!("migrate-{}", mode.slug());
-        let (status, body) = said(Chance::cycling(), &action, r#"{"confirm":true}"#).await;
+        // A replacement's yes is the offer that named what it would stop.
+        let agreed = if mode == Mode::Replace {
+            r#"{"offer":"5c3a1d20"}"#
+        } else {
+            r#"{"confirm":true}"#
+        };
+        let (status, body) = said(Chance::cycling(), &action, agreed).await;
         assert_eq!(status, StatusCode::ACCEPTED.as_u16(), "{action}: {body}");
         assert!(
             body.contains(&action),

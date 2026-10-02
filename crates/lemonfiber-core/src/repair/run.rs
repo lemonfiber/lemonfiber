@@ -96,6 +96,11 @@ pub struct Report {
     pub beyond: Vec<Beyond>,
     /// Whether this run was allowed to act at all.
     pub acted: bool,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// Offer what can be put right, carry out what is confirmed, and prove each one.
@@ -176,6 +181,7 @@ pub async fn mending(
     // it was read costs nothing and leaves no record of a decline nobody made.
     let acting = stance.may_act() && confirm.stands(&offered);
     let mut report = Report {
+        rehearsed: false,
         agreement: repair::agreement(&offered),
         offered: offered.clone(),
         mended: Vec::new(),

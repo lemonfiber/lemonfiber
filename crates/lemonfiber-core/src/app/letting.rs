@@ -127,18 +127,20 @@ fn not_held(download: &str) -> Problem {
 
 /// The agreement names a reading that is not the one standing now.
 fn another_offer(download: &str, standing: &str) -> Problem {
-    Problem::new(
-        ANOTHER_OFFER,
-        Severity::Error,
-        format!("That agreement was given for a different reading of {download}"),
-        "What it occupies, where it stands and the ratio it has earned are all in \
-         the name an offer goes by, so an offer that has moved since it was read is \
-         a different offer. Acting on this one would be acting on something nobody \
-         saw.",
-        Remedy::new("Read the offer again, and answer the name it prints")
-            .with_detail(format!("the offer standing now is {standing}")),
+    crate::agreement::moved(
+        Problem::new(
+            ANOTHER_OFFER,
+            Severity::Error,
+            format!("That agreement was given for a different reading of {download}"),
+            "What it occupies, where it stands and the ratio it has earned are all in \
+             the name an offer goes by, so an offer that has moved since it was read is \
+             a different offer. Acting on this one would be acting on something nobody \
+             saw.",
+            Remedy::new("Read the offer again, and answer the name it prints")
+                .with_detail(format!("the offer standing now is {standing}")),
+        )
+        .in_state(State::Guided),
     )
-    .in_state(State::Guided)
 }
 
 /// The client could not be reached, or would not let it go.

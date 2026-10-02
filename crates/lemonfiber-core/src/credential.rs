@@ -183,6 +183,11 @@ pub struct Inventory {
     /// One value, where one was asked for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revealed: Option<Revealed>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 impl Inventory {
@@ -190,6 +195,7 @@ impl Inventory {
     #[must_use]
     pub fn of(held: Vec<Held>) -> Self {
         Self {
+            rehearsed: false,
             held,
             protection: Protection::stated(),
             rotated: None,

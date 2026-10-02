@@ -69,6 +69,11 @@ pub struct Bundle {
     /// machine that would not say where lemonfiber keeps its own files, which is the
     /// one destination of the three that needs that answer.
     pub would_go: Option<PathBuf>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// Describe a bundle, or produce one.
@@ -109,6 +114,7 @@ pub async fn run(
     if !write_it {
         let bytes = measure(&contents)?;
         return Ok(Bundle {
+            rehearsed: false,
             contents,
             bytes,
             path: None,
@@ -124,6 +130,7 @@ pub async fn run(
     };
     let written = write(archives.vault.as_ref(), &contents, &at).await?;
     Ok(Bundle {
+        rehearsed: false,
         contents,
         bytes: written.bytes,
         path: Some(written.path),

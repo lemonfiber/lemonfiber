@@ -75,6 +75,7 @@ fn a_verdict_reads_in_the_words_the_check_used() {
 #[test]
 fn a_finding_with_a_code_leads_its_line_with_it() {
     let report = crate::model::DoctorReport {
+        rehearsed: false,
         overall: crate::doctor::Overall::Broken,
         findings: vec![
             crate::doctor::Finding::in_category(

@@ -51,6 +51,7 @@ use std::collections::BTreeMap;
 use schemars::{schema_for, Schema};
 use serde::Serialize;
 
+use lemonfiber_core::agreement;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::error::codes::declared;
@@ -62,6 +63,7 @@ use lemonfiber_core::model::{
 
 use crate::admission::admitted::Admitted;
 use crate::jobs::started::Started;
+use crate::read::answering;
 use crate::refusal::Refusal;
 use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::news::Newest;
@@ -156,18 +158,28 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 
 /// Every refusal this surface answers with, keyed by its code.
 ///
+/// Its own, and the core's refusals of an answer that named an offer or a listing that
+/// has since moved: those end work rather than a request, and they are the one refusal
+/// a client answers by reading again rather than by reporting a failure, so a client
+/// has to be able to name them as it names this surface's own.
+///
 /// A code the registry does not declare cannot be built, so every refusal is found;
 /// one missing here would be a code no client can name, and a test counts them.
 fn refusals() -> BTreeMap<String, Listed> {
-    Refusal::EVERY
+    let own = Refusal::EVERY
         .iter()
-        .filter_map(|refusal| {
-            let declared = declared(refusal.code())?;
+        .map(|refusal| (refusal.code(), refusal.status()));
+    let moved = agreement::MOVED
+        .iter()
+        .map(|code| (*code, answering(agreement::MOVED_AMISS)));
+    own.chain(moved)
+        .filter_map(|(code, status)| {
+            let declared = declared(code)?;
             Some((
                 declared.code().as_str().to_owned(),
                 Listed {
                     name: declared.name(),
-                    status: refusal.status().as_u16(),
+                    status: status.as_u16(),
                     description: declared.description(),
                 },
             ))

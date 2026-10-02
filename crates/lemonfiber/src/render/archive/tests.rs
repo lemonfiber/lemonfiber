@@ -139,6 +139,7 @@ fn a_capture_of_one_service_names_it_and_says_nothing_it_need_not() {
 #[test]
 fn a_restore_that_has_touched_nothing_lists_what_it_would_overwrite() {
     let said = restoration(&Restoration {
+        rehearsed: false,
         would: Preview {
             manifest: manifest(),
             downgrade: true,
@@ -160,6 +161,7 @@ fn a_restore_that_put_something_back_says_so_and_what_is_left_to_do() {
     // happened, and a run that printed the same paragraph twice would read as
     // though it had done the work twice.
     let said = restoration(&Restoration {
+        rehearsed: false,
         would: Preview {
             manifest: manifest(),
             downgrade: false,
@@ -182,6 +184,7 @@ fn a_restore_that_put_something_back_says_so_and_what_is_left_to_do() {
 #[test]
 fn a_restore_that_moved_nothing_says_nothing_about_moving() {
     let said = restoration(&Restoration {
+        rehearsed: false,
         would: Preview {
             manifest: manifest(),
             downgrade: false,
@@ -222,6 +225,7 @@ fn holding(missing: Vec<String>, revealed: Vec<String>) -> Contents {
 #[test]
 fn a_bundle_that_does_not_exist_yet_says_what_it_would_hold() {
     let said = bundle(&Bundle {
+        rehearsed: false,
         contents: holding(
             vec!["the diagnosis could not run".to_owned()],
             vec!["INDEXER_KEY".to_owned()],
@@ -249,6 +253,7 @@ fn a_bundle_that_does_not_exist_yet_says_what_it_would_hold() {
 #[test]
 fn more_than_one_revealed_setting_reads_as_more_than_one() {
     let said = bundle(&Bundle {
+        rehearsed: false,
         contents: holding(
             Vec::new(),
             vec!["INDEXER_KEY".to_owned(), "VPN_KEY".to_owned()],
@@ -265,6 +270,7 @@ fn more_than_one_revealed_setting_reads_as_more_than_one() {
 #[test]
 fn a_bundle_that_exists_says_where_it_is_and_that_it_has_gone_nowhere() {
     let said = bundle(&Bundle {
+        rehearsed: false,
         contents: holding(Vec::new(), Vec::new()),
         bytes: 4096,
         path: Some(PathBuf::from("/tmp/lemonfiber-support.tar.gz")),

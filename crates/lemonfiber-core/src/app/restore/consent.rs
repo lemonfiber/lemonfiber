@@ -82,17 +82,19 @@ impl Consent {
 /// from a data root that moved under them, and the two ask for opposite things
 /// next.
 fn moved_on(agreed: &str, stands: &str) -> Problem {
-    Problem::new(
-        MOVED_ON,
-        Severity::Warning,
-        "What you agreed to is not what this backup would do now",
-        format!(
-            "The listing you answered was {agreed}, and a fresh look at the archive lists \
-             {stands}. Something has changed since you read it, so nothing was overwritten."
-        ),
-        Remedy::new("Ask what the backup holds again, and read what it says now"),
+    crate::agreement::moved(
+        Problem::new(
+            MOVED_ON,
+            Severity::Warning,
+            "What you agreed to is not what this backup would do now",
+            format!(
+                "The listing you answered was {agreed}, and a fresh look at the archive lists \
+                 {stands}. Something has changed since you read it, so nothing was overwritten."
+            ),
+            Remedy::new("Ask what the backup holds again, and read what it says now"),
+        )
+        .in_state(State::Guided),
     )
-    .in_state(State::Guided)
 }
 
 #[cfg(test)]

@@ -165,6 +165,7 @@ fn a_trace(item: &str) -> TraceReport {
 /// saying to run that one.
 fn a_diagnosis() -> DoctorReport {
     DoctorReport {
+        rehearsed: false,
         overall: Overall::Unknown,
         findings: vec![Finding::in_category(
             Category::Vpn,

@@ -149,10 +149,7 @@ async fn asking_to_carry_records_across_reaches_the_command_that_would() {
 #[tokio::test]
 async fn asking_to_stand_in_place_of_what_is_here_reaches_the_command_that_would() {
     let ctx = a_context().build();
-    let asked = Command::Migrate(MigrateAction::Act {
-        mode: Mode::Replace,
-        confirmed: false,
-    });
+    let asked = Command::Migrate(MigrateAction::Replace { offer: None });
     let read = dispatch(asked, &ctx).await;
     let answered = matches!(&read, Ok(Outcome::Replacement(_)));
     assert!(answered, "{read:?}");

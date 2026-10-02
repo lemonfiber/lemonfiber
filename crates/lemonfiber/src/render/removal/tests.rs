@@ -4,6 +4,7 @@ use lemonfiber_core::model::{HouseholdRemoval, Revoked};
 /// A removal as it stands before anything is done to it.
 fn asked(requests: usize) -> HouseholdRemoval {
     HouseholdRemoval {
+        rehearsed: false,
         name: "ana".to_owned(),
         confirmed: false,
         requests,

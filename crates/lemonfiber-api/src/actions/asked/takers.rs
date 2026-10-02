@@ -118,11 +118,13 @@ pub const TAKES_FORMS: &[&str] = &[
 /// picking an audio format is not a choice this host has to transcode for. The
 /// command line drops it there too.
 ///
-/// The four acts on a setup already on the machine are forks too. Unconfirmed each
-/// says what it would come to and changes nothing; confirmed, adopting and importing
-/// are the operator saying they have backed up the databases it named, standing
-/// beside starts a second stack on the ports it chose, and replacing stops what it
-/// named. `migrate <mode> --confirm` is the same fork at the command line.
+/// Three of the four acts on a setup already on the machine are forks too.
+/// Unconfirmed each says what it would come to and changes nothing; confirmed,
+/// adopting and importing are the operator saying they have backed up the databases
+/// it named, and standing beside starts a second stack on the ports it chose.
+/// `migrate <mode> --confirm` is the same fork at the command line. Replacing is not
+/// one of them: it stops what it named, and its yes is the offer that named it — see
+/// [`TAKES_CONSENT`].
 pub const TAKES_AGREEMENT: &[&str] = &[
     "config-set",
     "forget",
@@ -130,7 +132,6 @@ pub const TAKES_AGREEMENT: &[&str] = &[
     "migrate-adopt",
     "migrate-beside",
     "migrate-import",
-    "migrate-replace",
     "uninstall",
     "remove",
     "quality-set",
@@ -149,22 +150,32 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 /// letting a download go states what that costs a tracker's opinion of somebody and
 /// then asks the client to take it; a disk account names what it would reclaim and
 /// then takes it; removing the tier that reaches the operator's own content lists
-/// what would go and then removes it. Each is two requests with a decision in the
-/// gap, and in that gap the thing that was read can move — a repair's effects
+/// what would go and then removes it; standing in place of a setup already here
+/// names what it would stop and then stops it. Each is two requests with a decision
+/// in the gap, and in that gap the thing that was read can move — a repair's effects
 /// rewritten by a fresh diagnosis, a restore's re-point derived again from a data root
 /// that has changed, a download's ratio earned while somebody was deciding, a file on
-/// offer imported after all. So the answer names what it was given for, and the run
+/// offer imported after all, a container started in the setup a replacement would
+/// stop. So the answer names what it was given for, and the run
 /// that acts builds that name again and compares.
 ///
 /// On a repair, a restore and a removal it sits beside a `confirm` that can stand in
-/// for it where nothing needs naming. On letting a download go and on reclaiming room
-/// there is no `confirm` at all — see [`TAKES_AGREEMENT`], which leaves both out — so
-/// the name of the offer is the only way to say yes. That is the point of it there: a
-/// blanket yes to a removal would be agreement from somebody who had not read what
-/// would go.
+/// for it where nothing needs naming. On letting a download go, on reclaiming room and
+/// on replacing a setup there is no `confirm` at all — see [`TAKES_AGREEMENT`], which
+/// leaves all three out — so the name of the offer is the only way to say yes. That is
+/// the point of it there: a blanket yes to a removal would be agreement from somebody
+/// who had not read what would go, and one to a replacement from somebody who had not
+/// read what would stop.
 ///
 /// Everywhere else the reply is the answer.
-pub const TAKES_CONSENT: &[&str] = &["repair", "restore", "space", "stop-seeding", "uninstall"];
+pub const TAKES_CONSENT: &[&str] = &[
+    "migrate-replace",
+    "repair",
+    "restore",
+    "space",
+    "stop-seeding",
+    "uninstall",
+];
 
 /// The action whose command carries which completed download it is about.
 ///

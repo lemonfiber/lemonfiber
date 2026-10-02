@@ -211,6 +211,7 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
             beside: Vec::new(),
         }),
         household: Panel::Ready(crate::model::HouseholdReport {
+            rehearsed: false,
             members: Vec::new(),
             available: true,
             findings: Vec::new(),

@@ -99,6 +99,7 @@ fn substituting(
 
     if ctx.dry_run {
         return Ok(SubstitutionReport {
+            rehearsed: false,
             substitution,
             applied: false,
         });
@@ -130,6 +131,7 @@ fn substituting(
     }
 
     Ok(SubstitutionReport {
+        rehearsed: false,
         substitution,
         applied: true,
     })

@@ -140,6 +140,12 @@ codes! {
         /// Raised when the stack's own location is not on the machine being operated.
         ABSENT_THERE = "LIFE-6",
     }
+    /// The `MIGRATE` codes.
+    migrate {
+        /// Raised when a replacement was agreed to for an offer that is not the one
+        /// standing now.
+        OFFER_MOVED = "MIGRATE-1",
+    }
     /// The `PAIR` codes.
     pair {
         /// Raised when there is nowhere to keep what pairing a phone needs.

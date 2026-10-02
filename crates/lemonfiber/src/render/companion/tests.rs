@@ -55,6 +55,7 @@ fn a_numbered_address_is_cautioned_beside_it() {
 fn replacing_says_its_cost_before_and_its_new_certificate_after() {
     let kept = Some("ab".repeat(32));
     let asked = certificate(&Replacement {
+        rehearsed: false,
         replaced: false,
         fingerprint: kept.clone(),
         consequence: "Every phone refuses it.".to_owned(),
@@ -68,6 +69,7 @@ fn replacing_says_its_cost_before_and_its_new_certificate_after() {
     assert!(asked.contains("companion certificate --confirm"), "{asked}");
 
     let done = certificate(&Replacement {
+        rehearsed: false,
         replaced: true,
         fingerprint: kept,
         consequence: "Every phone refuses it.".to_owned(),
@@ -77,6 +79,7 @@ fn replacing_says_its_cost_before_and_its_new_certificate_after() {
     assert!(done.contains("A phone paired from now on pins"), "{done}");
 
     let none = certificate(&Replacement {
+        rehearsed: false,
         replaced: false,
         fingerprint: None,
         consequence: "Every phone refuses it.".to_owned(),
@@ -94,6 +97,7 @@ fn both_answers_are_shaped_by_their_own_renderer() {
         pairing(&report).text()
     );
     let replaced = Replacement {
+        rehearsed: false,
         replaced: true,
         fingerprint: Some("ab".repeat(32)),
         consequence: "Every phone refuses it.".to_owned(),

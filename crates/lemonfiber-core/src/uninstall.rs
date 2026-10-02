@@ -203,6 +203,11 @@ pub struct Uninstall {
     pub manifest: Manifest,
     /// Whether anything was removed on this run.
     pub removal: Removal,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    ///
+    /// Said in a field of its own so that a rehearsal is never told from the real run by
+    /// its wording alone.
+    pub rehearsed: bool,
 }
 
 /// What the lines that are going occupy.

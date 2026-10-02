@@ -16,6 +16,47 @@
 //! whether a caller may ask at all is decided above, once, for every request. And
 //! it is a race and replay guard rather than a permission: anybody who can send the
 //! second request could have made the change themselves.
+//!
+//! **An answer refused for naming what has since moved is one refusal, wherever it
+//! is raised.** It is the one a client answers by reading again and offering what it
+//! reads now, rather than by reporting a failure, so it has to be told from every
+//! other by its code alone. [`MOVED`] is every code it carries, and [`moved`] is how
+//! each is raised: the web API publishes the list among the refusals it answers
+//! with, and answers each at the status [`MOVED_AMISS`] gives, so a code added here
+//! reaches a client as a regenerated diff and a refusal raised without [`moved`]
+//! would be answered as a failure of the machine.
+
+use crate::error::codes::{gone, migrate, repair, restore, space};
+use crate::error::{Amiss, Code, Problem};
+
+/// Every code an answer is refused with for naming an offer or a listing that has
+/// since moved.
+///
+/// Each is declared beside its family rather than here, because the family is where
+/// an operator searching for the code reads what else that command refuses. Letting a
+/// download go raises the disk account's, because its offer is one line of that
+/// account.
+pub const MOVED: [Code; 5] = [
+    repair::STALE,
+    restore::MOVED_ON,
+    migrate::OFFER_MOVED,
+    space::ANOTHER_OFFER,
+    gone::ANOTHER_READING,
+];
+
+/// Where the fault lies in an answer that named what has since moved.
+///
+/// In how it asked: nothing is broken, and the same request with the name that
+/// stands now is answered. Not a failure of the machine, which is what a client
+/// gives up on, and not other work holding the stack, which a client waits out.
+pub const MOVED_AMISS: Amiss = Amiss::Asking;
+
+/// The refusal of an answer that named what has since moved, as every command
+/// raising one raises it.
+#[must_use]
+pub fn moved(refusal: Problem) -> Problem {
+    refusal.lies_in(MOVED_AMISS)
+}
 
 /// A checksum over every word an operator read before agreeing.
 ///

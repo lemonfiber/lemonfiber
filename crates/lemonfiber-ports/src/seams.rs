@@ -27,6 +27,7 @@ use crate::time::Clock;
 use crate::FileSystem;
 
 /// The seams a run reaches the outside world through.
+#[derive(Clone)]
 pub struct Seams {
     /// How programs are run.
     pub runner: Arc<dyn Runner>,

@@ -137,6 +137,7 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
     let held = read(ctx)?;
     match action {
         Asked::Installed => Ok(Installs {
+            rehearsed: false,
             substituted: standing::substituted(
                 held.installed(),
                 &super::targets::chosen_fillers(ctx),
@@ -314,6 +315,7 @@ async fn install(
     let standing = if recorded { after } else { held };
 
     Ok(Installs {
+        rehearsed: false,
         removal: None,
         installed: standing.installed().to_vec(),
         install: Some(Box::new(Install {

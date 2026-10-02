@@ -249,6 +249,7 @@ fn an_answer_that_is_not_a_restoration_calls_for_no_re_point() {
 /// An update's own account of itself, with `coming` still on the way down.
 fn an_update(coming: &[&str]) -> Outcome {
     Outcome::Update(lemonfiber_core::update::run::Report {
+        rehearsed: false,
         state: lemonfiber_core::update::State::UpdatesAvailable,
         changes: Vec::new(),
         in_flight: coming.iter().map(|one| (*one).to_owned()).collect(),

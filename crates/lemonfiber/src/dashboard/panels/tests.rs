@@ -33,6 +33,7 @@ fn said(lines: &[ratatui::text::Line<'static>]) -> Vec<String> {
 /// A household with one request in each state, for the panel to choose from.
 fn asked(states: &[Option<State>]) -> Panel<HouseholdReport> {
     Panel::Ready(HouseholdReport {
+        rehearsed: false,
         members: vec![HouseholdMember {
             name: "Ana".to_owned(),
             requests: states
@@ -120,6 +121,7 @@ fn a_household_panel_that_could_not_be_filled_says_why() {
 #[test]
 fn a_request_service_that_was_not_read_says_so_rather_than_looking_empty() {
     let unread = Panel::Ready(HouseholdReport {
+        rehearsed: false,
         members: Vec::new(),
         available: false,
         findings: vec!["seerr did not answer".to_owned()],

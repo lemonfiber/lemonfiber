@@ -26,6 +26,7 @@ fn beyond() -> Beyond {
 
 fn report(acted: bool, outcomes: Vec<Outcome>) -> Report {
     Report {
+        rehearsed: false,
         offered: vec![repair()],
         agreement: agreement(&[repair()]),
         beyond: Vec::new(),
@@ -100,6 +101,7 @@ fn every_outcome_reads_as_what_it_was() {
 #[test]
 fn a_fault_past_repairing_is_named_with_somewhere_to_go() {
     let past = Report {
+        rehearsed: false,
         offered: Vec::new(),
         agreement: agreement(&[]),
         mended: Vec::new(),

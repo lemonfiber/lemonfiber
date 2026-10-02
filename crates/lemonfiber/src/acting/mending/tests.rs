@@ -43,6 +43,7 @@ pub(crate) fn offering(offered: Vec<Repair>) -> Report {
 /// first of the two can be answered.
 pub(crate) fn a_diagnosis() -> DoctorReport {
     DoctorReport {
+        rehearsed: false,
         overall: Overall::Degraded,
         findings: vec![
             Finding::in_category(

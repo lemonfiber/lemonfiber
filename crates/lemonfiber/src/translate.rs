@@ -110,7 +110,11 @@ pub(crate) fn migrating(action: Option<&MigrateCommand>) -> MigrateAction {
         MigrateCommand::Adopt { confirm } => (Mode::Adopt, *confirm),
         MigrateCommand::Import { confirm } => (Mode::Import, *confirm),
         MigrateCommand::Beside { confirm } => (Mode::Beside, *confirm),
-        MigrateCommand::Replace { confirm } => (Mode::Replace, *confirm),
+        MigrateCommand::Replace { offer } => {
+            return MigrateAction::Replace {
+                offer: offer.clone(),
+            }
+        }
     };
     MigrateAction::Act { mode, confirmed }
 }
