@@ -164,7 +164,8 @@ async fn greeted(ctx: Ctx) -> ExitCode {
         say!("lemonfiber — run `lemonfiber --help` to see what it can do");
         return ExitCode::SUCCESS;
     };
-    greeting(ctx, &paths, &Console).await
+    // Boxed: a first run holds the whole of its state across its waits.
+    Box::pin(greeting(ctx, &paths, &Console)).await
 }
 
 /// The diagnosis a `doctor` run asked for, or the code a repairing one ended with.

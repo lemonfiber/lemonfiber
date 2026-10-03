@@ -4796,6 +4796,12 @@
           ],
           "required": true
         },
+        "running": {
+          "type": [
+            "array|null[string]"
+          ],
+          "required": false
+        },
         "services": {
           "type": [
             "array[string]"

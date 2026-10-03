@@ -18,6 +18,8 @@ mod grounded;
 pub(crate) mod halted;
 mod inflight;
 mod lock;
+mod preview;
+pub(crate) use preview::preview;
 mod remote;
 // Reached from outside this module by the one lifecycle path that does not run the
 // prelude the rest share, which is the staged half of an update.
@@ -383,22 +385,6 @@ pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Ma
     if let Some(key) = crate::secret::generate(ctx.seams.random.as_ref()) {
         super::targets::record_secret(ctx, crate::config::BINDERY_API_KEY, &key);
     }
-}
-
-/// What naming these forms would come to, without running anything.
-///
-/// The same resolution a lifecycle command does, stopping where it would start
-/// spawning Compose — so what this answers and what that does cannot disagree
-/// about which services a form holds or why one was left out. A surface states
-/// it before acting; an operator can also just ask.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] a surface should render when the stack cannot be read
-/// or the forms cannot be resolved — an unknown name among them, a form that
-/// refuses company, or a closure the configuration empties.
-pub(crate) fn preview(ctx: &Ctx, forms: &[String]) -> Result<Plan, Box<Problem>> {
-    resolved(ctx, forms).map(|(_, plan)| plan)
 }
 
 /// The stack's manifest, and what the named forms come to in it.

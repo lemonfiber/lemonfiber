@@ -199,6 +199,7 @@ async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
         dropped: Vec::new(),
         filtered: Vec::new(),
         footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
     };
     let command = build(
         &plan,

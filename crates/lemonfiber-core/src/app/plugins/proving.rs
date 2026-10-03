@@ -148,6 +148,7 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
         dropped: Vec::new(),
         filtered: Vec::new(),
         footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
     };
     build(&plan, &settings, stack, action, ctx.environment)
 }
@@ -193,6 +194,7 @@ pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
         dropped: Vec::new(),
         filtered: Vec::new(),
         footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
     };
     let restart = Action::Restart(vec![service.to_owned()]);
     let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);

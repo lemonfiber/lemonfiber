@@ -411,7 +411,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     match command {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
-        Command::Preview { forms } => engine::preview(ctx, &forms).map(Outcome::Preview),
+        Command::Preview { forms } => engine::preview(ctx, &forms).await.map(Outcome::Preview),
         Command::Up { forms } => lifecycle(ctx, &forms, Action::Up).await,
         Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::Lifecycle),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,

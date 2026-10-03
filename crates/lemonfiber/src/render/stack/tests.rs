@@ -4,7 +4,7 @@ use lemonfiber_core::docker::{Condition, State};
 use lemonfiber_core::model::{
     LifecycleReport, ResetReport, StackEdit, StatusReport, SupervisionReport,
 };
-use lemonfiber_core::stack::closure::{Dropped, Filtered, Footprint};
+use lemonfiber_core::stack::closure::{Dropped, Filtered, Footprint, Running};
 
 #[test]
 fn a_reset_names_every_change_it_would_revert() {
@@ -690,6 +690,44 @@ fn a_status_report_names_the_running_forms_and_what_they_left_out() {
     assert!(text.contains("running for: tv, movies"), "{text}");
     assert!(
         text.contains("left out: Gluetun — no VPN and torrent client are configured"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_preview_names_what_is_already_running_and_says_nothing_where_nothing_is() {
+    let plan = Plan {
+        services: vec!["sonarr".to_owned(), "bazarr".to_owned()],
+        ..a_plan("tv", Vec::new())
+    };
+    let some = preview(&Plan {
+        running: Running::Read(vec!["bazarr".to_owned()]),
+        ..plan.clone()
+    })
+    .text();
+    assert!(
+        some.contains("already running, and left as they are: bazarr"),
+        "{some}"
+    );
+    for quiet in [Running::Read(Vec::new()), Running::Unasked] {
+        let said = preview(&Plan {
+            running: quiet,
+            ..plan.clone()
+        })
+        .text();
+        assert!(!said.contains("already running"), "{said}");
+    }
+}
+
+#[test]
+fn a_preview_that_could_not_read_what_is_running_says_so() {
+    let text = preview(&Plan {
+        running: Running::Unread,
+        ..a_plan("tv", Vec::new())
+    })
+    .text();
+    assert!(
+        text.contains("whether any of these are already running could not be read"),
         "{text}"
     );
 }

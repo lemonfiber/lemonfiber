@@ -513,3 +513,29 @@ fn a_filtered_service_is_named_with_what_it_needed_and_who_asked() {
         && out.forms == named(&["dl"])
         && !out.name.is_empty()));
 }
+
+/// A plan says which of its services are running only where something asked, and says
+/// an unread engine as unread: absent, `null` and a list are three different answers.
+#[test]
+fn a_plan_says_what_is_running_only_where_it_was_asked() {
+    let said = |running: super::Running| {
+        let plan = super::Plan {
+            forms: vec!["tv".to_owned()],
+            profiles: std::collections::BTreeSet::new(),
+            services: vec!["sonarr".to_owned()],
+            dropped: Vec::new(),
+            filtered: Vec::new(),
+            footprint: super::Footprint::default(),
+            running,
+        };
+        serde_json::to_value(plan)
+            .ok()
+            .and_then(|value| value.get("running").cloned())
+    };
+    assert_eq!(said(super::Running::Unasked), None);
+    assert_eq!(said(super::Running::Unread), Some(serde_json::Value::Null));
+    assert_eq!(
+        said(super::Running::Read(vec!["sonarr".to_owned()])),
+        Some(serde_json::json!(["sonarr"]))
+    );
+}

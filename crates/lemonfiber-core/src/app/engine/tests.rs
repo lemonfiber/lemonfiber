@@ -199,6 +199,7 @@ fn an_action_is_aimed_at_what_it_names_or_else_at_its_plan() {
         dropped: Vec::new(),
         filtered: Vec::new(),
         footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
     };
     let one = vec!["gluetun".to_owned()];
     for action in [
