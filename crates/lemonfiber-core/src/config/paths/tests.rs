@@ -41,6 +41,7 @@ fn configuration_and_regenerable_data_are_kept_apart() {
         paths.admission(),
         paths.updates(),
         paths.plugins(),
+        paths.gate_read(),
     ];
     let data: Vec<PathBuf> = vec![
         paths.stack(),

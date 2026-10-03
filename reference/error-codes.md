@@ -73,6 +73,8 @@ what to do about it, is written for operators at
 - `FORM-2`
 - `FORM-3`
 - `FORM-4`
+- `GATE-1`
+- `GATE-2`
 - `GONE-1`
 - `GONE-2`
 - `GONE-3`

@@ -24,6 +24,11 @@ pub struct Paths {
 /// somewhere the reversal will not look.
 pub(crate) const JOURNAL: &str = "journal.jsonl";
 
+/// The file name of the last entry of the request gate's record a diagnosis read,
+/// named once because a running check reaches it beside the environment file rather
+/// than through this layout.
+pub const GATE_READ: &str = "gate-read.json";
+
 /// The install record's file name, named once for the reason the journal's is: the
 /// command that writes it reaches it beside the environment file rather than through
 /// this layout, so the two spellings have to be one.
@@ -111,6 +116,15 @@ impl Paths {
     #[must_use]
     pub fn baseline(&self) -> PathBuf {
         self.config.join("baseline.json")
+    }
+
+    /// The last entry of the request gate's record a diagnosis read, so the next one
+    /// reports only what came after. Kept with configuration because it records what
+    /// this operator has been shown: a restore that lost it would show them every
+    /// refusal and removal the record still holds again, as though each were new.
+    #[must_use]
+    pub fn gate_read(&self) -> PathBuf {
+        self.config.join(GATE_READ)
     }
 
     /// Where the words this operator has gone and found out about are kept.

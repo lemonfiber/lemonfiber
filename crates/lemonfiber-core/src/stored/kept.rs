@@ -205,6 +205,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::handoffs,
     },
     Entry {
+        accessor: "gate_read",
+        what: "where the request gate's record was last read",
+        why: "The doctor reports what the request gate refused and removed since it last \
+              looked. This is the place it reached, so each refusal and removal is reported \
+              once.",
+        secret: false,
+        at: Paths::gate_read,
+    },
+    Entry {
         accessor: "plugins",
         what: "what is installed of somebody else's",
         why: "Each plugin you installed, and what installing it settled: the images it runs, \

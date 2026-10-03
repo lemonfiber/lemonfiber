@@ -65,7 +65,7 @@ mod operating;
 mod serving;
 
 pub use operating::{
-    ack, ask, bind, config, diag, docker, env, form, host, life, migrate, pair, proc, read,
+    ack, ask, bind, config, diag, docker, env, form, gate, host, life, migrate, pair, proc, read,
     rehearse, serve, setup, stack, telling, tui, update, watch, word,
 };
 pub use serving::{
