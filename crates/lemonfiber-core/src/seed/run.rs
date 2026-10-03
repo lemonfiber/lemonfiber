@@ -32,7 +32,7 @@ mod subtitles;
 // Seerr's Jellyfin connection, held at the request gate's Jellyfin route.
 mod linking;
 // The request gate's tokens, one per route, held raw by the request service alone.
-mod tokens;
+pub(crate) mod tokens;
 use fulfilment::seed_fulfilment_targets;
 pub(crate) mod identity;
 mod reset;

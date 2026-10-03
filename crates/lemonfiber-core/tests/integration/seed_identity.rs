@@ -151,7 +151,17 @@ impl Requests for FakeReq {
     async fn move_fulfilment_target(
         &self,
         _held: &lemonfiber_core::ports::service::RegisteredTarget,
-        _target: &lemonfiber_core::ports::service::FulfilmentTarget,
+        _at: &lemonfiber_core::ports::service::Endpoint,
+        _key: &str,
+    ) -> Result<(), Failure> {
+        Ok(())
+    }
+
+    async fn test_fulfilment_target(
+        &self,
+        _television: bool,
+        _at: &lemonfiber_core::ports::service::Endpoint,
+        _key: &str,
     ) -> Result<(), Failure> {
         Ok(())
     }

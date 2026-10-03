@@ -171,9 +171,9 @@ pub async fn wire_fulfilment_targets(
             .and_then(|from| held_at(&existing, from, target.television));
         let state = match here.or(before) {
             Some(held) if held.at == target.at && held.key == target.key => State::AlreadyWired,
-            Some(held) => moved(seerr, held, target, rehearsing).await,
+            Some(held) => tested(seerr, target, moved(seerr, held, target, rehearsing).await).await,
             None => {
-                wire_one(
+                let added = wire_one(
                     seerr.add_fulfilment_target(target),
                     seerr.fulfilment_targets(),
                     |rows| held_at(rows, &target.at, target.television).map(|have| have.id.clone()),
@@ -189,12 +189,30 @@ pub async fn wire_fulfilment_targets(
                         ours: Some(reached_at(&target.at)),
                     }),
                 )
-                .await
+                .await;
+                tested(seerr, target, added).await
             }
         };
         wirings.push(Wiring::settled(described_target(target), state));
     }
     wirings
+}
+
+/// `written`, where it is a target just wired, held to the request service's own test
+/// of it: a target is wired only once the service has reached the \*arr with it.
+async fn tested(seerr: &dyn Requests, target: &FulfilmentTarget, written: State) -> State {
+    if written != State::Wired {
+        return written;
+    }
+    match seerr
+        .test_fulfilment_target(target.television, &target.at, &target.key)
+        .await
+    {
+        Ok(()) => State::Wired,
+        Err(failure) => State::Failed {
+            detail: format!("Seerr's own test of the target failed: {failure}"),
+        },
+    }
 }
 
 /// Move a target the request service holds to where, and with what, it should be
@@ -212,7 +230,10 @@ async fn moved(
             ours: Some(reached_at(&target.at)),
         };
     }
-    match seerr.move_fulfilment_target(held, target).await {
+    match seerr
+        .move_fulfilment_target(held, &target.at, &target.key)
+        .await
+    {
         Ok(()) => State::Wired,
         Err(failure) => unreached(&failure),
     }

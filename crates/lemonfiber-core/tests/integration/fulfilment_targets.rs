@@ -306,7 +306,17 @@ fn gated() -> FulfilmentTarget {
 /// A request service listing `listed` for Sonarr on every read, and answering a move
 /// with `moved`.
 fn moving(listed: &str, moved: u16) -> (Seerr, Arc<Fake>) {
+    moving_tested(listed, moved, 200)
+}
+
+/// [`moving`], answering its own test of a target with `tested`.
+fn moving_tested(listed: &str, moved: u16, tested: u16) -> (Seerr, Arc<Fake>) {
     let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Post,
+            "/settings/sonarr/test",
+            vec![Answer::reply(tested, String::new())],
+        ),
         (
             Method::Get,
             "/settings/radarr",
@@ -417,7 +427,7 @@ async fn a_move_that_does_not_land_is_reported() {
         television: true,
     };
     let said = seerr
-        .move_fulfilment_target(&gone, &gated())
+        .move_fulfilment_target(&gone, &gated().at, "the-token")
         .await
         .err()
         .map(|failure| failure.to_string())
@@ -462,7 +472,9 @@ async fn a_film_target_moves_within_the_film_list() {
         ..gated()
     };
 
-    let moved = seerr.move_fulfilment_target(&held, &film).await;
+    let moved = seerr
+        .move_fulfilment_target(&held, &film.at, &film.key)
+        .await;
 
     assert!(moved.is_ok(), "{moved:?}");
     assert!(http
@@ -501,7 +513,10 @@ async fn a_move_or_registration_the_service_does_not_answer_fails() {
         let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
 
         assert!(
-            seerr.move_fulfilment_target(&held, &gated()).await.is_err(),
+            seerr
+                .move_fulfilment_target(&held, &gated().at, "the-token")
+                .await
+                .is_err(),
             "{name}"
         );
     }
@@ -513,4 +528,29 @@ async fn a_move_or_registration_the_service_does_not_answer_fails() {
     )]);
     let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
     assert!(seerr.add_fulfilment_target(&sonarr()).await.is_err());
+}
+
+/// A target moved but not reached by the request service's own test is not wired.
+#[tokio::test]
+async fn a_target_the_request_service_cannot_reach_is_not_wired() {
+    let (seerr, http) = moving_tested(HELD_DIRECTLY, 200, 500);
+
+    let states = wire(&seerr, &[gated()]).await;
+
+    assert!(
+        matches!(states.first(), Some(State::Failed { detail }) if detail.starts_with("Seerr's own test of the target failed: ")),
+        "{states:?}"
+    );
+    let tested = http
+        .requests()
+        .into_iter()
+        .find(|asked| asked.url.ends_with("/settings/sonarr/test"))
+        .and_then(|asked| asked.body)
+        .unwrap_or_default();
+    assert!(
+        tested.contains("\"hostname\":\"request-gate\"")
+            && tested.contains("\"baseUrl\":\"/sonarr\"")
+            && tested.contains("\"apiKey\":\"the-token\""),
+        "{tested}"
+    );
 }
