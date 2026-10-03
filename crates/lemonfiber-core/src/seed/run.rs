@@ -29,6 +29,8 @@ mod minted;
 mod published;
 pub(crate) use published::published_as;
 mod subtitles;
+// Seerr's Jellyfin connection, held at the request gate's Jellyfin route.
+mod linking;
 // The request gate's tokens, one per route, held raw by the request service alone.
 mod tokens;
 use fulfilment::seed_fulfilment_targets;
@@ -212,29 +214,17 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         aggregators::seed_aggregators(ctx, &manifest.services, project.as_deref(), &filled).await,
     );
 
-    // Jellyfin as Seerr's identity source: one household account, not two.
-    // Jellyfin has no key to read, so its admin password is minted and recorded
-    // like qBittorrent's, then Seerr is pointed at it.
-    //
-    // Ahead of everything that talks to the request service, because this is what
-    // gives it an owner. A request service with none refuses the credential, and a
-    // pass that asked it for anything first would report a fresh stack as broken and
-    // then, in the same run, fix what it had just reported.
-    let (identity_wirings, identity_records) =
-        seed_jellyfin_identity(ctx, &manifest.services, &baseline, &filled).await;
-    wirings.extend(identity_wirings);
-    baseline.merge(&identity_records);
-
-    // Which origins a browser may read the media server from: the front door's alone.
-    // After the identity step, because that is the run that records the administrator
-    // credential this is written with.
-    wirings.extend(cors::seed_cors(ctx, &manifest.services).await);
-
-    // The decline service's key, minted with the same administrator session.
-    wirings.extend(decline::seed_decline_key(ctx, &manifest.services, project.as_deref()).await);
-
-    // The request gate's routes, with the same session.
-    wirings.extend(gate::seed_gate_routes(ctx, &manifest.services, project.as_deref()).await);
+    // The media server and everything that signs in to it as its administrator.
+    wirings.extend(
+        seed_media_server(
+            ctx,
+            &manifest.services,
+            project.as_deref(),
+            &filled,
+            &mut baseline,
+        )
+        .await,
+    );
 
     // The *arrs the request service hands a request to. Without this the household
     // can ask and nothing downstream ever hears, and with it the request surface
@@ -429,6 +419,48 @@ fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
 /// temporary password is printed once, early, so a generous tail finds it well
 /// after start without pulling the whole log.
 const TEMP_PASSWORD_LOG_LINES: u32 = 200;
+
+/// The media server's administrator, and everything that signs in with it: who may
+/// read the server from a browser, the decline service's key, the request gate's
+/// routes, and the request service pointed at the server.
+async fn seed_media_server(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
+    baseline: &mut crate::baseline::Baseline,
+) -> Vec<crate::seed::Wiring> {
+    // Jellyfin as Seerr's identity source: one household account, not two. In two
+    // halves, because what Seerr is pointed at may need the first: Jellyfin has no key
+    // to read, so its admin password is minted and recorded like qBittorrent's here,
+    // and the request gate's Jellyfin key below is minted with it.
+    let mut wirings = Vec::new();
+    let admin = identity::seed_jellyfin_admin(ctx, services, filled).await;
+
+    // Which origins a browser may read the media server from: the front door's alone.
+    // After the identity's first half, because that is what records the administrator
+    // credential this is written with.
+    wirings.extend(cors::seed_cors(ctx, services).await);
+
+    // The decline service's key, minted with the same administrator session.
+    wirings.extend(decline::seed_decline_key(ctx, services, project).await);
+
+    // The request gate's routes, with the same session.
+    wirings.extend(gate::seed_gate_routes(ctx, services, project).await);
+
+    // The second half: Seerr pointed at Jellyfin, through the gate where the stack runs
+    // one, whose routes the step above wrote.
+    //
+    // Ahead of everything that talks to the request service, because this is what
+    // gives it an owner. A request service with none refuses the credential, and a
+    // pass that asked it for anything first would report a fresh stack as broken and
+    // then, in the same run, fix what it had just reported.
+    let (identity_wirings, identity_records) =
+        seed_jellyfin_identity(ctx, services, baseline, filled, admin, project).await;
+    baseline.merge(&identity_records);
+    wirings.extend(identity_wirings);
+    wirings
+}
 
 #[cfg(test)]
 mod tests;

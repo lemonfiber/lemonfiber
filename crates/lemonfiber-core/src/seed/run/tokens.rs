@@ -65,7 +65,7 @@ impl Kept {
                 .iter()
                 .find(|have| have.at == at && have.television == target.television)
                 .map(|have| have.key.clone())
-                .filter(|key| self.accepted.accepts(&route, key));
+                .filter(|key| self.accepts(&route, key));
             let Some(key) = holding.or_else(|| crate::secret::generate(ctx.seams.random.as_ref()))
             else {
                 refused.push(Wiring::settled(
@@ -86,22 +86,21 @@ impl Kept {
         (gated, refused)
     }
 
-    /// Hand the gate every token in `gated` beside what it accepts now, so the request
-    /// service may be given them without a call failing in between.
+    /// Hand the gate every token `presented` on its route beside what it accepts now,
+    /// so the request service may be given them without a call failing in between.
     ///
     /// # Errors
     ///
     /// The reason the file could not be written.
-    pub(super) fn beside(&self, gated: &[FulfilmentTarget]) -> Result<Tokens, String> {
+    pub(super) fn beside(&self, presented: &[Presented]) -> Result<Tokens, String> {
         let mut routes = self.accepted.routes.clone();
-        for target in gated {
-            let hash = TokenHash::of(&target.key);
-            let route = route_of(target);
-            match routes.iter_mut().find(|one| one.route == route) {
-                Some(one) if one.tokens.contains(&hash) => {}
-                Some(one) => one.tokens.push(hash),
+        for one in presented {
+            let hash = TokenHash::of(&one.token);
+            match routes.iter_mut().find(|held| held.route == one.route) {
+                Some(held) if held.tokens.contains(&hash) => {}
+                Some(held) => held.tokens.push(hash),
                 None => routes.push(Accepted {
-                    route,
+                    route: one.route.clone(),
                     tokens: vec![hash],
                 }),
             }
@@ -113,7 +112,7 @@ impl Kept {
         Ok(beside)
     }
 
-    /// Leave the gate accepting on each route of `gated` only the token the request
+    /// Leave the gate accepting on each route of `presented` only the token the request
     /// service now holds, where `held` says it holds it; every other route as it was.
     ///
     /// # Errors
@@ -122,14 +121,13 @@ impl Kept {
     pub(super) fn only(
         &self,
         beside: &Tokens,
-        gated: &[FulfilmentTarget],
+        presented: &[Presented],
         held: &[bool],
     ) -> Result<(), String> {
         let mut routes = beside.routes.clone();
-        for (target, _) in gated.iter().zip(held).filter(|(_, held)| **held) {
-            let route = route_of(target);
-            if let Some(one) = routes.iter_mut().find(|one| one.route == route) {
-                one.tokens = vec![TokenHash::of(&target.key)];
+        for (one, _) in presented.iter().zip(held).filter(|(_, held)| **held) {
+            if let Some(kept) = routes.iter_mut().find(|kept| kept.route == one.route) {
+                kept.tokens = vec![TokenHash::of(&one.token)];
             }
         }
         let only = Tokens::of(routes);
@@ -139,9 +137,17 @@ impl Kept {
         self.write(&only)
     }
 
-    /// Where the tokens are kept.
-    pub(super) fn path(&self) -> &Path {
-        &self.path
+    /// Whether the gate accepts `token` on `route` now.
+    pub(super) fn accepts(&self, route: &str, token: &str) -> bool {
+        self.accepted.accepts(route, token)
+    }
+
+    /// Why the tokens could not be handed to the gate, for the report.
+    pub(super) fn unwritten(&self, reason: &str) -> String {
+        format!(
+            "the tokens could not be written to {}: {reason}",
+            self.path.display()
+        )
     }
 
     fn write(&self, tokens: &Tokens) -> Result<(), String> {
@@ -150,7 +156,20 @@ impl Kept {
     }
 }
 
-/// The route `target` is reached on through the gate.
-fn route_of(target: &FulfilmentTarget) -> String {
-    target.at.base.trim_start_matches('/').to_owned()
+/// A token the request service is to present on a route.
+pub(super) struct Presented {
+    /// The route.
+    pub(super) route: String,
+    /// The token.
+    pub(super) token: String,
+}
+
+impl Presented {
+    /// What `target`, reached through the gate, presents there.
+    pub(super) fn by(target: &FulfilmentTarget) -> Self {
+        Self {
+            route: target.at.base.trim_start_matches('/').to_owned(),
+            token: target.key.clone(),
+        }
+    }
 }

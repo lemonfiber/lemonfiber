@@ -116,8 +116,18 @@ fn the_request_service_is_set_up_before_anything_is_registered_into_it() {
         .unwrap_or_default();
     let shipped = production(&seed);
 
+    // The request service is set up among the media server's steps, which run as one.
+    let helper = shipped
+        .find("async fn seed_media_server(")
+        .unwrap_or(shipped.len());
+    assert!(
+        shipped
+            .get(helper..)
+            .is_some_and(|body| body.contains("seed_jellyfin_identity(")),
+        "the request service is set up among the media server's steps"
+    );
     let (Some(identity), Some(targets)) = (
-        shipped.find("seed_jellyfin_identity("),
+        shipped.find("seed_media_server("),
         shipped.find("seed_fulfilment_targets("),
     ) else {
         unreachable!("seeding sets up the request service and registers the *arrs into it");

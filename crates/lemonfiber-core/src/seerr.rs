@@ -19,6 +19,7 @@ use serde::Deserialize;
 
 mod addressing;
 mod asking;
+mod linking;
 mod members;
 mod notices;
 mod records;
@@ -30,7 +31,8 @@ use records::{RequestPage, RequestRecord, REQUEST_PAGE};
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{
-    Failure, FulfilmentTarget, HouseholdRequest, RegisteredTarget, Requesting, Requests, Telling,
+    Failure, FulfilmentTarget, HouseholdRequest, MediaServerLink, RegisteredTarget, Requesting,
+    Requests, Telling,
 };
 
 /// Seerr's own API key, read from the settings file it writes.
@@ -309,6 +311,18 @@ impl Requests for Seerr {
         target: &FulfilmentTarget,
     ) -> Result<(), Failure> {
         targets::move_fulfilment_target(self, held, target).await
+    }
+
+    async fn media_server_link(&self) -> Result<MediaServerLink, Failure> {
+        linking::media_server_link(self).await
+    }
+
+    async fn link_media_server(
+        &self,
+        at: &crate::ports::service::Endpoint,
+        key: &str,
+    ) -> Result<(), Failure> {
+        linking::link_media_server(self, at, key).await
     }
 
     async fn link_members(&self, members: &[String]) -> Result<(), Failure> {

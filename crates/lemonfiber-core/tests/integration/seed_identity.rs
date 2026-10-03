@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use crate::common;
 use async_trait::async_trait;
 use lemonfiber_core::ports::service::{Failure, HouseholdRequest, MediaServer, Requests, Telling};
-use lemonfiber_core::seed::{wire_jellyfin_identity, State};
+use lemonfiber_core::seed::{wire_jellyfin_admin, wire_seerr_identity, State};
 
 // ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
 
@@ -156,6 +156,22 @@ impl Requests for FakeReq {
         Ok(())
     }
 
+    async fn media_server_link(
+        &self,
+    ) -> Result<lemonfiber_core::ports::service::MediaServerLink, Failure> {
+        Err(Failure::Unavailable {
+            service: "seerr".to_owned(),
+        })
+    }
+
+    async fn link_media_server(
+        &self,
+        _at: &lemonfiber_core::ports::service::Endpoint,
+        _key: &str,
+    ) -> Result<(), Failure> {
+        Ok(())
+    }
+
     /// Neither is anything about removing somebody: this file is about identity setup.
     /// A fake that refused would make every test here about a second service.
     async fn member_for(&self, _media_server_id: &str) -> Result<Option<String>, Failure> {
@@ -235,16 +251,15 @@ async fn identity(
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
     let random = lemonfiber_fixtures::ports::Chance::exactly(random);
-    let (wiring, minted) = wire_jellyfin_identity(
-        &media,
-        &seerr,
-        &random,
-        recorded,
-        "http://jellyfin:8096",
-        false,
-    )
-    .await;
-    (wiring.state, minted)
+    match wire_jellyfin_admin(&media, &random, recorded, false).await {
+        Ok((password, minted)) => (
+            wire_seerr_identity(&seerr, &password, "http://jellyfin:8096", false)
+                .await
+                .state,
+            minted,
+        ),
+        Err(state) => (state, None),
+    }
 }
 
 /// The same two services, asked what the pass would do rather than asked to do it.
@@ -256,16 +271,15 @@ async fn would_identity(
     // Randomness is available on purpose: what proves nothing was minted is that
     // nothing came back, not that nothing could have.
     let random = lemonfiber_fixtures::ports::Chance::exactly(Some(RANDOM.to_vec()));
-    let (wiring, minted) = wire_jellyfin_identity(
-        &media,
-        &seerr,
-        &random,
-        recorded,
-        "http://jellyfin:8096",
-        true,
-    )
-    .await;
-    (wiring.state, minted)
+    match wire_jellyfin_admin(&media, &random, recorded, true).await {
+        Ok((password, minted)) => (
+            wire_seerr_identity(&seerr, &password, "http://jellyfin:8096", true)
+                .await
+                .state,
+            minted,
+        ),
+        Err(state) => (state, None),
+    }
 }
 
 fn media(startup: Startup, create: Create) -> FakeMedia {

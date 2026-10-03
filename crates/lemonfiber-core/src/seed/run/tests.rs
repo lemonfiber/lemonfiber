@@ -369,6 +369,7 @@ mod cors;
 mod decline;
 mod gate;
 mod identity;
+mod linking;
 mod passwords;
 mod publishing;
 mod requests;

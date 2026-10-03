@@ -14,48 +14,96 @@ use super::Ctx;
 /// that ask, whether a person is who they say they are.
 const IDENTITY: &str = "identity.source";
 
-/// Make whatever fills the identity source the one Seerr signs in against, so the
-/// household signs in once.
+/// Jellyfin's administrator, as the first half of the identity left it: the password
+/// to go on with, or the state the identity rests in without one.
+pub(super) struct Admin(Result<String, crate::seed::State>);
+
+/// The first half of making whatever fills the identity source the one Seerr signs in
+/// against: the media server's administrator, minted where its wizard has not run.
 ///
-/// Both must be in the stack; without either there is nothing to wire. The media
-/// server's admin password is the one credential minted rather than read — recorded
-/// on the run that mints it and read back on a later run — so the driver is given
-/// what was recorded and hands back a freshly minted one for the surface to record.
+/// Both must be in the stack; without either there is nothing to wire. The admin
+/// password is the one credential minted rather than read — recorded on the run that
+/// mints it and read back on a later run. Recorded here, before the second half, so the
+/// steps between the two can sign in with it.
+pub(super) async fn seed_jellyfin_admin(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Option<Admin> {
+    seerr_service(services)?;
+    let jellyfin = identity_source(services, filled)?;
+    let client =
+        crate::jellyfin::Jellyfin::new(ctx.seams.http.clone(), &jellyfin.loopback, "jellyfin");
+    let recorded = recorded_jellyfin_password(ctx);
+    let administered = crate::seed::wire_jellyfin_admin(
+        &client,
+        ctx.seams.random.as_ref(),
+        recorded.as_deref(),
+        ctx.dry_run,
+    )
+    .await;
+    // A rehearsal mints nothing, so there is nothing here to record — the condition is
+    // already false. Written as a pair with the sign-in below rather than left to that
+    // coincidence, because a value that arrived from anywhere else would be recorded by
+    // a run that promised to write nothing.
+    if let (Ok((_, Some(password))), false) = (&administered, ctx.dry_run) {
+        record_jellyfin_password(ctx, password);
+    }
+    Some(Admin(administered.map(|(password, _)| password)))
+}
+
+/// The second half: Seerr signed in through Jellyfin — at the request gate's Jellyfin
+/// route where the stack runs the gate, and at Jellyfin's own address where it does
+/// not — then, through the gate, handed the token it reaches Jellyfin with after that.
 pub(super) async fn seed_jellyfin_identity(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     expected: &crate::baseline::Baseline,
     filled: &std::collections::BTreeMap<String, Vec<String>>,
+    admin: Option<Admin>,
+    project: Option<&std::path::Path>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let mut records = crate::baseline::Baseline::new();
-    let (Some(seerr_base), Some(jellyfin)) =
-        (seerr_service(services), identity_source(services, filled))
-    else {
+    let (Some(seerr_base), Some(jellyfin), Some(Admin(administered))) = (
+        seerr_service(services),
+        identity_source(services, filled),
+        admin,
+    ) else {
         return (Vec::new(), records);
     };
+    let gate = project.filter(|_| crate::app::gating::service(services).is_some());
+    let server_url = match gate {
+        Some(_) => {
+            let at = super::tokens::through_the_gate(&jellyfin.id);
+            format!("http://{}:{}{}", at.host, at.port, at.base)
+        }
+        None => jellyfin.network_url.clone(),
+    };
 
-    let jellyfin_client =
-        crate::jellyfin::Jellyfin::new(ctx.seams.http.clone(), &jellyfin.loopback, "jellyfin");
-    let seerr_client = crate::seerr::Seerr::new(ctx.seams.http.clone(), &seerr_base, "seerr");
-    let recorded = recorded_jellyfin_password(ctx);
+    let wiring = match administered {
+        Ok(password) => {
+            let seerr_client =
+                crate::seerr::Seerr::new(ctx.seams.http.clone(), &seerr_base, "seerr");
+            crate::seed::wire_seerr_identity(&seerr_client, &password, &server_url, ctx.dry_run)
+                .await
+        }
+        Err(state) => crate::seed::Wiring::settled(crate::seed::IDENTITY.to_owned(), state),
+    };
 
-    let (wiring, minted) = crate::seed::wire_jellyfin_identity(
-        &jellyfin_client,
-        &seerr_client,
-        ctx.seams.random.as_ref(),
-        recorded.as_deref(),
-        &jellyfin.network_url,
-        ctx.dry_run,
-    )
-    .await;
+    // What the household is told and where the request service reaches the media server
+    // are read and written with the request service's own key, which the setup above
+    // is what writes, so the client is opened only now.
+    let owner = crate::app::targets::seerr_as_owner(ctx, services, seerr_base.clone()).await;
 
-    // A rehearsal mints nothing, so there is nothing here to record — the condition is
-    // already false. Written as a pair with the sign-in below rather than left to that
-    // coincidence, because a value that arrived from anywhere else would be recorded by
-    // a run that promised to write nothing.
-    if let Some(password) = minted.as_ref().filter(|_| !ctx.dry_run) {
-        record_jellyfin_password(ctx, password);
-    }
+    let linked = match (gate, &wiring.state) {
+        (Some(_), crate::seed::State::WouldWire { .. }) => {
+            Some(super::linking::would_link(&jellyfin.id))
+        }
+        (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => {
+            Some(super::linking::seed_media_server_link(ctx, &owner, &jellyfin.id, project).await)
+        }
+        _ => None,
+    };
 
     // The run that set the request service up is the one that showed it the
     // administrator's password, so that password is changed straight after it and the
@@ -69,11 +117,7 @@ pub(super) async fn seed_jellyfin_identity(
 
     // What the household is told is its own managed field, reconciled whether or not
     // the identity above was wired this run: the identity step stops at a service
-    // already initialised, and that is every install after the first. It is read and
-    // written with the request service's own key, which the setup above is what
-    // writes, so the client is opened only now.
-    let owner = crate::app::targets::seerr_as_owner(ctx, services, seerr_base.clone()).await;
-
+    // already initialised, and that is every install after the first.
     let (told, held) = crate::seed::wire_household_telling(
         &owner,
         expected.entry(SEERR, crate::seed::TELLING),
@@ -83,7 +127,7 @@ pub(super) async fn seed_jellyfin_identity(
     remember(&mut records, &told.state, held, &ctx.stamp());
 
     (
-        [Some(wiring), changed, Some(told)]
+        [Some(wiring), linked, changed, Some(told)]
             .into_iter()
             .flatten()
             .collect(),
