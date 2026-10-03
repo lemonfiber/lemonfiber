@@ -7,14 +7,16 @@ use super::*;
 /// The name the gate's Jellyfin key is filed under.
 const APP: &str = crate::jellyfin::GATE_APP;
 
-/// A stack with the media server, the request service, Sonarr and Radarr and, where
-/// `gating`, the request gate.
+/// A stack with the media server, the request service, Sonarr, Radarr and Lidarr — which
+/// files music the request service never asks for, so the gate has no route to it — and,
+/// where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![
         jellyfin_svc(),
         seerr_svc(),
         arr("sonarr", 8989, "tv"),
         arr("radarr", 7878, "movies"),
+        arr("lidarr", 8686, "music"),
     ];
     if gating {
         services.push(manifest_service(
