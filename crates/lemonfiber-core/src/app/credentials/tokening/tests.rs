@@ -572,3 +572,58 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
         "{rotation:?}"
     );
 }
+
+#[tokio::test]
+async fn a_route_for_a_service_the_stack_no_longer_names_is_called_by_its_route() {
+    let http = serving("held", "linked", 200, &[200], 200);
+    let (ctx, at) = scene(
+        "tokens-unnamed",
+        true,
+        &accepting(&["held"], &[]),
+        http,
+        true,
+    );
+    let without_sonarr: Vec<_> = stack(true)
+        .into_iter()
+        .filter(|service| service.id != "sonarr")
+        .collect();
+
+    let lines = held(&ctx, &without_sonarr, Some(&at)).await;
+
+    assert_eq!(
+        named(&lines, "Request gate token for sonarr").state,
+        State::Active
+    );
+}
+
+#[tokio::test]
+async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
+    let http = Fake::by_route_in_turn(vec![(
+        Method::Get,
+        "/settings/sonarr",
+        vec![Answer::Silent],
+    )]);
+    let (ctx, at) = scene(
+        "tokens-rotate-unanswered",
+        true,
+        &accepting(&["held"], &[]),
+        http,
+        true,
+    );
+    let line = Held {
+        name: SONARR.to_owned(),
+        setting: "request-gate/tokens.json#sonarr".to_owned(),
+        consumers: Vec::new(),
+        location: String::new(),
+        origin: crate::credential::Origin::Lemonfiber,
+        from: crate::origin::Origin::Bundled,
+        state: State::Active,
+        fingerprint: None,
+        advisory: None,
+    };
+
+    let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+
+    assert!(unproven(&rotation.settled).is_some(), "{rotation:?}");
+    assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
+}
