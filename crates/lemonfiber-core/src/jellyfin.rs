@@ -19,8 +19,11 @@ use crate::recyclarr::Kind;
 
 mod cors;
 mod household;
+mod keys;
 mod library;
 mod setup;
+
+pub use keys::DECLINE_APP;
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access
 /// token — its own scheme, named as it parses it. The values only have to be present and
@@ -105,45 +108,6 @@ impl Jellyfin {
         Ok(request)
     }
 
-    /// Revoke the API key filed under lemonfiber's name, where there is one.
-    ///
-    /// No part of the stack reads one: an API key on this server administers all of it,
-    /// and the dashboard is published to the household network, which is not somewhere
-    /// one is kept. A key on the server is a credential nothing needs, so it is taken off
-    /// rather than left valid.
-    ///
-    /// Answers whether one was there to revoke.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, answers
-    /// the key list with something unreadable, or refuses the revocation.
-    pub async fn revoke_our_key(&self) -> Result<bool, Failure> {
-        let Some(ours) = self.our_key().await? else {
-            return Ok(false);
-        };
-        let revoking = self
-            .as_admin(Method::Delete, &format!("/Auth/Keys/{ours}"), None)
-            .await?;
-        let response = self.endpoint.send(&revoking).await?;
-        self.endpoint.expect_success(&response)?;
-        Ok(true)
-    }
-
-    /// The key already filed under lemonfiber's name, where there is one.
-    async fn our_key(&self) -> Result<Option<String>, Failure> {
-        let request = self.as_admin(Method::Get, "/Auth/Keys", None).await?;
-        let response = self.endpoint.send(&request).await?;
-        let keys: Keys = self
-            .endpoint
-            .decode(&response, "the key list could not be read")?;
-        Ok(keys
-            .items
-            .into_iter()
-            .find(|key| key.app_name == APP && !key.access_token.is_empty())
-            .map(|key| key.access_token))
-    }
-
     /// Sign in as the household admin and return the access token the reads carry.
     async fn sign_in(&self) -> Result<String, Failure> {
         let body =
@@ -158,26 +122,6 @@ impl Jellyfin {
             .decode(&response, "the sign-in was not accepted")?;
         Ok(session.access_token)
     }
-}
-
-/// The name lemonfiber files its own API key under, so an operator reading Jellyfin's
-/// key list can tell which key is whose.
-const APP: &str = "lemonfiber";
-
-/// The keys Jellyfin holds, as it lists them.
-#[derive(Deserialize)]
-struct Keys {
-    #[serde(rename = "Items", default)]
-    items: Vec<Key>,
-}
-
-/// One key in that list: what made it, and the value itself.
-#[derive(Deserialize)]
-struct Key {
-    #[serde(rename = "AppName", default)]
-    app_name: String,
-    #[serde(rename = "AccessToken", default)]
-    access_token: String,
 }
 
 /// The one field of a sign-in lemonfiber reads: the access token every later read

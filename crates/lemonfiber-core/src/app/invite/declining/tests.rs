@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lemonfiber_sidecar::decline::TokenHash;
 
-use super::{table, table_path, with_token};
+use super::{path, table, with_token};
 use crate::invitation::{Offer, Offers};
 use crate::ports::service::Member;
 
@@ -80,7 +80,10 @@ fn a_token_is_recorded_as_its_hash_on_an_offer_already_recorded() {
 #[test]
 fn the_table_goes_into_the_decline_services_configuration_directory() {
     assert_eq!(
-        table_path(Path::new("/stack")),
+        path(
+            Path::new("/stack"),
+            lemonfiber_sidecar::decline::File::Table
+        ),
         Path::new("/stack/config/decline/invitations.json")
     );
 }
@@ -119,7 +122,10 @@ fn an_account_is_declined_where_its_offers_token_was_refused() {
 #[test]
 fn refusals_are_recorded_beside_the_table() {
     assert_eq!(
-        super::refusals_path(Path::new("/stack")),
+        path(
+            Path::new("/stack"),
+            lemonfiber_sidecar::decline::File::Refusals
+        ),
         Path::new("/stack/config/decline/refusals.json")
     );
 }

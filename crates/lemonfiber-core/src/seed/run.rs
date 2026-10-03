@@ -19,6 +19,8 @@ mod baseline;
 mod clients;
 // Jellyfin's cross-origin allow-list, held to the front door's origin on every pass.
 mod cors;
+// The decline service's own media-server key, minted for it alone.
+mod decline;
 mod fulfilment;
 mod published;
 pub(crate) use published::published_as;
@@ -221,6 +223,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // After the identity step, because that is the run that records the administrator
     // credential this is written with.
     wirings.extend(cors::seed_cors(ctx, &manifest.services).await);
+
+    // The decline service's key, minted with the same administrator session.
+    wirings.extend(decline::seed_decline_key(ctx, &manifest.services, project.as_deref()).await);
 
     // The *arrs the request service hands a request to. Without this the household
     // can ask and nothing downstream ever hears, and with it the request surface
