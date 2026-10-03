@@ -7,7 +7,7 @@
 
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    Client as _, FulfilmentTarget, QualityProfile, Requests as _,
+    Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests as _,
 };
 use lemonfiber_core::seed::{wire_fulfilment_targets, State};
 use lemonfiber_core::seerr::Seerr;
@@ -20,8 +20,12 @@ use std::sync::Arc;
 fn sonarr() -> FulfilmentTarget {
     FulfilmentTarget {
         name: "Sonarr".to_owned(),
-        host: "sonarr".to_owned(),
-        port: 8989,
+        at: Endpoint {
+            host: "sonarr".to_owned(),
+            port: 8989,
+            base: String::new(),
+        },
+        moved_from: None,
         key: "the-key".to_owned(),
         television: true,
         profile: QualityProfile {
@@ -58,7 +62,7 @@ fn holding(film: &str, television: &str) -> (Seerr, Arc<Fake>) {
 
 /// Sonarr as the request service reports it once registered.
 fn registered() -> String {
-    r#"{"id":1,"hostname":"sonarr","port":8989}"#.to_owned()
+    r#"{"id":1,"hostname":"sonarr","port":8989,"apiKey":"the-key"}"#.to_owned()
 }
 
 async fn wire(seerr: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
@@ -119,7 +123,10 @@ async fn an_arr_the_request_service_lacks_is_handed_over() {
 /// they changed about it survives a seed.
 #[tokio::test]
 async fn an_arr_already_registered_is_left_untouched_despite_a_different_name() {
-    let renamed = format!("[{}]", r#"{"id":1,"hostname":"sonarr","port":8989}"#);
+    let renamed = format!(
+        "[{}]",
+        r#"{"id":1,"name":"Renamed","hostname":"sonarr","port":8989,"apiKey":"the-key"}"#
+    );
     let (seerr, http) = holding("[]", &renamed);
 
     let states = wire(&seerr, &[sonarr()]).await;
@@ -238,7 +245,7 @@ async fn a_rehearsed_pass_names_the_endpoint_it_would_register_and_registers_non
         states,
         vec![State::WouldWire {
             yours: None,
-            ours: Some("sonarr:8989".to_owned()),
+            ours: Some("at sonarr:8989".to_owned()),
         }],
         "{states:?}"
     );
@@ -279,4 +286,231 @@ async fn a_rehearsed_read_as_the_owner_says_it_could_not_tell_rather_than_naming
         !said.contains("credential") && !said.contains("refused"),
         "a rehearsal put a credential fault in front of an operator who has none: {said}"
     );
+}
+
+/// Sonarr as the request service should reach it through the gate, held before at its
+/// own address.
+fn gated() -> FulfilmentTarget {
+    FulfilmentTarget {
+        at: Endpoint {
+            host: "request-gate".to_owned(),
+            port: 5057,
+            base: "/sonarr".to_owned(),
+        },
+        moved_from: Some(sonarr().at),
+        key: "the-token".to_owned(),
+        ..sonarr()
+    }
+}
+
+/// A request service listing `listed` for Sonarr on every read, and answering a move
+/// with `moved`.
+fn moving(listed: &str, moved: u16) -> (Seerr, Arc<Fake>) {
+    let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/settings/radarr",
+            vec![Answer::reply(200, "[]")],
+        ),
+        (
+            Method::Get,
+            "/settings/sonarr",
+            vec![Answer::reply(200, listed.to_owned())],
+        ),
+        (
+            Method::Put,
+            "/settings/sonarr/1",
+            vec![Answer::reply(moved, String::new())],
+        ),
+    ]);
+    (Seerr::new(http.clone(), "http://seerr:5055", "seerr"), http)
+}
+
+/// Sonarr held at its own address, named and profiled by the operator.
+const HELD_DIRECTLY: &str = r#"[{"id":1,"name":"Mine","hostname":"sonarr","port":8989,"apiKey":"the-key","activeProfileId":9}]"#;
+
+/// An \*arr held where it was reached before is moved in place: its endpoint and key
+/// change, and everything the operator chose about it stays.
+#[tokio::test]
+async fn an_arr_held_where_it_was_reached_before_is_moved_in_place() {
+    let (seerr, http) = moving(HELD_DIRECTLY, 200);
+
+    let states = wire(&seerr, &[gated()]).await;
+
+    assert_eq!(states, vec![State::Wired], "{states:?}");
+    let sent = http
+        .requests()
+        .into_iter()
+        .find(|asked| asked.method == Method::Put)
+        .and_then(|asked| asked.body)
+        .unwrap_or_default();
+    for field in [
+        "\"hostname\":\"request-gate\"",
+        "\"port\":5057",
+        "\"baseUrl\":\"/sonarr\"",
+        "\"apiKey\":\"the-token\"",
+        "\"name\":\"Mine\"",
+        "\"activeProfileId\":9",
+    ] {
+        assert!(sent.contains(field), "{field} missing from {sent}");
+    }
+}
+
+/// An \*arr held at the right endpoint under another key has its key rewritten.
+#[tokio::test]
+async fn an_arr_held_under_another_key_has_it_rewritten() {
+    let (seerr, http) = moving(
+        r#"[{"id":1,"hostname":"sonarr","port":8989,"apiKey":"an-old-key"}]"#,
+        200,
+    );
+
+    let states = wire(&seerr, &[sonarr()]).await;
+
+    assert_eq!(states, vec![State::Wired], "{states:?}");
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.method == Method::Put
+            && asked
+                .body
+                .as_deref()
+                .is_some_and(|body| body.contains("the-key"))));
+}
+
+/// A rehearsal says where the \*arr would move from and to, and moves nothing.
+#[tokio::test]
+async fn a_rehearsed_move_says_where_and_moves_nothing() {
+    let (seerr, http) = moving(HELD_DIRECTLY, 200);
+
+    let states = would_wire(&seerr, &[gated()]).await;
+
+    assert_eq!(
+        states,
+        vec![State::WouldWire {
+            yours: Some("at sonarr:8989".to_owned()),
+            ours: Some("at the request gate".to_owned()),
+        }],
+        "{states:?}"
+    );
+    assert!(!http
+        .requests()
+        .iter()
+        .any(|asked| asked.method == Method::Put));
+}
+
+/// A move the request service refuses, or one of a target it no longer holds, is
+/// reported rather than called done.
+#[tokio::test]
+async fn a_move_that_does_not_land_is_reported() {
+    let (seerr, _) = moving(HELD_DIRECTLY, 500);
+    let states = wire(&seerr, &[gated()]).await;
+    assert!(
+        matches!(states.first(), Some(State::Failed { .. })),
+        "{states:?}"
+    );
+
+    let (seerr, _) = moving(HELD_DIRECTLY, 200);
+    let gone = lemonfiber_core::ports::service::RegisteredTarget {
+        id: "7".to_owned(),
+        at: sonarr().at,
+        key: String::new(),
+        television: true,
+    };
+    let said = seerr
+        .move_fulfilment_target(&gone, &gated())
+        .await
+        .err()
+        .map(|failure| failure.to_string())
+        .unwrap_or_default();
+    assert!(
+        said.contains("no longer holds the target it listed as 7"),
+        "{said}"
+    );
+}
+
+/// A film target moves within the film list.
+#[tokio::test]
+async fn a_film_target_moves_within_the_film_list() {
+    let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/settings/radarr",
+            vec![Answer::reply(
+                200,
+                r#"[{"id":1,"hostname":"radarr","port":7878,"apiKey":"old"}]"#,
+            )],
+        ),
+        (
+            Method::Put,
+            "/settings/radarr/1",
+            vec![Answer::reply(200, "")],
+        ),
+    ]);
+    let seerr = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
+    let held = lemonfiber_core::ports::service::RegisteredTarget {
+        id: "1".to_owned(),
+        at: Endpoint {
+            host: "radarr".to_owned(),
+            port: 7878,
+            base: String::new(),
+        },
+        key: "old".to_owned(),
+        television: false,
+    };
+    let film = FulfilmentTarget {
+        television: false,
+        ..gated()
+    };
+
+    let moved = seerr.move_fulfilment_target(&held, &film).await;
+
+    assert!(moved.is_ok(), "{moved:?}");
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.method == Method::Put && asked.url.contains("/settings/radarr/1")));
+}
+
+/// A request service that stops answering, or answers with something other than a
+/// list, at any point of a move or a registration fails it rather than calling it done.
+#[tokio::test]
+async fn a_move_or_registration_the_service_does_not_answer_fails() {
+    let held = lemonfiber_core::ports::service::RegisteredTarget {
+        id: "1".to_owned(),
+        at: sonarr().at,
+        key: "the-key".to_owned(),
+        television: true,
+    };
+    for (name, listed, put) in [
+        ("unlisted", Answer::Silent, Answer::reply(200, "")),
+        (
+            "unreadable",
+            Answer::reply(200, "not a list"),
+            Answer::reply(200, ""),
+        ),
+        (
+            "unwritten",
+            Answer::reply(200, HELD_DIRECTLY),
+            Answer::Silent,
+        ),
+    ] {
+        let http = Fake::by_route_in_turn(vec![
+            (Method::Get, "/settings/sonarr", vec![listed]),
+            (Method::Put, "/settings/sonarr/1", vec![put]),
+        ]);
+        let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+
+        assert!(
+            seerr.move_fulfilment_target(&held, &gated()).await.is_err(),
+            "{name}"
+        );
+    }
+
+    let http = Fake::by_route_in_turn(vec![(
+        Method::Post,
+        "/settings/sonarr",
+        vec![Answer::Silent],
+    )]);
+    let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+    assert!(seerr.add_fulfilment_target(&sonarr()).await.is_err());
 }

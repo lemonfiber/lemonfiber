@@ -18,7 +18,8 @@ use lemonfiber_manifest::Service;
 
 use super::arrs::{reached_at, read_servarr_key, servarr_arrs};
 use super::Ctx;
-use crate::ports::service::{Client as _, FulfilmentTarget, QualityProfile};
+use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
+use crate::seed::{State, Wiring};
 
 /// The media type an \*arr must file for the request service to send it anything.
 const TELEVISION: &str = "tv";
@@ -68,10 +69,17 @@ pub(super) async fn wanted_targets(
         let Some(folder) = first_folder(&client).await else {
             continue;
         };
+        // Reached at its own address, and moved back there from the gate where the stack
+        // no longer runs one; [`seed_fulfilment_targets`] turns it to the gate where it does.
+        let moved_from = Some(super::tokens::through_the_gate(&host));
         wanted.push(FulfilmentTarget {
             name: arr.target.name.clone(),
-            host,
-            port,
+            at: Endpoint {
+                host,
+                port,
+                base: String::new(),
+            },
+            moved_from,
             key,
             television,
             profile,
@@ -122,7 +130,7 @@ pub(super) async fn seed_fulfilment_targets(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&Path>,
-) -> Vec<crate::seed::Wiring> {
+) -> Vec<Wiring> {
     // Asked before anything else, because what follows asks every \*arr what it holds
     // and there is no sense doing that with nobody to tell about it.
     let Some(base) = super::identity::seerr_service(services) else {
@@ -136,9 +144,77 @@ pub(super) async fn seed_fulfilment_targets(
     // a target reads what the service already holds and then writes. Unsigned, all of
     // it comes back as a refusal about a credential.
     let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
+    match project.filter(|_| crate::app::gating::service(services).is_some()) {
+        Some(project) => through_the_gate(ctx, &seerr, wanted, project).await,
+        None => wired(ctx, &seerr, &wanted).await,
+    }
+}
+
+/// Hand the request service `wanted` as they are.
+async fn wired(ctx: &Ctx, seerr: &dyn Requests, wanted: &[FulfilmentTarget]) -> Vec<Wiring> {
     let mut journal = crate::journal::Journal::new();
-    crate::seed::wire_fulfilment_targets(&seerr, &wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
+    crate::seed::wire_fulfilment_targets(seerr, wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
         .await
+}
+
+/// Hand the request service `wanted` at the request gate, each under a token of its
+/// route that the gate accepts.
+async fn through_the_gate(
+    ctx: &Ctx,
+    seerr: &dyn Requests,
+    wanted: Vec<FulfilmentTarget>,
+    project: &Path,
+) -> Vec<Wiring> {
+    let kept = super::tokens::Kept::read(ctx, project).await;
+    let held = seerr.fulfilment_targets().await.unwrap_or_default();
+    let (gated, mut wirings) = kept.targets(ctx, wanted, &held);
+    if ctx.dry_run {
+        wirings.extend(wired(ctx, seerr, &gated).await);
+        return wirings;
+    }
+    let beside = match kept.beside(&gated) {
+        Ok(beside) => beside,
+        Err(reason) => {
+            let detail = unwritten(&kept, &reason);
+            wirings.extend(gated.iter().map(|target| {
+                Wiring::settled(
+                    crate::seed::described_target(target),
+                    State::Failed {
+                        detail: detail.clone(),
+                    },
+                )
+            }));
+            return wirings;
+        }
+    };
+    let told = wired(ctx, seerr, &gated).await;
+    let holding: Vec<bool> = told
+        .iter()
+        .map(|wiring| matches!(wiring.state, State::Wired | State::AlreadyWired))
+        .collect();
+    wirings.extend(told);
+    // The old tokens stay accepted beside the new where this cannot be written, which
+    // keeps every call working and is said rather than called done.
+    if let Err(reason) = kept.only(&beside, &gated, &holding) {
+        wirings.push(Wiring::settled(
+            TOKENS.to_owned(),
+            State::Failed {
+                detail: unwritten(&kept, &reason),
+            },
+        ));
+    }
+    wirings
+}
+
+/// What the report calls the gate's tokens, where retiring the old ones fails.
+const TOKENS: &str = "The request gate's tokens";
+
+/// Why the tokens could not be handed to the gate.
+fn unwritten(kept: &super::tokens::Kept, reason: &str) -> String {
+    format!(
+        "the tokens could not be written to {}: {reason}",
+        kept.path().display()
+    )
 }
 
 #[cfg(test)]

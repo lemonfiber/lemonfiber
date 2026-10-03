@@ -11,7 +11,9 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::{Http, Method};
-use lemonfiber_core::ports::service::{Failure, FulfilmentTarget, QualityProfile, Requests};
+use lemonfiber_core::ports::service::{
+    Endpoint, Failure, FulfilmentTarget, QualityProfile, Requests,
+};
 use lemonfiber_core::seerr::Seerr;
 
 fn seerr(fake: &Arc<Fake>) -> Seerr {
@@ -132,8 +134,12 @@ async fn the_client_that_sets_it_up_carries_no_key() {
 fn target(television: bool) -> FulfilmentTarget {
     FulfilmentTarget {
         name: if television { "Sonarr" } else { "Radarr" }.to_owned(),
-        host: if television { "sonarr" } else { "radarr" }.to_owned(),
-        port: if television { 8989 } else { 7878 },
+        at: Endpoint {
+            host: if television { "sonarr" } else { "radarr" }.to_owned(),
+            port: if television { 8989 } else { 7878 },
+            base: String::new(),
+        },
+        moved_from: None,
         key: ["ke", "y"].concat(),
         television,
         profile: QualityProfile {

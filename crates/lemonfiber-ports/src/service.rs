@@ -38,9 +38,9 @@ pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
 pub use carrying::{Carried, Carrying, Record};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
-    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, FulfilmentTarget,
-    QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient, RegisteredFolder,
-    RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
+    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, Endpoint,
+    FulfilmentTarget, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
+    RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};

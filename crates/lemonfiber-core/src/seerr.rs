@@ -22,6 +22,7 @@ mod asking;
 mod members;
 mod notices;
 mod records;
+mod targets;
 
 use members::{approves_own, MemberResource, LINK_MEMBERS, MEMBERS, NOT_FOUND};
 use records::{RequestPage, RequestRecord, REQUEST_PAGE};
@@ -135,21 +136,6 @@ const APPROVED_BY_POLICY: u32 = 128;
 pub const OCCASIONS: u32 =
     RECEIVED | DECIDED_YES | ARRIVED | COULD_NOT | DECIDED_NO | APPROVED_BY_POLICY;
 
-/// Where the \*arrs that fetch what the household asks for are registered.
-///
-/// Two lists, not one: the request service keeps film and television apart because
-/// they are fetched by different services, and which list a target belongs in is
-/// intrinsic to which \*arr it is.
-const FILM: &str = "/settings/radarr";
-const TELEVISION: &str = "/settings/sonarr";
-
-/// How available a film must be before it is fetched.
-///
-/// The service's own vocabulary. Released is the one that matches what a household
-/// means by asking for something: in cinemas is not something anybody can watch at
-/// home, and announced is not something that exists yet.
-const WHEN_RELEASED: &str = "released";
-
 /// Where the one agent that needs no account of its own is configured.
 ///
 /// Every other agent Seerr offers wants a service to sign in to — a mail server, a
@@ -252,32 +238,6 @@ struct PublicSettings {
     initialized: bool,
 }
 
-/// An \*arr the request service holds, in its own words.
-///
-/// Matched on afterwards by host and port rather than by `name`, so an operator who
-/// renamed one is not handed a duplicate of it.
-#[derive(Deserialize)]
-struct TargetResource {
-    #[serde(default)]
-    id: i64,
-    #[serde(default)]
-    hostname: String,
-    #[serde(default)]
-    port: u16,
-}
-
-impl TargetResource {
-    /// The same target in this product's own words.
-    fn registered(self, television: bool) -> RegisteredTarget {
-        RegisteredTarget {
-            id: self.id.to_string(),
-            host: self.hostname,
-            port: self.port,
-            television,
-        }
-    }
-}
-
 /// What Seerr holds for the browser-push agent, in its own words.
 ///
 /// `types` is the bit field of occasions. Both default rather than being required,
@@ -336,11 +296,19 @@ impl Requests for Seerr {
     }
 
     async fn fulfilment_targets(&self) -> Result<Vec<RegisteredTarget>, Failure> {
-        fulfilment_targets(self).await
+        targets::fulfilment_targets(self).await
     }
 
     async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure> {
-        add_fulfilment_target(self, target).await
+        targets::add_fulfilment_target(self, target).await
+    }
+
+    async fn move_fulfilment_target(
+        &self,
+        held: &RegisteredTarget,
+        target: &FulfilmentTarget,
+    ) -> Result<(), Failure> {
+        targets::move_fulfilment_target(self, held, target).await
     }
 
     async fn link_members(&self, members: &[String]) -> Result<(), Failure> {
@@ -423,69 +391,6 @@ async fn requests(seerr: &Seerr) -> Result<Vec<HouseholdRequest>, Failure> {
         skip += REQUEST_PAGE;
     }
     Ok(requests)
-}
-
-async fn fulfilment_targets(seerr: &Seerr) -> Result<Vec<RegisteredTarget>, Failure> {
-    let mut held = Vec::new();
-    for (path, television) in [(FILM, false), (TELEVISION, true)] {
-        let response = seerr
-            .endpoint
-            .send(&seerr.request(Method::Get, path, None))
-            .await?;
-        let listed: Vec<TargetResource> = seerr.endpoint.decode(
-            &response,
-            "the request service's fulfilment targets could not be read",
-        )?;
-        held.extend(
-            listed
-                .into_iter()
-                .map(|target| target.registered(television)),
-        );
-    }
-    Ok(held)
-}
-
-async fn add_fulfilment_target(seerr: &Seerr, target: &FulfilmentTarget) -> Result<(), Failure> {
-    // The last field is the one the two lists do not share, and each requires its
-    // own: television is filed in folders per season, and a film has a point before
-    // which there is nothing to fetch. Sending the wrong one is not a field ignored
-    // — the service refuses the registration for the one that is missing.
-    let differs = if target.television {
-        // Seasons in folders of their own, because that is how the media server
-        // reads a series and how anybody browsing one expects to find it.
-        ("enableSeasonFolders", serde_json::json!(true))
-    } else {
-        ("minimumAvailability", serde_json::json!(WHEN_RELEASED))
-    };
-
-    // Built as the map it is rather than assembled through an option that is always
-    // full: a field added by reaching inside a literal object carries a branch for
-    // the object not being one, which is a case that cannot arise and so can never
-    // be shown working.
-    let fields: serde_json::Map<String, serde_json::Value> = [
-        ("name", serde_json::json!(target.name)),
-        ("hostname", serde_json::json!(target.host)),
-        ("port", serde_json::json!(target.port)),
-        ("apiKey", serde_json::json!(target.key)),
-        ("useSsl", serde_json::json!(false)),
-        ("activeProfileId", serde_json::json!(target.profile.id)),
-        ("activeProfileName", serde_json::json!(target.profile.name)),
-        ("activeDirectory", serde_json::json!(target.folder)),
-        ("is4k", serde_json::json!(false)),
-        ("isDefault", serde_json::json!(true)),
-        differs,
-    ]
-    .into_iter()
-    .map(|(at, value)| (at.to_owned(), value))
-    .collect();
-
-    let body = serde_json::Value::Object(fields).to_string();
-    let path = if target.television { TELEVISION } else { FILM };
-    let written = seerr
-        .endpoint
-        .send(&seerr.request(Method::Post, path, Some(body)))
-        .await?;
-    seerr.endpoint.expect_success(&written)
 }
 
 async fn link_members(seerr: &Seerr, members: &[String]) -> Result<(), Failure> {
