@@ -211,6 +211,9 @@ fn serving() -> Vec<Outcome> {
         Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
             address: "http://a-machine.local:8096".to_owned(),
+            decline: Some(
+                "http://a-machine.local:5056/decline/9f2c4e8a1b7d3f60a5e2c9b4d7f1a3e8".to_owned(),
+            ),
             caution: None,
             hours: 48,
             withdrawn: Vec::new(),

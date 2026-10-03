@@ -8197,6 +8197,13 @@
                 "null"
               ]
             },
+            "decline": {
+              "description": "Where they can decline it instead, where the stack runs the decline service.\n\nA page on the household's own network that refuses this invitation and nothing\nelse, and switches the account made for it off. Its token is in this address\nalone: offering the same person again mints a new one, and the old address stops\ndeclining anything. Absent on a rehearsal, for somebody already in the household,\nand where the stack runs no decline service.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "hours": {
               "description": "How many hours it stands before it is withdrawn.\n\nCounted from when it was *offered*, which for an account whose password was\ntaken off is the moment of the reset rather than when the account was made.\nWhat happens at the end depends on the account: one nobody has been in is\nremoved, and one somebody has is switched off and kept.",
               "type": "integer",

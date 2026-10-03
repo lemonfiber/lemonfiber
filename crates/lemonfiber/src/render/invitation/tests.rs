@@ -5,6 +5,7 @@ fn offered(withdrawn: Vec<String>) -> Invitation {
     Invitation {
         name: "ana".to_owned(),
         address: "http://192.168.1.20:8096".to_owned(),
+        decline: None,
         caution: None,
         hours: 48,
         withdrawn,
@@ -392,4 +393,23 @@ fn nothing_is_said_about_withdrawals_where_there_were_none() {
         !said.contains("withdrawn"),
         "a run that took nothing back said it had: {said}"
     );
+}
+
+#[test]
+fn a_decline_address_is_said_beside_the_address_to_send() {
+    let declinable = Invitation {
+        decline: Some("http://192.168.1.20:5056/decline/9f2c".to_owned()),
+        ..offered(Vec::new())
+    };
+
+    let said = invitation(&declinable).text();
+
+    assert!(said.contains("  If they would rather not, they can decline it here:\n  http://192.168.1.20:5056/decline/9f2c"));
+}
+
+#[test]
+fn without_a_decline_service_nothing_is_said_about_declining() {
+    let said = invitation(&offered(Vec::new())).text();
+
+    assert!(!said.contains("decline"));
 }

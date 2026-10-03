@@ -120,6 +120,14 @@ pub struct Invitation {
     /// with — those resolve only on this machine or inside the stack, and an
     /// invitation carrying one sends somebody an address that cannot open.
     pub address: String,
+    /// Where they can decline it instead, where the stack runs the decline service.
+    ///
+    /// A page on the household's own network that refuses this invitation and nothing
+    /// else, and switches the account made for it off. Its token is in this address
+    /// alone: offering the same person again mints a new one, and the old address stops
+    /// declining anything. Absent on a rehearsal, for somebody already in the household,
+    /// and where the stack runs no decline service.
+    pub decline: Option<String>,
     /// What is worth knowing about the address itself, where anything is.
     ///
     /// An address that is a number is one a router can hand elsewhere, so a bookmark

@@ -97,6 +97,7 @@ fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> In
     Invitation {
         name,
         address: reachable.url,
+        decline: None,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn: Vec::new(),

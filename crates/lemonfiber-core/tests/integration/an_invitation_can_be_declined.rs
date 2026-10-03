@@ -1,0 +1,295 @@
+//! An invitation carries the address that declines it, where the stack runs the decline
+//! service, and the service is handed what it needs to act on it and nothing more.
+//!
+//! The token goes out once, in the address. What is written down, in the offer record
+//! and in the table the service reads, is its hash, so neither file declines anybody.
+
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use crate::common::household::recorded_admin;
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::config::Settings;
+use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::support::Reporting;
+use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_sidecar::decline::{Table, TokenHash};
+
+/// The shipped stack with the decline service added, as the stack declares it.
+fn stack_with_decline(tag: &str) -> PathBuf {
+    let from = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/media-stack"
+    ));
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("declinable-{tag}")).kept();
+    let _ = std::fs::create_dir_all(&to);
+    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
+    let jellyfin = read
+        .split("[[service]]")
+        .find(|block| block.contains("id = \"jellyfin\""))
+        .unwrap_or_default();
+    let decline = jellyfin
+        .replace("id = \"jellyfin\"", "id = \"decline\"")
+        .replace("name = \"Jellyfin\"", "name = \"Decline\"")
+        .replace("port = 8096", "port = 5056")
+        .replace(
+            "api = { kind = \"jellyfin\", key_source = \"generated\" }\n",
+            "",
+        )
+        .replace(
+            "provides = [\"media.serve\", \"identity.source\"]",
+            "provides = []",
+        );
+    let _ = std::fs::write(
+        to.join("stack.toml"),
+        format!("{read}\n[[service]]{decline}"),
+    );
+    to
+}
+
+/// A media server that signs in, holds nobody, and takes the account it is given.
+fn a_server_holding_nobody() -> Arc<Fake> {
+    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
+    Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![signed_in.clone(), signed_in.clone(), signed_in],
+        ),
+        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
+        (
+            "/System/ActivityLog",
+            vec![Answer::reply(200, r#"{"Items":[]}"#)],
+        ),
+        ("/Users/9/Policy", vec![Answer::reply(204, "")]),
+        (
+            "/Users/New",
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+            )],
+        ),
+        ("/Users", vec![Answer::reply(200, "[]")]),
+    ])
+}
+
+fn context(env: &Path, stack: &'static Path) -> Ctx {
+    lemonfiber_testing::a_context()
+        .over(Source::External(stack))
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .clock(Arc::new(lemonfiber_adapters::System))
+        .settings(Settings {
+            env_file: Some(env.to_path_buf()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(a_server_holding_nobody())
+}
+
+async fn invited(ctx: &Ctx, confirm: bool) -> Option<lemonfiber_core::model::Invitation> {
+    match dispatch(
+        Command::Invite {
+            name: "ana".to_owned(),
+            allowance: Allowance::default(),
+            confirm,
+        },
+        ctx,
+    )
+    .await
+    {
+        Ok(Outcome::Invitation(invitation)) => Some(invitation),
+        _ => None,
+    }
+}
+
+fn gone(env: &Path, stack: &Path) {
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(Path::new("/")));
+    let _ = std::fs::remove_dir_all(stack);
+}
+
+/// An invitation made on a stack running the decline service carries its decline
+/// address, and the service's table holds that invitation's token as a hash.
+#[tokio::test]
+async fn an_invitation_carries_the_address_that_declines_it() {
+    let env = recorded_admin("declinable");
+    let stack: &'static Path = Box::leak(stack_with_decline("made").into_boxed_path());
+    let ctx = context(&env, stack);
+
+    let invitation = invited(&ctx, true).await;
+    let decline = invitation.as_ref().and_then(|one| one.decline.clone());
+    let token = decline
+        .as_deref()
+        .and_then(|address| address.strip_prefix("http://192.168.1.20:5056/decline/"))
+        .map(str::to_owned);
+    let table = std::fs::read_to_string(stack.join("config/decline/invitations.json"))
+        .ok()
+        .and_then(|text| Table::read(&text).ok());
+    let record =
+        std::fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
+    gone(&env, stack);
+
+    let Some(token) = token else {
+        unreachable!("no decline address on the invitation: {invitation:?}");
+    };
+    assert_eq!(
+        token.len(),
+        32,
+        "a decline token is 128 bits, in hexadecimal"
+    );
+    let held = table
+        .as_ref()
+        .and_then(|table| table.find(&TokenHash::of(&token)));
+    assert_eq!(
+        held.map(|one| (one.account.as_str(), one.name.as_str())),
+        Some(("9", "ana"))
+    );
+    assert!(held.is_some_and(|one| one.lapses > one.issued));
+    assert!(
+        !record.contains(&token),
+        "the offer record holds the token itself"
+    );
+    assert!(record.contains(TokenHash::of(&token).as_str()));
+}
+
+/// A rehearsal mints no token, so it carries no decline address and writes no table.
+#[tokio::test]
+async fn a_rehearsal_carries_no_decline_address() {
+    let env = recorded_admin("declinable-rehearsed");
+    let stack: &'static Path = Box::leak(stack_with_decline("rehearsed").into_boxed_path());
+    let ctx = context(&env, stack);
+
+    let invitation = invited(&ctx, false).await;
+    let written = stack.join("config/decline/invitations.json").exists();
+    gone(&env, stack);
+
+    assert!(invitation.is_some_and(|one| one.rehearsed && one.decline.is_none()));
+    assert!(!written);
+}
+
+/// A stack without the decline service is told about nothing to decline at.
+#[tokio::test]
+async fn without_the_decline_service_there_is_no_decline_address() {
+    let env = recorded_admin("undeclinable");
+    let ctx = lemonfiber_testing::a_context()
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .clock(Arc::new(lemonfiber_adapters::System))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(a_server_holding_nobody());
+
+    let invitation = invited(&ctx, true).await;
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(Path::new("/")));
+
+    assert!(invitation.is_some_and(|one| !one.rehearsed && one.decline.is_none()));
+}
+
+/// A media server holding ana's account, unclaimed and switched on, which takes writes.
+fn holding_ana_unclaimed() -> Arc<Fake> {
+    let household = r#"[{"Id":"9","Name":"ana","HasPassword":false,
+        "Policy":{"IsAdministrator":false,"IsDisabled":false,"EnableAllFolders":true}}]"#;
+    Fake::by_route(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+        ),
+        (
+            Method::Get,
+            "/System/ActivityLog",
+            Answer::reply(200, r#"{"Items":[]}"#),
+        ),
+        (Method::Post, "/Users/9/Policy", Answer::reply(204, "")),
+        (Method::Get, "/Users", Answer::reply(200, household)),
+        (Method::Get, "", Answer::Silent),
+        (Method::Post, "", Answer::Silent),
+    ])
+}
+
+/// An offer out for ana, made an hour ago with `token`, and the table holding it.
+fn offered_with(env: &Path, stack: &Path, token: &str) {
+    let now = jiff::Timestamp::now();
+    let at = |hours: i64| {
+        now.checked_add(jiff::SignedDuration::from_hours(hours))
+            .map(|moment| moment.strftime("%Y-%m-%dT%H:%M:%SZ").to_string())
+            .unwrap_or_default()
+    };
+    let record = serde_json::json!({
+        "9": {"offered": at(-1), "lapses": at(47), "decline": TokenHash::of(token).as_str()}
+    });
+    let _ = std::fs::write(env.with_file_name("invitations.json"), record.to_string());
+    let table = Table::of(vec![lemonfiber_sidecar::decline::Invitation {
+        token: TokenHash::of(token),
+        account: "9".to_owned(),
+        name: "ana".to_owned(),
+        issued: 1,
+        lapses: u64::MAX,
+    }]);
+    let _ = std::fs::create_dir_all(stack.join("config/decline"));
+    let _ = std::fs::write(
+        stack.join("config/decline/invitations.json"),
+        table.written(),
+    );
+}
+
+/// Offering the same person again mints a new token, and the table stops holding the
+/// old one, so the address sent first no longer declines anything.
+#[tokio::test]
+async fn offering_again_replaces_the_token_the_first_address_carried() {
+    let env = recorded_admin("declinable-again");
+    let stack: &'static Path = Box::leak(stack_with_decline("again").into_boxed_path());
+    offered_with(&env, stack, "first-token");
+    let ctx = lemonfiber_testing::a_context()
+        .over(Source::External(stack))
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .clock(Arc::new(lemonfiber_adapters::System))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(holding_ana_unclaimed());
+
+    let again = invited(&ctx, true).await;
+    let table = std::fs::read_to_string(stack.join("config/decline/invitations.json"))
+        .ok()
+        .and_then(|text| Table::read(&text).ok());
+    gone(&env, stack);
+
+    let token = again
+        .as_ref()
+        .and_then(|one| one.decline.as_deref())
+        .and_then(|address| address.rsplit('/').next())
+        .map(str::to_owned);
+    assert!(
+        again
+            .as_ref()
+            .is_some_and(|one| one.standing == lemonfiber_core::model::InvitationStanding::Waiting),
+        "{again:?}"
+    );
+    assert!(table
+        .as_ref()
+        .is_some_and(|table| table.find(&TokenHash::of("first-token")).is_none()));
+    assert!(token.is_some_and(|token| table
+        .as_ref()
+        .is_some_and(|table| table.find(&TokenHash::of(&token)).is_some())));
+}

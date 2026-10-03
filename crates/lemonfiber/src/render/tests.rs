@@ -297,6 +297,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
         Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
             address: "http://a-machine.local:8096".to_owned(),
+            decline: None,
             caution: None,
             hours: 48,
             withdrawn: Vec::new(),

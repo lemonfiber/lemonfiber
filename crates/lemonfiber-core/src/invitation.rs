@@ -56,6 +56,11 @@ pub(crate) struct Offer {
     pub(crate) offered: String,
     /// When it runs out.
     pub(crate) lapses: String,
+    /// The hash of the token its decline address carries, where the stack runs the
+    /// decline service. The token itself went out on the invitation and is kept
+    /// nowhere, so a copy of this record declines nobody.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) decline: Option<lemonfiber_sidecar::decline::TokenHash>,
 }
 
 /// An account nobody has claimed, with when it was offered where that is known.

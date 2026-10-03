@@ -353,6 +353,10 @@ async fn what_is_passed_on_carries_no_password() {
             // have to pass this list — its own field set is held below.
             "applied",
             "caution",
+            // Where they can decline it instead: an address whose token declines this
+            // one invitation and signs nobody in. Not a password, and asserted here so
+            // that adding one would have to pass this list.
+            "decline",
             "hours",
             // Whether the request service has been told about them — not a password,
             // and asserted here so that adding one would have to pass this list.
@@ -438,6 +442,7 @@ async fn what_a_reset_passes_on_is_an_invitation_with_no_password_in_it() {
             "address",
             "applied",
             "caution",
+            "decline",
             "hours",
             "linked",
             "name",

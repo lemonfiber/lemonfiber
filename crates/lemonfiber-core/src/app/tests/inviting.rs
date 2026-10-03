@@ -585,3 +585,86 @@ async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
+
+/// An offer on a stack running the decline service carries its decline address.
+///
+/// **In-crate as well as out**, because this file is compiled twice, and the decline
+/// address is minted only when the stack runs the service: an offer driven from only one
+/// copy leaves the other's minting counted as never run.
+#[tokio::test]
+async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_address() {
+    let env = recorded_admin("offers-declinable");
+    let from = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/media-stack"
+    ));
+    let stack = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack").kept();
+    let _ = std::fs::create_dir_all(&stack);
+    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
+    let decline = read
+        .split("[[service]]")
+        .find(|block| block.contains("id = \"jellyfin\""))
+        .unwrap_or_default()
+        .replace("id = \"jellyfin\"", "id = \"decline\"")
+        .replace("port = 8096", "port = 5056")
+        .replace(
+            "api = { kind = \"jellyfin\", key_source = \"generated\" }\n",
+            "",
+        )
+        .replace(
+            "provides = [\"media.serve\", \"identity.source\"]",
+            "provides = []",
+        );
+    let _ = std::fs::write(
+        stack.join("stack.toml"),
+        format!("{read}\n[[service]]{decline}"),
+    );
+    let stack: &'static std::path::Path = Box::leak(stack.into_boxed_path());
+    let http = Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
+        ),
+        (
+            "/System/ActivityLog",
+            vec![Answer::reply(200, r#"{"Items":[]}"#)],
+        ),
+        (
+            "/Users/New",
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+            )],
+        ),
+        ("/Users", vec![Answer::reply(200, "[]")]),
+    ]);
+    let ctx = a_context()
+        .over(crate::stack::Source::External(stack))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http);
+
+    let made = dispatch(
+        Command::Invite {
+            name: "ana".to_owned(),
+            allowance: Allowance::default(),
+            confirm: true,
+        },
+        &ctx,
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    let _ = std::fs::remove_dir_all(stack);
+
+    let decline = invited(&made).and_then(|report| report.decline.clone());
+    assert!(
+        decline
+            .as_deref()
+            .is_some_and(|url| url.starts_with("http://192.168.1.20:5056/decline/")),
+        "{made:?}"
+    );
+}

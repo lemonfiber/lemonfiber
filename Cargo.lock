@@ -1466,6 +1466,7 @@ dependencies = [
  "lemonfiber-manifest",
  "lemonfiber-plugin",
  "lemonfiber-ports",
+ "lemonfiber-sidecar",
  "lemonfiber-testing",
  "rcgen",
  "ring",
