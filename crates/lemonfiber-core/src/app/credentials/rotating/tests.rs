@@ -52,17 +52,24 @@ fn a_setting_the_catalogue_does_not_declare_reports_no_consumers() {
 }
 
 /// Every credential this cannot replace itself says where a replacement comes
-/// from, by name. The torrent client's password is left out because it is the one
-/// this *does* replace, so it never reaches this sentence.
+/// from, by name. The torrent client's and the media server's administrator passwords
+/// are left out because they are the two this *does* replace, so they never reach this
+/// sentence.
 #[test]
 fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from() {
     let asked: Vec<&str> = CATALOGUE
         .iter()
         .map(|entry| entry.setting)
-        .filter(|setting| *setting != config::QBITTORRENT_PASSWORD_KEY)
+        .filter(|setting| {
+            ![
+                config::QBITTORRENT_PASSWORD_KEY,
+                config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            ]
+            .contains(setting)
+        })
         .collect();
 
-    assert_eq!(asked.len(), 6, "{asked:?}");
+    assert_eq!(asked.len(), 5, "{asked:?}");
     for setting in asked {
         let said = elsewhere(setting);
         assert!(said.contains("still in force"), "{setting}: {said}");

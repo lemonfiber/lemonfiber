@@ -30,6 +30,11 @@ const MINTING: &str = "a real run would generate a new web UI password, set it o
      torrent client, sign in with it to prove the client had taken it, and only then \
      record it. Nothing was generated here, and nothing was set.";
 
+/// What a rehearsal says about replacing the media server's administrator password.
+const ADMINISTERING: &str = "a real run would generate a new administrator password, set it \
+     on Jellyfin, sign in with it to prove Jellyfin took it, and only then record it. Nothing \
+     was generated here, and nothing was set.";
+
 /// What a rehearsal says about handing a service's own key back out.
 const REPUBLISHING: &str = "a real run would read the key the service wrote for itself, \
      ask the service to identify itself with it, and — only if it answered — publish \
@@ -65,6 +70,9 @@ pub(crate) async fn rotate(
         Origin::Service => republished(ctx, held, services, project).await,
         Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {
             replaced(ctx, held, services).await
+        }
+        Origin::Lemonfiber if held.setting == config::JELLYFIN_ADMIN_PASSWORD_KEY => {
+            administrator(ctx, held, services).await
         }
         // A credential whose replacement comes from somewhere else writes nothing on
         // any run, so a rehearsal of it *is* the run: the same sentence, saying where a
@@ -117,10 +125,6 @@ fn elsewhere(setting: &str) -> String {
         config::PROVIDER_PASS_KEY => (
             "your Usenet provider's own account page",
             "lemonfiber setup",
-        ),
-        config::JELLYFIN_ADMIN_PASSWORD_KEY => (
-            "Jellyfin's own account settings",
-            "lemonfiber config set JELLYFIN_ADMIN_PASSWORD",
         ),
         config::AUDIOBOOKSHELF_PASSWORD_KEY => (
             "Audiobookshelf's own account settings",
@@ -196,6 +200,90 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
             },
         ),
         Err(failure) => unproven(held, &said(&failure)),
+    }
+}
+
+/// Replace the media server's administrator password with a freshly minted one.
+async fn administrator(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
+    match replace_jellyfin_password(ctx, services, ctx.dry_run).await {
+        Ok(Replaced::Rehearsed) => would_rotate(held, ADMINISTERING),
+        Ok(Replaced::Done) => Rotation::landed(
+            &held.name,
+            "Jellyfin took the new password and signed in with it",
+            reached(&held.setting),
+        ),
+        Err(Replacing::Refused) => Rotation::stopped(
+            &held.name,
+            Settled::Refused {
+                detail: "Jellyfin refused the password lemonfiber holds, so there was nothing to \
+                         change it with. Nothing was written; the recorded password is the one \
+                         it was before."
+                    .to_owned(),
+            },
+        ),
+        Err(Replacing::Unproven(detail)) => unproven(held, &detail),
+    }
+}
+
+/// How far a replacement of the media server's administrator password went.
+pub(crate) enum Replaced {
+    /// Set, proven and recorded.
+    Done,
+    /// This run only says what it would do, and a real run would get as far as minting.
+    Rehearsed,
+}
+
+/// Why the media server's administrator password was not replaced.
+pub(crate) enum Replacing {
+    /// Jellyfin refused the password lemonfiber holds.
+    Refused,
+    /// Nothing usable answered, or there was nothing to replace with; why, in words.
+    Unproven(String),
+}
+
+/// Mint a new administrator password, set it on Jellyfin, prove it by signing in with
+/// it, and only then record it — the order that leaves the recorded password the one in
+/// force wherever this stops.
+pub(crate) async fn replace_jellyfin_password(
+    ctx: &Ctx,
+    services: &[Service],
+    rehearsing: bool,
+) -> Result<Replaced, Replacing> {
+    let Some((addr, current)) = service_addr(services, ApiKind::Jellyfin)
+        .zip(recorded_secret(ctx, config::JELLYFIN_ADMIN_PASSWORD_KEY))
+    else {
+        return Err(Replacing::Unproven(
+            "lemonfiber holds no administrator password for this Jellyfin, so there is nothing \
+             to change; run `lemonfiber seed`"
+                .to_owned(),
+        ));
+    };
+    // Below what can be told without acting, and above the mint: a password generated to
+    // describe a rotation is a secret that exists because somebody asked a question.
+    if rehearsing {
+        return Ok(Replaced::Rehearsed);
+    }
+    let Some(replacement) = crate::secret::generate(ctx.seams.random.as_ref()) else {
+        return Err(Replacing::Unproven(
+            "no randomness was available to generate a replacement, and a guessable password on \
+             the account that administers the media server is worse than the one in force"
+                .to_owned(),
+        ));
+    };
+    let client = crate::jellyfin::Jellyfin::authenticated(
+        ctx.seams.http.clone(),
+        &addr.loopback,
+        &addr.id,
+        config::JELLYFIN_ADMIN_USER,
+        current,
+    );
+    match client.replace_password(&replacement).await {
+        Ok(()) => {
+            record_secret(ctx, config::JELLYFIN_ADMIN_PASSWORD_KEY, &replacement);
+            Ok(Replaced::Done)
+        }
+        Err(Failure::Unauthorised { .. }) => Err(Replacing::Refused),
+        Err(failure) => Err(Replacing::Unproven(said(&failure))),
     }
 }
 

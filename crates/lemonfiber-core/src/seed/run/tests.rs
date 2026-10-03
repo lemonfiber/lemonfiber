@@ -230,6 +230,12 @@ fn jellyfin_svc() -> lemonfiber_manifest::Service {
 /// "yes", which is the read-write-read the identity wiring performs. Scripting the
 /// change in order rather than flipping a flag says which write is meant to cause it.
 fn household(completed: bool, signed_in: bool) -> Arc<Fake> {
+    household_changing(completed, signed_in, 200, 204)
+}
+
+/// [`household`], with Jellyfin answering the administrator's sign-in with `admitted`
+/// and the password change with `changed`.
+fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: u16) -> Arc<Fake> {
     let initialised = if signed_in {
         vec![Answer::reply(200, r#"{"initialized":true}"#)]
     } else {
@@ -249,6 +255,16 @@ fn household(completed: bool, signed_in: bool) -> Arc<Fake> {
         // Jellyfin's setup calls and Seerr's sign-in succeed, but neither by
         // itself finishes Seerr's setup.
         ("/Startup/", vec![Answer::reply(200, "")]),
+        // The administrator's sign-in, and the password change made once the request
+        // service has been set up.
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(
+                admitted,
+                r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#,
+            )],
+        ),
+        ("/Users/admin-id/Password", vec![Answer::reply(changed, "")]),
         ("/auth/jellyfin", vec![Answer::reply(200, "")]),
         ("/settings/initialize", vec![Answer::reply(200, "")]),
         // Untouched by anybody: what a service that has never had the agent

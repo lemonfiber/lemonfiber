@@ -21,6 +21,7 @@ mod cors;
 mod household;
 mod keys;
 mod library;
+mod password;
 mod setup;
 
 pub use keys::DECLINE_APP;
@@ -110,26 +111,37 @@ impl Jellyfin {
 
     /// Sign in as the household admin and return the access token the reads carry.
     async fn sign_in(&self) -> Result<String, Failure> {
-        let body =
-            serde_json::json!({ "Username": self.username, "Pw": self.password }).to_string();
+        Ok(self.signed_in(&self.password).await?.access_token)
+    }
+
+    /// Sign in as the household admin with `password`, and keep what the sign-in answers.
+    async fn signed_in(&self, password: &str) -> Result<Session, Failure> {
+        let body = serde_json::json!({ "Username": self.username, "Pw": password }).to_string();
         let mut request = self.request(Method::Post, "/Users/AuthenticateByName", Some(body));
         request
             .headers
             .push((AUTHORIZATION_HEADER.to_owned(), AUTHORIZATION.to_owned()));
         let response = self.endpoint.send(&request).await?;
-        let session: Session = self
-            .endpoint
-            .decode(&response, "the sign-in was not accepted")?;
-        Ok(session.access_token)
+        self.endpoint
+            .decode(&response, "the sign-in was not accepted")
     }
 }
 
-/// The one field of a sign-in lemonfiber reads: the access token every later read
-/// carries. Named as Jellyfin sends it, in `PascalCase`.
+/// The two fields of a sign-in lemonfiber reads: the access token every later read
+/// carries, and whose account it opened. Named as Jellyfin sends them, in `PascalCase`.
 #[derive(Deserialize)]
 struct Session {
     #[serde(rename = "AccessToken", default)]
     access_token: String,
+    #[serde(rename = "User", default)]
+    user: SignedIn,
+}
+
+/// The account a sign-in opened.
+#[derive(Deserialize, Default)]
+struct SignedIn {
+    #[serde(rename = "Id", default)]
+    id: String,
 }
 
 /// Jellyfin's own name for the item type a [`Kind`] traces — a series for television, a
