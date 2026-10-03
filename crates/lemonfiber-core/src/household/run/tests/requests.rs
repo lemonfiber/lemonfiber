@@ -339,7 +339,7 @@ fn narrowing_to_one_member_is_forgiving_about_how_the_name_is_typed() {
 async fn the_household_view_reads_the_requests_and_names_them_from_the_library() {
     let context = ctx_with(
         &Fake {
-            sign_in: "",
+            answered: "",
             requests: r#"{"pageInfo":{"results":1},"results":[
                 {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
                  "requestedBy":{"displayName":"Alex"}}

@@ -69,33 +69,13 @@ pub(super) async fn seed_jellyfin_identity(
 
     // What the household is told is its own managed field, reconciled whether or not
     // the identity above was wired this run: the identity step stops at a service
-    // already initialised, and that is every install after the first.
-    //
-    // Which is exactly why the session is opened here. The telling is read and
-    // written as the owner, and the step above only signs in on the run that
-    // initialises the service — so on every run after that one, this read had no
-    // session and the request service refused it. Signing in opens that session
-    // without finishing anybody's setup. A failure is left to the telling to report:
-    // it is about to say the same thing in its own words, and saying it twice would
-    // be two failures where the operator has one problem.
-    //
-    // And not on a run that only says what it would do. A sign-in is a POST that opens
-    // a session on somebody else's service: state left behind by a run that promised to
-    // leave none, and the rule this pass keeps is that it issues nothing but reads. The
-    // telling is then read without one and answers unauthorised, which it reports as
-    // what a real run would set rather than as the service refusing a credential.
-    let current = recorded_jellyfin_password(ctx);
-    if let Some(password) = current.as_deref().filter(|_| !ctx.dry_run) {
-        let _ = crate::ports::service::Requests::sign_in(
-            &seerr_client,
-            crate::config::JELLYFIN_ADMIN_USER,
-            password,
-        )
-        .await;
-    }
+    // already initialised, and that is every install after the first. It is read and
+    // written with the request service's own key, which the setup above is what
+    // writes, so the client is opened only now.
+    let owner = crate::app::targets::seerr_as_owner(ctx, services, seerr_base.clone()).await;
 
     let (told, held) = crate::seed::wire_household_telling(
-        &seerr_client,
+        &owner,
         expected.entry(SEERR, crate::seed::TELLING),
         ctx.dry_run,
     )

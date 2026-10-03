@@ -220,24 +220,18 @@ pub(crate) async fn reaching(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Result<crate::app::targets::HouseholdAccess, String> {
-    let Some(access) = seerr_reader(ctx, services) else {
+    let Some(access) = seerr_reader(ctx, services).await else {
         return Err(
-            "there is no request service to ask, or no recorded media-server \
-                    password to sign in with, so what the household has asked for is \
-                    not shown"
+            "there is no request service to ask, or it has not written its own key yet, \
+             so what the household has asked for is not shown"
                 .to_owned(),
         );
     };
 
-    if access
-        .seerr
-        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
-        .await
-        .is_err()
-    {
+    if access.seerr.answers().await.is_err() {
         return Err(
-            "the request service would not accept the household's sign-in, so \
-                    what it has been asked for is not shown"
+            "the request service would not accept lemonfiber's key, so what it has been \
+             asked for is not shown"
                 .to_owned(),
         );
     }

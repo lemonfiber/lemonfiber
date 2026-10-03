@@ -86,7 +86,7 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
             Answer::reply(200, "[]"),
         ),
         (None, "/Users", Answer::reply(200, ACCOUNTS)),
-        (None, "/auth/jellyfin", Answer::reply(200, "{}")),
+        (None, "/auth/me", Answer::reply(200, "{}")),
         (
             None,
             "/settings/main",
@@ -135,7 +135,10 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
     let _ = std::fs::create_dir_all(&dir);
     let mut context = a_context()
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(
+            SeedFs::keyed(Some(KEYED), None)
+                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+        ))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
     crate::app::targets::record_secret(

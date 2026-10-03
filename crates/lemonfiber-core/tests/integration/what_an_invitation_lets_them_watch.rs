@@ -119,7 +119,7 @@ fn a_server(policy: &'static str, libraries: Answer, written: Answer) -> Arc<Fak
                 signed_in,
             ],
         ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         // The request service holds no account for anybody, which is nothing to hold
         // rather than a failure to hold something.
@@ -146,6 +146,7 @@ fn a_server(policy: &'static str, libraries: Answer, written: Answer) -> Arc<Fak
 /// A context over the shipped stack, with the media server up and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
     lemonfiber_testing::a_context()
+        .over(crate::common::household::set_up_beside(env))
         .engine(Arc::new(Reporting::holding(
             &["jellyfin"],
             Lifecycle::Running,
@@ -218,7 +219,7 @@ fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
                 signed_in,
             ],
         ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         (
             PERMISSIONS,

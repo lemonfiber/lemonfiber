@@ -54,6 +54,37 @@ pub fn recorded_admin(name: &str) -> std::path::PathBuf {
     env
 }
 
+/// The shipped stack, in a directory of its own whose request service has been set up:
+/// its settings file holds the key it answers as its owner, which is what lemonfiber
+/// reads and writes it with.
+///
+/// Leaked because `Source::External` holds a `&'static Path`.
+#[track_caller]
+pub fn set_up_request_service(name: &str) -> Source {
+    let from = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/media-stack"
+    ));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-stack")).kept();
+    let settings = dir.join("config").join("seerr").join("settings.json");
+    let _ = std::fs::create_dir_all(settings.parent().unwrap_or(&dir));
+    let _ = std::fs::write(&settings, lemonfiber_fixtures::support::SEERR_SETTINGS);
+    let _ = std::fs::copy(from.join("stack.toml"), dir.join("stack.toml"));
+    Source::External(Box::leak(dir.into_boxed_path()))
+}
+
+/// [`set_up_request_service`], named after the scratch directory `env` sits in, for the
+/// tests that already keep one per case.
+#[track_caller]
+pub fn set_up_beside(env: &std::path::Path) -> Source {
+    let name = env
+        .parent()
+        .and_then(std::path::Path::file_name)
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("beside");
+    set_up_request_service(name)
+}
+
 /// A context over a transport that answers everything both writes ask.
 ///
 /// The refusing case next door proves the dispatcher reaches these commands; this one
@@ -118,7 +149,7 @@ pub fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
                     "Policy":{"EnableAllFolders":true}}]"#,
             ),
         ),
-        (None, "/auth/jellyfin", Answer::reply(200, "{}")),
+        (None, "/auth/me", Answer::reply(200, "{}")),
         (
             None,
             "/settings/main",
@@ -195,6 +226,7 @@ pub fn context(name: &str, transport: &Arc<Fake>) -> Ctx {
 /// settings are always the permissive ones.
 pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
     lemonfiber_testing::a_context()
+        .over(set_up_request_service(name))
         .engine(Arc::new(Reporting::holding(
             &["jellyfin", "seerr"],
             Lifecycle::Running,

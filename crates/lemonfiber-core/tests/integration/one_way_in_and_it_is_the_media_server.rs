@@ -38,6 +38,8 @@ fn ways_in(source: &str) -> BTreeSet<String> {
     source
         .split('"')
         .filter(|piece| piece.starts_with("/auth"))
+        // Who a key belongs to is a question asked with the key, not a way in.
+        .filter(|piece| *piece != "/auth/me")
         .map(str::to_owned)
         .collect()
 }

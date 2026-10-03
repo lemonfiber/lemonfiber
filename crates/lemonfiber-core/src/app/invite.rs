@@ -386,18 +386,13 @@ async fn told(
     members: &[String],
     narrowed: Option<&str>,
 ) -> Told {
-    let Some(access) = crate::app::targets::seerr_reader(ctx, services) else {
+    let Some(access) = crate::app::targets::seerr_reader(ctx, services).await else {
         return Told {
             linked: Linked::NotTried,
             requesting: Linked::NotTried,
         };
     };
-    if access
-        .seerr
-        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
-        .await
-        .is_err()
-    {
+    if access.seerr.answers().await.is_err() {
         return Told {
             linked: Linked::NotYet,
             requesting: Linked::NotYet,

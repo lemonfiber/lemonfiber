@@ -57,7 +57,7 @@ pub(super) async fn settle(
     }
 
     walk.say(Line::saying(Step::Available, chosen.named.clone()));
-    let household = seerr_reader(walk.ctx, services).is_some();
+    let household = seerr_reader(walk.ctx, services).await.is_some();
     walk.finished(Shape::Pipeline, &chosen.named, link, household)
 }
 

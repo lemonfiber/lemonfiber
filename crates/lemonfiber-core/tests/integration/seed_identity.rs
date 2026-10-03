@@ -124,9 +124,8 @@ impl Requests for FakeReq {
 
     /// Signing in is the first half of configuring identity, and fails the same way.
     /// It names no media server: a service already pointed at one refuses an address.
-    async fn sign_in(&self, username: &str, password: &str) -> Result<(), Failure> {
-        self.configure_identity(username, password, "http://jellyfin:8096")
-            .await
+    async fn answers(&self) -> Result<(), Failure> {
+        Ok(())
     }
 
     /// The seeding driver never reads the household's requests; the household view is

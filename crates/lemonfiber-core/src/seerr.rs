@@ -157,26 +157,48 @@ const WHEN_RELEASED: &str = "released";
 /// household that has done nothing but visit the page can be reached.
 const WEBPUSH: &str = "/settings/notifications/webpush";
 
-/// A client for one Seerr's identity setup.
+/// A client for one Seerr.
 pub struct Seerr {
     endpoint: Endpoint,
+    /// Seerr's own API key, which it answers as its owner; none for the client that sets
+    /// it up, since a Seerr that has not been set up has no key yet.
+    key: Option<String>,
 }
 
 impl Seerr {
-    /// A client for the Seerr reached at `base`, named `service`.
+    /// A client for the Seerr reached at `base`, named `service`, carrying no key: the
+    /// one that sets it up.
     #[must_use]
     pub fn new(http: Arc<dyn Http>, base: impl Into<String>, service: impl Into<String>) -> Self {
         Self {
             endpoint: Endpoint::new(http, base, service),
+            key: None,
         }
     }
 
-    /// A request to a path under Seerr's versioned API. A JSON body is declared as
-    /// such, because Seerr's framework only parses a body it is told is JSON and
-    /// silently drops one it is not.
+    /// A client for the Seerr reached at `base`, named `service`, carrying its own `key`.
+    #[must_use]
+    pub fn keyed(
+        http: Arc<dyn Http>,
+        base: impl Into<String>,
+        service: impl Into<String>,
+        key: impl Into<String>,
+    ) -> Self {
+        Self {
+            endpoint: Endpoint::new(http, base, service),
+            key: Some(key.into()),
+        }
+    }
+
+    /// A request to a path under Seerr's versioned API, carrying the key where this
+    /// client holds one. A JSON body is declared as such, because Seerr's framework
+    /// only parses a body it is told is JSON and silently drops one it is not.
     fn request(&self, method: Method, path: &str, body: Option<String>) -> Request {
-        self.endpoint
-            .json_request(method, &format!("/api/v1{path}"), body)
+        let path = format!("/api/v1{path}");
+        match &self.key {
+            Some(key) => self.endpoint.keyed_request(method, &path, key, body),
+            None => self.endpoint.json_request(method, &path, body),
+        }
     }
 
     /// Send a sign-in and keep whatever session it leaves.
@@ -282,18 +304,12 @@ impl Requests for Seerr {
         Ok(settings.initialized)
     }
 
-    async fn sign_in(&self, username: &str, password: &str) -> Result<(), Failure> {
-        // No address: this is the sign-in for a service already pointed at a media
-        // server, and naming one again is how you ask it to be pointed somewhere. It
-        // refuses that outright — "hostname already configured" — so a session opened
-        // this way is the only one available after the first run, which is every run
-        // that matters for reading.
-        let body = serde_json::json!({
-            "username": username,
-            "password": password,
-        })
-        .to_string();
-        self.opened(body).await
+    async fn answers(&self) -> Result<(), Failure> {
+        let response = self
+            .endpoint
+            .send(&self.request(Method::Get, "/auth/me", None))
+            .await?;
+        self.endpoint.expect_success(&response)
     }
 
     async fn configure_identity(

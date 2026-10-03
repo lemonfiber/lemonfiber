@@ -72,13 +72,13 @@ fn titles() -> BTreeMap<(&'static str, i64), String> {
     titles
 }
 
-/// A transport answering the media server's accounts, the request service's
-/// sign-in and read, and the \*arr libraries, by the shape of the URL.
+/// A transport answering the media server's accounts, the request service's check of
+/// its own key and its reads, and the \*arr libraries, by the shape of the URL.
 struct Fake {
     accounts: &'static str,
     folders: &'static str,
     ratings: &'static str,
-    sign_in: &'static str,
+    answered: &'static str,
     requests: &'static str,
     library: &'static str,
     refuse: bool,
@@ -105,7 +105,7 @@ impl Default for Fake {
             // at all — its name for content it has no rating for.
             ratings: r#"[{"Name":"Unrated"},{"Name":"U","Value":0},
                 {"Name":"12A","Value":12},{"Name":"15","Value":15}]"#,
-            sign_in: "",
+            answered: "",
             requests: "",
             library: "[]",
             refuse: false,
@@ -136,8 +136,8 @@ impl Fake {
             ),
             ("/Users", Answer::reply(200, self.accounts)),
             (
-                "/auth/jellyfin",
-                Answer::reply(if self.refuse { 500 } else { 200 }, self.sign_in),
+                "/auth/me",
+                Answer::reply(if self.refuse { 403 } else { 200 }, self.answered),
             ),
         ];
         if let Some(account) = self.account {
@@ -203,7 +203,8 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("household-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let disk = SeedFs::keyed(Some(KEYED), None);
+    let disk =
+        SeedFs::keyed(Some(KEYED), None).with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS);
     let mut context = a_context()
         .build()
         .with_filesystem(Arc::new(if no_room {

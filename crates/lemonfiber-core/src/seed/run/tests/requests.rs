@@ -1,17 +1,16 @@
-//! The request service: signed in to, and handed the *arrs.
+//! The request service: reached with its own key, and handed the *arrs.
 
 use super::*;
 
-/// The registration is made by a client that has signed in.
+/// The registration carries the request service's own key.
 ///
-/// Every call the request service takes here is an authenticated one, and nothing
-/// but signing in opens a session — so a client handed over unsigned makes every
-/// registration come back as a refusal about a credential, which is what this did
-/// for as long as it existed. Asserted by the call that went out, because a
-/// registration attempted without one looks the same from the outside as one that
-/// was refused for any other reason.
+/// Every call the request service takes here is an authenticated one, and after its
+/// setup the key it wrote for itself is what authenticates them: the media server's
+/// administrator password does not pass through it again. Asserted by the calls that
+/// went out, because a registration attempted without the key looks the same from
+/// the outside as one refused for any other reason.
 #[tokio::test]
-async fn the_request_service_is_signed_in_to_before_it_is_handed_anything() {
+async fn the_registration_carries_the_request_services_own_key() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("targets");
     let http = Fake::by_path_in_turn(vec![
@@ -23,7 +22,6 @@ async fn the_request_service_is_signed_in_to_before_it_is_handed_anything() {
             "/rootfolder",
             vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
         ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "")]),
         ("/settings/radarr", vec![Answer::reply(200, "[]")]),
         (
             "/settings/sonarr",
@@ -36,25 +34,42 @@ async fn the_request_service_is_signed_in_to_before_it_is_handed_anything() {
     ]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+        .with_filesystem(Arc::new(
+            SeedFs::keyed(Some(KEYED), None)
+                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+        ));
 
     let _ = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), seerr_svc()],
+        &[arr("sonarr", 8989, "tv"), seerr_with_settings()],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
     let asked = http.requests();
-    let signed_in = asked
+    let to_the_request_service: Vec<_> = asked
         .iter()
-        .position(|request| request.url.contains("/auth/jellyfin"));
-    let registered = asked
-        .iter()
-        .position(|request| request.url.contains("/settings/sonarr"));
+        .filter(|request| request.url.contains("/api/v1/"))
+        .collect();
     assert!(
-        signed_in.is_some_and(|opened| registered.is_some_and(|told| opened < told)),
-        "signed in at {signed_in:?}, registered at {registered:?}: the session has to come first"
+        to_the_request_service
+            .iter()
+            .any(|request| request.method == Method::Post
+                && request.url.contains("/settings/sonarr")),
+        "{asked:?}"
+    );
+    assert!(
+        to_the_request_service.iter().all(|request| request
+            .headers
+            .iter()
+            .any(|(name, value)| name == "X-Api-Key" && value == "seerr-own-key")),
+        "a call to the request service went without its key: {asked:?}"
+    );
+    assert!(
+        !asked
+            .iter()
+            .any(|request| request.url.contains("/auth/jellyfin")),
+        "the administrator's password went through the request service again: {asked:?}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }

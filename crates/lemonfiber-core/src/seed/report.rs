@@ -321,32 +321,32 @@ pub(super) fn unreached(failure: &Failure) -> State {
     }
 }
 
-/// What a read that would have needed a session comes to on a pass that opens none.
+/// What a read made with the request service's own key comes to on a pass that only
+/// says what it would do.
 ///
-/// A rehearsal signs in to nothing: a session is state left on somebody else's service,
-/// and the rule a rehearsed seed keeps is that it issues nothing but reads. So an
-/// unauthorised answer to one of the reads made as the owner is this run declining to
-/// open a session, not the service refusing a credential — and reporting the second
-/// would put a fault in front of an operator that nobody has.
+/// A rehearsal reads with the key like a real run, so an unauthorised answer there is a
+/// service with no key yet: one not set up, whose setup is the write a rehearsal does
+/// not make. Reporting that as a refused credential would put a fault in front of an
+/// operator that nobody has.
 ///
 /// What it reports instead is that it could not tell. Naming what a real run would
-/// write here would be a guess: what the service already holds is exactly what the
-/// session would have shown, and a rehearsal that guesses at the half it could not see
-/// has done its one job wrong. Every other failure is the failure it is, in both
-/// tenses.
+/// write here would be a guess: what the service holds is exactly what the read would
+/// have shown, and a rehearsal that guesses at the half it could not see has done its
+/// one job wrong. Every other failure is the failure it is, in both tenses.
 pub(super) fn unread(failure: &Failure, rehearsing: bool) -> State {
     if rehearsing && matches!(failure, Failure::Unauthorised { .. }) {
         return State::Skipped {
-            reason: WITHOUT_A_SESSION.to_owned(),
+            reason: NOT_SET_UP.to_owned(),
         };
     }
     unreached(failure)
 }
 
-/// Why a rehearsal has nothing to say about a connection it reads as the owner.
-const WITHOUT_A_SESSION: &str = "reading this needs a session with the service, and \
-     opening one is a write that a run only saying what it would do does not make; a \
-     real run signs in and reports what it found";
+/// Why a rehearsal has nothing to say about a connection it reads as the owner: the
+/// service has written no key yet, because the run that sets it up is the one that
+/// writes it.
+const NOT_SET_UP: &str = "the request service has not been set up yet, so there is \
+     nothing to read; a real run sets it up and reports what it found";
 
 /// A service's existing resources, observed once — or, where it could not be
 /// reached, every wanted connection as the state that unreachability leaves it in.

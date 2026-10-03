@@ -42,7 +42,7 @@ fn answering_with(lookup: Answer, gone: Answer) -> Arc<Fake> {
             "/Users/AuthenticateByName",
             vec![signed_in.clone(), signed_in],
         ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/api/v1/request", vec![Answer::reply(200, REQUESTS)]),
         ("/user/jellyfin/", vec![lookup]),
         ("/api/v1/user/", vec![gone]),
@@ -60,6 +60,7 @@ fn answering() -> Arc<Fake> {
 /// A context over the shipped stack, with the media server up and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
     lemonfiber_testing::a_context()
+        .over(crate::common::household::set_up_beside(env))
         .engine(Arc::new(Reporting::holding(
             &["jellyfin"],
             Lifecycle::Running,
@@ -457,7 +458,7 @@ async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone(
             "/Users/AuthenticateByName",
             vec![signed_in.clone(), signed_in],
         ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/auth/me", vec![Answer::reply(200, "{}")]),
         (
             "/api/v1/request",
             vec![Answer::reply(
@@ -518,7 +519,7 @@ async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
                 "/Users/AuthenticateByName",
                 vec![signed_in.clone(), signed_in],
             ),
-            ("/auth/jellyfin", vec![sign_in]),
+            ("/auth/me", vec![sign_in]),
             (
                 "/api/v1/request",
                 vec![Answer::reply(
