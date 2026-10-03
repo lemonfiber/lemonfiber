@@ -74,6 +74,7 @@ pub(crate) async fn household(
     let mut findings = Vec::new();
     let (libraries, certificates) = named_by_the_server(&server, &mut findings).await;
     let expired = standing::expired(ctx, &server, &accounts, &mut findings).await;
+    let declined = standing::declined(ctx, &server, &accounts, &mut findings).await;
 
     // A request service that will not answer costs the requests, not the household.
     // Who is here is the media server's fact, and reporting nobody because a second
@@ -165,6 +166,7 @@ pub(crate) async fn household(
             no_room,
             hosted: crate::app::hosting::keeping(ctx, Hostable::Expiring).await,
             expired: &expired,
+            declined: &declined,
         },
         member,
     );
@@ -329,7 +331,7 @@ fn assemble(
         let mut member = HouseholdMember {
             access: named_access(&account.access, naming, approves_own),
             asking: held.map(|held| allowance::reported(held, &made, naming.now)),
-            standing: standing::standing(&account, naming.expired),
+            standing: standing::standing(&account, naming.expired, naming.declined),
             last_seen: account.last_seen,
             claimed: account.claimed,
             name: account.name,

@@ -160,6 +160,10 @@ pub enum MemberStanding {
     /// Offered, and the offer ran out before anybody claimed it. The next invitation
     /// takes it back.
     Expired,
+    /// Offered, and the person refused it at its decline address. The account is kept,
+    /// switched off, until the operator removes it or reissues it; no sweep takes it
+    /// back as run out.
+    Declined,
     /// Claimed, and able to sign in.
     #[default]
     Active,

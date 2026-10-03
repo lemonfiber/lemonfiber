@@ -28,6 +28,7 @@ fn assembled(
             reasons: &crate::asking::Reasons::default(),
             hosted: false,
             expired: &std::collections::BTreeSet::new(),
+            declined: &std::collections::BTreeSet::new(),
             expiring: None,
             no_room: false,
         },

@@ -24,7 +24,7 @@
 //! see [`crate::invitation`].
 
 mod allowing;
-mod declining;
+pub(crate) mod declining;
 mod offering;
 mod refusals;
 mod reissuing;

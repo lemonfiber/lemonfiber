@@ -42,7 +42,9 @@ pub(crate) async fn reissue(
 ) -> Result<Invitation, Box<crate::error::Problem>> {
     let name = name.trim().to_owned();
     let Reaching {
-        server, reachable, ..
+        server,
+        reachable,
+        services,
     } = reaching(ctx, &name).await?;
 
     let Ok(household) = server.household().await else {
@@ -83,7 +85,13 @@ pub(crate) async fn reissue(
     // cannot sign in to until this is written — and switched on first, it would open to
     // the old password for as long as the reset took.
     super::offering::guarded(&server, &member, None, false).await?;
-    Ok(renewed(member.name, reachable, false))
+    // A new decline address with the new offer: the old token went with the old record,
+    // so a refusal of it no longer reads as this account's standing.
+    let decline = super::declining::issued(ctx, &services, &held.household, &member).await;
+    Ok(Invitation {
+        decline,
+        ..renewed(member.name, reachable, false)
+    })
 }
 /// The invitation a reissue account is sent with.
 ///

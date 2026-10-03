@@ -6,9 +6,10 @@
 //! directory. Offering the same person again mints a new token, so an older address
 //! stops declining anything.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_sidecar::decline::{File, Invitation, Table, TokenHash};
+use lemonfiber_sidecar::decline::{File, Invitation, Refusals, Table, TokenHash};
 
 use crate::app::Ctx;
 use crate::invitation::Offers;
@@ -67,6 +68,41 @@ pub(super) fn table_path(project: &Path) -> PathBuf {
         .join("config")
         .join(SERVICE)
         .join(File::Table.name())
+}
+
+/// The accounts whose standing offer was declined: the ones whose offer's token the
+/// decline service recorded a refusal for.
+///
+/// Matched on the token rather than the account, so an account offered again since it
+/// was declined, under a new token, is an invitation again rather than still declined.
+/// A record the service has not written, or one that cannot be read, declines nobody.
+pub(crate) fn declined(ctx: &Ctx, offers: &Offers) -> BTreeSet<String> {
+    crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
+        .and_then(|project| std::fs::read_to_string(refusals_path(&project)).ok())
+        .and_then(|text| Refusals::read(&text).ok())
+        .map_or_else(BTreeSet::new, |refusals| refused(offers, &refusals))
+}
+
+/// The accounts among `offers` whose token `refusals` records a refusal of.
+fn refused(offers: &Offers, refusals: &Refusals) -> BTreeSet<String> {
+    offers
+        .iter()
+        .filter(|(_, offer)| {
+            offer
+                .decline
+                .as_ref()
+                .is_some_and(|token| refusals.of(token).is_some())
+        })
+        .map(|(id, _)| id.clone())
+        .collect()
+}
+
+/// Where the decline service records its refusals, beside the table.
+pub(super) fn refusals_path(project: &Path) -> PathBuf {
+    project
+        .join("config")
+        .join(SERVICE)
+        .join(File::Refusals.name())
 }
 
 /// The offers with `token`'s hash on `member`'s, which must already be recorded.
