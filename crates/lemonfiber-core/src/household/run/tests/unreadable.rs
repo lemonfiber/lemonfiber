@@ -9,7 +9,7 @@ async fn a_service_still_starting_costs_names_without_being_called_a_failed_read
     // where they stand, and nothing claims a read failed that was never made.
     let mut context = ctx_with(
         &Fake {
-            sign_in: "",
+            answered: "",
             requests: r#"{"pageInfo":{"results":1},"results":[
                 {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
                  "requestedBy":{"displayName":"Alex"}}
@@ -20,7 +20,9 @@ async fn a_service_still_starting_costs_names_without_being_called_a_failed_read
         },
         "starting",
     );
-    context = context.with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    context = context.with_filesystem(Arc::new(
+        SeedFs::keyed(None, None).with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+    ));
     let report = household(&context, None).await.unwrap_or_default();
     assert!(report.available);
     let first = report.members.first().and_then(|m| m.requests.first());
@@ -37,13 +39,13 @@ async fn a_service_still_starting_costs_names_without_being_called_a_failed_read
 }
 
 #[tokio::test]
-async fn a_refused_sign_in_costs_the_requests_and_not_the_household() {
+async fn a_refused_key_costs_the_requests_and_not_the_household() {
     // Who is in the house is the media server's fact. Reporting nobody because the
     // *request* service refused would be the same defect this read was built to
     // fix, one service along — so the members still list and the refusal is said.
     let context = ctx_with(
         &Fake {
-            sign_in: "no",
+            answered: "no",
             refuse: true,
             ..Fake::default()
         },
@@ -73,7 +75,7 @@ async fn a_refused_sign_in_costs_the_requests_and_not_the_household() {
 async fn an_unreadable_request_record_costs_the_requests_and_not_the_household() {
     let context = ctx_with(
         &Fake {
-            sign_in: "",
+            answered: "",
             requests: "not json",
             library: "[]",
             refuse: false,
@@ -187,7 +189,7 @@ async fn libraries_that_will_not_read_cost_their_names_and_not_the_access() {
 async fn an_unreadable_library_costs_names_not_the_view() {
     let context = ctx_with(
         &Fake {
-            sign_in: "",
+            answered: "",
             requests: r#"{"pageInfo":{"results":1},"results":[
                 {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
                  "requestedBy":{"displayName":"Alex"}}
@@ -221,7 +223,7 @@ async fn a_stack_with_no_recorded_password_has_nothing_to_ask_with() {
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
         .with_http(
             Fake {
-                sign_in: "",
+                answered: "",
                 requests: "",
                 library: "[]",
                 refuse: false,
@@ -306,7 +308,7 @@ async fn an_account_that_holds_unrated_content_back_reads_as_one_that_does() {
 async fn a_household_view_over_an_unreadable_stack_is_an_error() {
     let mut context = ctx_with(
         &Fake {
-            sign_in: "",
+            answered: "",
             requests: "",
             library: "[]",
             refuse: false,

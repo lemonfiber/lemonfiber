@@ -82,23 +82,16 @@ pub trait Requests: Send + Sync {
         server_url: &str,
     ) -> Result<(), Failure>;
 
-    /// Sign in through the media server as `username` with `password`, leaving the
-    /// session the later reads are made under.
+    /// Whether the service answers to the key this client carries, as its owner.
     ///
-    /// Signing in is what [`Requests::configure_identity`] does first; this is that step
-    /// on its own, for a read that must not also finish somebody's setup.
-    ///
-    /// **Where the media server is, is not named here**, and that is the difference
-    /// between the two. A service that has been pointed at one already knows where it
-    /// is, and naming it again is an attempt to point it somewhere — which it refuses,
-    /// because moving a household's identity source out from under them is not a thing
-    /// a sign-in should be able to do. So this opens a session on a service that is
-    /// already set up, and [`Requests::configure_identity`] is the one that sets it up.
+    /// The service's own key is what every read and write after its setup carries, so
+    /// the media server's administrator password passes through it only once, on the
+    /// sign-in that sets it up.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn sign_in(&self, username: &str, password: &str) -> Result<(), Failure>;
+    /// Returns [`Failure`] when it is unreachable or refuses the key.
+    async fn answers(&self) -> Result<(), Failure>;
 
     /// Every request the household has made, across its members.
     ///

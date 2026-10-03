@@ -278,6 +278,10 @@ pub fn seeding_with(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
     Fake::by_path(routes)
 }
 
+/// The settings file a request service that has been set up writes, holding the key
+/// it answers as its owner.
+pub const SEERR_SETTINGS: &str = r#"{"main":{"apiKey":"seerr-own-key"}}"#;
+
 /// A filesystem that hands back a Servarr configuration for a Servarr path and
 /// a `SABnzbd` one for `SABnzbd`'s, or nothing. Only `read` is meaningful to
 /// seeding; the rest are unused.

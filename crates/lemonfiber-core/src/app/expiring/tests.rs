@@ -335,7 +335,7 @@ fn service(closes: u16, lists: u16) -> Arc<Transport> {
             "/Users/AuthenticateByName",
             Answer::reply(200, r#"{"AccessToken":"token"}"#),
         ),
-        (None, "/auth/jellyfin", Answer::reply(200, "{}")),
+        (None, "/auth/me", Answer::reply(200, "{}")),
         (
             Some(crate::ports::http::Method::Get),
             "/request/7",
@@ -367,7 +367,10 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
     let held: Arc<Transport> = Arc::clone(&transport);
     let mut ctx = a_context()
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(
+            SeedFs::keyed(Some(KEYED), None)
+                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+        ))
         .with_http(held);
     ctx.settings.env_file = Some(env_at(name, &a_password()));
     crate::app::targets::record_secret(

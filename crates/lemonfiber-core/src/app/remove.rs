@@ -60,7 +60,7 @@ pub(crate) async fn remove(
         return Err(Box::new(runs_the_server(&member.name)));
     }
 
-    let asking = super::targets::seerr_reader(ctx, &manifest.services);
+    let asking = super::targets::seerr_reader(ctx, &manifest.services).await;
     let mut cost = what_it_costs(asking.as_ref(), &member).await;
 
     if !confirm {
@@ -175,12 +175,7 @@ enum Held {
 
 /// The account the request service holds for this member, where it holds one.
 async fn their_account(access: &super::targets::HouseholdAccess, member: &Member) -> Held {
-    if access
-        .seerr
-        .sign_in(crate::config::JELLYFIN_ADMIN_USER, &access.password)
-        .await
-        .is_err()
-    {
+    if access.seerr.answers().await.is_err() {
         return Held::Unreadable;
     }
     match access.seerr.member_for(&member.id).await {

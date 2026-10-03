@@ -84,74 +84,55 @@ pub(crate) async fn open_servarrs(
     open
 }
 
-/// The request service, already signed in as the owner.
+/// The request service, carrying its own key, which it answers as its owner.
 ///
-/// **Every authenticated call it takes needs a session**, and nothing but signing in
-/// opens one — so a client handed out unsigned is one whose every use comes back as a
-/// refusal about a credential, which is what registering the \*arrs did for as long as
-/// it existed. Built in one place so that cannot be forgotten again.
+/// **Its own key, never the media server's administrator password.** That password
+/// passes through the request service once, on the sign-in that sets it up, and every
+/// read and write after that carries the key the service wrote for itself. A key is a
+/// header on each request rather than a session left open on somebody else's service,
+/// so a pass that only says what it would do reads with it too.
 ///
 /// **Takes the address rather than finding it**, so it always hands a client back and
-/// the caller keeps the one place that decides there is nobody to talk to. A stack
-/// with no credential to sign in with, or a sign-in that fails, still gets a client:
-/// whatever is about to use it reports what went wrong in its own words, and handing
-/// back nothing would leave the operator with no line at all about work that was
-/// attempted and failed — worse than a failure they can read.
-pub(crate) async fn seerr_as_owner(ctx: &Ctx, base: String) -> Seerr {
-    let seerr = Seerr::new(ctx.seams.http.clone(), base, "seerr");
-    // **And not on a pass that only says what it would do.** A sign-in is a `POST` that
-    // opens a session on somebody else's service — state left behind by a run that
-    // promised to leave none — so a rehearsal takes the client unsigned on purpose.
-    // Every read it then makes answers unauthorised, which is this run declining to
-    // open a session rather than the service refusing a credential, and the caller says
-    // so in those words. Held here rather than at the call site because that is where
-    // the forgetting happened last time.
-    if ctx.dry_run {
-        return seerr;
+/// the caller keeps the one place that decides there is nobody to talk to. A service
+/// that has not written its key yet still gets a client: whatever is about to use it
+/// reports the refusal in its own words, and handing back nothing would leave the
+/// operator with no line at all about work that was attempted and failed.
+pub(crate) async fn seerr_as_owner(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    base: String,
+) -> Seerr {
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    match seerr_key(ctx, services, project.as_deref()).await {
+        Some(key) => Seerr::keyed(ctx.seams.http.clone(), base, "seerr", key),
+        None => Seerr::new(ctx.seams.http.clone(), base, "seerr"),
     }
-    if let Some(password) = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY) {
-        let _ = crate::ports::service::Requests::sign_in(
-            &seerr,
-            crate::config::JELLYFIN_ADMIN_USER,
-            &password,
-        )
-        .await;
-    }
-    seerr
 }
 
-/// What reading the household's requests needs: the request service, and the media-server
-/// credential the sign-in is made with. Seerr authenticates its household against Jellyfin,
-/// so the account lemonfiber holds a password for is how it asks — as the owner, whose
-/// session sees every member's requests.
+/// What reading the household's requests needs: the request service, carrying the key
+/// it answers as its owner, whose reads see every member's requests.
 pub(crate) struct HouseholdAccess {
     /// The request service, reached on the host.
     pub seerr: Seerr,
-    /// The media-server admin password lemonfiber minted and recorded.
-    pub password: String,
 }
 
-/// The request service and the credential to read it with, or nothing where the stack has
-/// no request service, no media server to authenticate against, or no recorded password
-/// to sign in with.
+/// The request service to read the household from, or nothing where the stack has no
+/// request service, no media server for it to authenticate the household against, or a
+/// request service that has not written its own key yet.
 ///
 /// The household view treats any of those as nothing to report rather than a fault: a
-/// stack without a request service has no household requests, and one whose password was
-/// never recorded has no way to ask for them.
-pub(crate) fn seerr_reader(
+/// stack without a request service has no household requests, and one not yet set up
+/// has nobody to have asked for anything.
+pub(crate) async fn seerr_reader(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Option<HouseholdAccess> {
     let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
-    // A stack with no media server has nothing for the request service to authenticate
-    // against, so there is nobody to ask on behalf of. Where it is is not needed — the
-    // request service was pointed at it when it was set up, and asking it to be pointed
-    // somewhere again is what it refuses.
     service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
-    let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let key = seerr_key(ctx, services, project.as_deref()).await?;
     Some(HouseholdAccess {
-        seerr: Seerr::new(ctx.seams.http.clone(), seerr.loopback, "seerr"),
-        password,
+        seerr: Seerr::keyed(ctx.seams.http.clone(), seerr.loopback, "seerr", key),
     })
 }
 
@@ -348,9 +329,9 @@ pub(crate) fn bindery_reader(
 
 /// The request service's own key, read from the settings file it writes.
 ///
-/// Published with the rest of the stack's keys; lemonfiber itself reaches Seerr by
-/// signing in rather than by key. Nothing before Seerr is initialised, since
-/// that is the run that writes one.
+/// Published with the rest of the stack's keys, and the key lemonfiber itself reads and
+/// writes Seerr with. Nothing before Seerr is initialised, since that is the run that
+/// writes one.
 pub(crate) async fn seerr_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],

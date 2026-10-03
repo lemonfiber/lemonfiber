@@ -251,15 +251,14 @@ async fn a_rehearsed_pass_names_the_endpoint_it_would_register_and_registers_non
     );
 }
 
-/// A read a rehearsal makes as the owner says it could not tell, rather than naming a
-/// credential fault nobody has.
+/// A read a rehearsal makes of a request service not yet set up says it could not
+/// tell, rather than naming a credential fault nobody has.
 ///
-/// Every call here is authenticated and nothing but signing in opens a session — and
-/// signing in is a `POST` that leaves state on somebody else's service, which a run
-/// promising to leave none does not make. So the answer comes back unauthorised, and
-/// an operator told their key was refused would go looking for a broken credential and
-/// find a working one. What they are told instead is that this run declined to open a
-/// session and that a real one signs in and reports what it found.
+/// A service not yet set up has written no key, so the client a rehearsal reads with
+/// carries none and the answer comes back unauthorised. An operator told their key was
+/// refused would go looking for a broken credential that does not exist yet. What they
+/// are told instead is that the service is not set up, and that a real run sets it up
+/// and reports what it found.
 #[tokio::test]
 async fn a_rehearsed_read_as_the_owner_says_it_could_not_tell_rather_than_naming_a_fault() {
     let http = Fake::by_path(vec![("/settings", Answer::reply(401, ""))]);
@@ -270,10 +269,10 @@ async fn a_rehearsed_read_as_the_owner_says_it_could_not_tell_rather_than_naming
     let said = format!("{states:?}");
     assert!(
         said.starts_with("[Skipped"),
-        "a session this run chose not to open was reported as something else: {said}"
+        "a service not yet set up was reported as something else: {said}"
     );
     assert!(
-        said.contains("session"),
+        said.contains("not been set up"),
         "the operator was not told why nothing could be read: {said}"
     );
     assert!(

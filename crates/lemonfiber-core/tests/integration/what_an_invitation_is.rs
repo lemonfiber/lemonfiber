@@ -12,7 +12,6 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use crate::common::stack::stack;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::Linked;
@@ -57,7 +56,7 @@ fn answering_all(session: Answer, linking: Answer) -> Arc<Fake> {
             )],
         ),
         ("/user/import-from-jellyfin", vec![linking]),
-        ("/auth/jellyfin", vec![session]),
+        ("/auth/me", vec![session]),
         ("/Users", vec![Answer::reply(200, HELD)]),
     ])
 }
@@ -74,7 +73,7 @@ fn context(env: &std::path::Path) -> Ctx {
 
 /// The same, over a transport the caller chose.
 fn context_over(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    context_on(env, http, stack())
+    context_on(env, http, crate::common::household::set_up_beside(env))
 }
 
 /// The same again, over a stack the caller chose — for the one case that is about a

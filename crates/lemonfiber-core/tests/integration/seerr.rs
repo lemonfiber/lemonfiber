@@ -80,31 +80,52 @@ async fn an_address_with_no_port_is_given_the_one_its_scheme_implies() {
     assert!(secure.contains(r#""port":443"#), "{secure}");
 }
 
-/// Opening a session names no media server, because naming one asks to move it.
-///
-/// A service already pointed at a media server refuses an address outright — moving
-/// a household's identity source out from under them is not something a sign-in
-/// should be able to do — and every run after the first meets exactly that service.
-/// So a sign-in that carried the address could never open a session on a working
-/// stack, which is the only stack the reads happen on.
+/// After its setup, the request service is read with its own key, which it answers as
+/// its owner: every request carries it, and whether it is taken is one read of who the
+/// key belongs to.
 #[tokio::test]
-async fn opening_a_session_names_no_media_server() {
-    let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
-    assert!(seerr(&fake).sign_in("admin", &password()).await.is_ok());
+async fn a_keyed_client_carries_the_services_own_key_on_every_request() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"id":1}"#)]);
+    let http: Arc<dyn Http> = fake.clone();
+    let keyed = Seerr::keyed(http, "http://127.0.0.1:5055", "seerr", "its-own-key");
 
-    let body = fake
+    assert!(keyed.answers().await.is_ok());
+    let asked = fake.requests();
+    assert!(asked
+        .first()
+        .is_some_and(|request| request.url.ends_with("/api/v1/auth/me")
+            && request
+                .headers
+                .iter()
+                .any(|(name, value)| name == "X-Api-Key" && value == "its-own-key")));
+}
+
+/// A key the request service refuses is a failure, not an answer.
+#[tokio::test]
+async fn a_key_the_service_refuses_is_a_failure() {
+    let fake = Fake::in_turn(vec![Answer::reply(403, "")]);
+    let http: Arc<dyn Http> = fake.clone();
+
+    assert!(
+        Seerr::keyed(http, "http://127.0.0.1:5055", "seerr", "stale")
+            .answers()
+            .await
+            .is_err()
+    );
+}
+
+/// The client that sets the request service up carries no key, because a service not
+/// yet set up has none.
+#[tokio::test]
+async fn the_client_that_sets_it_up_carries_no_key() {
+    let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":false}"#)]);
+
+    let _ = seerr(&fake).initialized().await;
+
+    assert!(fake
         .requests()
         .first()
-        .and_then(|request| request.body.clone())
-        .unwrap_or_default();
-
-    assert!(body.contains(r#""username":"admin""#), "{body}");
-    for named in ["hostname", "port", "useSsl", "urlBase", "serverType"] {
-        assert!(
-            !body.contains(named),
-            "a session-only sign-in named {named}, which the service refuses: {body}"
-        );
-    }
+        .is_some_and(|request| !request.headers.iter().any(|(name, _)| name == "X-Api-Key")));
 }
 
 /// An \*arr as the request service is told about it.
@@ -435,19 +456,6 @@ async fn an_unreachable_seerr_is_unavailable_on_the_sign_in() {
         configure(&fake).await,
         Err(Failure::Unavailable { .. })
     ));
-}
-
-#[tokio::test]
-async fn signing_in_opens_a_session_without_finishing_setup() {
-    // The read path signs in only: finishing setup is somebody else's business, and a
-    // read must never complete a household's configuration as a side effect.
-    let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
-    assert!(seerr(&fake).sign_in("admin", &password()).await.is_ok());
-    let requests = fake.requests();
-    assert_eq!(requests.len(), 1);
-    assert!(requests
-        .first()
-        .is_some_and(|request| request.url.ends_with("/api/v1/auth/jellyfin")));
 }
 
 #[tokio::test]

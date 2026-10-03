@@ -90,7 +90,7 @@ fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
                     "Policy":{"EnableAllFolders":true}}]"#,
             ),
         ),
-        (None, "/auth/jellyfin", Answer::reply(200, "{}")),
+        (None, "/auth/me", Answer::reply(200, "{}")),
         (
             None,
             "/settings/main",
@@ -142,7 +142,11 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
             Lifecycle::Running,
             Health::Healthy,
         )))
-        .filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts)))
+        .filesystem(Arc::new(
+            SeedFs::keyed(None, None)
+                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS)
+                .with_facts(facts),
+        ))
         .settings(Settings {
             env_file: Some(env),
             data_root: Some(dir),

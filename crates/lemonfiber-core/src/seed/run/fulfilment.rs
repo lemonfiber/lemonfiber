@@ -135,7 +135,7 @@ pub(super) async fn seed_fulfilment_targets(
     // Signed in, because every call that follows is an authenticated one: registering
     // a target reads what the service already holds and then writes. Unsigned, all of
     // it comes back as a refusal about a credential.
-    let seerr = crate::app::targets::seerr_as_owner(ctx, base).await;
+    let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
     let mut journal = crate::journal::Journal::new();
     crate::seed::wire_fulfilment_targets(&seerr, &wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
         .await

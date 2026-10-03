@@ -139,7 +139,7 @@ fn a_stack_asking(member: Answer, written: Answer) -> Arc<Fake> {
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     Fake::by_path_in_turn(vec![
         ("/Users/AuthenticateByName", vec![signed_in]),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         (PERMISSIONS, vec![Answer::reply(200, APPROVES_OWN), written]),
         ("/user/jellyfin/", vec![member]),
