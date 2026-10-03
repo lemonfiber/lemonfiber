@@ -37,25 +37,25 @@ fn a_value() -> String {
     format!("{}{}", "the-", "recorded-value")
 }
 
-#[test]
-fn asking_once_prints_the_warning_and_not_the_value() {
+#[tokio::test]
+async fn asking_once_prints_the_warning_and_not_the_value() {
     let ctx = keeping("once");
     let secret = a_value();
     record_secret(&ctx, "A_TEST_PASS", &secret);
 
-    let revealed = reveal(&ctx, &line("A_TEST_PASS"), false);
+    let revealed = reveal(&ctx, &line("A_TEST_PASS"), false).await;
 
     assert_eq!(revealed.value, None);
     assert_eq!(revealed.warning, SHOULDER);
 }
 
-#[test]
-fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
+#[tokio::test]
+async fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
     let ctx = keeping("again");
     let secret = a_value();
     record_secret(&ctx, "A_TEST_PASS", &secret);
 
-    let revealed = reveal(&ctx, &line("A_TEST_PASS"), true);
+    let revealed = reveal(&ctx, &line("A_TEST_PASS"), true).await;
 
     assert_eq!(revealed.value.as_deref(), Some(secret.as_str()));
     assert_eq!(revealed.warning, REVEALED);
@@ -63,8 +63,8 @@ fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
 
 /// Even where a value happens to sit under the same name, because a plugin's
 /// secret is not one lemonfiber has captured and anything found there is not it.
-#[test]
-fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
+#[tokio::test]
+async fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
     let ctx = keeping("plugin");
     record_secret(&ctx, "comics/api_key", &a_value());
     let mut held = line("comics/api_key");
@@ -72,7 +72,7 @@ fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
         named: "comics".to_owned(),
     };
 
-    let revealed = reveal(&ctx, &held, true);
+    let revealed = reveal(&ctx, &held, true).await;
 
     assert_eq!(revealed.value, None);
     assert!(
@@ -82,11 +82,11 @@ fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
     );
 }
 
-#[test]
-fn a_credential_with_nothing_recorded_says_so_rather_than_showing_an_empty_value() {
+#[tokio::test]
+async fn a_credential_with_nothing_recorded_says_so_rather_than_showing_an_empty_value() {
     let ctx = keeping("nothing");
 
-    let revealed = reveal(&ctx, &line("NOTHING_RECORDED_PASS"), true);
+    let revealed = reveal(&ctx, &line("NOTHING_RECORDED_PASS"), true).await;
 
     assert_eq!(revealed.value, None);
     assert!(

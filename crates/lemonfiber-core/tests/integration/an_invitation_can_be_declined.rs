@@ -536,3 +536,110 @@ async fn reissuing_a_declined_account_offers_it_under_a_new_token() {
         Some(TokenHash::of("ana-token").as_str())
     );
 }
+
+/// What the decline service reports holding when it holds `key`.
+fn holding(key: &str) -> String {
+    let held = lemonfiber_sidecar::decline::Key::read(key).ok();
+    serde_json::to_string(&lemonfiber_sidecar::decline::Health::holding(held.as_ref()))
+        .unwrap_or_default()
+}
+
+/// The decline key is listed, printed on a confirmed ask, and replaced in the order that
+/// keeps a working key at every moment, all through the dispatcher.
+#[tokio::test]
+async fn the_decline_key_is_listed_shown_and_replaced() {
+    let env = recorded_admin("decline-key-credentials");
+    let stack: &'static Path = Box::leak(stack_with_decline("key-credentials").into_boxed_path());
+    let key_file = stack.join("config/decline/jellyfin.key");
+    let _ = std::fs::create_dir_all(stack.join("config/decline"));
+    let _ = std::fs::write(&key_file, "old\n");
+    let listed = |keys: &[&str]| {
+        let items: Vec<serde_json::Value> = keys
+            .iter()
+            .map(|key| serde_json::json!({ "AppName": "lemonfiber-decline", "AccessToken": key }))
+            .collect();
+        Answer::reply(
+            200,
+            Box::leak(
+                serde_json::json!({ "Items": items })
+                    .to_string()
+                    .into_boxed_str(),
+            ),
+        )
+    };
+    let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
+        ),
+        (
+            Method::Get,
+            "/Auth/Keys",
+            vec![
+                listed(&["old"]),
+                listed(&["old", "fresh"]),
+                listed(&["old", "fresh"]),
+            ],
+        ),
+        (Method::Post, "/Auth/Keys", vec![Answer::reply(204, "")]),
+        (Method::Delete, "/Auth/Keys/", vec![Answer::reply(204, "")]),
+        (Method::Get, "/System/Info", vec![Answer::reply(200, "{}")]),
+        (
+            Method::Get,
+            "5056/health",
+            vec![Answer::reply(
+                200,
+                Box::leak(holding("fresh").into_boxed_str()),
+            )],
+        ),
+    ]);
+    let ctx = lemonfiber_testing::a_context()
+        .over(Source::External(stack))
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+    let asked = |asking| dispatch(Command::Credentials(asking), &ctx);
+
+    let shown = match asked(lemonfiber_core::app::Asking::Reveal {
+        credential: "Jellyfin decline key".to_owned(),
+        confirmed: true,
+    })
+    .await
+    {
+        Ok(Outcome::Credentials(inventory)) => inventory.revealed.and_then(|one| one.value),
+        _ => None,
+    };
+    let rotated = match asked(lemonfiber_core::app::Asking::Rotate {
+        credential: "Jellyfin decline key".to_owned(),
+    })
+    .await
+    {
+        Ok(Outcome::Credentials(inventory)) => inventory.rotated.map(|one| one.settled),
+        _ => None,
+    };
+    let held_now = std::fs::read_to_string(&key_file).unwrap_or_default();
+    gone(&env, stack);
+
+    assert_eq!(shown.as_deref(), Some("old"));
+    assert!(
+        matches!(
+            rotated,
+            Some(lemonfiber_core::credential::Settled::Replaced { .. })
+        ),
+        "{rotated:?}"
+    );
+    assert_eq!(held_now.trim(), "fresh");
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.method == Method::Delete && asked.url.ends_with("/Auth/Keys/old")));
+}

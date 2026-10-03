@@ -14,6 +14,7 @@
 //! secrets in this stack belong to services, so a manifest that could not be read
 //! would leave those reading as none at all — which is a claim, not a gap.
 
+mod declining;
 mod reading;
 mod revealing;
 mod rotating;
@@ -47,7 +48,7 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
         Asking::Reveal {
             credential,
             confirmed,
-        } => showing(ctx, held, &credential, confirmed),
+        } => showing(ctx, held, &credential, confirmed).await,
         Asking::Rotate { credential } => {
             replacing(
                 ctx,
@@ -64,9 +65,9 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
 }
 
 /// The inventory with one value printed, or with the reason there is nothing to print.
-fn showing(ctx: &Ctx, held: Vec<Held>, credential: &str, confirmed: bool) -> Inventory {
+async fn showing(ctx: &Ctx, held: Vec<Held>, credential: &str, confirmed: bool) -> Inventory {
     let revealed = match named(&held, credential) {
-        Some(found) => revealing::reveal(ctx, found, confirmed),
+        Some(found) => revealing::reveal(ctx, found, confirmed).await,
         None => revealing::nothing_by_that_name(credential, &named_ones(&held)),
     };
     Inventory::of(held).showing(revealed)

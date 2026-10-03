@@ -1,4 +1,4 @@
-use super::{File, Invitation, Key, Refusal, Refusals, Table, TokenHash, FORMAT};
+use super::{File, Health, Invitation, Key, Refusal, Refusals, Table, TokenHash, FORMAT};
 
 fn invitation(token: &str, lapses: u64) -> Invitation {
     Invitation {
@@ -149,5 +149,26 @@ fn a_key_is_named_by_its_sha256_and_not_by_itself() {
     assert_eq!(
         fingerprint.as_deref(),
         Ok("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    );
+}
+
+#[test]
+fn health_says_which_key_the_service_holds_and_reads_back() {
+    let held = Key::read("one").ok();
+    let other = Key::read("two").ok();
+    let health = Health::holding(held.as_ref());
+
+    assert!(held.as_ref().is_some_and(|key| health.holds(key)));
+    assert!(other.as_ref().is_some_and(|key| !health.holds(key)));
+    assert!(held
+        .as_ref()
+        .is_some_and(|key| !Health::holding(None).holds(key)));
+    let said = serde_json::to_string(&health).unwrap_or_default();
+    assert_eq!(serde_json::from_str::<Health>(&said).ok(), Some(health));
+    assert_eq!(
+        serde_json::to_string(&Health::holding(None))
+            .ok()
+            .as_deref(),
+        Some(r#"{"key":null}"#)
     );
 }

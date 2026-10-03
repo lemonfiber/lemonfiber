@@ -14,7 +14,7 @@ use serde::Deserialize;
 use crate::ports::http::Method;
 use crate::ports::service::Failure;
 
-use super::Jellyfin;
+use super::{carrying, Jellyfin, AUTHORIZATION_HEADER};
 
 /// The name lemonfiber files its own API key under.
 const APP: &str = "lemonfiber";
@@ -98,6 +98,21 @@ impl Jellyfin {
                 "a key was minted as {app} and the key list does not show exactly one new one"
             ))),
         }
+    }
+
+    /// Whether Jellyfin answers to `key` alone: its system information, read with the
+    /// key and no session.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where Jellyfin is unreachable or refuses the key.
+    pub async fn answers_to(&self, key: &str) -> Result<(), Failure> {
+        let mut asking = self.request(Method::Get, "/System/Info", None);
+        asking
+            .headers
+            .push((AUTHORIZATION_HEADER.to_owned(), carrying(key)));
+        let response = self.endpoint.send(&asking).await?;
+        self.endpoint.expect_success(&response)
     }
 
     /// Revoke the key `key`.

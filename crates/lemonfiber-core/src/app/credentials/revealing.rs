@@ -20,7 +20,7 @@ use crate::credential::{Held, Revealed, REVEALED, SHOULDER};
 /// Unconfirmed, the warning is the whole answer. Confirmed, the value comes with the
 /// warning still attached, because the thing worth saying is as true afterwards as it
 /// was before — the value is in the scrollback either way once it has been printed.
-pub(crate) fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
+pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
     if !confirmed {
         return Revealed {
             name: held.name.clone(),
@@ -35,7 +35,12 @@ pub(crate) fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed {
             warning: held.unheld(plugin),
         };
     }
-    match recorded_secret(ctx, &held.setting) {
+    let recorded = if held.setting == super::declining::SETTING {
+        super::declining::value(ctx, held).await
+    } else {
+        recorded_secret(ctx, &held.setting)
+    };
+    match recorded {
         Some(value) => Revealed {
             name: held.name.clone(),
             value: Some(value),
