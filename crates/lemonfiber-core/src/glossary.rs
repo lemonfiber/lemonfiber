@@ -363,9 +363,26 @@ pub fn mentioned(text: &str) -> Vec<&'static Term> {
 }
 
 /// The words in a piece of text, with anybody's name for something passed over.
+///
+/// A command is a name too: `seed` in `lemonfiber seed` names what to run, not torrent
+/// seeding, so the word after the product's own name contributes nothing.
 fn words(text: &str) -> Vec<String> {
-    text.split_whitespace().map(word).collect()
+    let mut after_the_product = false;
+    text.split_whitespace()
+        .map(|token| {
+            let said = word(token);
+            let commanded = std::mem::replace(&mut after_the_product, said == COMMANDED);
+            if commanded {
+                String::new()
+            } else {
+                said
+            }
+        })
+        .collect()
 }
+
+/// The word a command follows, as [`word`] leaves it.
+const COMMANDED: &str = "lemonfiber";
 
 /// The word inside a token, or nothing where the token is a name.
 ///

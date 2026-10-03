@@ -119,7 +119,7 @@ fn a_rehearsed_pass_says_it_wrote_nothing_and_what_running_it_for_real_would_tak
     assert!(text.contains("1 left to wire — run it again without --dry-run."));
     assert!(text.contains("Nothing was written."));
     assert!(
-        !text.contains("run seed again once ready"),
+        !text.contains("again once ready"),
         "a rehearsal that tells them to run it again has told them it ran: {text}"
     );
 
@@ -229,4 +229,29 @@ fn a_lost_baseline_says_drift_could_not_be_assessed() {
         unsupported: Vec::new(),
     };
     assert!(seeding(&report).text().contains("could not be read"));
+}
+
+/// A pass that left work names the command that finishes it, and the footnote under it
+/// does not explain that command as torrent seeding.
+#[test]
+fn a_pass_with_work_left_names_the_command_and_explains_no_seeding() {
+    let waiting = seed_report(vec![wiring(
+        "a",
+        SeedState::Skipped {
+            reason: "not up".to_owned(),
+        },
+    )]);
+    let text = seeding(&waiting).text();
+
+    assert!(
+        text.contains("1 left to wire — run `lemonfiber seed` again once ready."),
+        "{text}"
+    );
+    let told = crate::render::glossary::footnotes(
+        &text,
+        true,
+        &lemonfiber_core::acknowledged::Acknowledged::none(),
+    )
+    .text();
+    assert!(!told.contains("seed —"), "{told}");
 }
