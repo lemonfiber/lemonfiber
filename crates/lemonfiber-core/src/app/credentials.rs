@@ -19,6 +19,7 @@ mod gating;
 mod reading;
 mod revealing;
 mod rotating;
+mod tokening;
 
 use super::targets::project_directory;
 use super::{Ctx, Problem};

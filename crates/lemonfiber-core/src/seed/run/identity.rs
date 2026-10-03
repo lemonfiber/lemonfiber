@@ -196,7 +196,7 @@ fn remember(
 
 /// Where the host reaches Seerr's API, if the stack has it — resolved the way every
 /// service lemonfiber speaks to is.
-pub(super) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
+pub(crate) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
     crate::app::targets::service_addr(services, lemonfiber_manifest::ApiKind::Seerr)
         .map(|addr| addr.loopback)
 }

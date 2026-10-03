@@ -308,9 +308,19 @@ impl Requests for Seerr {
     async fn move_fulfilment_target(
         &self,
         held: &RegisteredTarget,
-        target: &FulfilmentTarget,
+        at: &crate::ports::service::Endpoint,
+        key: &str,
     ) -> Result<(), Failure> {
-        targets::move_fulfilment_target(self, held, target).await
+        targets::move_fulfilment_target(self, held, at, key).await
+    }
+
+    async fn test_fulfilment_target(
+        &self,
+        television: bool,
+        at: &crate::ports::service::Endpoint,
+        key: &str,
+    ) -> Result<(), Failure> {
+        targets::test_fulfilment_target(self, television, at, key).await
     }
 
     async fn media_server_link(&self) -> Result<MediaServerLink, Failure> {

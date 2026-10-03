@@ -17,7 +17,7 @@ use crate::ports::service::{Endpoint, FulfilmentTarget, RegisteredTarget};
 use crate::seed::{State, Wiring};
 
 /// Where the request service reaches `route` through the gate.
-pub(super) fn through_the_gate(route: &str) -> Endpoint {
+pub(crate) fn through_the_gate(route: &str) -> Endpoint {
     Endpoint {
         host: gating::SERVICE.to_owned(),
         port: PORT,
@@ -26,7 +26,7 @@ pub(super) fn through_the_gate(route: &str) -> Endpoint {
 }
 
 /// The tokens the gate accepts now, and where they are kept.
-pub(super) struct Kept {
+pub(crate) struct Kept {
     path: PathBuf,
     accepted: Tokens,
 }
@@ -34,7 +34,7 @@ pub(super) struct Kept {
 impl Kept {
     /// What the gate under `project` accepts: nothing, where its file is missing or
     /// unreadable, which every token then fails and is replaced.
-    pub(super) async fn read(ctx: &Ctx, project: &Path) -> Self {
+    pub(crate) async fn read(ctx: &Ctx, project: &Path) -> Self {
         let path = gating::path(project, File::Tokens);
         let accepted = ctx
             .seams
@@ -50,7 +50,7 @@ impl Kept {
     /// service holds for its route where the gate accepts it and a new one where it
     /// does not — and the routes a new one was minted for, with a failure for each
     /// target none could be minted for.
-    pub(super) fn targets(
+    pub(crate) fn targets(
         &self,
         ctx: &Ctx,
         wanted: Vec<FulfilmentTarget>,
@@ -92,7 +92,7 @@ impl Kept {
     /// # Errors
     ///
     /// The reason the file could not be written.
-    pub(super) fn beside(&self, presented: &[Presented]) -> Result<Tokens, String> {
+    pub(crate) fn beside(&self, presented: &[Presented]) -> Result<Tokens, String> {
         let mut routes = self.accepted.routes.clone();
         for one in presented {
             let hash = TokenHash::of(&one.token);
@@ -118,7 +118,7 @@ impl Kept {
     /// # Errors
     ///
     /// The reason the file could not be written.
-    pub(super) fn only(
+    pub(crate) fn only(
         &self,
         beside: &Tokens,
         presented: &[Presented],
@@ -138,12 +138,22 @@ impl Kept {
     }
 
     /// Whether the gate accepts `token` on `route` now.
-    pub(super) fn accepts(&self, route: &str, token: &str) -> bool {
+    pub(crate) fn accepts(&self, route: &str, token: &str) -> bool {
         self.accepted.accepts(route, token)
     }
 
+    /// Leave the gate accepting what it accepted when this was read: a replacement
+    /// that did not land is taken back out of the file.
+    ///
+    /// # Errors
+    ///
+    /// The reason the file could not be written.
+    pub(crate) fn restore(&self) -> Result<(), String> {
+        self.write(&self.accepted)
+    }
+
     /// Why the tokens could not be handed to the gate, for the report.
-    pub(super) fn unwritten(&self, reason: &str) -> String {
+    pub(crate) fn unwritten(&self, reason: &str) -> String {
         format!(
             "the tokens could not be written to {}: {reason}",
             self.path.display()
@@ -157,16 +167,16 @@ impl Kept {
 }
 
 /// A token the request service is to present on a route.
-pub(super) struct Presented {
+pub(crate) struct Presented {
     /// The route.
-    pub(super) route: String,
+    pub(crate) route: String,
     /// The token.
-    pub(super) token: String,
+    pub(crate) token: String,
 }
 
 impl Presented {
     /// What `target`, reached through the gate, presents there.
-    pub(super) fn by(target: &FulfilmentTarget) -> Self {
+    pub(crate) fn by(target: &FulfilmentTarget) -> Self {
         Self {
             route: target.at.base.trim_start_matches('/').to_owned(),
             token: target.key.clone(),

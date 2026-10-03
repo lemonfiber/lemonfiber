@@ -102,6 +102,11 @@ fn serving(held: &[&str], added: u16, moved: u16) -> Arc<Fake> {
         ),
         (
             Method::Post,
+            "/settings/sonarr/test",
+            vec![Answer::reply(200, "")],
+        ),
+        (
+            Method::Post,
             "/settings/sonarr",
             vec![Answer::reply(added, "")],
         ),
@@ -215,7 +220,7 @@ async fn an_arr_held_at_its_own_address_is_moved_to_the_gate() {
     assert!(!http
         .requests()
         .iter()
-        .any(|asked| asked.method == Method::Post));
+        .any(|asked| asked.method == Method::Post && asked.url.ends_with("/settings/sonarr")));
 }
 
 /// A stack that no longer runs the gate moves Sonarr back to its own address, with

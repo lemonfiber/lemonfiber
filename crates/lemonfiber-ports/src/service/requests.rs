@@ -199,7 +199,7 @@ pub trait Requests: Send + Sync {
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure>;
 
-    /// Point a target it holds at `target`'s endpoint and key, leaving everything else
+    /// Point a target it holds at `at`, presenting `key`, leaving everything else
     /// about it — its name, profile, folder and the rest — as it holds them.
     ///
     /// # Errors
@@ -208,7 +208,21 @@ pub trait Requests: Send + Sync {
     async fn move_fulfilment_target(
         &self,
         held: &RegisteredTarget,
-        target: &FulfilmentTarget,
+        at: &Endpoint,
+        key: &str,
+    ) -> Result<(), Failure>;
+
+    /// Ask it to reach the \*arr at `at` presenting `key`, in the list `television`
+    /// names, the way its own settings test does, from wherever it runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable, or could not reach the \*arr.
+    async fn test_fulfilment_target(
+        &self,
+        television: bool,
+        at: &Endpoint,
+        key: &str,
     ) -> Result<(), Failure>;
 
     /// Where it reaches the media server for everything after a sign-in, and with what.

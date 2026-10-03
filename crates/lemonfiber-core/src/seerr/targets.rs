@@ -130,7 +130,8 @@ pub(super) async fn add_fulfilment_target(
 pub(super) async fn move_fulfilment_target(
     seerr: &Seerr,
     held: &RegisteredTarget,
-    target: &FulfilmentTarget,
+    at: &Endpoint,
+    key: &str,
 ) -> Result<(), Failure> {
     let path = if held.television { TELEVISION } else { FILM };
     let response = seerr
@@ -154,10 +155,10 @@ pub(super) async fn move_fulfilment_target(
         )));
     };
     for (at, value) in [
-        ("hostname", serde_json::json!(target.at.host)),
-        ("port", serde_json::json!(target.at.port)),
-        ("baseUrl", serde_json::json!(target.at.base)),
-        ("apiKey", serde_json::json!(target.key)),
+        ("hostname", serde_json::json!(at.host)),
+        ("port", serde_json::json!(at.port)),
+        ("baseUrl", serde_json::json!(at.base)),
+        ("apiKey", serde_json::json!(key)),
         ("useSsl", serde_json::json!(false)),
     ] {
         moved.insert(at.to_owned(), value);
@@ -168,4 +169,26 @@ pub(super) async fn move_fulfilment_target(
         .send(&seerr.request(Method::Put, &format!("{path}/{}", held.id), Some(body)))
         .await?;
     seerr.endpoint.expect_success(&written)
+}
+
+pub(super) async fn test_fulfilment_target(
+    seerr: &Seerr,
+    television: bool,
+    at: &Endpoint,
+    key: &str,
+) -> Result<(), Failure> {
+    let path = if television { TELEVISION } else { FILM };
+    let body = serde_json::json!({
+        "hostname": at.host,
+        "port": at.port,
+        "baseUrl": at.base,
+        "apiKey": key,
+        "useSsl": false,
+    })
+    .to_string();
+    let tested = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, &format!("{path}/test"), Some(body)))
+        .await?;
+    seerr.endpoint.expect_success(&tested)
 }

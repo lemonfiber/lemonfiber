@@ -28,6 +28,13 @@ pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed 
             warning: SHOULDER.to_owned(),
         };
     }
+    if super::tokening::is_token(held) {
+        return Revealed {
+            name: held.name.clone(),
+            value: None,
+            warning: super::tokening::UNPRINTED.to_owned(),
+        };
+    }
     if let Some(plugin) = held.plugins() {
         return Revealed {
             name: held.name.clone(),
