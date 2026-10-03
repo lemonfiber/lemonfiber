@@ -99,6 +99,24 @@ fn a_word_inside_somebody_elses_name_is_not_a_term() {
     );
 }
 
+/// A command is named, not explained: `seed` after the product's name is what to run.
+#[test]
+fn a_command_is_not_a_term() {
+    let words = |text| {
+        mentioned(text)
+            .into_iter()
+            .map(|term| term.word)
+            .collect::<Vec<_>>()
+    };
+
+    assert!(words("Run `lemonfiber seed` to wire it.").is_empty());
+    assert_eq!(
+        words("Run lemonfiber seed; what has finished is yours to seed."),
+        ["seed"],
+        "the word itself still counts away from the command"
+    );
+}
+
 /// A word does not stop being a word for ending a sentence or sitting in
 /// brackets, and a footnote that went missing there would look arbitrary.
 #[test]

@@ -106,7 +106,7 @@ pub(super) fn seeding(report: &SeedReport) -> Lines {
     let again = if report.rehearsed {
         "run it again without --dry-run"
     } else {
-        "run seed again once ready"
+        "run `lemonfiber seed` again once ready"
     };
     if outstanding.is_empty() {
         lines.spaced(if report.rehearsed {
