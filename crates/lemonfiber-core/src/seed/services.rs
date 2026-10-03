@@ -10,7 +10,7 @@ use super::{
     Application, Journal, MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
 use crate::baseline::Record;
-use crate::ports::service::{FulfilmentTarget, RegisteredTarget, Telling};
+use crate::ports::service::{Endpoint, FulfilmentTarget, RegisteredTarget, Telling};
 use crate::secret;
 use crate::seerr::OCCASIONS;
 
@@ -135,8 +135,13 @@ pub(crate) async fn tell_the_household(
 /// Only the \*arrs actually in the stack are offered, and that is the half worth
 /// stating — the request service offers what its targets can deliver, so television
 /// is not offered where Sonarr is not running. An \*arr that is absent is simply
-/// never handed over; one the operator registered themselves is left exactly as it
-/// is, never rewritten, the same way an application already present is.
+/// never handed over.
+///
+/// One already held is matched by where it is reached, never by its label. Held there
+/// with the key it should present, it is left exactly as it is. Held there with
+/// another key, or held where it was reached before (`moved_from`), it is moved in
+/// place: its endpoint and key are rewritten and everything the operator chose about
+/// it stays, so requests already tied to it stay tied to it.
 pub async fn wire_fulfilment_targets(
     seerr: &dyn Requests,
     wanted: &[FulfilmentTarget],
@@ -150,7 +155,7 @@ pub async fn wire_fulfilment_targets(
     let existing = match observe_or_untold(
         seerr.fulfilment_targets().await,
         wanted,
-        describe_target,
+        described_target,
         rehearsing,
     ) {
         Ok(existing) => existing,
@@ -159,52 +164,85 @@ pub async fn wire_fulfilment_targets(
 
     let mut wirings = Vec::new();
     for target in wanted {
-        let state = if holds(&existing, target) {
-            State::AlreadyWired
-        } else {
-            wire_one(
-                seerr.add_fulfilment_target(target),
-                seerr.fulfilment_targets(),
-                |rows| holding(rows, target).map(|have| have.id.clone()),
-                Naming {
-                    service: "seerr",
-                    resource: "fulfilment target",
-                    noun: "request target",
-                },
-                journal,
-                at,
-                rehearsing.then(|| State::WouldWire {
-                    yours: None,
-                    ours: Some(format!("{}:{}", target.host, target.port)),
-                }),
-            )
-            .await
+        let here = held_at(&existing, &target.at, target.television);
+        let before = target
+            .moved_from
+            .as_ref()
+            .and_then(|from| held_at(&existing, from, target.television));
+        let state = match here.or(before) {
+            Some(held) if held.at == target.at && held.key == target.key => State::AlreadyWired,
+            Some(held) => moved(seerr, held, target, rehearsing).await,
+            None => {
+                wire_one(
+                    seerr.add_fulfilment_target(target),
+                    seerr.fulfilment_targets(),
+                    |rows| held_at(rows, &target.at, target.television).map(|have| have.id.clone()),
+                    Naming {
+                        service: "seerr",
+                        resource: "fulfilment target",
+                        noun: "request target",
+                    },
+                    journal,
+                    at,
+                    rehearsing.then(|| State::WouldWire {
+                        yours: None,
+                        ours: Some(reached_at(&target.at)),
+                    }),
+                )
+                .await
+            }
         };
-        wirings.push(Wiring::settled(describe_target(target), state));
+        wirings.push(Wiring::settled(described_target(target), state));
     }
     wirings
 }
 
-/// The one the request service holds at this target's endpoint, if it holds one.
-///
-/// By host, port and which list it is in — never by name, so an operator who
-/// renamed it is not handed a second copy of the same service.
-fn holding<'a>(
-    held: &'a [RegisteredTarget],
-    want: &FulfilmentTarget,
-) -> Option<&'a RegisteredTarget> {
-    held.iter().find(|have| {
-        have.host == want.host && have.port == want.port && have.television == want.television
-    })
+/// Move a target the request service holds to where, and with what, it should be
+/// reached.
+async fn moved(
+    seerr: &dyn Requests,
+    held: &RegisteredTarget,
+    target: &FulfilmentTarget,
+    rehearsing: bool,
+) -> State {
+    if rehearsing {
+        // Where only the key moves, the endpoint said twice would read as no change.
+        return State::WouldWire {
+            yours: (held.at != target.at).then(|| reached_at(&held.at)),
+            ours: Some(reached_at(&target.at)),
+        };
+    }
+    match seerr.move_fulfilment_target(held, target).await {
+        Ok(()) => State::Wired,
+        Err(failure) => unreached(&failure),
+    }
 }
 
-/// Whether the request service already reaches this \*arr.
-fn holds(held: &[RegisteredTarget], want: &FulfilmentTarget) -> bool {
-    holding(held, want).is_some()
+/// The one the request service holds at `endpoint` in the list `television` names,
+/// if it holds one.
+///
+/// By where it is reached — never by name, so an operator who renamed it is not
+/// handed a second copy of the same service.
+fn held_at<'a>(
+    held: &'a [RegisteredTarget],
+    endpoint: &Endpoint,
+    television: bool,
+) -> Option<&'a RegisteredTarget> {
+    held.iter()
+        .find(|have| have.at == *endpoint && have.television == television)
+}
+
+/// Where a target is reached, as the report says it: the request gate by name, and
+/// anything else by host and port.
+fn reached_at(endpoint: &Endpoint) -> String {
+    if endpoint.host == crate::app::gating::SERVICE {
+        return "at the request gate".to_owned();
+    }
+    format!("at {}:{}", endpoint.host, endpoint.port)
 }
 
 /// A fulfilment target's description for the report.
-fn describe_target(target: &FulfilmentTarget) -> String {
+pub(crate) fn described_target(target: &FulfilmentTarget) -> String {
     format!("{} as a request target", target.name)
 }
 

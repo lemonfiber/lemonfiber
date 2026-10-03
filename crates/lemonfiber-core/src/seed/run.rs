@@ -29,6 +29,8 @@ mod minted;
 mod published;
 pub(crate) use published::published_as;
 mod subtitles;
+// The request gate's tokens, one per route, held raw by the request service alone.
+mod tokens;
 use fulfilment::seed_fulfilment_targets;
 pub(crate) mod identity;
 mod reset;

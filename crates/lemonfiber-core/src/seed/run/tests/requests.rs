@@ -115,7 +115,7 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
         wirings.first().map(|wiring| &wiring.state),
         Some(&crate::seed::State::WouldWire {
             yours: None,
-            ours: Some("sonarr:8989".to_owned()),
+            ours: Some("at sonarr:8989".to_owned()),
         }),
         "{wirings:?}"
     );

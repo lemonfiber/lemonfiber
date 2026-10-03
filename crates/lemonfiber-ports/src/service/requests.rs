@@ -198,6 +198,18 @@ pub trait Requests: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn add_fulfilment_target(&self, target: &FulfilmentTarget) -> Result<(), Failure>;
+
+    /// Point a target it holds at `target`'s endpoint and key, leaving everything else
+    /// about it — its name, profile, folder and the rest — as it holds them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable, refuses, or no longer holds `held`.
+    async fn move_fulfilment_target(
+        &self,
+        held: &RegisteredTarget,
+        target: &FulfilmentTarget,
+    ) -> Result<(), Failure>;
 }
 
 /// Whether the request service reaches the household, and about what.
