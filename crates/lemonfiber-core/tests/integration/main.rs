@@ -59,6 +59,7 @@ mod starting;
 mod stored;
 mod switch;
 mod the_command_nobody_has_taught_yet;
+mod the_gate_holds_its_own_key;
 mod the_household_needs_no_account_here;
 mod uninstall;
 mod update;

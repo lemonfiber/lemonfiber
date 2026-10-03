@@ -15,6 +15,7 @@
 //! would leave those reading as none at all — which is a claim, not a gap.
 
 mod declining;
+mod gating;
 mod reading;
 mod revealing;
 mod rotating;
