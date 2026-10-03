@@ -266,12 +266,9 @@ const QBITTORRENT: Entry = Entry {
 const JELLYFIN: Entry = Entry {
     name: "Jellyfin administrator password",
     setting: config::JELLYFIN_ADMIN_PASSWORD_KEY,
-    consumers: &[
-        Consumer::at_the_service("Jellyfin's own administrator account"),
-        Consumer::by_seeding(
-            "Seerr, which signs in through Jellyfin to authenticate the household",
-        ),
-    ],
+    consumers: &[Consumer::at_the_service(
+        "Jellyfin's own administrator account",
+    )],
     origin: Origin::Lemonfiber,
     needed: Needed::Always,
     proven_by: None,

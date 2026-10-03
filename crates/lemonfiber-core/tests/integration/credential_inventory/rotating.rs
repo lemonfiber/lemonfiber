@@ -2,7 +2,7 @@
 
 use super::{asked, ctx, env_at, recorded, silent, the_torrent_password};
 use lemonfiber_core::app::Asking;
-use lemonfiber_core::config::QBITTORRENT_PASSWORD_KEY;
+use lemonfiber_core::config::{JELLYFIN_ADMIN_PASSWORD_KEY, QBITTORRENT_PASSWORD_KEY};
 use lemonfiber_core::credential::Rotation;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -273,4 +273,150 @@ async fn a_rehearsed_rotation_mints_nothing_and_asks_the_client_for_nothing() {
         reached.is_empty(),
         "a rehearsal signed in to the client: {reached:?}"
     );
+}
+
+/// A media server whose administrator signs in with `before`, whose password change
+/// answers `changed`, and whose sign-in with the replacement answers `after`.
+fn administered(before: u16, changed: u16, after: u16) -> Arc<Fake> {
+    administered_by(
+        before,
+        Answer::reply(changed, ""),
+        Answer::reply(after, r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#),
+    )
+}
+
+/// The same, with the password change and the sign-in after it answered as given.
+fn administered_by(before: u16, changed: Answer, after: Answer) -> Arc<Fake> {
+    let session = r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#;
+    Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(before, session), after],
+        ),
+        ("/Users/admin-id/Password", vec![changed]),
+    ])
+}
+
+/// The administrator's password the run records, built as the others are.
+fn the_administrator_password() -> String {
+    format!("{}{}", "4444dddd", "5555eeee6666")
+}
+
+/// What one rotation of the media server's administrator password settled as.
+async fn administrator_rotated(
+    name: &str,
+    http: Arc<Fake>,
+    rehearsing: bool,
+) -> (String, Option<String>, Arc<Fake>) {
+    let password = the_administrator_password();
+    let env = env_at(name, &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)]);
+    let mut ctx = ctx(env.clone(), Files::empty(), http.clone());
+    ctx.dry_run = rehearsing;
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "jellyfin".to_owned(),
+        },
+    )
+    .await;
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    (said, recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY), http)
+}
+
+/// A replacement Jellyfin takes and signs in with is recorded; the old password is gone.
+#[tokio::test]
+async fn the_administrator_password_is_replaced_once_jellyfin_signs_in_with_it() {
+    let (said, recorded, http) =
+        administrator_rotated("admin-landed", administered(200, 204, 200), false).await;
+
+    assert!(said.starts_with("Some(Replaced"), "{said}");
+    assert!(recorded.is_some_and(|now| now != the_administrator_password()));
+    let changed = http
+        .requests()
+        .into_iter()
+        .find(|asked| asked.url.ends_with("/Users/admin-id/Password"))
+        .and_then(|asked| asked.body)
+        .unwrap_or_default();
+    assert!(
+        changed.contains("CurrentPw") && changed.contains("NewPw"),
+        "the change was not asked for"
+    );
+}
+
+/// Wherever the replacement is refused or not proven, the recorded password is the one
+/// it was before.
+#[tokio::test]
+async fn a_replacement_jellyfin_will_not_take_leaves_the_recorded_password() {
+    for (name, http, settled) in [
+        ("admin-refused", administered(401, 204, 200), "Some(Refused"),
+        (
+            "admin-unchanged",
+            administered(200, 500, 200),
+            "Some(Unproven",
+        ),
+        (
+            "admin-unproven",
+            administered(200, 204, 401),
+            "Some(Unproven",
+        ),
+        (
+            "admin-unreached",
+            administered_by(200, Answer::Silent, Answer::reply(200, "{}")),
+            "Some(Unproven",
+        ),
+        (
+            "admin-unanswered",
+            administered_by(200, Answer::reply(204, ""), Answer::reply(500, "")),
+            "Some(Unproven",
+        ),
+    ] {
+        let (said, recorded, _) = administrator_rotated(name, http, false).await;
+
+        assert!(said.starts_with(settled), "{name}: {said}");
+        assert_eq!(recorded, Some(the_administrator_password()), "{name}");
+    }
+}
+
+/// A rehearsal says what a real run would do and asks Jellyfin nothing.
+#[tokio::test]
+async fn a_rehearsed_administrator_rotation_asks_jellyfin_nothing() {
+    let (said, recorded, http) =
+        administrator_rotated("admin-rehearsed", administered(200, 204, 200), true).await;
+
+    assert!(said.starts_with("Some(Rehearsed"), "{said}");
+    assert_eq!(recorded, Some(the_administrator_password()));
+    assert!(http.requests().is_empty());
+}
+
+/// Without a recorded password, or without randomness, nothing is asked of Jellyfin.
+#[tokio::test]
+async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
+    let http = administered(200, 204, 200);
+    let env = env_at("admin-unrecorded", &[]);
+    let unrecorded = asked(
+        &ctx(env, Files::empty(), http.clone()),
+        Asking::Rotate {
+            credential: "jellyfin".to_owned(),
+        },
+    )
+    .await;
+    let said = format!("{:?}", unrecorded.rotated.map(|one| one.settled));
+    assert!(said.contains("holds no administrator password"), "{said}");
+
+    let password = the_administrator_password();
+    let env = env_at(
+        "admin-unrandom",
+        &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)],
+    );
+    let unrandom = asked(
+        &ctx(env.clone(), Files::empty(), http.clone()).with_random(Arc::new(FixedRandom(None))),
+        Asking::Rotate {
+            credential: "jellyfin".to_owned(),
+        },
+    )
+    .await;
+    let said = format!("{:?}", unrandom.rotated.map(|one| one.settled));
+    assert!(said.contains("no randomness"), "{said}");
+    assert_eq!(recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY), Some(password));
+    assert!(http.requests().is_empty());
 }

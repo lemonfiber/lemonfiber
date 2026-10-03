@@ -57,6 +57,16 @@ pub(super) async fn seed_jellyfin_identity(
         record_jellyfin_password(ctx, password);
     }
 
+    // The run that set the request service up is the one that showed it the
+    // administrator's password, so that password is changed straight after it and the
+    // one the request service saw opens nothing.
+    let changed = (wiring.state == crate::seed::State::Wired && !ctx.dry_run)
+        .then(|| changed_after_setup(ctx, services));
+    let changed = match changed {
+        Some(changing) => Some(changing.await),
+        None => None,
+    };
+
     // What the household is told is its own managed field, reconciled whether or not
     // the identity above was wired this run: the identity step stops at a service
     // already initialised, and that is every install after the first.
@@ -74,11 +84,8 @@ pub(super) async fn seed_jellyfin_identity(
     // leave none, and the rule this pass keeps is that it issues nothing but reads. The
     // telling is then read without one and answers unauthorised, which it reports as
     // what a real run would set rather than as the service refusing a credential.
-    if let Some(password) = minted
-        .as_deref()
-        .or(recorded.as_deref())
-        .filter(|_| !ctx.dry_run)
-    {
+    let current = recorded_jellyfin_password(ctx);
+    if let Some(password) = current.as_deref().filter(|_| !ctx.dry_run) {
         let _ = crate::ports::service::Requests::sign_in(
             &seerr_client,
             crate::config::JELLYFIN_ADMIN_USER,
@@ -95,7 +102,43 @@ pub(super) async fn seed_jellyfin_identity(
     .await;
     remember(&mut records, &told.state, held, &ctx.stamp());
 
-    (vec![wiring, told], records)
+    (
+        [Some(wiring), changed, Some(told)]
+            .into_iter()
+            .flatten()
+            .collect(),
+        records,
+    )
+}
+
+/// What the report calls the change made after the request service was set up.
+const CHANGED: &str =
+    "Jellyfin's administrator password, changed once the request service was set up";
+
+/// Change the administrator's password, and say how that went.
+async fn changed_after_setup(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+) -> crate::seed::Wiring {
+    let failed =
+        match crate::app::credentials::replace_jellyfin_password(ctx, services, false).await {
+            Ok(_) => {
+                return crate::seed::Wiring::settled(CHANGED.to_owned(), crate::seed::State::Wired)
+            }
+            Err(crate::app::credentials::Replacing::Refused) => {
+                "Jellyfin refused the password lemonfiber holds".to_owned()
+            }
+            Err(crate::app::credentials::Replacing::Unproven(detail)) => detail,
+        };
+    let mut wiring = crate::seed::Wiring::settled(
+        CHANGED.to_owned(),
+        crate::seed::State::Failed { detail: failed },
+    );
+    wiring.escalate(
+        "The password the request service saw at setup still opens Jellyfin.".to_owned(),
+        "Run `lemonfiber credentials rotate jellyfin`.".to_owned(),
+    );
+    wiring
 }
 
 /// The service the household's telling is recorded under.

@@ -76,18 +76,28 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         &identified(),
     )
     .await;
-    assert_eq!(wirings.len(), 2);
+    assert_eq!(wirings.len(), 3);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
         Some(&crate::seed::State::Wired),
         "a fresh household is minted, signed in, and confirmed"
+    );
+    // The run that showed the request service the administrator's password changes it.
+    assert_eq!(
+        wirings
+            .get(1)
+            .map(|wiring| (wiring.connection.as_str(), &wiring.state)),
+        Some((
+            "Jellyfin's administrator password, changed once the request service was set up",
+            &crate::seed::State::Wired
+        ))
     );
     // A service nobody has configured is one nobody in the house hears from, so
     // the telling is written rather than left at the untouched default — and the
     // baseline records what was written, or the next run reads this as the
     // operator's own value and preserves an absence.
     assert_eq!(
-        wirings.get(1).map(|wiring| &wiring.state),
+        wirings.get(2).map(|wiring| &wiring.state),
         Some(&crate::seed::State::Wired),
         "a household that has never been told anything is set up to be told"
     );
@@ -104,6 +114,55 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         "the minted password is recorded: {written}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
+/// A password change Jellyfin refuses after the request service's setup is said, with
+/// what it leaves open and how to close it, and the minted password stays recorded.
+#[tokio::test]
+async fn a_password_change_jellyfin_refuses_after_setup_is_said() {
+    for (tag, admitted, changed) in [("unchanged", 200, 500), ("unadmitted", 401, 204)] {
+        a_password_change_refused_after_setup_is_said(tag, admitted, changed).await;
+    }
+}
+
+async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16, changed: u16) {
+    let env = config_scratch(&format!("jellyfin-{tag}"));
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let ctx = seed_ctx(
+        None,
+        true,
+        Vec::new(),
+        Some(vec![0x11; 24]),
+        Some(env.to_path_buf()),
+    )
+    .with_http(super::household_changing(false, false, admitted, changed));
+
+    let (wirings, _) = super::super::seed_jellyfin_identity(
+        &ctx,
+        &[jellyfin_svc(), seerr_svc()],
+        &crate::baseline::Baseline::new(),
+        &identified(),
+    )
+    .await;
+    let changed = wirings.get(1);
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert!(
+        matches!(
+            changed.map(|one| &one.state),
+            Some(crate::seed::State::Failed { .. })
+        ),
+        "{changed:?}"
+    );
+    assert!(
+        changed.is_some_and(|one| format!("{one:?}").contains("still opens Jellyfin")),
+        "{changed:?}"
+    );
+    assert!(written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
 }
 
 /// A telling the operator set before lemonfiber ever ran is taken on, not flagged.

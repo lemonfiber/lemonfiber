@@ -25,6 +25,8 @@ use crate::app::command::Asking;
 use crate::credential::{Held, Inventory, Rotation, Settled};
 use crate::error::Diagnose;
 
+pub(crate) use rotating::{replace_jellyfin_password, Replacing};
+
 /// What was asked about the credentials this stack holds.
 ///
 /// # Errors
