@@ -54,7 +54,7 @@ pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
-pub use requests::{HouseholdRequest, Requesting, Requests, Telling};
+pub use requests::{HouseholdRequest, MediaServerLink, Requesting, Requests, Telling};
 pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};

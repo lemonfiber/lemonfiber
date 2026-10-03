@@ -234,7 +234,7 @@ fn held_at<'a>(
 
 /// Where a target is reached, as the report says it: the request gate by name, and
 /// anything else by host and port.
-fn reached_at(endpoint: &Endpoint) -> String {
+pub(crate) fn reached_at(endpoint: &Endpoint) -> String {
     if endpoint.host == crate::app::gating::SERVICE {
         return "at the request gate".to_owned();
     }
@@ -364,41 +364,26 @@ pub async fn wire_qbittorrent_password(
     }
 }
 
-/// Make Jellyfin the identity source for Seerr: mint and set Jellyfin's admin
-/// account where its wizard has not run, then point Seerr's authentication at it.
-///
-/// Two services in order. Jellyfin has no key to read, so — like qBittorrent —
-/// its admin password is one lemonfiber mints, sets by driving the first-run
-/// wizard, and hands back for the surface to record; a wizard already run by the
-/// household leaves its password unknown, so the wiring is skipped rather than
-/// reset. With the credential in hand, Seerr is signed in through Jellyfin, which
-/// on a fresh Seerr also creates its owner. An already-initialised Seerr is never
-/// re-pointed, since that would cost the household its existing sign-ins. The
-/// minted password is returned to record whenever the account was created, even
-/// if Seerr itself could not then be reached, because the account now holds it.
-pub async fn wire_jellyfin_identity(
-    jellyfin: &dyn MediaServer,
-    seerr: &dyn Requests,
-    random: &dyn Random,
-    recorded_password: Option<&str>,
-    server_url: &str,
-    rehearsing: bool,
-) -> (Wiring, Option<String>) {
-    let connection = "Jellyfin as Seerr's identity".to_owned();
-    let (password, minted) =
-        match jellyfin_admin(jellyfin, random, recorded_password, rehearsing).await {
-            Ok(pair) => pair,
-            Err(state) => return (Wiring::settled(connection, state), None),
-        };
-    let state = configure_seerr(seerr, &password, server_url, rehearsing).await;
-    (Wiring::settled(connection, state), minted)
-}
+/// What the report calls Jellyfin's being the identity Seerr signs in against.
+pub const IDENTITY: &str = "Jellyfin as Seerr's identity";
 
-/// The Jellyfin admin credential, and the password to record if it was newly
-/// minted: minted where the wizard has not run, read from what was recorded where
-/// it has, and unknown — so the wiring cannot proceed — where the household ran
-/// the wizard itself.
-async fn jellyfin_admin(
+/// The first half of making Jellyfin the identity source for Seerr: Jellyfin's admin
+/// credential, and the password to record where it was newly minted.
+///
+/// Jellyfin has no key to read, so — like qBittorrent — its admin password is one
+/// lemonfiber mints, sets by driving the first-run wizard, and hands back for the
+/// surface to record; a wizard already run by the household leaves its password
+/// unknown, so the wiring is skipped rather than reset. The minted password is handed
+/// back whenever the account was created, even if Seerr could not then be reached,
+/// because the account now holds it.
+///
+/// Apart from the second half, [`wire_seerr_identity`], because what Seerr is pointed
+/// at may need this credential first: the request gate's Jellyfin key is minted with it.
+///
+/// # Errors
+///
+/// The state the connection rests in where there is no credential to go on with.
+pub async fn wire_jellyfin_admin(
     jellyfin: &dyn MediaServer,
     random: &dyn Random,
     recorded: Option<&str>,
@@ -434,6 +419,19 @@ async fn jellyfin_admin(
         Ok(()) => Ok((password.clone(), Some(password))),
         Err(failure) => Err(unreached(&failure)),
     }
+}
+
+/// The second half: Seerr signed in through Jellyfin at `server_url`, which on a fresh
+/// Seerr also creates its owner. An already-initialised Seerr is never re-pointed,
+/// since that would cost the household its existing sign-ins.
+pub async fn wire_seerr_identity(
+    seerr: &dyn Requests,
+    password: &str,
+    server_url: &str,
+    rehearsing: bool,
+) -> Wiring {
+    let state = configure_seerr(seerr, password, server_url, rehearsing).await;
+    Wiring::settled(IDENTITY.to_owned(), state)
 }
 
 /// Point Seerr at the media server, unless it is already initialised — which is

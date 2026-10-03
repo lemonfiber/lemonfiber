@@ -172,10 +172,12 @@ async fn through_the_gate(
         wirings.extend(wired(ctx, seerr, &gated).await);
         return wirings;
     }
-    let beside = match kept.beside(&gated) {
+    let presented: Vec<super::tokens::Presented> =
+        gated.iter().map(super::tokens::Presented::by).collect();
+    let beside = match kept.beside(&presented) {
         Ok(beside) => beside,
         Err(reason) => {
-            let detail = unwritten(&kept, &reason);
+            let detail = kept.unwritten(&reason);
             wirings.extend(gated.iter().map(|target| {
                 Wiring::settled(
                     crate::seed::described_target(target),
@@ -195,11 +197,11 @@ async fn through_the_gate(
     wirings.extend(told);
     // The old tokens stay accepted beside the new where this cannot be written, which
     // keeps every call working and is said rather than called done.
-    if let Err(reason) = kept.only(&beside, &gated, &holding) {
+    if let Err(reason) = kept.only(&beside, &presented, &holding) {
         wirings.push(Wiring::settled(
             TOKENS.to_owned(),
             State::Failed {
-                detail: unwritten(&kept, &reason),
+                detail: kept.unwritten(&reason),
             },
         ));
     }
@@ -208,14 +210,3 @@ async fn through_the_gate(
 
 /// What the report calls the gate's tokens, where retiring the old ones fails.
 const TOKENS: &str = "The request gate's tokens";
-
-/// Why the tokens could not be handed to the gate.
-fn unwritten(kept: &super::tokens::Kept, reason: &str) -> String {
-    format!(
-        "the tokens could not be written to {}: {reason}",
-        kept.path().display()
-    )
-}
-
-#[cfg(test)]
-mod tests;

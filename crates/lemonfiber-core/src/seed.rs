@@ -53,10 +53,12 @@ pub use drift::{intent, reconcile, same_endpoint, wholesale_drift, Intent, Obser
 use report::{observe_or_skip, observe_or_untold, record_outcome, unreached, unread};
 pub use report::{Assessment, Report, Severity, State, Wiring};
 pub use roots::{contested_roots, wire_root_folders, Placing};
-pub(crate) use services::{described_target, observed_telling, said, wanted_telling, TELLING};
+pub(crate) use services::{
+    described_target, observed_telling, reached_at, said, wanted_telling, TELLING,
+};
 pub use services::{
-    wire_applications, wire_fulfilment_targets, wire_household_telling, wire_jellyfin_identity,
-    wire_qbittorrent_password,
+    wire_applications, wire_fulfilment_targets, wire_household_telling, wire_jellyfin_admin,
+    wire_qbittorrent_password, wire_seerr_identity, IDENTITY,
 };
 
 use std::collections::BTreeMap;

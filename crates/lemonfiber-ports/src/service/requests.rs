@@ -7,7 +7,7 @@
 
 use async_trait::async_trait;
 
-use super::{Failure, FulfilmentTarget, RegisteredTarget};
+use super::{Endpoint, Failure, FulfilmentTarget, RegisteredTarget};
 
 /// One thing a household member asked for, as the request service records it.
 ///
@@ -210,6 +210,32 @@ pub trait Requests: Send + Sync {
         held: &RegisteredTarget,
         target: &FulfilmentTarget,
     ) -> Result<(), Failure>;
+
+    /// Where it reaches the media server for everything after a sign-in, and with what.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn media_server_link(&self) -> Result<MediaServerLink, Failure>;
+
+    /// Reach the media server at `at` with `key` from now on, leaving everything else
+    /// about the connection as it holds it. The service proves the pair against the
+    /// media server before it keeps it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable, refuses, or the media server does
+    /// not answer to the pair.
+    async fn link_media_server(&self, at: &Endpoint, key: &str) -> Result<(), Failure>;
+}
+
+/// Where the request service reaches the media server, and the key it presents there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MediaServerLink {
+    /// Where.
+    pub at: Endpoint,
+    /// The key.
+    pub key: String,
 }
 
 /// Whether the request service reaches the household, and about what.

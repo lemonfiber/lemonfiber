@@ -579,3 +579,65 @@ fn settings_without_a_key_yet_yield_nothing() {
     assert_eq!(lemonfiber_core::seerr::api_key("{}"), None);
     assert_eq!(lemonfiber_core::seerr::api_key("not json at all"), None);
 }
+
+/// Where the request service reaches the media server is read off its settings.
+#[tokio::test]
+async fn the_media_server_link_is_read_from_its_settings() {
+    let fake = Fake::in_turn(vec![Answer::reply(
+        200,
+        r#"{"name":"Jellyfin","ip":"request-gate","port":5057,"urlBase":"/jellyfin","apiKey":"the-token"}"#,
+    )]);
+
+    let link = seerr(&fake).media_server_link().await;
+
+    assert_eq!(
+        link.ok(),
+        Some(lemonfiber_core::ports::service::MediaServerLink {
+            at: Endpoint {
+                host: "request-gate".to_owned(),
+                port: 5057,
+                base: "/jellyfin".to_owned(),
+            },
+            key: "the-token".to_owned(),
+        })
+    );
+    let unreadable = Fake::in_turn(vec![Answer::reply(200, "not settings")]);
+    assert!(seerr(&unreadable).media_server_link().await.is_err());
+    let silent = Fake::in_turn(vec![Answer::Silent]);
+    assert!(seerr(&silent).media_server_link().await.is_err());
+}
+
+/// A new link sends where and with what, and nothing else, and a refusal is said.
+#[tokio::test]
+async fn a_new_media_server_link_sends_where_and_with_what() {
+    let at = Endpoint {
+        host: "request-gate".to_owned(),
+        port: 5057,
+        base: "/jellyfin".to_owned(),
+    };
+    let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
+
+    let linked = seerr(&fake).link_media_server(&at, "the-token").await;
+
+    assert!(linked.is_ok(), "{linked:?}");
+    let sent = fake
+        .requests()
+        .into_iter()
+        .next()
+        .and_then(|asked| asked.body)
+        .unwrap_or_default();
+    assert!(
+        sent.contains("\"ip\":\"request-gate\"")
+            && sent.contains("\"urlBase\":\"/jellyfin\"")
+            && sent.contains("\"apiKey\":\"the-token\"")
+            && !sent.contains("\"name\""),
+        "{sent}"
+    );
+    for answer in [Answer::reply(400, ""), Answer::Silent] {
+        let refusing = Fake::in_turn(vec![answer]);
+        assert!(seerr(&refusing)
+            .link_media_server(&at, "the-token")
+            .await
+            .is_err());
+    }
+}

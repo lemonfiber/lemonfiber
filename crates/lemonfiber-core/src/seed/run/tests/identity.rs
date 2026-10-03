@@ -2,24 +2,31 @@
 
 use super::*;
 
+/// Both halves of the identity step, as a run takes them on a stack without the gate.
+async fn identity(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    expected: &crate::baseline::Baseline,
+    filled: &std::collections::BTreeMap<String, Vec<String>>,
+) -> (Vec<Wiring>, crate::baseline::Baseline) {
+    let admin = super::super::identity::seed_jellyfin_admin(ctx, services, filled).await;
+    super::super::seed_jellyfin_identity(ctx, services, expected, filled, admin, None).await
+}
+
 #[tokio::test]
 async fn identity_does_nothing_without_both_jellyfin_and_seerr() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
     // Seerr present but no Jellyfin, and the other way round: either alone is
     // nothing to wire.
     let base = crate::baseline::Baseline::new();
-    assert!(
-        super::super::seed_jellyfin_identity(&ctx, &[seerr_svc()], &base, &identified())
-            .await
-            .0
-            .is_empty()
-    );
-    assert!(
-        super::super::seed_jellyfin_identity(&ctx, &[jellyfin_svc()], &base, &identified())
-            .await
-            .0
-            .is_empty()
-    );
+    assert!(identity(&ctx, &[seerr_svc()], &base, &identified())
+        .await
+        .0
+        .is_empty());
+    assert!(identity(&ctx, &[jellyfin_svc()], &base, &identified())
+        .await
+        .0
+        .is_empty());
 }
 
 #[tokio::test]
@@ -38,7 +45,7 @@ async fn identity_leaves_an_already_set_up_household_alone() {
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
         .with_http(household(true, true));
 
-    let (wirings, _records) = super::super::seed_jellyfin_identity(
+    let (wirings, _records) = identity(
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
@@ -69,7 +76,7 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
     )
     .with_http(household(false, false));
 
-    let (wirings, records) = super::super::seed_jellyfin_identity(
+    let (wirings, records) = identity(
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
@@ -140,7 +147,7 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16,
     )
     .with_http(super::household_changing(false, false, admitted, changed));
 
-    let (wirings, _) = super::super::seed_jellyfin_identity(
+    let (wirings, _) = identity(
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
@@ -195,7 +202,7 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
     let ctx =
         seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
 
-    let (wirings, records) = super::super::seed_jellyfin_identity(
+    let (wirings, records) = identity(
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
@@ -259,7 +266,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         "2026-08-28T00:00:00Z",
     );
 
-    let (wirings, records) = super::super::seed_jellyfin_identity(
+    let (wirings, records) = identity(
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &baseline,
