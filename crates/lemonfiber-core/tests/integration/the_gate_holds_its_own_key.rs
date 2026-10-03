@@ -2,7 +2,7 @@
 //! replaced in the order that keeps a working key at every moment, all through the
 //! dispatcher.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
@@ -14,35 +14,6 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
 use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
-
-/// The shipped stack with the request gate added beside Jellyfin.
-fn stack_with_the_gate(tag: &str) -> PathBuf {
-    let from = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    ));
-    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("gated-{tag}")).kept();
-    let _ = std::fs::create_dir_all(&to);
-    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let jellyfin = read
-        .split("[[service]]")
-        .find(|block| block.contains("id = \"jellyfin\""))
-        .unwrap_or_default();
-    let gate = jellyfin
-        .replace("id = \"jellyfin\"", "id = \"request-gate\"")
-        .replace("name = \"Jellyfin\"", "name = \"Request gate\"")
-        .replace("port = 8096", "port = 5057")
-        .replace(
-            "api = { kind = \"jellyfin\", key_source = \"generated\" }\n",
-            "",
-        )
-        .replace(
-            "provides = [\"media.serve\", \"identity.source\"]",
-            "provides = []",
-        );
-    let _ = std::fs::write(to.join("stack.toml"), format!("{read}\n[[service]]{gate}"));
-    to
-}
 
 /// The gate's routes, with Jellyfin's presenting `key`.
 fn routes(key: &str) -> String {
@@ -59,7 +30,8 @@ fn routes(key: &str) -> String {
 #[tokio::test]
 async fn the_gate_key_is_listed_shown_and_replaced() {
     let env = recorded_admin("gate-key-credentials");
-    let stack: &'static Path = Box::leak(stack_with_the_gate("key-credentials").into_boxed_path());
+    let stack: &'static Path =
+        Box::leak(crate::common::stack::with_the_gate("key-credentials").into_boxed_path());
     let routes_file = stack.join("config/request-gate/upstreams.json");
     let _ = std::fs::create_dir_all(stack.join("config/request-gate"));
     let _ = std::fs::write(&routes_file, routes("old"));

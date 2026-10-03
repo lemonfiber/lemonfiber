@@ -41,6 +41,7 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "services.quality-guides",
     "services.releases",
     "services.releases.",
+    "services.request-gate-record",
     "storage.hardlinks",
     "storage.mode",
     "storage.permissions",

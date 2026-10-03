@@ -271,6 +271,15 @@ codes! {
         /// Raised when a stack names a newer lemonfiber than the one running.
         STACK_NEEDS_NEWER = "STACK-9",
     }
+    /// The `GATE` codes.
+    gate {
+        /// Raised when the request gate refused calls since the last diagnosis: the
+        /// request service asked for something it has no use for.
+        REFUSED = "GATE-1",
+        /// Raised when more entries reached the gate's record between two diagnoses than
+        /// it keeps, so some could not be reported.
+        LOST = "GATE-2",
+    }
     /// The `TELLING` codes.
     telling {
         /// Raised when the household is told about less than lemonfiber now sets out to tell

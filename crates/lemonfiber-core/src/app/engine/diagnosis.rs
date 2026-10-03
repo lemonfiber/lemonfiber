@@ -15,6 +15,7 @@ use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
+use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
@@ -194,6 +195,22 @@ fn indexer_still_answers(ctx: &Ctx) -> IndexerCheck {
         )),
         ctx.settings.indexer.clone(),
     )
+}
+
+/// What the request gate refused and removed since the last diagnosis, where the
+/// stack runs one: its record, and the place last read kept beside the settings.
+fn gate_record(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> GateRecordCheck {
+    let gate = project
+        .filter(|_| crate::app::gating::service(services).is_some())
+        .map(|project| Gate {
+            record: crate::app::gating::path(project, lemonfiber_sidecar::gate::File::Record),
+            read: crate::app::targets::beside_env(ctx, crate::config::paths::GATE_READ),
+        });
+    GateRecordCheck::new(ctx.seams.filesystem.clone(), gate)
 }
 
 /// Whether the people in the house will hear back about what they asked for.
@@ -389,6 +406,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
             .unwrap_or_default(),
     );
     let telling = household_telling(ctx, &manifest.services);
+    let gate = gate_record(ctx, &manifest.services, project.as_deref());
     // Whether the stack would actually come back after a restart, which is a different
     // question from whether the operator asked for it to. The answer they gave is read
     // here rather than inside the check, for the reason every other reading is: a check
@@ -415,6 +433,7 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
         Box::new(releases),
         Box::new(wiring),
         Box::new(telling),
+        Box::new(gate),
         Box::new(permissions),
     ];
     // Appended to the same list rather than kept in one of their own, which is the

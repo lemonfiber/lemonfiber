@@ -30,6 +30,7 @@ use crate::validate::{Live, Validator};
 use crate::walkthrough::{Narrator as Stepwise, Unheard};
 
 mod moment;
+pub(crate) use moment::instant;
 
 /// Everything a command needs that is not part of the command itself.
 ///
