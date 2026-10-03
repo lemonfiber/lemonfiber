@@ -94,6 +94,36 @@ pub(super) async fn seed_subtitles(
     wirings
 }
 
+/// Point the finder at the \*arr `arr` with the key it answers to now, whatever the
+/// finder holds: what replacing that \*arr's key owes it. The finder shows whether it
+/// holds a key and never which, so there is nothing to read first.
+///
+/// Nothing where the stack has no subtitle finder or `arr` files nothing it subtitles.
+pub(crate) async fn rewatch(
+    ctx: &Ctx,
+    services: &[Service],
+    project: Option<&Path>,
+    arr: &str,
+) -> Option<crate::seed::State> {
+    let finder = crate::app::targets::bazarr_reader(ctx, services, project).await?;
+    let arr = servarr_arrs(services, project)
+        .into_iter()
+        .find(|one| one.target.id == arr)?;
+    let (which, (host, port)) =
+        subtitled(&arr.media_types).zip(reached_at(services, &arr.target.id))?;
+    let api_key = read_servarr_key(ctx, &arr.target.config).await?;
+    let watched = Watched {
+        which,
+        host,
+        port,
+        api_key,
+    };
+    Some(match finder.watch(&watched).await {
+        Ok(()) => crate::seed::State::Wired,
+        Err(failure) => unreached(&failure),
+    })
+}
+
 /// Point the finder at one \*arr, leaving it alone where it already is.
 ///
 /// Read first, because the operator may have set this themselves or a previous run

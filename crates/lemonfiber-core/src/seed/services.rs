@@ -10,7 +10,9 @@ use super::{
     Application, Journal, MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
 use crate::baseline::Record;
-use crate::ports::service::{Endpoint, FulfilmentTarget, RegisteredTarget, Telling};
+use crate::ports::service::{
+    Endpoint, FulfilmentTarget, RegisteredApplication, RegisteredTarget, Telling,
+};
 use crate::secret;
 use crate::seerr::OCCASIONS;
 
@@ -294,9 +296,9 @@ pub async fn wire_applications(
     for application in wanted {
         let already = existing
             .iter()
-            .any(|have| same_base_url(&have.base_url, &application.base_url));
-        let state = if already {
-            State::AlreadyWired
+            .find(|have| same_base_url(&have.base_url, &application.base_url));
+        let state = if let Some(held) = already {
+            current_key(prowlarr, held, application, rehearsing).await
         } else {
             wire_one(
                 prowlarr.register_application(application),
@@ -326,6 +328,31 @@ pub async fn wire_applications(
         ));
     }
     wirings
+}
+
+/// An application Prowlarr already holds, kept on the \*arr's current key.
+///
+/// Prowlarr shows a stored key only masked, so the only way to tell a key the \*arr
+/// has since replaced is Prowlarr's own test, which runs with the key it stores. One
+/// that fails is given the \*arr's current key, in place and nothing else, and tested
+/// again. A rehearsal asks nothing: the test is a `POST`, which a rehearsal does not
+/// send.
+async fn current_key(
+    prowlarr: &dyn AppSync,
+    held: &RegisteredApplication,
+    application: &Application,
+    rehearsing: bool,
+) -> State {
+    if rehearsing || prowlarr.test_application(held).await.is_ok() {
+        return State::AlreadyWired;
+    }
+    if let Err(failure) = prowlarr.rekey_application(held, &application.api_key).await {
+        return unreached(&failure);
+    }
+    match prowlarr.test_application(held).await {
+        Ok(()) => State::Wired,
+        Err(failure) => unreached(&failure),
+    }
 }
 
 /// An application connection's description for the report.

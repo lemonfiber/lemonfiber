@@ -43,13 +43,16 @@ use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FI
 // Reached by reconfiguration as well as by seeding: what the \*arrs that file media
 // are, and the record of what lemonfiber last wrote. One answer to each, rather than a
 // second reader beside this one that could disagree with it.
+pub(crate) use applications::resync_application;
 pub(crate) use arrs::servarr_arrs;
 pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{
     category_for, download_clients, qbittorrent_target, read_sabnzbd_key, seed_qbittorrent_password,
 };
+pub(crate) use gate::reroute;
 use identity::seed_jellyfin_identity;
 pub(crate) use reset::reset_connections;
+pub(crate) use subtitles::rewatch;
 
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes — or, on a run that only says what it would do,

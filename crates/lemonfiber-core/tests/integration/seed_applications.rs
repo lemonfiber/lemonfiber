@@ -21,6 +21,12 @@ struct FakeProwlarr {
     applications: Mutex<Vec<RegisteredApplication>>,
     reads: Mutex<u32>,
     next_id: Mutex<u32>,
+    /// Whether the key it stores is one the *arr no longer answers to.
+    stale: Mutex<bool>,
+    /// Whether a new key it is given still fails its test.
+    stays_stale: bool,
+    /// Every key it was given, in order.
+    rekeyed: Mutex<Vec<String>>,
 }
 
 impl FakeProwlarr {
@@ -30,6 +36,19 @@ impl FakeProwlarr {
             applications: Mutex::new(applications),
             reads: Mutex::new(0),
             next_id: Mutex::new(100),
+            stale: Mutex::new(false),
+            stays_stale: false,
+            rekeyed: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// The same, holding a key the *arr has since replaced; where `stays_stale`, the
+    /// key it is given fails too.
+    fn stale(applications: Vec<RegisteredApplication>, stays_stale: bool) -> Self {
+        Self {
+            stale: Mutex::new(true),
+            stays_stale,
+            ..Self::with(Mode::Normal, applications)
         }
     }
 }
@@ -59,6 +78,30 @@ impl AppSync for FakeProwlarr {
                 Ok(())
             }
         }
+    }
+
+    async fn test_application(&self, _held: &RegisteredApplication) -> Result<(), Failure> {
+        if self.stale.lock().map_or(true, |stale| *stale) {
+            return Err(Failure::Refused {
+                service: "prowlarr".to_owned(),
+                detail: "HTTP 400: cannot connect to Sonarr".to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    async fn rekey_application(
+        &self,
+        _held: &RegisteredApplication,
+        key: &str,
+    ) -> Result<(), Failure> {
+        if let Ok(mut rekeyed) = self.rekeyed.lock() {
+            rekeyed.push(key.to_owned());
+        }
+        if let Ok(mut stale) = self.stale.lock() {
+            *stale = self.stays_stale;
+        }
+        Ok(())
     }
 
     async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure> {
@@ -271,4 +314,73 @@ async fn a_rehearsed_pass_names_the_address_it_would_register_and_registers_none
     assert_eq!(recorded, 0, "a rehearsal journalled a change nobody made");
     let held = prowlarr.applications().await.unwrap_or_default();
     assert!(held.is_empty(), "the application was registered: {held:?}");
+}
+
+/// An application whose stored key the *arr no longer answers to is given the
+/// current one, in place, and tested again.
+#[tokio::test]
+async fn an_application_on_a_replaced_key_is_given_the_current_one() {
+    let existing = vec![RegisteredApplication {
+        id: "1".to_owned(),
+        base_url: "http://sonarr:8989".to_owned(),
+    }];
+    let prowlarr = FakeProwlarr::stale(existing.clone(), false);
+    let mut journal = Journal::new();
+
+    let wirings = wire_applications(
+        &prowlarr,
+        "prowlarr",
+        &[app("http://sonarr:8989")],
+        &mut journal,
+        "t",
+        false,
+    )
+    .await;
+
+    assert_eq!(
+        wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
+        vec![State::Wired]
+    );
+    assert_eq!(
+        prowlarr
+            .rekeyed
+            .lock()
+            .map(|keys| keys.clone())
+            .unwrap_or_default(),
+        vec!["arr-key".to_owned()]
+    );
+
+    let still = FakeProwlarr::stale(existing, true);
+    let (states, _) = seed_applications(still, &[app("http://sonarr:8989")]).await;
+    assert!(
+        matches!(states.as_slice(), [State::Failed { detail }] if detail.contains("cannot connect")),
+        "{states:?}"
+    );
+}
+
+/// A rehearsal does not test an application Prowlarr holds: the test is a `POST`.
+#[tokio::test]
+async fn a_rehearsal_tests_nothing() {
+    let existing = vec![RegisteredApplication {
+        id: "1".to_owned(),
+        base_url: "http://sonarr:8989".to_owned(),
+    }];
+    let prowlarr = FakeProwlarr::stale(existing, false);
+    let mut journal = Journal::new();
+
+    let wirings = wire_applications(
+        &prowlarr,
+        "prowlarr",
+        &[app("http://sonarr:8989")],
+        &mut journal,
+        "t",
+        true,
+    )
+    .await;
+
+    assert_eq!(
+        wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
+        vec![State::AlreadyWired]
+    );
+    assert!(prowlarr.rekeyed.lock().is_ok_and(|keys| keys.is_empty()));
 }

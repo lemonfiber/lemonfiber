@@ -24,8 +24,8 @@ use common::stack::project;
 use lemonfiber_core::app::{dispatch, Asking, Command, Ctx, Outcome};
 use lemonfiber_core::config::{store, Protocols, Settings};
 use lemonfiber_core::credential::Inventory;
+use lemonfiber_core::ports::filesystem::FileSystem;
 use lemonfiber_core::ports::http::Http;
-use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::Reporting;
 
@@ -69,7 +69,7 @@ fn recorded(path: &Path, key: &str) -> Option<String> {
 
 /// A run over the stack this repository carries, with the given settings file, the
 /// given service configurations, and the given transport.
-fn ctx(env: PathBuf, files: Arc<Files>, http: Arc<dyn Http>) -> Ctx {
+fn ctx(env: PathBuf, files: Arc<dyn FileSystem>, http: Arc<dyn Http>) -> Ctx {
     lemonfiber_testing::a_context()
         .engine(Arc::new(Reporting::default()))
         .filesystem(files)
@@ -141,4 +141,5 @@ fn beside(name: &str, register: &str) -> PathBuf {
 mod listing;
 mod plugins;
 mod republishing;
+mod resetting;
 mod rotating;

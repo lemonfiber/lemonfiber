@@ -163,6 +163,24 @@ fn a_credential_that_must_be_changed_elsewhere_says_where() {
 }
 
 #[test]
+fn a_replaced_key_that_did_not_answer_is_said_in_the_services_own_terms() {
+    let text = drawn(Inventory::of(Vec::new()).after(Rotation::stopped(
+        "Sonarr API key",
+        Settled::ReplacedUnproven {
+            detail: "the service replaced its key and the new one did not answer".to_owned(),
+        },
+    )));
+
+    assert!(
+        text.contains(
+            "Sonarr API key: the service replaced its key and the new one did not answer"
+        ),
+        "{text}"
+    );
+    assert!(!text.contains("was not replaced"), "{text}");
+}
+
+#[test]
 fn a_rehearsed_rotation_names_where_the_value_lives_and_what_is_owed_after() {
     let text = drawn(Inventory::of(Vec::new()).after(Rotation::would(
         "qBittorrent web UI password",

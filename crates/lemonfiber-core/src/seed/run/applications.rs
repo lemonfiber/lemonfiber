@@ -86,6 +86,50 @@ pub(super) async fn seed_applications(
     wirings
 }
 
+/// Hold Prowlarr's application for the \*arr called `arr` to the key it answers to now,
+/// proven by Prowlarr's own test: what replacing that \*arr's key owes Prowlarr.
+///
+/// Nothing where the stack has no Prowlarr, Prowlarr has not written its key, or `arr`
+/// is not one its app sync covers.
+pub(crate) async fn resync_application(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+    arr: &str,
+) -> Option<crate::seed::State> {
+    let source = prowlarr_source(services, project)?;
+    let prowlarr_key = read_servarr_key(ctx, &source.target.config).await?;
+    let arr = syncable_arrs(services, project)
+        .into_iter()
+        .find(|one| one.name == arr)?;
+    let application = crate::ports::service::Application {
+        name: arr.name,
+        kind: arr.kind,
+        prowlarr_url: source.network_url,
+        base_url: arr.network_url,
+        api_key: read_servarr_key(ctx, &arr.config).await?,
+    };
+    let client = crate::prowlarr::Prowlarr::new(
+        ctx.seams.http.clone(),
+        &source.target.base,
+        prowlarr_key,
+        &source.target.id,
+    );
+    let mut journal = crate::journal::Journal::new();
+    crate::seed::wire_applications(
+        &client,
+        &source.target.name,
+        &[application],
+        &mut journal,
+        &ctx.stamp(),
+        ctx.dry_run,
+    )
+    .await
+    .into_iter()
+    .next()
+    .map(|wiring| wiring.state)
+}
+
 /// Prowlarr as the app-sync source: the Servarr-shape service that manages no
 /// media, reached at its published port and known on the network by its own
 /// container name. Nothing where the stack has no such service or no project to

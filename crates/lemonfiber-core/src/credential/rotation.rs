@@ -4,7 +4,7 @@
 //! operation rather than an edit: a replacement is proven against the live service
 //! *before* the existing value stops being the one in force, so a mistyped key
 //! leaves the operator with a working credential rather than with neither. Every
-//! outcome here except one therefore keeps the existing value, and
+//! outcome here except two therefore keeps the existing value, and
 //! [`Rotation::kept_the_existing`] is that property written down where a test can
 //! hold it.
 //!
@@ -33,6 +33,16 @@ pub enum Settled {
     /// was changed, because an unproven replacement is not a better one.
     Unproven {
         /// Why nothing could be concluded.
+        detail: String,
+    },
+    /// The service replaced the credential itself, and the replacement did not answer.
+    ///
+    /// The one way of not landing that keeps nothing: a service asked to replace its
+    /// own key drops the old one the moment it makes the new one, so there is no order
+    /// that proves first. What is owed is the command that hands the new one out once
+    /// the service answers.
+    ReplacedUnproven {
+        /// What did not answer, and what to run once it does.
         detail: String,
     },
     /// Nothing was attempted, because this run only said what a rotation would do.
@@ -203,12 +213,25 @@ impl Rotation {
     /// Whether the credential that was in force before this rotation is still the
     /// one in force.
     ///
-    /// True for every outcome but a landed replacement, and that is the guarantee: a
-    /// replacement that was refused, that could not be proven, or that named nothing
-    /// leaves the operator exactly where they were rather than with nothing working.
+    /// True for every outcome but a landed replacement and a service's own replacement
+    /// that did not answer, and that is the guarantee: a replacement that was refused,
+    /// that could not be proven, or that named nothing leaves the operator exactly where
+    /// they were rather than with nothing working.
     #[must_use]
     pub const fn kept_the_existing(&self) -> bool {
-        !matches!(self.settled, Settled::Replaced { .. })
+        !matches!(
+            self.settled,
+            Settled::Replaced { .. } | Settled::ReplacedUnproven { .. }
+        )
+    }
+
+    /// Whether a rotation was asked for and did not land.
+    #[must_use]
+    pub const fn failed(&self) -> bool {
+        !matches!(
+            self.settled,
+            Settled::Replaced { .. } | Settled::Rehearsed { .. }
+        )
     }
 
     /// Whether this run only said what a rotation would do.

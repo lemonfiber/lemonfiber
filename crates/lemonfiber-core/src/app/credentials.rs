@@ -17,6 +17,7 @@
 mod declining;
 mod gating;
 mod reading;
+mod resetting;
 mod revealing;
 mod rotating;
 mod tokening;
