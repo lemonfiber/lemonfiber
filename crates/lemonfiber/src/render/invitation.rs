@@ -53,6 +53,10 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     if let Some(caution) = &report.caution {
         lines.put(format!("  {caution}"));
     }
+    if let Some(decline) = &report.decline {
+        lines.put("  If they would rather not, they can decline it here:".to_owned());
+        lines.put(format!("  {decline}"));
+    }
 
     // Nothing to claim, so nothing to point a camera at. The address stands because
     // it is still where they sign in, but a code and an instruction about setting a

@@ -15,6 +15,7 @@ lemonfiber-manifest = { workspace = true }
 # nothing there reaches back here, which is what lets it be read with no stack.
 lemonfiber-plugin = { workspace = true }
 lemonfiber-ports = { workspace = true }
+lemonfiber-sidecar = { workspace = true }
 argon2 = { workspace = true }
 ring = { workspace = true }
 # The certificate the web surface presents to a paired phone, and reading its key back.

@@ -24,6 +24,7 @@
 //! see [`crate::invitation`].
 
 mod allowing;
+mod declining;
 mod offering;
 mod refusals;
 mod reissuing;
@@ -107,6 +108,8 @@ pub(crate) async fn offer(
         return Ok(Invitation {
             name: already.map_or(name, |member| member.name),
             address: reachable.url,
+            // A rehearsal mints no token, so there is no address yet that would decline.
+            decline: None,
             caution: reachable.caution,
             hours: HOURS_TO_CLAIM,
             withdrawn: names(&sweeping.withdrawn),
@@ -137,6 +140,12 @@ pub(crate) async fn offer(
     // The account being narrowed is named only where something was written on it: an
     // offer that says nothing about access must not quietly take a permission off
     // somebody's account one service along.
+    let decline = if standing == InvitationStanding::Joined {
+        None
+    } else {
+        declining::issued(ctx, &services, &held.household, &member).await
+    };
+
     let narrowed = allowed.as_ref().map(|_| member.id.as_str());
     let Told { linked, requesting } =
         told(ctx, &services, &to_link(&held, &member), narrowed).await;
@@ -145,6 +154,7 @@ pub(crate) async fn offer(
     Ok(Invitation {
         name: member.name,
         address: reachable.url,
+        decline,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn: taken.withdrawn,

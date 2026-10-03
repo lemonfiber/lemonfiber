@@ -109,6 +109,7 @@ fn an_offer() -> lemonfiber_core::model::Invitation {
     lemonfiber_core::model::Invitation {
         name: "ana".to_owned(),
         address: "http://192.168.1.20:8096".to_owned(),
+        decline: None,
         caution: None,
         hours: 48,
         withdrawn: Vec::new(),
