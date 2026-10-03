@@ -427,3 +427,90 @@ async fn a_move_that_does_not_land_is_reported() {
         "{said}"
     );
 }
+
+/// A film target moves within the film list.
+#[tokio::test]
+async fn a_film_target_moves_within_the_film_list() {
+    let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/settings/radarr",
+            vec![Answer::reply(
+                200,
+                r#"[{"id":1,"hostname":"radarr","port":7878,"apiKey":"old"}]"#,
+            )],
+        ),
+        (
+            Method::Put,
+            "/settings/radarr/1",
+            vec![Answer::reply(200, "")],
+        ),
+    ]);
+    let seerr = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
+    let held = lemonfiber_core::ports::service::RegisteredTarget {
+        id: "1".to_owned(),
+        at: Endpoint {
+            host: "radarr".to_owned(),
+            port: 7878,
+            base: String::new(),
+        },
+        key: "old".to_owned(),
+        television: false,
+    };
+    let film = FulfilmentTarget {
+        television: false,
+        ..gated()
+    };
+
+    let moved = seerr.move_fulfilment_target(&held, &film).await;
+
+    assert!(moved.is_ok(), "{moved:?}");
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.method == Method::Put && asked.url.contains("/settings/radarr/1")));
+}
+
+/// A request service that stops answering, or answers with something other than a
+/// list, at any point of a move or a registration fails it rather than calling it done.
+#[tokio::test]
+async fn a_move_or_registration_the_service_does_not_answer_fails() {
+    let held = lemonfiber_core::ports::service::RegisteredTarget {
+        id: "1".to_owned(),
+        at: sonarr().at,
+        key: "the-key".to_owned(),
+        television: true,
+    };
+    for (name, listed, put) in [
+        ("unlisted", Answer::Silent, Answer::reply(200, "")),
+        (
+            "unreadable",
+            Answer::reply(200, "not a list"),
+            Answer::reply(200, ""),
+        ),
+        (
+            "unwritten",
+            Answer::reply(200, HELD_DIRECTLY),
+            Answer::Silent,
+        ),
+    ] {
+        let http = Fake::by_route_in_turn(vec![
+            (Method::Get, "/settings/sonarr", vec![listed]),
+            (Method::Put, "/settings/sonarr/1", vec![put]),
+        ]);
+        let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+
+        assert!(
+            seerr.move_fulfilment_target(&held, &gated()).await.is_err(),
+            "{name}"
+        );
+    }
+
+    let http = Fake::by_route_in_turn(vec![(
+        Method::Post,
+        "/settings/sonarr",
+        vec![Answer::Silent],
+    )]);
+    let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+    assert!(seerr.add_fulfilment_target(&sonarr()).await.is_err());
+}
