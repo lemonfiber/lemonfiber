@@ -99,6 +99,11 @@ pub struct Upstream {
     pub address: String,
     /// What the gate presents to it.
     pub credential: Credential,
+    /// The upstream's majors the stack supports, read off its own version: the gate
+    /// forwards to no other. Empty on the \*arr routes, whose one supported API the
+    /// gate knows itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub majors: Vec<u32>,
 }
 
 /// Every route the gate answers, as the core writes them.

@@ -81,6 +81,26 @@ fn a_service_is_referred_to_by_its_digest_where_it_pins_one() {
 }
 
 #[test]
+fn a_service_supports_the_major_of_its_tag() {
+    for (tag, majors) in [
+        ("10.11.11", vec![10]),
+        ("12.1", vec![12]),
+        ("v4.0.15", vec![4]),
+        ("latest-stable", vec![]),
+    ] {
+        let tagged = service(MINIMAL).map(|service| Service {
+            tag: tag.to_owned(),
+            ..service
+        });
+        assert_eq!(
+            tagged.map(|service| service.majors()),
+            Some(majors),
+            "{tag}"
+        );
+    }
+}
+
+#[test]
 fn reads_every_declared_collection() {
     let counted = parse(MINIMAL).map(|manifest| {
         (

@@ -75,6 +75,12 @@ pub(super) async fn seed_gate_routes(
         .await
         .and_then(|text| Upstreams::read(&text).ok());
     let routes = arr_routes(ctx, services, project).await;
+    // The Jellyfin lines the stack runs, which the gate forwards to and to no other.
+    let majors: Vec<u32> = services
+        .iter()
+        .find(|service| service.id == jellyfin.id)
+        .map(lemonfiber_manifest::Service::majors)
+        .unwrap_or_default();
     let held = current
         .as_ref()
         .and_then(|upstreams| upstreams.route(&jellyfin.id))
@@ -82,20 +88,20 @@ pub(super) async fn seed_gate_routes(
         .filter(|key| filed.contains(key));
     let state = match held {
         Some(key) => {
-            let wanted = Upstreams::of(with(&routes, to_jellyfin(&jellyfin, &key)));
+            let wanted = Upstreams::of(with(&routes, to_jellyfin(&jellyfin, &majors, &key)));
             let others: Vec<&String> = filed.iter().filter(|one| **one != key).collect();
             kept(ctx, &client, current.as_ref(), &wanted, others, &path).await
         }
         None if ctx.dry_run => State::WouldWire {
             yours: Some(listed(current.as_ref())),
-            ours: Some(named(&with(&routes, to_jellyfin(&jellyfin, "")))),
+            ours: Some(named(&with(&routes, to_jellyfin(&jellyfin, &majors, "")))),
         },
         None => {
             let key = match minted::mint(&client, GATE_APP).await {
                 Ok(key) => key,
                 Err(state) => return Some(settled(state)),
             };
-            let wanted = Upstreams::of(with(&routes, to_jellyfin(&jellyfin, &key)));
+            let wanted = Upstreams::of(with(&routes, to_jellyfin(&jellyfin, &majors, &key)));
             if let Err(failure) = crate::config::store::write(&path, &wanted.written()) {
                 let _ = client.revoke(&key).await;
                 return Some(settled(State::Failed {
@@ -178,18 +184,20 @@ async fn arr_routes(
             },
             address: format!("http://{host}:{port}"),
             credential: Credential::new(key),
+            majors: Vec::new(),
         });
     }
     routes
 }
 
-/// The route to `jellyfin`, presenting `key`.
-fn to_jellyfin(jellyfin: &ServiceAddr, key: &str) -> Upstream {
+/// The route to `jellyfin`, forwarding to `majors` and presenting `key`.
+fn to_jellyfin(jellyfin: &ServiceAddr, majors: &[u32], key: &str) -> Upstream {
     Upstream {
         route: jellyfin.id.clone(),
         kind: Kind::Jellyfin,
         address: jellyfin.network_url.clone(),
         credential: Credential::new(key),
+        majors: majors.to_vec(),
     }
 }
 

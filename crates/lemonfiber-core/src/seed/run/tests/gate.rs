@@ -122,6 +122,7 @@ fn holding(arrs: &[(&str, &str)], key: &str) -> Upstreams {
                 if *arr == "sonarr" { 8989 } else { 7878 }
             ),
             credential: Credential::new(*credential),
+            majors: Vec::new(),
         })
         .collect();
     upstreams.push(Upstream {
@@ -129,6 +130,7 @@ fn holding(arrs: &[(&str, &str)], key: &str) -> Upstreams {
         kind: Kind::Jellyfin,
         address: jellyfin_svc_network_url(),
         credential: Credential::new(key),
+        majors: jellyfin_svc().majors(),
     });
     Upstreams::of(upstreams)
 }
@@ -187,6 +189,11 @@ async fn the_routes_are_written_with_a_key_of_the_gates_own() {
 
     assert_eq!(state, Some(State::Wired));
     assert_eq!(routes(&at), Some(holding(ARRS, "fresh")));
+    // The test stack pins Jellyfin at tag `1`, so the gate forwards to major 1 alone.
+    assert_eq!(
+        routes(&at).and_then(|held| held.route("jellyfin").map(|one| one.majors.clone())),
+        Some(vec![1])
+    );
     assert!(revoked.is_empty(), "{revoked:?}");
     assert!(http.asked_for(&format!("/Auth/Keys?App={APP}")));
 }
