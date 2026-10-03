@@ -8726,6 +8726,16 @@
               },
               "uniqueItems": true
             },
+            "running": {
+              "description": "Which of [`Self::services`] are already running, where a form's introspection\nasked the engine.\n\nStarting a form leaves what is already running as it is, so a running service\nis not one the start would bring up. Absent where nothing asked, which is every\nplan but a preview's; `null` where the engine would not say, which is never said\nas nothing running.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
             "services": {
               "description": "The services those profiles start, in the order the stack declares them.\n\nA service belongs to exactly one profile, so a service two named forms\nboth reach is here once. That is a property of the manifest rather than\nof a pass over this list: the union is over profiles, and a service\nappearing twice is not a state this can hold.",
               "type": "array",
@@ -12722,6 +12732,16 @@
                 "type": "string"
               },
               "uniqueItems": true
+            },
+            "running": {
+              "description": "Which of [`Self::services`] are already running, where a form's introspection\nasked the engine.\n\nStarting a form leaves what is already running as it is, so a running service\nis not one the start would bring up. Absent where nothing asked, which is every\nplan but a preview's; `null` where the engine would not say, which is never said\nas nothing running.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
             },
             "services": {
               "description": "The services those profiles start, in the order the stack declares them.\n\nA service belongs to exactly one profile, so a service two named forms\nboth reach is here once. That is a property of the manifest rather than\nof a pass over this list: the union is over profiles, and a service\nappearing twice is not a state this can hold.",

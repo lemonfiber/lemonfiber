@@ -51,6 +51,45 @@ pub struct Plan {
     pub filtered: Vec<Filtered>,
     /// What the stack estimates the services that would start need.
     pub footprint: Footprint,
+    /// Which of [`Self::services`] are already running, where a form's introspection
+    /// asked the engine.
+    ///
+    /// Starting a form leaves what is already running as it is, so a running service
+    /// is not one the start would bring up. Absent where nothing asked, which is every
+    /// plan but a preview's; `null` where the engine would not say, which is never said
+    /// as nothing running.
+    #[serde(skip_serializing_if = "Running::unasked")]
+    #[schemars(with = "Option<Vec<String>>")]
+    pub running: Running,
+}
+
+/// Which of a plan's services are already running, as far as anything asked.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Running {
+    /// Nothing asked: a plan resolved to act on, rather than to be read.
+    #[default]
+    Unasked,
+    /// Asked, and the engine would not say.
+    Unread,
+    /// These, in the plan's order.
+    Read(Vec<String>),
+}
+
+impl Running {
+    /// Whether nothing asked, which is a plan that says nothing about it.
+    #[must_use]
+    pub const fn unasked(&self) -> bool {
+        matches!(self, Self::Unasked)
+    }
+}
+
+impl serde::Serialize for Running {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Read(services) => services.serialize(serializer),
+            Self::Unasked | Self::Unread => serializer.serialize_none(),
+        }
+    }
 }
 
 /// A service a closure asked for that the configuration leaves out, and why.
@@ -282,6 +321,7 @@ fn planned(
         footprint: footprint(manifest, &services),
         services,
         dropped,
+        running: Running::Unasked,
     })
 }
 

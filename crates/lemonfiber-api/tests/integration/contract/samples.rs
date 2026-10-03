@@ -42,7 +42,10 @@ fn running() -> Vec<Outcome> {
             changelog: lemonfiber_core::changelog::Notes::unread(),
         }),
         Outcome::Forms(FormsReport { forms: Vec::new() }),
-        Outcome::Preview(plan()),
+        Outcome::Preview(lemonfiber_core::stack::closure::Plan {
+            running: lemonfiber_core::stack::closure::Running::Read(vec!["sonarr".to_owned()]),
+            ..plan()
+        }),
         Outcome::Lifecycle(LifecycleReport {
             action: "up".to_owned(),
             plan: plan(),

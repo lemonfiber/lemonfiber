@@ -549,5 +549,6 @@ pub(super) fn plan() -> Plan {
         dropped: Vec::new(),
         filtered: Vec::new(),
         footprint: lemonfiber_core::stack::closure::Footprint::default(),
+        running: lemonfiber_core::stack::closure::Running::Unasked,
     }
 }

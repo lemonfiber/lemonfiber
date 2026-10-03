@@ -5,17 +5,22 @@
 //! credential checks are: the app layer is compiled twice, and a path exercised only
 //! in-crate has its coverage counted from the copy that never ran.
 //!
-//! Nothing is faked. A listing reads the stack description and nothing else — no engine,
-//! no network, no files of its own — so the real adapters go in and none of them is
-//! reached. That is the claim worth making here as much as the listing itself.
+//! Nothing is faked for a listing. It reads the stack description and nothing else — no
+//! engine, no network, no files of its own — so the real adapters go in and none of them
+//! is reached. A preview asks the engine one thing as well, which of the services it would
+//! start are already running, so the tests about that answer hand it an engine to ask.
 
 use common::stack::project;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::common;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::ports::docker::{Health, Lifecycle};
+use lemonfiber_core::stack::closure::Running;
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::support::Reporting;
 
 fn ctx(stack: Source) -> Ctx {
     lemonfiber_testing::a_live_context().over(stack).build()
@@ -157,5 +162,60 @@ async fn a_preview_answers_a_script_under_the_name_it_is_published_by() {
         said,
         Some((true, true, true)),
         "the kind names the question asked, and the payload is the plan itself: {document:?}"
+    );
+}
+
+/// A preview of `library` over an engine answering as `engine`, as what is running.
+async fn running_under(engine: Reporting) -> Option<Running> {
+    let ctx = lemonfiber_testing::a_context()
+        .engine(Arc::new(engine))
+        .over(Source::External(project()))
+        .settings(Settings {
+            project: "lemonfiber".to_owned(),
+            ..Settings::default()
+        })
+        .build();
+    match dispatch(
+        Command::Preview {
+            forms: vec!["library".to_owned()],
+        },
+        &ctx,
+    )
+    .await
+    {
+        Ok(Outcome::Preview(plan)) => Some(plan.running),
+        _ => None,
+    }
+}
+
+/// Starting a form leaves what is already running as it is, so the preview names those
+/// services rather than presenting every one as something the start would bring up.
+#[tokio::test]
+async fn a_preview_names_the_services_it_would_start_that_are_already_running() {
+    let engine = Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy)
+        .alongside(Reporting::holding(
+            &["seerr"],
+            Lifecycle::Exited,
+            Health::None,
+        ))
+        .alongside(Reporting::holding(
+            &["sonarr"],
+            Lifecycle::Running,
+            Health::Healthy,
+        ));
+
+    assert_eq!(
+        running_under(engine).await,
+        Some(Running::Read(vec!["jellyfin".to_owned()])),
+        "running and in the form; an exited one, and a running one the form does not hold, are not"
+    );
+}
+
+/// An engine that will not answer is said as such, never as nothing running.
+#[tokio::test]
+async fn a_preview_says_it_could_not_read_what_is_running_where_the_engine_would_not_answer() {
+    assert_eq!(
+        running_under(Reporting::absent()).await,
+        Some(Running::Unread)
     );
 }

@@ -9,7 +9,7 @@ use lemonfiber_core::model::{
     UnsupportedReport, Vigil,
 };
 use lemonfiber_core::plural::s;
-use lemonfiber_core::stack::closure::{Filtered, Footprint, Plan, Protocol};
+use lemonfiber_core::stack::closure::{Filtered, Footprint, Plan, Protocol, Running};
 use lemonfiber_core::text::plain;
 
 use super::Lines;
@@ -51,7 +51,30 @@ pub(super) fn reset(report: &ResetReport) -> Lines {
 /// number before it is a screenful.
 pub(super) fn preview(plan: &Plan) -> Lines {
     let mut lines = affects(plan, Doing::Starting);
+    lines.extend(running(&plan.running));
     lines.extend(estimate(&plan.footprint));
+    lines
+}
+
+/// Which of the services a start would reach are already running, and so stay as
+/// they are.
+///
+/// Said only where there are some, and said as unread where the engine would not
+/// answer, so a plan never reads as bringing up what is already up.
+fn running(running: &Running) -> Lines {
+    let mut lines = Lines::default();
+    match running {
+        Running::Unread => {
+            lines.put("whether any of these are already running could not be read".to_owned());
+        }
+        Running::Read(up) if !up.is_empty() => {
+            lines.put(format!(
+                "already running, and left as they are: {}",
+                up.join(", ")
+            ));
+        }
+        Running::Unasked | Running::Read(_) => {}
+    }
     lines
 }
 
