@@ -735,3 +735,25 @@ fn an_invitation_that_ran_out_says_so() {
         "{text}"
     );
 }
+
+/// A declined invitation says so, and what the operator can do about it.
+#[test]
+fn a_declined_invitation_says_what_is_left_to_do() {
+    let report = HouseholdReport {
+        members: vec![HouseholdMember {
+            name: "Ana".to_owned(),
+            claimed: false,
+            standing: MemberStanding::Declined,
+            ..HouseholdMember::default()
+        }],
+        available: true,
+        ..HouseholdReport::default()
+    };
+
+    let text = household(&report).text();
+    assert!(
+        text.contains("invited, and they declined it — remove the account or reissue it"),
+        "{text}"
+    );
+    assert!(!text.contains("switched off — reissue"), "{text}");
+}

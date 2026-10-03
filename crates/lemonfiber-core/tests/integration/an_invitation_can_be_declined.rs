@@ -10,6 +10,7 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::model::MemberStanding;
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -198,6 +199,171 @@ async fn without_the_decline_service_there_is_no_decline_address() {
     assert!(invitation.is_some_and(|one| !one.rehearsed && one.decline.is_none()));
 }
 
+/// An account the media server holds, unclaimed, switched on or off as asked, whose
+/// policy writes it answers with `policy`.
+fn holding_ana(disabled: bool, policy: u16) -> Arc<Fake> {
+    let household = format!(
+        r#"[{{"Id":"9","Name":"ana","HasPassword":false,
+            "Policy":{{"IsAdministrator":false,"IsDisabled":{disabled},"EnableAllFolders":true}}}}]"#
+    );
+    let account = format!(
+        r#"{{"Id":"9","Name":"ana","HasPassword":false,
+            "Policy":{{"IsAdministrator":false,"IsDisabled":{disabled},"EnableAllFolders":true}}}}"#
+    );
+    Fake::by_route(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+        ),
+        (
+            Method::Get,
+            "/System/ActivityLog",
+            Answer::reply(200, r#"{"Items":[]}"#),
+        ),
+        (Method::Post, "/Users/9/Policy", Answer::reply(policy, "")),
+        (
+            Method::Get,
+            "/Users/9",
+            Answer::reply(200, Box::leak(account.into_boxed_str())),
+        ),
+        (
+            Method::Get,
+            "/Users",
+            Answer::reply(200, Box::leak(household.into_boxed_str())),
+        ),
+        (Method::Get, "", Answer::Silent),
+        (Method::Post, "", Answer::Silent),
+    ])
+}
+
+/// An offer out for ana, made an hour ago with `token`, and the decline service's record
+/// of refusing it where `refused`.
+fn offered_and_maybe_refused(env: &Path, stack: &Path, token: &str, refused: bool) {
+    let now = jiff::Timestamp::now();
+    let at = |hours: i64| {
+        now.checked_add(jiff::SignedDuration::from_hours(hours))
+            .map(|moment| moment.strftime("%Y-%m-%dT%H:%M:%SZ").to_string())
+            .unwrap_or_default()
+    };
+    let record = serde_json::json!({
+        "9": {"offered": at(-1), "lapses": at(47), "decline": TokenHash::of(token).as_str()}
+    });
+    let _ = std::fs::write(env.with_file_name("invitations.json"), record.to_string());
+    if refused {
+        let refusals = lemonfiber_sidecar::decline::Refusals::default().with(
+            lemonfiber_sidecar::decline::Refusal {
+                token: TokenHash::of(token),
+                account: "9".to_owned(),
+                at: 1,
+            },
+        );
+        let _ = std::fs::create_dir_all(stack.join("config/decline"));
+        let _ = std::fs::write(
+            stack.join("config/decline/refusals.json"),
+            refusals.written(),
+        );
+    }
+}
+
+/// What the household read says ana stands as, what it found, and everything that was
+/// sent, with the media server answering policy writes with `policy`.
+async fn ana_stands(
+    tag: &str,
+    disabled: bool,
+    refused: bool,
+    policy: u16,
+) -> (
+    Option<MemberStanding>,
+    Vec<String>,
+    Vec<lemonfiber_core::ports::http::Request>,
+) {
+    let env = recorded_admin(&format!("declined-{tag}"));
+    let stack: &'static Path = Box::leak(stack_with_decline(tag).into_boxed_path());
+    offered_and_maybe_refused(&env, stack, "ana-token", refused);
+    let http = holding_ana(disabled, policy);
+    let ctx = lemonfiber_testing::a_context()
+        .over(Source::External(stack))
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .clock(Arc::new(lemonfiber_adapters::System))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+
+    let said = dispatch(Command::Household { member: None }, &ctx).await;
+    gone(&env, stack);
+
+    let Ok(Outcome::Household(report)) = said else {
+        return (None, Vec::new(), http.requests());
+    };
+    let standing = report
+        .members
+        .into_iter()
+        .find(|member| member.name == "ana")
+        .map(|member| member.standing);
+    (standing, report.findings, http.requests())
+}
+
+/// An invitation the person declined reads as declined, apart from one that lapsed, and
+/// nothing is written to an account the decline service already switched off.
+#[tokio::test]
+async fn a_declined_invitation_stands_as_declined() {
+    let (standing, _, sent) = ana_stands("refused", true, true, 204).await;
+
+    assert_eq!(standing, Some(MemberStanding::Declined));
+    assert!(!sent
+        .iter()
+        .any(|request| request.url.contains("/Users/9/Policy")));
+}
+
+/// A refusal recorded against an account still switched on is switched off on the read.
+#[tokio::test]
+async fn a_declined_account_still_switched_on_is_switched_off() {
+    let (standing, findings, sent) = ana_stands("unenforced", false, true, 204).await;
+
+    assert_eq!(standing, Some(MemberStanding::Declined));
+    assert!(sent
+        .iter()
+        .any(|request| request.url.contains("/Users/9/Policy")));
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.starts_with("ana declined their invitation")),
+        "{findings:?}"
+    );
+}
+
+/// A declined account the media server will not switch off is said among the findings,
+/// because it can still be claimed.
+#[tokio::test]
+async fn a_declined_account_that_cannot_be_switched_off_is_said() {
+    let (standing, findings, _) = ana_stands("unswitched", false, true, 500).await;
+
+    assert_eq!(standing, Some(MemberStanding::Declined));
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.starts_with("ana declined their invitation")),
+        "{findings:?}"
+    );
+}
+
+/// Without a refusal, an offer out is an invitation, as it always was.
+#[tokio::test]
+async fn an_offer_nobody_refused_is_still_an_invitation() {
+    let (standing, _, _) = ana_stands("unrefused", false, false, 204).await;
+
+    assert_eq!(standing, Some(MemberStanding::Invited));
+}
+
 /// A media server holding ana's account, unclaimed and switched on, which takes writes.
 fn holding_ana_unclaimed() -> Arc<Fake> {
     let household = r#"[{"Id":"9","Name":"ana","HasPassword":false,
@@ -292,4 +458,81 @@ async fn offering_again_replaces_the_token_the_first_address_carried() {
     assert!(token.is_some_and(|token| table
         .as_ref()
         .is_some_and(|table| table.find(&TokenHash::of(&token)).is_some())));
+}
+
+/// Reissuing a declined account offers it again under a new token: the invitation carries
+/// a fresh decline address, and the refusal of the old token is no longer its standing.
+#[tokio::test]
+async fn reissuing_a_declined_account_offers_it_under_a_new_token() {
+    let env = recorded_admin("declined-reissued");
+    let stack: &'static Path = Box::leak(stack_with_decline("reissued").into_boxed_path());
+    offered_and_maybe_refused(&env, stack, "ana-token", true);
+    let household = r#"[{"Id":"9","Name":"ana","HasPassword":false,
+        "Policy":{"IsAdministrator":false,"IsDisabled":true,"EnableAllFolders":true}}]"#;
+    let account = r#"{"Id":"9","Name":"ana","HasPassword":false,
+        "Policy":{"IsAdministrator":false,"IsDisabled":true,"EnableAllFolders":true}}"#;
+    let http = Fake::by_route(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+        ),
+        (Method::Post, "/Users/9/Password", Answer::reply(204, "")),
+        (Method::Post, "/Users/9/Policy", Answer::reply(204, "")),
+        (Method::Get, "/Users/9", Answer::reply(200, account)),
+        (Method::Get, "/Users", Answer::reply(200, household)),
+        (Method::Get, "", Answer::Silent),
+        (Method::Post, "", Answer::Silent),
+    ]);
+    let ctx = lemonfiber_testing::a_context()
+        .over(Source::External(stack))
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .clock(Arc::new(lemonfiber_adapters::System))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http);
+
+    let reissued = match dispatch(
+        Command::Reissue {
+            name: "ana".to_owned(),
+        },
+        &ctx,
+    )
+    .await
+    {
+        Ok(Outcome::Invitation(invitation)) => Some(invitation),
+        _ => None,
+    };
+    let offers: serde_json::Value = std::fs::read_to_string(env.with_file_name("invitations.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default();
+    gone(&env, stack);
+
+    let token = reissued
+        .as_ref()
+        .and_then(|one| one.decline.as_deref())
+        .and_then(|address| address.rsplit('/').next())
+        .map(str::to_owned);
+    assert!(token.is_some(), "{reissued:?}");
+    let recorded = offers.get("9").and_then(|offer| offer.get("decline"));
+    assert_eq!(
+        recorded.and_then(serde_json::Value::as_str),
+        token
+            .as_deref()
+            .map(|token| TokenHash::of(token).as_str().to_owned())
+            .as_deref()
+    );
+    assert_ne!(
+        recorded.and_then(serde_json::Value::as_str),
+        Some(TokenHash::of("ana-token").as_str())
+    );
 }

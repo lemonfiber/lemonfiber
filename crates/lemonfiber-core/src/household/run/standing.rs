@@ -43,12 +43,51 @@ pub(super) async fn expired(
         .collect()
 }
 
-/// Where this account stands, given which invitations have run out.
+/// The accounts whose invitation was declined, switched off where the decline service
+/// could not do it itself.
 ///
-/// Switched off first, because it overrides the rest: an account nobody can sign in to is
-/// neither a member who can nor an invitation somebody could take up.
-pub(super) fn standing(account: &Member, expired: &BTreeSet<String>) -> MemberStanding {
-    if account.access.disabled {
+/// A refusal recorded against an account still switched on is one whose write did not
+/// land; this reading holds the administrator's session, so it switches the account off
+/// rather than leave a declined invitation claimable. One it cannot switch off is said.
+pub(super) async fn declined(
+    ctx: &Ctx,
+    server: &crate::jellyfin::Jellyfin,
+    accounts: &[Member],
+    findings: &mut Vec<String>,
+) -> BTreeSet<String> {
+    let offers: Offers = crate::app::record::beside(ctx, RECORD);
+    let declined = crate::app::invite::declining::declined(ctx, &offers);
+    for account in accounts {
+        if declined.contains(&account.id)
+            && !account.claimed
+            && !account.access.disabled
+            && server.suspend(&account.id).await.is_err()
+        {
+            findings.push(format!(
+                "{} declined their invitation and the account could not be switched off, so \
+                 it can still be claimed",
+                account.name
+            ));
+        }
+    }
+    declined
+}
+
+/// Where this account stands, given which invitations have run out and which were
+/// declined.
+///
+/// Declined first, because the person said so and the account is kept for that reason:
+/// switched off by the decline service, or about to be. Then switched off, because it
+/// overrides the rest: an account nobody can sign in to is neither a member who can nor
+/// an invitation somebody could take up.
+pub(super) fn standing(
+    account: &Member,
+    expired: &BTreeSet<String>,
+    declined: &BTreeSet<String>,
+) -> MemberStanding {
+    if !account.claimed && declined.contains(&account.id) {
+        MemberStanding::Declined
+    } else if account.access.disabled {
         MemberStanding::Suspended
     } else if account.claimed {
         MemberStanding::Active

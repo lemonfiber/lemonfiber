@@ -84,3 +84,42 @@ fn the_table_goes_into_the_decline_services_configuration_directory() {
         Path::new("/stack/config/decline/invitations.json")
     );
 }
+
+#[test]
+fn an_account_is_declined_where_its_offers_token_was_refused() {
+    use lemonfiber_sidecar::decline::{Refusal, Refusals};
+
+    let offers: Offers = [
+        ("9".to_owned(), offer(Some("ana-token"))),
+        ("10".to_owned(), offer(Some("bo-token"))),
+        ("11".to_owned(), offer(None)),
+    ]
+    .into_iter()
+    .collect();
+    let refusals = Refusals::default()
+        .with(Refusal {
+            token: TokenHash::of("ana-token"),
+            account: "9".to_owned(),
+            at: 1,
+        })
+        .with(Refusal {
+            token: TokenHash::of("an-older-token"),
+            account: "10".to_owned(),
+            at: 1,
+        });
+
+    let declined = super::refused(&offers, &refusals);
+
+    assert_eq!(
+        declined.into_iter().collect::<Vec<_>>(),
+        vec!["9".to_owned()]
+    );
+}
+
+#[test]
+fn refusals_are_recorded_beside_the_table() {
+    assert_eq!(
+        super::refusals_path(Path::new("/stack")),
+        Path::new("/stack/config/decline/refusals.json")
+    );
+}

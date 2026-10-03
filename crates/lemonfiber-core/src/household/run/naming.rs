@@ -97,6 +97,8 @@ pub(super) struct Naming<'a> {
     pub(super) hosted: bool,
     /// The invitations that have run out, by the account's id.
     pub(super) expired: &'a std::collections::BTreeSet<String>,
+    /// The invitations their person declined, by the account's id.
+    pub(super) declined: &'a std::collections::BTreeSet<String>,
 }
 
 /// The title each \*arr knows its items by, keyed by the service and the id the request

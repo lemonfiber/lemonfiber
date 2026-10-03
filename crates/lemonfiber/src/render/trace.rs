@@ -272,6 +272,8 @@ fn standing(member: &HouseholdMember) -> String {
                 || "no sign-in recorded".to_owned(),
                 |day| format!("last seen {day}"),
             )
+    } else if member.standing == MemberStanding::Declined {
+        "invited, and they declined it — remove the account or reissue it".to_owned()
     } else if member.standing == MemberStanding::Expired {
         "invited, and it ran out before anybody set a password".to_owned()
     } else {
