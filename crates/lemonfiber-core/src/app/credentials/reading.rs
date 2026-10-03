@@ -66,6 +66,7 @@ pub(crate) async fn taken(
             published.as_deref(),
         ));
     }
+    taken.extend(super::declining::held(ctx, services, project).await);
     taken.extend(installed.iter().flat_map(declared));
     taken
 }

@@ -68,6 +68,7 @@ pub mod condition;
 pub mod config;
 pub mod credential;
 pub mod dashboard;
+pub mod decline;
 pub mod docker;
 pub mod doctor;
 pub mod door;

@@ -258,6 +258,33 @@ impl Key {
     }
 }
 
+/// What the service answers on its health route: the fingerprint of the key it holds,
+/// or nothing where the core has not written one.
+///
+/// The core reads it after writing a new key, and revokes the old one only once the
+/// service says it holds the new.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Health {
+    /// [`Key::fingerprint`] of the key the service holds.
+    pub key: Option<String>,
+}
+
+impl Health {
+    /// The health of a service holding `key`, or none.
+    #[must_use]
+    pub fn holding(key: Option<&Key>) -> Self {
+        Self {
+            key: key.map(Key::fingerprint),
+        }
+    }
+
+    /// Whether the service holds `key`.
+    #[must_use]
+    pub fn holds(&self, key: &Key) -> bool {
+        self.key.as_deref() == Some(key.fingerprint().as_str())
+    }
+}
+
 /// `value` as one of these files is written: indented JSON ending in a newline.
 fn written(value: &impl Serialize) -> String {
     let mut text = serde_json::to_string_pretty(value).unwrap_or_default();

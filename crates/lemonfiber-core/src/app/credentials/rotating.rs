@@ -59,6 +59,9 @@ pub(crate) async fn rotate(
         );
     }
     match held.origin {
+        Origin::Lemonfiber if held.setting == super::declining::SETTING => {
+            super::declining::rotate(ctx, held, services).await
+        }
         Origin::Service => republished(ctx, held, services, project).await,
         Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {
             replaced(ctx, held, services).await
@@ -81,7 +84,7 @@ pub(crate) async fn rotate(
 /// need something done are read off the same catalogue a landed rotation reports them
 /// from, so the list an operator plans around is the list they will be given — and the
 /// one consumer a rotation reaches by itself is left out, because it is not a step.
-fn would_rotate(held: &Held, how: &str) -> Rotation {
+pub(super) fn would_rotate(held: &Held, how: &str) -> Rotation {
     Rotation::would(
         &held.name,
         how,
@@ -284,7 +287,7 @@ async fn republished(
 }
 
 /// A rotation that could not be proven, and so changed nothing.
-fn unproven(held: &Held, detail: &str) -> Rotation {
+pub(super) fn unproven(held: &Held, detail: &str) -> Rotation {
     Rotation::stopped(
         &held.name,
         Settled::Unproven {
@@ -295,7 +298,7 @@ fn unproven(held: &Held, detail: &str) -> Rotation {
 
 /// What a service said about a failure, with anything credential-shaped in it
 /// withheld — the same rule every other sentence a service produces goes through.
-fn said(failure: &Failure) -> String {
+pub(super) fn said(failure: &Failure) -> String {
     crate::config::store::withheld_text(&format!(
         "the replacement could not be proven: {failure}. Nothing was written; the existing \
          credential is the one still in force."
