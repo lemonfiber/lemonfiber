@@ -25,6 +25,7 @@ lemonfiber-fixtures = { path = "crates/lemonfiber-fixtures" }
 lemonfiber-manifest = { path = "crates/lemonfiber-manifest" }
 lemonfiber-plugin = { path = "crates/lemonfiber-plugin" }
 lemonfiber-ports = { path = "crates/lemonfiber-ports" }
+lemonfiber-sidecar = { path = "crates/lemonfiber-sidecar" }
 lemonfiber-testing = { path = "crates/lemonfiber-testing" }
 schemars = "1.2"
 async-trait = "0.1"

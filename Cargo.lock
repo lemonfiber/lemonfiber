@@ -1533,6 +1533,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemonfiber-sidecar"
+version = "0.16.0"
+dependencies = [
+ "ring",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lemonfiber-testing"
 version = "0.16.0"
 dependencies = [
