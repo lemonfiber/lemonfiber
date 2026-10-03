@@ -16,13 +16,13 @@ use crate::invitation::Offers;
 use crate::ports::service::Member;
 
 /// The decline service's id in the stack manifest.
-pub(super) const SERVICE: &str = "decline";
+pub(crate) const SERVICE: &str = "decline";
 
 /// How many random bytes back a decline token: 128 bits, held only as a hash.
 const TOKEN_BYTES: usize = 16;
 
 /// The decline service, where the stack runs one.
-pub(super) fn service(
+pub(crate) fn service(
     services: &[lemonfiber_manifest::Service],
 ) -> Option<&lemonfiber_manifest::Service> {
     services.iter().find(|service| service.id == SERVICE)
@@ -61,13 +61,11 @@ pub(super) fn table(offers: &Offers, household: &[Member]) -> Table {
     )
 }
 
-/// Where the table goes: the decline service's configuration directory, under the
-/// project root the stack's config volumes are mounted from.
-pub(super) fn table_path(project: &Path) -> PathBuf {
-    project
-        .join("config")
-        .join(SERVICE)
-        .join(File::Table.name())
+/// Where one of the files the core and the decline service hand each other lives: the
+/// service's configuration directory, under the project root the stack's config volumes
+/// are mounted from.
+pub(crate) fn path(project: &Path, file: File) -> PathBuf {
+    project.join("config").join(SERVICE).join(file.name())
 }
 
 /// The accounts whose standing offer was declined: the ones whose offer's token the
@@ -78,7 +76,7 @@ pub(super) fn table_path(project: &Path) -> PathBuf {
 /// A record the service has not written, or one that cannot be read, declines nobody.
 pub(crate) fn declined(ctx: &Ctx, offers: &Offers) -> BTreeSet<String> {
     crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
-        .and_then(|project| std::fs::read_to_string(refusals_path(&project)).ok())
+        .and_then(|project| std::fs::read_to_string(path(&project, File::Refusals)).ok())
         .and_then(|text| Refusals::read(&text).ok())
         .map_or_else(BTreeSet::new, |refusals| refused(offers, &refusals))
 }
@@ -95,14 +93,6 @@ fn refused(offers: &Offers, refusals: &Refusals) -> BTreeSet<String> {
         })
         .map(|(id, _)| id.clone())
         .collect()
-}
-
-/// Where the decline service records its refusals, beside the table.
-pub(super) fn refusals_path(project: &Path) -> PathBuf {
-    project
-        .join("config")
-        .join(SERVICE)
-        .join(File::Refusals.name())
 }
 
 /// The offers with `token`'s hash on `member`'s, which must already be recorded.
@@ -151,8 +141,11 @@ pub(super) async fn issued(
     if !household.iter().any(|held| held.id == member.id) {
         household.push(member.clone());
     }
-    crate::config::store::write(&table_path(&project), &table(&offers, &household).written())
-        .ok()?;
+    crate::config::store::write(
+        &path(&project, File::Table),
+        &table(&offers, &household).written(),
+    )
+    .ok()?;
     address(ctx, service, &token).await
 }
 
