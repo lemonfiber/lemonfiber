@@ -55,6 +55,7 @@ pub(crate) mod expiring;
 #[cfg(test)]
 pub(crate) mod fixtures;
 pub mod forwarding;
+pub(crate) mod gating;
 pub(crate) mod handoff;
 pub(crate) mod held;
 pub(crate) mod history;

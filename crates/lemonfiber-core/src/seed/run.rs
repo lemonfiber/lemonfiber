@@ -22,6 +22,10 @@ mod cors;
 // The decline service's own media-server key, minted for it alone.
 mod decline;
 mod fulfilment;
+// The request gate's routes, and the key it holds for the media server.
+mod gate;
+// The Jellyfin keys minted for the services lemonfiber builds.
+mod minted;
 mod published;
 pub(crate) use published::published_as;
 mod subtitles;
@@ -226,6 +230,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // The decline service's key, minted with the same administrator session.
     wirings.extend(decline::seed_decline_key(ctx, &manifest.services, project.as_deref()).await);
+
+    // The request gate's routes, with the same session.
+    wirings.extend(gate::seed_gate_routes(ctx, &manifest.services, project.as_deref()).await);
 
     // The *arrs the request service hands a request to. Without this the household
     // can ask and nothing downstream ever hears, and with it the request surface

@@ -51,7 +51,7 @@ pub(super) async fn seed_decline_key(
     // A stack that does not run the service asked for nothing here: a key list that
     // could not be read is left for the next run to retire from, not reported.
     if !declining {
-        return retired(ctx, &client, &filed.ok()?).await;
+        return super::minted::retired(ctx, &client, DECLINE_APP, CONNECTION, &filed.ok()?).await;
     }
     let filed = match filed {
         Ok(filed) => filed,
@@ -90,10 +90,7 @@ async fn kept(ctx: &Ctx, client: &Jellyfin, filed: &[String], key: &str) -> Stat
             ours: Some(count(1)),
         };
     }
-    match revoked(client, others).await {
-        Ok(()) => State::Wired,
-        Err(failure) => crate::seed::unreached(&failure),
-    }
+    super::minted::revoking(client, others).await
 }
 
 /// Mint a key, write it where the service reads it, and only then revoke what it replaces.
@@ -101,18 +98,13 @@ async fn kept(ctx: &Ctx, client: &Jellyfin, filed: &[String], key: &str) -> Stat
 /// A key that could not be written is revoked again at once: one nothing holds is not
 /// left on the server for the next run to find.
 async fn minted(client: &Jellyfin, filed: &[String], path: &Path) -> State {
-    let key = match client.mint(DECLINE_APP).await {
+    let key = match super::minted::mint(client, DECLINE_APP).await {
         Ok(key) => key,
-        Err(failure) => return crate::seed::unreached(&failure),
+        Err(state) => return state,
     };
-    let Ok(written) = Key::read(&key) else {
-        let _ = client.revoke(&key).await;
-        return State::Failed {
-            detail: "Jellyfin minted a key that is not one word, so it was revoked again"
-                .to_owned(),
-        };
-    };
-    if let Err(failure) = crate::config::store::write(path, &written.written()) {
+    // One word, which is what minting it settled, so it reads as a key.
+    let written = Key::read(&key).map(|key| key.written()).unwrap_or_default();
+    if let Err(failure) = crate::config::store::write(path, &written) {
         let _ = client.revoke(&key).await;
         return State::Failed {
             detail: format!(
@@ -121,40 +113,7 @@ async fn minted(client: &Jellyfin, filed: &[String], path: &Path) -> State {
             ),
         };
     }
-    match revoked(client, filed.iter().collect()).await {
-        Ok(()) => State::Wired,
-        Err(failure) => crate::seed::unreached(&failure),
-    }
-}
-
-/// The stack no longer runs the decline service: revoke every key filed under its name.
-async fn retired(ctx: &Ctx, client: &Jellyfin, filed: &[String]) -> Option<Wiring> {
-    if filed.is_empty() {
-        return None;
-    }
-    let state = if ctx.dry_run {
-        State::WouldWire {
-            yours: Some(count(filed.len())),
-            ours: Some(count(0)),
-        }
-    } else {
-        match revoked(client, filed.iter().collect()).await {
-            Ok(()) => State::Wired,
-            Err(failure) => crate::seed::unreached(&failure),
-        }
-    };
-    Some(settled(state))
-}
-
-/// Revoke every key in `keys`, stopping at the first the server refuses.
-async fn revoked(
-    client: &Jellyfin,
-    keys: Vec<&String>,
-) -> Result<(), crate::ports::service::Failure> {
-    for key in keys {
-        client.revoke(key).await?;
-    }
-    Ok(())
+    super::minted::revoking(client, filed).await
 }
 
 /// What a rehearsal says where a real run would mint the key: nothing of the value,
@@ -168,11 +127,7 @@ fn would_mint() -> Wiring {
 
 /// How many keys are filed under the service's name, said as a reader would.
 fn count(keys: usize) -> String {
-    match keys {
-        0 => format!("no key filed as {DECLINE_APP}"),
-        1 => format!("one key filed as {DECLINE_APP}"),
-        many => format!("{many} keys filed as {DECLINE_APP}"),
-    }
+    super::minted::count(DECLINE_APP, keys)
 }
 
 /// This connection, resting in `state`.

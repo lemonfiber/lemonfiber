@@ -7,7 +7,8 @@
 //!
 //! The one filed as `lemonfiber` is held by nothing, and is taken off. The one filed as
 //! `lemonfiber-decline` is held by the decline service alone, which switches off an
-//! invitation the invitee refuses.
+//! invitation the invitee refuses, and the one filed as `lemonfiber-request-gate` by the
+//! request gate alone, which answers the request service's calls to the media server.
 
 use serde::Deserialize;
 
@@ -21,6 +22,9 @@ const APP: &str = "lemonfiber";
 
 /// The name the decline service's key is filed under.
 pub const DECLINE_APP: &str = "lemonfiber-decline";
+
+/// The name the request gate's key is filed under.
+pub const GATE_APP: &str = "lemonfiber-request-gate";
 
 /// Where the keys are listed, minted and revoked.
 const KEYS: &str = "/Auth/Keys";

@@ -24,7 +24,7 @@ mod library;
 mod password;
 mod setup;
 
-pub use keys::DECLINE_APP;
+pub use keys::{DECLINE_APP, GATE_APP};
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access
 /// token — its own scheme, named as it parses it. The values only have to be present and

@@ -10,6 +10,17 @@ fn sonarr() -> Upstream {
         kind: Kind::Sonarr,
         address: "http://sonarr:8989".to_owned(),
         credential: Credential::new("the-sonarr-key"),
+        majors: Vec::new(),
+    }
+}
+
+fn jellyfin() -> Upstream {
+    Upstream {
+        route: "jellyfin".to_owned(),
+        kind: Kind::Jellyfin,
+        address: "http://jellyfin:8096".to_owned(),
+        credential: Credential::new("the-gates-key"),
+        majors: vec![10, 12],
     }
 }
 
@@ -35,6 +46,19 @@ fn upstreams_read_back_and_find_a_route_whatever_its_case() {
     assert_eq!(
         upstreams.route("sonarr").map(|one| one.credential.reveal()),
         Some("the-sonarr-key")
+    );
+}
+
+#[test]
+fn a_route_carries_its_majors_and_an_arr_route_none() {
+    let upstreams = Upstreams::of(vec![sonarr(), jellyfin()]);
+    let written = upstreams.written();
+
+    assert_eq!(Upstreams::read(&written).ok(), Some(upstreams.clone()));
+    assert_eq!(written.matches("\"majors\"").count(), 1, "{written}");
+    assert_eq!(
+        upstreams.route("jellyfin").map(|one| one.majors.clone()),
+        Some(vec![10, 12])
     );
 }
 

@@ -367,6 +367,7 @@ mod arrs;
 mod baseline;
 mod cors;
 mod decline;
+mod gate;
 mod identity;
 mod passwords;
 mod publishing;

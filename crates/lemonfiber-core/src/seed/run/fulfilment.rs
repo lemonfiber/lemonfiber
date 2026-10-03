@@ -85,7 +85,7 @@ pub(super) async fn wanted_targets(
 ///
 /// `None` is not a failure: it is Lidarr or Bindery, which file media the request
 /// service does not deal in at all.
-fn fetches(media_types: &[String]) -> Option<bool> {
+pub(super) fn fetches(media_types: &[String]) -> Option<bool> {
     if media_types.iter().any(|kind| kind == TELEVISION) {
         return Some(true);
     }

@@ -305,6 +305,20 @@ impl Service {
             None => format!("{}:{}", self.image, self.tag),
         }
     }
+
+    /// The majors of this service the stack supports: the first number of its pinned
+    /// tag, which is the one line a service pinned by a single tag runs. Nothing where
+    /// the tag does not open with a number.
+    #[must_use]
+    pub fn majors(&self) -> Vec<u32> {
+        let version = self.tag.strip_prefix('v').unwrap_or(&self.tag);
+        version
+            .split('.')
+            .next()
+            .and_then(|major| major.parse().ok())
+            .into_iter()
+            .collect()
+    }
 }
 
 /// A service this stack used to carry, and what became of it.
