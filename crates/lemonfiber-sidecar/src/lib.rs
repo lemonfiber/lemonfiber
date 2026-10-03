@@ -11,7 +11,11 @@
 //! carries no more of lemonfiber than the shapes it shares.
 
 pub mod decline;
+pub mod gate;
 
+mod shape;
+mod token;
 mod unreadable;
 
+pub use token::TokenHash;
 pub use unreadable::Unreadable;

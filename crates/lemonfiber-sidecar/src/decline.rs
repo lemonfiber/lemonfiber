@@ -9,10 +9,10 @@
 //! - [`File::Refusals`], what it declined, written by the service and read back by
 //!   the core, which reports each as the invitation's standing.
 
-use std::fmt::Write as _;
-
 use serde::{Deserialize, Serialize};
 
+use crate::shape::written;
+pub use crate::TokenHash;
 use crate::Unreadable;
 
 /// The files in the decline service's configuration directory.
@@ -41,40 +41,6 @@ impl File {
 /// The shape of [`Table`] and [`Refusals`] this build reads and writes. A file in
 /// another shape is refused rather than read as far as it happens to agree.
 pub const FORMAT: u32 = 1;
-
-/// A decline token, as the files hold it: its SHA-256, in lowercase hexadecimal.
-///
-/// The token itself is in the invitation the person received and nowhere else, so a
-/// copy of either file yields nothing that declines anybody.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct TokenHash(String);
-
-impl TokenHash {
-    /// The hash of `token`, as it is written down.
-    #[must_use]
-    pub fn of(token: &str) -> Self {
-        let digest = ring::digest::digest(&ring::digest::SHA256, token.as_bytes());
-        Self(hex(digest.as_ref()))
-    }
-
-    /// The hash as it is written down.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// `bytes` in lowercase hexadecimal.
-fn hex(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .fold(String::with_capacity(bytes.len() * 2), |mut out, byte| {
-            // Writing to a `String` cannot fail.
-            let _ = write!(out, "{byte:02x}");
-            out
-        })
-}
 
 /// One invitation the service may decline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,10 +196,16 @@ impl Key {
     pub fn read(text: &str) -> Result<Self, Unreadable> {
         let key = text.trim();
         if key.is_empty() {
-            return Err(unreadable(File::Key, "it holds no key"));
+            return Err(crate::shape::unreadable(
+                File::Key.name(),
+                "it holds no key",
+            ));
         }
         if key.split_whitespace().nth(1).is_some() {
-            return Err(unreadable(File::Key, "it holds more than one word"));
+            return Err(crate::shape::unreadable(
+                File::Key.name(),
+                "it holds more than one word",
+            ));
         }
         Ok(Self(key.to_owned()))
     }
@@ -254,7 +226,7 @@ impl Key {
     /// and what the core compares against the key it wrote before revoking the old one.
     #[must_use]
     pub fn fingerprint(&self) -> String {
-        TokenHash::of(&self.0).0
+        TokenHash::of(&self.0).as_str().to_owned()
     }
 }
 
@@ -285,36 +257,14 @@ impl Health {
     }
 }
 
-/// `value` as one of these files is written: indented JSON ending in a newline.
-fn written(value: &impl Serialize) -> String {
-    let mut text = serde_json::to_string_pretty(value).unwrap_or_default();
-    text.push('\n');
-    text
-}
-
 /// `text` read as the shape `file` should hold.
 fn read<T: serde::de::DeserializeOwned>(file: File, text: &str) -> Result<T, Unreadable> {
-    serde_json::from_str(text).map_err(|error| unreadable(file, &error.to_string()))
+    crate::shape::read(file.name(), text)
 }
 
 /// Whether `format` is the one this build reads.
 fn formatted(file: File, format: u32) -> Result<(), Unreadable> {
-    if format == FORMAT {
-        Ok(())
-    } else {
-        Err(unreadable(
-            file,
-            &format!("it is written in format {format}, and this build reads format {FORMAT}"),
-        ))
-    }
-}
-
-/// `file` could not be read, because `why`.
-fn unreadable(file: File, why: &str) -> Unreadable {
-    Unreadable {
-        file: file.name(),
-        why: why.to_owned(),
-    }
+    crate::shape::formatted(file.name(), format, FORMAT)
 }
 
 #[cfg(test)]
