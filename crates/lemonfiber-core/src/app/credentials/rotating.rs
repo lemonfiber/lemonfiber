@@ -67,6 +67,9 @@ pub(crate) async fn rotate(
         Origin::Lemonfiber if held.setting == super::declining::SETTING => {
             super::declining::rotate(ctx, held, services).await
         }
+        Origin::Lemonfiber if held.setting == super::gating::SETTING => {
+            super::gating::rotate(ctx, held, services).await
+        }
         Origin::Service => republished(ctx, held, services, project).await,
         Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {
             replaced(ctx, held, services).await

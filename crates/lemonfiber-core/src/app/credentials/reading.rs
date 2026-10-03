@@ -67,6 +67,7 @@ pub(crate) async fn taken(
         ));
     }
     taken.extend(super::declining::held(ctx, services, project).await);
+    taken.extend(super::gating::held(ctx, services, project).await);
     taken.extend(installed.iter().flat_map(declared));
     taken
 }

@@ -37,6 +37,8 @@ pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed 
     }
     let recorded = if held.setting == super::declining::SETTING {
         super::declining::value(ctx, held).await
+    } else if held.setting == super::gating::SETTING {
+        super::gating::value(ctx, held).await
     } else {
         recorded_secret(ctx, &held.setting)
     };

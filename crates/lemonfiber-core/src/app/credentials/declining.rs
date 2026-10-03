@@ -47,7 +47,8 @@ const ROTATING: &str = "a real run would mint a new key on Jellyfin, write it wh
 const LANDED: &str = "Jellyfin took the new key, and the decline service holds it";
 
 /// Why there is nothing to mint with.
-const NO_ADMINISTRATOR: &str = "lemonfiber holds no administrator for this Jellyfin, so there \
+pub(super) const NO_ADMINISTRATOR: &str =
+    "lemonfiber holds no administrator for this Jellyfin, so there \
                                 is nothing to mint a key with; run `lemonfiber seed`";
 
 /// Why a new key was revoked before it was ever used.
@@ -55,7 +56,7 @@ const UNWRITTEN: &str =
     "the new key could not be written where the decline service reads it, so it was revoked again";
 
 /// Why a new key was revoked once Jellyfin refused it.
-const UNTAKEN: &str =
+pub(super) const UNTAKEN: &str =
     "Jellyfin did not take the new key, so it was revoked and the old one put back";
 
 /// Why a new key was revoked once the service did not hold it.
