@@ -32,7 +32,7 @@ use std::time::Duration;
 
 use axum::Router;
 use lemonfiber::cli::RawUi;
-use lemonfiber_api::admission::Admitting;
+use lemonfiber_api::admission::{Admitting, HouseholdAtHand};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
@@ -332,9 +332,11 @@ async fn serving(
     // One register, shared by the door, the guard over everything else and the
     // stream: two would be a run somebody could be admitted to half of. It reads the
     // password afresh every time it is asked, which is what lets the loop below ask
-    // again without anything having to tell it.
+    // again without anything having to tell it, and opens the household from the
+    // stack at each asking for the same reason.
     let admitting = Arc::new(Admitting {
         kept: ctx.settings.admission.clone(),
+        household: Some(Arc::clone(&ctx) as Arc<dyn HouseholdAtHand>),
         ..Admitting::default()
     });
     let app = app(embedded, asked.assets.clone());

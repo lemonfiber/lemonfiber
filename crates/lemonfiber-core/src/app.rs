@@ -63,6 +63,7 @@ pub(crate) mod import;
 pub(crate) mod invite;
 pub(crate) mod letting;
 pub(crate) mod materialise;
+pub mod members;
 pub(crate) mod music;
 pub(crate) mod outbox;
 pub mod plugins;

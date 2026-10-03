@@ -47,6 +47,7 @@ use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::admission::{self as credential, Credential};
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{Household, Signed};
@@ -88,9 +89,33 @@ pub struct Admitting {
     /// Where the operator's password is kept, where this machine has anywhere to
     /// keep one.
     pub kept: Option<PathBuf>,
-    /// The household this machine keeps, where one is reachable. Asked who somebody
-    /// is when the machine's own password does not know them.
-    pub household: Option<Arc<dyn Household>>,
+    /// Where the household this machine keeps is found. Asked who somebody is when
+    /// the machine's own password does not know them.
+    pub household: Option<Arc<dyn HouseholdAtHand>>,
+}
+
+/// Where the household is found, at the moment somebody is checked against it.
+///
+/// Asked on every sign-in and every member's call rather than once at start, the
+/// way the operator's credential is read: a stack seeded while this surface was
+/// already serving has a household from that moment on.
+pub trait HouseholdAtHand: Send + Sync {
+    /// The household as it stands now, or nothing where there is none to ask.
+    fn now(&self) -> Option<Arc<dyn Household>>;
+}
+
+/// One household, the same at every asking.
+impl HouseholdAtHand for Arc<dyn Household> {
+    fn now(&self) -> Option<Arc<dyn Household>> {
+        Some(Arc::clone(self))
+    }
+}
+
+/// The household of the stack this surface serves, opened from it at each asking.
+impl HouseholdAtHand for Ctx {
+    fn now(&self) -> Option<Arc<dyn Household>> {
+        lemonfiber_core::app::members::household(self)
+    }
 }
 
 impl Admitting {
@@ -139,7 +164,7 @@ impl Admitting {
                 return Some(Opened::Operator(held));
             }
         }
-        let (household, name) = (self.household.as_ref()?, given.name.as_deref()?);
+        let name = given.name.as_deref()?;
         // An account nobody has claimed yet has no password, and the media server
         // lets an empty one sign in to it. That is an invitation still waiting for
         // its person, not a member proving who they are, so an empty password opens
@@ -147,6 +172,7 @@ impl Admitting {
         if given.password.is_empty() {
             return None;
         }
+        let household = self.household.as_ref()?.now()?;
 
         // A name for this sign-in at the server, fresh each time: the server keeps one
         // sign-in per account and device, so a second under one name would end the
@@ -212,9 +238,9 @@ impl Admitting {
     /// media-server reboot and tell them their account had been removed, which is
     /// the same mistake the sign-in door is built to avoid one floor down.
     async fn still_standing(&self, signed: Signed) -> Knocking {
-        let Some(household) = self.household.as_ref() else {
-            // A build with no household behind it has no member sessions to hold,
-            // so one arriving here is a session this run cannot vouch for.
+        let Some(household) = self.household.as_ref().and_then(|at| at.now()) else {
+            // With no household to open there is nobody to ask whether this member
+            // still stands, so the session is one this run cannot vouch for.
             return Knocking::Unconfirmed;
         };
         match household.standing(&signed).await {

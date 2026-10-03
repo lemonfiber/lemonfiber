@@ -13,7 +13,9 @@ pub(crate) use axum::body::{to_bytes, Body};
 pub(crate) use axum::extract::FromRequestParts as _;
 pub(crate) use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
 pub(crate) use lemonfiber_api::admission::sessions::Opened;
-pub(crate) use lemonfiber_api::admission::{Admitting, Caller, Knocking, RETRY_AFTER, SESSION};
+pub(crate) use lemonfiber_api::admission::{
+    Admitting, Caller, HouseholdAtHand, Knocking, RETRY_AFTER, SESSION,
+};
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::events::Streaming;
 pub(crate) use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
@@ -398,11 +400,48 @@ pub(crate) fn door_with(
 ) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
     let admitting = Arc::new(Admitting {
         kept: path.clone(),
-        household: Some(household),
+        household: Some(Arc::new(household as Arc<dyn Household>)),
         ..Admitting::default()
     });
     let (router, token) = surface(world(path, random), &admitting);
     (router, token, admitting)
+}
+
+/// The world a stack runs in: the repository's stack, whose media server answers
+/// through `transport`, with an env file of the test's own.
+pub(crate) fn a_stack(named: &str, transport: Arc<Fake>) -> Ctx {
+    let mut ctx = lemonfiber_testing::a_context()
+        .runner(Arc::new(Idle))
+        .build()
+        .with_http(transport)
+        .with_random(Arc::new(not_the_token()));
+    ctx.settings.env_file = Some(a_directory(named).join(".env"));
+    ctx
+}
+
+/// The stack seeded: the media server's admin password recorded where the stack
+/// keeps it.
+pub(crate) fn seeded(ctx: &Ctx) {
+    let Some(env) = ctx.settings.env_file.as_deref() else {
+        unreachable!("a stack built here has an env file")
+    };
+    let Ok(()) = lemonfiber_core::config::store::set(
+        env,
+        lemonfiber_core::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        &a_password(),
+    ) else {
+        unreachable!("a scratch directory can be written")
+    };
+}
+
+/// The surface over that stack, admitting from the household the stack holds.
+pub(crate) fn door_over(ctx: &Ctx) -> (axum::Router, Arc<Admitting>) {
+    let admitting = Arc::new(Admitting {
+        household: Some(Arc::new(ctx.clone()) as Arc<dyn HouseholdAtHand>),
+        ..Admitting::default()
+    });
+    let (router, _) = surface(ctx.clone(), &admitting);
+    (router, admitting)
 }
 
 /// A name and a password, as a member sends them.
