@@ -24,7 +24,7 @@ expect = { status = 200, json_has_keys = ["Items"] }
 fixture = "recordings/jellyfin/catalogue.json"
 "#;
 
-/// The shipped stack, with Jellyfin claiming `media.serve` as `claim` writes it.
+/// The shipped stack, with Jellyfin alone providing and claiming `media.serve` as `claim` writes it.
 fn claiming(claim: &str) -> Manifest {
     let mut manifest = Manifest::from_toml(STACK).unwrap_or_else(|why| unreachable!("{why}"));
     for service in &mut manifest.services {
@@ -35,6 +35,7 @@ fn claiming(claim: &str) -> Manifest {
             )];
         } else {
             service.provides = Vec::new();
+            service.claim = Vec::new();
         }
     }
     manifest
