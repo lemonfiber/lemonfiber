@@ -452,3 +452,70 @@ async fn a_replaced_key_rewatches_each_finder_and_refuses_one_read_from_a_file_l
     );
     assert!(unwritten.is_empty(), "{unwritten:?}");
 }
+
+/// A replacement owes a finder nothing where the finder cannot be reached to tell: it
+/// publishes no port, it has written no key yet, or what it wrote holds none of its own.
+/// Nor does it owe one that does not watch the curator at all.
+#[tokio::test]
+async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
+    /// The finder's configuration with a key under a curator and none under `auth`.
+    const NOT_ITS_OWN: &str = "sonarr:\n  apikey: someone-elses\n";
+    let watched = |finder: Option<&'static str>| {
+        let fs = match finder {
+            Some(config) => {
+                SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"), None).with_bazarr(config)
+            }
+            None => SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"), None),
+        };
+        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(fs))
+    };
+    let stack = || {
+        vec![
+            arr("sonarr", 8989, "tv"),
+            arr("lidarr", 8686, "music"),
+            bazarr_svc(),
+        ]
+    };
+    let mut unpublished = bazarr_svc();
+    unpublished.port = None;
+
+    let not_watched = super::super::rewatch(
+        &watched(Some(FINDER_CONFIG)),
+        &fillers_of(stack()),
+        "lidarr",
+    )
+    .await;
+    let no_key = super::super::rewatch(&watched(None), &fillers_of(stack()), "sonarr").await;
+    let not_its_own =
+        super::super::rewatch(&watched(Some(NOT_ITS_OWN)), &fillers_of(stack()), "sonarr").await;
+    let unreached = super::super::rewatch(
+        &watched(Some(FINDER_CONFIG)),
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), unpublished]),
+        "sonarr",
+    )
+    .await;
+
+    assert!(not_watched.is_empty(), "{not_watched:?}");
+    assert!(no_key.is_empty(), "{no_key:?}");
+    assert!(not_its_own.is_empty(), "{not_its_own:?}");
+    assert!(unreached.is_empty(), "{unreached:?}");
+}
+
+/// The finder's key is read from the file its declaration names, and a declaration
+/// naming none has no key to read.
+#[tokio::test]
+async fn a_finder_naming_no_configuration_file_has_no_key_to_publish() {
+    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
+        SeedFs::keyed(None, None).with_bazarr(FINDER_CONFIG),
+    ));
+    let mut unnamed = bazarr_svc();
+    if let Some(api) = unnamed.api.as_mut() {
+        api.path = None;
+    }
+
+    let named = crate::app::targets::bazarr_key(&ctx, &[bazarr_svc()], Some(stack_root())).await;
+    let unnamed = crate::app::targets::bazarr_key(&ctx, &[unnamed], Some(stack_root())).await;
+
+    assert!(named.is_some_and(|key| key == "finder-key"));
+    assert!(unnamed.is_none());
+}
