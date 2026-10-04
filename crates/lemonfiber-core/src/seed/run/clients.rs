@@ -93,7 +93,7 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String,
 /// A Usenet client's API key, read from the file it writes it to, or nothing where it
 /// names no such file or has not written one yet.
 async fn usenet_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
-    let text = ctx.seams.filesystem.read(filler.key_file.as_ref()?).await?;
+    let text = crate::app::targets::credential_file(ctx, filler).await?;
     crate::sabnzbd::api_key(&text)
 }
 

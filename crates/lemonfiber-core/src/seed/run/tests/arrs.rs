@@ -209,6 +209,27 @@ fn a_plugin_standing_in_for_the_usenet_client_is_reached_where_it_answers() {
     assert_eq!(credentials, vec![&Credential::ApiKey("its-own".to_owned())]);
 }
 
+/// A filler the \*arr is connected to nothing by is told about as nothing, while the
+/// client beside it is told about as ever.
+#[test]
+fn a_filler_nothing_connects_is_not_told_about() {
+    let installed = [crate::test_support::an_installed(
+        "unadapted",
+        vec![crate::test_support::a_placed(
+            "unadapted",
+            &["download.usenet"],
+            None,
+            Some(6789),
+        )],
+    )];
+    let chosen = crate::wiring::Chosen::read(Some("download.usenet=unadapted"));
+
+    assert_eq!(
+        reached(&told(&installed, &chosen, &both_held(), "tv")),
+        vec![vec![("qBittorrent".to_owned(), "gluetun".to_owned(), 8081)]]
+    );
+}
+
 /// An \*arr filing a media type with no category field is told about no client.
 #[test]
 fn an_arr_with_no_category_is_told_about_no_client() {

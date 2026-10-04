@@ -280,7 +280,9 @@ async fn a_plugin_setting_that_lands_on_one_the_stack_holds_is_refused() {
         .iter()
         .filter(|wiring| matches!(wiring.state, crate::seed::State::Refused { .. }))
         .collect();
-    assert_eq!(refused.len(), 1, "{wirings:?}");
+    // Counted rather than printed: what came back sits beside minted passwords, and a
+    // failing assertion prints its message into the run's log.
+    assert_eq!(refused.len(), 1);
     assert!(refused
         .iter()
         .all(|wiring| wiring.connection == "nzbget the stand-in web UI password"));
@@ -316,7 +318,7 @@ async fn a_torrent_client_publishing_no_port_has_no_password_set() {
 
     let (wirings, minted) = super::super::clients::seed_passwords(&ctx, &fillers).await;
 
-    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(wirings.is_empty());
     assert!(minted.is_empty());
 }
 

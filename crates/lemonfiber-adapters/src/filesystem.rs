@@ -60,6 +60,15 @@ impl FileSystem for Disk {
         tokio::fs::read_to_string(path).await.ok()
     }
 
+    /// Opened once, refusing a link at the file itself, and then checked by what was
+    /// opened rather than by its name: the name, resolved, has to lie beneath `within`
+    /// and to name the very file the handle holds. A link swapped in on the way after
+    /// the open resolves somewhere else, or names another file, and either is refused —
+    /// so there is no moment between a look and a read for it to change under.
+    async fn read_beneath(&self, path: &Path, within: &Path) -> Option<String> {
+        read_beneath(path, within).await
+    }
+
     /// One syscall, which is the whole point: `create_new` asks the kernel to create
     /// the file *and* fail if it already exists, so two processes racing here get one
     /// `true` between them. Anything built from a separate look-then-write would have
@@ -304,6 +313,59 @@ pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
         file: meta.file_index().unwrap_or_default(),
         links: u64::from(meta.number_of_links().unwrap_or_default()),
     }
+}
+
+/// Read `path`, a plain file beneath `within`, opening it once and checking what was
+/// opened.
+async fn read_beneath(path: &Path, within: &Path) -> Option<String> {
+    use tokio::io::AsyncReadExt as _;
+
+    let mut file = no_follow().open(path).await.ok()?;
+    let opened = file.metadata().await.ok()?;
+    let root = tokio::fs::canonicalize(within).await.ok()?;
+    let resolved = tokio::fs::canonicalize(path).await.ok()?;
+    let named = tokio::fs::metadata(&resolved).await.ok()?;
+    if !opened.is_file() || !resolved.starts_with(&root) || !same_file(&opened, &named) {
+        return None;
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text).await.ok()?;
+    Some(text)
+}
+
+/// Opening for reading, refusing to follow a link at the last name of the path.
+#[cfg(unix)]
+fn no_follow() -> tokio::fs::OpenOptions {
+    let mut options = tokio::fs::OpenOptions::new();
+    options.read(true).custom_flags(libc::O_NOFOLLOW);
+    options
+}
+
+/// Opening for reading. Windows has no flag for it, so a link at the last name is
+/// caught by the file it opened not being the one the name resolves to.
+#[cfg(windows)]
+fn no_follow() -> tokio::fs::OpenOptions {
+    let mut options = tokio::fs::OpenOptions::new();
+    options.read(true);
+    options
+}
+
+/// Whether two readings are of one file: the same device and the same number on it.
+#[cfg(unix)]
+fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt as _;
+
+    one.dev() == other.dev() && one.ino() == other.ino()
+}
+
+/// Whether two readings are of one file: the same volume and the same index on it.
+#[cfg(windows)]
+fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt as _;
+
+    one.volume_serial_number() == other.volume_serial_number()
+        && one.file_index() == other.file_index()
+        && one.file_index().is_some()
 }
 
 #[cfg(test)]

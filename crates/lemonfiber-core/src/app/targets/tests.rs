@@ -166,3 +166,57 @@ fn the_sum_saturates_rather_than_wrapping() {
     let downloads = [download(Some(u64::MAX)), download(Some(1))];
     assert_eq!(committed_of(&downloads), u64::MAX);
 }
+
+/// A service whose credential lives in `file`, confined to `within` where it is a
+/// plugin's.
+fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
+    crate::wiring::Filler {
+        id: "stand-in".to_owned(),
+        name: "Stand-in".to_owned(),
+        origin: crate::origin::Origin::Bundled,
+        address: None,
+        adapter: None,
+        published: None,
+        key_file: Some(std::path::PathBuf::from(file)),
+        confined_to: within.map(std::path::PathBuf::from),
+    }
+}
+
+/// A plugin's credential is read only from beneath the directory its container owns;
+/// the stack's own is read where it is, and a service naming no file reads nothing.
+#[tokio::test]
+async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
+    let files = lemonfiber_fixtures::files::Files::at(vec![
+        (
+            std::path::PathBuf::from("/stack/config/stand-in/key.ini"),
+            "beneath",
+        ),
+        (std::path::PathBuf::from("/stack/secret"), "the host's own"),
+    ]);
+    let context = ctx().with_filesystem(files);
+    let read = |filler: crate::wiring::Filler| {
+        let context = &context;
+        async move { super::credential_file(context, &filler).await }
+    };
+
+    assert_eq!(
+        read(keyed_in(
+            "/stack/config/stand-in/key.ini",
+            Some("/stack/config/stand-in")
+        ))
+        .await
+        .as_deref(),
+        Some("beneath")
+    );
+    assert_eq!(
+        read(keyed_in("/stack/secret", Some("/stack/config/stand-in"))).await,
+        None
+    );
+    assert_eq!(
+        read(keyed_in("/stack/secret", None)).await.as_deref(),
+        Some("the host's own")
+    );
+    let mut unkeyed = keyed_in("/stack/secret", None);
+    unkeyed.key_file = None;
+    assert_eq!(read(unkeyed).await, None);
+}

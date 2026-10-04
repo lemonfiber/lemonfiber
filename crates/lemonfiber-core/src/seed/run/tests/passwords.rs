@@ -30,6 +30,7 @@ fn torrent_client() -> crate::wiring::Filler {
         }),
         published: Some(8081),
         key_file: None,
+        confined_to: None,
     }
 }
 

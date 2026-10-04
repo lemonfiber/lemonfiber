@@ -53,6 +53,10 @@ pub struct Filler {
     /// Where on this machine the file its credential is read from sits, where its
     /// adapter names one and the stack has been written to disk.
     pub key_file: Option<std::path::PathBuf>,
+    /// The directory a plugin's container owns, which its credential file has to stay
+    /// beneath when it is read; nothing for the stack's own services, whose images are
+    /// the stack's.
+    pub confined_to: Option<std::path::PathBuf>,
 }
 
 impl Filler {
@@ -194,6 +198,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
                 service.api.as_ref().and_then(|api| api.path.as_deref()),
             )
         }),
+        confined_to: None,
     }
 }
 
@@ -216,6 +221,8 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>) -> Filler {
         published: placed.published(),
         key_file: project
             .and_then(|project| crate::app::targets::plugin_config_path(project, placed)),
+        confined_to: project
+            .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
     }
 }
 

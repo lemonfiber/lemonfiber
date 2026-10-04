@@ -76,6 +76,26 @@ fn a_stack_service_is_reached_where_it_says_it_listens() {
     );
 }
 
+/// A service waiting on another that is no tunnel is reached at its own id.
+#[test]
+fn a_service_waiting_on_something_other_than_a_tunnel_is_reached_at_its_own_id() {
+    let fillers = shipped(&[], &Chosen::default(), |manifest| {
+        for service in &mut manifest.services {
+            if service.id == "sabnzbd" {
+                service.depends_on = vec!["prowlarr".to_owned()];
+            }
+        }
+    });
+
+    assert_eq!(
+        fillers
+            .service("sabnzbd")
+            .and_then(|one| one.address.as_ref())
+            .map(|at| at.host.as_str()),
+        Some("sabnzbd")
+    );
+}
+
 /// Every ask the stack declares is answered, and a link kept to a named service is not
 /// an ask.
 #[test]

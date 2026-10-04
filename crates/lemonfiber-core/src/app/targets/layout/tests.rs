@@ -139,3 +139,18 @@ fn a_plugins_credential_is_never_read_from_outside_its_directory() {
         );
     }
 }
+
+/// A plugin's service owns the directory named for it, and only where its id is one
+/// plain name.
+#[test]
+fn a_plugins_service_owns_the_directory_named_for_it() {
+    let project = std::path::Path::new("/opt/lemonfiber/stack");
+    assert_eq!(
+        super::plugin_config_dir(project, &keyed_at("nzbget", "/config/key")),
+        Some(project.join("config/nzbget"))
+    );
+    assert_eq!(
+        super::plugin_config_dir(project, &keyed_at("../etc", "/config/key")),
+        None
+    );
+}

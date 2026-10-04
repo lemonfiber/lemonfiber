@@ -286,3 +286,94 @@ async fn a_claim_makes_the_directory_it_needs() {
     assert!(Disk.claim(&path, "held").await);
     assert_eq!(Disk.read(&path).await.as_deref(), Some("held"));
 }
+
+/// A container's own directory, holding a plain key file, and a secret beside it that
+/// the container must never be handed.
+fn confined() -> (
+    lemonfiber_fixtures::scratch::Scratch,
+    std::path::PathBuf,
+    std::path::PathBuf,
+) {
+    let dir = scratch();
+    let owned = dir.join("config").join("stand-in");
+    let _ = std::fs::create_dir_all(owned.join("nested"));
+    let _ = std::fs::write(owned.join("key.ini"), "plain");
+    let _ = std::fs::write(owned.join("nested").join("key.ini"), "nested");
+    let secret = dir.join("secret");
+    let _ = std::fs::write(&secret, "the host's own");
+    (dir, owned, secret)
+}
+
+/// A plain file beneath the directory is read, however deep.
+#[tokio::test]
+async fn a_plain_file_beneath_the_directory_is_read() {
+    let (dir, owned, _) = confined();
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("key.ini"), &owned)
+            .await
+            .as_deref(),
+        Some("plain")
+    );
+    assert_eq!(
+        Disk.read_beneath(&owned.join("nested").join("key.ini"), &owned)
+            .await
+            .as_deref(),
+        Some("nested")
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A link where the file is expected is refused, wherever it points — even at a file
+/// inside the directory.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_linked_key_file_is_refused() {
+    let (dir, owned, secret) = confined();
+    let _ = std::os::unix::fs::symlink(&secret, owned.join("outward.ini"));
+    let _ = std::os::unix::fs::symlink(owned.join("key.ini"), owned.join("inward.ini"));
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("outward.ini"), &owned).await,
+        None
+    );
+    assert_eq!(
+        Disk.read_beneath(&owned.join("inward.ini"), &owned).await,
+        None
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A linked directory on the way to the file is refused where it leads outside.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_linked_directory_on_the_way_out_is_refused() {
+    let (dir, owned, _) = confined();
+    let _ = std::os::unix::fs::symlink(&dir, owned.join("up"));
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("up").join("secret"), &owned)
+            .await,
+        None
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A directory and anything outside the one named are not read.
+#[tokio::test]
+async fn a_directory_or_a_file_outside_is_not_read() {
+    let (dir, owned, secret) = confined();
+
+    assert_eq!(Disk.read_beneath(&owned.join("nested"), &owned).await, None);
+    assert_eq!(Disk.read_beneath(&secret, &owned).await, None);
+    assert_eq!(
+        Disk.read_beneath(&owned.join("absent.ini"), &owned).await,
+        None
+    );
+    assert_eq!(
+        Disk.read_beneath(&owned.join("key.ini"), &owned.join("absent"))
+            .await,
+        None
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

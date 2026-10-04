@@ -326,6 +326,22 @@ pub trait FileSystem: Storage + Send + Sync {
     /// unreadable file collapse to the same "nothing to compare against" answer.
     async fn read(&self, path: &Path) -> Option<String>;
 
+    /// Read a small file somebody else's container can write, only where it is a plain
+    /// file lying beneath `within` once every link on the way is resolved — or `None`.
+    ///
+    /// The container owns the directory, so it can put a link where a file is expected,
+    /// or link a directory on the way to one, and a plain read would follow either to
+    /// any file on the host. A link at the file itself is refused outright, and one on
+    /// the way is refused wherever it leads outside `within`.
+    ///
+    /// The default written here looks and then reads, which leaves a window between the
+    /// two. It is for the fakes, where nothing races; the implementation that touches a
+    /// real filesystem overrides it with one that opens the file once and checks what
+    /// it opened, and is the only one whose promise is worth anything.
+    async fn read_beneath(&self, path: &Path, within: &Path) -> Option<String> {
+        read_beneath(self, path, within).await
+    }
+
     /// Record a small file lemonfiber keeps for itself, creating the directory
     /// for it where needed.
     ///
@@ -337,6 +353,22 @@ pub trait FileSystem: Storage + Send + Sync {
     /// Who owns a path and how it may be accessed, or `None` where the platform
     /// does not report it — which is every platform but Unix.
     async fn ownership(&self, path: &Path) -> Option<Ownership>;
+}
+
+/// The default confined read: resolve both, and read only where one lies beneath the
+/// other.
+async fn read_beneath<F: FileSystem + ?Sized>(
+    filesystem: &F,
+    path: &Path,
+    within: &Path,
+) -> Option<String> {
+    let root = filesystem.canonicalize(within).await.ok()?;
+    let resolved = filesystem.canonicalize(path).await.ok()?;
+    if resolved.starts_with(&root) {
+        filesystem.read(path).await
+    } else {
+        None
+    }
 }
 
 /// The default claim: read, and write only where nothing was there to read.

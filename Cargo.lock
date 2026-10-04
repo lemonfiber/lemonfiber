@@ -1416,6 +1416,7 @@ dependencies = [
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-ports",
+ "libc",
  "reqwest",
  "rustls",
  "rustls-pki-types",

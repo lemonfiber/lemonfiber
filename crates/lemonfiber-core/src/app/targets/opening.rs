@@ -153,6 +153,20 @@ pub(crate) struct ServiceAddr {
     pub port: u16,
 }
 
+/// What the file a service's credential is read from holds.
+///
+/// A plugin's is read only where it is a plain file beneath the directory its container
+/// owns: whatever runs there can write that directory, and a link put where the file is
+/// expected would otherwise have lemonfiber read any file on the host and hand it to the
+/// container as its own credential. Nothing where the service names no such file.
+pub(crate) async fn credential_file(ctx: &Ctx, filler: &crate::wiring::Filler) -> Option<String> {
+    let file = filler.key_file.as_deref()?;
+    match filler.confined_to.as_deref() {
+        Some(within) => ctx.seams.filesystem.read_beneath(file, within).await,
+        None => ctx.seams.filesystem.read(file).await,
+    }
+}
+
 /// Where this machine reaches a service that publishes this port.
 pub(crate) fn loopback(port: u16) -> String {
     format!("http://127.0.0.1:{port}")
