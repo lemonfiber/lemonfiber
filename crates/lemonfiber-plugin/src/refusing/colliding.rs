@@ -39,6 +39,16 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
                     service.id, held.name
                 ),
             });
+        } else if let Some(held) = bundled::spelled_like(&service.id) {
+            found.push(Violation {
+                location: format!("{at}.id"),
+                message: format!(
+                    "{} is written as the stack's own {} is ({}) once case and `-` or `_` are set \
+                     aside, and lemonfiber keeps what a service holds in settings named that way \
+                     — the two would share them",
+                    service.id, held.name, held.id
+                ),
+            });
         }
         let clash = service
             .port

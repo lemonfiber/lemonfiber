@@ -108,6 +108,19 @@ fn a_servarr_service_without_an_api_version_is_caught() {
 }
 
 #[test]
+fn a_service_with_an_api_and_no_listens_is_caught() {
+    // The first service the stack declares one for is the indexer aggregator, so
+    // taking it away leaves an api nothing could say where to reach.
+    let text = edited("listens = 9696\n", "");
+    let caught = messages(&text).iter().any(|message| {
+        message
+            == "service prowlarr: declares an api but no listens, the port it answers on \
+                inside the stack's network"
+    });
+    assert!(caught);
+}
+
+#[test]
 fn a_duplicate_profile_id_is_caught() {
     let text = edited(r#"id = "usenet""#, r#"id = "search""#);
     assert!(messages(&text)

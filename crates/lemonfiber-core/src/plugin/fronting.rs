@@ -147,11 +147,7 @@ fn entry(placed: &Placed, reached: &Reached) -> String {
         Reached::Household { port, .. } => format!("http://{{{{HOMEPAGE_VAR_LAN_HOST}}}}:{port}"),
         Reached::Loopback { port, .. } => format!("http://localhost:{port}"),
     };
-    let name = if placed.name.is_empty() {
-        &placed.service
-    } else {
-        &placed.name
-    };
+    let name = placed.called();
     format!(
         "    - {}:\n        icon: {}\n        href: {}\n        description: {}\n",
         quoted(name),

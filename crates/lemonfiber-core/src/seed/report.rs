@@ -95,6 +95,18 @@ pub enum State {
         /// Why the operator said to leave it alone, in their own words.
         reason: String,
     },
+    /// Something on this machine fills what a service asks for, and nothing lemonfiber
+    /// does connects the two — the filler names no adapter, or none lemonfiber pairs with
+    /// what the asker speaks.
+    ///
+    /// Settled, because no run changes it: the stack, or what is installed, has to. Said
+    /// rather than left out, because a filler nothing reaches and a filler lemonfiber
+    /// forgot would otherwise read the same, and the operator who installed one to stand
+    /// in for another is the one who needs to know which.
+    Unmatched {
+        /// What fills it, what asked, and why nothing connects them.
+        reason: String,
+    },
     /// Prerequisite unavailable; a later run will complete it.
     Skipped {
         /// Why it could not be attempted.
@@ -138,6 +150,7 @@ impl State {
                 | Self::Adopted
                 | Self::Unmanaged
                 | Self::Observed { .. }
+                | Self::Unmatched { .. }
         )
     }
 }

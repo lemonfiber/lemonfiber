@@ -212,3 +212,36 @@ id          = "shelf""#,
     );
     assert_eq!(read(&proxy), before, "nothing of it was written");
 }
+
+/// A second plugin bringing a service named as the first one's is refused before
+/// anything of it is written, though it would answer on a label of its own: the two
+/// would be one container and share one credential.
+#[tokio::test]
+async fn a_service_named_as_another_plugins_refuses_the_install() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("service-taken", runner, answering(200));
+    let (proxy, _) = fronted(&ctx);
+    let _ = installing(&ctx, &source("service-taken", PROVING)).await;
+    let before = read(&proxy);
+    let second = PROVING.replace(
+        r#"id          = "komga"
+name        = "Komga"
+version"#,
+        r#"id          = "shelf"
+name        = "Shelf"
+version"#,
+    ) + "\n[[wiring]]\nservice  = \"komga\"\nhostname = \"shelf\"\n";
+
+    let refused = installing(&ctx, &source("service-taken-second", &second)).await;
+
+    let said = refused.err();
+    assert_eq!(
+        said.as_ref().map(|problem| problem.code.to_string()),
+        Some("PLUGIN-24".to_owned())
+    );
+    assert!(
+        said.is_some_and(|problem| problem.summary.contains("komga")),
+        "the refusal names the service both would bring"
+    );
+    assert_eq!(read(&proxy), before, "nothing of it was written");
+}

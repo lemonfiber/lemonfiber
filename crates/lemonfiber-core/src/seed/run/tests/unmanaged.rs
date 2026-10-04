@@ -47,3 +47,34 @@ fn a_service_declared_unmanaged_is_taken_out_of_the_pass_and_reported() {
         .first()
         .is_some_and(|wiring| !wiring.severity.is_warning()));
 }
+
+/// A plugin's service the operator declared unmanaged is taken out of its plugin's
+/// record for the pass and said, and its neighbour is left in.
+#[test]
+fn a_plugins_service_declared_unmanaged_is_taken_out_of_the_pass_and_reported() {
+    let installed = [crate::test_support::an_installed(
+        "pair",
+        vec![
+            crate::test_support::a_placed("kept", &[], None, None),
+            crate::test_support::a_placed("left-alone", &[], None, None),
+        ],
+    )];
+    let declared = vec![("left-alone".to_owned(), "mine to run".to_owned())];
+
+    let (kept, observed) = withheld_brought(&installed, &declared);
+
+    let left: Vec<&str> = kept
+        .iter()
+        .flat_map(|one| one.services.iter().map(|placed| placed.service.as_str()))
+        .collect();
+    assert_eq!(left, vec!["kept"]);
+    assert_eq!(
+        observed,
+        vec![crate::seed::Wiring::settled(
+            "left-alone the stand-in".to_owned(),
+            crate::seed::State::Observed {
+                reason: "mine to run".to_owned()
+            },
+        )]
+    );
+}

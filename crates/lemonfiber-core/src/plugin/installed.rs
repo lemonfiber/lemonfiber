@@ -201,6 +201,17 @@ impl Placed {
         }
     }
 
+    /// What it is called in front of an operator: the name it was installed with, or its
+    /// id where the record was written before names were kept.
+    #[must_use]
+    pub fn called(&self) -> &str {
+        if self.name.is_empty() {
+            &self.service
+        } else {
+            &self.name
+        }
+    }
+
     /// The port this machine reaches the service on, where it publishes one.
     ///
     /// Nothing where it publishes none, which is a service with no listener rather
@@ -210,6 +221,41 @@ impl Placed {
     pub fn published(&self) -> Option<u16> {
         self.reached.as_ref().map(Reached::port)
     }
+}
+
+/// A service of `would` named, once spelled as an environment name, as a service of
+/// another installed plugin already is: the one it would bring, the one already there,
+/// and whose that is.
+///
+/// lemonfiber writes a plugin's container under its service's id and keeps what the
+/// service holds in settings named after it, so two such services would be one container
+/// and one credential. The same plugin's own record is not another plugin's, so an update
+/// replacing a version is not held to the names of the version it replaces.
+#[must_use]
+pub fn spelled_alike(
+    would: &Installed,
+    installed: &[Installed],
+) -> Option<(String, String, String)> {
+    for other in installed
+        .iter()
+        .filter(|other| other.plugin != would.plugin)
+    {
+        for theirs in &other.services {
+            let spelled = lemonfiber_manifest::environment_name(&theirs.service);
+            let ours = would
+                .services
+                .iter()
+                .find(|ours| lemonfiber_manifest::environment_name(&ours.service) == spelled);
+            if let Some(ours) = ours {
+                return Some((
+                    ours.service.clone(),
+                    theirs.service.clone(),
+                    other.plugin.clone(),
+                ));
+            }
+        }
+    }
+    None
 }
 
 /// One plugin's install, as it was decided.

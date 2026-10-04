@@ -57,6 +57,9 @@ etcetera = "0.11"
 # The operating system's CSPRNG, for every secret lemonfiber mints itself.
 getrandom = "0.4"
 include_dir = "0.7"
+# The platform's own spelling of the flag that refuses to open a file through a link;
+# its constants alone, and only in the filesystem adapter.
+libc = "0.2"
 # rustls, not the platform's TLS: it keeps the musl static release target free of
 # an OpenSSL build dependency. json for decoding service API responses.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }

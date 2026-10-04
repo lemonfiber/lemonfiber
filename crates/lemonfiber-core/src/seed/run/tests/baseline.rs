@@ -279,6 +279,32 @@ fn reset_ctx(
         .with_http(http)
 }
 
+/// A register of installed plugins that is there and will not read is a machine that
+/// cannot say what fills its asks, so a reset puts back nothing rather than putting
+/// connections back to a guess.
+#[tokio::test]
+async fn a_reset_over_an_unreadable_register_puts_back_nothing() {
+    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-unread");
+    let _ = std::fs::remove_dir_all(&dir);
+    let context = reset_ctx(&dir, Arc::new(SeedFs::keyed(Some(KEYED), None)), seeding());
+    let _ = crate::config::store::write(
+        &dir.join("baseline.json"),
+        r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
+    );
+    let readable = super::super::reset_connections(&context, false).await;
+    let _ = std::fs::write(dir.join(crate::config::paths::PLUGINS), "not a register");
+
+    let unread = super::super::reset_connections(&context, false).await;
+
+    assert!(
+        !readable.is_empty(),
+        "the drift is previewed while the register reads"
+    );
+    assert!(unread.is_empty(), "{unread:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[tokio::test]
 async fn a_reset_skips_an_arr_that_has_not_written_its_key() {
     // A client is wanted, but the \*arr's key is not readable — it has not finished

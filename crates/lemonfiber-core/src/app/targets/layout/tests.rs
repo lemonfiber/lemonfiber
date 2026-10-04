@@ -80,3 +80,77 @@ fn a_path_outside_every_known_mount_resolves_to_nothing() {
     );
     assert_eq!(config_path(project, &a_service("odd"), None), None);
 }
+
+/// A plugin's service whose adapter reads its key from `path`.
+fn keyed_at(service: &str, path: &str) -> crate::plugin::Placed {
+    crate::test_support::a_placed(
+        service,
+        &[],
+        Some(lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+            key_source: lemonfiber_manifest::KeySource::ConfigIni,
+            path: Some(path.to_owned()),
+            version: None,
+        }),
+        Some(8080),
+    )
+}
+
+/// A plugin's credential is read from beneath its own configuration directory, at the
+/// mount its record names.
+#[test]
+fn a_plugins_credential_is_read_beneath_its_own_directory() {
+    let project = std::path::Path::new("/opt/lemonfiber/stack");
+    assert_eq!(
+        super::plugin_config_path(project, &keyed_at("nzbget", "/config/nzbget.conf")),
+        Some(project.join("config/nzbget/nzbget.conf"))
+    );
+    assert_eq!(
+        super::plugin_config_path(
+            project,
+            &crate::test_support::a_placed("nzbget", &[], None, None)
+        ),
+        None,
+        "an adapter naming no file, or none at all, has nothing to read"
+    );
+}
+
+/// Nothing a record holds can have the credential read from outside the service's own
+/// directory: not a path that climbs out, not one beside the mount, not the directory
+/// itself, and not a service id that is anything but one plain name.
+#[test]
+fn a_plugins_credential_is_never_read_from_outside_its_directory() {
+    let project = std::path::Path::new("/opt/lemonfiber/stack");
+    for (service, path) in [
+        ("nzbget", "/config/../../etc/shadow"),
+        ("nzbget", "/etc/shadow"),
+        ("nzbget", "/configuration/key"),
+        ("nzbget", "/config"),
+        ("nzbget", "/config/"),
+        ("nzbget", "/config//etc/shadow"),
+        ("../../etc", "/config/shadow"),
+        ("nested/name", "/config/key"),
+        ("", "/config/key"),
+    ] {
+        assert_eq!(
+            super::plugin_config_path(project, &keyed_at(service, path)),
+            None,
+            "{service} reading {path}"
+        );
+    }
+}
+
+/// A plugin's service owns the directory named for it, and only where its id is one
+/// plain name.
+#[test]
+fn a_plugins_service_owns_the_directory_named_for_it() {
+    let project = std::path::Path::new("/opt/lemonfiber/stack");
+    assert_eq!(
+        super::plugin_config_dir(project, &keyed_at("nzbget", "/config/key")),
+        Some(project.join("config/nzbget"))
+    );
+    assert_eq!(
+        super::plugin_config_dir(project, &keyed_at("../etc", "/config/key")),
+        None
+    );
+}

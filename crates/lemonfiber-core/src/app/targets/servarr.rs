@@ -69,7 +69,7 @@ pub(crate) fn target_for(service: &lemonfiber_manifest::Service, project: &Path)
     Some(Target {
         id: service.id.clone(),
         name: service.name.clone(),
-        base: format!("http://127.0.0.1:{port}"),
+        base: super::opening::loopback(port),
         config,
         version,
     })

@@ -13,6 +13,22 @@ fn a_service_taking_the_id_of_a_bundled_one_is_refused_naming_both() {
     );
 }
 
+/// An id that differs from a bundled one only by case or by `-` against `_` is the same
+/// id where lemonfiber keeps what a service holds, and is refused naming both.
+#[test]
+fn a_service_spelled_like_a_bundled_one_is_refused_naming_both() {
+    for (id, theirs) in [
+        ("Jellyfin", "jellyfin"),
+        ("calibre_web_automated", "calibre-web-automated"),
+    ] {
+        let said = without(SERVICE, &format!("[[service]]\nid          = \"{id}\""));
+        assert!(
+            names(&said, &[&format!("service {id}.id"), theirs, "once case"]),
+            "{id} got: {said:?}"
+        );
+    }
+}
+
 #[test]
 fn a_service_on_a_port_the_stack_publishes_is_refused_naming_both() {
     let said = without("port        = 25600", "port        = 8096");

@@ -52,8 +52,63 @@ pub(crate) fn config_path(
     let inside = CONFIG_MOUNTS
         .iter()
         .find_map(|mount| path.strip_prefix(mount))?;
-    Some(project.join("config").join(&service.id).join(inside))
+    Some(project.join(CONFIG_DIR).join(&service.id).join(inside))
 }
+
+/// The host path an installed plugin's service has its credential read from.
+///
+/// The same convention as a bundled service's, with the one mount the plugin's own
+/// record names in place of the list: lemonfiber mounts a plugin's configuration
+/// directory wherever the plugin said it reads one, so a path beneath anywhere else is
+/// a file nothing on this machine holds. Nothing where its adapter names no path.
+///
+/// **And nothing that could leave that directory.** The path is a stranger's, read back
+/// from a record on disk, and what is read here is handed to the plugin's service as its
+/// credential: a `..` in it, or a service id that is not one plain name, would have this
+/// read any file on the host and send it away. The reader refuses such a manifest at
+/// install, and this is the second wall rather than the first, because what is on disk is
+/// not always what this build wrote.
+///
+/// A path is not the whole of it: the container owns the directory and can put a link
+/// where the file is expected. What reads the file reads it through
+/// [`crate::ports::filesystem::FileSystem::read_beneath`], held to
+/// [`plugin_config_dir`].
+pub(crate) fn plugin_config_path(
+    project: &Path,
+    placed: &crate::plugin::Placed,
+) -> Option<PathBuf> {
+    let path = placed.api.as_ref()?.path.as_deref()?;
+    let inside = Path::new(
+        path.strip_prefix(placed.config_path.as_str())?
+            .strip_prefix('/')?,
+    );
+    let directory = plugin_config_dir(project, placed)?;
+    plain(inside).then(|| directory.join(inside))
+}
+
+/// The directory on this machine an installed plugin's service owns: its configuration
+/// directory, mounted into its container, and so a directory whatever runs there can
+/// write anything into.
+///
+/// Nothing where the service's id is not one plain name, which would put the directory
+/// somewhere other than beside every other service's.
+pub(crate) fn plugin_config_dir(project: &Path, placed: &crate::plugin::Placed) -> Option<PathBuf> {
+    let service = Path::new(&placed.service);
+    (plain(service) && service.components().count() == 1)
+        .then(|| project.join(CONFIG_DIR).join(service))
+}
+
+/// Whether a path is one or more plain names and nothing else: no root, no `..`, no `.`.
+fn plain(path: &Path) -> bool {
+    path.components().count() > 0
+        && path
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+}
+
+/// The directory under the project root each service's configuration directory sits in,
+/// one per service and named for it.
+const CONFIG_DIR: &str = "config";
 
 /// A file kept beside the environment file — the one durable location the context
 /// carries, so every record lemonfiber persists (the drift baseline, the materialised

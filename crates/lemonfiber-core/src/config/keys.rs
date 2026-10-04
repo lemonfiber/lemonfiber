@@ -258,12 +258,45 @@ pub(crate) const JELLYFIN_ADMIN_USER: &str = "admin";
 /// services, and either may change without the other.
 pub(crate) const QBITTORRENT_USER: &str = "admin";
 
-/// The environment key holding the account name qBittorrent is reached under.
+/// What a torrent client's web UI password setting ends in, after the service it is
+/// for.
+///
+/// Per service, because the password is the one a particular client was set to, and a
+/// second client standing in for the first is a second password. The bundled client's
+/// comes out as [`QBITTORRENT_PASSWORD_KEY`], which is where the tunnel's forwarded-port
+/// push reads it.
+pub(crate) const PASSWORD_SUFFIX: &str = "_PASSWORD";
+
+/// What the setting holding the account a torrent client is reached under ends in.
 ///
 /// The tunnel's forwarded-port push reads both halves of the credential from the
 /// environment, so the name is written beside the password rather than left to the
-/// default it falls back on.
-pub(crate) const QBITTORRENT_USERNAME_KEY: &str = "QBITTORRENT_USERNAME";
+/// default it falls back on; the bundled client's comes out as `QBITTORRENT_USERNAME`,
+/// which is where the push reads it.
+pub(crate) const USERNAME_SUFFIX: &str = "_USERNAME";
+
+/// What the setting a service's own key is published under ends in.
+pub(crate) const API_KEY_SUFFIX: &str = "_API_KEY";
+
+/// Every ending a setting holding one service's credential is given, so a name computed
+/// for one service can be checked against every name another's would take.
+pub(crate) const CREDENTIAL_SUFFIXES: [&str; 3] =
+    [API_KEY_SUFFIX, PASSWORD_SUFFIX, USERNAME_SUFFIX];
+
+/// What a setting holding a credential of an installed plugin's service starts with,
+/// before the service's id.
+///
+/// A plugin's id is a stranger's choice. Without a namespace of its own, a service
+/// called after a setting this build or the stack already keeps — the media server's
+/// administrator, another service's password — would have that setting read and handed
+/// to it as its own credential.
+pub(crate) const PLUGIN_SETTING: &str = "plugin-";
+
+/// A setting named for one service: its id as an environment name spells it, and then
+/// what the setting holds.
+pub(crate) fn for_service(id: &str, holds: &str) -> String {
+    format!("{}{holds}", lemonfiber_manifest::environment_name(id))
+}
 
 /// Every setting lemonfiber names.
 ///

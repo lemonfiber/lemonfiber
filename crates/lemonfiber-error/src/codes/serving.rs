@@ -212,6 +212,9 @@ codes! {
         /// Raised when what the catalogue's origin served is not what the catalogue
         /// reviewed.
         NOT_AS_REVIEWED = "PLUGIN-23",
+        /// Raised when a plugin's service would be named, where lemonfiber keeps what a
+        /// service holds, as another installed plugin's service already is.
+        SPELLED_ALIKE = "PLUGIN-24",
     }
     /// The `PROVIDER` codes.
     provider {

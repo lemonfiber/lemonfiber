@@ -1,7 +1,7 @@
 use lemonfiber_ports::filesystem::Storage;
 use std::path::Path;
 
-use super::{gone, Disk, Eraser, FileSystem, Volume};
+use super::{gone, Beneath, Disk, Eraser, FileSystem, Volume};
 
 /// A path with no directory above it, which is where the making has nothing to do.
 ///
@@ -285,4 +285,126 @@ async fn a_claim_makes_the_directory_it_needs() {
 
     assert!(Disk.claim(&path, "held").await);
     assert_eq!(Disk.read(&path).await.as_deref(), Some("held"));
+}
+
+/// A container's own directory, holding a plain key file, and a secret beside it that
+/// the container must never be handed.
+fn confined() -> (
+    lemonfiber_fixtures::scratch::Scratch,
+    std::path::PathBuf,
+    std::path::PathBuf,
+) {
+    let dir = scratch();
+    let owned = dir.join("config").join("stand-in");
+    let _ = std::fs::create_dir_all(owned.join("nested"));
+    let _ = std::fs::write(owned.join("key.ini"), "plain");
+    let _ = std::fs::write(owned.join("nested").join("key.ini"), "nested");
+    let secret = dir.join("secret");
+    let _ = std::fs::write(&secret, "the host's own");
+    (dir, owned, secret)
+}
+
+/// A plain file beneath the directory is read, however deep.
+#[tokio::test]
+async fn a_plain_file_beneath_the_directory_is_read() {
+    let (dir, owned, _) = confined();
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("key.ini"), &owned).await,
+        Beneath::Read("plain".to_owned())
+    );
+    assert_eq!(
+        Disk.read_beneath(&owned.join("nested").join("key.ini"), &owned)
+            .await,
+        Beneath::Read("nested".to_owned())
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A link where the file is expected is refused, wherever it points — even at a file
+/// inside the directory.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_linked_key_file_is_refused() {
+    let (dir, owned, secret) = confined();
+    let _ = std::os::unix::fs::symlink(&secret, owned.join("outward.ini"));
+    let _ = std::os::unix::fs::symlink(owned.join("key.ini"), owned.join("inward.ini"));
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("outward.ini"), &owned).await,
+        Beneath::Escaped
+    );
+    assert_eq!(
+        Disk.read_beneath(&owned.join("inward.ini"), &owned).await,
+        Beneath::Escaped
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A linked directory on the way to the file is refused where it leads outside.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_linked_directory_on_the_way_out_is_refused() {
+    let (dir, owned, _) = confined();
+    let _ = std::os::unix::fs::symlink(&dir, owned.join("up"));
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("up").join("secret"), &owned)
+            .await,
+        Beneath::Escaped
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A plain file that does not hold text is read as nothing, the way an unreadable key
+/// file is anywhere else.
+#[tokio::test]
+async fn a_plain_file_holding_no_text_is_absent() {
+    let (dir, owned, _) = confined();
+    let _ = std::fs::write(owned.join("binary.ini"), [0xff, 0xfe, 0x00]);
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("binary.ini"), &owned).await,
+        Beneath::Absent
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A pipe where the file is expected is refused at once rather than waited on.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_pipe_where_the_file_is_expected_is_refused_without_waiting() {
+    let (dir, owned, _) = confined();
+    let pipe = owned.join("pipe.ini");
+    let made = tokio::process::Command::new("mkfifo")
+        .arg(&pipe)
+        .status()
+        .await;
+
+    assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
+    assert_eq!(Disk.read_beneath(&pipe, &owned).await, Beneath::Escaped);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A directory and anything outside the one named are refused; what is not there is
+/// absent, which is the ordinary case of a key not written yet.
+#[tokio::test]
+async fn a_directory_or_a_file_outside_is_refused_and_nothing_is_absent() {
+    let (dir, owned, secret) = confined();
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("nested"), &owned).await,
+        Beneath::Escaped
+    );
+    assert_eq!(Disk.read_beneath(&secret, &owned).await, Beneath::Escaped);
+    assert_eq!(
+        Disk.read_beneath(&owned.join("absent.ini"), &owned).await,
+        Beneath::Absent
+    );
+    assert_eq!(
+        Disk.read_beneath(&owned.join("key.ini"), &owned.join("absent"))
+            .await,
+        Beneath::Absent
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }

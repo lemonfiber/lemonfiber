@@ -1,6 +1,7 @@
 use super::{aggregator_target, project_directory};
 use crate::app::targets::downloads::committed_of;
 use crate::app::Ctx;
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::Download;
 use crate::test_support::a_context;
 
@@ -165,4 +166,110 @@ fn a_download_reporting_no_figure_is_left_out_of_the_sum() {
 fn the_sum_saturates_rather_than_wrapping() {
     let downloads = [download(Some(u64::MAX)), download(Some(1))];
     assert_eq!(committed_of(&downloads), u64::MAX);
+}
+
+/// A service whose credential lives in `file`, confined to `within` where it is a
+/// plugin's.
+fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
+    crate::wiring::Filler {
+        id: "stand-in".to_owned(),
+        name: "Stand-in".to_owned(),
+        origin: crate::origin::Origin::Bundled,
+        address: None,
+        adapter: None,
+        published: None,
+        key_file: Some(std::path::PathBuf::from(file)),
+        confined_to: within.map(std::path::PathBuf::from),
+    }
+}
+
+/// A plugin's credential is read only from beneath the directory its container owns;
+/// the stack's own is read where it is, and a service naming no file reads nothing.
+#[tokio::test]
+async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
+    let files = lemonfiber_fixtures::files::Files::at(vec![
+        (
+            std::path::PathBuf::from("/stack/config/stand-in/key.ini"),
+            "beneath",
+        ),
+        (std::path::PathBuf::from("/stack/secret"), "the host's own"),
+    ]);
+    let context = ctx().with_filesystem(files);
+    let read = |filler: crate::wiring::Filler| {
+        let context = &context;
+        async move { super::credential_file(context, &filler).await }
+    };
+
+    assert_eq!(
+        read(keyed_in(
+            "/stack/config/stand-in/key.ini",
+            Some("/stack/config/stand-in")
+        ))
+        .await,
+        Beneath::Read("beneath".to_owned())
+    );
+    assert_eq!(
+        read(keyed_in("/stack/secret", Some("/stack/config/stand-in"))).await,
+        Beneath::Escaped
+    );
+    assert_eq!(
+        read(keyed_in("/stack/secret", None)).await,
+        Beneath::Read("the host's own".to_owned())
+    );
+    assert_eq!(read(keyed_in("/stack/absent", None)).await, Beneath::Absent);
+    let mut unkeyed = keyed_in("/stack/secret", None);
+    unkeyed.key_file = None;
+    assert_eq!(read(unkeyed).await, Beneath::Absent);
+}
+
+/// Each of the three a confined read can come to, through one filesystem: a plain file
+/// beneath is read, one resolving away is refused, and one that does not resolve at all
+/// is absent rather than refused — nothing is there yet, which is the ordinary case of a
+/// key not written.
+///
+/// One filesystem for all three on purpose: the coverage gate reads the read's best
+/// instantiation alone, so the three have to be taken by the same one.
+#[tokio::test]
+async fn a_confined_read_comes_to_read_refused_or_absent() {
+    let context = ctx().with_filesystem(std::sync::Arc::new(
+        lemonfiber_fixtures::support::SeedFs::keyed(Some("held"), None)
+            .missing(vec!["gone"])
+            .leading_away(vec!["away"]),
+    ));
+    let read = |file: &'static str| {
+        let context = &context;
+        async move {
+            super::credential_file(context, &keyed_in(file, Some("/stack/config/stand-in"))).await
+        }
+    };
+
+    assert_eq!(
+        read("/stack/config/stand-in/key.ini").await,
+        Beneath::Read("held".to_owned())
+    );
+    assert_eq!(
+        read("/stack/config/stand-in/away.ini").await,
+        Beneath::Escaped
+    );
+    assert_eq!(
+        read("/stack/config/stand-in/gone.ini").await,
+        Beneath::Absent
+    );
+}
+
+/// A refused credential file is said in the plugin's name where a plugin brought it,
+/// and in the service's where it did not.
+#[test]
+fn a_refused_credential_file_is_said_in_the_name_of_whoever_brought_it() {
+    let mut brought = keyed_in("/stack/secret", None);
+    brought.origin = crate::origin::Origin::Plugin {
+        named: "nzbget".to_owned(),
+    };
+
+    assert_eq!(
+        super::escaped(&brought),
+        "nzbget's credential file is a link, leads outside the directory its container \
+         owns, or is not a file at all, so it was not read"
+    );
+    assert!(super::escaped(&keyed_in("/stack/secret", None)).starts_with("Stand-in's"));
 }

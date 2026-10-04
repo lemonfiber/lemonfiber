@@ -2,6 +2,24 @@
 
 use super::*;
 
+/// The shipped stack's download clients, as the registration hands them to publishing.
+static SHIPPED: std::sync::LazyLock<crate::wiring::Fillers> = std::sync::LazyLock::new(|| {
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), None)
+        })
+        .unwrap_or_default()
+});
+
+/// The shipped stack's clients holding `held`.
+fn published(held: &Held) -> super::super::published::Clients<'_> {
+    super::super::published::Clients {
+        fillers: &SHIPPED,
+        held,
+    }
+}
+
 /// The request service is handed the \*arrs, read from the \*arrs themselves.
 ///
 /// Everything the request service needs to fetch through one — where it is, what
@@ -73,7 +91,15 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
         &ctx,
         &[arr("sonarr", 8989, "tv")],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        Some("sab-key"),
+        // A plugin's client is in hand beside the stack's own, and nothing reads its key
+        // out of the environment, so it is not written there.
+        published(&Held::from(std::collections::BTreeMap::from([
+            (
+                "sabnzbd".to_owned(),
+                Credential::ApiKey("sab-key".to_owned()),
+            ),
+            ("nzbget".to_owned(), Credential::ApiKey("theirs".to_owned())),
+        ]))),
     )
     .await;
 
@@ -82,6 +108,14 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
     assert!(
         written.contains("SONARR_API_KEY=the-key"),
         "the *arr's key was read and never written down: {written}"
+    );
+    assert!(
+        written.contains("SABNZBD_API_KEY=sab-key"),
+        "the download client's key was in hand and never written down: {written}"
+    );
+    assert!(
+        !written.contains("theirs"),
+        "a plugin's client's key was written where nothing reads it: {written}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
@@ -115,12 +149,6 @@ fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
 async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("published-widely");
-    // The name is published to pair with a password already minted, so record one.
-    let _ = store::set(
-        &env,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
-        "minted-earlier",
-    );
     // The media server signs in and lists its keys, one of them lemonfiber's; the
     // listening server says it already has an account. What an earlier run published
     // for the dashboard is in the file, to be retired.
@@ -179,7 +207,15 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
             ),
         ],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        // The torrent client's password is in hand, which is what its account name is
+        // published to pair with.
+        published(&Held::from(std::collections::BTreeMap::from([(
+            "qbittorrent".to_owned(),
+            Credential::UserPass {
+                username: crate::config::QBITTORRENT_USER.to_owned(),
+                password: "minted-earlier".to_owned(),
+            },
+        )]))),
     )
     .await;
 
@@ -245,7 +281,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
         &ctx,
         &[jellyfin_svc()],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 
@@ -276,7 +312,7 @@ async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
         &ctx,
         &[arr("sonarr", 8989, "tv")],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 
@@ -312,7 +348,7 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
         &ctx,
         &[arr("sonarr", 8989, "tv"), audiobookshelf_svc()],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 
@@ -361,7 +397,7 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
         &ctx,
         &[pathless],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 
@@ -394,7 +430,7 @@ async fn a_listening_server_with_no_account_is_given_one() {
         &ctx,
         &[audiobookshelf_svc()],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 
@@ -434,7 +470,7 @@ async fn a_listening_server_somebody_already_claimed_is_left_alone() {
         &ctx,
         &[audiobookshelf_svc()],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 
@@ -469,7 +505,7 @@ async fn nothing_is_published_where_no_service_has_written_a_key() {
         &ctx,
         &[arr("sonarr", 8989, "tv")],
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        None,
+        published(&Held::default()),
     )
     .await;
 

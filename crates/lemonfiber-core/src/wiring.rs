@@ -22,9 +22,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
+mod fillers;
 pub(crate) mod run;
 mod settling;
 
+pub use fillers::{Address, Ask, Filler, Fillers};
 use settling::claimants;
 pub use settling::{contested_by, filled, settle, unfilled};
 

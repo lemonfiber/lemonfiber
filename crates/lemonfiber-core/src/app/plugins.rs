@@ -236,6 +236,7 @@ async fn install(
         .record(would.clone())
         .map_err(|there| Box::new(already(&there, &named)))?;
     writing::unanswered(&would, held.installed())?;
+    writing::unshared(&would, held.installed())?;
 
     // Where the writes land, asked for before the branch rather than inside it. What
     // a rehearsal has to state is where every change goes, and a path is a fact about

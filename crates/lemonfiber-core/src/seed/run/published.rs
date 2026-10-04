@@ -26,13 +26,13 @@
 use lemonfiber_manifest::Service;
 
 use super::arrs::read_servarr_key;
+use super::clients::Held;
 use super::Ctx;
+use crate::ports::service::Credential;
+use crate::wiring::Fillers;
 
 /// What this connection is called where it is reported.
 const CONNECTION: &str = "Keys the stack's own services read";
-
-/// The suffix a published key is named with.
-const SUFFIX: &str = "_API_KEY";
 
 /// The service in this stack answering a given kind of API, where there is one.
 fn with_api(services: &[Service], kind: lemonfiber_manifest::ApiKind) -> Option<&Service> {
@@ -42,29 +42,20 @@ fn with_api(services: &[Service], kind: lemonfiber_manifest::ApiKind) -> Option<
 }
 
 /// The environment name a service's key is published under.
-///
-/// Upper-cased, with anything that cannot appear in an environment name replaced —
-/// a service id is a Compose name and may carry hyphens, which a shell would read
-/// as an operator rather than as part of the name.
 pub(crate) fn published_as(id: &str) -> String {
-    let name: String = id
-        .to_uppercase()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    format!("{name}{SUFFIX}")
+    crate::config::for_service(id, crate::config::API_KEY_SUFFIX)
 }
 
 /// Put every key this pass could read where the stack's own services read it.
 ///
-/// `sabnzbd_key` is the one already read for the download-client registration, passed
-/// in rather than read again — the same file, and a second read could only fail where
+/// `clients` is what was already gathered for the download-client registration, passed
+/// in rather than read again — the same files, and a second read could only fail where
 /// the first had.
 pub(super) async fn publish_keys(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&std::path::Path>,
-    sabnzbd_key: Option<&str>,
+    clients: Clients<'_>,
 ) -> crate::seed::Wiring {
     let mut published = written_down(ctx, services, project).await;
 
@@ -72,12 +63,12 @@ pub(super) async fn publish_keys(
     // mints its password, and retiring revokes a key, so a rehearsal that got past here
     // would have changed the very things it promised only to describe.
     if ctx.dry_run {
-        return would_publish(ctx, services, published, sabnzbd_key);
+        return would_publish(published, clients);
     }
 
     claimed(ctx, services).await;
     retired(ctx, services).await;
-    published.extend(pairs_with_a_password(ctx, services, sabnzbd_key));
+    published.extend(from_the_clients(clients));
 
     if published.is_empty() {
         return crate::seed::Wiring::settled(CONNECTION.to_owned(), nothing_to_publish());
@@ -104,18 +95,9 @@ fn nothing_to_publish() -> crate::seed::State {
 /// Every pair gathered here is a setting and the credential destined for it, and the
 /// report is serialized — so the names are the whole of what an operator is deciding
 /// about, and the values are the one thing a question must never make a second copy of.
-fn would_publish(
-    ctx: &Ctx,
-    services: &[Service],
-    written: Vec<(String, String)>,
-    sabnzbd_key: Option<&str>,
-) -> crate::seed::Wiring {
+fn would_publish(written: Vec<(String, String)>, clients: Clients<'_>) -> crate::seed::Wiring {
     let mut settings: Vec<String> = written.into_iter().map(|(name, _)| name).collect();
-    settings.extend(
-        pairs_with_a_password(ctx, services, sabnzbd_key)
-            .into_iter()
-            .map(|(name, _)| name),
-    );
+    settings.extend(from_the_clients(clients).into_iter().map(|(name, _)| name));
     settings.sort();
     settings.dedup();
     let state = if settings.is_empty() {
@@ -217,31 +199,45 @@ async fn retired(ctx: &Ctx, services: &[Service]) {
     }
 }
 
-/// The credentials that are not a key: one already read for the download clients, and
-/// one account name.
+/// The download clients on this machine and the credential each answers to, as the
+/// registration gathered them.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Clients<'a> {
+    /// Who each client is, and whether the stack ships it.
+    pub(super) fillers: &'a Fillers,
+    /// The credential each answers to, where it is in hand.
+    pub(super) held: &'a Held,
+}
+
+/// What the stack's own download clients' credentials publish: each client's key under
+/// its own name, and the account name each torrent client is reached under.
+///
+/// The stack's alone. What reads these is the stack's own Compose — the tunnel's
+/// forwarded-port push reads the torrent client's account — and a plugin's client has
+/// nothing reading its credential out of the environment, so writing it there would be
+/// a second copy of a secret nobody asked for.
 ///
 /// The name is published only once a password exists for it to pair with — one half of
 /// a credential authenticates with neither, and a name published on its own would let
-/// this connection report success on a stack where nothing was read at all.
-fn pairs_with_a_password(
-    ctx: &Ctx,
-    services: &[Service],
-    sabnzbd_key: Option<&str>,
-) -> Vec<(String, String)> {
-    let mut found: Vec<(String, String)> = services
-        .iter()
-        .find(|service| service.id == "sabnzbd")
-        .zip(sabnzbd_key)
-        .map(|(service, key)| (published_as(&service.id), key.to_owned()))
-        .into_iter()
-        .collect();
-    if with_api(services, lemonfiber_manifest::ApiKind::Qbittorrent).is_some()
-        && crate::app::targets::recorded_qbittorrent_password(ctx).is_some()
-    {
-        found.push((
-            crate::config::QBITTORRENT_USERNAME_KEY.to_owned(),
-            crate::config::QBITTORRENT_USER.to_owned(),
-        ));
+/// this connection report success on a stack where nothing was read at all. The
+/// password itself is already recorded under its own setting by the run that minted it.
+fn from_the_clients(clients: Clients<'_>) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    for (service, credential) in clients.held.each() {
+        let ours = clients
+            .fillers
+            .service(service)
+            .is_some_and(|filler| filler.origin == crate::origin::Origin::Bundled);
+        if !ours {
+            continue;
+        }
+        found.push(match credential {
+            Credential::ApiKey(key) => (published_as(service), key.clone()),
+            Credential::UserPass { username, .. } => (
+                crate::config::for_service(service, crate::config::USERNAME_SUFFIX),
+                username.clone(),
+            ),
+        });
     }
     found
 }

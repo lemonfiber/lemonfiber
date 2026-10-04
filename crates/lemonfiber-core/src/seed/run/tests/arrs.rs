@@ -90,16 +90,208 @@ fn a_category_is_named_by_the_media_the_application_files() {
     assert!(category_for("comics").is_none());
 }
 
+/// Both download clients' credentials, as a pass that read and recorded them holds them.
+fn both_held() -> Held {
+    Held::from(std::collections::BTreeMap::from([
+        ("sabnzbd".to_owned(), Credential::ApiKey("k".to_owned())),
+        (
+            "qbittorrent".to_owned(),
+            Credential::UserPass {
+                username: "admin".to_owned(),
+                password: "p".to_owned(),
+            },
+        ),
+    ]))
+}
+
+/// The clients the shipped stack's Sonarr is told about, with `installed` and `chosen`,
+/// filing under `media` — one list per Sonarr, which the shipped stack has one of.
+fn told(
+    installed: &[crate::plugin::Installed],
+    chosen: &crate::wiring::Chosen,
+    held: &Held,
+    media: &str,
+) -> Vec<Vec<crate::ports::service::DownloadClient>> {
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            let fillers =
+                crate::wiring::Fillers::of(&manifest, installed, chosen, Some(stack_root()));
+            servarr_arrs(&manifest.services, Some(stack_root()))
+                .into_iter()
+                .filter(|arr| arr.target.id == "sonarr")
+                .map(|mut arr| {
+                    arr.media_types = vec![media.to_owned()];
+                    super::super::arrs::wanted_clients(&arr, &fillers, held)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Where each client is reached, by name, for each \*arr told about them.
+fn reached(told: &[Vec<crate::ports::service::DownloadClient>]) -> Vec<Vec<(String, String, u16)>> {
+    told.iter()
+        .map(|clients| {
+            clients
+                .iter()
+                .map(|client| (client.name.clone(), client.host.clone(), client.port))
+                .collect()
+        })
+        .collect()
+}
+
+/// Each \*arr is told about what fills its download asks, at the port each says it
+/// answers on beside the others — the torrent client through the tunnel whose network it
+/// shares — and only where the credential is in hand.
 #[test]
-fn a_download_client_is_built_for_each_credential_in_hand() {
-    let category = crate::ports::service::Category {
-        field: "tvCategory".to_owned(),
-        value: "tv".to_owned(),
-    };
-    assert_eq!(download_clients(Some("k"), Some("p"), &category).len(), 2);
-    assert_eq!(download_clients(Some("k"), None, &category).len(), 1);
-    assert_eq!(download_clients(None, Some("p"), &category).len(), 1);
-    assert!(download_clients(None, None, &category).is_empty());
+fn a_download_client_is_built_for_each_filler_whose_credential_is_in_hand() {
+    let nothing = crate::wiring::Chosen::default();
+    let usenet_only = Held::from(std::collections::BTreeMap::from([(
+        "sabnzbd".to_owned(),
+        Credential::ApiKey("k".to_owned()),
+    )]));
+
+    assert_eq!(
+        reached(&told(&[], &nothing, &both_held(), "tv")),
+        vec![vec![
+            ("SABnzbd".to_owned(), "sabnzbd".to_owned(), 8080),
+            ("qBittorrent".to_owned(), "gluetun".to_owned(), 8081),
+        ]]
+    );
+    assert_eq!(
+        reached(&told(&[], &nothing, &usenet_only, "tv")),
+        vec![vec![("SABnzbd".to_owned(), "sabnzbd".to_owned(), 8080)]]
+    );
+    assert_eq!(
+        told(&[], &nothing, &Held::default(), "tv"),
+        vec![Vec::new()]
+    );
+}
+
+/// A plugin chosen to stand in for the Usenet client is told about at its own id and
+/// the port it answers on, with its own credential, and nothing else changes.
+#[test]
+fn a_plugin_standing_in_for_the_usenet_client_is_reached_where_it_answers() {
+    let stand_in = crate::test_support::a_placed(
+        "nzbget",
+        &["download.usenet"],
+        Some(lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+            key_source: lemonfiber_manifest::KeySource::ConfigIni,
+            path: Some("/config/sabnzbd.ini".to_owned()),
+            version: None,
+        }),
+        Some(6789),
+    );
+    let installed = [crate::test_support::an_installed("nzbget", vec![stand_in])];
+    let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
+    let mut held = both_held();
+    held.keys.insert(
+        "nzbget".to_owned(),
+        Credential::ApiKey("its-own".to_owned()),
+    );
+
+    let told = told(&installed, &chosen, &held, "tv");
+
+    assert_eq!(
+        reached(&told),
+        vec![vec![
+            ("nzbget the stand-in".to_owned(), "nzbget".to_owned(), 6789),
+            ("qBittorrent".to_owned(), "gluetun".to_owned(), 8081),
+        ]]
+    );
+    let credentials: Vec<&Credential> = told
+        .iter()
+        .filter_map(|clients| clients.first())
+        .map(|client| &client.credential)
+        .collect();
+    assert_eq!(credentials, vec![&Credential::ApiKey("its-own".to_owned())]);
+}
+
+/// A filler the \*arr is connected to nothing by is told about as nothing, while the
+/// client beside it is told about as ever.
+#[test]
+fn a_filler_nothing_connects_is_not_told_about() {
+    let installed = [crate::test_support::an_installed(
+        "unadapted",
+        vec![crate::test_support::a_placed(
+            "unadapted",
+            &["download.usenet"],
+            None,
+            Some(6789),
+        )],
+    )];
+    let chosen = crate::wiring::Chosen::read(Some("download.usenet=unadapted"));
+
+    assert_eq!(
+        reached(&told(&installed, &chosen, &both_held(), "tv")),
+        vec![vec![("qBittorrent".to_owned(), "gluetun".to_owned(), 8081)]]
+    );
+}
+
+/// A plugin's Usenet client whose key file leads away from the directory its container
+/// owns is not read, and each \*arr that asks for it is told why on that connection.
+#[tokio::test]
+async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection() {
+    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    let stand_in = crate::test_support::a_placed(
+        "nzbget",
+        &["download.usenet"],
+        Some(lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+            key_source: lemonfiber_manifest::KeySource::ConfigIni,
+            path: Some("/config/sabnzbd.ini".to_owned()),
+            version: None,
+        }),
+        Some(6789),
+    );
+    let installed = [crate::test_support::an_installed("nzbget", vec![stand_in])];
+    let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
+    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
+        SeedFs::keyed(None, Some(SABNZBD)).leading_away(vec!["config/nzbget/"]),
+    ));
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(&manifest, &installed, &chosen, Some(stack_root()))
+        })
+        .unwrap_or_default();
+
+    let held =
+        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
+    let refused = super::super::clients::refused(&fillers, &held);
+
+    assert!(held.of("nzbget").is_none(), "the file was read");
+    assert_eq!(
+        refused
+            .iter()
+            .map(|wiring| wiring.connection.as_str())
+            .collect::<Vec<&str>>(),
+        vec![
+            "nzbget the stand-in into Sonarr",
+            "nzbget the stand-in into Radarr",
+            "nzbget the stand-in into Lidarr",
+        ]
+    );
+    assert!(refused.iter().all(|wiring| matches!(
+        &wiring.state,
+        crate::seed::State::Refused { reason } if reason.starts_with("nzbget's credential file")
+    )));
+}
+
+/// An \*arr filing a media type with no category field is told about no client.
+#[test]
+fn an_arr_with_no_category_is_told_about_no_client() {
+    assert_eq!(
+        told(
+            &[],
+            &crate::wiring::Chosen::default(),
+            &both_held(),
+            "comics"
+        ),
+        vec![Vec::new()]
+    );
 }
 
 #[test]
