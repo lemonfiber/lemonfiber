@@ -81,7 +81,9 @@ fn rotation(rotated: &Rotation) -> Lines {
         Settled::Unproven { detail } => {
             format!("{} was not replaced: {detail}", rotated.credential)
         }
-        Settled::Elsewhere { detail } => format!("{}: {detail}", rotated.credential),
+        Settled::Elsewhere { detail } | Settled::ReplacedUnproven { detail } => {
+            format!("{}: {detail}", rotated.credential)
+        }
         Settled::Unknown { known } => format!(
             "Nothing here is called `{}`. What is: {}.",
             rotated.credential,

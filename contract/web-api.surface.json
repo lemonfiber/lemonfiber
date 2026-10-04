@@ -7241,6 +7241,7 @@
             "const:\"refused\"",
             "const:\"rehearsed\"",
             "const:\"replaced\"",
+            "const:\"replaced-unproven\"",
             "const:\"unknown\"",
             "const:\"unproven\""
           ],
@@ -7252,6 +7253,7 @@
         "\"refused\"",
         "\"rehearsed\"",
         "\"replaced\"",
+        "\"replaced-unproven\"",
         "\"unknown\"",
         "\"unproven\""
       ]

@@ -207,13 +207,9 @@ pub(super) fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode 
 /// wrong — the operator has one more command to run and the report names it.
 pub(super) fn rotating(inventory: &lemonfiber_core::credential::Inventory) -> ExitCode {
     match &inventory.rotated {
-        // A rehearsal keeps the existing credential and is not a rotation that failed:
-        // nothing was attempted, and what came back is the answer that was asked for.
-        // Read before the failure below, because it satisfies that test too.
-        Some(rotated) if rotated.rehearsed() => ExitCode::SUCCESS,
-        Some(rotated) if rotated.kept_the_existing() => ExitCode::from(FAILURE),
-        // No rotation was asked for, or one was and it landed. Neither is a fault, so
-        // they answer alike rather than through two arms saying the same thing.
+        Some(rotated) if rotated.failed() => ExitCode::from(FAILURE),
+        // No rotation was asked for, one was only rehearsed, or one landed. None is a
+        // fault, so they answer alike rather than through arms saying the same thing.
         None | Some(_) => ExitCode::SUCCESS,
     }
 }

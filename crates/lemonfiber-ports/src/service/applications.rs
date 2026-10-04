@@ -76,4 +76,24 @@ pub trait AppSync: Send + Sync {
     ///
     /// Returns [`Failure`] when Prowlarr is unreachable or refuses.
     async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure>;
+
+    /// Whether Prowlarr reaches the \*arr an application it holds names, with what
+    /// that application holds — the test its own settings page runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when Prowlarr is unreachable, or the test does not pass.
+    async fn test_application(&self, held: &RegisteredApplication) -> Result<(), Failure>;
+
+    /// Give an application Prowlarr holds `key` for the \*arr it names, leaving
+    /// everything else about it as Prowlarr holds it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when Prowlarr is unreachable, refuses, or no longer holds it.
+    async fn rekey_application(
+        &self,
+        held: &RegisteredApplication,
+        key: &str,
+    ) -> Result<(), Failure>;
 }

@@ -118,6 +118,27 @@ pub(super) async fn seed_gate_routes(
     Some(settled(state))
 }
 
+/// Write the gate's routes again after the \*arr `arr` replaced its key, so its route
+/// presents the new one: what replacing that key owes the gate.
+///
+/// Nothing where the stack runs no gate or the request service does not fulfil
+/// through `arr`.
+pub(crate) async fn reroute(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+    arr: &str,
+) -> Option<State> {
+    gating::service(services)?;
+    let routed = super::servarr_arrs(services, project)
+        .into_iter()
+        .any(|one| one.target.id == arr && super::fulfilment::fetches(&one.media_types).is_some());
+    routed.then_some(())?;
+    seed_gate_routes(ctx, services, project)
+        .await
+        .map(|wiring| wiring.state)
+}
+
 /// The gate already holds a key Jellyfin lists: bring its routes up to what they should
 /// be, and revoke whatever else is filed under its name.
 async fn kept(

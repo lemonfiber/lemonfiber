@@ -3078,6 +3078,24 @@
               ]
             },
             {
+              "description": "The service replaced the credential itself, and the replacement did not answer.\n\nThe one way of not landing that keeps nothing: a service asked to replace its\nown key drops the old one the moment it makes the new one, so there is no order\nthat proves first. What is owed is the command that hands the new one out once\nthe service answers.",
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "description": "What did not answer, and what to run once it does.",
+                  "type": "string"
+                },
+                "settled": {
+                  "type": "string",
+                  "const": "replaced-unproven"
+                }
+              },
+              "required": [
+                "settled",
+                "detail"
+              ]
+            },
+            {
               "description": "Nothing was attempted, because this run only said what a rotation would do.\n\nIts own outcome rather than one of the refusals above, because it is not a\nrefusal: nothing went wrong, and what an operator is being told is what would\nhappen if they ran it again meaning it. Carrying its own three fields rather\nthan one sentence, because \"it would rotate the qBittorrent password\" is not a\nreport — where the value lives is what would be written over, and what is owed\nafterwards is the half nobody finds out about until a consumer stops working.\n\nNo value appears here and none is generated to put here. A replacement minted\nto describe a rotation is a secret that exists because somebody asked a\nquestion, and it would then have to be kept or thrown away — and one thrown\naway may be one the service has already taken.",
               "type": "object",
               "properties": {

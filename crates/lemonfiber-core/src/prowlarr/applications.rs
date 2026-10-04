@@ -38,6 +38,83 @@ impl AppSync for Prowlarr {
             .filter_map(ApplicationResource::registered)
             .collect())
     }
+
+    async fn test_application(&self, held: &RegisteredApplication) -> Result<(), Failure> {
+        // Sent as Prowlarr holds it, its key masked: Prowlarr tests a masked key with
+        // the one it stores, which is the key in question.
+        let resource = held_resource(self, held).await?;
+        let tested = self
+            .endpoint
+            .send(&self.request(
+                Method::Post,
+                "/applications/test",
+                Some(serde_json::Value::Object(resource).to_string()),
+            ))
+            .await?;
+        self.endpoint.expect_success(&tested)
+    }
+
+    async fn rekey_application(
+        &self,
+        held: &RegisteredApplication,
+        key: &str,
+    ) -> Result<(), Failure> {
+        rekey(self, held, key).await
+    }
+}
+
+/// Write `key` into the application Prowlarr holds under `held`'s identifier, changing
+/// nothing else about it.
+async fn rekey(
+    prowlarr: &Prowlarr,
+    held: &RegisteredApplication,
+    key: &str,
+) -> Result<(), Failure> {
+    let mut resource = held_resource(prowlarr, held).await?;
+    let fields = resource
+        .get_mut("fields")
+        .and_then(serde_json::Value::as_array_mut)
+        .into_iter()
+        .flatten();
+    for field in fields
+        .filter(|field| field.get("name").and_then(serde_json::Value::as_str) == Some("apiKey"))
+    {
+        if let Some(field) = field.as_object_mut() {
+            field.insert("value".to_owned(), serde_json::json!(key));
+        }
+    }
+    let written = prowlarr
+        .endpoint
+        .send(&prowlarr.request(
+            Method::Put,
+            &format!("/applications/{}", held.id),
+            Some(serde_json::Value::Object(resource).to_string()),
+        ))
+        .await?;
+    prowlarr.endpoint.expect_success(&written)
+}
+
+/// The application Prowlarr holds under `held`'s identifier, whole and as it holds it.
+async fn held_resource(
+    prowlarr: &Prowlarr,
+    held: &RegisteredApplication,
+) -> Result<serde_json::Map<String, serde_json::Value>, Failure> {
+    let listed: Vec<serde_json::Map<String, serde_json::Value>> = prowlarr
+        .read("/applications", "the application list could not be read")
+        .await?;
+    listed
+        .into_iter()
+        .find(|one| {
+            one.get("id")
+                .and_then(serde_json::Value::as_i64)
+                .is_some_and(|id| id.to_string() == held.id)
+        })
+        .ok_or_else(|| {
+            prowlarr.endpoint.refused(&format!(
+                "Prowlarr no longer holds the application it listed as {}",
+                held.id
+            ))
+        })
 }
 
 /// An application resource as Prowlarr reports it: the identifier it assigned,

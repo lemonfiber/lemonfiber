@@ -103,3 +103,17 @@ fn a_rotation_that_reached_everything_strands_nobody() {
     assert_eq!(landed.consumers.len(), 1);
     assert!(landed.stranded().is_empty());
 }
+
+#[test]
+fn a_key_the_service_replaced_that_did_not_answer_kept_nothing_and_failed() {
+    let lost = Rotation::stopped(
+        "Sonarr API key",
+        Settled::ReplacedUnproven {
+            detail: "the new one did not answer".to_owned(),
+        },
+    );
+
+    assert!(!lost.kept_the_existing());
+    assert!(lost.failed());
+    assert!(!partly_landed().failed());
+}

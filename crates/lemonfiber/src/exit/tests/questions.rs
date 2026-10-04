@@ -65,6 +65,17 @@ fn listing_the_credentials_is_a_question_and_a_replacement_that_did_not_happen_i
         ))),
         success()
     );
+    // A key the service replaced and that did not answer kept nothing, and is the
+    // one failure a script most has to act on.
+    assert_ne!(
+        asked(Inventory::of(Vec::new()).after(Rotation::stopped(
+            "Sonarr API key",
+            Settled::ReplacedUnproven {
+                detail: "the new one did not answer".to_owned(),
+            },
+        ))),
+        success()
+    );
     // A rehearsal keeps the existing credential too, and a script that read that
     // as a failed rotation would refuse to go on having asked a question.
     assert_eq!(

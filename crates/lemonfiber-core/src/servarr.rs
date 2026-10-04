@@ -91,6 +91,21 @@ impl Servarr {
         )
     }
 
+    /// Ask the service to replace its own API key. The old key stops answering at once
+    /// and the new one is in the configuration file the service writes, where every
+    /// key lemonfiber hands out is read from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses.
+    pub async fn replace_key(&self) -> Result<(), Failure> {
+        let body = serde_json::json!({ "name": RESET_KEY }).to_string();
+        let response = self
+            .probe(&self.request(Method::Post, "/command", Some(body)))
+            .await?;
+        self.endpoint.expect_success(&response)
+    }
+
     /// Send a request to the versioned API, turning a `404` — the whole
     /// `/api/v{version}` prefix not served — into an unsupported-version failure
     /// rather than passing it on as a generic refusal. A service upgraded past (or
@@ -107,6 +122,9 @@ impl Servarr {
         Ok(response)
     }
 }
+
+/// The command a Servarr service replaces its own API key on.
+const RESET_KEY: &str = "ResetApiKey";
 
 /// The status a service returns for a path its API version does not serve — here,
 /// the whole versioned prefix, so it names an unsupported API version.

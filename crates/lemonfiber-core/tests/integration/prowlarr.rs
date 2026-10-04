@@ -11,7 +11,7 @@
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use lemonfiber_core::ports::http::Http;
+use lemonfiber_core::ports::http::{Http, Method};
 use lemonfiber_core::ports::service::{
     AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers, Limits,
     RegisteredApplication,
@@ -395,4 +395,90 @@ async fn indexers_that_cannot_be_read_are_a_failure_rather_than_an_empty_list() 
             Err(Failure::Refused { .. })
         ));
     }
+}
+
+/// Prowlarr's application list as it shows it: the stored key masked.
+const HELD: &str = r#"[{"id":3,"name":"Sonarr","fields":[{"name":"baseUrl","value":"http://sonarr:8989"},{"name":"apiKey","value":"********"}]}]"#;
+
+/// The application the list above holds.
+fn held() -> RegisteredApplication {
+    RegisteredApplication {
+        id: "3".to_owned(),
+        base_url: "http://sonarr:8989".to_owned(),
+    }
+}
+
+#[tokio::test]
+async fn an_application_is_tested_as_prowlarr_holds_it_with_its_key_masked() {
+    let fake = Fake::by_rules(vec![
+        (
+            Some(Method::Post),
+            "/applications/test",
+            Answer::reply(200, ""),
+        ),
+        (None, "/applications", Answer::reply(200, HELD)),
+    ]);
+
+    assert!(prowlarr(&fake).test_application(&held()).await.is_ok());
+    let sent = fake.request();
+    assert!(sent
+        .as_ref()
+        .is_some_and(|request| request.url.ends_with("/api/v1/applications/test")));
+    assert!(sent
+        .and_then(|request| request.body)
+        .is_some_and(|body| body.contains("********")));
+}
+
+#[tokio::test]
+async fn an_application_whose_stored_key_fails_its_test_is_refused() {
+    let fake = Fake::by_rules(vec![
+        (
+            Some(Method::Post),
+            "/applications/test",
+            Answer::reply(400, "[]"),
+        ),
+        (None, "/applications", Answer::reply(200, HELD)),
+    ]);
+
+    assert!(prowlarr(&fake).test_application(&held()).await.is_err());
+}
+
+#[tokio::test]
+async fn an_application_is_rekeyed_in_place_with_only_its_key_changed() {
+    let fake = Fake::by_rules(vec![
+        (
+            Some(Method::Put),
+            "/applications/3",
+            Answer::reply(202, "{}"),
+        ),
+        (None, "/applications", Answer::reply(200, HELD)),
+    ]);
+
+    assert!(prowlarr(&fake)
+        .rekey_application(&held(), "the-new-key")
+        .await
+        .is_ok());
+    let sent = fake.request();
+    assert!(sent
+        .as_ref()
+        .is_some_and(|request| request.url.ends_with("/api/v1/applications/3")));
+    let body = sent.and_then(|request| request.body).unwrap_or_default();
+    assert!(
+        body.contains(r#"{"name":"apiKey","value":"the-new-key"}"#),
+        "{body}"
+    );
+    assert!(body.contains(r#""value":"http://sonarr:8989""#), "{body}");
+}
+
+#[tokio::test]
+async fn an_application_prowlarr_no_longer_lists_is_refused_by_name() {
+    let fake = Fake::always(Answer::reply(200, "[]"));
+
+    let refused = prowlarr(&fake)
+        .rekey_application(&held(), "the-new-key")
+        .await;
+    assert!(
+        matches!(&refused, Err(failure) if failure.to_string().contains("no longer holds the application it listed as 3")),
+        "{refused:?}"
+    );
 }

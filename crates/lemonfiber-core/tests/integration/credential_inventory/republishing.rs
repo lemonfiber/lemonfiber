@@ -1,4 +1,5 @@
-//! Handing a service's own key out again.
+//! Handing a service's own key out again: the indexer aggregator's, which files no
+//! media and so is not reset.
 
 use super::{asked, ctx, env_at, recorded, silent, the_service_key, SERVICE_CONFIG};
 use lemonfiber_core::app::Asking;
@@ -6,34 +7,37 @@ use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A Servarr status body, as a healthy service answers `system/status` with.
-const SONARR_STATUS: &str = r#"{"instanceName":"Sonarr","version":"4.0.15.2941"}"#;
+const PROWLARR_STATUS: &str = r#"{"instanceName":"Prowlarr","version":"1.32.2.4987"}"#;
 
 /// A service that answers to the key it holds has that key handed out again — the
 /// repair for one that regenerated it underneath a stack still serving the old copy.
 #[tokio::test]
 async fn a_service_that_answers_to_its_own_key_has_it_handed_out_again() {
     let stale = format!("{}{}", "0000stale", "keykeykeykey");
-    let env = env_at("republish", &[("SONARR_API_KEY", &stale)]);
-    let http = Fake::by_path(vec![("/system/status", Answer::reply(200, SONARR_STATUS))]);
+    let env = env_at("republish", &[("PROWLARR_API_KEY", &stale)]);
+    let http = Fake::by_path(vec![(
+        "/system/status",
+        Answer::reply(200, PROWLARR_STATUS),
+    )]);
     let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http);
 
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "Sonarr API key".to_owned(),
+            credential: "Prowlarr API key".to_owned(),
         },
     )
     .await;
 
     let said = format!("{:?}", inventory.rotated.clone().map(|one| one.settled));
     assert!(said.starts_with("Some(Replaced"), "{said}");
-    assert!(said.contains("Sonarr"), "{said}");
+    assert!(said.contains("Prowlarr"), "{said}");
     assert_eq!(
         inventory.rotated.map(|one| one.consumers.len()),
         Some(2),
         "the service and everything reading it from the environment"
     );
-    assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(the_service_key()));
+    assert_eq!(recorded(&env, "PROWLARR_API_KEY"), Some(the_service_key()));
 }
 
 /// A service that refuses the key in its own configuration is not one to hand that
@@ -41,21 +45,21 @@ async fn a_service_that_answers_to_its_own_key_has_it_handed_out_again() {
 #[tokio::test]
 async fn a_service_that_refuses_its_own_key_has_nothing_published_for_it() {
     let stale = format!("{}{}", "0000stale", "keykeykeykey");
-    let env = env_at("refuseskey", &[("SONARR_API_KEY", &stale)]);
+    let env = env_at("refuseskey", &[("PROWLARR_API_KEY", &stale)]);
     let http = Fake::by_path(vec![("/system/status", Answer::reply(401, ""))]);
     let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http);
 
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "Sonarr API key".to_owned(),
+            credential: "Prowlarr API key".to_owned(),
         },
     )
     .await;
 
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     assert!(said.starts_with("Some(Refused"), "{said}");
-    assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(stale));
+    assert_eq!(recorded(&env, "PROWLARR_API_KEY"), Some(stale));
 }
 
 /// A service that answers with something else leaves the key unproven, and its own
@@ -63,7 +67,7 @@ async fn a_service_that_refuses_its_own_key_has_nothing_published_for_it() {
 #[tokio::test]
 async fn a_service_that_answers_unusably_leaves_its_key_unproven() {
     let stale = format!("{}{}", "0000stale", "keykeykeykey");
-    let env = env_at("unusable", &[("SONARR_API_KEY", &stale)]);
+    let env = env_at("unusable", &[("PROWLARR_API_KEY", &stale)]);
     let http = Fake::by_path(vec![(
         "/system/status",
         Answer::reply(500, "upstream is down"),
@@ -73,7 +77,7 @@ async fn a_service_that_answers_unusably_leaves_its_key_unproven() {
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "Sonarr API key".to_owned(),
+            credential: "Prowlarr API key".to_owned(),
         },
     )
     .await;
@@ -81,7 +85,7 @@ async fn a_service_that_answers_unusably_leaves_its_key_unproven() {
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     assert!(said.starts_with("Some(Unproven"), "{said}");
     assert!(said.contains("still in force"), "{said}");
-    assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(stale));
+    assert_eq!(recorded(&env, "PROWLARR_API_KEY"), Some(stale));
 }
 
 /// A service that has written no key has none to hand out.
@@ -93,7 +97,7 @@ async fn a_service_that_has_written_no_key_has_none_to_hand_out() {
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "Sonarr API key".to_owned(),
+            credential: "Prowlarr API key".to_owned(),
         },
     )
     .await;
@@ -135,14 +139,17 @@ async fn a_key_that_cannot_be_proven_by_identity_points_at_the_seeding_instead()
 #[tokio::test]
 async fn a_rehearsed_republish_reads_no_key_and_asks_the_service_nothing() {
     let stale = format!("{}{}", "0000stale", "keykeykeykey");
-    let env = env_at("rehearsed-republish", &[("SONARR_API_KEY", &stale)]);
-    let http = Fake::by_path(vec![("/system/status", Answer::reply(200, SONARR_STATUS))]);
+    let env = env_at("rehearsed-republish", &[("PROWLARR_API_KEY", &stale)]);
+    let http = Fake::by_path(vec![(
+        "/system/status",
+        Answer::reply(200, PROWLARR_STATUS),
+    )]);
     let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http.clone()).rehearsing();
 
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "Sonarr API key".to_owned(),
+            credential: "Prowlarr API key".to_owned(),
         },
     )
     .await;
@@ -151,7 +158,7 @@ async fn a_rehearsed_republish_reads_no_key_and_asks_the_service_nothing() {
     assert!(said.starts_with("Some(Rehearsed"), "{said}");
     assert!(said.contains("Nothing was read out"), "{said}");
     assert!(!said.contains(&the_service_key()), "{said}");
-    assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(stale));
+    assert_eq!(recorded(&env, "PROWLARR_API_KEY"), Some(stale));
     let reached = http.requests();
     assert!(
         reached.is_empty(),
