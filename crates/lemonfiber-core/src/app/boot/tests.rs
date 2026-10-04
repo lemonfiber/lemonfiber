@@ -46,9 +46,11 @@ impl Supply for Machine {
 /// invented one: the two questions *behind* the start are about a stack that
 /// genuinely settled, and a stack settles when the engine reports the services the
 /// manifest says the named form holds.
-const LIBRARY: [&str; 5] = [
+const LIBRARY: [&str; 7] = [
     "jellyfin",
     "seerr",
+    "request-gate",
+    "decline",
     "calibre-web-automated",
     "audiobookshelf",
     "navidrome",

@@ -76,6 +76,10 @@ const HOUSEHOLD: &[(&str, &str)] = &[
         "the page linking the household services is opened wherever they are",
     ),
     (
+        "decline",
+        "somebody invited turns the invitation down from their own device",
+    ),
+    (
         "caddy",
         "the hostnames and certificates every other household service is reached by",
     ),

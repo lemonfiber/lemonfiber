@@ -489,7 +489,7 @@ fn every_link_the_shipped_stack_declares_is_answered() {
         counted.map(|(answered, _, _)| answered),
         counted.map(|(_, declared, _)| declared)
     );
-    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(6));
+    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(7));
 }
 
 /// An ask for every filler with nothing to fill it is unfilled, not "every one of

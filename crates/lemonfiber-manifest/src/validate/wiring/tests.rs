@@ -6,7 +6,7 @@ const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml")
 const TODAY: Date = Date {
     year: 2026,
     month: 10,
-    day: 1,
+    day: 4,
 };
 
 /// Everything wrong with a manifest, as one line each.

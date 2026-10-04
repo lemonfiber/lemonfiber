@@ -33,7 +33,7 @@ const ROOT: &str = "/srv/media";
 
 /// One image this stack declares, named once so a case does not spell the digest twice.
 const SONARR: &str =
-    "lscr.io/linuxserver/sonarr@sha256:a5c1a5fecbef946927ab90ad68df319ac5fe644057e5fc18cd993f01ac07b2b2";
+    "lscr.io/linuxserver/sonarr@sha256:f247545d23ba8b233d6604575347e48a623fe6ad75dda02348bf81917f3b5c06";
 
 /// Settings naming a project, a layout and a data location — the three a survey
 /// reads before it asks anything.
