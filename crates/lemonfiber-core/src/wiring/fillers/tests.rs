@@ -237,7 +237,7 @@ fn a_plugins_credential_is_kept_apart_from_the_stacks() {
 /// Two plugins' services whose ids run into each other's endings never share a
 /// setting: `a-api` holding a key and `a` holding its API key are kept apart.
 #[test]
-fn a_plugin_id_running_into_anothers_ending_is_kept_apart() {
+fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
     let installed = [
         an_installed("first", vec![a_placed("a", &[], None, None)]),
         an_installed("second", vec![a_placed("a-api", &[], None, None)]),
