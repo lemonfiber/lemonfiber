@@ -222,6 +222,27 @@ async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
     assert_eq!(read(unkeyed).await, Beneath::Absent);
 }
 
+/// A plugin's credential file that does not resolve at all is absent rather than
+/// refused: nothing is there yet, which is the ordinary case of a key not written.
+#[tokio::test]
+async fn a_plugins_credential_file_that_does_not_resolve_is_absent() {
+    let context = ctx().with_filesystem(std::sync::Arc::new(
+        lemonfiber_fixtures::support::SeedFs::keyed(None, None).missing(vec!["stand-in"]),
+    ));
+
+    assert_eq!(
+        super::credential_file(
+            &context,
+            &keyed_in(
+                "/stack/config/stand-in/key.ini",
+                Some("/stack/config/stand-in")
+            )
+        )
+        .await,
+        Beneath::Absent
+    );
+}
+
 /// A refused credential file is said in the plugin's name where a plugin brought it,
 /// and in the service's where it did not.
 #[test]

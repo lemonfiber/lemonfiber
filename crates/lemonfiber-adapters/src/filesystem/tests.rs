@@ -356,6 +356,20 @@ async fn a_linked_directory_on_the_way_out_is_refused() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A plain file that does not hold text is read as nothing, the way an unreadable key
+/// file is anywhere else.
+#[tokio::test]
+async fn a_plain_file_holding_no_text_is_absent() {
+    let (dir, owned, _) = confined();
+    let _ = std::fs::write(owned.join("binary.ini"), [0xff, 0xfe, 0x00]);
+
+    assert_eq!(
+        Disk.read_beneath(&owned.join("binary.ini"), &owned).await,
+        Beneath::Absent
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A pipe where the file is expected is refused at once rather than waited on.
 #[cfg(unix)]
 #[tokio::test]
