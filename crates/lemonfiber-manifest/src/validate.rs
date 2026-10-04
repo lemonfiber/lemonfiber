@@ -62,6 +62,12 @@ fn word(half: &str) -> bool {
 /// The OSI-approved identifiers a service licence may use.
 const OSI: &str = include_str!("spdx_osi.txt");
 
+/// Where lemonfiber publishes the images it builds from its own code, and nothing else.
+const OWN_IMAGES: &str = "ghcr.io/lemonfiber/";
+
+/// The licence lemonfiber's own code carries, and so every image it builds.
+const OWN_LICENCE: &str = "Hippocratic-3.0";
+
 /// The identifiers a vendored list holds, ignoring the prose it explains itself with.
 fn identifiers(list: &str) -> BTreeSet<&str> {
     list.lines()
@@ -388,8 +394,18 @@ fn estimated(service: &Service) -> Option<String> {
         .then(|| "estimates it needs no memory at all, which is not an estimate".to_owned())
 }
 
-/// A service declares a licence anyone can look up.
+/// A service declares a licence anyone can look up: lemonfiber's own where lemonfiber
+/// builds its image, and an OSI one everywhere else.
 fn licensed(service: &Service, osi: &BTreeSet<&str>) -> Option<String> {
+    if service.image.starts_with(OWN_IMAGES) {
+        return (service.license != OWN_LICENCE).then(|| {
+            format!(
+                "declares licence {}, but its image is one lemonfiber builds, which carries \
+                 {OWN_LICENCE}",
+                service.license
+            )
+        });
+    }
     (!osi.contains(service.license.as_str())).then(|| {
         format!(
             "declares licence {}, which is not a recognised OSI identifier",

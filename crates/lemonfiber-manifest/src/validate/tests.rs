@@ -217,6 +217,41 @@ fn a_licence_outside_the_osi_list_is_caught() {
 }
 
 #[test]
+fn an_image_lemonfiber_builds_carries_lemonfiber_s_licence_and_no_other() {
+    let own = edited(
+        r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
+        r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
+    );
+    assert!(messages(&own)
+        .iter()
+        .any(|m| m.contains("its image is one lemonfiber builds, which carries Hippocratic-3.0")));
+
+    let licensed = STACK
+        .replacen(
+            r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
+            r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
+            1,
+        )
+        .replacen(r#"license = "MIT""#, r#"license = "Hippocratic-3.0""#, 1);
+    assert!(
+        !messages(&licensed).iter().any(|m| m.contains("licence")),
+        "{:?}",
+        messages(&licensed)
+    );
+}
+
+#[test]
+fn lemonfiber_s_licence_on_an_image_it_does_not_build_is_caught() {
+    let text = edited(
+        r#"license = "GPL-3.0-only""#,
+        r#"license = "Hippocratic-3.0""#,
+    );
+    assert!(messages(&text)
+        .iter()
+        .any(|m| m.contains("Hippocratic-3.0, which is not a recognised OSI identifier")));
+}
+
+#[test]
 fn a_malformed_last_release_is_caught() {
     let text = STACK.replacen("last_release = ", "last_release = \"26-07-01\" # ", 1);
     assert!(messages(&text)
