@@ -35,6 +35,7 @@ image        = "linuxserver/sonarr"
 tag          = "4.0.10"
 digest = "sha256:abababababababababababababababababababababababababababababababab"
 port         = 8989
+listens      = 8989
 bind         = "loopback"
 criticality  = "core"
 license      = "GPL-3.0-only"

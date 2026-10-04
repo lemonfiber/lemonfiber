@@ -135,6 +135,7 @@ what to do about it, is written for operators at
 - `PLUGIN-21`
 - `PLUGIN-22`
 - `PLUGIN-23`
+- `PLUGIN-24`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

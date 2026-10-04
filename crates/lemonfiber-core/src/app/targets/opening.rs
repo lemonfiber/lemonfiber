@@ -153,6 +153,11 @@ pub(crate) struct ServiceAddr {
     pub port: u16,
 }
 
+/// Where this machine reaches a service that publishes this port.
+pub(crate) fn loopback(port: u16) -> String {
+    format!("http://127.0.0.1:{port}")
+}
+
 /// The address of the one service of a given api kind, or nothing where the stack has
 /// none or it publishes no port to reach it on. The single place the "find the service
 /// by its kind, format where it is reached" step lives, so every caller that speaks to a
@@ -169,7 +174,7 @@ pub(crate) fn service_addr(
         let port = service.port?;
         Some(ServiceAddr {
             id: service.id.clone(),
-            loopback: format!("http://127.0.0.1:{port}"),
+            loopback: loopback(port),
             network_url: format!("http://{}:{port}", service.id),
             port,
         })

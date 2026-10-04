@@ -7059,6 +7059,7 @@
             "const:\"skipped\"",
             "const:\"stale\"",
             "const:\"unmanaged\"",
+            "const:\"unmatched\"",
             "const:\"wired\"",
             "const:\"would-adopt\"",
             "const:\"would-wire\""
@@ -7083,6 +7084,7 @@
         "\"skipped\"",
         "\"stale\"",
         "\"unmanaged\"",
+        "\"unmatched\"",
         "\"wired\"",
         "\"would-adopt\"",
         "\"would-wire\""

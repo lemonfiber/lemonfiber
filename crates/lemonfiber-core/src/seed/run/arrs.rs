@@ -2,11 +2,14 @@
 //!
 //! Everything a single \*arr needs pointed at it, and the order it has to happen in.
 
+use super::clients::Held;
+use super::connecting::{pairings, Connection};
 use super::{
-    category_for, download_clients, escalate_broken_roots, skipped, target_for, wanted_roots, Ctx,
-    Path, DATA_ROOT, SCHEMA_VERSION_FIELD,
+    category_for, escalate_broken_roots, skipped, target_for, wanted_roots, Ctx, Path, DATA_ROOT,
+    SCHEMA_VERSION_FIELD,
 };
-use crate::ports::service::Client;
+use crate::ports::service::{Client, DownloadClient};
+use crate::wiring::Fillers;
 
 /// A Servarr application that files media: its identity and address (as the
 /// credential check resolves them) and the media types it manages, which give
@@ -58,17 +61,17 @@ pub(super) fn reached_at(
 }
 
 /// The inputs a seed pass reads once and hands to every \*arr it seeds: the
-/// cross-\*arr contested-root map, the download-client credentials, the host data
-/// root each root folder is checked against, the loaded baseline to compare with, and
-/// whether this is an adopt pass. Grouped so seeding one \*arr takes the pass and the
+/// cross-\*arr contested-root map, who fills each ask and the credential each
+/// download client answers to, the host data root each root folder is checked
+/// against, the loaded baseline to compare with, and whether this is an adopt pass. Grouped so seeding one \*arr takes the pass and the
 /// \*arr rather than a long list that only `arr` varies across.
 pub(super) struct ArrSeeding<'a> {
     /// Root-folder paths more than one \*arr wants — refused rather than wired.
     pub(super) contested: &'a std::collections::BTreeMap<String, Vec<String>>,
-    /// `SABnzbd`'s API key, where it has written one.
-    pub(super) sabnzbd_key: Option<&'a str>,
-    /// qBittorrent's web UI password, minted this run or recorded on an earlier one.
-    pub(super) qbittorrent_password: Option<&'a str>,
+    /// Who fills each of the stack's asks, and where each is reached.
+    pub(super) fillers: &'a Fillers,
+    /// The credential each download client answers to, where it is in hand.
+    pub(super) held: &'a Held,
     /// The host directory `/data` resolves to, for the root-folder existence check.
     pub(super) data_root: Option<&'a Path>,
     /// What lemonfiber last recorded — the expected leg of the drift comparison.
@@ -87,7 +90,7 @@ pub(super) async fn seed_arr(
     seeding: &ArrSeeding<'_>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let wanted = wanted_roots(&arr.media_types);
-    let clients = arr_download_clients(arr, seeding.sabnzbd_key, seeding.qbittorrent_password);
+    let clients = wanted_clients(arr, seeding.fillers, seeding.held);
     // What this \*arr writes is recorded in its own baseline, against the loaded
     // snapshot, so several \*arrs can be seeded at once without sharing one; the
     // caller folds them back into one afterwards.
@@ -202,18 +205,42 @@ pub(super) async fn seed_arr(
     (wirings, records)
 }
 
-/// The download clients an \*arr registers — one per credential in hand — under the
-/// category its first media type files as, or none where it manages no category.
-pub(super) fn arr_download_clients(
-    arr: &Arr,
-    sabnzbd_key: Option<&str>,
-    qbittorrent_password: Option<&str>,
-) -> Vec<crate::ports::service::DownloadClient> {
-    arr.media_types
+/// The download clients an \*arr is told about: each service filling one of its asks
+/// that lemonfiber connects to it as a download client, at the address that service
+/// declares, under the category the \*arr's first media type files as.
+///
+/// None where it manages no category. A filler whose credential is not in hand yet is
+/// left out rather than told about with nothing to prove itself with, and a later run
+/// that finds the credential tells the \*arr then.
+pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<DownloadClient> {
+    let Some(category) = arr
+        .media_types
         .first()
         .and_then(|media| category_for(media))
-        .map(|category| download_clients(sabnzbd_key, qbittorrent_password, &category))
-        .unwrap_or_default()
+    else {
+        return Vec::new();
+    };
+    let mut wanted = Vec::new();
+    for pairing in pairings(fillers) {
+        if pairing.ask.by != arr.target.id {
+            continue;
+        }
+        let Ok((Connection::DownloadClient(kind), at)) = pairing.made else {
+            continue;
+        };
+        let Some(credential) = held.of(&pairing.filler.id) else {
+            continue;
+        };
+        wanted.push(DownloadClient {
+            name: pairing.filler.name.clone(),
+            host: at.host.clone(),
+            port: at.port,
+            kind,
+            credential: credential.clone(),
+            category: category.clone(),
+        });
+    }
+    wanted
 }
 
 /// A Servarr application's API key, read from the configuration file it wrote it

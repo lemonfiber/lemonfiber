@@ -78,4 +78,51 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     path
 }
 
+/// One installed plugin's service, filling `provides`, speaking `api` where it names one
+/// and answering on `listens` where it says.
+///
+/// Its configuration directory is the format's fallback, `/config`, so an adapter path
+/// beneath it reads the way a bundled service's does.
+pub(crate) fn a_placed(
+    service: &str,
+    provides: &[&str],
+    api: Option<lemonfiber_manifest::Api>,
+    listens: Option<u16>,
+) -> crate::plugin::Placed {
+    crate::plugin::Placed {
+        service: service.to_owned(),
+        image: "example.invalid/stand-in".to_owned(),
+        digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            .to_owned(),
+        tag: "1.0.0".to_owned(),
+        config_path: "/config".to_owned(),
+        takes_data: false,
+        reached: listens.map(|port| crate::plugin::Reached::Loopback { port, group: None }),
+        provides: provides.iter().map(|one| (*one).to_owned()).collect(),
+        name: format!("{service} the stand-in"),
+        description: "Stands in for a bundled service".to_owned(),
+        api,
+        listens,
+    }
+}
+
+/// An installed plugin holding these services.
+pub(crate) fn an_installed(
+    plugin: &str,
+    services: Vec<crate::plugin::Placed>,
+) -> crate::plugin::Installed {
+    crate::plugin::Installed {
+        plugin: plugin.to_owned(),
+        version: "1.0.0".to_owned(),
+        services,
+        provides: Vec::new(),
+        contributions: Vec::new(),
+        declared: crate::plugin::Declaration::default(),
+        from: String::new(),
+        revision: String::new(),
+        signed: String::new(),
+        installed_at: String::new(),
+    }
+}
+
 mod tests;

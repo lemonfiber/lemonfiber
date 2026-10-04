@@ -17,6 +17,8 @@ mod applications;
 mod arrs;
 mod baseline;
 mod clients;
+// What one service asking for what another fills comes to, by what each speaks.
+mod connecting;
 // Jellyfin's cross-origin allow-list, held to the front door's origin on every pass.
 mod cors;
 // The decline service's own media-server key, minted for it alone.
@@ -39,7 +41,7 @@ pub(crate) mod identity;
 mod reset;
 
 use applications::{seed_applications, skipped};
-use arrs::{arr_download_clients, read_servarr_key, seed_arr, ArrSeeding};
+use arrs::{read_servarr_key, seed_arr, wanted_clients, ArrSeeding};
 use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FIELD};
 // Reached by reconfiguration as well as by seeding: what the \*arrs that file media
 // are, and the record of what lemonfiber last wrote. One answer to each, rather than a
@@ -47,9 +49,7 @@ use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FI
 pub(crate) use applications::resync_application;
 pub(crate) use arrs::servarr_arrs;
 pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
-use clients::{
-    category_for, download_clients, qbittorrent_target, read_sabnzbd_key, seed_qbittorrent_password,
-};
+use clients::{category_for, held, seed_passwords, Held};
 pub(crate) use gate::reroute;
 use identity::seed_jellyfin_identity;
 pub(crate) use reset::reset_connections;
@@ -119,39 +119,26 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // the stack asks for is a candidate like any other — and a record that is there and
     // will not read refuses the seed rather than letting it wire past a contest nobody
     // could see.
-    let installed = crate::app::plugins::read(ctx)?;
-    let filled = crate::wiring::filled(&crate::wiring::settle(
-        &manifest,
-        installed.installed(),
-        &crate::app::targets::chosen_fillers(ctx),
-    ));
-
-    // qBittorrent's password, the one credential lemonfiber mints. Collecting the
-    // optional target into a list wires it where the stack has it and does nothing
-    // where it does not, without a branch a test could not reach. The generated
-    // value is kept to register qBittorrent as a download client below.
-    let mut qbittorrent_password = None;
-    for target in qbittorrent_target(&manifest.services)
-        .into_iter()
-        .collect::<Vec<_>>()
-    {
-        let (wiring, generated) = seed_qbittorrent_password(ctx, &target).await;
-        qbittorrent_password = generated.or(qbittorrent_password);
-        wirings.push(wiring);
-    }
-
-    // A later run mints nothing — the password in force is the one already set —
-    // so the value recorded on the run that minted it stands in. Without this an
-    // \*arr that came up after the first seed would never learn about qBittorrent,
-    // since its password cannot be read back from qBittorrent itself.
-    let qbittorrent_password =
-        qbittorrent_password.or_else(|| crate::app::targets::recorded_qbittorrent_password(ctx));
-
-    // Root folders and download clients for each \*arr that files media. The
-    // download clients' own credentials are read once: SABnzbd's key from its
-    // config, qBittorrent's the password minted or recorded above.
+    let register = crate::app::plugins::read(ctx)?;
+    let (installed, kept_back) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
+    wirings.extend(kept_back);
+    let chosen = crate::app::targets::chosen_fillers(ctx);
+    let filled = crate::wiring::filled(&crate::wiring::settle(&manifest, &installed, &chosen));
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let sabnzbd_key = read_sabnzbd_key(ctx, &manifest.services, project.as_deref()).await;
+    let fillers = crate::wiring::Fillers::of(&manifest, &installed, &chosen, project.as_deref());
+
+    // Each torrent client's password, the one credential lemonfiber mints. A later run
+    // mints nothing — the password in force is the one already set — so the value
+    // recorded on the run that minted it stands in. Without that an \*arr that came up
+    // after the first seed would never learn about the client, since its password
+    // cannot be read back from the client itself.
+    let (minted, passwords) = seed_passwords(ctx, &fillers).await;
+    wirings.extend(minted);
+    let held = held(ctx, &fillers, &passwords).await;
+
+    // Root folders and download clients for each \*arr that files media, and the
+    // pairs that come to no connection at all, said rather than left out.
+    wirings.extend(connecting::unmatched(&fillers));
     // The host data root, read once, so each \*arr's root folders can be checked
     // against the filesystem they file into and a folder pointing nowhere raised as a
     // warning.
@@ -194,8 +181,8 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // field key carries the service, no two \*arrs collide.
     let seeding = ArrSeeding {
         contested: &contested,
-        sabnzbd_key: sabnzbd_key.as_deref(),
-        qbittorrent_password: qbittorrent_password.as_deref(),
+        fillers: &fillers,
+        held: &held,
         data_root: data_root.as_deref(),
         expected: &baseline,
         adopt,
@@ -243,7 +230,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
             ctx,
             &manifest.services,
             project.as_deref(),
-            sabnzbd_key.as_deref(),
+            published::Clients {
+                fillers: &fillers,
+                held: &held,
+            },
         )
         .await,
     );
@@ -316,18 +306,38 @@ fn withheld(
     observed
 }
 
-/// The download-client wirings lemonfiber manages, as a caller that only reads them needs
-/// them: each \*arr, the clients lemonfiber would write there, and what it last recorded
-/// for each.
+/// The same, for the services installed plugins brought: each one the operator declared
+/// unmanaged is taken out of its plugin's record for the pass, and said.
 ///
-/// Here rather than where it is used, so the read-only half of drift and the writing half
-/// gather their inputs the same way. A diagnosis that worked out the wanted clients for
-/// itself would be a second opinion about what lemonfiber intends, and the two would drift
-/// apart exactly where an operator most needs them not to.
-///
-/// Nothing where the baseline could not be read. A record that is there but unreadable
-/// cannot tell an operator's edit from lemonfiber's own value, and reporting drift against
-/// a baseline that is not there would call every wiring in the stack an edit.
+/// A plugin's service is one this pass can write to — a torrent client's password is set
+/// on the client itself — so the promise is the same one, and kept the same way.
+fn withheld_brought(
+    installed: &[crate::plugin::Installed],
+    declared: &[(String, String)],
+) -> (Vec<crate::plugin::Installed>, Vec<crate::seed::Wiring>) {
+    let mut observed = Vec::new();
+    let kept = installed
+        .iter()
+        .map(|one| {
+            let mut one = one.clone();
+            one.services.retain(|placed| {
+                let Some(because) = crate::unmanaged::covering(declared, &placed.service) else {
+                    return true;
+                };
+                observed.push(crate::seed::Wiring::settled(
+                    placed.called().to_owned(),
+                    crate::seed::State::Observed {
+                        reason: because.to_owned(),
+                    },
+                ));
+                false
+            });
+            one
+        })
+        .collect();
+    (kept, observed)
+}
+
 /// The request service to ask about the household's telling, and what lemonfiber
 /// last recorded setting it to.
 ///
@@ -355,38 +365,60 @@ pub(crate) fn managed_telling(
     (seerr, recorded)
 }
 
+/// The download-client wirings lemonfiber manages, as a caller that only reads them needs
+/// them: each \*arr, the clients lemonfiber would write there, and what it last recorded
+/// for each.
+///
+/// Here rather than where it is used, so the read-only half of drift and the writing half
+/// gather their inputs the same way. A diagnosis that worked out the wanted clients for
+/// itself would be a second opinion about what lemonfiber intends, and the two would drift
+/// apart exactly where an operator most needs them not to.
+///
+/// Nothing where the baseline could not be read. A record that is there but unreadable
+/// cannot tell an operator's edit from lemonfiber's own value, and reporting drift against
+/// a baseline that is not there would call every wiring in the stack an edit.
 pub(crate) async fn managed_wirings(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
+    installed: &[crate::plugin::Installed],
     project: Option<&Path>,
 ) -> Vec<crate::doctor::wiring::Managed> {
     let Loaded::Formed(baseline) = load_baseline(ctx) else {
         return Vec::new();
     };
-    let sabnzbd_key = read_sabnzbd_key(ctx, services, project).await;
-    let qbittorrent_password = crate::app::targets::recorded_qbittorrent_password(ctx);
-    servarr_arrs(services, project)
+    let (fillers, held) = reading(ctx, manifest, installed, project).await;
+    servarr_arrs(&manifest.services, project)
         .into_iter()
         .map(|arr| {
-            let clients = arr_download_clients(
-                &arr,
-                sabnzbd_key.as_deref(),
-                qbittorrent_password.as_deref(),
-            )
-            .into_iter()
-            .map(|want| crate::doctor::wiring::Wired {
-                recorded: baseline
-                    .entry(&arr.target.name, &crate::seed::client_field(&want))
-                    .cloned(),
-                want,
-            })
-            .collect();
+            let clients = wanted_clients(&arr, &fillers, &held)
+                .into_iter()
+                .map(|want| crate::doctor::wiring::Wired {
+                    recorded: baseline
+                        .entry(&arr.target.name, &crate::seed::client_field(&want))
+                        .cloned(),
+                    want,
+                })
+                .collect();
             crate::doctor::wiring::Managed {
                 target: arr.target,
                 clients,
             }
         })
         .collect()
+}
+
+/// Who fills each ask and the credential each download client answers to, as a pass
+/// that mints nothing reads them: every torrent client's password is the one recorded.
+async fn reading(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    installed: &[crate::plugin::Installed],
+    project: Option<&Path>,
+) -> (crate::wiring::Fillers, Held) {
+    let chosen = crate::app::targets::chosen_fillers(ctx);
+    let fillers = crate::wiring::Fillers::of(manifest, installed, &chosen, project);
+    let held = held(ctx, &fillers, &std::collections::BTreeMap::new()).await;
+    (fillers, held)
 }
 
 /// The temporary password qBittorrent announced in its log, if it has.
@@ -408,14 +440,6 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
         log.push('\n');
     }
     crate::qbittorrent::temporary_password(&log)
-}
-
-/// Record the generated password where the forwarded-port push reads it — the
-/// `QBITTORRENT_PASSWORD` setting in the environment file. Best-effort: a value
-/// that could not be written is reported by the push's own missing-password
-/// message rather than failing the wiring that did land.
-fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
-    crate::app::targets::record_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY, password);
 }
 
 /// The \*arrs the request service hands a request to. Without this the household can

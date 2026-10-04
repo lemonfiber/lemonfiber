@@ -80,77 +80,254 @@ fn only_reachable_servarr_services_with_a_config_path_become_targets() {
     );
 }
 
-#[test]
-fn a_sabnzbd_config_path_is_the_config_mount_of_the_one_sabnzbd_service() {
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    let sabnzbd_api = |path: Option<&str>| lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-        key_source: lemonfiber_manifest::KeySource::ConfigIni,
-        path: path.map(str::to_owned),
-        version: None,
-    };
-    let services = vec![
-        manifest_service("jellyfin", None, Some(8096)),
-        manifest_service(
-            "sonarr",
-            Some(servarr_api(Some("/config/config.xml"))),
-            Some(8989),
-        ),
-        manifest_service(
-            "sabnzbd",
-            Some(sabnzbd_api(Some("/config/sabnzbd.ini"))),
-            Some(8080),
-        ),
-    ];
+/// What the shipped stack's asks come to on this machine, with nothing installed.
+fn shipped_fillers(project: Option<&std::path::Path>) -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), project)
+        })
+        .unwrap_or_default()
+}
+
+/// A Usenet client's key is read from the file its own declaration names, and held
+/// against that client rather than against its kind.
+#[tokio::test]
+async fn a_usenet_clients_key_is_held_against_the_client_it_was_read_from() {
+    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+
+    let held = super::super::clients::held(
+        &ctx,
+        &shipped_fillers(Some(stack_root())),
+        &std::collections::BTreeMap::new(),
+    )
+    .await;
 
     assert_eq!(
-        sabnzbd_config_path(&services, project),
-        Some(project.join("config/sabnzbd/sabnzbd.ini")),
-        "read from where Compose mounts SABnzbd's config"
-    );
-    assert!(
-        sabnzbd_config_path(&[], project).is_none(),
-        "no SABnzbd service, no path"
-    );
-    assert!(
-        sabnzbd_config_path(
-            &[manifest_service(
-                "sabnzbd",
-                Some(sabnzbd_api(None)),
-                Some(8080)
-            )],
-            project
-        )
-        .is_none(),
-        "a SABnzbd that declares no config file"
-    );
-    assert!(
-        sabnzbd_config_path(
-            &[manifest_service(
-                "sabnzbd",
-                Some(sabnzbd_api(Some("/data/elsewhere.ini"))),
-                Some(8080)
-            )],
-            project
-        )
-        .is_none(),
-        "a config path outside the /config mount"
+        held.of("sabnzbd"),
+        Some(&Credential::ApiKey("the-sab-key".to_owned()))
     );
 }
 
+/// Without a project there is no file beneath it to read a key from, so no Usenet
+/// client's key is in hand — and one that has written nothing yet holds none either.
 #[tokio::test]
-async fn a_sabnzbd_key_needs_a_project_and_a_sabnzbd_to_read() {
+async fn a_usenet_key_needs_a_project_and_a_file_that_holds_one() {
+    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+    let unwritten = seed_ctx(None, true, Vec::new(), None, None)
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+    let nowhere = super::super::clients::held(
+        &ctx,
+        &shipped_fillers(None),
+        &std::collections::BTreeMap::new(),
+    )
+    .await;
+    let nothing_yet = super::super::clients::held(
+        &unwritten,
+        &shipped_fillers(Some(stack_root())),
+        &std::collections::BTreeMap::new(),
+    )
+    .await;
+
+    assert!(nowhere.of("sabnzbd").is_none(), "read from no project");
+    assert!(
+        nothing_yet.of("sabnzbd").is_none(),
+        "read from a file never written"
+    );
+}
+
+/// A torrent client's password is the one minted for it this run where there is one,
+/// and otherwise the one recorded under its own setting.
+#[tokio::test]
+async fn a_torrent_clients_password_is_the_one_minted_or_recorded_for_it() {
+    let path = config_scratch("held-torrent");
+    let _ = store::set(
+        &path,
+        crate::config::QBITTORRENT_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
+    let fillers = shipped_fillers(None);
+
+    let recorded =
+        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
+    let minted = super::super::clients::held(
+        &ctx,
+        &fillers,
+        &std::collections::BTreeMap::from([("qbittorrent".to_owned(), "minted-now".to_owned())]),
+    )
+    .await;
+
+    // Compared rather than printed: the values are credentials, and a failing
+    // assertion prints its message into the run's log.
+    assert!(password_of(&recorded, "qbittorrent").is_some_and(|held| held == "minted-earlier"));
+    assert!(password_of(&minted, "qbittorrent").is_some_and(|held| held == "minted-now"));
+    assert!(password_of(&minted, "sabnzbd").is_none());
+}
+
+/// The password held for a service, where what is held for it is one.
+fn password_of(held: &Held, service: &str) -> Option<String> {
+    match held.of(service) {
+        Some(Credential::UserPass { password, .. }) => Some(password.clone()),
+        Some(Credential::ApiKey(_)) | None => None,
+    }
+}
+
+/// The bundled torrent client's password is recorded where the tunnel's forwarded-port
+/// push reads it, as it always was.
+#[test]
+fn the_bundled_torrent_clients_password_setting_is_the_one_the_tunnel_reads() {
+    let fillers = shipped_fillers(None);
+    let setting = fillers
+        .service("qbittorrent")
+        .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX));
+    assert_eq!(
+        setting.as_deref(),
+        Some(crate::config::QBITTORRENT_PASSWORD_KEY)
+    );
+}
+
+/// A torrent client a plugin brought, whose id would spell a setting lemonfiber keeps
+/// for something else, is never handed that setting's value: its own is named apart.
+#[tokio::test]
+async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
+    let path = config_scratch("held-namesake");
+    let _ = store::set(
+        &path,
+        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        "the-administrator",
+    );
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
+    let namesake = crate::test_support::a_placed(
+        "jellyfin-admin",
+        &["download.torrent"],
+        Some(torrent_api()),
+        Some(8082),
+    );
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &[crate::test_support::an_installed(
+                    "namesake",
+                    vec![namesake],
+                )],
+                &crate::wiring::Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default();
+
+    let held =
+        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
+
+    assert!(password_of(&held, "jellyfin-admin").is_none());
+    assert_eq!(
+        fillers
+            .service("jellyfin-admin")
+            .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX))
+            .as_deref(),
+        Some("PLUGIN_JELLYFIN_ADMIN_PASSWORD")
+    );
+}
+
+/// Where even a plugin's own namespace lands on a setting one of the stack's services
+/// holds, the setting is refused: nothing is read for the plugin's client, and the pass
+/// says so rather than setting a password it would then keep on top of another.
+#[tokio::test]
+async fn a_plugin_setting_that_lands_on_one_the_stack_holds_is_refused() {
+    let path = config_scratch("held-landed");
+    let _ = store::set(&path, "PLUGIN_NZBGET_PASSWORD", "the-stacks-own");
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|mut manifest| {
+            // An operator's own stack may name a service anything, including what a
+            // plugin's namespace would spell.
+            manifest
+                .services
+                .push(manifest_service("plugin-nzbget", None, None));
+            crate::wiring::Fillers::of(
+                &manifest,
+                &[crate::test_support::an_installed(
+                    "nzbget",
+                    vec![crate::test_support::a_placed(
+                        "nzbget",
+                        &["download.torrent"],
+                        Some(torrent_api()),
+                        Some(8082),
+                    )],
+                )],
+                &crate::wiring::Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default();
+
+    let held =
+        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
+    let (wirings, minted) = super::super::clients::seed_passwords(&ctx, &fillers).await;
+
+    assert!(password_of(&held, "nzbget").is_none());
+    assert!(minted.is_empty());
+    let refused: Vec<&crate::seed::Wiring> = wirings
+        .iter()
+        .filter(|wiring| matches!(wiring.state, crate::seed::State::Refused { .. }))
+        .collect();
+    assert_eq!(refused.len(), 1, "{wirings:?}");
+    assert!(refused
+        .iter()
+        .all(|wiring| wiring.connection == "nzbget the stand-in web UI password"));
+}
+
+/// A torrent client that publishes no port is one this machine cannot reach to set a
+/// password on, so it is passed over rather than reported as tried.
+#[tokio::test]
+async fn a_torrent_client_publishing_no_port_has_no_password_set() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    assert!(
-        read_sabnzbd_key(&ctx, &[], None).await.is_none(),
-        "without a project there is nowhere to read from"
-    );
-    assert!(
-        read_sabnzbd_key(&ctx, &[], Some(std::path::Path::new("/srv/stack")))
-            .await
-            .is_none(),
-        "without a SABnzbd service there is no key"
-    );
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|mut manifest| {
+            manifest
+                .services
+                .retain(|service| service.id != "qbittorrent");
+            crate::wiring::Fillers::of(
+                &manifest,
+                &[crate::test_support::an_installed(
+                    "unpublished",
+                    vec![crate::test_support::a_placed(
+                        "unpublished",
+                        &["download.torrent"],
+                        Some(torrent_api()),
+                        None,
+                    )],
+                )],
+                &crate::wiring::Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default();
+
+    let (wirings, minted) = super::super::clients::seed_passwords(&ctx, &fillers).await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(minted.is_empty());
+}
+
+/// qBittorrent's adapter, as a plugin's torrent client names it.
+fn torrent_api() -> lemonfiber_manifest::Api {
+    lemonfiber_manifest::Api {
+        kind: lemonfiber_manifest::ApiKind::Qbittorrent,
+        key_source: lemonfiber_manifest::KeySource::Generated,
+        path: None,
+        version: None,
+    }
 }
 
 #[test]

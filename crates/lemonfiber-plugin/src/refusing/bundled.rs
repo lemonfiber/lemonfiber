@@ -70,6 +70,15 @@ pub(super) fn named(id: &str) -> Option<&'static Service> {
     services().iter().find(|service| service.id == id)
 }
 
+/// The shipped service whose id is written as this one is once each is spelled as an
+/// environment name, where the stack ships one.
+pub(super) fn spelled_like(id: &str) -> Option<&'static Service> {
+    let spelled = lemonfiber_manifest::environment_name(id);
+    services()
+        .iter()
+        .find(|service| lemonfiber_manifest::environment_name(&service.id) == spelled)
+}
+
 /// The shipped service published on this port, where the stack publishes one there.
 pub(super) fn publishing(port: u16) -> Option<&'static Service> {
     services().iter().find(|service| service.port == Some(port))

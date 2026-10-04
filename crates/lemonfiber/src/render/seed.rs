@@ -35,6 +35,10 @@ fn connection(wiring: &lemonfiber_core::seed::Wiring) -> Lines {
             ));
             lines.put(format!("      {reason}"));
         }
+        SeedState::Unmatched { reason } => {
+            lines.put(format!("  · {connection}   reached by nothing here"));
+            lines.put(format!("      {reason}"));
+        }
         SeedState::Stale => lines.put(format!(
             "  · {connection}   yours for now — a newer default is not yet applied"
         )),

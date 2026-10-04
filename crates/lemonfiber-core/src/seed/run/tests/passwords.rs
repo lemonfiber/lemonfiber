@@ -12,6 +12,27 @@ fn is_would_wire(wiring: &crate::seed::Wiring) -> bool {
     matches!(wiring.state, crate::seed::State::WouldWire { .. })
 }
 
+/// The stack's torrent client, as the lookup resolves it.
+fn torrent_client() -> crate::wiring::Filler {
+    crate::wiring::Filler {
+        id: "qbittorrent".to_owned(),
+        name: "qBittorrent".to_owned(),
+        origin: crate::origin::Origin::Bundled,
+        address: Some(crate::wiring::Address {
+            host: "gluetun".to_owned(),
+            port: 8081,
+        }),
+        adapter: Some(lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Qbittorrent,
+            key_source: lemonfiber_manifest::KeySource::Generated,
+            path: None,
+            version: None,
+        }),
+        published: Some(8081),
+        key_file: None,
+    }
+}
+
 /// The three replies a full password exchange expects: log in, set, confirm.
 fn exchange() -> Vec<(u16, &'static str)> {
     vec![(200, "Ok."), (200, ""), (200, "Ok.")]
@@ -255,9 +276,11 @@ async fn a_password_already_set_is_reported_rather_than_set_again() {
     )
     .with_http(http.clone());
 
-    let (wiring, recorded) = super::super::seed_qbittorrent_password(
+    let (wiring, recorded) = super::super::clients::seed_qbittorrent_password(
         &ctx,
-        &("qbittorrent".to_owned(), "http://127.0.0.1:8081".to_owned()),
+        &torrent_client(),
+        "http://127.0.0.1:8081",
+        crate::config::QBITTORRENT_PASSWORD_KEY,
     )
     .await;
 
@@ -309,9 +332,11 @@ async fn a_recorded_password_the_client_refuses_falls_through_to_the_temporary()
     )
     .with_http(http.clone());
 
-    let (wiring, recorded) = super::super::seed_qbittorrent_password(
+    let (wiring, recorded) = super::super::clients::seed_qbittorrent_password(
         &ctx,
-        &("qbittorrent".to_owned(), "http://127.0.0.1:8081".to_owned()),
+        &torrent_client(),
+        "http://127.0.0.1:8081",
+        crate::config::QBITTORRENT_PASSWORD_KEY,
     )
     .await;
 
@@ -354,9 +379,11 @@ async fn a_rehearsed_pass_will_not_sign_in_to_test_the_password_it_recorded() {
     .with_http(http.clone())
     .rehearsing();
 
-    let (wiring, recorded) = super::super::seed_qbittorrent_password(
+    let (wiring, recorded) = super::super::clients::seed_qbittorrent_password(
         &ctx,
-        &("qbittorrent".to_owned(), "http://127.0.0.1:8081".to_owned()),
+        &torrent_client(),
+        "http://127.0.0.1:8081",
+        crate::config::QBITTORRENT_PASSWORD_KEY,
     )
     .await;
 

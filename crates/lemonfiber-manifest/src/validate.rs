@@ -192,6 +192,7 @@ fn check_services(
             .chain(released(service, today))
             .chain(permitted(service))
             .chain(versioned(service))
+            .chain(listened(service))
             .chain(outbound(service))
             .chain(offered(service))
             .chain(depended(service, &of_service));
@@ -332,6 +333,19 @@ fn versioned(service: &Service) -> Option<String> {
     let api = service.api.as_ref()?;
     (api.kind == ApiKind::Servarr && api.version.is_none())
         .then(|| "has the servarr API shape but names no api.version".to_owned())
+}
+
+/// A service lemonfiber talks to says the port it answers on inside the stack's network.
+///
+/// The port it publishes is the host's end of a mapping, and the other end is not
+/// always the same number. What reaches it from beside it reaches the other end, so
+/// without this lemonfiber would be guessing at it — and a service standing in for
+/// another would be reached wherever the one it replaced answered.
+fn listened(service: &Service) -> Option<String> {
+    (service.api.is_some() && service.listens.is_none()).then(|| {
+        "declares an api but no listens, the port it answers on inside the stack's network"
+            .to_owned()
+    })
 }
 
 /// A service belongs to a profile the stack declares.

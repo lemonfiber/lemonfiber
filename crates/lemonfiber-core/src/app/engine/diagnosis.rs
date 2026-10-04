@@ -380,7 +380,8 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
     let wiring = WiringCheck::new(
         ctx.seams.http.clone(),
         ctx.seams.filesystem.clone(),
-        crate::seed::run::managed_wirings(ctx, &manifest.services, project.as_deref()).await,
+        crate::seed::run::managed_wirings(ctx, manifest, &stack.installed, project.as_deref())
+            .await,
         ctx.stamp(),
     );
     // Where the stack is actually listening, asked of the container engine rather

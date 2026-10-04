@@ -1,20 +1,17 @@
-//! Resolving the download clients a service should be told about.
+//! The download clients a service should be told about.
 //!
-//! Where each one is reached, which credential proves it, and what category its
-//! transfers are filed under.
+//! Which credential proves each one, held per client rather than per kind, and what
+//! category its transfers are filed under. Where each is reached is the filler's own
+//! declaration, read through [`crate::wiring::Fillers`].
 
-use super::{read_temporary_password, record_qbittorrent_password, Ctx, Path, PathBuf};
+use std::collections::BTreeMap;
 
-/// Where a Servarr application reaches `SABnzbd` on the stack's network: the
-/// container name, and `SABnzbd`'s own listening port rather than the
-/// host-published one, because the application connects across the network, not
-/// through the host.
-pub(super) const SABNZBD_HOST: (&str, u16) = ("sabnzbd", 8080);
+use lemonfiber_manifest::ApiKind;
 
-/// Where a Servarr application reaches qBittorrent: through Gluetun, whose network
-/// namespace qBittorrent shares, on qBittorrent's web UI port. qBittorrent has no
-/// network of its own, so its address is Gluetun's.
-pub(super) const QBITTORRENT_HOST: (&str, u16) = ("gluetun", 8081);
+use crate::ports::service::Credential;
+use crate::wiring::{Filler, Fillers};
+
+use super::{read_temporary_password, Ctx};
 
 /// The category an application files under, named as that application names its
 /// category field, for the media type it manages.
@@ -36,92 +33,126 @@ pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Categor
     })
 }
 
-/// `SABnzbd`'s API key, read from its `sabnzbd.ini` under the project root, or
-/// nothing where the stack has no `SABnzbd`, no project to read from, or
-/// `SABnzbd` has not written its key yet.
-pub(super) async fn read_sabnzbd_key(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
-) -> Option<String> {
-    let path = sabnzbd_config_path(services, project?)?;
-    let text = ctx.seams.filesystem.read(&path).await?;
+/// The credential each download client on this machine answers to, by the service it
+/// is.
+///
+/// Per service, because two clients speaking one adapter are two accounts: a client
+/// standing in for another is told about with its own key, never the one the client it
+/// replaced held.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(super) struct Held(pub(super) BTreeMap<String, Credential>);
+
+impl Held {
+    /// The credential this service answers to, where it is in hand.
+    pub(super) fn of(&self, service: &str) -> Option<&Credential> {
+        self.0.get(service)
+    }
+
+    /// Every credential in hand, beside the service it proves.
+    pub(super) fn each(&self) -> impl Iterator<Item = (&str, &Credential)> {
+        self.0
+            .iter()
+            .map(|(service, credential)| (service.as_str(), credential))
+    }
+}
+
+/// Every download client's credential that is in hand: a Usenet client's key, read from
+/// the file it wrote it to, and a torrent client's password, minted this run or recorded
+/// on an earlier one.
+///
+/// A client missing from the answer has not written its key yet, or has never had a
+/// password set, and nothing is told about it until a later run finds one.
+pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String, String>) -> Held {
+    let mut held = BTreeMap::new();
+    for filler in fillers.speaking(ApiKind::Sabnzbd) {
+        if let Some(key) = usenet_key(ctx, filler).await {
+            held.insert(filler.id.clone(), Credential::ApiKey(key));
+        }
+    }
+    for filler in fillers.speaking(ApiKind::Qbittorrent) {
+        let Some(setting) = fillers.setting(filler, crate::config::PASSWORD_SUFFIX) else {
+            continue;
+        };
+        let password = minted
+            .get(&filler.id)
+            .cloned()
+            .or_else(|| crate::app::targets::recorded_secret(ctx, &setting));
+        if let Some(password) = password {
+            held.insert(
+                filler.id.clone(),
+                Credential::UserPass {
+                    username: crate::config::QBITTORRENT_USER.to_owned(),
+                    password,
+                },
+            );
+        }
+    }
+    Held(held)
+}
+
+/// A Usenet client's API key, read from the file it writes it to, or nothing where it
+/// names no such file or has not written one yet.
+async fn usenet_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
+    let text = ctx.seams.filesystem.read(filler.key_file.as_ref()?).await?;
     crate::sabnzbd::api_key(&text)
 }
 
-/// The host path to `SABnzbd`'s configuration file, resolved the way a Servarr
-/// config path is: its `/config` mount lives at `config/<id>` under the project
-/// root. Nothing where the stack has no `SABnzbd` writing a config there.
-pub(super) fn sabnzbd_config_path(
-    services: &[lemonfiber_manifest::Service],
-    project: &Path,
-) -> Option<PathBuf> {
-    services.iter().find_map(|service| {
-        let api = service.api.as_ref()?;
-        if api.kind != lemonfiber_manifest::ApiKind::Sabnzbd {
-            return None;
+/// Set every torrent client's web UI password, where it is still the one it started
+/// with, and answer what each came to beside every password minted this run, by the
+/// service it was minted for.
+///
+/// One that publishes no port is passed over: this machine sets the password through the
+/// client's own web UI, and a client it cannot reach is one it cannot set anything on.
+/// One whose password would be kept under a setting something else already holds is
+/// refused before anything is read or set, and said.
+pub(super) async fn seed_passwords(
+    ctx: &Ctx,
+    fillers: &Fillers,
+) -> (Vec<crate::seed::Wiring>, BTreeMap<String, String>) {
+    let mut wirings = Vec::new();
+    let mut minted = BTreeMap::new();
+    for filler in fillers.speaking(ApiKind::Qbittorrent) {
+        let Some(port) = filler.published else {
+            continue;
+        };
+        let Some(setting) = fillers.setting(filler, crate::config::PASSWORD_SUFFIX) else {
+            wirings.push(crate::seed::Wiring::settled(
+                password_connection(filler),
+                crate::seed::State::Refused {
+                    reason: format!(
+                        "the setting {}'s password would be kept under is one lemonfiber or the \
+                         stack already keeps something else in, so it is neither read nor set",
+                        filler.name
+                    ),
+                },
+            ));
+            continue;
+        };
+        let base = crate::app::targets::loopback(port);
+        let (wiring, generated) = seed_qbittorrent_password(ctx, filler, &base, &setting).await;
+        wirings.push(wiring);
+        if let Some(password) = generated {
+            minted.insert(filler.id.clone(), password);
         }
-        crate::app::targets::config_path(project, service, api.path.as_deref())
-    })
-}
-
-/// The download clients to register, one per credential that is in hand.
-pub(super) fn download_clients(
-    sabnzbd_key: Option<&str>,
-    qbittorrent_password: Option<&str>,
-    category: &crate::ports::service::Category,
-) -> Vec<crate::ports::service::DownloadClient> {
-    let mut clients = Vec::new();
-    if let Some(key) = sabnzbd_key {
-        clients.push(crate::ports::service::DownloadClient {
-            name: "SABnzbd".to_owned(),
-            host: SABNZBD_HOST.0.to_owned(),
-            port: SABNZBD_HOST.1,
-            kind: crate::ports::service::ClientKind::Sabnzbd,
-            credential: crate::ports::service::Credential::ApiKey(key.to_owned()),
-            category: category.clone(),
-        });
     }
-    if let Some(password) = qbittorrent_password {
-        clients.push(crate::ports::service::DownloadClient {
-            name: "qBittorrent".to_owned(),
-            host: QBITTORRENT_HOST.0.to_owned(),
-            port: QBITTORRENT_HOST.1,
-            kind: crate::ports::service::ClientKind::Qbittorrent,
-            credential: crate::ports::service::Credential::UserPass {
-                username: crate::config::QBITTORRENT_USER.to_owned(),
-                password: password.to_owned(),
-            },
-            category: category.clone(),
-        });
-    }
-    clients
+    (wirings, minted)
 }
 
-/// qBittorrent's address, if the stack has it: the id names the container to read
-/// a log from, the base is where the host reaches its web UI. Nothing where it
-/// publishes no port — a client the host cannot reach is no target to wire.
-pub(super) fn qbittorrent_target(
-    services: &[lemonfiber_manifest::Service],
-) -> Option<(String, String)> {
-    crate::app::targets::service_addr(services, lemonfiber_manifest::ApiKind::Qbittorrent)
-        .map(|addr| (addr.id, addr.loopback))
-}
-
-/// Set qBittorrent's web UI password, where it is still the one it started with.
+/// Set one torrent client's web UI password, where it is still the one it started with.
 ///
 /// A password already recorded and still accepted is the one in force, and the
 /// connection reports that rather than setting another. Otherwise the temporary
 /// password is read from the container's own log; without it there is nothing to
 /// authenticate with, so the connection is skipped for a re-run once the container
 /// has announced one. A generated password that lands is recorded in the
-/// environment where the forwarded-port push reads it.
+/// environment under `setting`, the client's own.
 pub(super) async fn seed_qbittorrent_password(
     ctx: &Ctx,
-    target: &(String, String),
+    filler: &Filler,
+    base: &str,
+    setting: &str,
 ) -> (crate::seed::Wiring, Option<String>) {
-    let (id, base) = target;
-    let connection = "qBittorrent web UI password".to_owned();
+    let connection = password_connection(filler);
     let client = crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), base);
 
     // A password lemonfiber has already set is the one in force, and asking again
@@ -130,7 +161,7 @@ pub(super) async fn seed_qbittorrent_password(
     // reached for it a second time would authenticate with a credential that was
     // spent the first time. Checked against the client rather than assumed from
     // the recording, because a container rebuilt from nothing holds neither.
-    if let Some(recorded) = crate::app::targets::recorded_qbittorrent_password(ctx) {
+    if let Some(recorded) = crate::app::targets::recorded_secret(ctx, setting) {
         // Signing in is how this question is answered, and signing in is a POST — state
         // left on the client by a run that promised to leave none. So a rehearsal says
         // what it could not tell rather than guessing: the recorded password is usually
@@ -155,11 +186,14 @@ pub(super) async fn seed_qbittorrent_password(
         }
     }
 
-    let Some(temporary) = read_temporary_password(ctx, id).await else {
+    let Some(temporary) = read_temporary_password(ctx, &filler.id).await else {
         let wiring = crate::seed::Wiring::settled(
             connection,
             crate::seed::State::Skipped {
-                reason: "qBittorrent has not announced a temporary password yet; a later run completes it".to_owned(),
+                reason: format!(
+                    "{} has not announced a temporary password yet; a later run completes it",
+                    filler.name
+                ),
             },
         );
         return (wiring, None);
@@ -178,9 +212,14 @@ pub(super) async fn seed_qbittorrent_password(
     // to that, because a value arriving from anywhere else would be written down by a
     // run that promised to write nothing.
     if let Some(password) = recorded.as_ref().filter(|_| !ctx.dry_run) {
-        record_qbittorrent_password(ctx, password);
+        crate::app::targets::record_secret(ctx, setting, password);
     }
     (wiring, recorded)
+}
+
+/// What setting one torrent client's web UI password is called where it is reported.
+fn password_connection(filler: &Filler) -> String {
+    format!("{} web UI password", filler.name)
 }
 
 /// What a rehearsal says about a torrent client whose recorded password it will not

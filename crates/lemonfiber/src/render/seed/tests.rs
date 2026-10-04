@@ -74,6 +74,12 @@ fn every_seed_state_says_what_became_of_the_connection() {
             },
         ),
         wiring("o", SeedState::WouldAdopt),
+        wiring(
+            "p",
+            SeedState::Unmatched {
+                reason: "it names no adapter".to_owned(),
+            },
+        ),
     ]);
     let text = seeding(&report).text();
     for phrase in [
@@ -94,6 +100,8 @@ fn every_seed_state_says_what_became_of_the_connection() {
         "would be changed from “tv-sonarr” to “lemonfiber”",
         "would be set to a newly generated value",
         "would be adopted",
+        "reached by nothing here",
+        "it names no adapter",
     ] {
         assert!(text.contains(phrase), "missing {phrase}");
     }

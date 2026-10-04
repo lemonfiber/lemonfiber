@@ -63,6 +63,7 @@ pub(crate) async fn update(
     without.forget(&was.plugin);
     let contests = super::standing::contested(ctx, &without, &would)?;
     super::writing::unanswered(&would, without.installed())?;
+    super::writing::unshared(&would, without.installed())?;
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
         crate::plugin::writes(&would, stack),

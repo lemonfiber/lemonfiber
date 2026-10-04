@@ -48,7 +48,7 @@ fn download_target_for(
         _ => return None,
     };
     Some(DownloadTarget {
-        base: format!("http://127.0.0.1:{port}"),
+        base: super::opening::loopback(port),
         kind,
     })
 }

@@ -4,8 +4,8 @@
 //! them before it is confirmed and reverts nothing it did not show.
 
 use super::{
-    arr_download_clients, load_baseline, project_directory, read_sabnzbd_key, save_baseline,
-    servarr_arrs, Ctx, Loaded,
+    load_baseline, project_directory, reading, save_baseline, servarr_arrs, wanted_clients, Ctx,
+    Loaded,
 };
 
 /// Revert every drifted service connection to lemonfiber's own — or, unconfirmed, report
@@ -16,9 +16,13 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         return Vec::new();
     };
+    // A register that is there and will not read is a machine that cannot say what fills
+    // its asks, and a reset that went on would put back connections to a guess.
+    let Ok(register) = crate::app::plugins::read(ctx) else {
+        return Vec::new();
+    };
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let sabnzbd_key = read_sabnzbd_key(ctx, &manifest.services, project.as_deref()).await;
-    let qbittorrent_password = crate::app::targets::recorded_qbittorrent_password(ctx);
+    let (fillers, held) = reading(ctx, &manifest, register.installed(), project.as_deref()).await;
     let arrs = servarr_arrs(&manifest.services, project.as_deref());
     let baseline = match load_baseline(ctx) {
         Loaded::Formed(baseline) => baseline,
@@ -29,8 +33,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
 
     let mut wirings = Vec::new();
     for arr in &arrs {
-        let wanted =
-            arr_download_clients(arr, sabnzbd_key.as_deref(), qbittorrent_password.as_deref());
+        let wanted = wanted_clients(arr, &fillers, &held);
         if wanted.is_empty() {
             continue;
         }

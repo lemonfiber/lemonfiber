@@ -12,6 +12,7 @@ mod error;
 pub mod names;
 mod recognising;
 mod schema;
+mod spelling;
 mod validate;
 
 pub use date::Date;
@@ -20,6 +21,7 @@ pub use schema::{
     Api, ApiKind, Bind, Claimed, Criticality, Form, Health, HealthKind, KeySource, Manifest,
     Profile, Protocol, Removed, Service, Wiring,
 };
+pub use spelling::environment_name;
 pub use validate::{is_core_name, is_digest, validate, Violation, ALLOWED_GRANTS};
 
 /// The manifest schema version this crate prefers.

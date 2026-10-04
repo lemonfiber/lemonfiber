@@ -14464,6 +14464,24 @@
               ]
             },
             {
+              "description": "Something on this machine fills what a service asks for, and nothing lemonfiber\ndoes connects the two — the filler names no adapter, or none lemonfiber pairs with\nwhat the asker speaks.\n\nSettled, because no run changes it: the stack, or what is installed, has to. Said\nrather than left out, because a filler nothing reaches and a filler lemonfiber\nforgot would otherwise read the same, and the operator who installed one to stand\nin for another is the one who needs to know which.",
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "description": "What fills it, what asked, and why nothing connects them.",
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "const": "unmatched"
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            },
+            {
               "description": "Prerequisite unavailable; a later run will complete it.",
               "type": "object",
               "properties": {
