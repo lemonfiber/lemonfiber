@@ -98,14 +98,16 @@ pub(super) async fn seed_subtitles(
 /// finder holds: what replacing that \*arr's key owes it. The finder shows whether it
 /// holds a key and never which, so there is nothing to read first.
 ///
-/// Nothing where the stack has no subtitle finder or `arr` files nothing it subtitles.
+/// Answers with the finder's name and how the write came out. Nothing where the stack
+/// has no subtitle finder or `arr` files nothing it subtitles.
 pub(crate) async fn rewatch(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&Path>,
     arr: &str,
-) -> Option<crate::seed::State> {
+) -> Option<(String, crate::seed::State)> {
     let finder = crate::app::targets::bazarr_reader(ctx, services, project).await?;
+    let name = finder_name(services)?;
     let arr = servarr_arrs(services, project)
         .into_iter()
         .find(|one| one.target.id == arr)?;
@@ -118,10 +120,24 @@ pub(crate) async fn rewatch(
         port,
         api_key,
     };
-    Some(match finder.watch(&watched).await {
+    let state = match finder.watch(&watched).await {
         Ok(()) => crate::seed::State::Wired,
         Err(failure) => unreached(&failure),
-    })
+    };
+    Some((name, state))
+}
+
+/// What the stack calls its subtitle finder.
+fn finder_name(services: &[Service]) -> Option<String> {
+    services
+        .iter()
+        .find(|service| {
+            service
+                .api
+                .as_ref()
+                .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Bazarr)
+        })
+        .map(|service| service.name.clone())
 }
 
 /// Point the finder at one \*arr, leaving it alone where it already is.

@@ -133,9 +133,7 @@ pub(crate) async fn reroute(
     let routed = super::servarr_arrs(services, project)
         .into_iter()
         .any(|one| one.target.id == arr && super::fulfilment::fetches(&one.media_types).is_some());
-    if !routed {
-        return None;
-    }
+    routed.then_some(())?;
     seed_gate_routes(ctx, services, project)
         .await
         .map(|wiring| wiring.state)

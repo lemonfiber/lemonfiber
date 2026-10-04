@@ -89,14 +89,15 @@ pub(super) async fn seed_applications(
 /// Hold Prowlarr's application for the \*arr called `arr` to the key it answers to now,
 /// proven by Prowlarr's own test: what replacing that \*arr's key owes Prowlarr.
 ///
-/// Nothing where the stack has no Prowlarr, Prowlarr has not written its key, or `arr`
-/// is not one its app sync covers.
+/// Answers with Prowlarr's name and how the application came out. Nothing where the
+/// stack has no Prowlarr, Prowlarr has not written its key, or `arr` is not one its app
+/// sync covers.
 pub(crate) async fn resync_application(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     project: Option<&Path>,
     arr: &str,
-) -> Option<crate::seed::State> {
+) -> Option<(String, crate::seed::State)> {
     let source = prowlarr_source(services, project)?;
     let prowlarr_key = read_servarr_key(ctx, &source.target.config).await?;
     let arr = syncable_arrs(services, project)
@@ -127,7 +128,7 @@ pub(crate) async fn resync_application(
     .await
     .into_iter()
     .next()
-    .map(|wiring| wiring.state)
+    .map(|wiring| (source.target.name, wiring.state))
 }
 
 /// Prowlarr as the app-sync source: the Servarr-shape service that manages no

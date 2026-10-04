@@ -27,6 +27,8 @@ struct FakeProwlarr {
     stays_stale: bool,
     /// Every key it was given, in order.
     rekeyed: Mutex<Vec<String>>,
+    /// Whether it refuses to be given a key at all.
+    refuses_rekey: bool,
 }
 
 impl FakeProwlarr {
@@ -39,6 +41,7 @@ impl FakeProwlarr {
             stale: Mutex::new(false),
             stays_stale: false,
             rekeyed: Mutex::new(Vec::new()),
+            refuses_rekey: false,
         }
     }
 
@@ -95,6 +98,12 @@ impl AppSync for FakeProwlarr {
         _held: &RegisteredApplication,
         key: &str,
     ) -> Result<(), Failure> {
+        if self.refuses_rekey {
+            return Err(Failure::Refused {
+                service: "prowlarr".to_owned(),
+                detail: "HTTP 400: validation failed".to_owned(),
+            });
+        }
         if let Ok(mut rekeyed) = self.rekeyed.lock() {
             rekeyed.push(key.to_owned());
         }
@@ -348,6 +357,16 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
             .map(|keys| keys.clone())
             .unwrap_or_default(),
         vec!["arr-key".to_owned()]
+    );
+
+    let refusing = FakeProwlarr {
+        refuses_rekey: true,
+        ..FakeProwlarr::stale(existing.clone(), false)
+    };
+    let (states, _) = seed_applications(refusing, &[app("http://sonarr:8989")]).await;
+    assert!(
+        matches!(states.as_slice(), [State::Failed { detail }] if detail.contains("validation failed")),
+        "{states:?}"
     );
 
     let still = FakeProwlarr::stale(existing, true);

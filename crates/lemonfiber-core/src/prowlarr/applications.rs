@@ -59,29 +59,39 @@ impl AppSync for Prowlarr {
         held: &RegisteredApplication,
         key: &str,
     ) -> Result<(), Failure> {
-        let mut resource = held_resource(self, held).await?;
-        let fields = resource
-            .get_mut("fields")
-            .and_then(serde_json::Value::as_array_mut)
-            .into_iter()
-            .flatten();
-        for field in fields
-            .filter(|field| field.get("name").and_then(serde_json::Value::as_str) == Some("apiKey"))
-        {
-            if let Some(field) = field.as_object_mut() {
-                field.insert("value".to_owned(), serde_json::json!(key));
-            }
-        }
-        let written = self
-            .endpoint
-            .send(&self.request(
-                Method::Put,
-                &format!("/applications/{}", held.id),
-                Some(serde_json::Value::Object(resource).to_string()),
-            ))
-            .await?;
-        self.endpoint.expect_success(&written)
+        rekey(self, held, key).await
     }
+}
+
+/// Write `key` into the application Prowlarr holds under `held`'s identifier, changing
+/// nothing else about it.
+async fn rekey(
+    prowlarr: &Prowlarr,
+    held: &RegisteredApplication,
+    key: &str,
+) -> Result<(), Failure> {
+    let mut resource = held_resource(prowlarr, held).await?;
+    let fields = resource
+        .get_mut("fields")
+        .and_then(serde_json::Value::as_array_mut)
+        .into_iter()
+        .flatten();
+    for field in fields
+        .filter(|field| field.get("name").and_then(serde_json::Value::as_str) == Some("apiKey"))
+    {
+        if let Some(field) = field.as_object_mut() {
+            field.insert("value".to_owned(), serde_json::json!(key));
+        }
+    }
+    let written = prowlarr
+        .endpoint
+        .send(&prowlarr.request(
+            Method::Put,
+            &format!("/applications/{}", held.id),
+            Some(serde_json::Value::Object(resource).to_string()),
+        ))
+        .await?;
+    prowlarr.endpoint.expect_success(&written)
 }
 
 /// The application Prowlarr holds under `held`'s identifier, whole and as it holds it.

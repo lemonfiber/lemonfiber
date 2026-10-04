@@ -16,7 +16,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use lemonfiber_manifest::{ApiKind, Service};
+use lemonfiber_manifest::Service;
 
 use super::rotating::{unproven, would_rotate};
 use crate::app::targets::{record_secret, target_for};
@@ -50,11 +50,10 @@ pub(super) fn resettable(
     services: &[Service],
     project: Option<&Path>,
 ) -> Option<Target> {
-    let project = project?;
     services
         .iter()
         .filter(|service| !service.media_types.is_empty())
-        .filter_map(|service| target_for(service, project))
+        .filter_map(|service| project.and_then(|project| target_for(service, project)))
         .find(|target| published_as(&target.id) == held.setting)
 }
 
@@ -154,24 +153,17 @@ async fn copies(
 ) -> Vec<Propagation> {
     let arr = target.name.as_str();
     let mut copies = Vec::new();
-    if let Some(state) = crate::seed::run::resync_application(ctx, services, project, arr).await {
-        let prowlarr = crate::app::targets::aggregator_target(services, project)
-            .map_or_else(|| "Prowlarr".to_owned(), |aggregator| aggregator.name);
+    if let Some((prowlarr, state)) =
+        crate::seed::run::resync_application(ctx, services, project, arr).await
+    {
         copies.push(copy(
             format!("{prowlarr}, which supplies {arr} with indexers"),
             state,
         ));
     }
-    if let Some(state) = crate::seed::run::rewatch(ctx, services, project, &target.id).await {
-        let bazarr = services
-            .iter()
-            .find(|service| {
-                service
-                    .api
-                    .as_ref()
-                    .is_some_and(|api| api.kind == ApiKind::Bazarr)
-            })
-            .map_or("Bazarr", |service| service.name.as_str());
+    if let Some((bazarr, state)) =
+        crate::seed::run::rewatch(ctx, services, project, &target.id).await
+    {
         copies.push(copy(
             format!("{bazarr}, which finds subtitles for {arr}"),
             state,
