@@ -290,12 +290,27 @@ pub(crate) const CREDENTIAL_SUFFIXES: [&str; 3] =
 /// called after a setting this build or the stack already keeps — the media server's
 /// administrator, another service's password — would have that setting read and handed
 /// to it as its own credential.
-pub(crate) const PLUGIN_SETTING: &str = "plugin-";
+pub(crate) const PLUGIN_SETTING: &str = "PLUGIN_";
 
 /// A setting named for one service: its id as an environment name spells it, and then
 /// what the setting holds.
 pub(crate) fn for_service(id: &str, holds: &str) -> String {
     format!("{}{holds}", lemonfiber_manifest::environment_name(id))
+}
+
+/// A setting named for one installed plugin's service: [`PLUGIN_SETTING`], its id as an
+/// environment name spells it with every `_` written twice, and then what it holds.
+///
+/// Written twice so no two of these meet. Every ending in [`CREDENTIAL_SUFFIXES`] is one
+/// `_` and then a letter, so read from the left a `__` is the id's own `_` and the first
+/// `_` left over is where the id stops: the name gives back the id and the ending it was
+/// made of, and a service whose id runs on into another's ending — `a-api` beside `a`'s
+/// API key — spells a name of its own.
+pub(crate) fn for_plugin(id: &str, holds: &str) -> String {
+    format!(
+        "{PLUGIN_SETTING}{}{holds}",
+        lemonfiber_manifest::environment_name(id).replace('_', "__")
+    )
 }
 
 /// Every setting lemonfiber names.

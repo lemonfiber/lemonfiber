@@ -233,7 +233,7 @@ async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
             .service("jellyfin-admin")
             .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX))
             .as_deref(),
-        Some("PLUGIN_JELLYFIN_ADMIN_PASSWORD")
+        Some("PLUGIN_JELLYFIN__ADMIN_PASSWORD")
     );
 }
 
