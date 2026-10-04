@@ -39,7 +39,7 @@ fn reads_a_manifest_compiled_into_the_binary() {
         .manifest()
         .ok()
         .map(|manifest| (manifest.schema_version, manifest.services.len()));
-    assert_eq!(read, Some((1, 20)));
+    assert_eq!(read, Some((1, 22)));
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn reads_a_manifest_from_a_directory() {
         .manifest()
         .ok()
         .map(|manifest| (manifest.schema_version, manifest.services.len()));
-    assert_eq!(read, Some((1, 20)));
+    assert_eq!(read, Some((1, 22)));
 }
 
 #[test]
@@ -291,7 +291,7 @@ const fn today() -> lemonfiber_manifest::Date {
     lemonfiber_manifest::Date {
         year: 2026,
         month: 10,
-        day: 1,
+        day: 4,
     }
 }
 

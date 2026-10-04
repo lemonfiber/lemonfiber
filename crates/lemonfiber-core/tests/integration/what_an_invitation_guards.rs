@@ -39,17 +39,17 @@ const HOUSEHOLD: &str = r#"[
     {"Id":"7","Name":"bo","HasPassword":false},
     {"Id":"5","Name":"cy","HasPassword":false,"LastActivityDate":"2025-12-01T10:00:00.0000000Z"},
     {"Id":"11","Name":"ed","HasPassword":false},
-    {"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"2026-09-29T10:00:00.0000000Z"}
+    {"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"2026-10-02T10:00:00.0000000Z"}
 ]"#;
 
 /// What the media server recorded: the old offers in January, and `ed`'s yesterday.
 ///
-/// The test clock is stopped at the first of October, so January is long past the window
+/// The test clock is stopped at the fourth of October, so January is long past the window
 /// and the thirtieth of September is inside it.
 const RECORDED: &str = r#"{"Items":[
     {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"},
     {"Type":"UserPasswordChanged","Date":"2026-01-04T09:00:00.0000000Z","UserId":"5"},
-    {"Type":"UserCreated","Date":"2026-09-30T10:00:00.0000000Z","UserId":"11"}
+    {"Type":"UserCreated","Date":"2026-10-03T10:00:00.0000000Z","UserId":"11"}
 ]}"#;
 
 /// An account as the media server answers a read of it, for a policy to be written over.

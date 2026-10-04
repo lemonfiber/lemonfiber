@@ -38,7 +38,7 @@ use lemonfiber_ports::docker::{Health, Lifecycle};
 const TODAY: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
     year: 2026,
     month: 10,
-    day: 1,
+    day: 4,
 };
 
 /// Every service that stack declares.

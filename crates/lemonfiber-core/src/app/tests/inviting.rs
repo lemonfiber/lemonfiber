@@ -601,24 +601,7 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
     let stack = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack").kept();
     let _ = std::fs::create_dir_all(&stack);
     let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let decline = read
-        .split("[[service]]")
-        .find(|block| block.contains("id = \"jellyfin\""))
-        .unwrap_or_default()
-        .replace("id = \"jellyfin\"", "id = \"decline\"")
-        .replace("port = 8096", "port = 5056")
-        .replace(
-            "api = { kind = \"jellyfin\", key_source = \"generated\" }\n",
-            "",
-        )
-        .replace(
-            "provides = [\"media.serve\", \"identity.source\"]",
-            "provides = []",
-        );
-    let _ = std::fs::write(
-        stack.join("stack.toml"),
-        format!("{read}\n[[service]]{decline}"),
-    );
+    let _ = std::fs::write(stack.join("stack.toml"), read);
     let stack: &'static std::path::Path = Box::leak(stack.into_boxed_path());
     let http = Fake::by_path_in_turn(vec![
         (

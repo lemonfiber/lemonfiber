@@ -391,6 +391,8 @@ fn a_plan_names_the_services_the_profiles_hold() {
         Some(named(&[
             "jellyfin",
             "seerr",
+            "request-gate",
+            "decline",
             "calibre-web-automated",
             "audiobookshelf",
             "navidrome"

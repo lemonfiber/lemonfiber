@@ -45,9 +45,11 @@ fn ctx(engine: Reporting) -> Ctx {
 }
 
 /// Every service the `library` form declares.
-const LIBRARY: [&str; 5] = [
+const LIBRARY: [&str; 7] = [
     "jellyfin",
     "seerr",
+    "request-gate",
+    "decline",
     "calibre-web-automated",
     "audiobookshelf",
     "navidrome",

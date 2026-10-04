@@ -353,9 +353,11 @@ fn a_surveyed_service_names_the_form_it_is_running_for() {
 }
 
 /// Everything the `media` profile declares.
-const MEDIA: [&str; 5] = [
+const MEDIA: [&str; 7] = [
     "jellyfin",
     "seerr",
+    "request-gate",
+    "decline",
     "calibre-web-automated",
     "audiobookshelf",
     "navidrome",

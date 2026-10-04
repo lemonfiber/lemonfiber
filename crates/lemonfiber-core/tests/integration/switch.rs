@@ -151,6 +151,8 @@ async fn a_real_switch_stops_then_starts_then_waits() {
             &[
                 "jellyfin",
                 "seerr",
+                "request-gate",
+                "decline",
                 "calibre-web-automated",
                 "audiobookshelf",
                 "navidrome",

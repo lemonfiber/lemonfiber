@@ -106,6 +106,8 @@ async fn a_switch_that_succeeds_stops_starts_and_then_waits_for_health() {
             &[
                 "jellyfin",
                 "seerr",
+                "request-gate",
+                "decline",
                 "calibre-web-automated",
                 "audiobookshelf",
                 "navidrome",
