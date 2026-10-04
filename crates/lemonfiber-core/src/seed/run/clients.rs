@@ -16,6 +16,7 @@ use crate::wiring::Fillers;
 use super::connecting::{pairings, Connection};
 
 use super::{read_temporary_password, Ctx};
+use crate::origin::Origin;
 use crate::wiring::Filler;
 
 /// The category an application files under, named as that application names its
@@ -38,6 +39,41 @@ pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Categor
     })
 }
 
+/// Whose a credential is: the service's id, and the plugin that brought it where one
+/// did.
+///
+/// Both, because an id is not unique across the two: a stack updated after a plugin was
+/// installed can ship a service under the id the plugin's service already has, and one's
+/// credential is never handed out as the other's.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Holder {
+    /// The plugin that brought the service, or nothing for one of the stack's own.
+    pub(super) plugin: Option<String>,
+    /// The service's id.
+    pub(super) id: String,
+}
+
+impl Holder {
+    /// Whose `filler`'s credential is.
+    pub(super) fn of(filler: &Filler) -> Self {
+        Self {
+            plugin: match &filler.origin {
+                Origin::Plugin { named } => Some(named.clone()),
+                _ => None,
+            },
+            id: filler.id.clone(),
+        }
+    }
+
+    /// One of the stack's own services.
+    pub(super) fn stack(id: &str) -> Self {
+        Self {
+            plugin: None,
+            id: id.to_owned(),
+        }
+    }
+}
+
 /// The credential each download client on this machine answers to, by the service it
 /// is.
 ///
@@ -46,16 +82,20 @@ pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Categor
 /// replaced held.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct Held {
-    /// Each credential in hand, by the service it proves.
-    pub(super) keys: BTreeMap<String, Credential>,
+    /// Each credential in hand, by whose it is.
+    pub(super) keys: BTreeMap<Holder, Credential>,
     /// Every service whose credential file was refused rather than read.
-    pub(super) refused: BTreeSet<String>,
+    pub(super) refused: BTreeSet<Holder>,
 }
 
+/// The credentials of the stack's own services, by id.
 impl From<BTreeMap<String, Credential>> for Held {
     fn from(keys: BTreeMap<String, Credential>) -> Self {
         Self {
-            keys,
+            keys: keys
+                .into_iter()
+                .map(|(id, credential)| (Holder::stack(&id), credential))
+                .collect(),
             refused: BTreeSet::new(),
         }
     }
@@ -63,15 +103,16 @@ impl From<BTreeMap<String, Credential>> for Held {
 
 impl Held {
     /// The credential this service answers to, where it is in hand.
-    pub(super) fn of(&self, service: &str) -> Option<&Credential> {
-        self.keys.get(service)
+    pub(super) fn of(&self, holder: &Holder) -> Option<&Credential> {
+        self.keys.get(holder)
     }
 
-    /// Every credential in hand, beside the service it proves.
-    pub(super) fn each(&self) -> impl Iterator<Item = (&str, &Credential)> {
+    /// Every credential the stack's own services hold, beside the service it proves.
+    pub(super) fn stacks(&self) -> impl Iterator<Item = (&str, &Credential)> {
         self.keys
             .iter()
-            .map(|(service, credential)| (service.as_str(), credential))
+            .filter(|(holder, _)| holder.plugin.is_none())
+            .map(|(holder, credential)| (holder.id.as_str(), credential))
     }
 }
 
@@ -82,17 +123,18 @@ impl Held {
 /// A client missing from the answer has not written its key yet, or has never had a
 /// password set, and nothing is told about it until a later run finds one — unless the
 /// file its key would be in was refused, which is kept so it can be said.
-pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String, String>) -> Held {
+pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder, String>) -> Held {
     let mut held = Held::default();
     for filler in fillers.speaking(ApiKind::Sabnzbd) {
         match crate::app::targets::credential_file(ctx, filler).await {
             Beneath::Read(text) => {
                 if let Some(key) = crate::sabnzbd::api_key(&text) {
-                    held.keys.insert(filler.id.clone(), Credential::ApiKey(key));
+                    held.keys
+                        .insert(Holder::of(filler), Credential::ApiKey(key));
                 }
             }
             Beneath::Escaped => {
-                held.refused.insert(filler.id.clone());
+                held.refused.insert(Holder::of(filler));
             }
             Beneath::Absent => {}
         }
@@ -102,12 +144,12 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String,
             continue;
         };
         let password = minted
-            .get(&filler.id)
+            .get(&Holder::of(filler))
             .cloned()
             .or_else(|| crate::app::targets::recorded_secret(ctx, &setting));
         if let Some(password) = password {
             held.keys.insert(
-                filler.id.clone(),
+                Holder::of(filler),
                 Credential::UserPass {
                     username: crate::config::QBITTORRENT_USER.to_owned(),
                     password,
@@ -128,7 +170,7 @@ pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
     pairings(fillers)
         .iter()
         .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _))))
-        .filter(|pairing| held.refused.contains(&pairing.filler.id))
+        .filter(|pairing| held.refused.contains(&Holder::of(pairing.filler)))
         .map(|pairing| {
             Wiring::settled(
                 format!("{} into {}", pairing.filler.name, pairing.asker.name),
@@ -151,7 +193,7 @@ pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
 pub(super) async fn seed_passwords(
     ctx: &Ctx,
     fillers: &Fillers,
-) -> (Vec<crate::seed::Wiring>, BTreeMap<String, String>) {
+) -> (Vec<crate::seed::Wiring>, BTreeMap<Holder, String>) {
     let mut wirings = Vec::new();
     let mut minted = BTreeMap::new();
     for filler in fillers.speaking(ApiKind::Qbittorrent) {
@@ -163,8 +205,9 @@ pub(super) async fn seed_passwords(
                 password_connection(filler),
                 crate::seed::State::Refused {
                     reason: format!(
-                        "the setting {}'s password would be kept under is one lemonfiber or the \
-                         stack already keeps something else in, so it is neither read nor set",
+                        "the setting {}'s password would be kept under is one lemonfiber, the \
+                         stack or another installed service already keeps something else in, so \
+                         it is neither read nor set",
                         filler.name
                     ),
                 },
@@ -175,7 +218,7 @@ pub(super) async fn seed_passwords(
         let (wiring, generated) = seed_qbittorrent_password(ctx, filler, &base, &setting).await;
         wirings.push(wiring);
         if let Some(password) = generated {
-            minted.insert(filler.id.clone(), password);
+            minted.insert(Holder::of(filler), password);
         }
     }
     (wirings, minted)

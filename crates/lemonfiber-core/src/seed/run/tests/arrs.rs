@@ -188,7 +188,7 @@ fn a_plugin_standing_in_for_the_usenet_client_is_reached_where_it_answers() {
     let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
     let mut held = both_held();
     held.keys.insert(
-        "nzbget".to_owned(),
+        holder(Some("nzbget"), "nzbget"),
         Credential::ApiKey("its-own".to_owned()),
     );
 
@@ -262,7 +262,10 @@ async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection(
         super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
     let refused = super::super::clients::refused(&fillers, &held);
 
-    assert!(held.of("nzbget").is_none(), "the file was read");
+    assert!(
+        held.of(&holder(Some("nzbget"), "nzbget")).is_none(),
+        "the file was read"
+    );
     assert_eq!(
         refused
             .iter()
