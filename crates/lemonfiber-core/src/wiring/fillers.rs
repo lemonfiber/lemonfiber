@@ -151,31 +151,40 @@ impl Fillers {
 
     /// The setting a credential this service holds is kept under, ending in `holds`.
     ///
-    /// A stack service's is named after its id, as it always has been. A plugin's is
-    /// named in a namespace of its own, so no id a plugin chooses can compute the name of
-    /// a setting the stack keeps — and where one would still land on a setting this build
-    /// or one of the stack's services already holds, the answer is nothing, so the
-    /// setting is neither read for the plugin nor written for it.
+    /// A stack service's is named after its id. A plugin's is named in a namespace of its
+    /// own, spelled so no two of its services' settings meet — and where one would still
+    /// land on a setting this build names, or on one any other service here takes for
+    /// any credential, the answer is nothing, so the setting is neither read for the
+    /// plugin nor written for it. So is one ending in anything but a credential's ending,
+    /// which is what the spelling's guarantee is made of.
     #[must_use]
     pub fn setting(&self, filler: &Filler, holds: &str) -> Option<String> {
+        let setting = spelled(filler, holds);
         if !matches!(filler.origin, Origin::Plugin { .. }) {
-            return Some(crate::config::for_service(&filler.id, holds));
+            return Some(setting);
         }
-        let setting = crate::config::for_service(
-            &format!("{}{}", crate::config::PLUGIN_SETTING, filler.id),
-            holds,
-        );
-        let ours = self
+        let credential = crate::config::CREDENTIAL_SUFFIXES.contains(&holds);
+        let taken = self
             .services
             .iter()
-            .filter(|one| one.origin == Origin::Bundled)
+            .filter(|one| !(one.id == filler.id && one.origin == filler.origin))
             .flat_map(|one| {
                 crate::config::CREDENTIAL_SUFFIXES
                     .iter()
-                    .map(|suffix| crate::config::for_service(&one.id, suffix))
+                    .map(|suffix| spelled(one, suffix))
             })
-            .any(|taken| taken == setting);
-        (!ours && !crate::config::SETTINGS.contains(&setting.as_str())).then_some(setting)
+            .any(|other| other == setting);
+        (credential && !taken && !crate::config::SETTINGS.contains(&setting.as_str()))
+            .then_some(setting)
+    }
+}
+
+/// The name a credential `filler` holds would be kept under, ending in `holds`, before
+/// anything is refused.
+fn spelled(filler: &Filler, holds: &str) -> String {
+    match filler.origin {
+        Origin::Plugin { .. } => crate::config::for_plugin(&filler.id, holds),
+        _ => crate::config::for_service(&filler.id, holds),
     }
 }
 

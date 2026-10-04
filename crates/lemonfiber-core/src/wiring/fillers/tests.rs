@@ -230,6 +230,70 @@ fn a_plugins_credential_is_kept_apart_from_the_stacks() {
     );
     assert_eq!(
         setting("qbittorrent-two").as_deref(),
-        Some("PLUGIN_QBITTORRENT_TWO_PASSWORD")
+        Some("PLUGIN_QBITTORRENT__TWO_PASSWORD")
     );
+}
+
+/// Two plugins' services whose ids run into each other's endings never share a
+/// setting: `a-api` holding a key and `a` holding its API key are kept apart.
+#[test]
+fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
+    let installed = [
+        an_installed("first", vec![a_placed("a", &[], None, None)]),
+        an_installed("second", vec![a_placed("a-api", &[], None, None)]),
+    ];
+    let fillers = shipped(&installed, &Chosen::default(), |_| ());
+    let spelled = |id: &str, holds: &str| {
+        fillers
+            .service(id)
+            .map(|one| super::spelled(one, holds))
+            .unwrap_or_default()
+    };
+
+    assert_eq!(spelled("a", "_API_KEY"), "PLUGIN_A_API_KEY");
+    assert_eq!(spelled("a-api", "_KEY"), "PLUGIN_A__API_KEY");
+    assert_ne!(spelled("a", "_API_KEY"), spelled("a-api", "_KEY"));
+}
+
+/// Every ending a credential takes is one `_` and then a letter, which is what lets a
+/// plugin's setting be read back into the id and the ending it was made of.
+#[test]
+fn every_credential_ending_is_one_underscore_and_then_a_letter() {
+    for suffix in crate::config::CREDENTIAL_SUFFIXES {
+        let mut chars = suffix.chars();
+        assert_eq!(chars.next(), Some('_'), "{suffix}");
+        assert!(
+            chars.next().is_some_and(|c| c.is_ascii_alphabetic()),
+            "{suffix}"
+        );
+    }
+}
+
+/// A plugin's setting is refused where another service here takes the same name for any
+/// credential, where it would end in anything but a credential's ending, and never for
+/// the stack's own.
+#[test]
+fn a_plugin_setting_another_service_takes_is_refused() {
+    // Written alike once case and `-` or `_` are set aside, as a record kept before
+    // that was refused at install may still be.
+    let installed = [
+        an_installed("first", vec![a_placed("kept-one", &[], None, None)]),
+        an_installed("second", vec![a_placed("kept_one", &[], None, None)]),
+        an_installed("third", vec![a_placed("apart", &[], None, None)]),
+    ];
+    let fillers = shipped(&installed, &Chosen::default(), |_| ());
+    let setting = |id: &str, holds: &str| {
+        fillers
+            .service(id)
+            .and_then(|one| fillers.setting(one, holds))
+    };
+
+    assert_eq!(setting("kept-one", crate::config::PASSWORD_SUFFIX), None);
+    assert_eq!(setting("kept_one", crate::config::PASSWORD_SUFFIX), None);
+    assert_eq!(setting("apart", "_KEY"), None);
+    assert_eq!(
+        setting("apart", crate::config::PASSWORD_SUFFIX).as_deref(),
+        Some("PLUGIN_APART_PASSWORD")
+    );
+    assert_eq!(setting("sonarr", "_KEY").as_deref(), Some("SONARR_KEY"));
 }

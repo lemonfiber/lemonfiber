@@ -226,18 +226,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // configured that way and by no other means — the quality sync and the archive
     // extractor — so without this they run with nothing, and the quality sync refuses
     // its whole configuration over a single undefined name.
-    wirings.push(
-        published::publish_keys(
-            ctx,
-            &manifest.services,
-            project.as_deref(),
-            published::Clients {
-                fillers: &fillers,
-                held: &held,
-            },
-        )
-        .await,
-    );
+    wirings.push(published::publish_keys(ctx, &manifest.services, project.as_deref(), &held).await);
 
     // The subtitle finder, told which \*arrs to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly

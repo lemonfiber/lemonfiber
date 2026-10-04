@@ -106,7 +106,7 @@ async fn a_usenet_clients_key_is_held_against_the_client_it_was_read_from() {
     .await;
 
     assert_eq!(
-        held.of("sabnzbd"),
+        held.of(&holder(None, "sabnzbd")),
         Some(&Credential::ApiKey("the-sab-key".to_owned()))
     );
 }
@@ -134,9 +134,12 @@ async fn a_usenet_key_needs_a_project_and_a_file_that_holds_one() {
     )
     .await;
 
-    assert!(nowhere.of("sabnzbd").is_none(), "read from no project");
     assert!(
-        nothing_yet.of("sabnzbd").is_none(),
+        nowhere.of(&holder(None, "sabnzbd")).is_none(),
+        "read from no project"
+    );
+    assert!(
+        nothing_yet.of(&holder(None, "sabnzbd")).is_none(),
         "read from a file never written"
     );
 }
@@ -159,19 +162,22 @@ async fn a_torrent_clients_password_is_the_one_minted_or_recorded_for_it() {
     let minted = super::super::clients::held(
         &ctx,
         &fillers,
-        &std::collections::BTreeMap::from([("qbittorrent".to_owned(), "minted-now".to_owned())]),
+        &std::collections::BTreeMap::from([(holder(None, "qbittorrent"), "minted-now".to_owned())]),
     )
     .await;
 
     // Compared rather than printed: the values are credentials, and a failing
     // assertion prints its message into the run's log.
-    assert!(password_of(&recorded, "qbittorrent").is_some_and(|held| held == "minted-earlier"));
-    assert!(password_of(&minted, "qbittorrent").is_some_and(|held| held == "minted-now"));
-    assert!(password_of(&minted, "sabnzbd").is_none());
+    assert!(password_of(&recorded, &holder(None, "qbittorrent"))
+        .is_some_and(|held| held == "minted-earlier"));
+    assert!(
+        password_of(&minted, &holder(None, "qbittorrent")).is_some_and(|held| held == "minted-now")
+    );
+    assert!(password_of(&minted, &holder(None, "sabnzbd")).is_none());
 }
 
 /// The password held for a service, where what is held for it is one.
-fn password_of(held: &Held, service: &str) -> Option<String> {
+fn password_of(held: &Held, service: &super::super::clients::Holder) -> Option<String> {
     match held.of(service) {
         Some(Credential::UserPass { password, .. }) => Some(password.clone()),
         Some(Credential::ApiKey(_)) | None => None,
@@ -227,13 +233,13 @@ async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
     let held =
         super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
 
-    assert!(password_of(&held, "jellyfin-admin").is_none());
+    assert!(password_of(&held, &holder(Some("namesake"), "jellyfin-admin")).is_none());
     assert_eq!(
         fillers
             .service("jellyfin-admin")
             .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX))
             .as_deref(),
-        Some("PLUGIN_JELLYFIN_ADMIN_PASSWORD")
+        Some("PLUGIN_JELLYFIN__ADMIN_PASSWORD")
     );
 }
 
@@ -274,7 +280,7 @@ async fn a_plugin_setting_that_lands_on_one_the_stack_holds_is_refused() {
         super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
     let (wirings, minted) = super::super::clients::seed_passwords(&ctx, &fillers).await;
 
-    assert!(password_of(&held, "nzbget").is_none());
+    assert!(password_of(&held, &holder(Some("nzbget"), "nzbget")).is_none());
     assert!(minted.is_empty());
     let refused: Vec<&crate::seed::Wiring> = wirings
         .iter()
@@ -390,4 +396,44 @@ fn a_target_carries_the_servarr_api_version() {
         Some(8989),
     );
     assert!(super::super::target_for(&versionless, project).is_none());
+}
+
+/// A plugin's torrent client under the id one of the stack's own already has is held
+/// apart from it: the password minted for the plugin's is never the stack's, and the
+/// stack's is never handed to the plugin's.
+#[tokio::test]
+async fn a_plugin_client_sharing_a_stack_clients_id_never_shares_its_credential() {
+    let ctx = seed_ctx(None, true, Vec::new(), None, None);
+    let twin = crate::test_support::a_placed(
+        "qbittorrent",
+        &["download.torrent"],
+        Some(torrent_api()),
+        Some(8082),
+    );
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &[crate::test_support::an_installed("twin", vec![twin])],
+                &crate::wiring::Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default();
+
+    let held = super::super::clients::held(
+        &ctx,
+        &fillers,
+        &std::collections::BTreeMap::from([(
+            holder(Some("twin"), "qbittorrent"),
+            "the-twins".to_owned(),
+        )]),
+    )
+    .await;
+
+    // Compared rather than printed: the values are credentials.
+    assert!(password_of(&held, &holder(Some("twin"), "qbittorrent"))
+        .is_some_and(|password| password == "the-twins"));
+    assert!(password_of(&held, &holder(None, "qbittorrent")).is_none());
 }

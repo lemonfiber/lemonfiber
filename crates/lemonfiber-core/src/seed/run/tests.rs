@@ -379,3 +379,12 @@ mod taken_back;
 mod targets;
 mod tokens;
 mod unmanaged;
+
+/// Whose a credential is, for a test: one of the stack's own services where `plugin` is
+/// nothing, and otherwise the service that plugin brought.
+fn holder(plugin: Option<&str>, id: &str) -> super::clients::Holder {
+    super::clients::Holder {
+        plugin: plugin.map(str::to_owned),
+        id: id.to_owned(),
+    }
+}

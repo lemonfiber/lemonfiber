@@ -228,7 +228,7 @@ pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<D
         let Ok((Connection::DownloadClient(kind), at)) = pairing.made else {
             continue;
         };
-        let Some(credential) = held.of(&pairing.filler.id) else {
+        let Some(credential) = held.of(&super::clients::Holder::of(pairing.filler)) else {
             continue;
         };
         wanted.push(DownloadClient {

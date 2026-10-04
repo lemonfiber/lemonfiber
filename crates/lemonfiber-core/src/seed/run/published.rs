@@ -29,7 +29,6 @@ use super::arrs::read_servarr_key;
 use super::clients::Held;
 use super::Ctx;
 use crate::ports::service::Credential;
-use crate::wiring::Fillers;
 
 /// What this connection is called where it is reported.
 const CONNECTION: &str = "Keys the stack's own services read";
@@ -48,14 +47,14 @@ pub(crate) fn published_as(id: &str) -> String {
 
 /// Put every key this pass could read where the stack's own services read it.
 ///
-/// `clients` is what was already gathered for the download-client registration, passed
+/// `held` is what was already gathered for the download-client registration, passed
 /// in rather than read again — the same files, and a second read could only fail where
 /// the first had.
 pub(super) async fn publish_keys(
     ctx: &Ctx,
     services: &[Service],
     project: Option<&std::path::Path>,
-    clients: Clients<'_>,
+    held: &Held,
 ) -> crate::seed::Wiring {
     let mut published = written_down(ctx, services, project).await;
 
@@ -63,12 +62,12 @@ pub(super) async fn publish_keys(
     // mints its password, and retiring revokes a key, so a rehearsal that got past here
     // would have changed the very things it promised only to describe.
     if ctx.dry_run {
-        return would_publish(published, clients);
+        return would_publish(published, held);
     }
 
     claimed(ctx, services).await;
     retired(ctx, services).await;
-    published.extend(from_the_clients(clients));
+    published.extend(from_the_clients(held));
 
     if published.is_empty() {
         return crate::seed::Wiring::settled(CONNECTION.to_owned(), nothing_to_publish());
@@ -95,9 +94,9 @@ fn nothing_to_publish() -> crate::seed::State {
 /// Every pair gathered here is a setting and the credential destined for it, and the
 /// report is serialized — so the names are the whole of what an operator is deciding
 /// about, and the values are the one thing a question must never make a second copy of.
-fn would_publish(written: Vec<(String, String)>, clients: Clients<'_>) -> crate::seed::Wiring {
+fn would_publish(written: Vec<(String, String)>, held: &Held) -> crate::seed::Wiring {
     let mut settings: Vec<String> = written.into_iter().map(|(name, _)| name).collect();
-    settings.extend(from_the_clients(clients).into_iter().map(|(name, _)| name));
+    settings.extend(from_the_clients(held).into_iter().map(|(name, _)| name));
     settings.sort();
     settings.dedup();
     let state = if settings.is_empty() {
@@ -199,16 +198,6 @@ async fn retired(ctx: &Ctx, services: &[Service]) {
     }
 }
 
-/// The download clients on this machine and the credential each answers to, as the
-/// registration gathered them.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct Clients<'a> {
-    /// Who each client is, and whether the stack ships it.
-    pub(super) fillers: &'a Fillers,
-    /// The credential each answers to, where it is in hand.
-    pub(super) held: &'a Held,
-}
-
 /// What the stack's own download clients' credentials publish: each client's key under
 /// its own name, and the account name each torrent client is reached under.
 ///
@@ -221,16 +210,9 @@ pub(super) struct Clients<'a> {
 /// a credential authenticates with neither, and a name published on its own would let
 /// this connection report success on a stack where nothing was read at all. The
 /// password itself is already recorded under its own setting by the run that minted it.
-fn from_the_clients(clients: Clients<'_>) -> Vec<(String, String)> {
+fn from_the_clients(held: &Held) -> Vec<(String, String)> {
     let mut found = Vec::new();
-    for (service, credential) in clients.held.each() {
-        let ours = clients
-            .fillers
-            .service(service)
-            .is_some_and(|filler| filler.origin == crate::origin::Origin::Bundled);
-        if !ours {
-            continue;
-        }
+    for (service, credential) in held.stacks() {
         found.push(match credential {
             Credential::ApiKey(key) => (published_as(service), key.clone()),
             Credential::UserPass { username, .. } => (
