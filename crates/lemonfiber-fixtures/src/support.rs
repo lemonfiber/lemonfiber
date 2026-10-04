@@ -303,6 +303,9 @@ pub struct SeedFs {
     /// directories that are not there — so a root folder's existence check can be
     /// driven to missing. Every path resolves when empty.
     missing: Vec<&'static str>,
+    /// Path fragments a canonicalize resolves somewhere else entirely, standing in for
+    /// a link a container put where its file was expected.
+    leading_away: Vec<&'static str>,
     /// What a volume describe reports — a zero total by default, which the
     /// dashboard reads as free space unknown.
     facts: lemonfiber_ports::filesystem::StorageFacts,
@@ -321,6 +324,7 @@ impl SeedFs {
             seerr: None,
             only_prowlarr: false,
             missing: Vec::new(),
+            leading_away: Vec::new(),
             elsewhere: Vec::new(),
             wrote: std::sync::Mutex::new(Vec::new()),
             facts: lemonfiber_ports::filesystem::StorageFacts {
@@ -396,6 +400,14 @@ impl SeedFs {
     #[must_use]
     pub fn missing(mut self, fragments: Vec<&'static str>) -> Self {
         self.missing = fragments;
+        self
+    }
+
+    /// The same, resolving every path holding one of `fragments` to somewhere outside
+    /// any directory a test names — the shape of a link put where a file was expected.
+    #[must_use]
+    pub fn leading_away(mut self, fragments: Vec<&'static str>) -> Self {
+        self.leading_away = fragments;
         self
     }
 }
@@ -525,6 +537,13 @@ fn resolved(
     let text = path.to_string_lossy();
     if seed.missing.iter().any(|fragment| text.contains(fragment)) {
         return Err(lemonfiber_ports::filesystem::Fault::new("no such path"));
+    }
+    if seed
+        .leading_away
+        .iter()
+        .any(|fragment| text.contains(fragment))
+    {
+        return Ok(std::path::PathBuf::from("/etc/elsewhere"));
     }
     Ok(path.to_path_buf())
 }

@@ -93,7 +93,7 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         // A plugin's client is in hand beside the stack's own, and nothing reads its key
         // out of the environment, so it is not written there.
-        published(&Held(std::collections::BTreeMap::from([
+        published(&Held::from(std::collections::BTreeMap::from([
             (
                 "sabnzbd".to_owned(),
                 Credential::ApiKey("sab-key".to_owned()),
@@ -209,7 +209,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         // The torrent client's password is in hand, which is what its account name is
         // published to pair with.
-        published(&Held(std::collections::BTreeMap::from([(
+        published(&Held::from(std::collections::BTreeMap::from([(
             "qbittorrent".to_owned(),
             Credential::UserPass {
                 username: crate::config::QBITTORRENT_USER.to_owned(),

@@ -158,13 +158,38 @@ pub(crate) struct ServiceAddr {
 /// A plugin's is read only where it is a plain file beneath the directory its container
 /// owns: whatever runs there can write that directory, and a link put where the file is
 /// expected would otherwise have lemonfiber read any file on the host and hand it to the
-/// container as its own credential. Nothing where the service names no such file.
-pub(crate) async fn credential_file(ctx: &Ctx, filler: &crate::wiring::Filler) -> Option<String> {
-    let file = filler.key_file.as_deref()?;
+/// container as its own credential. Absent where the service names no such file.
+pub(crate) async fn credential_file(
+    ctx: &Ctx,
+    filler: &crate::wiring::Filler,
+) -> crate::ports::filesystem::Beneath {
+    use crate::ports::filesystem::Beneath;
+
+    let Some(file) = filler.key_file.as_deref() else {
+        return Beneath::Absent;
+    };
     match filler.confined_to.as_deref() {
         Some(within) => ctx.seams.filesystem.read_beneath(file, within).await,
-        None => ctx.seams.filesystem.read(file).await,
+        None => ctx
+            .seams
+            .filesystem
+            .read(file)
+            .await
+            .map_or(Beneath::Absent, Beneath::Read),
     }
+}
+
+/// Why a service's credential file was refused rather than read, naming the plugin
+/// that brought it where a plugin did.
+pub(crate) fn escaped(filler: &crate::wiring::Filler) -> String {
+    let whose = match &filler.origin {
+        crate::origin::Origin::Plugin { named } => named.as_str(),
+        _ => filler.name.as_str(),
+    };
+    format!(
+        "{whose}'s credential file is a link, leads outside the directory its container \
+         owns, or is not a file at all, so it was not read"
+    )
 }
 
 /// Where this machine reaches a service that publishes this port.

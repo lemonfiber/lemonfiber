@@ -135,6 +135,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     let (minted, passwords) = seed_passwords(ctx, &fillers).await;
     wirings.extend(minted);
     let held = held(ctx, &fillers, &passwords).await;
+    wirings.extend(clients::refused(&fillers, &held));
 
     // Root folders and download clients for each \*arr that files media, and the
     // pairs that come to no connection at all, said rather than left out.

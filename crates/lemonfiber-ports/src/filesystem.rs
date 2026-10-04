@@ -327,18 +327,19 @@ pub trait FileSystem: Storage + Send + Sync {
     async fn read(&self, path: &Path) -> Option<String>;
 
     /// Read a small file somebody else's container can write, only where it is a plain
-    /// file lying beneath `within` once every link on the way is resolved — or `None`.
+    /// file lying beneath `within` once every link on the way is resolved.
     ///
     /// The container owns the directory, so it can put a link where a file is expected,
     /// or link a directory on the way to one, and a plain read would follow either to
     /// any file on the host. A link at the file itself is refused outright, and one on
-    /// the way is refused wherever it leads outside `within`.
+    /// the way is refused wherever it leads outside `within` — each said as
+    /// [`Beneath::Escaped`], apart from a file that is simply not there yet.
     ///
     /// The default written here looks and then reads, which leaves a window between the
     /// two. It is for the fakes, where nothing races; the implementation that touches a
     /// real filesystem overrides it with one that opens the file once and checks what
     /// it opened, and is the only one whose promise is worth anything.
-    async fn read_beneath(&self, path: &Path, within: &Path) -> Option<String> {
+    async fn read_beneath(&self, path: &Path, within: &Path) -> Beneath {
         read_beneath(self, path, within).await
     }
 
@@ -361,14 +362,34 @@ async fn read_beneath<F: FileSystem + ?Sized>(
     filesystem: &F,
     path: &Path,
     within: &Path,
-) -> Option<String> {
-    let root = filesystem.canonicalize(within).await.ok()?;
-    let resolved = filesystem.canonicalize(path).await.ok()?;
-    if resolved.starts_with(&root) {
-        filesystem.read(path).await
-    } else {
-        None
+) -> Beneath {
+    let (Ok(root), Ok(resolved)) = (
+        filesystem.canonicalize(within).await,
+        filesystem.canonicalize(path).await,
+    ) else {
+        return Beneath::Absent;
+    };
+    if !resolved.starts_with(&root) {
+        return Beneath::Escaped;
     }
+    filesystem
+        .read(path)
+        .await
+        .map_or(Beneath::Absent, Beneath::Read)
+}
+
+/// What reading a file somebody else's container can write came to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Beneath {
+    /// It is a plain file beneath the directory, and this is what it holds.
+    Read(String),
+    /// Nothing is there to read yet, or it could not be read — the ordinary case of a
+    /// service that has not written it.
+    Absent,
+    /// Something is there and it is not a plain file of the directory's own: a link, a
+    /// path that leads outside the directory, or something that is not a file at all.
+    /// Refused, and worth saying, because it is either a mistake or an attempt.
+    Escaped,
 }
 
 /// The default claim: read, and write only where nothing was there to read.

@@ -1,6 +1,7 @@
 use super::{aggregator_target, project_directory};
 use crate::app::targets::downloads::committed_of;
 use crate::app::Ctx;
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::Download;
 use crate::test_support::a_context;
 
@@ -204,19 +205,36 @@ async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
             "/stack/config/stand-in/key.ini",
             Some("/stack/config/stand-in")
         ))
-        .await
-        .as_deref(),
-        Some("beneath")
+        .await,
+        Beneath::Read("beneath".to_owned())
     );
     assert_eq!(
         read(keyed_in("/stack/secret", Some("/stack/config/stand-in"))).await,
-        None
+        Beneath::Escaped
     );
     assert_eq!(
-        read(keyed_in("/stack/secret", None)).await.as_deref(),
-        Some("the host's own")
+        read(keyed_in("/stack/secret", None)).await,
+        Beneath::Read("the host's own".to_owned())
     );
+    assert_eq!(read(keyed_in("/stack/absent", None)).await, Beneath::Absent);
     let mut unkeyed = keyed_in("/stack/secret", None);
     unkeyed.key_file = None;
-    assert_eq!(read(unkeyed).await, None);
+    assert_eq!(read(unkeyed).await, Beneath::Absent);
+}
+
+/// A refused credential file is said in the plugin's name where a plugin brought it,
+/// and in the service's where it did not.
+#[test]
+fn a_refused_credential_file_is_said_in_the_name_of_whoever_brought_it() {
+    let mut brought = keyed_in("/stack/secret", None);
+    brought.origin = crate::origin::Origin::Plugin {
+        named: "nzbget".to_owned(),
+    };
+
+    assert_eq!(
+        super::escaped(&brought),
+        "nzbget's credential file is a link, leads outside the directory its container \
+         owns, or is not a file at all, so it was not read"
+    );
+    assert!(super::escaped(&keyed_in("/stack/secret", None)).starts_with("Stand-in's"));
 }

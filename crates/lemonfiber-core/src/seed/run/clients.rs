@@ -4,14 +4,19 @@
 //! category its transfers are filed under. Where each is reached is the filler's own
 //! declaration, read through [`crate::wiring::Fillers`].
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lemonfiber_manifest::ApiKind;
 
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::Credential;
-use crate::wiring::{Filler, Fillers};
+use crate::seed::{State, Wiring};
+use crate::wiring::Fillers;
+
+use super::connecting::{pairings, Connection};
 
 use super::{read_temporary_password, Ctx};
+use crate::wiring::Filler;
 
 /// The category an application files under, named as that application names its
 /// category field, for the media type it manages.
@@ -40,17 +45,31 @@ pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Categor
 /// standing in for another is told about with its own key, never the one the client it
 /// replaced held.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(super) struct Held(pub(super) BTreeMap<String, Credential>);
+pub(super) struct Held {
+    /// Each credential in hand, by the service it proves.
+    pub(super) keys: BTreeMap<String, Credential>,
+    /// Every service whose credential file was refused rather than read.
+    pub(super) refused: BTreeSet<String>,
+}
+
+impl From<BTreeMap<String, Credential>> for Held {
+    fn from(keys: BTreeMap<String, Credential>) -> Self {
+        Self {
+            keys,
+            refused: BTreeSet::new(),
+        }
+    }
+}
 
 impl Held {
     /// The credential this service answers to, where it is in hand.
     pub(super) fn of(&self, service: &str) -> Option<&Credential> {
-        self.0.get(service)
+        self.keys.get(service)
     }
 
     /// Every credential in hand, beside the service it proves.
     pub(super) fn each(&self) -> impl Iterator<Item = (&str, &Credential)> {
-        self.0
+        self.keys
             .iter()
             .map(|(service, credential)| (service.as_str(), credential))
     }
@@ -61,12 +80,21 @@ impl Held {
 /// on an earlier one.
 ///
 /// A client missing from the answer has not written its key yet, or has never had a
-/// password set, and nothing is told about it until a later run finds one.
+/// password set, and nothing is told about it until a later run finds one — unless the
+/// file its key would be in was refused, which is kept so it can be said.
 pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String, String>) -> Held {
-    let mut held = BTreeMap::new();
+    let mut held = Held::default();
     for filler in fillers.speaking(ApiKind::Sabnzbd) {
-        if let Some(key) = usenet_key(ctx, filler).await {
-            held.insert(filler.id.clone(), Credential::ApiKey(key));
+        match crate::app::targets::credential_file(ctx, filler).await {
+            Beneath::Read(text) => {
+                if let Some(key) = crate::sabnzbd::api_key(&text) {
+                    held.keys.insert(filler.id.clone(), Credential::ApiKey(key));
+                }
+            }
+            Beneath::Escaped => {
+                held.refused.insert(filler.id.clone());
+            }
+            Beneath::Absent => {}
         }
     }
     for filler in fillers.speaking(ApiKind::Qbittorrent) {
@@ -78,7 +106,7 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String,
             .cloned()
             .or_else(|| crate::app::targets::recorded_secret(ctx, &setting));
         if let Some(password) = password {
-            held.insert(
+            held.keys.insert(
                 filler.id.clone(),
                 Credential::UserPass {
                     username: crate::config::QBITTORRENT_USER.to_owned(),
@@ -87,14 +115,29 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<String,
             );
         }
     }
-    Held(held)
+    held
 }
 
-/// A Usenet client's API key, read from the file it writes it to, or nothing where it
-/// names no such file or has not written one yet.
-async fn usenet_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
-    let text = crate::app::targets::credential_file(ctx, filler).await?;
-    crate::sabnzbd::api_key(&text)
+/// Every download client whose credential file was refused, said on the connection it
+/// would have made into each \*arr that asks for it.
+///
+/// Refused rather than skipped: no later run reads it while it stays what it is, and
+/// it is either a mistake in the plugin or an attempt by it, which the operator has to
+/// see either way.
+pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
+    pairings(fillers)
+        .iter()
+        .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _))))
+        .filter(|pairing| held.refused.contains(&pairing.filler.id))
+        .map(|pairing| {
+            Wiring::settled(
+                format!("{} into {}", pairing.filler.name, pairing.asker.name),
+                State::Refused {
+                    reason: crate::app::targets::escaped(pairing.filler),
+                },
+            )
+        })
+        .collect()
 }
 
 /// Set every torrent client's web UI password, where it is still the one it started

@@ -1,7 +1,7 @@
 use lemonfiber_ports::filesystem::Storage;
 use std::path::Path;
 
-use super::{gone, Disk, Eraser, FileSystem, Volume};
+use super::{gone, Beneath, Disk, Eraser, FileSystem, Volume};
 
 /// A path with no directory above it, which is where the making has nothing to do.
 ///
@@ -310,16 +310,13 @@ async fn a_plain_file_beneath_the_directory_is_read() {
     let (dir, owned, _) = confined();
 
     assert_eq!(
-        Disk.read_beneath(&owned.join("key.ini"), &owned)
-            .await
-            .as_deref(),
-        Some("plain")
+        Disk.read_beneath(&owned.join("key.ini"), &owned).await,
+        Beneath::Read("plain".to_owned())
     );
     assert_eq!(
         Disk.read_beneath(&owned.join("nested").join("key.ini"), &owned)
-            .await
-            .as_deref(),
-        Some("nested")
+            .await,
+        Beneath::Read("nested".to_owned())
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -335,11 +332,11 @@ async fn a_linked_key_file_is_refused() {
 
     assert_eq!(
         Disk.read_beneath(&owned.join("outward.ini"), &owned).await,
-        None
+        Beneath::Escaped
     );
     assert_eq!(
         Disk.read_beneath(&owned.join("inward.ini"), &owned).await,
-        None
+        Beneath::Escaped
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -354,26 +351,43 @@ async fn a_linked_directory_on_the_way_out_is_refused() {
     assert_eq!(
         Disk.read_beneath(&owned.join("up").join("secret"), &owned)
             .await,
-        None
+        Beneath::Escaped
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// A directory and anything outside the one named are not read.
+/// A pipe where the file is expected is refused at once rather than waited on.
+#[cfg(unix)]
 #[tokio::test]
-async fn a_directory_or_a_file_outside_is_not_read() {
+async fn a_pipe_where_the_file_is_expected_is_refused_without_waiting() {
+    let (dir, owned, _) = confined();
+    let pipe = owned.join("pipe.ini");
+    let made = std::process::Command::new("mkfifo").arg(&pipe).status();
+
+    assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
+    assert_eq!(Disk.read_beneath(&pipe, &owned).await, Beneath::Escaped);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A directory and anything outside the one named are refused; what is not there is
+/// absent, which is the ordinary case of a key not written yet.
+#[tokio::test]
+async fn a_directory_or_a_file_outside_is_refused_and_nothing_is_absent() {
     let (dir, owned, secret) = confined();
 
-    assert_eq!(Disk.read_beneath(&owned.join("nested"), &owned).await, None);
-    assert_eq!(Disk.read_beneath(&secret, &owned).await, None);
+    assert_eq!(
+        Disk.read_beneath(&owned.join("nested"), &owned).await,
+        Beneath::Escaped
+    );
+    assert_eq!(Disk.read_beneath(&secret, &owned).await, Beneath::Escaped);
     assert_eq!(
         Disk.read_beneath(&owned.join("absent.ini"), &owned).await,
-        None
+        Beneath::Absent
     );
     assert_eq!(
         Disk.read_beneath(&owned.join("key.ini"), &owned.join("absent"))
             .await,
-        None
+        Beneath::Absent
     );
     let _ = std::fs::remove_dir_all(&dir);
 }

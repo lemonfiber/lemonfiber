@@ -17,7 +17,8 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 
 use lemonfiber_ports::filesystem::{
-    Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, Storage, StorageFacts, Volume,
+    Beneath, Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, Storage,
+    StorageFacts, Volume,
 };
 
 /// The filesystem on this machine, reached through the standard library.
@@ -65,7 +66,7 @@ impl FileSystem for Disk {
     /// and to name the very file the handle holds. A link swapped in on the way after
     /// the open resolves somewhere else, or names another file, and either is refused —
     /// so there is no moment between a look and a read for it to change under.
-    async fn read_beneath(&self, path: &Path, within: &Path) -> Option<String> {
+    async fn read_beneath(&self, path: &Path, within: &Path) -> Beneath {
         read_beneath(path, within).await
     }
 
@@ -317,27 +318,49 @@ pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
 
 /// Read `path`, a plain file beneath `within`, opening it once and checking what was
 /// opened.
-async fn read_beneath(path: &Path, within: &Path) -> Option<String> {
+async fn read_beneath(path: &Path, within: &Path) -> Beneath {
     use tokio::io::AsyncReadExt as _;
 
-    let mut file = no_follow().open(path).await.ok()?;
-    let opened = file.metadata().await.ok()?;
-    let root = tokio::fs::canonicalize(within).await.ok()?;
-    let resolved = tokio::fs::canonicalize(path).await.ok()?;
-    let named = tokio::fs::metadata(&resolved).await.ok()?;
-    if !opened.is_file() || !resolved.starts_with(&root) || !same_file(&opened, &named) {
-        return None;
+    let Ok(mut file) = no_follow().open(path).await else {
+        return unopened(path).await;
+    };
+    let (Ok(opened), Ok(root), Ok(resolved)) = (
+        file.metadata().await,
+        tokio::fs::canonicalize(within).await,
+        tokio::fs::canonicalize(path).await,
+    ) else {
+        return Beneath::Absent;
+    };
+    let named = tokio::fs::metadata(&resolved).await;
+    let plain = opened.is_file() && named.is_ok_and(|named| same_file(&opened, &named));
+    if !plain || !resolved.starts_with(&root) {
+        return Beneath::Escaped;
     }
     let mut text = String::new();
-    file.read_to_string(&mut text).await.ok()?;
-    Some(text)
+    match file.read_to_string(&mut text).await {
+        Ok(_) => Beneath::Read(text),
+        Err(_) => Beneath::Absent,
+    }
+}
+
+/// Why a file that would not open was not read: a link at its last name, which the open
+/// refused to follow, or nothing there to open at all.
+async fn unopened(path: &Path) -> Beneath {
+    match tokio::fs::symlink_metadata(path).await {
+        Ok(meta) if meta.file_type().is_symlink() => Beneath::Escaped,
+        Ok(_) | Err(_) => Beneath::Absent,
+    }
 }
 
 /// Opening for reading, refusing to follow a link at the last name of the path.
 #[cfg(unix)]
 fn no_follow() -> tokio::fs::OpenOptions {
     let mut options = tokio::fs::OpenOptions::new();
-    options.read(true).custom_flags(libc::O_NOFOLLOW);
+    // Not blocking, as well: a pipe put where the file is expected would otherwise hold
+    // the open until something wrote to it. A plain file is opened the same either way.
+    options
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     options
 }
 
