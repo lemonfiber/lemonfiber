@@ -222,23 +222,37 @@ async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
     assert_eq!(read(unkeyed).await, Beneath::Absent);
 }
 
-/// A plugin's credential file that does not resolve at all is absent rather than
-/// refused: nothing is there yet, which is the ordinary case of a key not written.
+/// Each of the three a confined read can come to, through one filesystem: a plain file
+/// beneath is read, one resolving away is refused, and one that does not resolve at all
+/// is absent rather than refused — nothing is there yet, which is the ordinary case of a
+/// key not written.
+///
+/// One filesystem for all three on purpose: the coverage gate reads the read's best
+/// instantiation alone, so the three have to be taken by the same one.
 #[tokio::test]
-async fn a_plugins_credential_file_that_does_not_resolve_is_absent() {
+async fn a_confined_read_comes_to_read_refused_or_absent() {
     let context = ctx().with_filesystem(std::sync::Arc::new(
-        lemonfiber_fixtures::support::SeedFs::keyed(None, None).missing(vec!["stand-in"]),
+        lemonfiber_fixtures::support::SeedFs::keyed(Some("held"), None)
+            .missing(vec!["gone"])
+            .leading_away(vec!["away"]),
     ));
+    let read = |file: &'static str| {
+        let context = &context;
+        async move {
+            super::credential_file(context, &keyed_in(file, Some("/stack/config/stand-in"))).await
+        }
+    };
 
     assert_eq!(
-        super::credential_file(
-            &context,
-            &keyed_in(
-                "/stack/config/stand-in/key.ini",
-                Some("/stack/config/stand-in")
-            )
-        )
-        .await,
+        read("/stack/config/stand-in/key.ini").await,
+        Beneath::Read("held".to_owned())
+    );
+    assert_eq!(
+        read("/stack/config/stand-in/away.ini").await,
+        Beneath::Escaped
+    );
+    assert_eq!(
+        read("/stack/config/stand-in/gone.ini").await,
         Beneath::Absent
     );
 }
