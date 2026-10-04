@@ -9764,6 +9764,7 @@
     "ASK-9": 404,
     "GONE-2": 400,
     "MIGRATE-1": 400,
+    "PLUGIN-4": 500,
     "READ-1": 400,
     "READ-10": 400,
     "READ-11": 400,
@@ -9783,6 +9784,15 @@
     "RESTORE-11": 400,
     "SERVE-6": 500,
     "SERVE-7": 500,
-    "SPACE-6": 400
+    "SPACE-6": 400,
+    "STACK-1": 500,
+    "STACK-2": 500,
+    "STACK-3": 500,
+    "STACK-4": 500,
+    "STACK-5": 500,
+    "STACK-6": 500,
+    "STACK-7": 500,
+    "STACK-8": 500,
+    "STACK-9": 500
   }
 }

@@ -25,8 +25,8 @@ use crate::refusal::Refusal;
 
 use super::{
     Wanted, ALERTS, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS,
-    EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, NEWS, OUTBOUND, QUALITY, REQUESTS, SERVICES,
-    SPACE, STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
+    EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, NEWS, OUTBOUND, PLUGINS, QUALITY, REQUESTS,
+    SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WIRING,
 };
 
 /// The parameter naming a form to narrow to.
@@ -115,6 +115,8 @@ const TAKEN: &[(&str, &[&str])] = &[
     (BANDWIDTH, &[]),
     (BUNDLE, &[]),
     (UPDATE, &[WHAT, TO]),
+    (PLUGINS, &[]),
+    (WIRING, &[]),
 ];
 
 /// The parameters that name one of several rather than one thing.

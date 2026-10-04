@@ -36,7 +36,7 @@ use crate::error::codes::stack::{
     STACK_INVALID, STACK_MALFORMED, STACK_NEEDS_NEWER, STACK_NOT_EMBEDDED, STACK_NOT_SET_UP,
     STACK_NOT_WRITTEN, STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
 };
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
 
 /// The manifest's filename, at the root of any stack directory.
 const MANIFEST: &str = "stack.toml";
@@ -311,6 +311,23 @@ fn collect(dir: &'static Dir<'static>, out: &mut Vec<StackFile>) {
         }
     }
 }
+
+/// Every code a stack that could not be read is refused with.
+///
+/// Listed so that what publishes a refusal before one is raised can name them: a read
+/// built on the manifest answers one of these where it could not read it, and a client
+/// told that has been told something different from an empty answer.
+pub const FAILURES: [Code; 9] = [
+    STACK_UNREADABLE,
+    STACK_UNUSABLE,
+    STACK_NEEDS_NEWER,
+    STACK_MALFORMED,
+    STACK_UNRECOGNISED,
+    STACK_INVALID,
+    STACK_NOT_SET_UP,
+    STACK_NOT_WRITTEN,
+    STACK_NOT_EMBEDDED,
+];
 
 /// The stack could not be read.
 #[derive(Debug, Error)]

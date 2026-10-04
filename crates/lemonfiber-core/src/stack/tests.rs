@@ -252,9 +252,9 @@ fn a_build_that_lost_its_stack_admits_it_rather_than_guessing() {
     assert!(!problem.remedies.is_empty(), "escalation is still offered");
 }
 
-#[test]
-fn every_failure_says_something_and_offers_something() {
-    let failures = [
+/// One of every way a stack fails to be read.
+fn every_failure() -> [Failure; 9] {
+    [
         Failure::Unreadable {
             path: "/tmp/x/stack.toml".into(),
             reason: "denied".to_owned(),
@@ -278,10 +278,42 @@ fn every_failure_says_something_and_offers_something() {
             path: "/tmp/x".into(),
             reason: "denied".to_owned(),
         },
-    ];
+        Failure::Invalid {
+            violations: vec!["service sonarr: port 8989 is published twice".to_owned()],
+        },
+    ]
+}
+
+#[test]
+fn every_failure_says_something_and_offers_something() {
+    let failures = every_failure();
     for failure in &failures {
         assert!(!failure.to_string().is_empty());
         assert!(!failure.problem().remedies.is_empty());
+    }
+}
+
+/// The published list is the list the failures raise, both ways: a code raised and not
+/// listed is one no client can name, and one listed and never raised is a refusal a
+/// client is told to expect and never meets.
+#[test]
+fn every_code_a_failure_raises_is_listed_and_every_listed_one_is_raised() {
+    let raised: Vec<_> = every_failure()
+        .iter()
+        .map(|failure| failure.problem().code)
+        .collect();
+    for code in &raised {
+        assert!(super::FAILURES.contains(code), "{code:?} is not listed");
+    }
+    for code in &super::FAILURES {
+        assert!(raised.contains(code), "{code:?} is listed and never raised");
+    }
+    for failure in every_failure() {
+        assert_eq!(
+            failure.problem().amiss,
+            crate::wiring::UNREAD_AMISS,
+            "{failure} is listed at the status a failure of the machine is answered with"
+        );
     }
 }
 

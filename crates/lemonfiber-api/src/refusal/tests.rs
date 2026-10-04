@@ -173,12 +173,27 @@ async fn nothing_rendered_is_answered_as_the_refusal_saying_so() {
 #[test]
 fn the_contract_lists_every_refusal_at_the_status_it_is_answered_with() {
     let listed = Contract::describe().refusals;
-    // This surface's own, and the core's refusals of an offer that has moved, which
-    // `contract/refusals` holds to their status.
+    // This surface's own, the core's refusals of an offer that has moved, which
+    // `contract/refusals` holds to their status, and what the plugins and wiring reads
+    // are refused with where what they read could not be read.
+    let unread: usize = lemonfiber_core::wiring::UNREAD
+        .iter()
+        .map(|codes| codes.len())
+        .sum();
     assert_eq!(
         listed.len(),
-        Refusal::EVERY.len() + lemonfiber_core::agreement::MOVED.len()
+        Refusal::EVERY.len() + lemonfiber_core::agreement::MOVED.len() + unread
     );
+    for code in lemonfiber_core::wiring::UNREAD
+        .iter()
+        .flat_map(|codes| codes.iter())
+    {
+        assert_eq!(
+            listed.get(code.as_str()).map(|entry| entry.status),
+            Some(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
+            "{code:?} is listed at the status a failure of the machine is answered with"
+        );
+    }
     for refusal in Refusal::EVERY {
         let entry = listed.get(refusal.code().as_str());
         assert_eq!(

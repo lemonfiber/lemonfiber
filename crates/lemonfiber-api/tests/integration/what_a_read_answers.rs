@@ -8,5 +8,6 @@ use crate::reading;
 
 mod choices;
 mod items;
+mod plugins;
 mod reaches;
 mod stack;
