@@ -208,6 +208,8 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             provides: Vec::new(),
             name: "Komga".to_owned(),
             description: "Reads comics".to_owned(),
+            api: None,
+            listens: None,
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

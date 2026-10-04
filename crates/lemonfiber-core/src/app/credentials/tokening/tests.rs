@@ -57,6 +57,7 @@ fn service(
         memory_mib: None,
         asks_for: None,
         reaches: None,
+        listens: None,
     }
 }
 

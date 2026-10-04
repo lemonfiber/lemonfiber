@@ -34,6 +34,7 @@ pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Ser
         memory_mib: None,
         asks_for: None,
         reaches: None,
+        listens: None,
     }
 }
 

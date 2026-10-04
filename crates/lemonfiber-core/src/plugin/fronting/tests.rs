@@ -14,6 +14,8 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
         provides: Vec::new(),
         name: "Komga".to_owned(),
         description: "Reads comics: in a browser".to_owned(),
+        api: None,
+        listens: None,
     }
 }
 

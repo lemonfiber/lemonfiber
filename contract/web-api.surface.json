@@ -455,6 +455,48 @@
         "\"silent\""
       ]
     },
+    "Api": {
+      "fields": {
+        "key_source": {
+          "type": [
+            "ref:KeySource"
+          ],
+          "required": true
+        },
+        "kind": {
+          "type": [
+            "ref:ApiKind"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "version": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "ApiKind": {
+      "fields": {},
+      "variants": [
+        "\"audiobookshelf\"",
+        "\"bazarr\"",
+        "\"bindery\"",
+        "\"jellyfin\"",
+        "\"qbittorrent\"",
+        "\"sabnzbd\"",
+        "\"seerr\"",
+        "\"servarr\""
+      ]
+    },
     "AskingStanding": {
       "fields": {},
       "variants": [
@@ -3285,6 +3327,18 @@
       },
       "variants": []
     },
+    "KeySource": {
+      "fields": {},
+      "variants": [
+        "\"api-settings\"",
+        "\"config-ini\"",
+        "\"config-json\"",
+        "\"config-xml\"",
+        "\"config-yaml\"",
+        "\"generated\"",
+        "\"none\""
+      ]
+    },
     "Leaving": {
       "fields": {
         "ours": {
@@ -5186,6 +5240,12 @@
     },
     "PluginPlaced": {
       "fields": {
+        "api": {
+          "type": [
+            "anyOf(null,ref:Api)"
+          ],
+          "required": false
+        },
         "config_path": {
           "type": [
             "string"
@@ -5209,6 +5269,12 @@
             "string"
           ],
           "required": true
+        },
+        "listens": {
+          "type": [
+            "integer|null/uint16"
+          ],
+          "required": false
         },
         "name": {
           "type": [

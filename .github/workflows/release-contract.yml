@@ -84,6 +84,7 @@ jobs:
           for artefact in \
             contract/plugin-manifest.schema.json \
             contract/capability-vocabulary.json \
+            contract/adapters.json \
             contract/extension-points.json
           do
             # A release missing one leaves an author's editor with nothing to validate

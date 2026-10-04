@@ -10563,6 +10563,88 @@
             }
           ]
         },
+        "Api": {
+          "description": "How lemonfiber talks to a service when seeding.\n\nThe same shape on a plugin's service as on the stack's own, which is what lets a\nplugin name one of these adapters rather than supply one of its own.",
+          "type": "object",
+          "properties": {
+            "key_source": {
+              "description": "Where the credential comes from.",
+              "$ref": "#/$defs/KeySource"
+            },
+            "kind": {
+              "description": "Selects the client implementation.",
+              "$ref": "#/$defs/ApiKind"
+            },
+            "path": {
+              "description": "The file holding the credential, where one applies.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "version": {
+              "description": "The major version of the service's HTTP API — the `/api/vN` path segment.\n\nRequired for the `servarr` shape and read there, because that one shape\nspans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),\nso the version is data rather than a guess from a service's name. Absent\nfor the other kinds, whose one fixed version their client already knows.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "key_source"
+          ]
+        },
+        "ApiKind": {
+          "description": "The API shapes lemonfiber knows how to speak.\n\nFour services share the `servarr` shape, which is what makes one client\nenough for them. Bindery is its own kind deliberately: it is not a Servarr\napplication and Prowlarr's app sync does not reach it. Bazarr is its own for\nthe neighbouring reason: it is told about the \\*arrs rather than being one of\nthem, in a form body a client of the shared shape could not send.",
+          "oneOf": [
+            {
+              "description": "Sonarr, Radarr, Lidarr and Prowlarr.",
+              "type": "string",
+              "const": "servarr"
+            },
+            {
+              "description": "`SABnzbd`.",
+              "type": "string",
+              "const": "sabnzbd"
+            },
+            {
+              "description": "qBittorrent's `WebUI` API.",
+              "type": "string",
+              "const": "qbittorrent"
+            },
+            {
+              "description": "Seerr.",
+              "type": "string",
+              "const": "seerr"
+            },
+            {
+              "description": "Bindery.",
+              "type": "string",
+              "const": "bindery"
+            },
+            {
+              "description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads, so it has a `key_source` of `generated`.",
+              "type": "string",
+              "const": "jellyfin"
+            },
+            {
+              "description": "Bazarr — the subtitle finder, which is told which \\*arrs to watch.",
+              "type": "string",
+              "const": "bazarr"
+            },
+            {
+              "description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.",
+              "type": "string",
+              "const": "audiobookshelf"
+            }
+          ]
+        },
         "Code": {
           "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in the error crate's `codes`\nmodule, and a code is never recycled.",
           "type": "string"
@@ -11148,6 +11230,46 @@
             "origin"
           ]
         },
+        "KeySource": {
+          "description": "Where a service's credential comes from.",
+          "oneOf": [
+            {
+              "description": "The service writes it to an XML file lemonfiber reads.",
+              "type": "string",
+              "const": "config-xml"
+            },
+            {
+              "description": "The service writes it to an INI file lemonfiber reads.",
+              "type": "string",
+              "const": "config-ini"
+            },
+            {
+              "description": "The service writes it to a JSON file lemonfiber reads.",
+              "type": "string",
+              "const": "config-json"
+            },
+            {
+              "description": "The service writes it to a YAML file lemonfiber reads.",
+              "type": "string",
+              "const": "config-yaml"
+            },
+            {
+              "description": "Retrieved over the service's own API once authenticated.",
+              "type": "string",
+              "const": "api-settings"
+            },
+            {
+              "description": "The service offers nothing durable, so lemonfiber mints and records one.",
+              "type": "string",
+              "const": "generated"
+            },
+            {
+              "description": "The API needs no credential.",
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
         "PluginChange": {
           "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches. Two of\nthem can be edits to a file the stack already has — the proxy's and the\ndashboard's — and those say so, as a region, so an operator reading the account\nknows which of their files the install writes into.",
           "type": "object",
@@ -11642,6 +11764,18 @@
           "description": "One service of an installed plugin, as it was placed.",
           "type": "object",
           "properties": {
+            "api": {
+              "description": "The adapter lemonfiber reaches it through, where the plugin named one.\n\nDefaulted for a record written before this was kept, which reads as naming\nnone: a service operated generically, as it was when installed.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Api"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
             "config_path": {
               "description": "Where inside the container its one configuration directory is mounted.\n\nResolved rather than optional. The record answers where the directory is, and\na run that re-derived the fallback would answer for a container it did not\nwrite the day that fallback moved.",
               "type": "string"
@@ -11658,6 +11792,17 @@
             "image": {
               "description": "The registry path, carrying no pin of its own.",
               "type": "string"
+            },
+            "listens": {
+              "description": "The port it answers on inside the stack's network, where it declared one.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "default": null,
+              "maximum": 65535,
+              "minimum": 0
             },
             "name": {
               "description": "What it is called, for a reader, which is what its dashboard entry is listed as.\n\nDefaulted for a record written before this was kept, which lists it by its id\nrather than leaving it off the panel.",
