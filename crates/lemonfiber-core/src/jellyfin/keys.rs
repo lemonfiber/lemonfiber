@@ -26,6 +26,10 @@ pub const DECLINE_APP: &str = "lemonfiber-decline";
 /// The name the request gate's key is filed under.
 pub const GATE_APP: &str = "lemonfiber-request-gate";
 
+/// What the request service files the key it mints for itself under, on the sign-in
+/// that sets it up without the request gate in front of the media server.
+pub const SEERR_APP: &str = "Seerr";
+
 /// Where the keys are listed, minted and revoked.
 const KEYS: &str = "/Auth/Keys";
 

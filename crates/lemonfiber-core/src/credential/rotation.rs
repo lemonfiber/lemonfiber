@@ -83,6 +83,22 @@ pub enum Settled {
     },
 }
 
+impl Settled {
+    /// What this outcome says in words of its own, where it says any: every outcome but
+    /// a landed replacement and a name nothing answers to.
+    #[must_use]
+    pub fn detail(&self) -> Option<&str> {
+        match self {
+            Self::Refused { detail }
+            | Self::Unproven { detail }
+            | Self::ReplacedUnproven { detail }
+            | Self::Elsewhere { detail }
+            | Self::Rehearsed { detail, .. } => Some(detail),
+            Self::Replaced { .. } | Self::Unknown { .. } => None,
+        }
+    }
+}
+
 /// How far a rotation reached one consumer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "reach", rename_all = "kebab-case")]
