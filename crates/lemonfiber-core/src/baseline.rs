@@ -143,7 +143,7 @@ impl Baseline {
         self.services
             .get(service)
             .into_iter()
-            .flat_map(|fields| fields.keys())
+            .flat_map(BTreeMap::keys)
             .filter_map(|field| field.strip_prefix(prefix).map(ToOwned::to_owned))
             .collect()
     }
