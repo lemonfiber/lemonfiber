@@ -119,6 +119,33 @@ fn config_path(record: Option<&Installed>, service: &str) -> Option<String> {
     placed(record, service).map(|one| one.config_path)
 }
 
+/// The adapter a service names and the port it answers on are what the record keeps,
+/// so whatever later asks for what it fills can be told about it.
+#[test]
+fn the_adapter_a_service_names_survives_the_install() {
+    let api = lemonfiber_manifest::Api {
+        kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+        key_source: lemonfiber_manifest::KeySource::ConfigIni,
+        path: Some("/config/sabnzbd.ini".to_owned()),
+        version: None,
+    };
+    let record = installed(|manifest| {
+        set(manifest, |service| {
+            service.api = Some(api.clone());
+            service.listens = Some(8080);
+        });
+    });
+
+    let komga = placed(record.as_ref(), "komga");
+    assert_eq!(komga.as_ref().and_then(|one| one.api.clone()), Some(api));
+    assert_eq!(komga.and_then(|one| one.listens), Some(8080));
+    assert_eq!(
+        placed(record.as_ref(), "komga-sidecar").map(|one| (one.api, one.listens)),
+        Some((None, None)),
+        "and the service that named none keeps none"
+    );
+}
+
 #[test]
 fn the_configuration_directory_a_service_declares_survives_the_install() {
     assert_eq!(

@@ -166,6 +166,15 @@ pub struct Placed {
     /// says beside it.
     #[serde(default)]
     pub description: String,
+    /// The adapter lemonfiber reaches it through, where the plugin named one.
+    ///
+    /// Defaulted for a record written before this was kept, which reads as naming
+    /// none: a service operated generically, as it was when installed.
+    #[serde(default)]
+    pub api: Option<lemonfiber_manifest::Api>,
+    /// The port it answers on inside the stack's network, where it declared one.
+    #[serde(default)]
+    pub listens: Option<u16>,
 }
 
 impl Placed {
@@ -187,6 +196,8 @@ impl Placed {
                 .collect(),
             name: service.name.clone(),
             description: manifest.plugin.description.clone(),
+            api: service.api.clone(),
+            listens: service.listens,
         }
     }
 

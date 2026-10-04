@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use super::{
-    capabilities_of, points, schema, vocabulary, Ungenerated, POINTS_PATH, SCHEMA_PATH, STACK,
-    VOCABULARY_PATH,
+    adapters, capabilities_of, points, schema, vocabulary, Ungenerated, ADAPTERS_PATH, POINTS_PATH,
+    SCHEMA_PATH, STACK, VOCABULARY_PATH,
 };
 use crate::doctor::Category;
 
@@ -41,6 +41,45 @@ fn the_committed_vocabulary_still_matches_the_types_and_the_pinned_stack() {
         fresh,
         "the capability vocabulary is out of date — regenerate it with `just capabilities`"
     );
+}
+
+/// The committed set of adapters and the ones this build implements must agree.
+#[test]
+fn the_committed_adapters_still_match_the_types() {
+    assert_eq!(
+        committed(ADAPTERS_PATH),
+        adapters().unwrap_or_default(),
+        "the set of adapters is out of date — regenerate it with `just adapters`"
+    );
+}
+
+/// What is published is every adapter the reader accepts, and nothing it refuses.
+///
+/// The published set is a list written beside the enum, so a kind added to one and not
+/// the other is caught here: the schema the reader is held to is generated from the
+/// enum itself.
+#[test]
+fn the_published_adapters_are_every_one_the_reader_accepts() {
+    let accepted = |schema: schemars::Schema| -> BTreeSet<String> {
+        serde_json::to_string(&schema)
+            .unwrap_or_default()
+            .split('"')
+            .map(str::to_owned)
+            .collect()
+    };
+    let kinds = accepted(schemars::schema_for!(lemonfiber_manifest::ApiKind));
+    for kind in lemonfiber_manifest::ApiKind::ALL {
+        let name = serde_json::to_value(kind).unwrap_or_default();
+        assert!(kinds.contains(name.as_str().unwrap_or_default()), "{name}");
+    }
+    let sources = accepted(schemars::schema_for!(lemonfiber_manifest::KeySource));
+    for source in lemonfiber_manifest::KeySource::ALL {
+        let name = serde_json::to_value(source).unwrap_or_default();
+        assert!(
+            sources.contains(name.as_str().unwrap_or_default()),
+            "{name}"
+        );
+    }
 }
 
 /// The committed points and the register they name must agree.

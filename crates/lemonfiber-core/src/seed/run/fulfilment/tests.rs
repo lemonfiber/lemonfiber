@@ -18,6 +18,7 @@ fn a_service(id: &str, port: Option<u16>) -> Service {
         bind: None,
         health: None,
         api: None,
+        listens: None,
         criticality: lemonfiber_manifest::Criticality::Core,
         license: "MIT".to_owned(),
         upstream: "https://example.test".to_owned(),

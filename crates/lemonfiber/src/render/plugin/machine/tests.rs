@@ -29,6 +29,8 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             provides: Vec::new(),
             name: "Komga".to_owned(),
             description: "Reads comics".to_owned(),
+            api: None,
+            listens: None,
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

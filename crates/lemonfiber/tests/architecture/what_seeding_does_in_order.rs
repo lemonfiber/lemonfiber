@@ -55,7 +55,7 @@ fn every_api_a_service_can_declare_is_acted_on() {
     );
 
     let schema =
-        fs::read_to_string(workspace_root().join("crates/lemonfiber-manifest/src/schema.rs"))
+        fs::read_to_string(workspace_root().join("crates/lemonfiber-manifest/src/schema/api.rs"))
             .unwrap_or_default();
     let Some(block) = schema
         .split_once("pub enum ApiKind {")

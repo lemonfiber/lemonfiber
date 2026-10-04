@@ -89,6 +89,88 @@
     "plugin"
   ],
   "$defs": {
+    "Api": {
+      "description": "How lemonfiber talks to a service when seeding.\n\nThe same shape on a plugin's service as on the stack's own, which is what lets a\nplugin name one of these adapters rather than supply one of its own.",
+      "type": "object",
+      "properties": {
+        "key_source": {
+          "description": "Where the credential comes from.",
+          "$ref": "#/$defs/KeySource"
+        },
+        "kind": {
+          "description": "Selects the client implementation.",
+          "$ref": "#/$defs/ApiKind"
+        },
+        "path": {
+          "description": "The file holding the credential, where one applies.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "version": {
+          "description": "The major version of the service's HTTP API — the `/api/vN` path segment.\n\nRequired for the `servarr` shape and read there, because that one shape\nspans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),\nso the version is data rather than a guess from a service's name. Absent\nfor the other kinds, whose one fixed version their client already knows.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "key_source"
+      ]
+    },
+    "ApiKind": {
+      "description": "The API shapes lemonfiber knows how to speak.\n\nFour services share the `servarr` shape, which is what makes one client\nenough for them. Bindery is its own kind deliberately: it is not a Servarr\napplication and Prowlarr's app sync does not reach it. Bazarr is its own for\nthe neighbouring reason: it is told about the \\*arrs rather than being one of\nthem, in a form body a client of the shared shape could not send.",
+      "oneOf": [
+        {
+          "description": "Sonarr, Radarr, Lidarr and Prowlarr.",
+          "type": "string",
+          "const": "servarr"
+        },
+        {
+          "description": "`SABnzbd`.",
+          "type": "string",
+          "const": "sabnzbd"
+        },
+        {
+          "description": "qBittorrent's `WebUI` API.",
+          "type": "string",
+          "const": "qbittorrent"
+        },
+        {
+          "description": "Seerr.",
+          "type": "string",
+          "const": "seerr"
+        },
+        {
+          "description": "Bindery.",
+          "type": "string",
+          "const": "bindery"
+        },
+        {
+          "description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads, so it has a `key_source` of `generated`.",
+          "type": "string",
+          "const": "jellyfin"
+        },
+        {
+          "description": "Bazarr — the subtitle finder, which is told which \\*arrs to watch.",
+          "type": "string",
+          "const": "bazarr"
+        },
+        {
+          "description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.",
+          "type": "string",
+          "const": "audiobookshelf"
+        }
+      ]
+    },
     "Capture": {
       "description": "A value taken out of an answer.",
       "type": "object",
@@ -432,6 +514,46 @@
         }
       ]
     },
+    "KeySource": {
+      "description": "Where a service's credential comes from.",
+      "oneOf": [
+        {
+          "description": "The service writes it to an XML file lemonfiber reads.",
+          "type": "string",
+          "const": "config-xml"
+        },
+        {
+          "description": "The service writes it to an INI file lemonfiber reads.",
+          "type": "string",
+          "const": "config-ini"
+        },
+        {
+          "description": "The service writes it to a JSON file lemonfiber reads.",
+          "type": "string",
+          "const": "config-json"
+        },
+        {
+          "description": "The service writes it to a YAML file lemonfiber reads.",
+          "type": "string",
+          "const": "config-yaml"
+        },
+        {
+          "description": "Retrieved over the service's own API once authenticated.",
+          "type": "string",
+          "const": "api-settings"
+        },
+        {
+          "description": "The service offers nothing durable, so lemonfiber mints and records one.",
+          "type": "string",
+          "const": "generated"
+        },
+        {
+          "description": "The API needs no credential.",
+          "type": "string",
+          "const": "none"
+        }
+      ]
+    },
     "Override": {
       "description": "A bundled thing the plugin will change.",
       "type": "object",
@@ -741,6 +863,18 @@
       "description": "What runs.\n\nDeclared in the stack manifest's service vocabulary, restricted to these fields.\nThe restriction is the substance of it: the set of fields *is* the set of things a\nplugin may ask for, so \"what can this plugin reach\" is answerable from the format\nrather than from the instance.",
       "type": "object",
       "properties": {
+        "api": {
+          "description": "The adapter lemonfiber reaches it through, in the stack manifest's own shape.\n\nNamed from a fixed set rather than supplied: a plugin cannot bring an adapter of\nits own, and naming one is what lets the services that ask for a capability it\nclaims be told about it as they are told about a bundled service declaring the\nsame. Absent, it is operated generically.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Api"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "bind": {
           "description": "Which tier the port is published on.",
           "anyOf": [
@@ -786,6 +920,17 @@
         "image": {
           "description": "Registry path, without tag or digest.",
           "type": "string"
+        },
+        "listens": {
+          "description": "The port it answers on inside the stack's network, where lemonfiber and the\nservices that ask reach it. Required where `api` is.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
         },
         "media_types": {
           "description": "Which media types it handles, in the stack manifest's vocabulary.",

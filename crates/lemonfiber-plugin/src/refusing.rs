@@ -26,6 +26,7 @@
 //! describes it, and the declaration is the entire basis on which a stranger's
 //! contribution was judged.
 
+mod adapting;
 mod bundled;
 pub mod carried;
 mod colliding;
@@ -164,6 +165,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
         pinned(service, found);
         placed(service, found);
+        adapting::adapted(service, found);
     }
 }
 

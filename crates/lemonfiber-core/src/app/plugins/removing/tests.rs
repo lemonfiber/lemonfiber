@@ -31,6 +31,7 @@ fn bundled(id: &str, provides: &[&str]) -> lemonfiber_manifest::Service {
         bind: None,
         health: None,
         api: None,
+        listens: None,
         criticality: lemonfiber_manifest::Criticality::Core,
         license: "MIT".to_owned(),
         upstream: "https://example.test".to_owned(),
