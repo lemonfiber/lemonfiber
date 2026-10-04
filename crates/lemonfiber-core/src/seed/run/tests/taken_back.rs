@@ -27,6 +27,7 @@ const LINK_TOKEN: &str = "link-token";
 fn gated() -> Vec<lemonfiber_manifest::Service> {
     vec![
         arr("sonarr", 8989, "tv"),
+        arr("lidarr", 8686, "music"),
         jellyfin_svc(),
         seerr_with_settings(),
         manifest_service("request-gate", None, Some(PORT)),
@@ -129,12 +130,17 @@ fn sonarr_gated() -> String {
 
 /// The request service's media-server link, at the gate under the token it accepts.
 fn linked() -> String {
+    link_at("request-gate", PORT, "/jellyfin")
+}
+
+/// The request service's media-server link at `host`, `port` and `base`.
+fn link_at(host: &str, port: u16, base: &str) -> String {
     serde_json::json!({
         "name": "Jellyfin",
-        "ip": "request-gate",
-        "port": PORT,
+        "ip": host,
+        "port": port,
         "useSsl": false,
-        "urlBase": "/jellyfin",
+        "urlBase": base,
         "apiKey": LINK_TOKEN,
     })
     .to_string()
@@ -154,6 +160,20 @@ fn keys(minted: bool) -> String {
 /// it with `tested`, and whose media server lists `keys` and answers a revoke with
 /// `revoked`; Sonarr answers a reset with `reset`.
 fn household(sonarr: &str, tested: u16, keys: &str, revoked: u16, reset: u16) -> Arc<Fake> {
+    linked_household(&linked(), sonarr, 200, tested, keys, revoked, reset)
+}
+
+/// The same, with the request service's media-server link as `link`, and its Sonarr
+/// targets listed with status `listed`.
+fn linked_household(
+    link: &str,
+    sonarr: &str,
+    listed: u16,
+    tested: u16,
+    keys: &str,
+    revoked: u16,
+    reset: u16,
+) -> Arc<Fake> {
     let leaked = |text: &str| -> &'static str { Box::leak(text.to_owned().into_boxed_str()) };
     Fake::by_route_in_turn(vec![
         (
@@ -164,7 +184,7 @@ fn household(sonarr: &str, tested: u16, keys: &str, revoked: u16, reset: u16) ->
         (
             Method::Get,
             "/settings/sonarr",
-            vec![Answer::reply(200, leaked(sonarr))],
+            vec![Answer::reply(listed, leaked(sonarr))],
         ),
         (
             Method::Get,
@@ -174,7 +194,7 @@ fn household(sonarr: &str, tested: u16, keys: &str, revoked: u16, reset: u16) ->
         (
             Method::Get,
             "/settings/jellyfin",
-            vec![Answer::reply(200, leaked(&linked()))],
+            vec![Answer::reply(200, leaked(link))],
         ),
         (
             Method::Post,
@@ -440,4 +460,67 @@ async fn an_owed_key_of_an_arr_the_stack_no_longer_runs_is_forgotten() {
         None,
         "{state:?}"
     );
+}
+
+#[tokio::test]
+async fn a_media_server_link_not_at_the_gate_holds_everything_back() {
+    let http = linked_household(
+        &link_at("jellyfin", 8096, ""),
+        &sonarr_gated(),
+        200,
+        200,
+        &keys(true),
+        204,
+        201,
+    );
+    let (ctx, project) = taking("link-direct", &http, false);
+    let (state, _) = taken(&ctx, &gated(), &project, owing()).await;
+    assert!(
+        matches!(&state, Some(State::Skipped { reason }) if reason.starts_with("Seerr still reaches Jellyfin without")),
+        "{state:?}"
+    );
+}
+
+#[tokio::test]
+async fn targets_that_cannot_be_listed_leave_everything_for_a_later_run() {
+    let http = linked_household(&linked(), "[]", 500, 200, &keys(false), 204, 201);
+    let (ctx, project) = taking("unlisted", &http, false);
+    let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
+    assert!(
+        matches!(state, Some(State::Failed { .. } | State::Skipped { .. })),
+        "{state:?}"
+    );
+    assert_eq!(baseline.expected("seerr", OWED_SONARR), Some("owed"));
+}
+
+#[tokio::test]
+async fn without_the_administrators_password_only_the_arr_keys_are_taken_back() {
+    let http = household(&sonarr_direct(), 200, &keys(true), 204, 201);
+    let (mut ctx, project) = taking("no-admin", &http, false);
+    ctx.settings.env_file = None;
+    let (state, _) = taken(&ctx, &gated(), &project, owing()).await;
+    assert!(
+        matches!(&state, Some(State::Skipped { reason }) if reason.starts_with("Seerr still reaches sonarr")),
+        "{state:?}"
+    );
+    assert!(!http
+        .requests()
+        .iter()
+        .any(|asked| asked.url.contains("/Auth/Keys")));
+}
+
+#[tokio::test]
+async fn a_stack_without_the_request_service_or_the_media_server_has_nothing_to_take_back() {
+    let http = household(&sonarr_gated(), 200, &keys(true), 204, 201);
+    let (ctx, project) = taking("no-seerr", &http, false);
+    let without = |id: &str| -> Vec<_> {
+        gated()
+            .into_iter()
+            .filter(|service| service.id != id)
+            .collect()
+    };
+    let (state, _) = taken(&ctx, &without("seerr"), &project, owing()).await;
+    assert_eq!(state, None);
+    let (state, _) = taken(&ctx, &without("jellyfin"), &project, Baseline::new()).await;
+    assert_eq!(state, None);
 }
