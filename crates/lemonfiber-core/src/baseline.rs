@@ -135,6 +135,26 @@ impl Baseline {
         self.services.get(service)?.get(field)
     }
 
+    /// Every field recorded for `service` whose name starts with `prefix`, by the rest of
+    /// its name: how work owed across runs is found again, where each owed item is a
+    /// field of its own.
+    #[must_use]
+    pub fn named(&self, service: &str, prefix: &str) -> Vec<String> {
+        self.services
+            .get(service)
+            .into_iter()
+            .flat_map(|fields| fields.keys())
+            .filter_map(|field| field.strip_prefix(prefix).map(ToOwned::to_owned))
+            .collect()
+    }
+
+    /// Drop the record of one field, where the thing it recorded is done with.
+    pub fn forget(&mut self, service: &str, field: &str) {
+        if let Some(fields) = self.services.get_mut(service) {
+            fields.remove(field);
+        }
+    }
+
     /// Whether nothing has been recorded yet — the state before a first seed, and
     /// the one a later run reads as "the baseline was never formed" rather than "the
     /// service holds nothing lemonfiber set".

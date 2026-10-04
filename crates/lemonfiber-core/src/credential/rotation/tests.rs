@@ -117,3 +117,25 @@ fn a_key_the_service_replaced_that_did_not_answer_kept_nothing_and_failed() {
     assert!(lost.failed());
     assert!(!partly_landed().failed());
 }
+
+#[test]
+fn an_outcome_says_its_own_words_where_it_has_any() {
+    let said = |settled: Settled| settled.detail().map(ToOwned::to_owned);
+    let words = || "the words".to_owned();
+
+    for settled in [
+        Settled::Refused { detail: words() },
+        Settled::Unproven { detail: words() },
+        Settled::ReplacedUnproven { detail: words() },
+        Settled::Elsewhere { detail: words() },
+        Settled::Rehearsed {
+            detail: words(),
+            location: "the environment file".to_owned(),
+            afterwards: Vec::new(),
+        },
+    ] {
+        assert_eq!(said(settled), Some(words()));
+    }
+    assert_eq!(said(Settled::Replaced { observed: words() }), None);
+    assert_eq!(said(Settled::Unknown { known: Vec::new() }), None);
+}

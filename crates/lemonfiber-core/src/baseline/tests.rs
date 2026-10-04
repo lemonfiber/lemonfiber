@@ -148,3 +148,24 @@ fn a_baseline_round_trips_through_its_serialised_form() {
     let restored: Baseline = serde_json::from_str(&json).unwrap_or_default();
     assert_eq!(restored, baseline);
 }
+
+#[test]
+fn owed_items_are_found_by_their_prefix_and_forgotten_once_done() {
+    let mut baseline = Baseline::new();
+    baseline.record("seerr", "held-key:sonarr", "owed", "1");
+    baseline.record("seerr", "held-key:radarr", "owed", "1");
+    baseline.record("seerr", "telling", "on", "1");
+
+    assert_eq!(
+        baseline.named("seerr", "held-key:"),
+        vec!["radarr".to_owned(), "sonarr".to_owned()]
+    );
+    baseline.forget("seerr", "held-key:radarr");
+    baseline.forget("nobody", "held-key:radarr");
+    assert_eq!(
+        baseline.named("seerr", "held-key:"),
+        vec!["sonarr".to_owned()]
+    );
+    assert!(baseline.named("nobody", "held-key:").is_empty());
+    assert_eq!(baseline.expected("seerr", "telling"), Some("on"));
+}

@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use lemonfiber_manifest::Service;
 
-use super::rotating::{unproven, would_rotate};
+use super::rotating::would_rotate;
 use crate::app::targets::{record_secret, target_for};
 use crate::app::Ctx;
 use crate::credential::{Held, Propagation, Reach, Rotation, Settled};
@@ -71,11 +71,39 @@ pub(super) async fn rotate(
     if ctx.dry_run {
         return would_rotate(held, RESETTING);
     }
+    reset(ctx, &held.name, &held.setting, services, project, target).await
+}
+
+/// Replace the key of the \*arr `target` is, on a run that means it: what taking a key
+/// back from a service that held it is, as well as what a rotation asked for is.
+pub(crate) async fn reset_arr(
+    ctx: &Ctx,
+    services: &[Service],
+    project: Option<&Path>,
+    target: Target,
+) -> Rotation {
+    let name = format!("{} API key", target.name);
+    let setting = published_as(&target.id);
+    reset(ctx, &name, &setting, services, project, target).await
+}
+
+/// The reset itself, recorded as `setting` and reported as `name`.
+async fn reset(
+    ctx: &Ctx,
+    name: &str,
+    setting: &str,
+    services: &[Service],
+    project: Option<&Path>,
+    target: Target,
+) -> Rotation {
     let fs = ctx.seams.filesystem.as_ref();
     let Some(old) = target.key(fs).await else {
-        return unproven(
-            held,
-            "the service has not written an API key yet, so there is none to replace",
+        return Rotation::stopped(
+            name,
+            Settled::Unproven {
+                detail: "the service has not written an API key yet, so there is none to replace"
+                    .to_owned(),
+            },
         );
     };
     let service = |key: String| {
@@ -89,7 +117,7 @@ pub(super) async fn rotate(
     };
     if let Err(failure) = service(old.clone()).replace_key().await {
         return Rotation::stopped(
-            &held.name,
+            name,
             Settled::Refused {
                 detail: crate::config::store::withheld_text(&format!(
                     "the service would not replace its key: {failure}. The existing key is \
@@ -99,24 +127,23 @@ pub(super) async fn rotate(
         );
     }
     let Some(new) = written_after(&target, fs, &old).await else {
-        return lost(held, "it wrote no new key to its configuration");
+        return lost(name, "it wrote no new key to its configuration");
     };
     let identity = match service(new.clone()).identity().await {
         Ok(identity) => identity,
-        Err(failure) => return lost(held, &failure.to_string()),
+        Err(failure) => return lost(name, &failure.to_string()),
     };
-    record_secret(ctx, &held.setting, &new);
-    let mut consumers: Vec<Propagation> =
-        super::reading::service_consumers(&target.name, &held.setting)
-            .into_iter()
-            .map(|(consumer, reached)| Propagation {
-                consumer,
-                reach: reached.reach(),
-            })
-            .collect();
+    record_secret(ctx, setting, &new);
+    let mut consumers: Vec<Propagation> = super::reading::service_consumers(&target.name, setting)
+        .into_iter()
+        .map(|(consumer, reached)| Propagation {
+            consumer,
+            reach: reached.reach(),
+        })
+        .collect();
     consumers.extend(copies(ctx, services, project, &target).await);
     Rotation::landed(
-        &held.name,
+        name,
         &format!(
             "{} {} replaced its key and answered to the new one",
             identity.name, identity.version
@@ -193,9 +220,9 @@ fn copy(consumer: String, state: State) -> Propagation {
 }
 
 /// A reset the service made whose new key did not answer: the old key is gone too.
-fn lost(held: &Held, reason: &str) -> Rotation {
+fn lost(name: &str, reason: &str) -> Rotation {
     Rotation::stopped(
-        &held.name,
+        name,
         Settled::ReplacedUnproven {
             detail: crate::config::store::withheld_text(&format!(
                 "the service replaced its key and the new one did not answer: {reason}. The old \

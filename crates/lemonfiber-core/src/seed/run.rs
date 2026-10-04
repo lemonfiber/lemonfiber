@@ -29,6 +29,7 @@ mod minted;
 mod published;
 pub(crate) use published::published_as;
 mod subtitles;
+mod taken_back;
 // Seerr's Jellyfin connection, held at the request gate's Jellyfin route.
 mod linking;
 // The request gate's tokens, one per route, held raw by the request service alone.
@@ -229,10 +230,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         .await,
     );
 
-    // The *arrs the request service hands a request to. Without this the household
-    // can ask and nothing downstream ever hears, and with it the request surface
-    // offers only what the stack can actually deliver.
-    wirings.extend(seed_fulfilment_targets(ctx, &manifest.services, project.as_deref()).await);
+    // The *arrs the request service hands a request to, and the credentials it held
+    // before the gate taken back.
+    wirings.extend(seed_requests(ctx, &manifest.services, project.as_deref(), &mut baseline).await);
 
     // The keys the stack's own services read out of the environment. Two of them are
     // configured that way and by no other means — the quality sync and the archive
@@ -416,6 +416,25 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
 /// message rather than failing the wiring that did land.
 fn record_qbittorrent_password(ctx: &Ctx, password: &str) {
     crate::app::targets::record_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY, password);
+}
+
+/// The \*arrs the request service hands a request to. Without this the household can
+/// ask and nothing downstream ever hears, and with it the request surface offers only
+/// what the stack can actually deliver.
+///
+/// Which \*arr keys the request service holds is noted first, because the move to the
+/// gate is what hides it; once it reaches everything through the gate, those keys and
+/// the Jellyfin key it minted itself are taken back.
+async fn seed_requests(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&Path>,
+    baseline: &mut crate::baseline::Baseline,
+) -> Vec<crate::seed::Wiring> {
+    taken_back::note_held(ctx, services, project, baseline).await;
+    let mut wirings = seed_fulfilment_targets(ctx, services, project).await;
+    wirings.extend(taken_back::seed_taken_back(ctx, services, project, baseline).await);
+    wirings
 }
 
 /// How many lines back to read for qBittorrent's start-up announcement. Its
