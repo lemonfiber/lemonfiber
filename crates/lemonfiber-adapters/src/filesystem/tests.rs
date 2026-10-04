@@ -376,7 +376,10 @@ async fn a_plain_file_holding_no_text_is_absent() {
 async fn a_pipe_where_the_file_is_expected_is_refused_without_waiting() {
     let (dir, owned, _) = confined();
     let pipe = owned.join("pipe.ini");
-    let made = std::process::Command::new("mkfifo").arg(&pipe).status();
+    let made = tokio::process::Command::new("mkfifo")
+        .arg(&pipe)
+        .status()
+        .await;
 
     assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
     assert_eq!(Disk.read_beneath(&pipe, &owned).await, Beneath::Escaped);
