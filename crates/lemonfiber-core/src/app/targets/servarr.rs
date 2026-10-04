@@ -72,6 +72,7 @@ pub(crate) fn target_for(service: &lemonfiber_manifest::Service, project: &Path)
         base: super::opening::loopback(port),
         config,
         version,
+        confined_to: None,
     })
 }
 

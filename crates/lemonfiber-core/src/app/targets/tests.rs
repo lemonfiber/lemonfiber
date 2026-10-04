@@ -180,6 +180,7 @@ fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
         published: None,
         key_file: Some(std::path::PathBuf::from(file)),
         confined_to: within.map(std::path::PathBuf::from),
+        media_types: Vec::new(),
     }
 }
 

@@ -30,6 +30,7 @@ const CONNECTION: &str = "The request gate's routes";
 pub(super) async fn seed_gate_routes(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
 ) -> Option<Wiring> {
     let jellyfin = super::identity::jellyfin_service(services)?;
@@ -74,7 +75,7 @@ pub(super) async fn seed_gate_routes(
         .read(&path)
         .await
         .and_then(|text| Upstreams::read(&text).ok());
-    let routes = arr_routes(ctx, services, project).await;
+    let routes = arr_routes(ctx, fillers).await;
     // The Jellyfin lines the stack runs, which the gate forwards to and to no other.
     let majors: Vec<u32> = services
         .iter()
@@ -126,15 +127,16 @@ pub(super) async fn seed_gate_routes(
 pub(crate) async fn reroute(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     arr: &str,
 ) -> Option<State> {
     gating::service(services)?;
-    let routed = super::servarr_arrs(services, project)
-        .into_iter()
-        .any(|one| one.target.id == arr && super::fulfilment::fetches(&one.media_types).is_some());
+    let routed = super::fulfilling(fillers)
+        .iter()
+        .any(|fulfils| fulfils.filler.id == arr);
     routed.then_some(())?;
-    seed_gate_routes(ctx, services, project)
+    seed_gate_routes(ctx, services, fillers, project)
         .await
         .map(|wiring| wiring.state)
 }
@@ -181,29 +183,22 @@ async fn kept(
 
 /// A route for each \*arr the request service fulfils through, with the key it wrote for
 /// itself. An \*arr that has written none yet has no route until it has.
-async fn arr_routes(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: &Path,
-) -> Vec<Upstream> {
+async fn arr_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream> {
     let mut routes = Vec::new();
-    for arr in super::servarr_arrs(services, Some(project)) {
-        let Some((television, (host, port))) = super::fulfilment::fetches(&arr.media_types)
-            .zip(super::arrs::reached_at(services, &arr.target.id))
+    for fulfils in super::fulfilling(fillers) {
+        let crate::ports::filesystem::Beneath::Read(key) =
+            super::arrs::servarr_key(ctx, fulfils.filler).await
         else {
             continue;
         };
-        let Some(key) = super::read_servarr_key(ctx, &arr.target.config).await else {
-            continue;
-        };
         routes.push(Upstream {
-            route: arr.target.id.clone(),
-            kind: if television {
+            route: fulfils.filler.id.clone(),
+            kind: if fulfils.television {
                 Kind::Sonarr
             } else {
                 Kind::Radarr
             },
-            address: format!("http://{host}:{port}"),
+            address: fulfils.at.url(),
             credential: Credential::new(key),
             majors: Vec::new(),
         });

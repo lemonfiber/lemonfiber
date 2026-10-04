@@ -1,7 +1,7 @@
 use crate::ports::filesystem::Storage;
 use std::sync::Arc;
 
-use super::applications::{application_kind, prowlarr_source, syncable_arrs};
+use super::applications::application_kind;
 use super::arrs::servarr_arrs;
 use super::baseline::escalate_broken_roots;
 use super::clients::{category_for, Held};
@@ -25,6 +25,9 @@ fn manifest_service(
     api: Option<lemonfiber_manifest::Api>,
     port: Option<u16>,
 ) -> lemonfiber_manifest::Service {
+    // Where it answers beside the others, said wherever it names an adapter, as the
+    // validator holds the stack to.
+    let listens = port.filter(|_| api.is_some());
     lemonfiber_manifest::Service {
         id: id.to_owned(),
         name: format!("{id} the app"),
@@ -51,7 +54,7 @@ fn manifest_service(
         memory_mib: None,
         asks_for: None,
         reaches: None,
-        listens: None,
+        listens,
     }
 }
 
@@ -143,7 +146,10 @@ fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wi
     report
         .wirings
         .iter()
-        .filter(|wiring| wiring.connection.contains("into "))
+        .filter(|wiring| {
+            wiring.connection.contains("into ")
+                && !matches!(wiring.state, crate::seed::State::Unmatched { .. })
+        })
         .collect()
 }
 
@@ -159,7 +165,69 @@ fn arr(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
         Some(port),
     );
     service.media_types = vec![media.to_owned()];
+    service.provides = vec!["library.curate".to_owned()];
     service
+}
+
+/// What the shipped stack's asks come to with these services in place of its own —
+/// the services a test declares, asked for as the stack asks.
+fn fillers_of(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
+    fillers_at(services, stack_root())
+}
+
+/// The same, with the stack written to disk at `project`.
+fn fillers_at(
+    services: Vec<lemonfiber_manifest::Service>,
+    project: &std::path::Path,
+) -> crate::wiring::Fillers {
+    fillers_beside(services, &[], project)
+}
+
+/// The same, with `installed` beside the stack.
+fn fillers_beside(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+    project: &std::path::Path,
+) -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|mut manifest| {
+            manifest.services = services;
+            crate::wiring::Fillers::of(
+                &manifest,
+                installed,
+                &crate::wiring::Chosen::default(),
+                Some(project),
+            )
+        })
+        .unwrap_or_default()
+}
+
+/// The stack's `services` beside a plugin's curator, `kept`, filing `media` and keeping
+/// its key in a file beneath the directory its container owns.
+fn beside_a_stand_in(
+    services: Vec<lemonfiber_manifest::Service>,
+    media: &str,
+) -> crate::wiring::Fillers {
+    let mut stand_in = crate::test_support::a_placed(
+        "kept",
+        &["library.curate"],
+        Some(servarr_api(Some("/config/config.xml"))),
+        Some(8990),
+    );
+    stand_in.media_types = vec![media.to_owned()];
+    fillers_beside(
+        services,
+        &[crate::test_support::an_installed("kept", vec![stand_in])],
+        stack_root(),
+    )
+}
+
+/// A filesystem holding every Servarr key, the stand-in's resolving away from beneath
+/// the directory its container owns.
+fn leading_away_from_the_stand_in() -> SeedFs {
+    SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"), None)
+        .leading_away(vec!["config/kept/"])
 }
 
 /// Prowlarr as a manifest service: a Servarr shape that files no media.

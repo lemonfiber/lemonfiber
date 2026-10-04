@@ -28,6 +28,7 @@ fn placed(service: &str) -> Placed {
         description: "Reads comics".to_owned(),
         api: None,
         listens: None,
+        media_types: Vec::new(),
     }
 }
 

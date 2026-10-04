@@ -20,6 +20,19 @@ pub(crate) enum Loaded {
     Lost,
 }
 
+impl Loaded {
+    /// The baseline a pass records against, and whether the record it stands in for
+    /// was lost: an empty one where nothing was read, so a lost record is never
+    /// mistaken for a first seed by the baseline alone.
+    pub(crate) fn starting(self) -> (crate::baseline::Baseline, bool) {
+        match self {
+            Self::Formed(baseline) => (baseline, false),
+            Self::Fresh => (crate::baseline::Baseline::new(), false),
+            Self::Lost => (crate::baseline::Baseline::new(), true),
+        }
+    }
+}
+
 /// Read the expected-state baseline from where the last run left it, telling a
 /// record that is genuinely absent from one that is there but lost.
 ///

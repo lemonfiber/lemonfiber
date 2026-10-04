@@ -8,6 +8,7 @@ use super::{
     category_for, escalate_broken_roots, skipped, target_for, wanted_roots, Ctx, Path, DATA_ROOT,
     SCHEMA_VERSION_FIELD,
 };
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Client, DownloadClient};
 use crate::wiring::Fillers;
 
@@ -42,22 +43,6 @@ pub(crate) fn servarr_arrs(
             })
         })
         .collect()
-}
-
-/// Where another service on the stack reaches this \*arr: its container name and
-/// port.
-///
-/// The container name rather than a loopback address, because everything that needs
-/// this is itself a container beside them — `127.0.0.1` there is the caller, not the
-/// \*arr. Nothing where the stack declares no port for it.
-pub(super) fn reached_at(
-    services: &[lemonfiber_manifest::Service],
-    id: &str,
-) -> Option<(String, u16)> {
-    services
-        .iter()
-        .find(|service| service.id == id)
-        .and_then(|service| service.port.map(|port| (service.id.clone(), port)))
 }
 
 /// The inputs a seed pass reads once and hands to every \*arr it seeds: the
@@ -241,6 +226,36 @@ pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<D
         });
     }
     wanted
+}
+
+/// The API key a service of the Servarr shape wrote for itself, read from the file
+/// its own declaration names — beneath its own directory where a plugin brought it.
+///
+/// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
+/// written, and a file refused stays refused, so the caller can say so.
+pub(super) async fn servarr_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
+    match crate::app::targets::credential_file(ctx, filler).await {
+        Beneath::Read(text) => {
+            crate::servarr::api_key(&text).map_or(Beneath::Absent, Beneath::Read)
+        }
+        other => other,
+    }
+}
+
+/// A connection refused because the filler's credential file was, saying why.
+///
+/// Refused rather than skipped: no later run reads the file while it stays what it is,
+/// and it is either a mistake in the plugin or an attempt by it, which the operator has
+/// to see either way.
+pub(super) fn refused(connection: String, filler: &crate::wiring::Filler) -> crate::seed::Wiring {
+    crate::seed::Wiring::settled(connection, refusal(filler))
+}
+
+/// What a connection comes to where the filler's credential file was refused.
+pub(super) fn refusal(filler: &crate::wiring::Filler) -> crate::seed::State {
+    crate::seed::State::Refused {
+        reason: crate::app::targets::escaped(filler),
+    }
 }
 
 /// A Servarr application's API key, read from the configuration file it wrote it

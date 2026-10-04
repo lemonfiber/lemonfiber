@@ -56,13 +56,24 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
             confirmed,
         } => showing(ctx, held, &credential, confirmed).await,
         Asking::Rotate { credential } => {
+            // Who reaches the service whose key is replaced, as the stack's asks settle
+            // it, so every copy of the key is handed the new one and no other.
+            let fillers = crate::wiring::Fillers::of(
+                &manifest,
+                installed,
+                &super::targets::chosen_fillers(ctx),
+                project.as_deref(),
+            );
             replacing(
                 ctx,
                 held,
                 &credential,
-                &manifest.services,
-                project.as_deref(),
-                installed,
+                Reaching {
+                    services: &manifest.services,
+                    fillers: &fillers,
+                    project: project.as_deref(),
+                    installed,
+                },
             )
             .await
         }
@@ -84,19 +95,37 @@ async fn replacing(
     ctx: &Ctx,
     held: Vec<Held>,
     credential: &str,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&std::path::Path>,
-    installed: &[crate::plugin::Installed],
+    reaching: Reaching<'_>,
 ) -> Inventory {
     let Some(found) = named(&held, credential) else {
         let known = named_ones(&held);
         return Inventory::of(held).after(unknown(credential, &known));
     };
-    let rotated = rotating::rotate(ctx, found, services, project).await;
+    let Reaching {
+        services,
+        fillers,
+        project,
+        installed,
+    } = reaching;
+    let rotated = rotating::rotate(ctx, found, services, fillers, project).await;
     // Read again, because a landed replacement has changed what the answer is and an
     // inventory taken before it would report the state the rotation just left behind.
     let after = reading::taken(ctx, services, project, installed).await;
     Inventory::of(after).after(rotated)
+}
+
+/// The stack a replacement reaches into: its services, who fills each of its asks,
+/// where it was written to disk and what is installed beside it.
+#[derive(Clone, Copy)]
+struct Reaching<'a> {
+    /// The stack's own services.
+    services: &'a [lemonfiber_manifest::Service],
+    /// Who fills each ask, so every copy of a replaced key is found.
+    fillers: &'a crate::wiring::Fillers,
+    /// Where the stack was written to disk.
+    project: Option<&'a std::path::Path>,
+    /// What is installed beside the stack.
+    installed: &'a [crate::plugin::Installed],
 }
 
 /// The line an operator's words name, where they name one.

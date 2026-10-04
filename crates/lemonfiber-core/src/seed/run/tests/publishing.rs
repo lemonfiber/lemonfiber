@@ -36,6 +36,7 @@ async fn the_arrs_in_the_stack_are_handed_to_the_request_service() {
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;

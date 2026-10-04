@@ -162,7 +162,13 @@ async fn seeded(
     gating: bool,
     project: &std::path::Path,
 ) -> (Option<State>, Vec<String>) {
-    let wiring = super::super::gate::seed_gate_routes(ctx, &stack(gating), Some(project)).await;
+    let wiring = super::super::gate::seed_gate_routes(
+        ctx,
+        &stack(gating),
+        &fillers_at(stack(gating), project),
+        Some(project),
+    )
+    .await;
     let revoked = http
         .requests()
         .into_iter()
@@ -384,9 +390,14 @@ async fn a_stack_without_jellyfin_has_no_routes() {
         Some(lemonfiber_sidecar::gate::PORT),
     )];
 
-    assert!(super::super::gate::seed_gate_routes(&ctx, &services, None)
-        .await
-        .is_none());
+    assert!(super::super::gate::seed_gate_routes(
+        &ctx,
+        &services,
+        &fillers_of(services.clone()),
+        None
+    )
+    .await
+    .is_none());
 }
 
 /// With no stack directory there is nowhere to hand the routes over, and nothing is
@@ -396,7 +407,9 @@ async fn without_a_stack_directory_nothing_is_minted() {
     let http = serving(&[&[]], 204, 204);
     let (ctx, _) = gate_ctx("gate-routes-no-project", true, ARRS, None, http.clone());
 
-    let wiring = super::super::gate::seed_gate_routes(&ctx, &stack(true), None).await;
+    let wiring =
+        super::super::gate::seed_gate_routes(&ctx, &stack(true), &fillers_of(stack(true)), None)
+            .await;
 
     assert_eq!(
         wiring.map(|one| one.state),

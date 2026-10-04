@@ -32,63 +32,135 @@ fn the_application_kind_follows_from_the_media() {
     assert!(application_kind(&[]).is_none());
 }
 
-#[test]
-fn prowlarr_is_the_servarr_service_that_files_no_media() {
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    // A media-filing *arr is never the source, however reachable.
-    assert!(prowlarr_source(&[arr("sonarr", 8989, "tv")], Some(project)).is_none());
-    // The Servarr service with no media is, known on the network by its own
-    // container name and port.
-    let source = prowlarr_source(&[prowlarr()], Some(project));
-    assert!(source.is_some_and(
-        |source| source.network_url == "http://prowlarr:9696" && source.target.id == "prowlarr"
-    ));
-    // Without a project there is nowhere to read a key from.
-    assert!(prowlarr_source(&[prowlarr()], None).is_none());
-}
-
-#[test]
-fn no_project_directory_means_no_arrs_to_sync() {
-    assert!(syncable_arrs(&[arr("sonarr", 8989, "tv")], None).is_empty());
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    let arrs = syncable_arrs(
-        &[arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
-        Some(project),
-    );
-    assert_eq!(arrs.len(), 2, "each media-filing arr is syncable");
-    assert!(arrs
-        .iter()
-        .any(|arr| arr.network_url == "http://sonarr:8989"));
-}
-
 #[tokio::test]
 async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    // Only a media-filing arr, so there is no app-sync source at all.
+    // Only a media-filing arr, so nothing asks for it at all.
     let wirings =
-        super::super::seed_applications(&ctx, &[arr("sonarr", 8989, "tv")], Some(project)).await;
+        super::super::seed_applications(&ctx, &fillers_of(vec![arr("sonarr", 8989, "tv")])).await;
     assert!(wirings.is_empty(), "no Prowlarr, no app sync");
+}
+
+/// An indexer this machine cannot reach, or that says nowhere the curators reach it
+/// back, has nothing registered into it and says nothing.
+#[tokio::test]
+async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
+    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+    let mut unpublished = prowlarr();
+    unpublished.port = None;
+    unpublished.listens = Some(9696);
+
+    let wirings = super::super::seed_applications(
+        &ctx,
+        &fillers_of(vec![unpublished, arr("sonarr", 8989, "tv")]),
+    )
+    .await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+}
+
+/// A curator whose credential file a plugin's container pointed away is refused on
+/// its application, and the others are registered as ever.
+#[tokio::test]
+async fn app_sync_refuses_a_curator_whose_key_file_leads_away() {
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(seeding())
+        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+    let fillers = beside_a_stand_in(vec![prowlarr(), arr("sonarr", 8989, "tv")], "movies");
+
+    let wirings = super::super::seed_applications(&ctx, &fillers).await;
+
+    assert!(
+        wirings.iter().any(|wiring| wiring.connection
+            == "kept the stand-in indexer sync via prowlarr the app"
+            && matches!(&wiring.state, crate::seed::State::Refused { reason }
+                if reason.starts_with("kept's credential file"))),
+        "{wirings:?}"
+    );
+    assert!(wirings
+        .iter()
+        .any(|wiring| wiring.connection.starts_with("sonarr the app")
+            && wiring.state == crate::seed::State::AlreadyWired));
+}
+
+/// What replacing a curator's key owes each indexer is its application held to the new
+/// one, and nothing for a curator no indexer registers.
+#[tokio::test]
+async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
+    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(seeding())
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+    let fillers = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+
+    let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
+    let nobody = super::super::resync_application(&ctx, &fillers, "radarr").await;
+
+    assert_eq!(
+        resynced,
+        vec![(
+            "prowlarr the app".to_owned(),
+            crate::seed::State::AlreadyWired
+        )]
+    );
+    assert!(nobody.is_empty());
+}
+
+/// An indexer that has not written its key yet holds no application to bring up to a
+/// replaced key, so a replacement owes it nothing yet.
+#[tokio::test]
+async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let fillers = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+
+    let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
+
+    assert!(resynced.is_empty(), "{resynced:?}");
+}
+
+/// A curator whose credential file leads away is refused on its resync rather than
+/// passed over, so the replacement says the indexer was not handed the key.
+#[tokio::test]
+async fn a_replaced_key_read_from_a_file_leading_away_is_refused_on_its_resync() {
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(seeding())
+        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+    let fillers = beside_a_stand_in(vec![prowlarr(), arr("sonarr", 8989, "tv")], "movies");
+
+    let resynced = super::super::resync_application(&ctx, &fillers, "kept").await;
+
+    assert!(
+        matches!(resynced.as_slice(), [(prowlarr, crate::seed::State::Refused { reason })]
+            if prowlarr == "prowlarr the app" && reason.starts_with("kept's credential file")),
+        "{resynced:?}"
+    );
 }
 
 #[tokio::test]
 async fn app_sync_skips_every_arr_until_prowlarr_has_written_its_key() {
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
     // Prowlarr's key is not readable yet, so it is still starting: every
     // application is skipped for a re-run rather than failed.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
-    let wirings = super::super::seed_applications(&ctx, &services, Some(project)).await;
+    let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
+    // The key that is missing is Prowlarr's, so it is Prowlarr the report names.
+    assert!(
+        wirings.iter().all(|wiring| matches!(&wiring.state,
+            crate::seed::State::Skipped { reason } if reason.starts_with("prowlarr the app has"))),
+        "{wirings:?}"
+    );
 }
 
 #[tokio::test]
 async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
     // Prowlarr's key is readable but Sonarr's is not — Sonarr came up after
     // Prowlarr — so Sonarr's application waits while Prowlarr itself proceeds.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
@@ -96,7 +168,7 @@ async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(SERVARR), None).only_for_prowlarr(),
         ));
-    let wirings = super::super::seed_applications(&ctx, &services, Some(project)).await;
+    let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
 }
@@ -104,14 +176,13 @@ async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
 #[tokio::test]
 async fn app_sync_registers_an_arr_whose_keys_are_all_readable() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
     // The seeding routes report Sonarr already registered — its baseUrl is in the
     // application list — so the connection reads back as already wired.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let wirings = super::super::seed_applications(&ctx, &services, Some(project)).await;
+    let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -147,8 +218,7 @@ fn registering_prowlarr() -> Arc<Fake> {
 #[tokio::test]
 async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let project = std::path::Path::new("/opt/lemonfiber/stack");
-    let services = vec![prowlarr(), arr("sonarr", 8989, "tv")];
+    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
     // Prowlarr holds no applications, so Sonarr is genuinely written and then
     // read back — the write path a pre-populated list would hide.
     let http = registering_prowlarr();
@@ -156,7 +226,7 @@ async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
 
-    let wirings = super::super::seed_applications(&ctx, &services, Some(project)).await;
+    let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),

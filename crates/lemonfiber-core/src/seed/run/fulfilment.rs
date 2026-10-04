@@ -16,52 +16,81 @@ use std::path::Path;
 
 use lemonfiber_manifest::Service;
 
-use super::arrs::{reached_at, read_servarr_key, servarr_arrs};
+use super::connecting::{pairings, Connection, FILM, TELEVISION};
 use super::Ctx;
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
 use crate::seed::{State, Wiring};
+use crate::wiring::{Address, Filler, Fillers};
 
-/// The media type an \*arr must file for the request service to send it anything.
-const TELEVISION: &str = "tv";
-const FILM: &str = "movies";
+/// One curator the request service hands requests to: which it is, where the request
+/// service reaches it, and whether it fetches television rather than film.
+pub(super) struct Fulfils<'a> {
+    /// The curator.
+    pub(super) filler: &'a Filler,
+    /// Where the request service reaches it beside the others.
+    pub(super) at: &'a Address,
+    /// Whether it fetches television rather than film.
+    pub(super) television: bool,
+}
 
-/// Every \*arr in this stack the request service should hand requests to.
+/// Every curator the request service asks for and lemonfiber hands it, as the stack's
+/// asks settle them — the one answer the request service's targets, the request gate's
+/// routes and the credentials taken back from the request service all read.
+pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
+    pairings(fillers)
+        .into_iter()
+        .filter_map(|pairing| match pairing.made {
+            Ok((Connection::Fulfilment { television }, at)) => Some(Fulfils {
+                filler: pairing.filler,
+                at,
+                television,
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Every \*arr the request service should hand requests to, and the wiring for each
+/// whose credential file was refused, said on the target it would have been.
 ///
 /// Each is read rather than assumed: the profile it fetches at and the folder it
 /// files into are asked of the \*arr itself, because the request service must name
 /// both when it hands over a request, and an operator may have renamed or replaced
 /// what setup created.
 ///
-/// An \*arr that cannot answer, or that has no profile or folder to name, is left
-/// out rather than registered half-configured — a target the request service holds
-/// but cannot fetch through is worse than one it does not hold, because the request
-/// is accepted either way and only the second is visibly missing.
-pub(super) async fn wanted_targets(
-    ctx: &Ctx,
-    services: &[Service],
-    project: Option<&Path>,
-) -> Vec<FulfilmentTarget> {
+/// An \*arr that cannot answer, that this machine cannot reach, or that has no profile
+/// or folder to name, is left out rather than registered half-configured — a target the
+/// request service holds but cannot fetch through is worse than one it does not hold,
+/// because the request is accepted either way and only the second is visibly missing.
+async fn wanted_targets(ctx: &Ctx, fillers: &Fillers) -> (Vec<FulfilmentTarget>, Vec<Wiring>) {
     let mut wanted = Vec::new();
-    for arr in servarr_arrs(services, project) {
-        // Taken together because only the first can actually decline: an \*arr that
-        // reached this point came from a service that publishes a port, so there is
-        // no separate way for the endpoint to be missing.
-        let Some((television, (host, port))) =
-            fetches(&arr.media_types).zip(reached_at(services, &arr.target.id))
-        else {
+    let mut refused = Vec::new();
+    for fulfils in fulfilling(fillers) {
+        let filler = fulfils.filler;
+        let key = match super::arrs::servarr_key(ctx, filler).await {
+            Beneath::Read(key) => key,
+            Beneath::Absent => continue,
+            Beneath::Escaped => {
+                refused.push(super::arrs::refused(
+                    crate::seed::as_request_target(&filler.name),
+                    filler,
+                ));
+                continue;
+            }
+        };
+        let (Some(published), Some(version)) = (
+            filler.published,
+            filler.adapter.as_ref().and_then(|api| api.version),
+        ) else {
             continue;
         };
-        let Some(key) = read_servarr_key(ctx, &arr.target.config).await else {
-            continue;
-        };
-        // Built from the key just read rather than opened again. Opening re-reads the
-        // same file, so a second failure there could only happen if the first had.
         let client = crate::servarr::Servarr::new(
             ctx.seams.http.clone(),
-            &arr.target.base,
+            crate::app::targets::loopback(published),
             key.clone(),
-            &arr.target.id,
-            arr.target.version,
+            &filler.id,
+            version,
         );
         let Some(profile) = first_profile(&client).await else {
             continue;
@@ -71,22 +100,22 @@ pub(super) async fn wanted_targets(
         };
         // Reached at its own address, and moved back there from the gate where the stack
         // no longer runs one; [`seed_fulfilment_targets`] turns it to the gate where it does.
-        let moved_from = Some(super::tokens::through_the_gate(&host));
+        let moved_from = Some(super::tokens::through_the_gate(&fulfils.at.host));
         wanted.push(FulfilmentTarget {
-            name: arr.target.name.clone(),
+            name: filler.name.clone(),
             at: Endpoint {
-                host,
-                port,
+                host: fulfils.at.host.clone(),
+                port: fulfils.at.port,
                 base: String::new(),
             },
             moved_from,
             key,
-            television,
+            television: fulfils.television,
             profile,
             folder,
         });
     }
-    wanted
+    (wanted, refused)
 }
 
 /// Whether this \*arr fetches television, film, or neither.
@@ -129,6 +158,7 @@ async fn first_folder(client: &crate::servarr::Servarr) -> Option<String> {
 pub(super) async fn seed_fulfilment_targets(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &Fillers,
     project: Option<&Path>,
 ) -> Vec<Wiring> {
     // Asked before anything else, because what follows asks every \*arr what it holds
@@ -136,18 +166,20 @@ pub(super) async fn seed_fulfilment_targets(
     let Some(base) = super::identity::seerr_service(services) else {
         return Vec::new();
     };
-    let wanted = wanted_targets(ctx, services, project).await;
+    let (wanted, refused) = wanted_targets(ctx, fillers).await;
     if wanted.is_empty() {
-        return Vec::new();
+        return refused;
     }
     // Signed in, because every call that follows is an authenticated one: registering
     // a target reads what the service already holds and then writes. Unsigned, all of
     // it comes back as a refusal about a credential.
     let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
-    match project.filter(|_| crate::app::gating::service(services).is_some()) {
+    let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
         Some(project) => through_the_gate(ctx, &seerr, wanted, project).await,
         None => wired(ctx, &seerr, &wanted).await,
-    }
+    };
+    wirings.extend(refused);
+    wirings
 }
 
 /// Hand the request service `wanted` as they are.

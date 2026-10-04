@@ -42,7 +42,7 @@ async fn both_arrs_are_handed_to_the_subtitle_finder() {
     let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG));
 
     let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     assert_eq!(wirings.len(), 2, "{wirings:?}");
     assert!(
@@ -85,8 +85,7 @@ async fn the_finder_is_reached_with_its_own_key() {
     )]);
     let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG));
 
-    let _ =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+    let _ = super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     let presented: Vec<String> = http
         .requests()
@@ -116,7 +115,7 @@ async fn an_arr_the_finder_already_watches_is_left_as_it_is() {
     let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG));
 
     let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     // An `all` over an empty list is true, so the count is asserted first:
     // a step that wired nothing would otherwise satisfy every check below.
@@ -144,7 +143,7 @@ async fn a_stack_without_a_subtitle_finder_has_nothing_to_wire() {
     let without = vec![arr("sonarr", 8989, "tv")];
 
     assert!(
-        super::super::subtitles::seed_subtitles(&ctx, &without, Some(stack_root()))
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(without))
             .await
             .is_empty()
     );
@@ -163,7 +162,7 @@ async fn a_finder_that_has_written_no_key_yet_is_left_for_a_later_run() {
     let ctx = subtitle_ctx(http, None);
 
     assert!(
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root()))
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack()))
             .await
             .is_empty()
     );
@@ -186,7 +185,7 @@ async fn an_arr_with_no_key_yet_is_skipped_rather_than_wired() {
         ));
 
     let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     // An `all` over an empty list is true, so the count is asserted first:
     // a step that wired nothing would otherwise satisfy every check below.
@@ -217,8 +216,7 @@ async fn an_arr_filing_media_with_no_subtitles_is_passed_over() {
         bazarr_svc(),
     ];
 
-    let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &with_music, Some(stack_root())).await;
+    let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers_of(with_music)).await;
 
     assert_eq!(
         wirings.len(),
@@ -246,14 +244,11 @@ async fn an_arr_with_no_port_declared_is_passed_over() {
     )]);
     let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
     let mut portless = arr("sonarr", 8989, "tv");
-    portless.port = None;
+    portless.listens = None;
 
-    let wirings = super::super::subtitles::seed_subtitles(
-        &ctx,
-        &[portless, bazarr_svc()],
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(vec![portless, bazarr_svc()]))
+            .await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
 }
@@ -279,8 +274,7 @@ async fn a_finder_with_no_configuration_path_is_no_target() {
 
     let wirings = super::super::subtitles::seed_subtitles(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), pathless],
-        Some(stack_root()),
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), pathless]),
     )
     .await;
 
@@ -294,7 +288,7 @@ async fn a_finder_that_refuses_is_reported_rather_than_passed_over() {
     let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
 
     let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     // An `all` over an empty list is true, so the count is asserted first:
     // a step that wired nothing would otherwise satisfy every check below.
@@ -326,7 +320,7 @@ async fn a_write_the_finder_refuses_is_reported() {
     let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
 
     let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     // An `all` over an empty list is true, so the count is asserted first:
     // a step that wired nothing would otherwise satisfy every check below.
@@ -365,7 +359,7 @@ async fn a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere(
     let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG)).rehearsing();
 
     let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &subtitle_stack(), Some(stack_root())).await;
+        super::super::subtitles::seed_subtitles(&ctx, &fillers_of(subtitle_stack())).await;
 
     let states: Vec<crate::seed::State> =
         wirings.iter().map(|wiring| wiring.state.clone()).collect();
@@ -387,4 +381,74 @@ async fn a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere(
         http.requests().iter().all(|asked| asked.body.is_none()),
         "a rehearsal pointed the finder at something"
     );
+}
+
+/// A curator whose credential file leads away is refused on its watch, and the finder
+/// is told about the others as ever.
+#[tokio::test]
+async fn a_curator_whose_key_file_leads_away_is_refused_its_watch() {
+    let http = Fake::by_path(vec![(
+        "/api/system/settings",
+        Answer::reply(200, WATCHING_NOTHING),
+    )]);
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(http)
+        .with_filesystem(Arc::new(
+            leading_away_from_the_stand_in().with_bazarr(FINDER_CONFIG),
+        ));
+    let fillers = beside_a_stand_in(vec![arr("sonarr", 8989, "tv"), bazarr_svc()], "movies");
+
+    let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
+
+    assert!(
+        wirings.iter().any(
+            |wiring| wiring.connection == "kept the stand-in watched for subtitles"
+                && matches!(wiring.state, crate::seed::State::Refused { .. })
+        ),
+        "{wirings:?}"
+    );
+    assert!(
+        wirings.iter().any(
+            |wiring| wiring.connection == "sonarr the app watched for subtitles"
+                && wiring.state == crate::seed::State::Wired
+        ),
+        "{wirings:?}"
+    );
+}
+
+/// What replacing a curator's key owes each finder watching it: the curator pointed at
+/// with the new key, refused where its credential file leads away, and nothing from a
+/// curator that has not written one yet.
+#[tokio::test]
+async fn a_replaced_key_rewatches_each_finder_and_refuses_one_read_from_a_file_leading_away() {
+    let http = Fake::by_path(vec![(
+        "/api/system/settings",
+        Answer::reply(200, WATCHING_NOTHING),
+    )]);
+    let refusing = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(
+            leading_away_from_the_stand_in().with_bazarr(FINDER_CONFIG),
+        ));
+    let unkeyed = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(http)
+        .with_filesystem(Arc::new(
+            SeedFs::keyed(None, None).with_bazarr(FINDER_CONFIG),
+        ));
+    let fillers = beside_a_stand_in(vec![arr("sonarr", 8989, "tv"), bazarr_svc()], "movies");
+
+    let watched = super::super::rewatch(&refusing, &fillers, "sonarr").await;
+    let refused = super::super::rewatch(&refusing, &fillers, "kept").await;
+    let unwritten = super::super::rewatch(&unkeyed, &fillers, "sonarr").await;
+
+    assert!(
+        matches!(watched.as_slice(), [(_, crate::seed::State::Wired)]),
+        "{watched:?}"
+    );
+    assert!(
+        matches!(refused.as_slice(), [(_, crate::seed::State::Refused { reason })]
+            if reason.starts_with("kept's credential file")),
+        "{refused:?}"
+    );
+    assert!(unwritten.is_empty(), "{unwritten:?}");
 }

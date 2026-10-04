@@ -10,24 +10,18 @@
 //! that is not running is skipped and completed on a later pass rather than holding
 //! up the other.
 
-use std::path::Path;
-
-use lemonfiber_manifest::Service;
-
-use super::arrs::{reached_at, read_servarr_key, servarr_arrs};
+use super::connecting::{pairings, Connection, FILM, TELEVISION};
 use super::Ctx;
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Subtitled, Subtitles as _, Watched};
-
-/// The media a subtitle can belong to, and the \*arr that files it.
-const TELEVISION: &str = "tv";
-const FILM: &str = "movies";
+use crate::wiring::{Address, Filler, Fillers};
 
 /// Which \*arr this is to the subtitle finder, or nothing where it files media that
 /// carries no subtitles.
 ///
 /// Music and books are not an omission: there is nothing to subtitle, so the finder
 /// has no setting for them at all.
-fn subtitled(media_types: &[String]) -> Option<Subtitled> {
+pub(super) fn subtitled(media_types: &[String]) -> Option<Subtitled> {
     if media_types.iter().any(|kind| kind == TELEVISION) {
         return Some(Subtitled::Sonarr);
     }
@@ -37,107 +31,143 @@ fn subtitled(media_types: &[String]) -> Option<Subtitled> {
     None
 }
 
-/// Tell the subtitle finder about every \*arr in this stack whose media has
-/// subtitles.
+/// One subtitle finder, and every curator it is told about with where it reaches each.
+struct Watching<'a> {
+    /// The finder that asks.
+    asker: &'a Filler,
+    /// Each curator, as the finder files it, and where it reaches it.
+    curators: Vec<(&'a Filler, Subtitled, &'a Address)>,
+}
+
+/// Every subtitle finder and the curators lemonfiber tells it about.
+fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
+    let mut found: Vec<Watching<'_>> = Vec::new();
+    for pairing in pairings(fillers) {
+        let Ok((Connection::Subtitles(which), at)) = pairing.made else {
+            continue;
+        };
+        match found
+            .iter_mut()
+            .find(|one| one.asker.id == pairing.asker.id)
+        {
+            Some(one) => one.curators.push((pairing.filler, which, at)),
+            None => found.push(Watching {
+                asker: pairing.asker,
+                curators: vec![(pairing.filler, which, at)],
+            }),
+        }
+    }
+    found
+}
+
+/// The finder as a client holding the key it wrote for itself, or nothing where this
+/// machine cannot reach it or it has not written one yet — a service still starting
+/// rather than a fault, so a later run completes it. A finder is one of the stack's own
+/// services, whose credential file is never confined, so nothing here is refused.
+async fn finder(ctx: &Ctx, asker: &Filler) -> Option<crate::bazarr::Bazarr> {
+    let published = asker.published?;
+    let key = crate::bazarr::api_key(
+        &crate::app::targets::credential_file(ctx, asker)
+            .await
+            .text()?,
+    )?;
+    Some(crate::bazarr::Bazarr::new(
+        ctx.seams.http.clone(),
+        crate::app::targets::loopback(published),
+        &asker.id,
+        key,
+    ))
+}
+
+/// What a curator's watch in a subtitle finder is called where it is reported.
+fn for_subtitles(curator: &str) -> String {
+    format!("{curator} watched for subtitles")
+}
+
+/// Tell each subtitle finder about every curator whose media has subtitles.
 ///
 /// Nothing to do where the stack has no subtitle finder, or where its key has not
 /// been written yet — the second is a service still starting rather than a fault, so
 /// it is skipped and a later run completes it.
-pub(super) async fn seed_subtitles(
-    ctx: &Ctx,
-    services: &[Service],
-    project: Option<&Path>,
-) -> Vec<crate::seed::Wiring> {
-    let Some(finder) = crate::app::targets::bazarr_reader(ctx, services, project).await else {
-        return Vec::new();
-    };
-
+pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
-    for arr in servarr_arrs(services, project) {
-        // Taken together rather than one after the other: an \*arr that reached this
-        // point came from a service that publishes a port, so there is no separate way
-        // for the address to be missing. What it files is the only thing that passes
-        // one over.
-        let Some((which, (host, port))) =
-            subtitled(&arr.media_types).zip(reached_at(services, &arr.target.id))
-        else {
+    for watching in watching(fillers) {
+        let Some(finder) = finder(ctx, watching.asker).await else {
             continue;
         };
-        let connection = format!("{} watched for subtitles", arr.target.name);
-        let Some(api_key) = read_servarr_key(ctx, &arr.target.config).await else {
+        for (curator, which, at) in &watching.curators {
+            let connection = for_subtitles(&curator.name);
+            let api_key = match super::arrs::servarr_key(ctx, curator).await {
+                Beneath::Read(key) => key,
+                Beneath::Absent => {
+                    wirings.push(super::skipped(connection, &curator.name));
+                    continue;
+                }
+                Beneath::Escaped => {
+                    wirings.push(super::arrs::refused(connection, curator));
+                    continue;
+                }
+            };
+            let watched = Watched {
+                which: *which,
+                host: at.host.clone(),
+                port: at.port,
+                api_key,
+            };
             wirings.push(crate::seed::Wiring::settled(
                 connection,
-                crate::seed::State::Skipped {
-                    reason: format!(
-                        "{} has not written its API key yet; a later run completes it",
-                        arr.target.name
-                    ),
-                },
+                watch(&finder, &watched, ctx.dry_run).await,
             ));
-            continue;
-        };
-        wirings.push(crate::seed::Wiring::settled(
-            connection,
-            watch(
-                &finder,
-                &Watched {
-                    which,
-                    host,
-                    port,
-                    api_key,
-                },
-                ctx.dry_run,
-            )
-            .await,
-        ));
+        }
     }
     wirings
 }
 
-/// Point the finder at the \*arr `arr` with the key it answers to now, whatever the
-/// finder holds: what replacing that \*arr's key owes it. The finder shows whether it
-/// holds a key and never which, so there is nothing to read first.
+/// Point each finder watching the curator `arr` at it with the key it answers to now,
+/// whatever the finder holds: what replacing that curator's key owes it. The finder
+/// shows whether it holds a key and never which, so there is nothing to read first.
 ///
-/// Answers with the finder's name and how the write came out. Nothing where the stack
-/// has no subtitle finder or `arr` files nothing it subtitles.
+/// Answers with each finder's name and how the write came out — none where no finder
+/// watches `arr`, and none from one where a key is not written yet, since there is
+/// nothing to hold to it until there is.
 pub(crate) async fn rewatch(
     ctx: &Ctx,
-    services: &[Service],
-    project: Option<&Path>,
+    fillers: &Fillers,
     arr: &str,
-) -> Option<(String, crate::seed::State)> {
-    let finder = crate::app::targets::bazarr_reader(ctx, services, project).await?;
-    let name = finder_name(services)?;
-    let arr = servarr_arrs(services, project)
-        .into_iter()
-        .find(|one| one.target.id == arr)?;
-    let (which, (host, port)) =
-        subtitled(&arr.media_types).zip(reached_at(services, &arr.target.id))?;
-    let api_key = read_servarr_key(ctx, &arr.target.config).await?;
-    let watched = Watched {
-        which,
-        host,
-        port,
-        api_key,
-    };
-    let state = match finder.watch(&watched).await {
-        Ok(()) => crate::seed::State::Wired,
-        Err(failure) => unreached(&failure),
-    };
-    Some((name, state))
-}
-
-/// What the stack calls its subtitle finder.
-fn finder_name(services: &[Service]) -> Option<String> {
-    services
-        .iter()
-        .find(|service| {
-            service
-                .api
-                .as_ref()
-                .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Bazarr)
-        })
-        .map(|service| service.name.clone())
+) -> Vec<(String, crate::seed::State)> {
+    let mut found = Vec::new();
+    for watching in watching(fillers) {
+        let Some((curator, which, at)) = watching
+            .curators
+            .iter()
+            .find(|(curator, _, _)| curator.id == arr)
+        else {
+            continue;
+        };
+        let Some(finder) = finder(ctx, watching.asker).await else {
+            continue;
+        };
+        let api_key = match super::arrs::servarr_key(ctx, curator).await {
+            Beneath::Read(key) => key,
+            Beneath::Absent => continue,
+            Beneath::Escaped => {
+                found.push((watching.asker.name.clone(), super::arrs::refusal(curator)));
+                continue;
+            }
+        };
+        let watched = Watched {
+            which: *which,
+            host: at.host.clone(),
+            port: at.port,
+            api_key,
+        };
+        let state = match finder.watch(&watched).await {
+            Ok(()) => crate::seed::State::Wired,
+            Err(failure) => unreached(&failure),
+        };
+        found.push((watching.asker.name.clone(), state));
+    }
+    found
 }
 
 /// Point the finder at one \*arr, leaving it alone where it already is.

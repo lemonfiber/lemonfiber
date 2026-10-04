@@ -266,7 +266,12 @@ pub(crate) fn reached_at(endpoint: &Endpoint) -> String {
 
 /// A fulfilment target's description for the report.
 pub(crate) fn described_target(target: &FulfilmentTarget) -> String {
-    format!("{} as a request target", target.name)
+    as_request_target(&target.name)
+}
+
+/// What a curator handed to the request service is called where it is reported.
+pub(crate) fn as_request_target(name: &str) -> String {
+    format!("{name} as a request target")
 }
 
 /// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave

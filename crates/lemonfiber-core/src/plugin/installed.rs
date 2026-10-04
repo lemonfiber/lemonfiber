@@ -175,6 +175,13 @@ pub struct Placed {
     /// The port it answers on inside the stack's network, where it declared one.
     #[serde(default)]
     pub listens: Option<u16>,
+    /// The media it files, in the stack manifest's vocabulary, which decides what it
+    /// comes to in each service that asks for what it provides.
+    ///
+    /// Defaulted for a record written before this was kept, which reads as filing
+    /// nothing named.
+    #[serde(default)]
+    pub media_types: Vec<String>,
 }
 
 impl Placed {
@@ -198,6 +205,7 @@ impl Placed {
             description: manifest.plugin.description.clone(),
             api: service.api.clone(),
             listens: service.listens,
+            media_types: service.media_types.clone(),
         }
     }
 

@@ -11804,6 +11804,14 @@
               "maximum": 65535,
               "minimum": 0
             },
+            "media_types": {
+              "description": "The media it files, in the stack manifest's vocabulary, which decides what it\ncomes to in each service that asks for what it provides.\n\nDefaulted for a record written before this was kept, which reads as filing\nnothing named.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
             "name": {
               "description": "What it is called, for a reader, which is what its dashboard entry is listed as.\n\nDefaulted for a record written before this was kept, which lists it by its id\nrather than leaving it off the panel.",
               "type": "string",

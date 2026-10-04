@@ -53,6 +53,7 @@ pub(crate) async fn rotate(
     ctx: &Ctx,
     held: &Held,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
 ) -> Rotation {
     if let Some(plugin) = held.plugins() {
@@ -74,7 +75,9 @@ pub(crate) async fn rotate(
             super::tokening::rotate(ctx, held, services, project).await
         }
         Origin::Service => match super::resetting::resettable(held, services, project) {
-            Some(target) => super::resetting::rotate(ctx, held, services, project, target).await,
+            Some(target) => {
+                super::resetting::rotate(ctx, held, services, fillers, project, target).await
+            }
             None => republished(ctx, held, services, project).await,
         },
         Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {

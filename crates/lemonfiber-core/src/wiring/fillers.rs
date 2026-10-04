@@ -32,6 +32,14 @@ pub struct Address {
     pub port: u16,
 }
 
+impl Address {
+    /// Where a service beside it reaches it over HTTP.
+    #[must_use]
+    pub fn url(&self) -> String {
+        format!("http://{}:{}", self.host, self.port)
+    }
+}
+
 /// One service on this machine, the stack's or a plugin's, as whatever reaches it needs
 /// it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,9 +65,30 @@ pub struct Filler {
     /// beneath when it is read; nothing for the stack's own services, whose images are
     /// the stack's.
     pub confined_to: Option<std::path::PathBuf>,
+    /// The media it files, which decides which of an asker's connections it comes to.
+    pub media_types: Vec<String>,
 }
 
 impl Filler {
+    /// The service as one of the Servarr shape this machine can open: where it reaches
+    /// it, the file its key is in and the version of the shape it speaks, or nothing
+    /// where it speaks another, publishes no port or names no file.
+    #[must_use]
+    pub fn target(&self) -> Option<crate::doctor::credentials::Target> {
+        let api = self
+            .adapter
+            .as_ref()
+            .filter(|api| api.kind == ApiKind::Servarr)?;
+        Some(crate::doctor::credentials::Target {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            base: crate::app::targets::loopback(self.published?),
+            config: self.key_file.clone()?,
+            version: api.version?,
+            confined_to: self.confined_to.clone(),
+        })
+    }
+
     /// Whether lemonfiber speaks to it through this adapter.
     #[must_use]
     pub fn speaks(&self, kind: ApiKind) -> bool {
@@ -208,6 +237,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
             )
         }),
         confined_to: None,
+        media_types: service.media_types.clone(),
     }
 }
 
@@ -232,6 +262,7 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>) -> Filler {
             .and_then(|project| crate::app::targets::plugin_config_path(project, placed)),
         confined_to: project
             .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
+        media_types: placed.media_types.clone(),
     }
 }
 
