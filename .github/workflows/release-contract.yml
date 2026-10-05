@@ -6,27 +6,48 @@
 # release it was generated against.
 #
 # Separate from `release.yml`, which dist autogenerates and would overwrite.
+#
+# Onto the draft `release.yml` leaves, before a maintainer publishes it, so that
+# nothing about a release changes once it is published: that is what lets the
+# repository hold published releases immutable, assets and tag alike.
+# `workflow_run` rather than a `release` trigger, since GitHub fires no release
+# event for a draft — the same reason `release-changelog` runs this way.
+#
+# Two jobs, because `workflow_run` carries a write token. `gather` reads the tagged
+# tree and can write nothing; `attach` holds the write grant and checks out no code
+# at all, taking what `gather` read as an artifact. Whatever a tag contains, it is
+# never read by the half that can act on the repository.
 name: release-contract
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
-  attach:
+  gather:
+    # The generated workflow also runs on every pull request; only a successful
+    # tag push produced a draft to attach to. And only one from this repository:
+    # a `workflow_run` fires for a fork's run too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       # The tag reaches `ref:` below, so its shape is settled before anything
-      # uses it rather than trusted because of who can publish a release.
+      # uses it rather than trusted because of who can push a tag.
       - name: Refuse a tag that is not a version
         id: tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           case "$TAG" in
@@ -47,11 +68,9 @@ jobs:
           # so a checkout without it would leave the declaration unwritable.
           submodules: true
 
-      - name: Attach the contract
+      - name: Gather the contract
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
-          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           contract="contract/web-api.contract.json"
@@ -65,8 +84,9 @@ jobs:
 
           python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$contract"
 
-          gh release upload "$TAG" "$contract" --clobber --repo "$REPO"
-          echo "attached $contract to $TAG"
+          mkdir -p "$RUNNER_TEMP/attached"
+          cp "$contract" "$RUNNER_TEMP/attached/"
+          echo "gathered $contract from $TAG"
 
       # The three a plugin author's tooling reads, on the same terms and for the
       # same reason. An editor validating `plugin.toml`, and a catalogue checking a
@@ -74,11 +94,9 @@ jobs:
       # against the release they are targeting rather than whatever is on the trunk
       # today. The names are unversioned so a consumer can ask a release
       # for a fixed name and get that release's copy.
-      - name: Attach what a plugin is authored against
+      - name: Gather what a plugin is authored against
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
-          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           for artefact in \
@@ -97,8 +115,8 @@ jobs:
 
             python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$artefact"
 
-            gh release upload "$TAG" "$artefact" --clobber --repo "$REPO"
-            echo "attached $artefact to $TAG"
+            cp "$artefact" "$RUNNER_TEMP/attached/"
+            echo "gathered $artefact from $TAG"
           done
 
       # A release says which manifest generation its stack carries, so that a copy
@@ -108,9 +126,7 @@ jobs:
       # sending anything it was not already sending.
       - name: Declare the stack generation this release carries
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
-          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           manifest="assets/media-stack/stack.toml"
@@ -137,6 +153,52 @@ jobs:
           # answered as unknown rather than as an error, so nobody downstream
           # would have reported it either.
           marker="stack-schema-$schema"
-          printf '%s\n' "$schema" > "$marker"
-          gh release upload "$TAG" "$marker" --clobber --repo "$REPO"
-          echo "declared $marker on $TAG"
+          printf '%s\n' "$schema" > "$RUNNER_TEMP/attached/$marker"
+          echo "declared $marker for $TAG"
+
+      - name: Hand it to the half that attaches it
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-contract
+          path: ${{ runner.temp }}/attached/
+          if-no-files-found: error
+
+  attach:
+    needs: gather
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Take what was gathered
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-contract
+          path: attached
+
+      - name: Attach it to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.gather.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Found over the listing rather than by tag: a draft release is not yet
+          # attached to its tag, so the by-tag endpoint cannot see it, and the
+          # listing returns drafts to a token with push access.
+          draft=$(gh api "repos/${REPO}/releases?per_page=100" \
+            --jq '[.[] | select(.tag_name == env.TAG) | .draft] | first // empty')
+          if [ -z "$draft" ]; then
+            echo "::error::no release found for ${TAG}."
+            exit 1
+          fi
+          # Nothing is attached to a release once it is published, so one published
+          # before this ran carries no contract, which is better said here than by a
+          # consumer.
+          if [ "$draft" != "true" ]; then
+            echo "::error::${TAG} was published before its contract was attached, and nothing is attached to a published release."
+            exit 1
+          fi
+          gh release upload "$TAG" attached/* --clobber --repo "$REPO"
+          for file in attached/*; do
+            echo "attached ${file#attached/} to ${TAG}"
+          done
