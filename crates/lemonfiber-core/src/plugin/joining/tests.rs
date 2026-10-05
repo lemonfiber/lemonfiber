@@ -13,7 +13,7 @@ fn joined_with(placed: &Placed, chosen: &Chosen) -> Vec<String> {
         .manifest()
         .map(|manifest| {
             let settled = crate::wiring::settle(&manifest, &installed, chosen);
-            super::Joins::of(&manifest, &stack.attached(), &settled).of_service(placed)
+            super::Joins::of(&manifest, &stack.attached(), &settled).of_service("stand-in", placed)
         })
         .unwrap_or_default()
 }
@@ -145,4 +145,18 @@ fn the_record_carries_what_each_service_joins_into_its_container() {
     );
     assert_eq!(written.matches("networks:").count(), 1, "{written}");
     assert!(written.contains("- gate-upstream"), "{written}");
+}
+
+/// A plugin's service named as one of the stack's is not settled by what the stack's
+/// own service of that name fills: it joins only through a capability it declares and
+/// is settled for in its own right, so a name never stands in for a role.
+#[test]
+fn a_plugin_service_named_as_a_stack_service_settles_for_nothing_by_the_name() {
+    let mut named = placed(ApiKind::Servarr, &[], &["tv"]);
+    named.service = "sonarr".to_owned();
+    let mut server = placed(ApiKind::Jellyfin, &["media.serve"], &[]);
+    server.service = "jellyfin".to_owned();
+
+    assert!(joined(&named).is_empty(), "{:?}", joined(&named));
+    assert!(joined(&server).is_empty(), "{:?}", joined(&server));
 }

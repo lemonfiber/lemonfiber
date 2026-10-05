@@ -530,3 +530,76 @@ fn a_choice_that_moves_no_networks_writes_over_nothing() {
         .iter()
         .all(|change| !matches!(change.kind, crate::journal::Kind::Rewritten { .. })));
 }
+
+/// What is installed changing between the moment a choice reads it and the moment it
+/// writes is refused, with nothing written: a document or a record written from what was
+/// read would put back a plugin that has since gone, or drop one installed since.
+#[test]
+fn a_choice_over_what_was_installed_since_it_read_writes_nothing() {
+    let (ctx, at) = ctx("raced");
+    let document = a_plugin_media_server(&ctx, &at);
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let read = crate::app::plugins::read(&ctx).ok();
+    let overwrites = manifest
+        .as_ref()
+        .zip(read.as_ref())
+        .map(|(manifest, register)| {
+            crate::app::plugins::writing::rejoined(
+                &ctx,
+                manifest,
+                register,
+                &crate::wiring::Chosen::read(Some("identity.source=server")),
+            )
+        })
+        .unwrap_or_default();
+    let kept = crate::app::plugins::kept_at(&ctx).unwrap_or_default();
+    assert!(std::fs::write(&kept, "{\"installed\":[]}\n").is_ok());
+    assert!(std::fs::remove_file(&document).is_ok());
+
+    let written = crate::app::plugins::writing::overwritten(&overwrites);
+
+    assert!(!overwrites.is_empty());
+    assert!(written.is_err());
+    assert_eq!(
+        std::fs::read_to_string(&kept).ok().as_deref(),
+        Some("{\"installed\":[]}\n")
+    );
+    assert!(!document.exists());
+}
+
+/// A file the machine will not let a choice write over is refused as unwritten, naming
+/// it, rather than reported written.
+#[test]
+fn a_file_that_will_not_be_written_over_is_said_unwritten() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let at = dir("unwritable-over");
+    let holding = at.join("holding");
+    let file = holding.join("serving.yml");
+    assert!(std::fs::create_dir_all(&holding).is_ok());
+    assert!(std::fs::write(&file, "before\n").is_ok());
+    let overwrite = crate::app::plugins::writing::Overwrite {
+        path: file.clone(),
+        previous: "before\n".to_owned(),
+        text: "after\n".to_owned(),
+    };
+    let locked = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o500))
+        .and_then(|()| std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o400)));
+
+    let written = crate::app::plugins::writing::overwritten(&[overwrite]);
+
+    let _ = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o700));
+    let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600));
+    assert!(locked.is_ok());
+    assert_eq!(
+        written
+            .err()
+            .map(|problem| problem.code.as_str().to_owned())
+            .as_deref(),
+        Some("WIRE-4")
+    );
+    assert_eq!(
+        std::fs::read_to_string(&file).ok().as_deref(),
+        Some("before\n")
+    );
+}

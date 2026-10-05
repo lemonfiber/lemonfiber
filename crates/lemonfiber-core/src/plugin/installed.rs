@@ -445,7 +445,7 @@ impl Installed {
                 .services
                 .into_iter()
                 .map(|placed| Placed {
-                    networks: joins.of_service(&placed),
+                    networks: joins.of_service(&self.plugin, &placed),
                     ..placed
                 })
                 .collect(),

@@ -266,6 +266,70 @@ pub(crate) fn rejoined(
     overwrites
 }
 
+/// Refuse where any file to be written over no longer holds what was read from it.
+///
+/// What a file is to hold was worked out from what it and the record of what is
+/// installed held when they were read. A plugin installed, removed or updated since has
+/// changed one of them, and writing what was worked out would put back a plugin that has
+/// gone or drop one that has arrived.
+///
+/// # Errors
+///
+/// Where a file holds something other than what was read, or is gone.
+pub(crate) fn unmoved(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
+    match overwrites.iter().find(|overwrite| {
+        std::fs::read_to_string(&overwrite.path).ok().as_deref() != Some(&overwrite.previous)
+    }) {
+        Some(moved) => Err(Box::new(moved_since(&moved.path))),
+        None => Ok(()),
+    }
+}
+
+/// Write each file over with what it is to hold, each asked again first whether it still
+/// holds what was read from it.
+///
+/// # Errors
+///
+/// Where a file no longer holds what was read, or cannot be written.
+pub(crate) fn overwritten(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
+    unmoved(overwrites)?;
+    for overwrite in overwrites {
+        unmoved(std::slice::from_ref(overwrite))?;
+        crate::config::store::write(&overwrite.path, &overwrite.text)
+            .map_err(|failure| Box::new(not_overwritten(&overwrite.path, &failure.to_string())))?;
+    }
+    Ok(())
+}
+
+/// A file a choice would write over has changed since the choice read it.
+fn moved_since(at: &Path) -> Problem {
+    Problem::new(
+        crate::error::codes::wire::WIRING_MOVED,
+        Severity::Error,
+        "What is installed changed while that choice was being made",
+        format!(
+            "{} no longer holds what it held when the choice was read, so nothing was changed.",
+            at.display()
+        ),
+        Remedy::new("Make the choice again"),
+    )
+    .in_state(State::Guided)
+}
+
+/// A file a choice writes over could not be written.
+fn not_overwritten(at: &Path, why: &str) -> Problem {
+    Problem::new(
+        crate::error::codes::wire::CHOICE_UNWRITABLE,
+        Severity::Error,
+        format!("{} could not be written", at.display()),
+        "The choice is recorded, and the change record holds what this file held, so \
+         `lemonfiber history` says what is there and it can be put back.",
+        Remedy::new("Check the permissions on the stack directory, then make the choice again"),
+    )
+    .in_state(State::Guided)
+    .with_detail(why.to_owned())
+}
+
 /// What the install decided, less every region with nowhere to land.
 ///
 /// Settled before the account is stated as well as before the writes are carried out,

@@ -180,6 +180,7 @@ fn substituting(
         &installed,
         &crate::wiring::Chosen::read(Some(&substitution.setting)),
     );
+    crate::app::plugins::writing::unmoved(&overwrites)?;
     changes.extend(
         overwrites
             .iter()
@@ -190,10 +191,7 @@ fn substituting(
     for (key, value) in writes {
         kept(path, key, value)?;
     }
-    for overwrite in &overwrites {
-        crate::config::store::write(&overwrite.path, &overwrite.text)
-            .map_err(|err| Box::new(err.problem()))?;
-    }
+    crate::app::plugins::writing::overwritten(&overwrites)?;
 
     Ok(reading(true))
 }

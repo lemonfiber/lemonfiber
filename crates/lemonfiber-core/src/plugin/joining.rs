@@ -40,8 +40,9 @@ use crate::stack::attached::DEFAULT;
 pub struct Joins {
     /// Every stack service that speaks an adapter, in the manifest's order.
     standing: Vec<Standing>,
-    /// Each service the stack's asks are settled to reach, with what they ask it for.
-    fills: BTreeMap<String, BTreeSet<String>>,
+    /// Each plugin's service the stack's asks are settled to reach, by the plugin and the
+    /// service, with what they ask it for.
+    fills: BTreeMap<(String, String), BTreeSet<String>>,
 }
 
 /// One stack service, as what a plugin's service could stand in for.
@@ -66,20 +67,31 @@ impl Joins {
         attached: &BTreeMap<String, BTreeSet<String>>,
         settled: &[crate::wiring::Wired],
     ) -> Self {
-        let mut fills: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        // A settled answer names a service by its id alone, so one a stack service also
+        // carries cannot be told apart from the stack's own: it is taken as the stack's,
+        // and no plugin's service is settled by a name it shares.
+        let mut fills: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
         for wired in settled {
-            if let crate::wiring::Reaches::Asked {
+            let crate::wiring::Reaches::Asked {
                 capability,
                 services,
+                origins,
                 ..
             } = &wired.reaches
-            {
-                for service in services {
-                    fills
-                        .entry(service.clone())
-                        .or_default()
-                        .insert(capability.clone());
+            else {
+                continue;
+            };
+            for service in services {
+                let Some(crate::origin::Origin::Plugin { named }) = origins.get(service) else {
+                    continue;
+                };
+                if manifest.services.iter().any(|one| one.id == *service) {
+                    continue;
                 }
+                fills
+                    .entry((named.clone(), service.clone()))
+                    .or_default()
+                    .insert(capability.clone());
             }
         }
         let standing = manifest
@@ -102,21 +114,26 @@ impl Joins {
         Self { standing, fills }
     }
 
-    /// The networks `placed` joins: every network a stack service it stands in for is
-    /// on, or nothing where that is the default network alone, which it is on already.
+    /// The networks `placed`, one of `plugin`'s services, joins: every network a stack
+    /// service it stands in for is on, through a capability it declares and is settled to
+    /// fill, or nothing where that is the default network alone, which it is on already.
     #[must_use]
-    pub fn of_service(&self, placed: &Placed) -> Vec<String> {
+    pub fn of_service(&self, plugin: &str, placed: &Placed) -> Vec<String> {
         let Some(speaks) = placed.api.as_ref().map(|api| api.kind) else {
             return Vec::new();
         };
-        let Some(fills) = self.fills.get(&placed.service) else {
+        let Some(settled) = self.fills.get(&(plugin.to_owned(), placed.service.clone())) else {
             return Vec::new();
         };
+        let fills: BTreeSet<&String> = settled
+            .iter()
+            .filter(|it| placed.provides.contains(it))
+            .collect();
         let joined: BTreeSet<&String> = self
             .standing
             .iter()
             .filter(|one| one.speaks == speaks)
-            .filter(|one| one.provides.iter().any(|it| fills.contains(it)))
+            .filter(|one| one.provides.iter().any(|it| fills.contains(&it)))
             .filter(|one| {
                 one.files.is_empty() || one.files.iter().any(|it| placed.media_types.contains(it))
             })
