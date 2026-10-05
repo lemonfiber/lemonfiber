@@ -354,3 +354,18 @@ async fn the_reading_says_where_a_plugin_came_from_when_and_what_it_stands_in_fo
         "a choice naming a service no plugin brought is not this read's"
     );
 }
+
+/// An answer naming a reading other than the one standing now acts on nothing: the
+/// install is refused naming what moved, and nothing is written.
+#[tokio::test]
+async fn an_install_answering_a_reading_that_moved_writes_nothing() {
+    let ctx = ctx("install-moved");
+    let asked = Asked::Install {
+        source: crate::plugin::Source::Path(source("install-moved", MANIFEST)),
+        consent: stale(),
+    };
+    let (code, said) = refused(plugins(&ctx, &asked).await);
+    assert_eq!(code, "PLUGIN-25");
+    assert!(said.contains("the plugin"), "it names what moved: {said}");
+    assert_eq!(made_paths(&ctx), Vec::<String>::new());
+}

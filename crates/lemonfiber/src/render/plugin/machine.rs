@@ -16,12 +16,13 @@ use lemonfiber_core::app::putting_back::Reversal;
 use lemonfiber_core::doctor::Verdict as Checked;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
-    Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Removal, Unfilled,
-    Verdict, Verification,
+    approvals, Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached,
+    Removal, Unfilled, Verdict, Verification,
 };
 
 use super::super::Lines;
 
+mod answering;
 mod listed;
 mod updated;
 
@@ -58,19 +59,42 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         // two part. What is listed is what the plugin may change of the stack's, and
         // an install that went back changed none of it — the same as a rehearsal.
         lines.extend(overriding(&install.overrides, install.recorded));
+        lines.extend(answering::recipes(&install.would.recipes));
         lines.extend(container(&install.would));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
         }
-        if !install.recorded && install.reversed.is_none() {
-            lines.spaced("Nothing was written. Run it again without --dry-run to install it.");
+        if !acted {
+            lines.extend(answering::unanswered(
+                "install",
+                report.agreement.as_deref(),
+                &approvals(&install.would.recipes),
+                report.rehearsed,
+            ));
         }
         lines.spaced(shelf(report.installed.len()));
     } else if let Some(one) = &report.removal {
         lines.extend(removal(one));
+        if !one.removed {
+            lines.extend(answering::unanswered(
+                "remove",
+                report.agreement.as_deref(),
+                &[],
+                report.rehearsed,
+            ));
+        }
         lines.spaced(shelf(report.installed.len()));
     } else if let Some(one) = &report.update {
         lines.extend(updated::updated(one));
+        let acted = one.install.recorded || one.restored.is_some();
+        if !acted {
+            lines.extend(answering::unanswered(
+                "update",
+                report.agreement.as_deref(),
+                &approvals(&one.install.would.recipes),
+                report.rehearsed,
+            ));
+        }
         lines.spaced(shelf(report.installed.len()));
     } else {
         lines.put(shelf(report.installed.len()));

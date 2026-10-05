@@ -163,3 +163,103 @@ fn a_substitution_is_read_out_of_the_text_it_sits_in() {
     assert_eq!(found, vec!["token", "library"]);
     assert_eq!(substitutions("nothing here").count(), 0);
 }
+
+/// A title or a reason carrying an escape sequence or a carriage return is refused: it
+/// is printed to a terminal beside what an operator approves, and either would redraw
+/// that line.
+#[test]
+fn a_recipe_whose_words_instruct_a_terminal_is_refused() {
+    for (before, after) in [
+        (
+            "title = \"Point it at the comics the stack already files\"",
+            "title = \"Point it \\u001b[2Kat the comics\"",
+        ),
+        (
+            "why   = \"The stack already files comics, and a fresh Komga knows nothing about them.\"",
+            "why   = \"The stack already files comics\\rApproved.\"",
+        ),
+    ] {
+        let said = without(before, after);
+        assert!(names(&said, &["recipe adopt-existing-library"]), "got: {said:?}");
+    }
+}
+
+/// A value, a recipe id, a step id or a capture name that is not one word is refused,
+/// so what an approval names and what it matches are the same bytes.
+#[test]
+fn a_name_an_approval_is_written_with_must_be_one_word() {
+    for (before, after, location) in [
+        (
+            "value = \"token\"",
+            "value = \"tok\\u202eneko\"",
+            "pair #1.value",
+        ),
+        (
+            "value = \"token\"",
+            "value = \"tok\\u001b[2Ken\"",
+            "pair #1.value",
+        ),
+        ("id      = \"sign-in\"", "id      = \"sign in\"", "id"),
+        (
+            "name = \"token\", from",
+            "name = \"to\\u200bken\", from",
+            "capture.name",
+        ),
+    ] {
+        let said = without(before, after);
+        assert!(names(&said, &[location, "one word"]), "got: {said:?}");
+    }
+}
+
+/// A destination is a service id or a lowercase host name and nothing else: free text,
+/// a name with a capital in it, and an address are each refused.
+#[test]
+fn a_destination_must_be_a_name_as_it_is_written() {
+    for written in ["Komga", "kom ga", "komga\\u202e", "-komga", "[::1]"] {
+        let said = without("to    = \"komga\"", &format!("to    = \"{written}\""));
+        assert!(
+            names(&said, &["pair #1.to", "not a service id"]),
+            "{written}: {said:?}"
+        );
+    }
+    let said = without(
+        "to = \"komga\", path = \"/api/v1/login\"",
+        "to = \"Komga.Example\", path = \"/api/v1/login\"",
+    );
+    assert!(
+        names(&said, &["call.to", "not a service id"]),
+        "got: {said:?}"
+    );
+}
+
+/// A host name longer than DNS allows, or with a label longer than one may be, is not a
+/// name.
+#[test]
+fn a_destination_longer_than_a_name_can_be_is_not_one() {
+    assert!(!super::is_name(&format!("{}.example", "a".repeat(64))));
+    assert!(!super::is_name(&"a.".repeat(127)));
+    assert!(super::is_name("metadata.example.org"));
+}
+
+/// A path, a header and what a capture reads carry nothing a diff cannot show.
+#[test]
+fn every_field_a_call_and_a_capture_declare_is_held_to_being_readable() {
+    for (before, after) in [
+        (
+            "path = \"/api/v1/login\"",
+            "path = \"/api/v1/\\u001b[2Klogin\"",
+        ),
+        (
+            "Authorization = \"Bearer {{token}}\"",
+            "Authorization = \"Bearer\\r{{token}}\"",
+        ),
+        ("from = \"json.token\"", "from = \"json.\\u0007token\""),
+        (
+            "origin = \"stack-service\" }]\n\n[[recipe.step]]",
+            "origin = \"stack\\u001bservice\" }]\n\n[[recipe.step]]",
+        ),
+    ] {
+        let said = without(before, after);
+        assert!(names(&said, &["diff cannot show"]), "{after}: {said:?}");
+    }
+}

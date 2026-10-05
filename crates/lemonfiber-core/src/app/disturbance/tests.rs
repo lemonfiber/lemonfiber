@@ -89,10 +89,13 @@ fn stopping_named_services_is_the_same_stop() {
 fn removing_or_updating_a_plugin_takes_something_away_and_installing_one_does_not() {
     let removing = Command::Plugins(Asked::Remove {
         plugin: "komga".to_owned(),
+        consent: crate::app::plugins::Consent::default(),
     });
     assert_eq!(of(&removing, WAITED), Some(Disturbance::Bounded(GRACE)));
     let updating = Command::Plugins(Asked::Update {
-        path: std::path::PathBuf::from("komga"),
+        plugin: "komga".to_owned(),
+        source: crate::plugin::Source::Path(std::path::PathBuf::from("komga")),
+        consent: crate::app::plugins::Consent::default(),
     });
     assert_eq!(
         of(&updating, WAITED),
@@ -103,6 +106,7 @@ fn removing_or_updating_a_plugin_takes_something_away_and_installing_one_does_no
     for quiet in [
         Command::Plugins(Asked::Install {
             source: crate::plugin::Source::Path(std::path::PathBuf::from("komga")),
+            consent: crate::app::plugins::Consent::default(),
         }),
         Command::Plugins(Asked::Installed),
     ] {

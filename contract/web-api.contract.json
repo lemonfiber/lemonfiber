@@ -11749,6 +11749,16 @@
             }
           ]
         },
+        "PluginAdapterOwner": {
+          "description": "Whose an adapter is.\n\nOne answer, and the field exists so that the answer is on the wire: an adapter a\nplugin could bring would be code a stranger wrote running with lemonfiber's\nauthority, which nothing here can load.",
+          "oneOf": [
+            {
+              "description": "lemonfiber's own, from the set `contract/adapters.json` publishes.",
+              "type": "string",
+              "const": "lemonfiber"
+            }
+          ]
+        },
         "PluginChange": {
           "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches. Two of\nthem can be edits to a file the stack already has — the proxy's and the\ndashboard's — and those say so, as a region, so an operator reading the account\nknows which of their files the install writes into.",
           "type": "object",
@@ -12078,6 +12088,14 @@
           "description": "One plugin's install, as it was decided.",
           "type": "object",
           "properties": {
+            "adapters": {
+              "description": "Every adapter of lemonfiber's its own services name, each said to be lemonfiber's.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PluginServiceAdapter"
+              }
+            },
             "contributions": {
               "description": "Every row it adds to a register lemonfiber already runs, as the install\nsettled them.\n\nKept here rather than read back off the plugin's own files, for the reason\neverything else on this record is: the author's directory may be gone the\nmoment an install is done, and a doctor run a month later is a question about\nthis machine rather than about a document. This record is the one answer, so a\nrow that runs is a row that was declared at install and has not changed under\nanybody since.\n\nDefaulted for a register written before this field existed, which reads as a\nplugin that contributes nothing — the same answer a plugin that contributes\nnothing gets, and the only one that can be given about a record that does not\nsay.",
               "type": "array",
@@ -12099,6 +12117,14 @@
                 "upstream": ""
               }
             },
+            "description": {
+              "description": "What it does for the operator, in its author's words. Absent alike.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
             "from": {
               "description": "The source it was installed from, as the operator named it.\n\nEmpty for a record written before this was kept. A rehearsal's account carries\nthe source it was asked about, because that is what it would record.",
               "type": "string",
@@ -12108,6 +12134,14 @@
               "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Empty where the record predates\nit; a rehearsal's account carries the moment it was asked, which is the stamp\nthe install would have run under.",
               "type": "string",
               "default": ""
+            },
+            "name": {
+              "description": "What the plugin calls itself, for a person to read.\n\nAbsent on a record written before it was kept, and never filled in from the id:\na name is the author's, and one made up here would be lemonfiber's.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
             },
             "plugin": {
               "description": "The plugin's id: the name it is installed and journalled under.",
@@ -12119,6 +12153,14 @@
               "default": [],
               "items": {
                 "type": "string"
+              }
+            },
+            "recipes": {
+              "description": "Every recipe it declares: each call in order with the adapter it reaches through,\nand every value that could leave for somewhere else.\n\nEmpty for a plugin that declares none and for a record written before these were\nkept, so a list is always there to read.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PluginRecipe"
               }
             },
             "revision": {
@@ -12154,6 +12196,13 @@
           "description": "What is installed, and what installing one came to.\n\nOne answer for the reading and for the verb, because they are one question: an\noperator who has just installed something wants to see it among what they had, and\na rehearsal that showed only the new entry would not say what it is joining.",
           "type": "object",
           "properties": {
+            "agreement": {
+              "description": "What this run's reading names itself, so an answer to it can say which reading\nit answered; nothing on the reading of what is installed, which offers nothing.\n\nNamed part by part, so an answer refused because something moved is told which\npart did.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "install": {
               "description": "What this run's install came to, or nothing where it only read.\n\nBoxed for the reason the update is: it carries a whole account, and every other\nrun's report would otherwise be as large as the one run that installs.",
               "anyOf": [
@@ -12237,6 +12286,35 @@
           "required": [
             "setting",
             "why"
+          ]
+        },
+        "PluginPair": {
+          "description": "One value a recipe could carry to one destination, as the operator agrees to it.",
+          "type": "object",
+          "properties": {
+            "approval": {
+              "description": "What approving this pair is written as, on the command line and over the web.",
+              "type": "string"
+            },
+            "origin": {
+              "description": "Whose value it is, as the step that captures it says; empty where no step does.",
+              "type": "string"
+            },
+            "to": {
+              "description": "Where it may be carried, by the name the manifest gives it.",
+              "type": "string"
+            },
+            "value": {
+              "description": "What the value is called within the recipe.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "origin",
+            "to",
+            "approval"
           ]
         },
         "PluginPlaced": {
@@ -12482,6 +12560,46 @@
             }
           ]
         },
+        "PluginRecipe": {
+          "description": "One recipe, as an operator agrees to what it does.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The recipe's id within the plugin.",
+              "type": "string"
+            },
+            "pairs": {
+              "description": "Every value it could carry, and where to.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginPair"
+              }
+            },
+            "steps": {
+              "description": "Every call, in the order the recipe makes them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginStep"
+              }
+            },
+            "title": {
+              "description": "What it accomplishes, in one line.",
+              "type": "string"
+            },
+            "why": {
+              "description": "Why it is worth running.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "title",
+            "why",
+            "steps",
+            "pairs"
+          ]
+        },
         "PluginRemoval": {
           "description": "What taking a plugin off the machine came to, or would come to.",
           "type": "object",
@@ -12595,6 +12713,30 @@
             "why"
           ]
         },
+        "PluginServiceAdapter": {
+          "description": "One adapter of lemonfiber's that one of the plugin's own services names.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "description": "Which of lemonfiber's adapters it is.",
+              "$ref": "#/$defs/ApiKind"
+            },
+            "owner": {
+              "description": "Whose it is, which is lemonfiber's.",
+              "$ref": "#/$defs/PluginAdapterOwner"
+            },
+            "service": {
+              "description": "The service that names it.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "service",
+            "kind",
+            "owner"
+          ]
+        },
         "PluginSource": {
           "description": "Whether one installed plugin's source can still be fetched.",
           "type": "object",
@@ -12670,6 +12812,65 @@
                 "why"
               ]
             }
+          ]
+        },
+        "PluginStep": {
+          "description": "One call a recipe makes, in the order it makes them.",
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "description": "The adapter the destination is reached through, or nothing where it is a name\noutside the stack, which no adapter of lemonfiber's speaks to.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginStepAdapter"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "description": "The step's id within its recipe.",
+              "type": "string"
+            },
+            "method": {
+              "description": "The HTTP method it calls with.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The path it calls.",
+              "type": "string"
+            },
+            "to": {
+              "description": "Where it calls: a service of this stack's or the plugin's own, or a name outside\nboth, as the manifest wrote it. Never a resolved address.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "method",
+            "to",
+            "path"
+          ]
+        },
+        "PluginStepAdapter": {
+          "description": "The adapter a call reaches its destination through.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "description": "Which of lemonfiber's adapters it is.",
+              "$ref": "#/$defs/ApiKind"
+            },
+            "owner": {
+              "description": "Whose it is, which is lemonfiber's.",
+              "$ref": "#/$defs/PluginAdapterOwner"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "owner"
           ]
         },
         "PluginSubstituted": {
@@ -21073,6 +21274,11 @@
       "name": "OFFER_MOVED",
       "status": 400,
       "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
+    },
+    "PLUGIN-25": {
+      "name": "PLUGIN_OFFER_MOVED",
+      "status": 400,
+      "description": "Raised when an install, an update or a removal answers an offer that was read against a plugin, a stack or a record that has since moved."
     },
     "PLUGIN-4": {
       "name": "UNRECORDED",

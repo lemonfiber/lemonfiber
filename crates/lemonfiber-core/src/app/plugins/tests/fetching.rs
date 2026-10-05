@@ -85,10 +85,11 @@ pub(super) fn served(name: &str, serving: &Arc<Serving>) -> Ctx {
 
 /// Install from `written`, as the operator would write it.
 async fn from_git(ctx: &Ctx, written: &str) -> Result<Installs, Box<crate::error::Problem>> {
-    plugins(
+    super::answered(
         ctx,
-        &Asked::Install {
+        Asked::Install {
             source: Source::named(written),
+            consent: crate::app::plugins::Consent::default(),
         },
     )
     .await

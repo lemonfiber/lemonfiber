@@ -449,18 +449,40 @@ pub(crate) enum Under {
 /// verbs are about this machine and go where every other verb goes.
 pub(crate) fn plugin(read: PluginCommand) -> Under {
     match read {
-        PluginCommand::Install { source } => {
-            Under::Dispatched(Command::Plugins(plugins::Asked::Install {
-                source: lemonfiber_core::plugin::Source::named(&source),
+        PluginCommand::Install {
+            source,
+            offer,
+            approved,
+        } => Under::Dispatched(Command::Plugins(plugins::Asked::Install {
+            source: lemonfiber_core::plugin::Source::named(&source),
+            consent: plugins::Consent {
+                agreement: offer,
+                approved,
+            },
+        })),
+        PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
+        PluginCommand::Remove { plugin, offer } => {
+            Under::Dispatched(Command::Plugins(plugins::Asked::Remove {
+                plugin,
+                consent: plugins::Consent {
+                    agreement: offer,
+                    approved: Vec::new(),
+                },
             }))
         }
-        PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
-        PluginCommand::Remove { plugin } => {
-            Under::Dispatched(Command::Plugins(plugins::Asked::Remove { plugin }))
-        }
-        PluginCommand::Update { path } => {
-            Under::Dispatched(Command::Plugins(plugins::Asked::Update { path }))
-        }
+        PluginCommand::Update {
+            plugin,
+            source,
+            offer,
+            approved,
+        } => Under::Dispatched(Command::Plugins(plugins::Asked::Update {
+            plugin,
+            source: lemonfiber_core::plugin::Source::named(&source),
+            consent: plugins::Consent {
+                agreement: offer,
+                approved,
+            },
+        })),
         PluginCommand::Authoring(read) => Under::Published(read),
     }
 }

@@ -499,3 +499,40 @@ async fn a_journal_that_cannot_be_read_refuses_a_removal() {
         "a removal went ahead over a journal nothing could read"
     );
 }
+
+/// An answer naming a reading other than the one standing now takes nothing away: the
+/// plugin is still installed and still recorded.
+#[tokio::test]
+async fn a_removal_answering_a_reading_that_moved_takes_nothing_away() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("remove-moved", runner.clone(), answering(200));
+    assert_eq!(
+        counted(installing(&ctx, &source("remove-moved", PROVING)).await),
+        Some(1)
+    );
+    let before = runner.seen().len();
+    let asked = Asked::Remove {
+        plugin: "komga".to_owned(),
+        consent: stale(),
+    };
+    assert_eq!(refusal(plugins(&ctx, &asked).await), "PLUGIN-25");
+    assert_eq!(counted(reading(&ctx).await), Some(1));
+    assert_eq!(
+        runner.seen().len(),
+        before,
+        "nothing was asked of the engine"
+    );
+}
+
+/// With nowhere to look for what was changed, a removal is refused before anything is
+/// taken, by the judgement the reversal would make.
+#[test]
+fn a_removal_with_nowhere_to_look_is_not_admitted() {
+    let mut nowhere = ctx("not-admitted");
+    nowhere.settings.stack_dir = None;
+    let admitted = crate::app::putting_back::admitted(&nowhere, "komga");
+    assert_eq!(
+        admitted.err().map(|problem| problem.code.to_string()),
+        Some("UNDO-4".to_owned())
+    );
+}

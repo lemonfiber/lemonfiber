@@ -397,12 +397,16 @@ fn taught_to_report() -> Vec<Command> {
         Command::Backup { service: None },
         Command::Plugins(plugins::Asked::Install {
             source: crate::plugin::Source::Path(std::path::PathBuf::from("/srv/komga")),
+            consent: plugins::Consent::default(),
         }),
         Command::Plugins(plugins::Asked::Update {
-            path: std::path::PathBuf::from("komga"),
+            plugin: "komga".to_owned(),
+            source: crate::plugin::Source::Path(std::path::PathBuf::from("komga")),
+            consent: plugins::Consent::default(),
         }),
         Command::Plugins(plugins::Asked::Remove {
             plugin: "komga".to_owned(),
+            consent: plugins::Consent::default(),
         }),
     ]
 }

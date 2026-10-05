@@ -249,8 +249,8 @@ fn engine_agreeing(named: &str) -> PathBuf {
     root
 }
 
-/// One verb on that machine, with nobody there, and how it ended.
-fn acting(root: &Path, argv: &[&str]) -> Option<i32> {
+/// One verb on that machine, with nobody there: how it ended and what it said.
+fn ran(root: &Path, argv: &[&str]) -> (Option<i32>, String) {
     std::process::Command::new(BINARY)
         .arg("--config-dir")
         .arg(root.join("config"))
@@ -263,53 +263,128 @@ fn acting(root: &Path, argv: &[&str]) -> Option<i32> {
         .current_dir(root)
         .stdin(Stdio::null())
         .output()
-        .ok()
-        .and_then(|ran| ran.status.code())
+        .map_or((None, String::new()), |ran| {
+            (
+                ran.status.code(),
+                String::from_utf8_lossy(&ran.stdout).into_owned(),
+            )
+        })
+}
+
+/// The name a reading of this verb goes by, read the way a script reads it: asked with
+/// no offer, as a document. What it is about to take away is said first, on a line of
+/// its own, so the document is the last line.
+fn offered(root: &Path, argv: &[&str]) -> String {
+    let asked: Vec<&str> = std::iter::once("--json")
+        .chain(argv.iter().copied())
+        .collect();
+    let (_, said) = ran(root, &asked);
+    said.lines()
+        .last()
+        .and_then(|document| serde_json::from_str::<serde_json::Value>(document).ok())
+        .and_then(|read| {
+            read.pointer("/data/agreement")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        })
+        .unwrap_or_default()
+}
+
+/// How one step is asked: as it is, or answering the offer its own reading gave.
+#[derive(Clone, Copy)]
+enum Asking {
+    /// The command as written.
+    AsIs,
+    /// The command again with `--offer`, naming what a reading of it answered with.
+    Answering,
 }
 
 /// Installing, rehearsing, updating and removing each run to their end with nobody at
 /// the terminal, and each ends with a status a script can branch on — shown both ways,
-/// in the order an operator would meet them.
+/// in the order an operator would meet them. A script acts the way a person does: it
+/// reads first, and answers the offer the reading named.
 #[test]
 fn each_verb_runs_to_its_end_with_nobody_at_the_terminal() {
     let root = engine_agreeing("lifecycle");
-    let steps: [(&str, &[&str], bool); 9] = [
+    let steps: [(&str, &[&str], Asking, bool); 11] = [
         (
             "removing what is not installed",
             &["plugin", "remove", "kavita"],
+            Asking::AsIs,
             false,
         ),
         (
             "updating what is not installed",
-            &["plugin", "update", "next"],
+            &["plugin", "update", "kavita", "./next"],
+            Asking::AsIs,
             false,
         ),
         (
             "rehearsing the install",
             &["plugin", "install", "--dry-run", "./source"],
+            Asking::AsIs,
             true,
         ),
-        ("installing", &["plugin", "install", "./source"], true),
+        (
+            "reading the install",
+            &["plugin", "install", "./source"],
+            Asking::AsIs,
+            true,
+        ),
+        (
+            "installing",
+            &["plugin", "install", "./source"],
+            Asking::Answering,
+            true,
+        ),
         (
             "installing it again",
             &["plugin", "install", "./source"],
+            Asking::AsIs,
             false,
         ),
         (
             "rehearsing the update",
-            &["plugin", "update", "--dry-run", "next"],
+            &["plugin", "update", "--dry-run", "kavita", "./next"],
+            Asking::AsIs,
             true,
         ),
-        ("updating", &["plugin", "update", "next"], true),
+        (
+            "updating",
+            &["plugin", "update", "kavita", "./next"],
+            Asking::Answering,
+            true,
+        ),
         (
             "rehearsing the removal",
             &["plugin", "remove", "--dry-run", "kavita"],
+            Asking::AsIs,
             true,
         ),
-        ("removing", &["plugin", "remove", "kavita"], true),
+        (
+            "removing",
+            &["plugin", "remove", "kavita"],
+            Asking::Answering,
+            true,
+        ),
+        (
+            "removing it again",
+            &["plugin", "remove", "kavita"],
+            Asking::AsIs,
+            false,
+        ),
     ];
-    for (step, argv, holds) in steps {
-        let ended = acting(&root, argv);
+    for (step, argv, asking, holds) in steps {
+        let offer = match asking {
+            Asking::AsIs => None,
+            Asking::Answering => Some(offered(&root, argv)),
+        };
+        let asked: Vec<&str> = argv
+            .iter()
+            .copied()
+            .chain(offer.iter().flat_map(|offer| ["--offer", offer.as_str()]))
+            .collect();
+        let (ended, said) = ran(&root, &asked);
         assert!(
             ended.is_some(),
             "{step} did not end with a status: {ended:?}"
@@ -317,7 +392,7 @@ fn each_verb_runs_to_its_end_with_nobody_at_the_terminal() {
         assert_eq!(
             ended == Some(0),
             holds,
-            "{step} ended with {ended:?}, where a script would branch the other way"
+            "{step} ended with {ended:?}, where a script would branch the other way: {said}"
         );
     }
 }

@@ -22,8 +22,9 @@ use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
 use super::super::Ctx;
-use super::{carry_out, nowhere_to_write, proving, verifying};
-use crate::error::codes::plugin::{NOTHING_TO_UPDATE, STUCK};
+use super::writing::{carry_out, nowhere_to_write};
+use super::{proving, verifying};
+use crate::error::codes::plugin::{ANOTHER_PLUGIN, NOTHING_TO_UPDATE, STUCK};
 
 /// Replace the installed version of a plugin with the one at this path, or say what
 /// doing so would come to.
@@ -39,16 +40,24 @@ use crate::error::codes::plugin::{NOTHING_TO_UPDATE, STUCK};
 pub(crate) async fn update(
     ctx: &Ctx,
     held: Register,
+    plugin: &str,
     path: &Path,
+    from: Option<&super::fetching::Fetched<'_>>,
+    consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let manifest = super::accepted(path)?;
+    let manifest = super::installing::accepted(path)?;
+    // The plugin named and the plugin the source holds have to be the one plugin: an
+    // update asked for one and carried out on another would replace something nobody
+    // named with something nobody read.
+    if manifest.plugin.id != plugin {
+        return Err(Box::new(another_plugin(plugin, &manifest.plugin.id)));
+    }
     // The stamp the whole update is journalled under, taken before anything is decided
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
     let stack_manifest = super::writing::stack_manifest(ctx)?;
-    let would = Installed::of(&manifest)
-        .installed(path, &stamp)
-        .joining(&super::writing::joins(ctx, &stack_manifest));
+    let (would, _) =
+        super::installing::settled(ctx, &stack_manifest, &manifest, path, from, &stamp);
     let Some(was) = held
         .installed()
         .iter()
@@ -71,13 +80,23 @@ pub(crate) async fn update(
         ctx,
         crate::plugin::writes(&would, stack),
     ));
+    let offer = super::offering::updating(&manifest, &was, &would, &changes, &contests);
+    let acting = super::offering::acting(
+        ctx,
+        consent,
+        &would.plugin,
+        &offer,
+        &super::offering::UPDATING,
+        &crate::plugin::approvals(&would.recipes),
+    )?;
     let mut account = started(&was, &would, &manifest, changes, contests);
 
-    // A rehearsal asks the reversal what it would put back, which judges it whole and
-    // touches nothing.
-    if ctx.dry_run {
-        account.went_back = super::super::putting_back::everything(ctx, &was.plugin).await?;
-        return Ok(answering(held.installed().to_vec(), account));
+    // A reading and a rehearsal ask the reversal what it would put back, which judges it
+    // whole and touches nothing.
+    if !acting {
+        account.went_back =
+            super::super::putting_back::everything(&ctx.clone().rehearsing(), &was.plugin).await?;
+        return Ok(answering(held.installed().to_vec(), account, offer));
     }
 
     // Judged before anything is taken, for the reason a removal judges first: a refusal
@@ -121,7 +140,7 @@ pub(crate) async fn update(
                 why.detail.unwrap_or(why.summary)
             ));
             account.restored = Some(restored(ctx, &was, stack, &stamp).await);
-            return Ok(answering(held.installed().to_vec(), account));
+            return Ok(answering(held.installed().to_vec(), account, offer));
         }
     }
 
@@ -139,27 +158,10 @@ pub(crate) async fn update(
         // Recorded last, and only here: until this lands every reader of the record
         // still sees the version being replaced, which is what keeps the machine on
         // one version or the other at every moment of the run.
-        Came::Held => {
-            let mut after = held.clone();
-            after.forget(&was.plugin);
-            let _ = after.record(would.clone());
-            match super::super::record::keep(super::kept_at(ctx).as_deref(), &after) {
-                Ok(()) => {
-                    account.install.recorded = true;
-                    let proxy = stack.join(crate::plugin::PROXY).display().to_string();
-                    let written = account.install.changes.iter().any(|change| {
-                        change.puts == crate::plugin::Puts::Region && change.path == proxy
-                    });
-                    let routed = written || super::proving::routes_withdrawn(&account.went_back);
-                    super::proving::refronted(ctx, stack, routed).await;
-                    return Ok(answering(after.installed().to_vec(), account));
-                }
-                Err(why) => Came::Stopped(format!(
-                    "the record of what is installed could not be written: {}",
-                    why.meaning
-                )),
-            }
-        }
+        Came::Held => match recorded(ctx, &held, &was, &would, stack, &mut account).await {
+            Ok(after) => return Ok(answering(after.installed().to_vec(), account, offer)),
+            Err(why) => Came::Stopped(why),
+        },
         other => other,
     };
 
@@ -170,7 +172,39 @@ pub(crate) async fn update(
     }
     account.install.reversed = Some(super::reversing(ctx, &would, stack, &stamp).await);
     account.restored = Some(restored(ctx, &was, stack, &stamp).await);
-    Ok(answering(held.installed().to_vec(), account))
+    Ok(answering(held.installed().to_vec(), account, offer))
+}
+
+/// Record the new version in place of the one it replaced, and put the front door in
+/// step with what the update wrote and withdrew. Answers the record as it stands
+/// after, or why it could not be written.
+async fn recorded(
+    ctx: &Ctx,
+    held: &Register,
+    was: &Installed,
+    would: &Installed,
+    stack: &Path,
+    account: &mut Update,
+) -> Result<Register, String> {
+    let mut after = held.clone();
+    after.forget(&was.plugin);
+    let _ = after.record(would.clone());
+    super::super::record::keep(super::kept_at(ctx).as_deref(), &after).map_err(|why| {
+        format!(
+            "the record of what is installed could not be written: {}",
+            why.meaning
+        )
+    })?;
+    account.install.recorded = true;
+    let proxy = stack.join(crate::plugin::PROXY).display().to_string();
+    let written = account
+        .install
+        .changes
+        .iter()
+        .any(|change| change.puts == crate::plugin::Puts::Region && change.path == proxy);
+    let routed = written || super::proving::routes_withdrawn(&account.went_back);
+    super::proving::refronted(ctx, stack, routed).await;
+    Ok(after)
 }
 
 /// The account as it stands before anything is done: what would go back is not yet
@@ -186,11 +220,7 @@ fn started(
         plugin: was.plugin.clone(),
         from: was.version.clone(),
         to: would.version.clone(),
-        interrupts: was
-            .services
-            .iter()
-            .map(|placed| placed.service.clone())
-            .collect(),
+        interrupts: super::offering::stopping(was),
         went_back: crate::app::putting_back::Reversal::default(),
         install: Install {
             would: would.clone(),
@@ -287,8 +317,9 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 }
 
 /// The report: the listing as the record stands, and this run's one account.
-fn answering(installed: Vec<Installed>, update: Update) -> Installs {
+fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Installs {
     Installs {
+        agreement: Some(offer),
         rehearsed: false,
         installed,
         install: None,
@@ -309,6 +340,26 @@ fn not_installed(plugin: &str) -> Problem {
         Remedy::new("Install it instead: `lemonfiber plugin install` on the same source"),
     )
     .in_state(State::Guided)
+}
+
+/// The source holds a different plugin from the one the update named. The name asked
+/// for is the asker's own words, so it is said through the sanitiser.
+fn another_plugin(named: &str, holds: &str) -> Problem {
+    let named = crate::text::plain(named);
+    Problem::new(
+        ANOTHER_PLUGIN,
+        Severity::Error,
+        format!("That source holds {holds}, not {named}"),
+        format!(
+            "Nothing was changed. An update puts a new version of {named} in place of the one \
+             installed, and this source holds a different plugin."
+        ),
+        Remedy::new(format!(
+            "Name a source that holds {named}, or install {holds} on its own"
+        )),
+    )
+    .in_state(State::Guided)
+    .lies_in(crate::error::Amiss::Asking)
 }
 
 /// The installed version's containers would not come off, and nothing else was touched.

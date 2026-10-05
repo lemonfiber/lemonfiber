@@ -30,8 +30,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Problem, Remedy, Severity, State};
 
-use crate::doctor::BUNDLED_CHECKS;
-use crate::plugin::{Install, Installed, Installs, Register};
+use crate::plugin::{Installed, Installs, Register};
 
 use super::Ctx;
 
@@ -60,14 +59,17 @@ mod fetching;
 mod cataloguing;
 // What is installed, read off the record alone or with each source asked.
 mod listing;
+// Installing from a directory: what it settles, its offer, and its writes and proofs.
+mod installing;
+// The yes to an install, an update or a removal, and the approval of what a recipe sends.
+mod offering;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;
 mod writing;
 
 pub use listing::{installed, recorded};
-use twice::already;
-use writing::{carry_out, nowhere_to_write};
+pub use offering::Consent;
 
 /// What is asked about the plugins on this machine.
 ///
@@ -78,21 +80,22 @@ use writing::{carry_out, nowhere_to_write};
 /// Apart from the five documents a plugin *author* reads, which are generated at
 /// build time and answer the same on a machine with nothing installed as on one
 /// running everything — so nothing dispatches them and nothing needs a stack. These
-/// two are about one operator's machine, so they arrive the way every other verb
-/// does.
+/// are about one operator's machine, so they arrive the way every other verb does.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Asked {
-    /// Install the plugin whose source is at this path, and record what that
-    /// decided.
+    /// Install the plugin at this source, and record what that decided.
     ///
-    /// The path is the operator's, and it is the only argument: what an install
-    /// writes is settled by the manifest rather than chosen at the command line, so
-    /// there is no flag by which an operator could be talked into installing
+    /// The source is the operator's, and beside the yes it is the only argument: what
+    /// an install writes is settled by the manifest rather than chosen at the command
+    /// line, so there is no flag by which an operator could be talked into installing
     /// something on terms the manifest did not declare.
     Install {
         /// The plugin's source: its name in the catalogue, its directory, the
         /// `plugin.toml` inside it, or a git repository at a revision.
         source: crate::plugin::Source,
+        /// The offer this answers and the pairs approved beside it, or nothing for the
+        /// reading.
+        consent: Consent,
     },
     /// Say what is installed, and what each install decided.
     Installed,
@@ -104,12 +107,33 @@ pub enum Asked {
     Remove {
         /// The plugin's id, as `lemonfiber plugin installed` lists it.
         plugin: String,
+        /// The offer this answers, or nothing for the reading. A removal sends nothing
+        /// anywhere, so it approves no pair.
+        consent: Consent,
     },
-    /// Replace an installed plugin with the version whose source is at this path, as
-    /// one operation that either holds or leaves the version it replaced in place.
+    /// Replace an installed plugin with the version at this source, as one operation
+    /// that either holds or leaves the version it replaced in place.
     Update {
-        /// The new version's source: its directory, or the `plugin.toml` inside it.
-        path: PathBuf,
+        /// The plugin's id, as `lemonfiber plugin installed` lists it. The source has to
+        /// hold this plugin and no other.
+        plugin: String,
+        /// The new version's source, any the install takes.
+        source: crate::plugin::Source,
+        /// The offer this answers and the pairs approved beside it, or nothing for the
+        /// reading.
+        consent: Consent,
+    },
+}
+
+/// What a source is read for, once it is a directory this run can read.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum Errand<'a> {
+    /// Installing it.
+    Install,
+    /// Putting it on in place of the version of this plugin installed now.
+    Update {
+        /// The plugin's id, which the source has to hold.
+        plugin: &'a str,
     },
 }
 
@@ -132,10 +156,11 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 ///
 /// Where the record cannot be read, where the source names no manifest this build
 /// can read, where the manifest is refused, where the plugin is installed already,
-/// where there is no stack to put its container in, where one of the writes would
-/// not land, where the plugin's own service would not start, or where the record of
-/// what is installed cannot be written. Every one of those after the first write puts
-/// the install back before it answers.
+/// where there is no stack to put its container in, where the yes names a reading that
+/// moved or leaves a value unapproved, where one of the writes would not land, where
+/// the plugin's own service would not start, or where the record of what is installed
+/// cannot be written. Every one of those after the first write puts the install back
+/// before it answers.
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     match action {
@@ -143,216 +168,70 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
         // Boxed, because each carries a whole install's worth of state across its awaits
         // — the stack's checks read twice, a reversal, a record — and every command the
         // dispatcher runs would otherwise be as large as the one that installs.
-        Asked::Install { source } => match source {
-            crate::plugin::Source::Path(path) => Box::pin(install(ctx, held, path, None)).await,
-            crate::plugin::Source::Git { url, revision } => {
-                Box::pin(fetching::installed(
-                    ctx,
-                    held,
-                    url,
-                    revision.as_deref(),
-                    None,
-                ))
-                .await
-            }
-            crate::plugin::Source::Name(name) => {
-                Box::pin(cataloguing::installed(ctx, held, name)).await
-            }
-        },
-        Asked::Remove { plugin } => Box::pin(removing::remove(ctx, held, plugin)).await,
-        Asked::Update { path } => Box::pin(updating::update(ctx, held, path)).await,
+        Asked::Install { source, consent } => {
+            Box::pin(sourced(ctx, held, source, Errand::Install, consent)).await
+        }
+        Asked::Remove { plugin, consent } => {
+            Box::pin(removing::remove(ctx, held, plugin, consent)).await
+        }
+        Asked::Update {
+            plugin,
+            source,
+            consent,
+        } => {
+            Box::pin(sourced(
+                ctx,
+                held,
+                source,
+                Errand::Update { plugin },
+                consent,
+            ))
+            .await
+        }
     }
 }
 
-/// Settle what installing this source decides, write the plugin's wiring, and record
-/// it.
-///
-/// Everything a rehearsal holds back is one branch wide, so what a rehearsal reports
-/// is what the real run reports — settled by the same code, refused for the same
-/// reasons, and stating the same three lists before stopping short of carrying them
-/// out.
-///
-/// **A rehearsal is refused wherever the install would be, including for want of a
-/// stack.** The account it gives is the one the install then follows, so a rehearsal
-/// that answered on a machine the install could not run on would be describing an
-/// operation that cannot happen there — and the operator would find that out on the
-/// run they thought they had already checked. What answers with no machine at all is
-/// `plugin claims`, which is the author's read and needs neither a stack nor a
-/// record.
-///
-/// **The register is the last thing written, and it is written only once the proofs
-/// have held.** That is what makes *registered* and *proved* the same fact rather than
-/// two that agree on a good day: the wiring goes down, the plugin's own services come
-/// up, every proof it declared is asked of them, and only then is the plugin recorded
-/// as installed. Every failure after the first write puts the install back, so what
-/// an operator is left with is the machine they had. And a run that dies outright
-/// still leaves only files nothing reads — inert, on the change record, and
-/// removable — because the register is what layers a plugin's document into the
-/// stack. The other order would leave a plugin the machine reports as installed and
-/// never proved.
-///
-/// **A proof that does not hold puts the whole install back.** The container comes off
-/// first, because nothing on disk records that it is running and a document removed
-/// out from under one leaves something Compose will never be asked about again; then
-/// the files go back through the rollback layer, over the journal entries the writing
-/// already made. Nothing here undoes anything itself.
-async fn install(
+/// Read a source for an errand: a directory as it is, a repository fetched at one
+/// commit, and a name resolved through the catalogue's verified index.
+async fn sourced(
+    ctx: &Ctx,
+    held: Register,
+    source: &crate::plugin::Source,
+    errand: Errand<'_>,
+    consent: &Consent,
+) -> Result<Installs, Box<Problem>> {
+    match source {
+        crate::plugin::Source::Path(path) => {
+            Box::pin(carried(ctx, held, path, None, errand, consent)).await
+        }
+        crate::plugin::Source::Git { url, revision } => {
+            let fetching = fetching::Fetching {
+                url,
+                revision: revision.as_deref(),
+                vouched: None,
+            };
+            Box::pin(fetching::fetched(ctx, held, &fetching, errand, consent)).await
+        }
+        crate::plugin::Source::Name(name) => {
+            Box::pin(cataloguing::resolved(ctx, held, name, errand, consent)).await
+        }
+    }
+}
+
+/// Carry an errand out over a directory this run can read.
+async fn carried(
     ctx: &Ctx,
     held: Register,
     path: &Path,
     from: Option<&fetching::Fetched<'_>>,
+    errand: Errand<'_>,
+    consent: &Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let manifest = accepted(path)?;
-
-    // One stamp for the run, taken before anything is decided, so the record says it
-    // was installed at the moment its changes are journalled under. A plugin fetched
-    // from a git source is recorded as coming from that source, at the one commit that
-    // was fetched, rather than from the checkout it was read out of.
-    let stamp = ctx.stamp();
-    let stack_manifest = writing::stack_manifest(ctx)?;
-    let settled = Installed::of(&manifest)
-        .installed(path, &stamp)
-        .joining(&writing::joins(ctx, &stack_manifest));
-    let (would, named) = match from {
-        Some(fetched) => {
-            let fetched_at = settled.fetched(fetched.url, fetched.commit);
-            (
-                match fetched.signed {
-                    Some(signed) => fetched_at.vouched(signed),
-                    None => fetched_at,
-                },
-                PathBuf::from(fetched.url),
-            )
+    match errand {
+        Errand::Install => Box::pin(installing::install(ctx, held, path, from, consent)).await,
+        Errand::Update { plugin } => {
+            Box::pin(updating::update(ctx, held, plugin, path, from, consent)).await
         }
-        None => (settled, path.to_path_buf()),
-    };
-    let mut after = held.clone();
-    after
-        .record(would.clone())
-        .map_err(|there| Box::new(already(&there, &named)))?;
-    writing::unanswered(&would, held.installed())?;
-    writing::unshared(&would, held.installed())?;
-
-    // Where the writes land, asked for before the branch rather than inside it. What
-    // a rehearsal has to state is where every change goes, and a path is a fact about
-    // this machine — so a machine with nowhere to put them has nothing for a
-    // rehearsal to state and nothing for an install to do.
-    let stack = ctx
-        .settings
-        .stack_dir
-        .as_deref()
-        .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
-    let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
-    let contests = standing::contested(ctx, &stack_manifest, &held, &would);
-
-    let mut stated = crate::plugin::proofs(&manifest);
-    let mut against = None;
-    let mut checked = None;
-    let mut put_back = None;
-    let mut recorded = false;
-
-    if !ctx.dry_run {
-        // An install starts containers, so it owes the pre-flight every start does,
-        // and owes it before anything is written: a machine that would resolve the
-        // plugin's mounts somewhere else is refused with nothing to put back.
-        super::engine::verified(ctx).await?;
-
-        // Read before a byte of it is written, and that order is the whole of what
-        // makes the second reading mean anything. What this has to tell apart is a
-        // check the install broke from one that was already failing, and after the
-        // fact there is nothing left to ask.
-        let (standing, before) = verifying::looked(ctx).await?;
-
-        carry_out(ctx, &would.plugin, &stamp, &planned)?;
-
-        // Started before it is registered, which is why the invocation carries this
-        // plugin rather than reading it back: the register is what layers a plugin's
-        // document into the stack, and it is deliberately not written yet.
-        proving::started(ctx, &would, stack, &stamp).await?;
-        proving::asked(ctx, &manifest, &would, &mut stated).await;
-        against = Some(proving::AGAINST);
-
-        // The stack is asked only where the plugin's own proofs held. A run that has
-        // already failed is a run being put back, and asking a machine mid-reversal
-        // what it makes of itself would produce an account of neither state.
-        if proving::held(&stated) {
-            checked = Some(crate::plugin::against(
-                &before,
-                &verifying::again(ctx, &standing).await,
-            ));
-        }
-
-        // Recorded where both halves held, and put back where either did not. One
-        // question answers for both: a verification nobody took is a run whose proofs
-        // did not hold, because that is the only way this gets here without one.
-        if checked
-            .as_ref()
-            .is_some_and(crate::plugin::Verification::held)
-        {
-            // Answered for here rather than passed on. The record writer is shared and
-            // says *your settings could not be saved, your existing settings are
-            // untouched* — which after the lines above is false twice over: the file
-            // is not the settings, and the machine has been written to.
-            //
-            // And it goes back, rather than being left for somebody to find. The
-            // proofs held, so the only thing between here and an install is the one
-            // file that could not be written — and a plugin whose container is up
-            // with nothing recording it is the state this verb exists to not leave.
-            if let Err(why) = super::record::keep(kept_at(ctx).as_deref(), &after) {
-                let back = reversing(ctx, &would, stack, &stamp).await;
-                return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
-            }
-            recorded = true;
-            proving::refronted(ctx, stack, proving::routes_written(&planned)).await;
-        } else {
-            put_back = Some(reversing(ctx, &would, stack, &stamp).await);
-        }
-    }
-
-    // What the record holds, which after a rehearsal or a reversal is what it held
-    // before. A listing that counted the entry nobody wrote would report an install
-    // that did not happen, in the same breath as saying nothing was written — and a
-    // reader who believes the count over the sentence is the one this is written for.
-    let standing = if recorded { after } else { held };
-
-    Ok(Installs {
-        rehearsed: false,
-        removal: None,
-        installed: standing.installed().to_vec(),
-        install: Some(Box::new(Install {
-            would,
-            recorded,
-            changes: crate::plugin::changes(&planned),
-            proofs: stated,
-            against,
-            verified: checked,
-            contests,
-            overrides: crate::plugin::overrides(&manifest),
-            reversed: put_back,
-        })),
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-    })
-}
-
-/// The manifest at this path, read and held to everything this build refuses.
-///
-/// One gate for an install and an update, so a version an update brings on is refused
-/// for exactly what an install of it would be. A refusal is total: none of a refused
-/// manifest is acted on.
-///
-/// # Errors
-///
-/// Where the path holds no manifest this build can read, or one it refuses.
-fn accepted(path: &Path) -> Result<lemonfiber_plugin::Manifest, Box<Problem>> {
-    let manifest =
-        crate::plugin::read(path).map_err(|unreadable| Box::new(unreadable_source(&unreadable)))?;
-    let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
-    if refusals.is_empty() {
-        Ok(manifest)
-    } else {
-        Err(Box::new(refused(&manifest.plugin.id, &refusals)))
     }
 }
 

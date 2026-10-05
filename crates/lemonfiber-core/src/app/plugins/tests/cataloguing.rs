@@ -61,10 +61,11 @@ fn cataloguing(
 
 /// Install `written`, as the operator would write it.
 async fn by_name(ctx: &Ctx, written: &str) -> Result<Installs, Box<crate::error::Problem>> {
-    plugins(
+    super::answered(
         ctx,
-        &Asked::Install {
+        Asked::Install {
             source: Source::named(written),
+            consent: crate::app::plugins::Consent::default(),
         },
     )
     .await
@@ -350,12 +351,15 @@ async fn a_release_file_handed_on_is_followed_and_verified() {
                 .into_iter()
                 .filter(|url| url.contains("lemonfiber-plugins") || url.contains("assets.example"))
                 .collect::<Vec<_>>(),
-            vec![
-                crate::plugin::catalogue::INDEX.to_owned(),
-                "https://assets.example/index".to_owned(),
-                crate::plugin::catalogue::SIGNATURE.to_owned(),
-                "https://assets.example/sig".to_owned(),
+            // Once for the reading and once for the act answering it, because the act
+            // reads the catalogue again rather than trusting what the reading saw.
+            [
+                crate::plugin::catalogue::INDEX,
+                "https://assets.example/index",
+                crate::plugin::catalogue::SIGNATURE,
+                "https://assets.example/sig",
             ]
+            .repeat(2)
         );
     }
 }

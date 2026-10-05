@@ -247,6 +247,15 @@ codes! {
         /// Raised when a plugin's service would be named, where lemonfiber keeps what a
         /// service holds, as another installed plugin's service already is.
         SPELLED_ALIKE = "PLUGIN-24",
+        /// Raised when an install, an update or a removal answers an offer that was read
+        /// against a plugin, a stack or a record that has since moved.
+        PLUGIN_OFFER_MOVED = "PLUGIN-25",
+        /// Raised when a value a recipe would carry to a destination was not approved as
+        /// itself, or an approval names a pair the recipe does not carry.
+        UNAPPROVED = "PLUGIN-26",
+        /// Raised when the source an update names holds a different plugin from the one
+        /// it was asked to update.
+        ANOTHER_PLUGIN = "PLUGIN-27",
     }
     /// The `PROVIDER` codes.
     provider {

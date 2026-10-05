@@ -5097,6 +5097,12 @@
       },
       "variants": []
     },
+    "PluginAdapterOwner": {
+      "fields": {},
+      "variants": [
+        "\"lemonfiber\""
+      ]
+    },
     "PluginChange": {
       "fields": {
         "path": {
@@ -5336,6 +5342,12 @@
     },
     "PluginInstalled": {
       "fields": {
+        "adapters": {
+          "type": [
+            "array[ref:PluginServiceAdapter]"
+          ],
+          "required": false
+        },
         "contributions": {
           "type": [
             "array[ref:Contribution]"
@@ -5345,6 +5357,12 @@
         "declared": {
           "type": [
             "ref:PluginDeclaration"
+          ],
+          "required": false
+        },
+        "description": {
+          "type": [
+            "null|string"
           ],
           "required": false
         },
@@ -5360,6 +5378,12 @@
           ],
           "required": false
         },
+        "name": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "plugin": {
           "type": [
             "string"
@@ -5369,6 +5393,12 @@
         "provides": {
           "type": [
             "array[string]"
+          ],
+          "required": false
+        },
+        "recipes": {
+          "type": [
+            "array[ref:PluginRecipe]"
           ],
           "required": false
         },
@@ -5401,6 +5431,12 @@
     },
     "PluginInstalls": {
       "fields": {
+        "agreement": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "install": {
           "type": [
             "anyOf(null,ref:PluginInstall)"
@@ -5455,6 +5491,35 @@
           "required": true
         },
         "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginPair": {
+      "fields": {
+        "approval": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "origin": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "value": {
           "type": [
             "string"
           ],
@@ -5634,6 +5699,41 @@
         "\"loopback\""
       ]
     },
+    "PluginRecipe": {
+      "fields": {
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "pairs": {
+          "type": [
+            "array[ref:PluginPair]"
+          ],
+          "required": true
+        },
+        "steps": {
+          "type": [
+            "array[ref:PluginStep]"
+          ],
+          "required": true
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginRemoval": {
       "fields": {
         "interrupts": {
@@ -5738,6 +5838,29 @@
       },
       "variants": []
     },
+    "PluginServiceAdapter": {
+      "fields": {
+        "kind": {
+          "type": [
+            "ref:ApiKind"
+          ],
+          "required": true
+        },
+        "owner": {
+          "type": [
+            "ref:PluginAdapterOwner"
+          ],
+          "required": true
+        },
+        "service": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
     "PluginSource": {
       "fields": {
         "from": {
@@ -5783,6 +5906,58 @@
         "\"unasked\"",
         "\"unreachable\""
       ]
+    },
+    "PluginStep": {
+      "fields": {
+        "adapter": {
+          "type": [
+            "anyOf(null,ref:PluginStepAdapter)"
+          ],
+          "required": false
+        },
+        "id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "method": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "path": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginStepAdapter": {
+      "fields": {
+        "kind": {
+          "type": [
+            "ref:ApiKind"
+          ],
+          "required": true
+        },
+        "owner": {
+          "type": [
+            "ref:PluginAdapterOwner"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
     },
     "PluginSubstituted": {
       "fields": {
@@ -10020,6 +10195,7 @@
     "ASK-9": 404,
     "GONE-2": 400,
     "MIGRATE-1": 400,
+    "PLUGIN-25": 400,
     "PLUGIN-4": 500,
     "READ-1": 400,
     "READ-10": 400,

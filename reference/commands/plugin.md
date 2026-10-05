@@ -245,7 +245,7 @@ A plugin's name — a bare word such as `komga` — is resolved through the cata
 
 Installing over an installation is refused naming it: that is an update, which puts one set of changes back before it applies another.
 
-`--dry-run` settles everything the real run settles, says the same account of it, and writes nothing.
+Named on its own it settles everything the real run settles, says the same account of it, writes nothing, and prints a name for that offer; answering with that name is the yes. The source is read again first, and an answer given for a different reading is refused, naming what moved. Every value a recipe would send to another host is listed, and each is approved as itself with `--approve`. `--dry-run` answers an offer the same way and writes nothing either.
 
 Usage: lemonfiber plugin install [OPTIONS] <SOURCE>
 
@@ -256,6 +256,12 @@ Arguments:
 Options:
       --json
           Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
+
+      --approve <VALUE@DESTINATION>
+          A value a recipe would send elsewhere, approved as itself, as the reading lists it. Once for each
 
       --dry-run
           Say what would happen, and change nothing
@@ -323,7 +329,7 @@ A removal is the rollback layer's work with a name on it, so it inherits every r
 
 There is no *disable*. A plugin is installed or it is not — a third state in which one is present but inert is a state nothing else in this product has and one an operator would have to keep in their head.
 
-`--dry-run` says what it would put back and what the machine would be left without, and touches nothing.
+Named on its own it says what it would stop, what it would put back and what the machine would be left without, touches nothing, and prints a name for that offer; answering with that name is the yes. The record is read again first, and an answer given for a different reading is refused, naming what moved.
 
 Usage: lemonfiber plugin remove [OPTIONS] <PLUGIN>
 
@@ -334,6 +340,9 @@ Arguments:
 Options:
       --json
           Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
 
       --dry-run
           Say what would happen, and change nothing
@@ -359,21 +368,30 @@ Options:
 ```text
 Replace an installed plugin with another version of it, as one operation.
 
-The source of the new version, held to everything an install is held to. The version installed comes off the way a removal takes it — every refusal the rollback layer makes, judged before anything moves — and the new one goes on the way an install puts it on: written, started, proved, and held against the stack's own checks as they read before the update began.
+The source of the new version is any an install takes, and has to hold the plugin named; it is held to everything an install is held to. The version installed comes off the way a removal takes it — every refusal the rollback layer makes, judged before anything moves — and the new one goes on the way an install puts it on: written, started, proved, and held against the stack's own checks as they read before the update began.
 
 The machine is on one version or the other at every moment, never between them. The record of what is installed is written last, once the new version has held; where it does not hold, it goes back and the version it replaced is put back on from its record, and the report says which version the machine is on.
 
-`--dry-run` says what would go back, what the new version would write and prove, and what would stop meanwhile, and touches nothing.
+Named on its own it says what would go back, what the new version would write and prove, what would stop meanwhile and what a recipe of the new version would send where, touches nothing, and prints a name for that offer; answering with that name, and approving each value with `--approve`, is the yes.
 
-Usage: lemonfiber plugin update [OPTIONS] <PATH>
+Usage: lemonfiber plugin update [OPTIONS] <PLUGIN> <SOURCE>
 
 Arguments:
-  <PATH>
-          The new version's source: its directory, or the `plugin.toml` inside it
+  <PLUGIN>
+          The plugin's id, as `lemonfiber plugin installed` lists it
+
+  <SOURCE>
+          The new version's source: its name in the catalogue, its directory, the `plugin.toml` inside it, or a git repository at a revision
 
 Options:
       --json
           Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
+
+      --approve <VALUE@DESTINATION>
+          A value a recipe would send elsewhere, approved as itself, as the reading lists it. Once for each
 
       --dry-run
           Say what would happen, and change nothing

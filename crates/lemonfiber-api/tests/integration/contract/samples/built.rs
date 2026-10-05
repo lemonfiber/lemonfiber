@@ -194,6 +194,8 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
     let one = lemonfiber_core::plugin::Installed {
         plugin: "komga".to_owned(),
         version: "1.2.0".to_owned(),
+        name: None,
+        description: None,
         services: vec![lemonfiber_core::plugin::Placed {
             service: "komga".to_owned(),
             image: "docker.io/gotson/komga".to_owned(),
@@ -218,6 +220,8 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         provides: Vec::new(),
         contributions: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
+        recipes: Vec::new(),
+        adapters: Vec::new(),
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
@@ -225,6 +229,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
     };
     lemonfiber_core::plugin::Installs {
         rehearsed: false,
+        agreement: None,
         removal: None,
         installed: vec![one.clone()],
         install: Some(Box::new(lemonfiber_core::plugin::Install {

@@ -38,44 +38,55 @@ pub(super) struct Vouched<'a> {
     pub(super) signed: &'a str,
 }
 
-/// Install the plugin a git source holds at the revision named, or at what it serves
-/// by default.
+/// Where a git source is, and what vouched for it where anything did.
+pub(super) struct Fetching<'a> {
+    /// The repository, as the operator named it or the catalogue's index named it.
+    pub(super) url: &'a str,
+    /// The branch, tag or commit named, or nothing for what it serves by default.
+    pub(super) revision: Option<&'a str>,
+    /// What the catalogue vouched for, which the fetched commit is held to.
+    pub(super) vouched: Option<&'a Vouched<'a>>,
+}
+
+/// Carry an errand out over the plugin a git source holds at the revision named, or
+/// at what it serves by default.
 ///
 /// Where the catalogue vouched for it, the manifest the commit holds has to be the one
-/// the catalogue reviewed before anything is installed.
+/// the catalogue reviewed before anything is read.
 ///
 /// # Errors
 ///
 /// Where fetching from a git source is switched off, where the source cannot be
 /// reached or holds nothing by the revision named, where the commit cannot be fetched,
 /// where it holds a manifest other than the one the catalogue reviewed, and every
-/// refusal an install from a directory makes.
-pub(super) async fn installed(
+/// refusal the errand makes over a directory.
+pub(super) async fn fetched(
     ctx: &Ctx,
     held: Register,
-    url: &str,
-    revision: Option<&str>,
-    vouched: Option<&Vouched<'_>>,
+    source: &Fetching<'_>,
+    errand: super::Errand<'_>,
+    consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
+    let url = source.url;
     if !ctx.settings.reaching.allows(REACH_PLUGIN_SOURCE_KEY) {
         return Err(Box::new(switched_off(url)));
     }
-    let commit = resolved(ctx, url, revision).await?;
+    let commit = resolved(ctx, url, source.revision).await?;
     let Some(into) = checkout(ctx, &commit) else {
         return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
     };
     if let Err(why) = made_fresh(&into) {
         return Err(Box::new(unfetched(url, &why.to_string())));
     }
-    let result = match fetched(ctx, url, &commit, &into).await {
-        Ok(()) => match as_reviewed(&into, vouched).await {
+    let result = match fetched_into(ctx, url, &commit, &into).await {
+        Ok(()) => match as_reviewed(&into, source.vouched).await {
             Ok(()) => {
                 let from = Fetched {
                     url,
                     commit: &commit,
-                    signed: vouched.map(|vouched| vouched.signed),
+                    signed: source.vouched.map(|vouched| vouched.signed),
                 };
-                super::install(ctx, held, &into, Some(&from)).await
+                super::carried(ctx, held, &into, Some(&from), errand, consent).await
             }
             Err(problem) => Err(problem),
         },
@@ -134,7 +145,7 @@ fn is_commit(named: &str) -> bool {
 }
 
 /// Fetch one commit into `into`, as data.
-async fn fetched(ctx: &Ctx, url: &str, commit: &str, into: &Path) -> Result<(), Box<Problem>> {
+async fn fetched_into(ctx: &Ctx, url: &str, commit: &str, into: &Path) -> Result<(), Box<Problem>> {
     let at = into.display().to_string();
     let steps: [&[&str]; 4] = [
         &["init", "--quiet", &at],

@@ -455,3 +455,48 @@ async fn a_rehearsed_update_is_refused_for_drift_as_the_real_one_is() {
         "UNDO-3"
     );
 }
+
+/// An answer naming a reading other than the one standing now changes nothing: the
+/// version installed stays on, and the record still names it.
+#[tokio::test]
+async fn an_update_answering_a_reading_that_moved_changes_nothing() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("update-moved", runner.clone(), answering(200));
+    assert_eq!(
+        counted(installing(&ctx, &source("update-moved", PROVING)).await),
+        Some(1)
+    );
+    let asked = Asked::Update {
+        plugin: "komga".to_owned(),
+        source: crate::plugin::Source::Path(source("update-moved-next", &next())),
+        consent: stale(),
+    };
+    assert_eq!(refusal(plugins(&ctx, &asked).await), "PLUGIN-25");
+    assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
+    assert!(
+        document(&ctx).contains(PINNED),
+        "its files are where they were"
+    );
+}
+
+/// An update names the plugin it replaces, and a source holding another plugin is
+/// refused naming both, before anything is read of the machine.
+#[tokio::test]
+async fn an_update_whose_source_holds_another_plugin_is_refused_naming_both() {
+    let ctx = ctx("update-another");
+    let asked = Asked::Update {
+        plugin: "kavita".to_owned(),
+        source: crate::plugin::Source::Path(source("update-another", &next())),
+        consent: super::super::Consent::default(),
+    };
+    let refusal = plugins(&ctx, &asked).await.err();
+    assert_eq!(
+        refusal.as_ref().map(|problem| problem.code.to_string()),
+        Some("PLUGIN-27".to_owned())
+    );
+    assert!(
+        refusal.is_some_and(|problem| problem.summary.contains("holds komga, not kavita")),
+        "it names both"
+    );
+    assert!(!record_of(&ctx).exists());
+}

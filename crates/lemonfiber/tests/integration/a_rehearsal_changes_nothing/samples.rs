@@ -261,6 +261,7 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
             "plugin",
             Command::Plugins(plugins::Asked::Install {
                 source: lemonfiber_core::plugin::Source::Path(a_plugin_source()),
+                consent: plugins::Consent::default(),
             }),
         ),
         (

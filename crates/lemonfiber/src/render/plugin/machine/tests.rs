@@ -17,6 +17,8 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
     Installed {
         plugin: plugin.to_owned(),
         version: "1.2.0".to_owned(),
+        name: None,
+        description: None,
         services: vec![Placed {
             service: plugin.to_owned(),
             image: format!("example.invalid/{plugin}"),
@@ -37,6 +39,8 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         provides: Vec::new(),
         contributions: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
+        recipes: Vec::new(),
+        adapters: Vec::new(),
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
@@ -108,6 +112,7 @@ fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> 
     next.version = "1.3.0".to_owned();
     Installs {
         rehearsed: false,
+        agreement: None,
         installed: vec![self::recorded("komga", None)],
         install: None,
         removal: None,

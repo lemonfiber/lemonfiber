@@ -385,8 +385,18 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         every.push((format!("{at}.title"), recipe.title.as_str()));
         every.push((format!("{at}.why"), recipe.why.as_str()));
         for step in &recipe.steps {
+            let here = format!("{at}.step {}", step.id);
+            every.push((format!("{here}.call.path"), step.call.path.as_str()));
             if let Some(body) = &step.call.body {
-                every.push((format!("{at}.step {}.call.body", step.id), body.as_str()));
+                every.push((format!("{here}.call.body"), body.as_str()));
+            }
+            for (header, value) in step.call.headers.iter().flatten() {
+                every.push((format!("{here}.call.headers"), header.as_str()));
+                every.push((format!("{here}.call.headers.{header}"), value.as_str()));
+            }
+            for capture in &step.capture {
+                every.push((format!("{here}.capture.from"), capture.from.as_str()));
+                every.push((format!("{here}.capture.origin"), capture.origin.as_str()));
             }
         }
     }

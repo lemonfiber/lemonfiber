@@ -26,7 +26,7 @@
 //! reaches a client as a regenerated diff and a refusal raised without [`moved`]
 //! would be answered as a failure of the machine.
 
-use crate::error::codes::{gone, migrate, repair, restore, space, wire};
+use crate::error::codes::{gone, migrate, plugin, repair, restore, space, wire};
 use crate::error::{Amiss, Code, Problem};
 
 /// Every code an answer is refused with for naming an offer or a listing that has
@@ -36,13 +36,14 @@ use crate::error::{Amiss, Code, Problem};
 /// an operator searching for the code reads what else that command refuses. Letting a
 /// download go raises the disk account's, because its offer is one line of that
 /// account.
-pub const MOVED: [Code; 6] = [
+pub const MOVED: [Code; 7] = [
     repair::STALE,
     restore::MOVED_ON,
     migrate::OFFER_MOVED,
     space::ANOTHER_OFFER,
     gone::ANOTHER_READING,
     wire::WIRING_MOVED,
+    plugin::PLUGIN_OFFER_MOVED,
 ];
 
 /// Where the fault lies in an answer that named what has since moved.

@@ -48,6 +48,12 @@ pub(super) fn declared(manifest: &Manifest, found: &mut Vec<Violation>) {
     let mut named: BTreeSet<&str> = BTreeSet::new();
     for recipe in &manifest.recipes {
         let at = format!("recipe {}", recipe.id);
+        worded(&recipe.id, &format!("{at}.id"), found);
+        for (number, pair) in recipe.pairs.iter().enumerate() {
+            let here = format!("{at}.pair #{}", number + 1);
+            worded(&pair.value, &format!("{here}.value"), found);
+            destination(&pair.to, &format!("{here}.to"), found);
+        }
         if !named.insert(&recipe.id) {
             found.push(Violation {
                 location: at.clone(),
@@ -99,10 +105,12 @@ fn flows(recipe: &Recipe, at: &str, found: &mut Vec<Violation>) {
                 message: "is declared twice, so a verdict against it names two calls".to_owned(),
             });
         }
+        worded(&step.id, &format!("{here}.id"), found);
         calling(step, &here, found);
         substituting(step, recipe, &captured, &here, found);
 
         for capture in &step.capture {
+            worded(&capture.name, &format!("{here}.capture.name"), found);
             if !captured.insert(&capture.name) {
                 found.push(Violation {
                     location: format!("{here}.capture"),
@@ -128,7 +136,9 @@ fn calling(step: &Step, at: &str, found: &mut Vec<Violation>) {
             message: format!("{} is not one of: {}", step.call.method, METHODS.join(", ")),
         });
     }
-    if looks_like_an_address(&step.call.to) {
+    if !is_name(&step.call.to) {
+        destination(&step.call.to, &format!("{at}.call.to"), found);
+    } else if looks_like_an_address(&step.call.to) {
         found.push(Violation {
             location: format!("{at}.call.to"),
             message: format!(
@@ -138,6 +148,68 @@ fn calling(step: &Step, at: &str, found: &mut Vec<Violation>) {
             ),
         });
     }
+}
+
+/// The longest a host name may be, as DNS bounds it.
+const LONGEST_NAME: usize = 253;
+
+/// The longest one label of a host name may be, as DNS bounds it.
+const LONGEST_LABEL: usize = 63;
+
+/// Refuse an id or a value that is not one word.
+///
+/// A recipe, a step and a value are named in what an operator approves and in the
+/// account a rehearsal gives, and a name carrying a space, a mark that draws nothing or
+/// an instruction to the terminal is one that reads differently from what is matched.
+/// One word of ASCII letters, digits, `-` and `_` reads the same everywhere it is
+/// printed, and is the same bytes wherever it is matched.
+fn worded(text: &str, at: &str, found: &mut Vec<Violation>) {
+    let word = !text.is_empty()
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_');
+    if !word {
+        found.push(Violation {
+            location: at.to_owned(),
+            message: format!(
+                "{text:?} is not one word of letters, digits, `-` and `_`, so what an operator \
+                 reads and what is matched could differ"
+            ),
+        });
+    }
+}
+
+/// Refuse a destination that is not a name.
+fn destination(to: &str, at: &str, found: &mut Vec<Violation>) {
+    if !is_name(to) {
+        found.push(Violation {
+            location: at.to_owned(),
+            message: format!(
+                "{to:?} is not a service id or a host name; a destination is lowercase labels of \
+                 letters, digits and `-`, joined by dots, so where a value goes is a thing the \
+                 operator can read and approve as it is written"
+            ),
+        });
+    }
+}
+
+/// Whether a destination is a name: a service id or a host name, in lowercase labels of
+/// letters, digits and hyphens joined by dots, within the lengths DNS allows.
+///
+/// Lowercase because a name differing only in case is the same host to DNS and a
+/// different string to anybody matching an approval against it.
+fn is_name(to: &str) -> bool {
+    !to.is_empty()
+        && to.len() <= LONGEST_NAME
+        && to.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= LONGEST_LABEL
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        })
 }
 
 /// Whether a destination is a numeric address rather than a name.
