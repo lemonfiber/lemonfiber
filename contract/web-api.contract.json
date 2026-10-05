@@ -14669,6 +14669,11 @@
               "const": "elsewhere"
             },
             {
+              "description": "Running in a container, from an image. The binary is part of the image, so\nmoving to another version is pulling that version's image and recreating the\ncontainer on it; a binary replaced inside goes when the container does.",
+              "type": "string",
+              "const": "image"
+            },
+            {
               "description": "This machine would not say where the running binary is, so none of the above\ncan be told apart. Not a failure, and not a licence to guess.",
               "type": "string",
               "const": "untellable"
@@ -14752,7 +14757,7 @@
               "$ref": "#/$defs/Installed"
             },
             "instead": {
-              "description": "Why there is nothing exact to type, where there is not.",
+              "description": "Why there is nothing exact to type, where there is not; or, where typing the\ncommand is not the whole of the move, what has to follow it.",
               "type": [
                 "string",
                 "null"

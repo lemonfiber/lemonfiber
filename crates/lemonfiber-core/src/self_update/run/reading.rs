@@ -40,6 +40,7 @@ pub(super) async fn installed(
     files: &dyn FileSystem,
     at: Option<&Path>,
     home: Option<&PathBuf>,
+    contained: bool,
 ) -> Installed {
     let receipt = match home {
         Some(home) => files.read(&receipt_under(home)).await.is_some(),
@@ -56,6 +57,7 @@ pub(super) async fn installed(
         at,
         receipt,
         recorded_by_cargo,
+        contained,
     })
 }
 

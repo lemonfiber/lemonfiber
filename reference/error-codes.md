@@ -106,6 +106,9 @@ what to do about it, is written for operators at
 - `LIFE-4`
 - `LIFE-5`
 - `LIFE-6`
+- `LIFE-7`
+- `LIFE-8`
+- `LIFE-9`
 - `MIGRATE-1`
 - `PAIR-1`
 - `PAIR-2`

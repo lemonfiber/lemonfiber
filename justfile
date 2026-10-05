@@ -287,6 +287,8 @@ scripts:
     python3 scripts/implementation_status.py --check
     python3 scripts/verify_dist_installer.py --self-test
     python3 scripts/the_installer_refuses_what_it_cannot_check.py --self-test
+    python3 scripts/the_templates_name_the_image.py --self-test
+    python3 scripts/the_templates_name_the_image.py --check
     python3 scripts/the_tag_a_shell_never_sees.py --self-test
     python3 scripts/pin_release_actions.py --self-test
     python3 scripts/the_tag_a_shell_never_sees.py --sweep

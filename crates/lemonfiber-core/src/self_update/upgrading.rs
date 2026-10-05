@@ -23,6 +23,9 @@ use super::installed::Installed;
 /// in [`crate::outbound`], which is the list an operator can read and switch off.
 const RELEASES: &str = "https://github.com/lemonfiber/lemonfiber";
 
+/// Where this project's own image is published, each release under its version.
+const IMAGE: &str = "ghcr.io/lemonfiber/lemonfiber";
+
 /// What to type to bring this copy to `version`, or to whatever is newest where no
 /// version is named.
 ///
@@ -44,6 +47,7 @@ pub fn command(installed: Installed, version: Option<&str>) -> Option<String> {
         (Installed::Cargo, Some(version)) => Some(format!(
             "cargo install --git {RELEASES} --tag v{version} --force {product}"
         )),
+        (Installed::Image, Some(version)) => Some(format!("docker pull {IMAGE}:{version}")),
         (Installed::Installer | Installed::Elsewhere | Installed::Untellable, Some(version)) => {
             Some(format!(
                 "curl -LsSf {RELEASES}/releases/download/v{version}/{product}-installer.sh | sh"
@@ -51,7 +55,11 @@ pub fn command(installed: Installed, version: Option<&str>) -> Option<String> {
         }
         (Installed::Homebrew | Installed::Distribution, _)
         | (
-            Installed::Cargo | Installed::Installer | Installed::Elsewhere | Installed::Untellable,
+            Installed::Cargo
+            | Installed::Image
+            | Installed::Installer
+            | Installed::Elsewhere
+            | Installed::Untellable,
             None,
         ) => None,
     }
@@ -83,6 +91,28 @@ pub fn why_not(installed: Installed, version: Option<&str>) -> Option<&'static s
              published as a pre-release — so a command naming no version would ask for one \
              that is not served. Run this again when the check can reach the release list.",
         ),
+    }
+}
+
+/// What has to follow the command before the move is made, where typing it is not the
+/// whole of it.
+///
+/// Only an image has a second half. Pulling fetches the new image and changes nothing
+/// that is running: the container goes on running the old one until it is recreated
+/// on the new, and how it is recreated belongs to whatever made it — a template, a
+/// project, a Compose file — none of which this copy can see from inside. Each of
+/// those names the image by digest, so the release's own template carries the digest
+/// to recreate it on.
+#[must_use]
+pub fn then(installed: Installed, version: Option<&str>) -> Option<String> {
+    match (installed, version) {
+        (Installed::Image, Some(version)) => Some(format!(
+            "Then recreate this container on that image: the template attached to v{version} at \
+             {RELEASES}/releases/tag/v{version} names it by digest, so put that template in \
+             place of the one this container was made from, or its digest in place of the old \
+             one. Settings and the stack stay in the directories it mounts."
+        )),
+        _ => None,
     }
 }
 

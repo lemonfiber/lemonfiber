@@ -260,6 +260,11 @@ async fn install(
     let mut recorded = false;
 
     if !ctx.dry_run {
+        // An install starts containers, so it owes the pre-flight every start does,
+        // and owes it before anything is written: a machine that would resolve the
+        // plugin's mounts somewhere else is refused with nothing to put back.
+        super::engine::verified(ctx).await?;
+
         // Read before a byte of it is written, and that order is the whole of what
         // makes the second reading mean anything. What this has to tell apart is a
         // check the install broke from one that was already failing, and after the

@@ -1,4 +1,4 @@
-use super::{carries, command, configuration, why_not, AFTERWARDS};
+use super::{carries, command, configuration, then, why_not, AFTERWARDS};
 use crate::self_update::installed::{Installed, EVERY_WAY};
 
 #[test]
@@ -181,4 +181,35 @@ fn two_versions_that_cannot_be_ordered_claim_nothing_about_the_configuration() {
 fn what_updating_leaves_alone_is_said_along_with_what_it_costs() {
     assert!(AFTERWARDS.contains("Nothing in the stack is stopped"));
     assert!(AFTERWARDS.contains("until you run it again"));
+}
+
+/// A copy in a container is moved by pulling that version's image, never by replacing
+/// the binary inside, and the pull is followed by recreating the container on it.
+#[test]
+fn a_copy_in_a_container_is_told_to_pull_the_image_and_recreate_the_container() {
+    assert_eq!(
+        command(Installed::Image, Some("0.19.0")).as_deref(),
+        Some("docker pull ghcr.io/lemonfiber/lemonfiber:0.19.0")
+    );
+    let follows = then(Installed::Image, Some("0.19.0")).unwrap_or_default();
+    assert!(follows.contains("recreate this container"), "{follows}");
+    assert!(follows.contains("releases/tag/v0.19.0"), "{follows}");
+    assert!(follows.contains("digest"), "{follows}");
+}
+
+/// Without a version there is no image to name, and that is said as not knowing which.
+#[test]
+fn a_copy_in_a_container_with_no_version_known_is_told_why_there_is_nothing() {
+    assert_eq!(command(Installed::Image, None), None);
+    assert_eq!(then(Installed::Image, None), None);
+    let said = why_not(Installed::Image, None).unwrap_or_default();
+    assert!(said.contains("pre-release"), "{said}");
+}
+
+/// Only an image has a second half: every other command is the whole of the move.
+#[test]
+fn nothing_but_an_image_has_anything_to_follow_its_command() {
+    for way in EVERY_WAY.iter().filter(|way| **way != Installed::Image) {
+        assert_eq!(then(*way, Some("0.19.0")), None, "{way:?}");
+    }
 }

@@ -1,0 +1,46 @@
+# lemonfiber, for Compose, Portainer, and anything else that reads a Compose file.
+#
+# This container holds the host's Docker socket. The socket is control of the host's
+# Docker: whoever holds it can start a privileged container that mounts the host's
+# root. lemonfiber needs it to run the stack, which is the same power a native install
+# gets from the `docker` group.
+#
+# The container shares the host's network, so the stack's services are reached on
+# the host's loopback, where they publish their ports, and the web surface listens on
+# the host's loopback too: http://127.0.0.1:${LEMONFIBER_PORT}/ on the host itself.
+# It refuses to listen beyond loopback until a password is set.
+#
+# Set these beside this file, in `.env`, or in Portainer's environment variables:
+#
+#   LEMONFIBER_HOME  lemonfiber's own directory: its settings and the stack it writes.
+#                    Mounted at the same path inside as on the host, because Compose
+#                    resolves the stack's mounts on the host. lemonfiber refuses to
+#                    start a stack whose paths differ.
+#   MEDIA            the directory your library and downloads live under, mounted the
+#                    same way. Choose it as the data location during setup.
+#   DOCKER_GID       the group that owns the socket: `stat -c %g /var/run/docker.sock`.
+#   PUID, PGID       who lemonfiber runs as. Not root.
+#   LEMONFIBER_PORT  the port the web surface listens on.
+#
+# The terminal interface: docker exec -it lemonfiber lemonfiber
+#
+# Updating means a new image: replace this file with the next release's, which names
+# that release's image by digest, and run `docker compose up -d`.
+name: lemonfiber
+services:
+  lemonfiber:
+    image: "{{IMAGE}}"
+    container_name: lemonfiber
+    restart: unless-stopped
+    network_mode: host
+    user: "${PUID:-1000}:${PGID:-1000}"
+    group_add:
+      - "${DOCKER_GID:?set DOCKER_GID to the group that owns /var/run/docker.sock}"
+    environment:
+      XDG_CONFIG_HOME: "${LEMONFIBER_HOME:?set LEMONFIBER_HOME to lemonfiber's own directory}/config"
+      XDG_DATA_HOME: "${LEMONFIBER_HOME}/data"
+    command: ["ui", "--no-browser", "--port", "${LEMONFIBER_PORT:-7461}"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "${LEMONFIBER_HOME}:${LEMONFIBER_HOME}"
+      - "${MEDIA:?set MEDIA to the directory your library lives under}:${MEDIA}"

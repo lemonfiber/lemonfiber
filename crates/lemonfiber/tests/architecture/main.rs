@@ -30,6 +30,7 @@ mod what_a_check_can_see;
 mod what_a_comment_may_be;
 mod what_a_form_holds;
 mod what_a_migration_may_reach;
+mod what_a_nas_template_holds;
 mod what_a_self_update_may_reach;
 mod what_a_source_file_may_not_say;
 mod what_a_verb_disturbs;

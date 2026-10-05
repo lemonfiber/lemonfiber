@@ -74,6 +74,10 @@ tokio = { workspace = true, features = ["test-util"] }
 # TOML, and a hand-rolled reader for either would be a second opinion about what
 # they say. Already in the tree via the manifest parser.
 toml = { workspace = true }
+# Reading the NAS templates, which are Compose files, so what each one runs and mounts
+# is checked as a document rather than matched as text. Already in the tree via the
+# core's reading of the stack.
+serde_yaml_ng = { workspace = true }
 # The architecture checks: the syntax tree they read the code as, and the lexer the
 # comment rules read comments with.
 syn = { workspace = true }

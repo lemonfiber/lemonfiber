@@ -80,6 +80,7 @@ fn a_receipt_from_each_is_read_as_the_one_that_writes_one_every_time() {
             at: Some(&path),
             receipt: true,
             recorded_by_cargo: true,
+            contained: false,
         }),
         Installed::Installer
     );
@@ -93,6 +94,7 @@ fn a_package_managers_tree_is_read_before_any_receipt() {
             at: Some(&path),
             receipt: true,
             recorded_by_cargo: true,
+            contained: false,
         }),
         Installed::Homebrew
     );
@@ -135,6 +137,7 @@ fn the_ones_a_tool_owns_are_the_ones_that_defer_and_they_name_the_tool() {
     assert_eq!(
         deferring,
         vec![
+            Installed::Image,
             Installed::Homebrew,
             Installed::Scoop,
             Installed::Winget,
@@ -174,6 +177,7 @@ fn every_way_is_named_once_and_by_something_a_reader_can_type() {
     assert_eq!(
         named,
         vec![
+            "image",
             "homebrew",
             "scoop",
             "winget",
@@ -192,4 +196,30 @@ fn a_tree_is_recognised_however_its_case_was_written() {
         Installed::read(&at(r"C:\Users\sam\SCOOP\apps\lemonfiber\lemonfiber.exe")),
         Installed::Scoop
     );
+}
+
+/// A copy in a container belongs to its image whatever else the machine says: the
+/// path inside is the image's choice, and a receipt beside it was baked in with it.
+#[test]
+fn a_copy_in_a_container_belongs_to_its_image_before_anything_else() {
+    let path = PathBuf::from("/usr/local/bin/lemonfiber");
+    assert_eq!(
+        Installed::read(&Signs {
+            at: Some(&path),
+            receipt: true,
+            recorded_by_cargo: true,
+            contained: true,
+        }),
+        Installed::Image
+    );
+    assert_eq!(
+        Installed::read(&Signs {
+            contained: true,
+            ..Signs::default()
+        }),
+        Installed::Image
+    );
+    assert_eq!(Installed::Image.owner(), Some("the container image"));
+    assert!(Installed::Image.defers());
+    assert!(!Installed::Image.resolves_newest());
 }

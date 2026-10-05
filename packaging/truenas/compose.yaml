@@ -1,0 +1,48 @@
+# lemonfiber for TrueNAS SCALE, as a custom app: Apps > Discover Apps > Custom App >
+# Install via YAML, and paste this file.
+#
+# This container holds the host's Docker socket. The socket is control of the host's
+# Docker: whoever holds it can start a privileged container that mounts the host's
+# root. lemonfiber needs it to run the stack, which is the same power a native install
+# gets from the `docker` group.
+#
+# The container shares the host's network, so the stack's services are reached on
+# the host's loopback, where they publish their ports, and the web surface listens on
+# the host's loopback too. It refuses to listen beyond loopback until a password is set.
+#
+# Before installing, change these to match your pool:
+#
+#   /mnt/tank/apps/lemonfiber  lemonfiber's own directory: its settings and the stack
+#                              it writes. It appears four times below and must be the
+#                              same in all five, because Compose resolves the stack's
+#                              mounts on the host and lemonfiber refuses to start a
+#                              stack whose paths differ.
+#   /mnt/tank/media            where your library and downloads live, mounted the same
+#                              way. Choose it as the data location during setup.
+#   999                        the group that owns the socket. Read it in System >
+#                              Shell with `stat -c %g /var/run/docker.sock`.
+#   7461                       the port the web surface listens on.
+#
+# lemonfiber runs as the apps user, 568, rather than as root.
+#
+# The terminal interface: docker exec -it lemonfiber lemonfiber
+#
+# Updating means a new image: edit the app and replace this YAML with the next
+# release's, which names that release's image by digest.
+services:
+  lemonfiber:
+    image: "{{IMAGE}}"
+    container_name: lemonfiber
+    restart: unless-stopped
+    network_mode: host
+    user: "568:568"
+    group_add:
+      - "999"
+    environment:
+      XDG_CONFIG_HOME: /mnt/tank/apps/lemonfiber/config
+      XDG_DATA_HOME: /mnt/tank/apps/lemonfiber/data
+    command: ["ui", "--no-browser", "--port", "7461"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/tank/apps/lemonfiber:/mnt/tank/apps/lemonfiber
+      - /mnt/tank/media:/mnt/tank/media

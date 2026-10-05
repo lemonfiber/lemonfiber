@@ -166,7 +166,7 @@ installers = ["shell"]
 # Windows is not a target: the native binary does not compile. What it waits on is
 # a register in `what_windows_is_waiting_on.rs`, held to this list by a test: the
 # target may be added here exactly when that register is empty.
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux-musl", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 # No publish jobs: nothing is published to the Homebrew tap.
 publish-jobs = []
 # cargo-dist creates and PUBLISHES the GitHub Release on a tag. Governance
