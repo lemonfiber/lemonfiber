@@ -75,5 +75,6 @@ mod library;
 /// is appears in the path, not in a filter applied afterwards — which is what makes the
 /// media server the thing that applies the age limit, the blocked kinds and the library
 /// access, and lemonfiber the thing that holds no second copy of any of them.
+mod sessions;
 mod setting_up;
 mod shelves;

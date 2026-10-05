@@ -286,9 +286,10 @@ async fn a_service_that_is_not_listening_is_unreachable() {
         body: None,
     };
     let outcome = Web::new().send(&request).await;
-    assert!(
-        outcome.is_err(),
-        "nothing answered, so it is unreachable rather than any status"
+    assert_eq!(
+        outcome.err().map(|failure| failure.connected),
+        Some(false),
+        "nothing answered, so it is unreachable, and no connection was ever made"
     );
 }
 
@@ -372,7 +373,11 @@ async fn a_body_that_does_not_arrive_is_unreachable() {
     };
     let outcome = Web::new().send(&request).await;
     server.stop().await;
-    assert!(outcome.is_err(), "a body that never arrives is unreachable");
+    assert_eq!(
+        outcome.err().map(|failure| failure.connected),
+        Some(true),
+        "a body that never arrives is unreachable, from a service that took the connection"
+    );
 }
 
 /// The whole reason this adapter does not use the default cookie store.

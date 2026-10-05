@@ -148,6 +148,58 @@ async fn a_reader_that_walks_away_stops_the_producer_rather_than_the_process() {
     engine.stop().await;
 }
 
+/// A follow whose reader walks away lets go of a container that has gone quiet.
+///
+/// A quiet container sends nothing for the reader to fail to deliver, so a producer
+/// that noticed the reader only on its next line would hold the engine's connection
+/// open for as long as the container stayed quiet — one per container, per follow.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_follow_whose_reader_walks_away_lets_go_of_a_quiet_container() {
+    let mut engine = fake::engine(
+        "quiet",
+        vec![
+            (
+                "containers/json",
+                fake::Reply::Body(200, LISTING.to_owned()),
+            ),
+            (
+                "/logs",
+                fake::Reply::Quiet(vec![(1, "said once\n".to_owned())]),
+            ),
+        ],
+    );
+
+    let daemon = Daemon::at(&engine.socket);
+    let query = lemonfiber_ports::docker::LogQuery {
+        tail: 10,
+        follow: true,
+    };
+    let Ok(mut lines) = daemon
+        .logs("lemonfiber", &["sonarr".to_owned()], query)
+        .await
+    else {
+        unreachable!("the engine is there to be followed");
+    };
+    assert!(lines.recv().await.is_some(), "the container said its line");
+
+    drop(lines);
+    let mut let_go = false;
+    for _ in 0..100 {
+        if engine
+            .asked_for()
+            .iter()
+            .any(|asked| asked == fake::HUNG_UP)
+        {
+            let_go = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(let_go, "the connection to the quiet container was let go");
+    engine.stop().await;
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn resource_use_is_sampled_for_the_services_that_are_running() {

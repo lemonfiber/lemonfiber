@@ -57,6 +57,7 @@ fn unreachable_names_the_url_and_the_reason() {
         url: "http://sonarr:8989/api".to_owned(),
         reason: "connection refused".to_owned(),
         attempts: 1,
+        connected: false,
     };
     let rendered = failure.to_string();
     assert!(rendered.contains("sonarr"));

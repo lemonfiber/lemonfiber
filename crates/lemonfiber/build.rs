@@ -11,6 +11,9 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+#[path = "build/carried.rs"]
+mod carried;
+
 /// Where the embedded stack lives, from the workspace root.
 const STACK: &str = "assets/media-stack";
 
@@ -53,6 +56,10 @@ fn main() {
     }
 
     app_speaks_this_version();
+    carried::stack(
+        &root,
+        &PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()),
+    );
 }
 
 /// Refuse to build against an app speaking a wire version this binary does not.

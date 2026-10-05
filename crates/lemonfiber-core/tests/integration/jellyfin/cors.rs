@@ -29,15 +29,13 @@ async fn the_allow_list_is_read_out_of_the_configuration() {
 }
 
 /// The whole configuration goes back with only the allow-list changed, and the write is
-/// held to what the server reads back.
+/// held to what the server reads back — all of it under the one sign-in.
 #[tokio::test]
 async fn the_front_door_alone_is_written_and_every_other_field_goes_back_as_it_was() {
     let fake = Fake::in_turn(vec![
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OPEN),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(204, ""),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(200, CLOSED),
     ]);
 
@@ -68,9 +66,7 @@ async fn a_list_that_reads_back_otherwise_is_a_failure() {
     let fake = Fake::in_turn(vec![
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OPEN),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(204, ""),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OPEN),
     ]);
 
@@ -123,7 +119,6 @@ async fn a_write_the_server_refuses_is_reported() {
     let fake = Fake::in_turn(vec![
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OPEN),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(400, ""),
     ]);
 

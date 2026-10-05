@@ -11,6 +11,8 @@
 
 use std::sync::Arc;
 
+mod deferring;
+
 use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
@@ -19,18 +21,13 @@ use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
-use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
-use crate::doctor::storage::StorageCheck;
 use crate::doctor::telling::TellingCheck;
-use crate::doctor::vpn::VpnCheck;
-use crate::doctor::wiring::WiringCheck;
 use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
 use crate::error::{Diagnose, Problem, Remedy, Severity};
 use crate::model::DoctorReport;
-use crate::ports::service::{Indexers, UsenetAccounts};
 
-use crate::app::targets::{committed_bytes, project_directory, servarr_targets};
+use crate::app::targets::{project_directory, servarr_targets};
 use crate::app::Ctx;
 
 use crate::error::codes::diag::NO_SUCH_CHECK;
@@ -117,6 +114,13 @@ pub(crate) async fn examined(
     report
 }
 
+/// How long the engine is given to say what the troubled services wrote lately.
+///
+/// The quoting comes after every check has answered, so nothing else bounds it, and
+/// an engine that will not answer would otherwise hold a finished diagnosis back
+/// without end. Past this the findings go out without their quotes.
+const QUOTED_WITHIN: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Every finding in trouble, carrying what its service said for itself lately.
 ///
 /// A check can say a service is not answering; only the service can say why, and an
@@ -152,7 +156,10 @@ pub(crate) async fn quoted(ctx: &Ctx, findings: Vec<Finding>) -> Vec<Finding> {
         return findings;
     }
 
-    let lines = super::settling::lately(ctx, &troubled).await;
+    let asked = super::settling::lately(ctx, &troubled);
+    let lines = tokio::time::timeout(QUOTED_WITHIN, asked)
+        .await
+        .unwrap_or_default();
     findings
         .into_iter()
         .map(|finding| {
@@ -224,38 +231,6 @@ fn household_telling(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Te
     TellingCheck::new(requests, recorded)
 }
 
-/// Whether what is meant to leave the house through the tunnel actually does.
-///
-/// Built apart from the assembly for the same reason the other three built apart from
-/// it are: asking this question takes more lines than any of the checks beside it, and
-/// an assembly longer than a reader holds in one go is one somebody adds a check to
-/// twice. What it needs that a check may not reach for itself — the port a client says
-/// it is listening on, and the client it would be corrected through — is read here,
-/// because this check speaks to containers and those are a service's own business.
-async fn tunnelled(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    project: Option<&std::path::Path>,
-    disruptive: bool,
-) -> VpnCheck {
-    VpnCheck::new(
-        ctx.seams.engine.clone(),
-        ctx.settings.project.clone(),
-        manifest,
-        crate::doctor::vpn::Asked {
-            protocols: ctx.settings.protocols,
-            echo: ctx.settings.ip_echo.clone(),
-            listening: crate::app::forwarding::listening_port(ctx, manifest, project).await,
-            port_forward: ctx.settings.port_forward.clone(),
-            disruptive,
-            client: crate::app::targets::torrent_client(
-                ctx,
-                &crate::app::targets::download_targets(&manifest.services, project),
-            ),
-        },
-    )
-}
-
 /// The checks this stack is examined by, built and ready to run.
 ///
 /// Assembled apart from the running of them because a repair has to ask the very same
@@ -281,7 +256,7 @@ pub(crate) async fn assembled(
         // missing from it — which is the one answer a reader would act on and should not.
         installed: crate::app::plugins::read(ctx)?.installed().to_vec(),
     };
-    let checks = assembling(ctx, &stack, disruptive).await;
+    let checks = assembling(ctx, &stack, disruptive);
     Ok((stack, checks))
 }
 
@@ -310,33 +285,13 @@ pub(crate) struct Stack {
 /// Fresh instances every time, and that is the point of asking again at all: a check
 /// holds what it read when it was built, so re-running the same instances would compare
 /// a machine against the very reading the work was meant to change.
-pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<dyn Check>> {
+pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<dyn Check>> {
     let manifest = &stack.manifest;
     let environment =
         EnvironmentCheck::reaching(ctx.seams.runner.clone(), ctx.settings.docker.clone());
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    // What the download clients still have to write, so the free-space finding
-    // projects exhaustion from the queue rather than only warning on a floor.
-    // Resolved from the same running-stack services the credentials check reaches;
-    // a client that will not answer contributes nothing, so a stack whose clients
-    // are all quiet reads as zero committed and the finding guards the raw free
-    // space.
-    let committed = committed_bytes(ctx, &manifest.services, project.as_deref()).await;
-    // The mounts are read here rather than inside the check, for the reason every other
-    // reading is: a check holds the seam it looks through, and the stack's own files are
-    // not reached through one. What the storage check does with them is report the half
-    // of the hardlink question its probe cannot see — a fork that splits the data
-    // location between two mounts, where imports copy however well the host links.
-    let storage = StorageCheck::new(
-        ctx.seams.filesystem.clone(),
-        ctx.settings.data_root.clone(),
-        ctx.settings.storage_state.clone(),
-        ctx.environment,
-        ctx.settings.service_user,
-        Some(committed),
-        ctx.stack.crowded_mounts(),
-    );
-    let vpn = tunnelled(ctx, manifest, project.as_deref(), disruptive).await;
+    let storage = deferring::stored(ctx, manifest, project.as_deref());
+    let vpn = deferring::tunnel(ctx, manifest, project.as_deref(), disruptive);
     let credentials = CredentialsCheck::new(
         ctx.seams.http.clone(),
         ctx.seams.filesystem.clone(),
@@ -372,18 +327,8 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
         servarr_targets(&manifest.services, project.as_deref()),
         disruptive,
     );
-    let providers = provider_accounts(ctx, &manifest.services, project.as_deref()).await;
-    // Whether each download client still files where lemonfiber wired it — the one field
-    // an operator and lemonfiber both write, so the only place a fix could write over
-    // somebody's own change. Read-only here: it says which side of the field moved, and
-    // the repair it hands back refuses to move the operator's.
-    let wiring = WiringCheck::new(
-        ctx.seams.http.clone(),
-        ctx.seams.filesystem.clone(),
-        crate::seed::run::managed_wirings(ctx, manifest, &stack.installed, project.as_deref())
-            .await,
-        ctx.stamp(),
-    );
+    let providers = deferring::providing(ctx, &manifest.services, project.as_deref());
+    let wiring = deferring::wired(ctx, stack, project.as_deref());
     // Where the stack is actually listening, asked of the container engine rather
     // than read out of the files that asked for it: a mapping edited by hand and
     // applied, or an image whose defaults changed under an upgrade, is a service
@@ -454,28 +399,4 @@ pub(crate) async fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Ve
         ));
     }
     checks
-}
-
-/// What the accounts underneath the stack have left, read from the services that use
-/// them.
-///
-/// The download client pulls through the Usenet accounts and the aggregator queries the
-/// indexers, and both keep their own records — so this costs the providers nothing. A
-/// check that spent the quota it measures would help cause the outage it is there to
-/// warn about.
-async fn provider_accounts(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&std::path::Path>,
-) -> ProvidersCheck {
-    ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, services, project)
-            .await
-            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
-        crate::app::targets::indexer_aggregator(ctx, services, project)
-            .await
-            .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
-        ctx.today(),
-        ctx.seams.clock.now(),
-    )
 }

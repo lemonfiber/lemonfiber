@@ -86,10 +86,20 @@ impl Wanted {
         }
     }
 
+    /// How many lines of each service go in: what was asked, held to
+    /// [`LogQuery::AT_MOST`].
+    ///
+    /// Held because a bundle keeps every line it reads until it is written, and read
+    /// here by both the gathering and the terms, so what the bundle states as its
+    /// window is the window it holds.
+    fn window(&self) -> u32 {
+        self.lines.min(LogQuery::AT_MOST)
+    }
+
     /// The terms a bundle made this way carries.
     fn terms(&self) -> Terms {
         Terms {
-            window: format!("the last {} lines of each service", self.lines),
+            window: format!("the last {} lines of each service", self.window()),
             filenames: self.filenames,
             revealed: self.reveal.clone(),
         }
@@ -150,7 +160,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         }),
     }
 
-    match logs(ctx, wanted.lines).await {
+    match logs(ctx, wanted.window()).await {
         Err(problem) => missing.push(format!("the logs could not be read — {}", problem.summary)),
         Ok(body) => pieces.push(Piece {
             name: "logs.txt".to_owned(),

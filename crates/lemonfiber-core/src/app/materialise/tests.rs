@@ -171,6 +171,21 @@ fn a_preview_names_the_reverts_but_writes_nothing() {
     assert_eq!(read(&into.join("compose.yaml")), edited);
 }
 
+/// A preview of a stack never written names nothing to revert and writes nothing:
+/// every file is one lemonfiber would write, and a preview only looks.
+#[test]
+fn a_preview_of_a_stack_never_written_writes_nothing() {
+    let (into, record) = scratch("unwritten-preview");
+    let source = Source::Embedded(&STACKLET);
+
+    let pending = pending_reverts(source, Some(&into), Some(&record), Some(&balanced()), &[])
+        .unwrap_or_default();
+
+    assert!(pending.is_empty(), "{pending:?}");
+    assert!(!into.join("compose.yaml").exists(), "nothing was written");
+    assert!(!record.exists(), "nothing was recorded");
+}
+
 #[test]
 fn an_external_stack_is_returned_and_nothing_is_written() {
     let (into, record) = scratch("external");
@@ -612,3 +627,5 @@ fn reapply_leaves_an_external_stack_alone() {
     );
     assert!(!into.exists(), "nothing was written for an external stack");
 }
+
+mod freshness;

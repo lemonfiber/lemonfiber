@@ -310,7 +310,7 @@ pub(crate) async fn lifecycle(
     // has to mean something to somebody who did not type it.
     let claim = lock::claimed(ctx, action.name()).await?;
     let outcome = worked(ctx, forms, action).await;
-    lock::released(ctx, claim).await;
+    lock::released(claim).await;
     outcome
 }
 

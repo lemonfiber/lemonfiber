@@ -20,47 +20,45 @@ fn the_download_rate_sums_the_speeds_actually_reported() {
 fn the_hardlink_status_reflects_the_empirical_probe() {
     use crate::storage::Linked;
     assert_eq!(
-        super::super::hardlink_of(&Linked::Yes { links: 2 }),
+        super::super::panels::hardlink_of(&Linked::Yes { links: 2 }),
         Hardlink::Linking
     );
-    assert_eq!(super::super::hardlink_of(&Linked::No), Hardlink::Copying);
+    assert_eq!(
+        super::super::panels::hardlink_of(&Linked::No),
+        Hardlink::Copying
+    );
     // An unwritable location or an unconfirmed link is never a met guarantee.
     assert_eq!(
-        super::super::hardlink_of(&Linked::Unwritable {
+        super::super::panels::hardlink_of(&Linked::Unwritable {
             message: "read-only".to_owned()
         }),
         Hardlink::Unknown
     );
     assert_eq!(
-        super::super::hardlink_of(&Linked::Unconfirmed),
+        super::super::panels::hardlink_of(&Linked::Unconfirmed),
         Hardlink::Unknown
     );
 }
 
-#[tokio::test]
-async fn storage_projects_exhaustion_from_the_download_rate() {
-    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let ctx = ctx(engine).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_facts(facts(3600, 10000)),
-    ));
+#[test]
+fn storage_projects_exhaustion_from_the_download_rate() {
     // 3600 bytes free, draining at 60 B/s, is a minute until full.
-    assert!(matches!(
-        super::super::storage(&ctx, 60, None).await,
-        Panel::Ready(s) if s.exhaustion == Some(Duration::from_secs(60))
-    ));
+    let storage = super::super::storage(Reading::Known(3600), Hardlink::Linking, 60);
+    assert_eq!(storage.exhaustion, Some(Duration::from_secs(60)));
 }
 
-#[tokio::test]
-async fn storage_projects_no_exhaustion_when_nothing_is_draining() {
-    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let ctx = ctx(engine).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_facts(facts(3600, 10000)),
-    ));
+#[test]
+fn storage_projects_no_exhaustion_when_nothing_is_draining() {
     // A rate of zero divides to no estimate rather than an infinite one.
-    assert!(matches!(
-        super::super::storage(&ctx, 0, None).await,
-        Panel::Ready(s) if s.exhaustion.is_none()
-    ));
+    let storage = super::super::storage(Reading::Known(3600), Hardlink::Linking, 0);
+    assert!(storage.exhaustion.is_none());
+}
+
+/// A stale figure is the last thing the volume said, not what it holds now.
+#[test]
+fn storage_projects_nothing_from_a_volume_it_could_not_read_now() {
+    let storage = super::super::storage(Reading::Stale(3600), Hardlink::Linking, 60);
+    assert!(storage.exhaustion.is_none());
 }
 
 #[tokio::test]
@@ -113,14 +111,14 @@ fn a_download_carries_its_last_speed_across_a_refresh_that_did_not_report_one() 
         household: Panel::unavailable("not read here"),
     };
     assert_eq!(
-        super::super::last_speed(Some(&before), "download"),
+        super::super::panels::last_speed(Some(&before), "download"),
         Some(&Reading::Known(4096))
     );
     assert_eq!(
-        super::super::last_speed(Some(&before), "something else"),
+        super::super::panels::last_speed(Some(&before), "something else"),
         None
     );
-    assert_eq!(super::super::last_speed(None, "download"), None);
+    assert_eq!(super::super::panels::last_speed(None, "download"), None);
 }
 
 /// A context whose records land in an emptied scratch directory, so a refresh

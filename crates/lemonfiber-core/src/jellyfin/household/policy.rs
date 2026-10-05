@@ -70,10 +70,9 @@ pub(super) async fn rewritten(
     id: &str,
     edit: &Edit<'_>,
 ) -> Result<(), Failure> {
-    let request = jellyfin
+    let response = jellyfin
         .as_admin(Method::Get, &format!("/Users/{id}"), None)
         .await?;
-    let response = jellyfin.endpoint.send(&request).await?;
     let held: AccountResource = jellyfin
         .endpoint
         .decode(&response, "what the account is allowed could not be read")?;
@@ -82,10 +81,9 @@ pub(super) async fn rewritten(
     edited(&mut policy, edit);
 
     let body = serde_json::Value::Object(policy).to_string();
-    let request = jellyfin
+    let response = jellyfin
         .as_admin(Method::Post, &format!("/Users/{id}/Policy"), Some(body))
         .await?;
-    let response = jellyfin.endpoint.send(&request).await?;
     jellyfin.endpoint.expect_success(&response)
 }
 

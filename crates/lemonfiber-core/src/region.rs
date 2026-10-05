@@ -158,5 +158,14 @@ pub fn carried(on_disk: &str, desired: &str) -> String {
         })
 }
 
+/// Whether `text` holds the opening of a region, which makes what belongs in it depend
+/// on the copy on disk.
+#[must_use]
+pub fn holds(text: &[u8]) -> bool {
+    String::from_utf8_lossy(text)
+        .lines()
+        .any(|line| line.starts_with(OPENS))
+}
+
 #[cfg(test)]
 mod tests;

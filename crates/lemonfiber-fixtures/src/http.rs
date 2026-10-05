@@ -296,6 +296,7 @@ fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> 
             url: request.url.clone(),
             reason: "connection refused".to_owned(),
             attempts: 1,
+            connected: false,
         }),
     }
 }

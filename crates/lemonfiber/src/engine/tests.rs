@@ -143,7 +143,7 @@ async fn a_pull_waits_for_the_stack_and_is_refused_when_the_wait_runs_out() {
     );
 
     if let Ok(claim) = held {
-        released(&ctx, claim).await;
+        released(claim).await;
     }
     let _ = std::fs::remove_dir_all(&dir);
 }

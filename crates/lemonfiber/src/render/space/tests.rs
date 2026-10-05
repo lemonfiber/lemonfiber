@@ -5,8 +5,8 @@ use lemonfiber_core::ports::filesystem::{FsKind, Identity, StorageFacts};
 use lemonfiber_core::ports::occupancy::Occupant;
 use lemonfiber_core::ports::service::Seeded;
 use lemonfiber_core::space::{
-    reckon, Candidate, Gone, Left, Measured, Reckoning, Reclaimed, Role, Stalled, Standing, Volume,
-    RATIO_CONSEQUENCE,
+    reckon, Candidate, Gone, Left, Measured, Reckoning, Reclaimed, Role, Stalled, Standing, Survey,
+    Tally, Volume, RATIO_CONSEQUENCE,
 };
 
 use super::{letting, reckoning};
@@ -37,9 +37,30 @@ fn volume(role: Role, at: &str, available: u64, kind: &str, committed: u64) -> V
     )
 }
 
+/// The files the stack below holds beneath its data root.
+fn on_disk() -> Vec<Occupant> {
+    vec![
+        file("/srv/media/downloads/Imported/a.mkv", 8_000, 41, 2),
+        file("/srv/media/films/Imported/a.mkv", 8_000, 41, 2),
+        file("/srv/media/downloads/Never.Taken/b.mkv", 3_000, 42, 1),
+    ]
+}
+
+/// The stack with its data root walked again, now holding `files`, folded the way a
+/// reckoning folds a walk: knowing what the client holds before it begins.
+fn walked(mut measured: Measured, files: Vec<Occupant>) -> Measured {
+    let held = measured.held.iter().map(|download| download.name.clone());
+    let mut survey = Survey::beneath(&measured.root, held.collect::<Vec<String>>());
+    for occupant in files {
+        survey.add(occupant);
+    }
+    measured.data = survey;
+    measured
+}
+
 /// A stack whose disk holds one imported file and one nothing ever took.
 fn a_stack() -> Measured {
-    Measured {
+    let measured = Measured {
         volumes: vec![volume(
             Role::Data,
             "/srv/media",
@@ -48,12 +69,8 @@ fn a_stack() -> Measured {
             35_000_000_000,
         )],
         root: PathBuf::from("/srv/media"),
-        data: vec![
-            file("/srv/media/downloads/Imported/a.mkv", 8_000, 41, 2),
-            file("/srv/media/films/Imported/a.mkv", 8_000, 41, 2),
-            file("/srv/media/downloads/Never.Taken/b.mkv", 3_000, 42, 1),
-        ],
-        services: Vec::new(),
+        data: Survey::default(),
+        services: Tally::default(),
         landing: 35_000_000_000,
         held: vec![
             Seeded {
@@ -70,7 +87,8 @@ fn a_stack() -> Measured {
         awaited: BTreeSet::new(),
         stalled: Vec::new(),
         marked: BTreeSet::new(),
-    }
+    };
+    walked(measured, on_disk())
 }
 
 /// What the report reads as.
@@ -302,12 +320,15 @@ fn a_disk_whose_only_reclaimable_room_is_seeding_invites_no_answer() {
     // case that would read as an invitation if the offer were decided by there
     // being anything reclaimable at all.
     let mut measured = a_stack();
-    measured.data = vec![file("/srv/media/downloads/Imported/a.mkv", 8_000, 41, 2)];
     measured.held = vec![Seeded {
         name: "Imported".to_owned(),
         bytes: 8_000,
         ratio: 175,
     }];
+    let measured = walked(
+        measured,
+        vec![file("/srv/media/downloads/Imported/a.mkv", 8_000, 41, 2)],
+    );
     let text = said(&reckon(&measured));
     assert!(text.contains("still seeding"), "{text}");
     assert!(
@@ -319,19 +340,18 @@ fn a_disk_whose_only_reclaimable_room_is_seeding_invites_no_answer() {
 
 #[test]
 fn a_file_far_out_of_line_with_the_rest_is_pointed_at() {
-    let mut measured = a_stack();
     let floor = 20 * 1024 * 1024 * 1024;
+    let mut files = on_disk();
     for number in 0..9 {
-        measured.data.push(file(
+        files.push(file(
             &format!("/srv/media/films/ordinary-{number}.mkv"),
             floor / 20,
             100 + number,
             1,
         ));
     }
-    measured
-        .data
-        .push(file("/srv/media/films/A.Remux.mkv", floor * 2, 200, 1));
+    files.push(file("/srv/media/films/A.Remux.mkv", floor * 2, 200, 1));
+    let measured = walked(a_stack(), files);
     let text = said(&reckon(&measured));
     assert!(text.contains("Far larger than anything else"), "{text}");
     assert!(text.contains("A.Remux.mkv"), "{text}");

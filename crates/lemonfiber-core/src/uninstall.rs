@@ -24,7 +24,7 @@ mod tier;
 use crate::error::codes::gone::{ANOTHER_READING, NEEDS_AGREEING};
 use serde::Serialize;
 
-pub use foreign::{beside, ours, Foreign};
+pub use foreign::{beside, ours, Foreign, Walked};
 pub use outside::{against, looked_for, Beside, Outside, EVERY as BESIDE};
 pub use tier::{Tier, EVERY as TIERS};
 

@@ -1,4 +1,5 @@
-use super::{chained, connect, refused_exec, spoken, Failure};
+use super::exec::{refused_exec, spoken, EXEC_SAID_AT_MOST, EXEC_WITHIN};
+use super::{chained, connect, Failure};
 use lemonfiber_ports::docker::{Origin, Target};
 
 /// An error with an optional cause, for driving a chain without a socket.
@@ -184,4 +185,53 @@ async fn a_chunk_that_will_not_arrive_ends_the_gathering() {
     ])
     .await;
     assert_eq!(said, "some of it\n", "the reading stops at the break");
+}
+
+/// A command that writes without stopping is kept to the bound, cut on a character.
+///
+/// The chunk that crosses the bound ends the reading, and what is kept of it stops
+/// short of a character it would have split: a cut through one would leave text no
+/// caller could compare against anything.
+#[tokio::test]
+async fn a_command_that_writes_without_stopping_is_kept_to_the_bound() {
+    let filler = "a".repeat(EXEC_SAID_AT_MOST - 1);
+    let said = attached(vec![
+        Ok(bollard::container::LogOutput::StdOut {
+            message: filler.clone().into(),
+        }),
+        Ok(bollard::container::LogOutput::StdOut {
+            message: "éé".into(),
+        }),
+        Ok(bollard::container::LogOutput::StdOut {
+            message: "never read".into(),
+        }),
+    ])
+    .await;
+    assert_eq!(
+        said, filler,
+        "a character the bound would split is left out whole"
+    );
+}
+
+/// A command that never ends is answered with what it wrote once the wait is spent.
+#[tokio::test(start_paused = true)]
+async fn a_command_that_never_ends_is_answered_with_what_it_wrote() {
+    let begun = tokio::time::Instant::now();
+    let opening = tokio_stream::iter(vec![Ok(bollard::container::LogOutput::StdOut {
+        message: "so far\n".into(),
+    })]);
+    let said = spoken(bollard::exec::StartExecResults::Attached {
+        output: Box::pin(tokio_stream::StreamExt::chain(
+            opening,
+            tokio_stream::pending(),
+        )),
+        input: Box::pin(tokio::io::sink()),
+    })
+    .await;
+    assert_eq!(said, "so far\n");
+    assert_eq!(
+        begun.elapsed(),
+        EXEC_WITHIN,
+        "the wait is the bound and no longer"
+    );
 }

@@ -62,8 +62,7 @@ impl Jellyfin {
     /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, or answers
     /// the key list with something unreadable.
     pub async fn filed_as(&self, app: &str) -> Result<Vec<String>, Failure> {
-        let request = self.as_admin(Method::Get, KEYS, None).await?;
-        let response = self.endpoint.send(&request).await?;
+        let response = self.as_admin(Method::Get, KEYS, None).await?;
         let keys: Keys = self
             .endpoint
             .decode(&response, "the key list could not be read")?;
@@ -89,10 +88,9 @@ impl Jellyfin {
     /// key under `app`.
     pub async fn mint(&self, app: &str) -> Result<String, Failure> {
         let before = self.filed_as(app).await?;
-        let minting = self
+        let response = self
             .as_admin(Method::Post, &format!("{KEYS}?App={app}"), None)
             .await?;
-        let response = self.endpoint.send(&minting).await?;
         self.endpoint.expect_success(&response)?;
         let mut new: Vec<String> = self
             .filed_as(app)
@@ -130,10 +128,9 @@ impl Jellyfin {
     /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, or refuses
     /// the revocation.
     pub async fn revoke(&self, key: &str) -> Result<(), Failure> {
-        let revoking = self
+        let response = self
             .as_admin(Method::Delete, &format!("{KEYS}/{key}"), None)
             .await?;
-        let response = self.endpoint.send(&revoking).await?;
         self.endpoint.expect_success(&response)
     }
 }

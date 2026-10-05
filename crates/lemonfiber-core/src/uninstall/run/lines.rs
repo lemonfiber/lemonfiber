@@ -230,8 +230,8 @@ fn beneath(gathered: &Gathered, root: &std::path::Path) -> u64 {
     gathered
         .kept
         .iter()
-        .filter(|occupant| occupant.path.starts_with(root))
-        .map(|occupant| occupant.bytes)
+        .filter(|(at, _)| at == root)
+        .map(|(_, bytes)| *bytes)
         .fold(0, u64::saturating_add)
 }
 
@@ -268,12 +268,7 @@ fn media(gathered: &Gathered, found: &[Foreign]) -> Vec<Item> {
 
     lines.extend(ours(&types).into_iter().filter_map(|directory| {
         let at = root.join(&directory);
-        let bytes = gathered
-            .walked
-            .iter()
-            .filter(|occupant| occupant.path.starts_with(&at))
-            .map(|occupant| occupant.bytes)
-            .fold(0, u64::saturating_add);
+        let bytes = gathered.walked.owned(&directory);
         (bytes > 0).then(|| Item {
             name: at.display().to_string(),
             sort: Sort::Path,
@@ -288,9 +283,5 @@ fn media(gathered: &Gathered, found: &[Foreign]) -> Vec<Item> {
 
 /// What the walk found beneath the data location.
 fn beneath_data(gathered: &Gathered) -> u64 {
-    gathered
-        .walked
-        .iter()
-        .map(|occupant| occupant.bytes)
-        .fold(0, u64::saturating_add)
+    gathered.walked.total()
 }

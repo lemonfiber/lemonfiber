@@ -32,7 +32,16 @@ pub enum Reply {
     /// A real one comes from a container that died or a tunnel that dropped, and
     /// the reading end cannot tell those apart from this.
     Cut(u8, String),
+    /// Docker's framing, chunked, and then the connection held open with nothing
+    /// more to say — a followed container that has gone quiet.
+    ///
+    /// Held until the client hangs up, which is recorded among the routes asked for
+    /// as [`HUNG_UP`] so a test can see whether the reading end ever let go.
+    Quiet(Vec<(u8, String)>),
 }
+
+/// What a held connection records once the client has hung up on it.
+pub const HUNG_UP: &str = "hung up";
 
 /// The API version this engine claims, which is deliberately not the one
 /// the adapter was compiled against — so a test can prove the two were
@@ -90,6 +99,20 @@ fn rendered(reply: &Reply) -> Vec<u8> {
             for (stream, text) in frames {
                 out.extend_from_slice(&frame(*stream, text));
             }
+            out
+        }
+        Reply::Quiet(frames) => {
+            let body: Vec<u8> = frames
+                .iter()
+                .flat_map(|(stream, text)| frame(*stream, text))
+                .collect();
+            let mut out = b"HTTP/1.1 200 OK\r\nContent-Type: \
+                application/vnd.docker.multiplexed-stream\r\n\
+                Transfer-Encoding: chunked\r\n\r\n"
+                .to_vec();
+            out.extend_from_slice(format!("{:x}\r\n", body.len()).as_bytes());
+            out.extend_from_slice(&body);
+            out.extend_from_slice(b"\r\n");
             out
         }
         Reply::Cut(stream, text) => {
@@ -241,6 +264,11 @@ async fn answer(
 
                         let _ = socket.write_all(&rendered(&reply)).await;
                         let _ = socket.flush().await;
+                        if matches!(reply, Reply::Quiet(_)) {
+                            let mut rest = [0_u8; 64];
+                            while socket.read(&mut rest).await.is_ok_and(|read| read > 0) {}
+                            let _ = asked.send(HUNG_UP.to_owned());
+                        }
                         let _ = socket.shutdown().await;
                     }
                 });

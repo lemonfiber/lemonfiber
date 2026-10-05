@@ -147,6 +147,10 @@ fn env_at(name: &str) -> std::path::PathBuf {
 }
 
 /// A context that can authenticate to a torrent client answering `replies`.
+/// What qBittorrent answers a read with before any login, which is how a fresh
+/// client's first read goes.
+const SIGNED_OUT: (u16, &str) = (403, "Forbidden");
+
 fn ctx_with_client(name: &str, replies: Vec<(u16, &'static str)>) -> crate::app::Ctx {
     let settings = crate::config::Settings {
         env_file: Some(env_at(name)),
@@ -163,11 +167,12 @@ fn ctx_with_client(name: &str, replies: Vec<(u16, &'static str)>) -> crate::app:
 
 #[tokio::test]
 async fn a_client_already_on_the_granted_port_is_read_and_left() {
-    // Login, then the preferences read. No write follows, because a write that
-    // changes nothing still restarts the client's listener.
+    // The read refused for want of a session, the login, then the read again. No
+    // write follows, because a write that changes nothing still restarts the
+    // client's listener.
     let ctx = ctx_with_client(
         "already",
-        vec![(200, "Ok."), (200, r#"{"listen_port":51413}"#)],
+        vec![SIGNED_OUT, (200, "Ok."), (200, r#"{"listen_port":51413}"#)],
     );
     assert_eq!(
         super::reconcile(&ctx, Some(51413), None).await,
@@ -182,11 +187,11 @@ async fn a_client_on_yesterdays_port_is_moved_to_the_one_granted_now() {
     let ctx = ctx_with_client(
         "moved",
         vec![
+            SIGNED_OUT,
             (200, "Ok."),
             (200, r#"{"listen_port":51413}"#),
             (200, "Ok."),
             (200, ""),
-            (200, "Ok."),
             (200, r#"{"listen_port":51999}"#),
         ],
     );
@@ -209,7 +214,6 @@ async fn a_client_that_will_not_answer_is_still_set_rather_than_assumed_correct(
             (500, "no"),
             (200, "Ok."),
             (200, ""),
-            (200, "Ok."),
             (200, r#"{"listen_port":51999}"#),
         ],
     );
@@ -242,11 +246,12 @@ async fn starting_a_stack_with_no_forwarding_asked_for_changes_nothing() {
 
 #[tokio::test]
 async fn a_client_that_refuses_the_write_says_so_in_its_own_words() {
-    // Login, the read, login, then a refusal — reported rather than recorded
-    // as done.
+    // The read refused for want of a session, login, the read, login, then a
+    // refusal — reported rather than recorded as done.
     let ctx = ctx_with_client(
         "refusing",
         vec![
+            SIGNED_OUT,
             (200, "Ok."),
             (200, r#"{"listen_port":51413}"#),
             (200, "Ok."),
@@ -271,7 +276,7 @@ async fn the_clients_own_port_is_read_for_the_diagnosis() {
     // is a service's own API.
     let ctx = ctx_with_client(
         "reading",
-        vec![(200, "Ok."), (200, r#"{"listen_port":51413}"#)],
+        vec![SIGNED_OUT, (200, "Ok."), (200, r#"{"listen_port":51413}"#)],
     );
     let manifests: Vec<_> = ctx
         .stack

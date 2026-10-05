@@ -6,14 +6,39 @@ use lemonfiber_fixtures::http::Fake;
 
 use super::Qbittorrent;
 
-/// A client whose transport answers each call from `replies` in order — the
-/// first is the login, the second the torrent list.
+/// A client whose transport holds no session yet: its first read is answered as
+/// signed out, and each call after that from `replies` in order — the first is the
+/// login, the second the read again.
 fn client(replies: Vec<(u16, &'static str)>) -> Qbittorrent {
+    let mut answered = vec![(super::SIGNED_OUT, "Forbidden")];
+    answered.extend(replies);
+    Qbittorrent::authenticated(
+        Fake::scripted(answered),
+        "http://127.0.0.1:8080",
+        a_password(),
+    )
+}
+
+/// A client whose transport answers each call from `replies` in order, for a write:
+/// a write logs in first, so the first is the login, and whatever is read after it is
+/// read under the session that login opened.
+fn writing(replies: Vec<(u16, &'static str)>) -> Qbittorrent {
     Qbittorrent::authenticated(
         Fake::scripted(replies),
         "http://127.0.0.1:8080",
         a_password(),
     )
+}
+
+/// A transport already holding a session is read under it, with no login first.
+#[tokio::test]
+async fn a_session_already_held_is_read_without_logging_in() {
+    let qbit = Qbittorrent::authenticated(
+        Fake::scripted(vec![(200, TWO_TORRENTS)]),
+        "http://127.0.0.1:8080",
+        a_password(),
+    );
+    assert_eq!(qbit.transfers().await.map(|read| read.len()).ok(), Some(2));
 }
 
 /// Two torrents: one mid-download with a real ETA, one complete and stalled at
@@ -156,10 +181,9 @@ async fn setting_the_port_is_confirmed_by_reading_it_back() {
     // Read back rather than trusted: a client that accepted the write and did
     // not apply it would otherwise be recorded as configured while remaining
     // unreachable, which is the failure this whole path exists to notice.
-    let client = client(vec![
+    let client = writing(vec![
         LOGGED_IN,
         (200, ""),
-        LOGGED_IN,
         (200, r#"{"listen_port":51413}"#),
     ]);
     assert!(client.set_listen_port(51413).await.is_ok());
@@ -168,12 +192,7 @@ async fn setting_the_port_is_confirmed_by_reading_it_back() {
 #[tokio::test]
 async fn a_client_that_took_the_write_and_kept_its_old_port_is_a_failure() {
     // Accepted and not applied — the case the read-back exists for.
-    let client = client(vec![
-        LOGGED_IN,
-        (200, ""),
-        LOGGED_IN,
-        (200, r#"{"listen_port":6881}"#),
-    ]);
+    let client = writing(vec![LOGGED_IN, (200, ""), (200, r#"{"listen_port":6881}"#)]);
     let refused = client.set_listen_port(51413).await;
     assert!(
         refused.is_err(),
@@ -262,6 +281,6 @@ async fn a_client_holding_no_password_cannot_ask_for_anything_to_be_removed() {
 
 #[tokio::test]
 async fn a_refused_write_is_reported_rather_than_read_back() {
-    let client = client(vec![LOGGED_IN, (403, "Forbidden")]);
+    let client = writing(vec![LOGGED_IN, (403, "Forbidden")]);
     assert!(client.set_listen_port(51413).await.is_err());
 }

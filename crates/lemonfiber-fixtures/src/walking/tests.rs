@@ -14,12 +14,24 @@ fn file(path: &str) -> Occupant {
     }
 }
 
+/// Everything a walk of `root` sends, or nothing where it refused.
+async fn walked(walking: &Walking, root: &str) -> Option<Vec<Occupant>> {
+    let mut sent = walking.beneath(Path::new(root)).await.ok()?;
+    let mut found = Vec::new();
+    while let Some(occupant) = sent.recv().await {
+        found.push(occupant);
+    }
+    Some(found)
+}
+
 #[tokio::test]
 async fn a_walk_answers_with_what_is_beneath_the_path_asked_about() {
     let walking = Walking::holding(vec![file("/srv/media/a.mkv"), file("/elsewhere/b.mkv")]);
-    let found = walking.beneath(Path::new("/srv/media")).await;
-    assert_eq!(found, Ok(vec![file("/srv/media/a.mkv")]));
-    assert_eq!(walking.beneath(Path::new("/nowhere")).await, Ok(Vec::new()));
+    assert_eq!(
+        walked(&walking, "/srv/media").await,
+        Some(vec![file("/srv/media/a.mkv")])
+    );
+    assert_eq!(walked(&walking, "/nowhere").await, Some(Vec::new()));
 }
 
 #[tokio::test]

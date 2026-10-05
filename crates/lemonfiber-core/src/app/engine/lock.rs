@@ -58,11 +58,13 @@
 //! is in flight would make the safe command the awkward one.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::app::Ctx;
 use crate::error::{Amiss, Problem, Remedy, Severity};
 use crate::plural::s;
+use crate::ports::FileSystem;
 
 /// What the claim is called, beside the settings it belongs to.
 const LOCKFILE: &str = "lifecycle.lock";
@@ -99,7 +101,30 @@ const TOOK_IT: &str = "the other operation finished — taking the stack now";
 ///
 /// Holds nothing where there was nothing to claim, so a caller does the same thing
 /// either way rather than remembering which case it is in.
-pub struct Claim(Option<PathBuf>);
+///
+/// Given back when it is dropped as well as when it is released. Work that is
+/// ended before it finishes — a browser releasing the job it was handed — never
+/// reaches the line that releases it, and a claim held by this server's own process
+/// is never taken as abandoned, so without this every later operation would wait
+/// out its whole turn and be refused until the server restarted.
+pub struct Claim(Option<Held>);
+
+/// The claim file, and the filesystem it is removed through.
+struct Held {
+    path: PathBuf,
+    filesystem: Arc<dyn FileSystem>,
+}
+
+impl Drop for Claim {
+    /// Dropping cannot wait, so the removal is handed to the runtime the work was
+    /// running on. Outside a runtime there is nothing to hand it to, and the claim
+    /// stays for `--force` or the next run that finds its process gone.
+    fn drop(&mut self) {
+        if let (Some(held), Ok(runtime)) = (self.0.take(), tokio::runtime::Handle::try_current()) {
+            runtime.spawn(async move { held.filesystem.remove(&held.path).await });
+        }
+    }
+}
 
 /// Claim the stack for this operation, waiting for whatever has it to finish.
 ///
@@ -146,7 +171,10 @@ async fn queued(ctx: &Ctx, path: &Path, doing: &str) -> Result<Claim, Box<Proble
             if !waited.is_zero() && !taken {
                 ctx.narrator.say(TOOK_IT).await;
             }
-            return Ok(Claim(Some(path.to_path_buf())));
+            return Ok(Claim(Some(Held {
+                path: path.to_path_buf(),
+                filesystem: Arc::clone(&ctx.seams.filesystem),
+            })));
         }
         // Checked after the attempt rather than before it, so the last look before
         // the bound is a real attempt at the claim rather than a sleep followed by a
@@ -211,9 +239,9 @@ fn abandoned(held: &Holder) -> String {
 /// Best effort and deliberately silent: this runs on the way out of an operation that
 /// may already be reporting something worse, and a claim that could not be cleaned up
 /// is a `--force` away rather than a second failure to read.
-pub async fn released(ctx: &Ctx, claim: Claim) {
-    if let Some(path) = claim.0 {
-        ctx.seams.filesystem.remove(&path).await;
+pub async fn released(mut claim: Claim) {
+    if let Some(held) = claim.0.take() {
+        held.filesystem.remove(&held.path).await;
     }
 }
 

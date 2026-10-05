@@ -14,6 +14,12 @@
 //! A status code is never retried, because a status code is an answer. A service
 //! that says `401` has spoken, and asking it again three times is neither more
 //! polite nor more informative.
+//!
+//! Nor is a service that took the connection and then said nothing. What a retry
+//! cures is a connection that could not be made a moment ago — a container
+//! restarting, a name resolving late. One that was made and went silent has
+//! already been given the whole wait, and asking it again would spend that wait
+//! twice more before saying the same thing.
 
 use async_trait::async_trait;
 
@@ -55,11 +61,11 @@ async fn sent<H: Http + ?Sized>(inner: &H, request: &Request) -> Result<Response
             Ok(response) => return Ok(response),
             Err(failure) => failure,
         };
-        let Some(wait) = is_idempotent(request.method)
+        let Some(wait) = (is_idempotent(request.method) && !failure.connected)
             .then(|| retry::again(attempt))
             .flatten()
         else {
-            // Either not safe to repeat, or the attempts are spent. The count
+            // Not safe to repeat, not a blip, or the attempts are spent. The count
             // travels with the failure so what reports it can tell a service
             // that was busy from one that is down.
             return Err(Unreachable {

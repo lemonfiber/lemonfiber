@@ -16,7 +16,6 @@ async fn the_key_filed_under_our_name_is_revoked_and_no_other() {
     let fake = Fake::in_turn(vec![
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OURS_TOO),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(204, ""),
     ]);
     let revoked = reader(&fake).revoke_our_key().await;
@@ -59,7 +58,6 @@ async fn a_revocation_the_server_refuses_is_reported() {
     let fake = Fake::in_turn(vec![
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, OURS_TOO),
-        Answer::reply(200, SIGNED_IN),
         Answer::reply(500, ""),
     ]);
     assert!(reader(&fake).revoke_our_key().await.is_err());

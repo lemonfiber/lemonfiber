@@ -72,25 +72,28 @@ impl Counting {
     /// figure that is too large by an unread file is better than one that is too
     /// small by a real one.
     pub fn count(&mut self, occupants: &[Occupant]) -> Tally {
-        let mut tally = Tally {
-            files: occupants.len(),
-            ..Tally::default()
-        };
+        let mut tally = Tally::default();
         for occupant in occupants {
-            tally.logical = tally.logical.saturating_add(occupant.bytes);
-            let counted = match occupant.identity {
-                Some(identity) if identity.file != 0 => self.seen.insert(identity.file),
-                // A platform that reports no file number leaves nothing to compare,
-                // and two zeroes are not evidence of one file however equal they look.
-                _ => true,
-            };
-            if counted {
-                tally.physical = tally.physical.saturating_add(occupant.bytes);
-            } else {
-                tally.shared += 1;
-            }
+            self.add(occupant, &mut tally);
         }
         tally
+    }
+
+    /// Count one more occupant into `tally`, for a walk counted as it arrives.
+    pub fn add(&mut self, occupant: &Occupant, tally: &mut Tally) {
+        tally.files += 1;
+        tally.logical = tally.logical.saturating_add(occupant.bytes);
+        let counted = match occupant.identity {
+            Some(identity) if identity.file != 0 => self.seen.insert(identity.file),
+            // A platform that reports no file number leaves nothing to compare,
+            // and two zeroes are not evidence of one file however equal they look.
+            _ => true,
+        };
+        if counted {
+            tally.physical = tally.physical.saturating_add(occupant.bytes);
+        } else {
+            tally.shared += 1;
+        }
     }
 }
 

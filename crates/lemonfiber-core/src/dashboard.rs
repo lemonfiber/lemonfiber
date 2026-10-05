@@ -18,6 +18,7 @@
 //! duration is computed from one clock and never runs backwards, since a host and a
 //! container disagreeing about the time must not render as a negative countdown.
 
+pub(crate) mod pace;
 pub mod run;
 
 use std::time::Duration;
@@ -39,6 +40,10 @@ use serde::Serialize;
 /// only once the last gather finished is what keeps a stack that answers in three
 /// seconds refreshing every three, rather than queueing work it will never catch
 /// up on. This is the floor and the intent, not a deadline.
+///
+/// It is how often the screen is refreshed, not how often every source behind it is
+/// asked: the panels whose figures move over minutes are read at a pace of their own
+/// and carried forward between readings (see [`pace`]).
 pub const TICK: Duration = Duration::from_secs(1);
 
 use crate::docker::Service;

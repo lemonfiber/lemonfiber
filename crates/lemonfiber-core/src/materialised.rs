@@ -22,6 +22,68 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Materialised {
     files: BTreeMap<String, u32>,
+    /// How each file stood once lemonfiber last wrote it or found it current, so a
+    /// file that still stands that way is known to be current without reading it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    seen: BTreeMap<String, Seen>,
+}
+
+/// How a stack file stood when lemonfiber last wrote it or found it current.
+///
+/// Its size and when it last changed are what tell a file nobody has touched since
+/// from one somebody has. Where the platform keeps a change time, that is the time
+/// used: any write moves it, and unlike the modification time no program can set it
+/// back, so a copy that restores an old date is still seen as written. What it was
+/// made from is the shipped content it carried, so a file left from an older build is
+/// not taken as current for a newer one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Seen {
+    /// Its size in bytes.
+    pub length: u64,
+    /// When it last changed, in nanoseconds since the epoch.
+    pub written: u128,
+    /// The checksum of the shipped content it was made from.
+    pub from: u32,
+    /// Whether it holds a region of lemonfiber's own writing, whose content is decided
+    /// by what is on disk — so it is always read.
+    pub regions: bool,
+}
+
+impl Seen {
+    /// How the file at `path` stands now, made from content with checksum `from`, or
+    /// nothing where it cannot be looked at.
+    #[must_use]
+    pub fn of(path: &std::path::Path, from: u32, regions: bool) -> Option<Self> {
+        let meta = std::fs::metadata(path).ok()?;
+        Some(Self {
+            length: meta.len(),
+            written: changed(&meta)?,
+            from,
+            regions,
+        })
+    }
+}
+
+/// When a file last changed, in nanoseconds since the epoch: its change time, which
+/// every write moves and nothing can set.
+#[cfg(unix)]
+fn changed(meta: &std::fs::Metadata) -> Option<u128> {
+    use std::os::unix::fs::MetadataExt as _;
+    let seconds = u128::try_from(meta.ctime()).ok()?;
+    let nanos = u128::try_from(meta.ctime_nsec()).ok()?;
+    Some(seconds * 1_000_000_000 + nanos)
+}
+
+/// Where the platform keeps no change time, when the file was last written.
+#[cfg(not(unix))]
+fn changed(meta: &std::fs::Metadata) -> Option<u128> {
+    let written = meta.modified().ok()?;
+    Some(
+        written
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_nanos(),
+    )
 }
 
 impl Materialised {
@@ -43,6 +105,24 @@ impl Materialised {
     #[must_use]
     pub fn checksum(&self, path: &str) -> Option<u32> {
         self.files.get(path).copied()
+    }
+
+    /// Record how a file stands once lemonfiber wrote it or found it current.
+    pub fn saw(&mut self, path: &str, seen: Option<Seen>) {
+        match seen {
+            Some(seen) => self.seen.insert(path.to_owned(), seen),
+            None => self.seen.remove(path),
+        };
+    }
+
+    /// Whether a file still stands exactly as lemonfiber last wrote it or found it
+    /// current, made from the same shipped content — current, without reading it.
+    #[must_use]
+    pub fn unchanged(&self, path: &str, now: Option<Seen>) -> bool {
+        match (self.seen.get(path), now) {
+            (Some(was), Some(now)) => !was.regions && *was == now && self.files.contains_key(path),
+            _ => false,
+        }
     }
 }
 

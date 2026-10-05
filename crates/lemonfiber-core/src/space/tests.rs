@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use super::{reckon, Category, Measured, Occupant, Seeded, Stalled, Standing, Volume};
+use super::{
+    reckon, Category, Counting, Measured, Occupant, Seeded, Stalled, Standing, Survey, Tally,
+    Volume,
+};
 use crate::ports::filesystem::{FsKind, Identity, StorageFacts};
 use crate::space::Role;
 
@@ -32,18 +35,47 @@ fn roomy(role: Role, at: &str) -> Volume {
     )
 }
 
+/// The files the stack below holds beneath its data root.
+fn on_disk() -> Vec<Occupant> {
+    vec![
+        file("/srv/media/downloads/Imported/a.mkv", 8_000, 41, 2),
+        file("/srv/media/films/Imported/a.mkv", 8_000, 41, 2),
+        file("/srv/media/downloads/Never.Taken/b.mkv", 3_000, 42, 1),
+    ]
+}
+
+/// The stack with its data root walked again, now holding `files`, as a reckoning
+/// folds the walk: knowing what the client holds before it begins.
+fn walked(mut measured: Measured, files: &[Occupant]) -> Measured {
+    let held = measured.held.iter().map(|download| download.name.clone());
+    let mut survey = Survey::beneath(&measured.root, held.collect::<Vec<String>>());
+    for occupant in files {
+        survey.add(occupant.clone());
+    }
+    measured.data = survey;
+    measured
+}
+
+/// The stack with these files beneath its data root as well as its own.
+fn with(measured: Measured, more: &[Occupant]) -> Measured {
+    let mut files = on_disk();
+    files.extend_from_slice(more);
+    walked(measured, &files)
+}
+
 /// A stack whose data root holds one imported file and one that was never
 /// taken, with the client still holding both.
 fn a_stack() -> Measured {
-    Measured {
+    let mut services = Tally::default();
+    Counting::default().add(
+        &file("/srv/lemonfiber/config/sonarr.db", 500, 90, 1),
+        &mut services,
+    );
+    let measured = Measured {
         volumes: vec![roomy(Role::Data, "/srv/media")],
         root: PathBuf::from("/srv/media"),
-        data: vec![
-            file("/srv/media/downloads/Imported/a.mkv", 8_000, 41, 2),
-            file("/srv/media/films/Imported/a.mkv", 8_000, 41, 2),
-            file("/srv/media/downloads/Never.Taken/b.mkv", 3_000, 42, 1),
-        ],
-        services: vec![file("/srv/lemonfiber/config/sonarr.db", 500, 90, 1)],
+        data: Survey::default(),
+        services,
         landing: 1_000,
         held: vec![
             Seeded {
@@ -60,7 +92,8 @@ fn a_stack() -> Measured {
         awaited: BTreeSet::new(),
         stalled: Vec::new(),
         marked: BTreeSet::new(),
-    }
+    };
+    walked(measured, &on_disk())
 }
 
 /// What one category of the report came to, by heading.
@@ -158,12 +191,15 @@ fn an_offer_that_has_moved_on_names_itself_differently() {
         bytes: 5_000,
         ratio: 0,
     });
-    later.data.push(file(
-        "/srv/media/downloads/Also.Never.Taken/c.mkv",
-        5_000,
-        43,
-        1,
-    ));
+    let later = with(
+        later,
+        &[file(
+            "/srv/media/downloads/Also.Never.Taken/c.mkv",
+            5_000,
+            43,
+            1,
+        )],
+    );
     assert_ne!(first.agreement, reckon(&later).agreement);
     assert_eq!(first.agreement.len(), 8, "{}", first.agreement);
 }
@@ -243,8 +279,7 @@ fn an_import_that_stopped_part_way_is_named_with_what_is_on_disk_for_it() {
 
 #[test]
 fn a_file_sitting_in_the_root_itself_is_still_accounted_for() {
-    let mut measured = a_stack();
-    measured.data.push(file("/srv/media/loose.mkv", 700, 99, 1));
+    let measured = with(a_stack(), &[file("/srv/media/loose.mkv", 700, 99, 1)]);
     let reckoned = reckon(&measured);
     assert_eq!(
         line(&reckoned.consumption, "the data location itself")
@@ -257,8 +292,7 @@ fn a_file_sitting_in_the_root_itself_is_still_accounted_for() {
 #[test]
 fn a_walked_file_outside_the_root_is_named_by_what_it_is_under() {
     // Nothing should produce one, and a walk that did must not lose it.
-    let mut measured = a_stack();
-    measured.data = vec![file("/elsewhere/odd/one.mkv", 5, 51, 1)];
+    let measured = walked(a_stack(), &[file("/elsewhere/odd/one.mkv", 5, 51, 1)]);
     let reckoned = reckon(&measured);
     assert_eq!(
         line(&reckoned.consumption, "elsewhere")
@@ -282,13 +316,13 @@ fn a_stack_with_nothing_on_it_reports_no_empty_lines() {
 
 #[test]
 fn archive_parts_beside_what_was_unpacked_from_them_are_offered() {
-    let mut measured = a_stack();
-    measured
-        .data
-        .push(file("/srv/media/downloads/Done/a.rar", 400, 61, 1));
-    measured
-        .data
-        .push(file("/srv/media/downloads/Done/Done.mkv", 900, 62, 1));
+    let measured = with(
+        a_stack(),
+        &[
+            file("/srv/media/downloads/Done/a.rar", 400, 61, 1),
+            file("/srv/media/downloads/Done/Done.mkv", 900, 62, 1),
+        ],
+    );
     let reckoned = reckon(&measured);
     assert_eq!(
         line(&reckoned.reclaimable, "archives already unpacked")
@@ -312,10 +346,10 @@ fn archive_parts_beside_what_was_unpacked_from_them_are_offered() {
 
 #[test]
 fn nothing_offered_twice_where_a_download_is_also_an_unpacked_archive() {
-    let mut measured = a_stack();
-    measured
-        .data
-        .push(file("/srv/media/downloads/Never.Taken/c.rar", 400, 63, 1));
+    let measured = with(
+        a_stack(),
+        &[file("/srv/media/downloads/Never.Taken/c.rar", 400, 63, 1)],
+    );
     let taking: Vec<String> = reckon(&measured)
         .offering(&measured)
         .into_iter()

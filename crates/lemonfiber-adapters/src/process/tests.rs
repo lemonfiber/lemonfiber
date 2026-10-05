@@ -108,3 +108,54 @@ async fn an_empty_argument_vector_is_refused_rather_than_spawned() {
         Err(Failure::Unusable { .. })
     ));
 }
+
+/// A program that outlasts the bound is stopped, and the run ends without an exit
+/// status rather than waiting for as long as the program chooses.
+#[tokio::test(start_paused = true)]
+async fn a_program_that_outlasts_the_bound_is_stopped() {
+    let outcome = Local
+        .run(&argv(&["sh", "-c", "sleep 30"]))
+        .await
+        .map(|output| output.status)
+        .ok();
+    assert_eq!(outcome, Some(None), "stopped, so there is no exit status");
+}
+
+/// Whether the process `pid` names is still there to be signalled.
+fn alive(pid: &str) -> bool {
+    std::process::Command::new("kill")
+        .args(["-0", pid])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// A stream whose reader goes away takes the program with it.
+///
+/// Work ended part-way drops what it was reading, and a start or a pull nobody is
+/// waiting on any more must not go on changing the stack behind everybody's back.
+#[tokio::test]
+async fn a_stream_whose_reader_goes_away_takes_the_program_with_it() {
+    let Ok(mut stream) = Local
+        .stream(&argv(&["sh", "-c", "echo $$; exec sleep 30"]))
+        .await
+    else {
+        unreachable!("sh is on every machine this runs on");
+    };
+    let pid = match stream.recv().await {
+        Some(Progress::Line(pid)) => pid,
+        other => unreachable!("the program says its pid first: {other:?}"),
+    };
+    assert!(alive(&pid), "the program is running while it is read");
+
+    drop(stream);
+    let mut gone = false;
+    for _ in 0..100 {
+        if !alive(&pid) {
+            gone = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(gone, "the program was stopped once nobody was reading it");
+}

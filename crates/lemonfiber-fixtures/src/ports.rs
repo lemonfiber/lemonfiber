@@ -64,6 +64,13 @@ impl Stopped {
     pub fn today() -> Arc<Self> {
         Self::at(TODAY)
     }
+
+    /// Stopped this many seconds into the day [`Stopped::today`] is, for a test that
+    /// moves the clock over the real manifest.
+    #[must_use]
+    pub fn into_today(seconds: u64) -> Arc<Self> {
+        Self::at(TODAY + seconds)
+    }
 }
 
 impl Clock for Stopped {

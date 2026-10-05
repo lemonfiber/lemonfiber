@@ -36,6 +36,7 @@ use lemonfiber_ports::docker::{
 };
 
 pub mod context;
+mod exec;
 mod images;
 mod mounts;
 mod presence;
@@ -306,7 +307,7 @@ impl Engine for Daemon {
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, Failure> {
-        executed(self, container, argv).await
+        exec::executed(self, container, argv).await
     }
 
     async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
@@ -321,106 +322,6 @@ impl Engine for Daemon {
     ) -> Result<Receiver<LogLine>, Failure> {
         read(self, project, services, query).await
     }
-}
-
-/// Run one command inside a container and collect what it said.
-async fn executed(
-    daemon: &Daemon,
-    container: &str,
-    argv: &[String],
-) -> Result<ExecOutput, Failure> {
-    let docker = daemon.client().await?;
-
-    let config = bollard::models::ExecConfig {
-        cmd: Some(argv.to_vec()),
-        attach_stdout: Some(true),
-        attach_stderr: Some(true),
-        ..Default::default()
-    };
-
-    let created = docker
-        .create_exec(container, config)
-        .await
-        .map_err(|error| refused_exec(error, container))?;
-
-    let started = docker
-        .start_exec(&created.id, None)
-        .await
-        .map_err(|error| daemon.refused(&error))?;
-
-    let stdout = spoken(started).await;
-
-    let inspected = docker
-        .inspect_exec(&created.id)
-        .await
-        .map_err(|error| daemon.refused(&error))?;
-
-    Ok(ExecOutput {
-        status: inspected
-            .exit_code
-            .and_then(|code| i32::try_from(code).ok()),
-        stdout,
-    })
-}
-
-/// What a refusal to start an exec means.
-///
-/// A container that is not there is the one refusal an operator can act on differently,
-/// so it keeps its own variant all the way up. Its own function because the other arm
-/// needs a daemon that answers badly, which no test here has — handed the error
-/// directly, both arms are ordinary.
-fn refused_exec(error: bollard::errors::Error, container: &str) -> Failure {
-    match error {
-        bollard::errors::Error::DockerResponseServerError {
-            status_code: 404, ..
-        } => Failure::NoSuchContainer {
-            name: container.to_owned(),
-        },
-        other => unreachable(&other),
-    }
-}
-
-/// Everything an attached exec wrote, and nothing at all where it was not attached.
-///
-/// Written as a value that starts empty and is filled where there is something to
-/// read, rather than as two arms. The other arm is the detached one, and this adapter
-/// never asks to detach — so as an arm of its own it is a line no run can enter,
-/// which is a line the coverage gate counts against every honest line beside it. As
-/// an absence it says the same thing: an exec nobody attached to wrote nothing here.
-async fn spoken(started: bollard::exec::StartExecResults) -> String {
-    let mut said = String::new();
-    if let bollard::exec::StartExecResults::Attached { output, .. } = started {
-        said = gathered(output).await;
-    }
-    said
-}
-
-/// Everything a stream of exec output said, joined in the order it arrived.
-///
-/// Generic over the stream, which is worth knowing about when reading its tests: a
-/// generic is compiled once per type it is reached with, so a test handing it a
-/// stream of its own would exercise a copy of this loop that no run ever executes
-/// while the copy the product uses stayed unmeasured. The tests reach it through
-/// [`spoken`], the way an exec does, so there is one copy and it is the one measured.
-///
-/// What arrived, and never a refusal. A stream that stops part-way is not this
-/// function's to judge: the exec is asked for its exit status immediately afterwards,
-/// and the two things that cut an output stream are both answered there — a
-/// connection that is gone fails the inspection with it, and a container that died
-/// mid-write reports the status it died with. A refusal raised here instead would be
-/// a second way to say the same thing, reachable only through a transport failing
-/// between two requests on one settled connection, which is to say reachable by
-/// nothing that could be written down.
-async fn gathered<S>(mut output: S) -> String
-where
-    S: tokio_stream::Stream<Item = Result<bollard::container::LogOutput, bollard::errors::Error>>
-        + Unpin,
-{
-    let mut said = String::new();
-    while let Some(Ok(chunk)) = output.next().await {
-        said.push_str(&chunk.to_string());
-    }
-    said
 }
 
 /// One sampling task per running container, feeding one channel.
@@ -497,7 +398,14 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
         .build();
 
     let mut chunks = std::pin::pin!(docker.logs(&container.id, Some(options)));
-    while let Some(Ok(chunk)) = chunks.next().await {
+    // The reader going away is watched for as well as the next chunk. A followed
+    // container that has gone quiet sends nothing to fail to deliver, so noticing
+    // only on a send would hold the engine's connection open for as long as it
+    // stayed quiet.
+    while let Some(Ok(chunk)) = tokio::select! {
+        next = chunks.next() => next,
+        () = sender.closed() => None,
+    } {
         let stream = match &chunk {
             bollard::container::LogOutput::StdErr { .. } => Stream::Stderr,
             _ => Stream::Stdout,
@@ -506,6 +414,10 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
         // One engine chunk is not one line. Splitting here rather than at the
         // reader means every consumer gets lines, and none of them reimplements
         // the splitting.
+        //
+        // A reader that leaves part-way through a chunk is noticed at the top of the
+        // loop, where `closed` then answers at once; the rest of the chunk's lines
+        // fail to send without waiting on anything.
         let text = chunk.to_string();
         for line in text.lines() {
             let (at, line) = split_timestamp(line);
@@ -515,9 +427,7 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
                 at,
                 line,
             };
-            if sender.send(sending).await.is_err() {
-                return;
-            }
+            let _delivered = sender.send(sending).await;
         }
     }
 }

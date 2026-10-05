@@ -209,8 +209,7 @@ const AT_ONCE: u32 = 200;
 #[async_trait]
 impl crate::ports::service::Household for Jellyfin {
     async fn household(&self) -> Result<Vec<Member>, Failure> {
-        let request = self.as_admin(Method::Get, "/Users", None).await?;
-        let response = self.endpoint.send(&request).await?;
+        let response = self.as_admin(Method::Get, "/Users", None).await?;
         let held: Vec<UserResource> = self
             .endpoint
             .decode(&response, "the household's accounts could not be read")?;
@@ -234,10 +233,9 @@ impl crate::ports::service::Household for Jellyfin {
         // No password: that is the invitation. The account exists from this moment,
         // which is why nothing has to be running for somebody to claim it later.
         let body = serde_json::json!({ "Name": name }).to_string();
-        let request = self
+        let response = self
             .as_admin(Method::Post, "/Users/New", Some(body))
             .await?;
-        let response = self.endpoint.send(&request).await?;
         let made: UserResource = self
             .endpoint
             .decode(&response, "the account could not be read back")?;
@@ -249,25 +247,22 @@ impl crate::ports::service::Household for Jellyfin {
         // when somebody changes their own, and naming neither is what makes this a
         // reset the operator cannot read the result of.
         let body = serde_json::json!({ "ResetPassword": true }).to_string();
-        let request = self
+        let response = self
             .as_admin(Method::Post, &format!("/Users/{id}/Password"), Some(body))
             .await?;
-        let response = self.endpoint.send(&request).await?;
         self.endpoint.expect_success(&response)
     }
 
     async fn withdraw(&self, id: &str) -> Result<(), Failure> {
-        let request = self
+        let response = self
             .as_admin(Method::Delete, &format!("/Users/{id}"), None)
             .await?;
-        let response = self.endpoint.send(&request).await?;
         self.endpoint.expect_success(&response)
     }
 
     async fn when_invited(&self, since: &str) -> Result<Vec<Invited>, Failure> {
         let path = format!("/System/ActivityLog/Entries?minDate={since}&limit={AT_ONCE}");
-        let request = self.as_admin(Method::Get, &path, None).await?;
-        let response = self.endpoint.send(&request).await?;
+        let response = self.as_admin(Method::Get, &path, None).await?;
         let recorded: ActivityResource = self.endpoint.decode(
             &response,
             "what the media server recorded could not be read",
@@ -287,8 +282,7 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
-        let request = self.as_admin(Method::Get, RATINGS, None).await?;
-        let response = self.endpoint.send(&request).await?;
+        let response = self.as_admin(Method::Get, RATINGS, None).await?;
         let held: Vec<RatingResource> = self
             .endpoint
             .decode(&response, "the server's own ratings could not be read")?;
@@ -316,8 +310,7 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn sessions(&self, member: &str) -> Result<Vec<Session>, Failure> {
-        let request = self.as_admin(Method::Get, "/Sessions", None).await?;
-        let response = self.endpoint.send(&request).await?;
+        let response = self.as_admin(Method::Get, "/Sessions", None).await?;
         let listed: Vec<SessionResource> = self
             .endpoint
             .decode(&response, "the media server's sessions could not be read")?;
@@ -334,10 +327,9 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn quick_connect(&self) -> Result<bool, Failure> {
-        let request = self
+        let response = self
             .as_admin(Method::Get, "/QuickConnect/Enabled", None)
             .await?;
-        let response = self.endpoint.send(&request).await?;
         self.endpoint.decode(
             &response,
             "the media server would not say whether it signs devices in by code",
@@ -349,10 +341,9 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
-        let request = self
+        let response = self
             .as_admin(Method::Get, "/Library/MediaFolders", None)
             .await?;
-        let response = self.endpoint.send(&request).await?;
         let held: FoldersResource = self
             .endpoint
             .decode(&response, "the server's libraries could not be read")?;

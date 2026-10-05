@@ -11,7 +11,8 @@
 //! warning to be read past, but the thing that stops the data location from being
 //! removed as one tree.
 
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -51,14 +52,6 @@ pub fn ours(media_types: &[String]) -> Vec<String> {
     named.sort();
     named.dedup();
     named
-}
-
-/// Whether a path beneath the data location sits inside one of the stack's own
-/// directories.
-fn is_ours(relative: &Path, ours: &[String]) -> bool {
-    let named = relative.to_string_lossy();
-    ours.iter()
-        .any(|directory| named == directory.as_str() || named.starts_with(&format!("{directory}/")))
 }
 
 /// Whether a directory is one the stack's own sit *under* — `media`, which holds the
@@ -101,26 +94,89 @@ pub fn beside(
     walked: &[crate::ports::occupancy::Occupant],
     media_types: &[String],
 ) -> Vec<Foreign> {
-    let ours = ours(media_types);
-    let mut found: std::collections::BTreeMap<String, (u64, u64)> =
-        std::collections::BTreeMap::new();
-
+    let mut folded = Walked::beneath(root, media_types);
     for occupant in walked {
-        let Ok(relative) = occupant.path.strip_prefix(root) else {
-            continue;
-        };
-        if is_ours(relative, &ours) {
-            continue;
+        folded.add(occupant);
+    }
+    folded.foreign()
+}
+
+/// A walk of the data location, folded as it arrives into what an uninstall reads
+/// of it: what it all occupies, what each of the stack's own directories occupies,
+/// and what is there that the stack did not put there.
+#[derive(Debug, Clone, Default)]
+pub struct Walked {
+    /// The data location.
+    root: PathBuf,
+    /// The stack's own directories beneath it.
+    ours: Vec<String>,
+    /// What every file walked occupies.
+    total: u64,
+    /// What each of the stack's own directories occupies.
+    owned: BTreeMap<String, u64>,
+    /// What is there that is not the stack's, by what it is credited to: how many
+    /// files, and what they occupy.
+    found: BTreeMap<String, (u64, u64)>,
+}
+
+impl Walked {
+    /// A walk beneath `root`, of a stack whose services hold these media types.
+    #[must_use]
+    pub fn beneath(root: &Path, media_types: &[String]) -> Self {
+        Self {
+            root: root.to_path_buf(),
+            ours: ours(media_types),
+            ..Self::default()
         }
-        let entry = found.entry(credited(relative, &ours)).or_insert((0, 0));
+    }
+
+    /// Fold one walked file in.
+    pub fn add(&mut self, occupant: &crate::ports::occupancy::Occupant) {
+        self.total = self.total.saturating_add(occupant.bytes);
+        let Ok(relative) = occupant.path.strip_prefix(&self.root) else {
+            return;
+        };
+        if let Some(directory) = self
+            .ours
+            .iter()
+            .find(|directory| relative.starts_with(directory))
+        {
+            let held = self.owned.entry(directory.clone()).or_default();
+            *held = held.saturating_add(occupant.bytes);
+            return;
+        }
+        let entry = self
+            .found
+            .entry(credited(relative, &self.ours))
+            .or_insert((0, 0));
         entry.0 = entry.0.saturating_add(1);
         entry.1 = entry.1.saturating_add(occupant.bytes);
     }
 
-    found
-        .into_iter()
-        .map(|(at, (files, bytes))| Foreign { at, files, bytes })
-        .collect()
+    /// What every file walked occupies.
+    #[must_use]
+    pub const fn total(&self) -> u64 {
+        self.total
+    }
+
+    /// What one of the stack's own directories occupies.
+    #[must_use]
+    pub fn owned(&self, directory: &str) -> u64 {
+        self.owned.get(directory).copied().unwrap_or_default()
+    }
+
+    /// Everything beneath the data location that the stack did not put there.
+    #[must_use]
+    pub fn foreign(&self) -> Vec<Foreign> {
+        self.found
+            .iter()
+            .map(|(at, (files, bytes))| Foreign {
+                at: at.clone(),
+                files: *files,
+                bytes: *bytes,
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

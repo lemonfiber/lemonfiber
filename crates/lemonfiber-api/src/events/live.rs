@@ -1,9 +1,15 @@
 //! One gather, and everyone listening to it.
 //!
 //! Concurrent surfaces must agree, and two gathers are two chances to disagree.
-//! So there is one here, whatever is listening: a source is gathered from on a
-//! tick, what it produced is said once, and every open stream hears the same
+//! So there is one here, however many are listening: a source is gathered from on
+//! a tick, what it produced is said once, and every open stream hears the same
 //! words. A second listener costs another subscriber, never another gather.
+//!
+//! And none while nobody is listening. A gather asks every service, the engine and
+//! the disks, and a server left running with no browser open would otherwise ask
+//! them every second for as long as it ran, for a screen nobody is looking at. The
+//! first listener to arrive is gathered for at once, so it is not left waiting on a
+//! tick.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,6 +60,8 @@ pub struct Live {
     wanted: Notify,
     /// Whether a listener has opened since the last gather.
     joined: AtomicBool,
+    /// A listener opening, for a gather waiting on there being anybody to hear it.
+    arrived: Notify,
     /// How many times every stream open has been told to end. A listener remembers
     /// the count it opened at and ends when it moves.
     ended: watch::Sender<u64>,
@@ -69,6 +77,7 @@ impl Live {
             backlog: Mutex::new(Backlog::opening(clock)),
             wanted: Notify::new(),
             joined: AtomicBool::new(false),
+            arrived: Notify::new(),
             ended: watch::channel(0).0,
         }
     }
@@ -104,6 +113,7 @@ impl Live {
         let backlog = self.backlog.lock().await;
         let said = self.said.subscribe();
         self.joined.store(true, Ordering::SeqCst);
+        self.arrived.notify_one();
         Listening {
             missed: backlog.since(seen).into(),
             said,
@@ -139,14 +149,26 @@ impl Live {
         }
     }
 
-    /// Gather on the tick, and whenever a listener asks, until the caller stops.
+    /// Gather on the tick, and whenever a listener asks, while anybody is listening
+    /// and until the caller stops.
     pub async fn gathering(self: Arc<Self>, source: Arc<dyn Gathers>) {
         loop {
+            self.heard().await;
             self.refresh(source.as_ref()).await;
             tokio::select! {
                 () = tokio::time::sleep(TICK) => {}
                 () = self.wanted.notified() => {}
             }
+        }
+    }
+
+    /// Wait until there is somebody to hear a gather.
+    ///
+    /// A listener that opened while nothing was waiting leaves its arrival stored,
+    /// so one that opens between the count and the wait is not missed.
+    async fn heard(&self) {
+        while self.said.receiver_count() == 0 {
+            self.arrived.notified().await;
         }
     }
 }

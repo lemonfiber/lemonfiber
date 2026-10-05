@@ -16,7 +16,8 @@ use crate::app::targets::{data_root, layout};
 use crate::app::Ctx;
 use crate::config::paths::Paths;
 use crate::ports::docker::Image;
-use crate::ports::occupancy::Occupant;
+use crate::space::run::walked;
+use crate::uninstall::foreign::Walked;
 use crate::uninstall::{Coming, Confidence, Tier};
 
 /// Everything one survey read, and what it could not.
@@ -41,10 +42,11 @@ pub(super) struct Gathered {
     pub(super) paths: Option<Paths>,
     /// The operator's data location, where this run could say.
     pub(super) root: Option<PathBuf>,
-    /// Every file beneath the data location.
-    pub(super) walked: Vec<Occupant>,
-    /// What lemonfiber's own two directories hold, where this tier asks.
-    pub(super) kept: Vec<Occupant>,
+    /// What the walk beneath the data location found.
+    pub(super) walked: Walked,
+    /// What lemonfiber's own two directories hold, each by where it is, where this
+    /// tier asks.
+    pub(super) kept: Vec<(PathBuf, u64)>,
     /// What the data location's own volume is, where it is worth saying.
     pub(super) volume: Option<String>,
     /// What is still coming down.
@@ -84,7 +86,11 @@ pub(super) async fn gather(ctx: &Ctx, tier: Tier) -> Gathered {
     let engine = engine(ctx, tier, &mut confidence).await;
     let paths = whereabouts(ctx, &mut confidence);
     let root = data_root(ctx).or_else(|| ctx.settings.data_root.clone());
-    let (walked, volume) = disk(ctx, root.as_deref(), &mut confidence).await;
+    let types: Vec<String> = services
+        .iter()
+        .flat_map(|service| service.media_types.clone())
+        .collect();
+    let (walked, volume) = disk(ctx, root.as_deref(), &types, &mut confidence).await;
     let kept = ours(ctx, tier, paths.as_ref(), &mut confidence).await;
 
     Gathered {
@@ -198,7 +204,7 @@ async fn ours(
     tier: Tier,
     paths: Option<&Paths>,
     confidence: &mut Confidence,
-) -> Vec<Occupant> {
+) -> Vec<(PathBuf, u64)> {
     let Some(paths) = paths.filter(|_| tier.touches_configuration()) else {
         return Vec::new();
     };
@@ -206,7 +212,14 @@ async fn ours(
     let mut held = Vec::new();
     for root in [paths.config_dir(), paths.data_dir()] {
         match ctx.seams.occupancy.beneath(root).await {
-            Ok(found) => held.extend(found),
+            Ok(walking) => {
+                let mut bytes = 0_u64;
+                walked(walking, |occupant| {
+                    bytes = bytes.saturating_add(occupant.bytes);
+                })
+                .await;
+                held.push((root.to_path_buf(), bytes));
+            }
             Err(fault) => {
                 *confidence = confidence.clone().short(format!(
                     "{} is there and would not be read, so what it holds is named \
@@ -250,14 +263,16 @@ fn whereabouts(ctx: &Ctx, confidence: &mut Confidence) -> Option<Paths> {
 async fn disk(
     ctx: &Ctx,
     root: Option<&std::path::Path>,
+    media_types: &[String],
     confidence: &mut Confidence,
-) -> (Vec<Occupant>, Option<String>) {
+) -> (Walked, Option<String>) {
     let Some(root) = root else {
-        return (Vec::new(), None);
+        return (Walked::default(), None);
     };
 
-    let walked = match ctx.seams.occupancy.beneath(root).await {
-        Ok(found) => found,
+    let mut folded = Walked::beneath(root, media_types);
+    match ctx.seams.occupancy.beneath(root).await {
+        Ok(walking) => walked(walking, |occupant| folded.add(&occupant)).await,
         Err(fault) => {
             *confidence = confidence.clone().short(format!(
                 "the data location is there and would not be read, so what is beneath \
@@ -265,11 +280,10 @@ async fn disk(
                  stack's: {}",
                 fault.message
             ));
-            Vec::new()
         }
-    };
+    }
 
-    (walked, mounted(ctx, root).await)
+    (folded, mounted(ctx, root).await)
 }
 
 /// What to say about the volume the data location sits on, where it is worth saying

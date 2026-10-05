@@ -23,6 +23,10 @@ path = "src/main.rs"
 lemonfiber-manifest = { workspace = true }
 # Reading the wire version the embedded app and the contract each declare.
 serde_json = { workspace = true }
+# Reading which files of the stack its compose files and its claims name, to carry
+# what runs and nothing else (`build/carried.rs`).
+serde_yaml_ng = { workspace = true }
+toml = { workspace = true }
 
 [dependencies]
 lemonfiber-adapters = { workspace = true }

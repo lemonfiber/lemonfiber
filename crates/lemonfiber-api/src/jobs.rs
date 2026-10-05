@@ -33,6 +33,11 @@
 //! every other command ends by itself, and ending a fetch that nobody happened to
 //! ask about would be ending work that was going to finish.
 //!
+//! What finished work came to is held the same way: kept for whoever asks about the
+//! name, and forgotten once nobody has for a whole lease, with a ceiling on how much
+//! of it is held at once. A register that kept every outcome would grow for as long
+//! as the server ran.
+//!
 //! Nothing outlives the run. A job names work in flight, work in flight does not
 //! survive the process doing it, and a record that did would describe jobs nothing
 //! is running.
@@ -75,6 +80,14 @@ const WIDTH: usize = 8;
 /// not treated as gone, short enough that a guard nobody remembers starting does
 /// not outlive the day.
 pub const LEASE: Duration = Duration::from_secs(30 * 60);
+
+/// The most finished work the register holds on to.
+///
+/// What a finished name came to is kept for whoever asks next, and is let go by the
+/// sweep once nobody has asked for a lease. A run that starts work faster than the
+/// sweep lets it go is bounded here instead: past this, the finished work that began
+/// longest ago is let go first. Work still running is never let go to make room.
+pub const FINISHED_AT_MOST: usize = 256;
 
 /// A name for work that outlives the request that started it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,6 +209,8 @@ struct Held {
     asked: u64,
     /// What that count stood at when the sweep last looked.
     swept: u64,
+    /// When it began, as a count of the work begun before it.
+    begun: u64,
 }
 
 /// The work this run started, and where each piece of it got to.
@@ -204,7 +219,36 @@ struct Held {
 /// flight, and work in flight does not survive the process that is doing it —
 /// so a record that outlived the run would describe jobs nothing is running.
 #[derive(Clone, Default)]
-pub struct Jobs(Arc<Mutex<HashMap<String, Held>>>);
+pub struct Jobs(Arc<Mutex<Register>>);
+
+/// The work held, and how much has been begun.
+#[derive(Default)]
+struct Register {
+    /// Each piece of work by its name.
+    held: HashMap<String, Held>,
+    /// How many pieces of work have been begun, which orders them by when.
+    begun: u64,
+}
+
+impl Register {
+    /// Let go of the finished work that began longest ago until there is room for
+    /// one more beside [`FINISHED_AT_MOST`].
+    fn making_room(&mut self) {
+        let mut finished: Vec<(u64, String)> = self
+            .held
+            .iter()
+            .filter(|(_, entry)| entry.work.standing != Standing::Running)
+            .map(|(name, entry)| (entry.begun, name.clone()))
+            .collect();
+        finished.sort_unstable();
+        let over = finished
+            .len()
+            .saturating_sub(FINISHED_AT_MOST.saturating_sub(1));
+        for (_, name) in finished.into_iter().take(over) {
+            self.held.remove(&name);
+        }
+    }
+}
 
 impl Jobs {
     /// Start a command under a name, and stop holding on to it.
@@ -248,12 +292,15 @@ impl Jobs {
             let (name, action) = (name.clone(), action.clone());
             tokio::spawn(async move {
                 let standing = doing.await;
-                if let Some(entry) = held.lock().await.get_mut(&name) {
+                if let Some(entry) = held.lock().await.held.get_mut(&name) {
                     entry.work = Work { action, standing };
                 }
             })
         };
-        register.insert(
+        register.making_room();
+        register.begun = register.begun.saturating_add(1);
+        let begun = register.begun;
+        register.held.insert(
             name,
             Held {
                 work: Work {
@@ -267,6 +314,7 @@ impl Jobs {
                 // happens to run a moment later.
                 asked: 1,
                 swept: 0,
+                begun,
             },
         );
     }
@@ -279,7 +327,7 @@ impl Jobs {
     /// second thing a client would have to remember to send.
     pub async fn about(&self, job: &str) -> Option<Work> {
         let mut register = self.0.lock().await;
-        let entry = register.get_mut(job)?;
+        let entry = register.held.get_mut(job)?;
         entry.asked = entry.asked.saturating_add(1);
         Some(entry.work.clone())
     }
@@ -291,33 +339,39 @@ impl Jobs {
     /// with what it came to rather than overwriting it with an ending.
     pub async fn stop(&self, job: &str) -> Option<Work> {
         let mut register = self.0.lock().await;
-        let entry = register.get_mut(job)?;
+        let entry = register.held.get_mut(job)?;
         Some(ended(entry))
     }
 
-    /// End the work with no ending of its own that nobody has asked about.
+    /// End the work with no ending of its own that nobody has asked about, and let
+    /// go of finished work nobody has asked about.
     ///
     /// Two passes rather than one: work untouched since the last look is let go,
     /// and work that was asked about has its mark moved up. So a name survives the
     /// first sweep after the last question about it and not the second, which is
     /// what makes the bound a range rather than a race with the sweep's timing.
     ///
-    /// Returns how many were let go, which is what a caller driving this on a timer
-    /// has to say about it.
+    /// Finished work is held to the same rule. What it came to is kept for whoever
+    /// asks, and a name nobody has asked about for a whole lease is forgotten rather
+    /// than held for the life of the run.
+    ///
+    /// Returns how many running pieces were let go, which is what a caller driving
+    /// this on a timer has to say about it.
     pub async fn sweep(&self) -> usize {
         let mut register = self.0.lock().await;
         let mut let_go = 0;
-        for entry in register.values_mut() {
-            if entry.lease != Lease::WhileAsked || entry.work.standing != Standing::Running {
-                continue;
+        register.held.retain(|_, entry| {
+            let untouched = entry.asked == entry.swept;
+            entry.swept = entry.asked;
+            if entry.work.standing != Standing::Running {
+                return !untouched;
             }
-            if entry.asked == entry.swept {
+            if entry.lease == Lease::WhileAsked && untouched {
                 ended(entry);
                 let_go += 1;
-            } else {
-                entry.swept = entry.asked;
             }
-        }
+            true
+        });
         let_go
     }
 
