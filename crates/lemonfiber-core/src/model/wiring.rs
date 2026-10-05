@@ -43,6 +43,13 @@ pub struct SubstitutionReport {
     /// answer, so the two are told apart here rather than by the caller remembering
     /// which flags it passed.
     pub applied: bool,
+    /// What this reading names itself, so a choice answering it can say which reading
+    /// it answered.
+    ///
+    /// Named part by part — the choice itself, what fills the capability now, what asks
+    /// for it, and what the change would leave unfilled — so a choice refused because the
+    /// wiring moved is told which of those moved.
+    pub agreement: String,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by

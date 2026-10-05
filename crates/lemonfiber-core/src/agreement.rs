@@ -26,7 +26,7 @@
 //! reaches a client as a regenerated diff and a refusal raised without [`moved`]
 //! would be answered as a failure of the machine.
 
-use crate::error::codes::{gone, migrate, repair, restore, space};
+use crate::error::codes::{gone, migrate, repair, restore, space, wire};
 use crate::error::{Amiss, Code, Problem};
 
 /// Every code an answer is refused with for naming an offer or a listing that has
@@ -36,12 +36,13 @@ use crate::error::{Amiss, Code, Problem};
 /// an operator searching for the code reads what else that command refuses. Letting a
 /// download go raises the disk account's, because its offer is one line of that
 /// account.
-pub const MOVED: [Code; 5] = [
+pub const MOVED: [Code; 6] = [
     repair::STALE,
     restore::MOVED_ON,
     migrate::OFFER_MOVED,
     space::ANOTHER_OFFER,
     gone::ANOTHER_READING,
+    wire::WIRING_MOVED,
 ];
 
 /// Where the fault lies in an answer that named what has since moved.
@@ -75,6 +76,45 @@ pub fn over(words: &[&str]) -> String {
         hasher.update(&[0]);
     }
     format!("{:08x}", hasher.finalize())
+}
+
+/// What joins the parts of an offer that names each part it was built from.
+const BETWEEN: char = '-';
+
+/// An offer named part by part, so a refusal can say which part moved.
+///
+/// Each part is the words of one thing an operator read — what a change would write,
+/// what it would leave without — named over [`over`] and joined in the order given.
+/// One name over everything says only *something changed*, and an operator told that
+/// has to read the whole offer again to find what; this says what.
+#[must_use]
+pub fn parted(parts: &[&[&str]]) -> String {
+    parts
+        .iter()
+        .map(|words| over(words))
+        .collect::<Vec<String>>()
+        .join(&BETWEEN.to_string())
+}
+
+/// Which parts of an offer differ between the one answered and the one standing,
+/// named by `names`, in the order the parts were built.
+///
+/// An answer with a different number of parts, or none at all, differs in every
+/// part: it was not built from this offer, and naming only some parts would claim a
+/// comparison that was never made.
+#[must_use]
+pub fn differs<'a>(answered: &str, standing: &str, names: &[&'a str]) -> Vec<&'a str> {
+    let given: Vec<&str> = answered.split(BETWEEN).collect();
+    let stands: Vec<&str> = standing.split(BETWEEN).collect();
+    if given.len() != stands.len() || given.len() != names.len() {
+        return names.to_vec();
+    }
+    names
+        .iter()
+        .zip(given.iter().zip(&stands))
+        .filter(|(_, (was, is))| was != is)
+        .map(|(name, _)| *name)
+        .collect()
 }
 
 #[cfg(test)]

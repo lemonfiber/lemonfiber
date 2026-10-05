@@ -46,7 +46,7 @@ Choose which service fills a capability, so everything that asked reaches it.
 
 Substituting is this and nothing else. A link asks for a capability, and which service answers is a setting — so it is recorded, it shows in the history, and `undo` puts it back.
 
-What the change would leave with nothing filling it is said before it is made. Run it with `--dry-run` to see that and write nothing.
+Named on its own it says what the change would come to — what fills the capability now, what asks for it, and what it would leave with nothing filling it — changes nothing, and prints a name for that offer; answering with that name is the yes. The wiring is read again first, and an answer given for a different reading is refused, naming what moved.
 
 Usage: lemonfiber wiring fill [OPTIONS] <CAPABILITY> <SERVICE>
 
@@ -61,8 +61,14 @@ Options:
       --json
           Print machine-readable output
 
+      --reason <TEXT>
+          Why you chose it, recorded with the choice and read back beside it
+
       --dry-run
           Say what would happen, and change nothing
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
 
       --force
           Take the stack from a run that claimed it and did not give it back

@@ -1,4 +1,4 @@
-use super::over;
+use super::{differs, over, parted};
 
 /// The same words read twice name the same thing, and eight characters of it.
 #[test]
@@ -55,4 +55,38 @@ fn a_moved_offer_lies_in_how_it_was_asked() {
     ));
     assert_eq!(raised.amiss, Amiss::Asking);
     assert_eq!(super::MOVED_AMISS, Amiss::Asking);
+}
+
+/// Each part is named on its own, so the same parts read twice name the same offer.
+#[test]
+fn an_offer_in_parts_names_each_part() {
+    let offer = parted(&[&["was nzbget"], &["sonarr", "radarr"]]);
+    assert_eq!(offer, parted(&[&["was nzbget"], &["sonarr", "radarr"]]));
+    assert_eq!(
+        offer,
+        format!("{}-{}", over(&["was nzbget"]), over(&["sonarr", "radarr"]))
+    );
+}
+
+/// What moved is named, and only what moved.
+#[test]
+fn a_part_that_moved_is_the_one_named() {
+    let names = ["what fills it now", "what asks for it"];
+    let answered = parted(&[&["was nzbget"], &["sonarr"]]);
+    let standing = parted(&[&["was nzbget"], &["sonarr", "radarr"]]);
+    assert_eq!(
+        differs(&answered, &standing, &names),
+        vec!["what asks for it"]
+    );
+    assert!(differs(&standing, &standing, &names).is_empty());
+}
+
+/// An answer not built from this offer at all differs in every part, rather than in
+/// whichever parts happened to line up.
+#[test]
+fn an_answer_of_another_shape_differs_in_every_part() {
+    let names = ["one", "two"];
+    let standing = parted(&[&["a"], &["b"]]);
+    assert_eq!(differs("0badc0de", &standing, &names), vec!["one", "two"]);
+    assert_eq!(differs("", &standing, &names), vec!["one", "two"]);
 }

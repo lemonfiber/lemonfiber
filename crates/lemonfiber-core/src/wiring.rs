@@ -23,12 +23,17 @@ use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
 use crate::error::codes::plugin::UNRECORDED;
+use crate::error::codes::wire::{
+    CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
+};
 use crate::error::{Amiss, Code};
 
+mod chosen;
 mod fillers;
 pub(crate) mod run;
 mod settling;
 
+pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{Address, Ask, Filler, Fillers};
 use settling::claimants;
 pub use settling::{contested_by, filled, settle, unfilled};
@@ -49,6 +54,20 @@ pub const UNREAD: [&[Code]; 2] = [&crate::stack::FAILURES, &[UNRECORDED]];
 /// answered once the file is put right.
 pub const UNREAD_AMISS: Amiss = Amiss::Answering;
 
+/// Every code a choice of what fills a capability is refused with, apart from the one
+/// an answer to a moved reading is, and where the fault lies in each.
+///
+/// Listed so a client can name each one and read its status before it meets it: a
+/// service this stack does not have is absent, a choice that would mean nothing is
+/// asked wrongly, and nowhere to record it is the machine.
+pub const REFUSED: [(Code, Amiss); 5] = [
+    (NO_SUCH_FILLER, Amiss::Naming),
+    (CANNOT_FILL, Amiss::Asking),
+    (NOTHING_ASKS, Amiss::Asking),
+    (CHOICE_UNWRITABLE, Amiss::Answering),
+    (UNREASONABLE, Amiss::Asking),
+];
+
 /// The setting holding which service the operator chose to fill a capability.
 ///
 /// One setting rather than one per capability, because the set of capabilities is a
@@ -56,6 +75,10 @@ pub const UNREAD_AMISS: Amiss = Amiss::Answering;
 /// a key per capability would be a second enumeration to keep in step, and the one
 /// thing certain about the first is that it will gain entries.
 pub(crate) const FILLS_KEY: &str = "LEMONFIBER_FILLS";
+
+/// The setting holding what the operator said about each choice, where they said
+/// anything.
+pub(crate) const FILLS_WHY_KEY: &str = "LEMONFIBER_FILLS_WHY";
 
 /// Who settled a contest between claimants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -172,73 +195,6 @@ impl std::fmt::Display for Unfilled {
     }
 }
 
-/// Which service the operator chose to fill each capability.
-///
-/// Read from one setting and written back to it. A capability with no entry is
-/// settled by the stack, which is where a default belongs: the operator's record
-/// holds what they decided, not a copy of what they left alone.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Chosen(BTreeMap<String, String>);
-
-impl Chosen {
-    /// The choices a recorded setting holds.
-    ///
-    /// Anything unreadable in it is dropped rather than failing the read. This value
-    /// reaches a listing and a seed as much as it reaches the command that writes it,
-    /// and a single malformed pair that stopped a stack from being described would
-    /// cost more than the pair is worth.
-    #[must_use]
-    pub fn read(setting: Option<&str>) -> Self {
-        Self(
-            setting
-                .unwrap_or_default()
-                .split(',')
-                .filter_map(|pair| pair.split_once('='))
-                .map(|(capability, service)| {
-                    (capability.trim().to_owned(), service.trim().to_owned())
-                })
-                .filter(|(capability, service)| !capability.is_empty() && !service.is_empty())
-                .collect(),
-        )
-    }
-
-    /// Every choice recorded, as the capability and the service chosen for it.
-    pub fn choices(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.0
-            .iter()
-            .map(|(capability, service)| (capability.as_str(), service.as_str()))
-    }
-
-    /// Who the operator chose to fill this capability, where they chose.
-    #[must_use]
-    pub fn filler(&self, capability: &str) -> Option<&str> {
-        self.0.get(capability).map(String::as_str)
-    }
-
-    /// The setting this becomes with one more choice recorded in it.
-    #[must_use]
-    pub fn with(&self, capability: &str, service: &str) -> String {
-        let mut held = self.0.clone();
-        held.insert(capability.to_owned(), service.to_owned());
-        held.iter()
-            .map(|(capability, service)| format!("{capability}={service}"))
-            .collect::<Vec<String>>()
-            .join(",")
-    }
-
-    /// What the setting says as it stands, or nothing where it says nothing.
-    #[must_use]
-    pub fn setting(&self) -> Option<String> {
-        (!self.0.is_empty()).then(|| {
-            self.0
-                .iter()
-                .map(|(capability, service)| format!("{capability}={service}"))
-                .collect::<Vec<String>>()
-                .join(",")
-        })
-    }
-}
-
 /// Why a substitution cannot be made.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Refused {
@@ -287,6 +243,11 @@ pub struct Substitution {
     pub leaves_unfilled: Vec<Unfilled>,
     /// The setting the change writes.
     pub setting: String,
+    /// What the operator said about the choice, where they said anything.
+    ///
+    /// Read back as the choice's own `why` wherever the choice is read, and absent
+    /// where nothing was said: nothing supplies a reason on the operator's behalf.
+    pub why: Option<String>,
 }
 
 /// What substituting one service for another would come to, changing nothing.
@@ -366,7 +327,33 @@ pub fn substitute(
             .filter(|one| !standing.contains(&(one.by.clone(), one.capability.clone())))
             .collect(),
         setting,
+        why: None,
     })
+}
+
+/// The journal entry the reasons beside a substitution are recorded as.
+///
+/// Beside the entry for the choice, under the same operation and stamp, so the two
+/// are one change in the history and go back together: a choice put back with the
+/// reason for the newer one still beside it would read as the operator's words about
+/// something they did not choose.
+#[must_use]
+pub fn recorded_why(
+    substitution: &Substitution,
+    previous: Option<&str>,
+    current: Option<&str>,
+    at: &str,
+) -> crate::journal::Change {
+    crate::journal::Change {
+        at: at.to_owned(),
+        operation: OPERATION.to_owned(),
+        target: substitution.capability.clone(),
+        kind: crate::journal::Kind::Set {
+            key: FILLS_WHY_KEY.to_owned(),
+            previous: previous.map(str::to_owned),
+            current: current.unwrap_or_default().to_owned(),
+        },
+    }
 }
 
 /// Whether this link is an ask for that capability.

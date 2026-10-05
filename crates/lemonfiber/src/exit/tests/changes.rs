@@ -554,7 +554,9 @@ fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out()
                 asked_by: vec!["bindery".to_owned()],
                 leaves_unfilled: Vec::new(),
                 setting: "indexer.search=nzbhydra2".to_owned(),
+                why: None,
             },
+            agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned(),
             applied,
         })
     };

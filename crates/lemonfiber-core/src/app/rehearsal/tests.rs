@@ -576,6 +576,8 @@ fn every_command_that_carries_both_is_split_on_which_it_is() {
             Command::Wiring(Linking::Fill(Filling {
                 capability: "indexer.search".to_owned(),
                 service: "nzbhydra2".to_owned(),
+                reason: None,
+                agreement: None,
             })),
             Rehearsal::Reports,
         ),

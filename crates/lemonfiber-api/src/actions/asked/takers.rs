@@ -160,12 +160,13 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 /// that acts builds that name again and compares.
 ///
 /// On a repair, a restore and a removal it sits beside a `confirm` that can stand in
-/// for it where nothing needs naming. On letting a download go, on reclaiming room and
-/// on replacing a setup there is no `confirm` at all — see [`TAKES_AGREEMENT`], which
-/// leaves all three out — so the name of the offer is the only way to say yes. That is
-/// the point of it there: a blanket yes to a removal would be agreement from somebody
-/// who had not read what would go, and one to a replacement from somebody who had not
-/// read what would stop.
+/// for it where nothing needs naming. On letting a download go, on reclaiming room, on
+/// replacing a setup and on choosing what fills a capability there is no `confirm` at
+/// all — see [`TAKES_AGREEMENT`], which leaves all four out — so the name of the offer
+/// is the only way to say yes. That is the point of it there: a blanket yes to a
+/// removal would be agreement from somebody who had not read what would go, one to a
+/// replacement from somebody who had not read what would stop, and one to a choice from
+/// somebody who had not read what it would leave unfilled.
 ///
 /// Everywhere else the reply is the answer.
 pub const TAKES_CONSENT: &[&str] = &[
@@ -175,6 +176,7 @@ pub const TAKES_CONSENT: &[&str] = &[
     "space",
     "stop-seeding",
     "uninstall",
+    "wiring-fill",
 ];
 
 /// The action whose command carries which completed download it is about.
@@ -296,12 +298,13 @@ pub const TAKES_TIER: &[&str] = &["uninstall"];
 
 /// The actions whose command carries the one service it was given.
 ///
-/// Two, and each takes one name rather than a list because what it decides is one
-/// thing: the scope recorded in an archive is one scope, and an update narrowed to a
-/// service is narrowed to a service. Apart from [`TAKES_SERVICES`] for the same
-/// reason the command line spells them differently: those narrow what a lifecycle
-/// command touches, and neither of these is a lifecycle command.
-pub const TAKES_SERVICE: &[&str] = &["backup", "update"];
+/// Three, and each takes one name rather than a list because what it decides is one
+/// thing: the scope recorded in an archive is one scope, an update narrowed to a
+/// service is narrowed to a service, and a capability is filled by one service. Apart
+/// from [`TAKES_SERVICES`] for the same reason the command line spells them
+/// differently: those narrow what a lifecycle command touches, and none of these is a
+/// lifecycle command.
+pub const TAKES_SERVICE: &[&str] = &["backup", "update", "wiring-fill"];
 
 /// The action whose command carries the run it was given.
 ///
@@ -383,13 +386,22 @@ pub const TAKES_POLICY: &[&str] = &["household-allow"];
 /// something.
 pub const TAKES_REQUEST: &[&str] = &["household-approve", "household-decline"];
 
-/// The action whose command carries why a request was turned down.
+/// The actions whose command carries a reason: why a request was turned down, and why
+/// a service was chosen to fill a capability.
 ///
-/// **One, and it is not the pair.** An approval owes the person who asked the thing
-/// they asked for; a refusal owes them a sentence. So a reason named to an approval is
-/// refused by name here rather than accepted and dropped — and the core carries it
-/// inside the variant that needs it, so a refusal cannot be built without one at all.
-pub const TAKES_REASON: &[&str] = &["household-decline"];
+/// **A decline and not the approval beside it.** An approval owes the person who asked
+/// the thing they asked for; a refusal owes them a sentence. So a reason named to an
+/// approval is refused by name here rather than accepted and dropped — and the core
+/// carries it inside the variant that needs it, so a refusal cannot be built without
+/// one at all. A choice's reason is the operator's own and optional, recorded with the
+/// choice and read back beside it.
+pub const TAKES_REASON: &[&str] = &["household-decline", "wiring-fill"];
+
+/// The action whose command carries which capability it is about.
+///
+/// Choosing what fills one, and nothing else: a capability is what a link asks for,
+/// and that is the one subject of a choice.
+pub const TAKES_CAPABILITY: &[&str] = &["wiring-fill"];
 
 /// The action whose command carries what the person being invited may watch.
 ///
@@ -467,7 +479,7 @@ pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub(crate) fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 43] = [
+    let carried: [(&str, bool, &[&str]); 44] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -510,6 +522,7 @@ pub(crate) fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Opt
         ("days", given.days.is_some(), TAKES_POLICY),
         ("request", given.request.is_some(), TAKES_REQUEST),
         ("reason", given.reason.is_some(), TAKES_REASON),
+        ("capability", given.capability.is_some(), TAKES_CAPABILITY),
         ("tier", given.tier.is_some(), TAKES_TIER),
         ("kept", given.kept.is_some(), TAKES_KEPT),
         ("down", given.down.is_some(), TAKES_SHARING),

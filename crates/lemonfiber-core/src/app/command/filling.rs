@@ -26,4 +26,12 @@ pub struct Filling {
     pub capability: String,
     /// The service to fill it.
     pub service: String,
+    /// What the operator says about the choice, where they say anything.
+    pub reason: Option<String>,
+    /// The offer being answered, as the reading of this choice named it.
+    ///
+    /// Nothing is the reading itself: what the choice would come to, with the name it
+    /// goes by, and nothing written. There is no bare yes, so the only way to the
+    /// change is through a run that said what it would cost.
+    pub agreement: Option<String>,
 }

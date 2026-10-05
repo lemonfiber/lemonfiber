@@ -91,7 +91,13 @@ fn asked(
     // decision they were never offered.
     let picked = chosen
         .filler(capability)
-        .map(|service| (service, Whose::Operator, None))
+        .map(|service| {
+            (
+                service,
+                Whose::Operator,
+                chosen.why(capability).map(str::to_owned),
+            )
+        })
         .or_else(|| {
             wiring
                 .filled_by

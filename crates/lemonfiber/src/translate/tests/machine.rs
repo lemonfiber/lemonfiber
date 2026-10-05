@@ -303,10 +303,14 @@ fn asking_what_is_wired_reads_and_the_verb_under_it_writes() {
         super::super::wiring(Some(lemonfiber::cli::WiringCommand::Fill {
             capability: "indexer.search".to_owned(),
             service: "nzbhydra2".to_owned(),
+            reason: Some("it searches more".to_owned()),
+            offer: Some("1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned()),
         })),
         Command::Wiring(Linking::Fill(Filling {
             capability: "indexer.search".to_owned(),
             service: "nzbhydra2".to_owned(),
+            reason: Some("it searches more".to_owned()),
+            agreement: Some("1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned()),
         }))
     );
 }

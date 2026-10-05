@@ -9,6 +9,7 @@ mod door;
 mod idle;
 mod nothing_is_carried_through;
 mod reading;
+mod what_a_choice_of_filler_means;
 mod what_a_disturbing_diagnosis_means;
 mod what_a_follow_says;
 mod what_a_listener_hears;

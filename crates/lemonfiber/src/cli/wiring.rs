@@ -16,12 +16,21 @@ pub enum WiringCommand {
     /// which service answers is a setting — so it is recorded, it shows in the
     /// history, and `undo` puts it back.
     ///
-    /// What the change would leave with nothing filling it is said before it is
-    /// made. Run it with `--dry-run` to see that and write nothing.
+    /// Named on its own it says what the change would come to — what fills the
+    /// capability now, what asks for it, and what it would leave with nothing
+    /// filling it — changes nothing, and prints a name for that offer; answering with
+    /// that name is the yes. The wiring is read again first, and an answer given for
+    /// a different reading is refused, naming what moved.
     Fill {
         /// The capability whose filler changes, such as `identity.source`.
         capability: String,
         /// The service to fill it.
         service: String,
+        /// Why you chose it, recorded with the choice and read back beside it.
+        #[arg(long, value_name = "TEXT")]
+        reason: Option<String>,
+        /// The offer being answered, as the run that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
 }
