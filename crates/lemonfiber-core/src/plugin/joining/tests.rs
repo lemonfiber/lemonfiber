@@ -149,14 +149,18 @@ fn the_record_carries_what_each_service_joins_into_its_container() {
 
 /// A plugin's service named as one of the stack's is not settled by what the stack's
 /// own service of that name fills: it joins only through a capability it declares and
-/// is settled for in its own right, so a name never stands in for a role.
+/// is settled for in its own right, so a name never stands in for a role — and one that
+/// does declare the capability is still taken as the stack's under the name they share.
 #[test]
 fn a_plugin_service_named_as_a_stack_service_settles_for_nothing_by_the_name() {
     let mut named = placed(ApiKind::Servarr, &[], &["tv"]);
     named.service = "sonarr".to_owned();
     let mut server = placed(ApiKind::Jellyfin, &["media.serve"], &[]);
     server.service = "jellyfin".to_owned();
+    let mut claiming = placed(ApiKind::Servarr, &["library.curate"], &["tv"]);
+    claiming.service = "sonarr".to_owned();
 
     assert!(joined(&named).is_empty(), "{:?}", joined(&named));
     assert!(joined(&server).is_empty(), "{:?}", joined(&server));
+    assert!(joined(&claiming).is_empty(), "{:?}", joined(&claiming));
 }

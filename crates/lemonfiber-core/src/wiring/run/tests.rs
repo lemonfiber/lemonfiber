@@ -531,6 +531,38 @@ fn a_choice_that_moves_no_networks_writes_over_nothing() {
         .all(|change| !matches!(change.kind, crate::journal::Kind::Rewritten { .. })));
 }
 
+/// With no stack directory there is no plugin document to write over, so a choice that
+/// moves a plugin's networks writes over nothing but the record of what is installed.
+#[test]
+fn without_a_stack_directory_no_plugin_document_is_written_over() {
+    let (mut ctx, at) = ctx("rejoined-nowhere");
+    let document = a_plugin_media_server(&ctx, &at);
+    ctx.settings.stack_dir = None;
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let read = crate::app::plugins::read(&ctx).ok();
+
+    let overwrites = manifest
+        .as_ref()
+        .zip(read.as_ref())
+        .map(|(manifest, register)| {
+            crate::app::plugins::writing::rejoined(
+                &ctx,
+                manifest,
+                register,
+                &crate::wiring::Chosen::read(Some("identity.source=server")),
+            )
+        })
+        .unwrap_or_default();
+
+    assert!(
+        overwrites
+            .iter()
+            .all(|overwrite| overwrite.path != document),
+        "{:?}",
+        overwrites.iter().map(|one| &one.path).collect::<Vec<_>>()
+    );
+}
+
 /// What is installed changing between the moment a choice reads it and the moment it
 /// writes is refused, with nothing written: a document or a record written from what was
 /// read would put back a plugin that has since gone, or drop one installed since.

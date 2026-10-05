@@ -102,6 +102,34 @@ fn undoing_a_version_move_asks_for_the_previous_pin() {
     );
 }
 
+/// A file written over is put back as it was, and only while it still holds what was
+/// written in its place.
+#[test]
+fn undoing_a_rewritten_file_puts_back_what_it_held() {
+    let rewritten = Change {
+        at: "t".to_owned(),
+        operation: "wiring".to_owned(),
+        target: "/srv/stack/compose/plugins/server.yml".to_owned(),
+        kind: Kind::Rewritten {
+            path: "/srv/stack/compose/plugins/server.yml".to_owned(),
+            previous: "services: {}\n".to_owned(),
+            written: 7,
+        },
+    };
+
+    assert_eq!(
+        rewritten.undo(),
+        Undo {
+            target: "/srv/stack/compose/plugins/server.yml".to_owned(),
+            action: Action::Rewind {
+                path: "/srv/stack/compose/plugins/server.yml".to_owned(),
+                previous: "services: {}\n".to_owned(),
+                written: 7,
+            },
+        },
+    );
+}
+
 #[test]
 fn undoing_a_made_path_removes_exactly_it() {
     assert_eq!(

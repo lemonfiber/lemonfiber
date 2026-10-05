@@ -11019,6 +11019,36 @@
               ]
             },
             {
+              "description": "Write a file back to what it held before lemonfiber wrote over it.\n\nOnly where it still holds what was written. One written since is somebody\nelse's work now, and is left exactly as it is.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "rewind"
+                },
+                "path": {
+                  "description": "The file to write back.",
+                  "type": "string"
+                },
+                "previous": {
+                  "description": "What to write back into it.",
+                  "type": "string"
+                },
+                "written": {
+                  "description": "The checksum of what lemonfiber wrote, which has to still be what is there\nfor writing the old text back to be undoing lemonfiber's own work.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "does",
+                "path",
+                "previous",
+                "written"
+              ]
+            },
+            {
               "description": "Pin a service back to the version it was standing on.\n\nThe one reversal nothing in this product carries out. Which version runs is\ndecided by the materialised stack and by what Compose was told to start, and\na reversal of settings and files reaches neither — so this is worked out,\nreported, and left for the operator rather than attempted.",
               "type": "object",
               "properties": {
@@ -18113,6 +18143,36 @@
                 "path",
                 "key",
                 "owner",
+                "written"
+              ]
+            },
+            {
+              "description": "Write a file back to what it held before lemonfiber wrote over it.\n\nOnly where it still holds what was written. One written since is somebody\nelse's work now, and is left exactly as it is.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "rewind"
+                },
+                "path": {
+                  "description": "The file to write back.",
+                  "type": "string"
+                },
+                "previous": {
+                  "description": "What to write back into it.",
+                  "type": "string"
+                },
+                "written": {
+                  "description": "The checksum of what lemonfiber wrote, which has to still be what is there\nfor writing the old text back to be undoing lemonfiber's own work.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "does",
+                "path",
+                "previous",
                 "written"
               ]
             },
