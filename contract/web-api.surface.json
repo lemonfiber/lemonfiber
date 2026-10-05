@@ -5276,6 +5276,12 @@
           ],
           "required": false
         },
+        "media_types": {
+          "type": [
+            "array[string]"
+          ],
+          "required": false
+        },
         "name": {
           "type": [
             "string"

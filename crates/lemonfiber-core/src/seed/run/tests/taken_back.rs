@@ -257,9 +257,14 @@ async fn taken(
     project: &std::path::Path,
     mut baseline: Baseline,
 ) -> (Option<State>, Baseline) {
-    let wiring =
-        super::super::taken_back::seed_taken_back(ctx, services, Some(project), &mut baseline)
-            .await;
+    let wiring = super::super::taken_back::seed_taken_back(
+        ctx,
+        services,
+        &fillers_at(services.to_vec(), project),
+        Some(project),
+        &mut baseline,
+    )
+    .await;
     (
         wiring.map(|one| {
             assert_eq!(one.connection, HELD);
@@ -274,13 +279,27 @@ async fn a_key_held_at_the_arrs_own_address_is_owed_and_one_at_the_gate_is_not()
     let direct = household(&sonarr_direct(), 200, &keys(false), 204, 201);
     let (ctx, project) = taking("noted", &direct, false);
     let mut noted = Baseline::new();
-    super::super::taken_back::note_held(&ctx, &gated(), Some(&project), &mut noted).await;
+    super::super::taken_back::note_held(
+        &ctx,
+        &gated(),
+        &fillers_at(gated(), &project),
+        Some(&project),
+        &mut noted,
+    )
+    .await;
     assert_eq!(noted.expected("seerr", OWED_SONARR), Some("owed"));
 
     let through = household(&sonarr_gated(), 200, &keys(false), 204, 201);
     let (ctx, project) = taking("not-noted", &through, false);
     let mut clean = Baseline::new();
-    super::super::taken_back::note_held(&ctx, &gated(), Some(&project), &mut clean).await;
+    super::super::taken_back::note_held(
+        &ctx,
+        &gated(),
+        &fillers_at(gated(), &project),
+        Some(&project),
+        &mut clean,
+    )
+    .await;
     assert!(clean.is_empty());
 
     // A stack without the gate owes nothing: the request service is meant to hold it.
@@ -289,7 +308,14 @@ async fn a_key_held_at_the_arrs_own_address_is_owed_and_one_at_the_gate_is_not()
         .filter(|service| service.id != "request-gate")
         .collect();
     let mut none = Baseline::new();
-    super::super::taken_back::note_held(&ctx, &ungated, Some(&project), &mut none).await;
+    super::super::taken_back::note_held(
+        &ctx,
+        &ungated,
+        &fillers_at(ungated.clone(), &project),
+        Some(&project),
+        &mut none,
+    )
+    .await;
     assert!(none.is_empty());
 }
 
@@ -298,7 +324,14 @@ async fn a_request_service_that_will_not_say_what_it_holds_owes_nothing_yet() {
     let silent = Fake::by_route(Vec::new());
     let (ctx, project) = taking("unsaid", &silent, false);
     let mut noted = Baseline::new();
-    super::super::taken_back::note_held(&ctx, &gated(), Some(&project), &mut noted).await;
+    super::super::taken_back::note_held(
+        &ctx,
+        &gated(),
+        &fillers_at(gated(), &project),
+        Some(&project),
+        &mut noted,
+    )
+    .await;
     assert!(noted.is_empty());
 }
 

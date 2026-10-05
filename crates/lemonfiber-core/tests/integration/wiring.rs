@@ -43,6 +43,7 @@ fn sonarr() -> Target {
         base: "http://127.0.0.1:8989".to_owned(),
         config: config(),
         version: 3,
+        confined_to: None,
     }
 }
 

@@ -210,6 +210,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             description: "Reads comics".to_owned(),
             api: None,
             listens: None,
+            media_types: Vec::new(),
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

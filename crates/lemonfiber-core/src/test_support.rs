@@ -103,6 +103,7 @@ pub(crate) fn a_placed(
         description: "Stands in for a bundled service".to_owned(),
         api,
         listens,
+        media_types: Vec::new(),
     }
 }
 

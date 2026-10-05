@@ -130,7 +130,13 @@ async fn seeded(
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
     let mut ctx = seed_ctx(None, true, Vec::new(), bytes, None).with_http(http.clone());
     ctx.dry_run = rehearsing;
-    super::super::seed_fulfilment_targets(&ctx, services, Some(project)).await
+    super::super::seed_fulfilment_targets(
+        &ctx,
+        services,
+        &fillers_at(services.to_vec(), project),
+        Some(project),
+    )
+    .await
 }
 
 /// The body of the one call made with `method`.
@@ -346,7 +352,13 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
             (tokens_file(&at), &both),
         ]));
 
-    let wirings = super::super::seed_fulfilment_targets(&ctx, &stack(true), Some(&at)).await;
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &stack(true),
+        &fillers_at(stack(true), &at),
+        Some(&at),
+    )
+    .await;
 
     assert_eq!(
         wirings

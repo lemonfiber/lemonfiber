@@ -34,6 +34,7 @@ fn sonarr() -> Target {
         base: "http://127.0.0.1:8989".to_owned(),
         config: config_path(),
         version: 3,
+        confined_to: None,
     }
 }
 
@@ -284,6 +285,7 @@ async fn a_film_service_is_searched_by_its_own_id() {
         base: "http://127.0.0.1:7878".to_owned(),
         config: PathBuf::from("/stack/config/radarr/config.xml"),
         version: 3,
+        confined_to: None,
     };
     let fs = Files::at(vec![(
         PathBuf::from("/stack/config/radarr/config.xml"),

@@ -31,6 +31,7 @@ fn torrent_client() -> crate::wiring::Filler {
         published: Some(8081),
         key_file: None,
         confined_to: None,
+        media_types: Vec::new(),
     }
 }
 
@@ -232,7 +233,11 @@ async fn seed_skips_qbittorrent_when_no_password_is_announced() {
         !report.wirings.is_empty(),
         "the run produced wirings to judge, not an empty report from an error"
     );
-    let all_skipped = report.wirings.iter().all(is_skipped);
+    let all_skipped = report
+        .wirings
+        .iter()
+        .filter(|wiring| !matches!(wiring.state, crate::seed::State::Unmatched { .. }))
+        .all(is_skipped);
     assert!(
         all_skipped,
         "an unannounced password is skipped, not failed"
@@ -247,7 +252,11 @@ async fn seed_skips_qbittorrent_when_its_log_cannot_be_read() {
         !report.wirings.is_empty(),
         "the run produced wirings to judge, not an empty report from an error"
     );
-    let all_skipped = report.wirings.iter().all(is_skipped);
+    let all_skipped = report
+        .wirings
+        .iter()
+        .filter(|wiring| !matches!(wiring.state, crate::seed::State::Unmatched { .. }))
+        .all(is_skipped);
     assert!(all_skipped, "an unreadable log is skipped, not failed");
 }
 

@@ -49,6 +49,9 @@ pub struct Target {
     /// are v3, Lidarr and Prowlarr v1, so it travels with the target rather than
     /// being assumed.
     pub version: u32,
+    /// The directory the key file has to stay beneath, where a plugin's container owns
+    /// the directory it is in; nothing for the stack's own services.
+    pub confined_to: Option<PathBuf>,
 }
 
 impl Target {
@@ -74,8 +77,14 @@ impl Target {
     /// Apart from [`Self::open`] because the aggregator speaks a shape of its own: it
     /// writes its key exactly the way the others do, and only what is built from it
     /// differs.
+    ///
+    /// A plugin's is read only where it is a plain file beneath the directory its
+    /// container owns, which can hold a link put where the file is expected.
     pub(crate) async fn key(&self, fs: &dyn FileSystem) -> Option<String> {
-        let config = fs.read(&self.config).await?;
+        let config = match &self.confined_to {
+            Some(within) => fs.read_beneath(&self.config, within).await.text()?,
+            None => fs.read(&self.config).await?,
+        };
         api_key(&config)
     }
 }

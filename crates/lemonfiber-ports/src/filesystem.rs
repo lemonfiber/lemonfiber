@@ -392,6 +392,17 @@ pub enum Beneath {
     Escaped,
 }
 
+impl Beneath {
+    /// What was read, for a reader with nothing to say about why nothing was.
+    #[must_use]
+    pub fn text(self) -> Option<String> {
+        match self {
+            Self::Read(text) => Some(text),
+            Self::Absent | Self::Escaped => None,
+        }
+    }
+}
+
 /// The default claim: read, and write only where nothing was there to read.
 async fn claimed<F: FileSystem + ?Sized>(filesystem: &F, path: &Path, contents: &str) -> bool {
     if filesystem.read(path).await.is_some() {

@@ -354,7 +354,14 @@ async fn an_arr_token_is_replaced_once_the_request_service_proves_it() {
     );
     let line = named(&held(&ctx, &stack(true), Some(&at)).await, SONARR);
 
-    let rotation = super::super::rotating::rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let rotation = super::super::rotating::rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &crate::wiring::Fillers::default(),
+        Some(&at),
+    )
+    .await;
 
     assert!(
         matches!(rotation.settled, Settled::Replaced { .. }),

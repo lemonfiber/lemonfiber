@@ -54,7 +54,8 @@ use report::{observe_or_skip, observe_or_untold, record_outcome, unreached, unre
 pub use report::{Assessment, Report, Severity, State, Wiring};
 pub use roots::{contested_roots, wire_root_folders, Placing};
 pub(crate) use services::{
-    described_target, observed_telling, reached_at, said, wanted_telling, TELLING,
+    as_request_target, described_target, observed_telling, reached_at, said, wanted_telling,
+    TELLING,
 };
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_jellyfin_admin,

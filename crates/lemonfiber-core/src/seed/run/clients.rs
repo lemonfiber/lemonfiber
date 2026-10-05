@@ -10,10 +10,10 @@ use lemonfiber_manifest::ApiKind;
 
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::Credential;
-use crate::seed::{State, Wiring};
+use crate::seed::Wiring;
 use crate::wiring::Fillers;
 
-use super::connecting::{pairings, Connection};
+use super::connecting::{pairings, Connection, FILM, MUSIC, TELEVISION};
 
 use super::{read_temporary_password, Ctx};
 use crate::origin::Origin;
@@ -28,9 +28,9 @@ use crate::wiring::Filler;
 /// no known field, so it names none rather than guessing.
 pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Category> {
     let field = match media {
-        "tv" => "tvCategory",
-        "movies" => "movieCategory",
-        "music" => "musicCategory",
+        TELEVISION => "tvCategory",
+        FILM => "movieCategory",
+        MUSIC => "musicCategory",
         _ => return None,
     };
     Some(crate::ports::service::Category {
@@ -162,21 +162,15 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder,
 
 /// Every download client whose credential file was refused, said on the connection it
 /// would have made into each \*arr that asks for it.
-///
-/// Refused rather than skipped: no later run reads it while it stays what it is, and
-/// it is either a mistake in the plugin or an attempt by it, which the operator has to
-/// see either way.
 pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
     pairings(fillers)
         .iter()
         .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _))))
         .filter(|pairing| held.refused.contains(&Holder::of(pairing.filler)))
         .map(|pairing| {
-            Wiring::settled(
+            super::arrs::refused(
                 format!("{} into {}", pairing.filler.name, pairing.asker.name),
-                State::Refused {
-                    reason: crate::app::targets::escaped(pairing.filler),
-                },
+                pairing.filler,
             )
         })
         .collect()

@@ -16,8 +16,7 @@ use std::path::Path;
 
 use lemonfiber_manifest::Service;
 
-use super::arrs::{reached_at, servarr_arrs};
-use super::fulfilment::fetches;
+use super::fulfilment::fulfilling;
 use super::tokens::{through_the_gate, Kept};
 use super::Ctx;
 use crate::baseline::Baseline;
@@ -25,6 +24,7 @@ use crate::credential::{Reach, Settled};
 use crate::jellyfin::{Jellyfin, SEERR_APP};
 use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
+use crate::wiring::Fillers;
 
 /// What the report calls this connection.
 const CONNECTION: &str = "The credentials the request service held";
@@ -44,6 +44,7 @@ const OWED: &str = "owed";
 pub(super) async fn note_held(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &Fillers,
     project: Option<&Path>,
     baseline: &mut Baseline,
 ) {
@@ -54,19 +55,14 @@ pub(super) async fn note_held(
     let Ok(held) = seerr.fulfilment_targets().await else {
         return;
     };
-    for arr in servarr_arrs(services, project) {
-        let Some((_, (host, port))) =
-            fetches(&arr.media_types).zip(reached_at(services, &arr.target.id))
-        else {
-            continue;
-        };
+    for fulfils in fulfilling(fillers) {
         if held
             .iter()
-            .any(|one| one.at.host == host && one.at.port == port)
+            .any(|one| one.at.host == fulfils.at.host && one.at.port == fulfils.at.port)
         {
             baseline.record(
                 SEERR,
-                &format!("{HELD_KEY}{}", arr.target.id),
+                &format!("{HELD_KEY}{}", fulfils.filler.id),
                 OWED,
                 &ctx.stamp(),
             );
@@ -79,6 +75,7 @@ pub(super) async fn note_held(
 pub(super) async fn seed_taken_back(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &Fillers,
     project: Option<&Path>,
     baseline: &mut Baseline,
 ) -> Option<Wiring> {
@@ -102,7 +99,7 @@ pub(super) async fn seed_taken_back(
     }
     let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
     let route = jellyfin.as_ref().map(|(_, route)| route.as_str());
-    let direct = match still_direct(ctx, &seerr, services, project, route).await {
+    let direct = match still_direct(ctx, &seerr, fillers, project, route).await {
         Ok(direct) => direct,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
     };
@@ -117,7 +114,7 @@ pub(super) async fn seed_taken_back(
     }
     let mut unsettled = Vec::new();
     for arr in owed {
-        unsettled.extend(replaced(ctx, services, project, &arr, baseline).await);
+        unsettled.extend(replaced(ctx, services, fillers, project, &arr, baseline).await);
     }
     if let Some((client, _)) = &jellyfin {
         for key in &minted {
@@ -143,21 +140,19 @@ pub(super) async fn seed_taken_back(
 async fn replaced(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &Fillers,
     project: &Path,
     arr: &str,
     baseline: &mut Baseline,
 ) -> Vec<String> {
     let field = format!("{HELD_KEY}{arr}");
-    // An \*arr the stack no longer runs holds no key anybody can use.
-    let Some(target) = services
-        .iter()
-        .find(|service| service.id == arr)
-        .and_then(|service| crate::app::targets::target_for(service, project))
-    else {
+    // An \*arr that is no longer on this machine holds no key anybody can use.
+    let Some(target) = fillers.service(arr).and_then(crate::wiring::Filler::target) else {
         baseline.forget(SEERR, &field);
         return Vec::new();
     };
-    let rotation = crate::app::credentials::reset_arr(ctx, services, Some(project), target).await;
+    let rotation =
+        crate::app::credentials::reset_arr(ctx, services, fillers, Some(project), target).await;
     if matches!(rotation.settled, Settled::Replaced { .. }) {
         baseline.forget(SEERR, &field);
         return rotation
@@ -184,7 +179,7 @@ async fn replaced(
 async fn still_direct(
     ctx: &Ctx,
     seerr: &dyn Requests,
-    services: &[Service],
+    fillers: &Fillers,
     project: &Path,
     route: Option<&str>,
 ) -> Result<Vec<String>, crate::ports::service::Failure> {
@@ -197,14 +192,10 @@ async fn still_direct(
         }
     }
     let held = seerr.fulfilment_targets().await?;
-    for arr in servarr_arrs(services, Some(project)) {
-        let Some((television, (host, _))) =
-            fetches(&arr.media_types).zip(reached_at(services, &arr.target.id))
-        else {
-            continue;
-        };
-        if !gated_target(seerr, &held, &kept, &host, television).await {
-            direct.push(arr.target.name.clone());
+    for fulfils in fulfilling(fillers) {
+        let host = &fulfils.at.host;
+        if !gated_target(seerr, &held, &kept, host, fulfils.television).await {
+            direct.push(fulfils.filler.name.clone());
         }
     }
     Ok(direct)

@@ -1,5 +1,5 @@
 use super::{pairings, unmatched, Connection, Unmade};
-use crate::ports::service::ClientKind;
+use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
 use crate::seed::State;
 use crate::test_support::{a_placed, an_installed};
 use crate::wiring::{Chosen, Fillers};
@@ -58,13 +58,14 @@ fn reasons(fillers: &Fillers) -> Vec<String> {
 }
 
 /// Every download ask the shipped stack makes comes to a download client of the kind
-/// its filler speaks, and nothing in it is reported as reached by nothing.
+/// its filler speaks.
 #[test]
 fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
 
     let made: Vec<(String, Option<Connection>)> = pairings(&fillers)
         .iter()
+        .filter(|pairing| pairing.ask.capability.starts_with("download."))
         .map(|pairing| {
             (
                 pairing.filler.id.clone(),
@@ -77,7 +78,117 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
         "sabnzbd" => *connection == Some(Connection::DownloadClient(ClientKind::Sabnzbd)),
         _ => *connection == Some(Connection::DownloadClient(ClientKind::Qbittorrent)),
     }));
-    assert!(unmatched(&fillers).is_empty());
+}
+
+/// Every curator the shipped stack's curation asks reach comes to the connection its
+/// media makes it, and the ones nothing connects are said — the music and book curators
+/// to the two askers that deal in neither, and not the book curator to the indexer, which
+/// it reaches itself through what it asks for.
+#[test]
+fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
+    let fillers = shipped(&[], &Chosen::default(), |_| ());
+
+    let made: Vec<(String, String, Option<Connection>)> = pairings(&fillers)
+        .iter()
+        .filter(|pairing| pairing.ask.capability == "library.curate")
+        .filter_map(|pairing| {
+            let connection = pairing.made.ok().map(|(connection, _)| connection);
+            connection.is_some().then(|| {
+                (
+                    pairing.asker.id.clone(),
+                    pairing.filler.id.clone(),
+                    connection,
+                )
+            })
+        })
+        .collect();
+    let said: Vec<String> = unmatched(&fillers)
+        .into_iter()
+        .map(|wiring| wiring.connection)
+        .collect();
+
+    assert_eq!(
+        made,
+        vec![
+            (
+                "prowlarr".to_owned(),
+                "sonarr".to_owned(),
+                Some(Connection::Application(ApplicationKind::Sonarr))
+            ),
+            (
+                "prowlarr".to_owned(),
+                "radarr".to_owned(),
+                Some(Connection::Application(ApplicationKind::Radarr))
+            ),
+            (
+                "prowlarr".to_owned(),
+                "lidarr".to_owned(),
+                Some(Connection::Application(ApplicationKind::Lidarr))
+            ),
+            (
+                "seerr".to_owned(),
+                "sonarr".to_owned(),
+                Some(Connection::Fulfilment { television: true })
+            ),
+            (
+                "seerr".to_owned(),
+                "radarr".to_owned(),
+                Some(Connection::Fulfilment { television: false })
+            ),
+            (
+                "bazarr".to_owned(),
+                "sonarr".to_owned(),
+                Some(Connection::Subtitles(Subtitled::Sonarr))
+            ),
+            (
+                "bazarr".to_owned(),
+                "radarr".to_owned(),
+                Some(Connection::Subtitles(Subtitled::Radarr))
+            ),
+        ]
+    );
+    assert_eq!(
+        said,
+        vec![
+            "Lidarr into Seerr",
+            "Bindery into Seerr",
+            "Lidarr into Bazarr",
+            "Bindery into Bazarr",
+        ]
+    );
+}
+
+/// A curator filing media an asker deals in none of is said, naming the media, and one
+/// naming no media at all is said as that.
+#[test]
+fn a_curator_filing_media_nothing_hands_the_asker_is_said_naming_it() {
+    let fillers = shipped(&[], &Chosen::default(), |manifest| {
+        for service in &mut manifest.services {
+            if service.id == "radarr" {
+                service.media_types = Vec::new();
+            }
+        }
+    });
+
+    let seerrs: Vec<String> = unmatched(&fillers)
+        .into_iter()
+        .filter(|wiring| wiring.connection.ends_with("into Seerr"))
+        .filter_map(|wiring| match wiring.state {
+            State::Unmatched { reason } => Some(reason),
+            _ => None,
+        })
+        .collect();
+
+    assert!(seerrs.contains(
+        &"Radarr fills library.curate, which Seerr asks for, and names no media it files, so \
+          lemonfiber cannot say what to hand Seerr"
+            .to_owned()
+    ));
+    assert!(seerrs.contains(
+        &"Lidarr fills library.curate, which Seerr asks for, and files music, which lemonfiber \
+          does not hand Seerr"
+            .to_owned()
+    ));
 }
 
 /// A filler naming no adapter is reported, naming what fills, what asked and why.
@@ -90,6 +201,7 @@ fn a_filler_naming_no_adapter_is_reported_as_reached_by_nothing() {
         unmatched(&fillers)
             .iter()
             .map(|wiring| wiring.connection.as_str())
+            .filter(|connection| connection.starts_with("stand-in"))
             .collect::<Vec<&str>>(),
         vec![
             "stand-in the stand-in into Sonarr",
@@ -177,9 +289,29 @@ fn an_asker_withheld_or_an_ask_answered_elsewhere_is_not_paired() {
         .collect();
     assert!(paired.iter().all(|(by, _)| *by != "sonarr"), "{paired:?}");
     assert!(
-        paired
-            .iter()
-            .all(|(_, capability)| capability.starts_with("download.")),
+        paired.iter().all(|(_, capability)| {
+            capability.starts_with("download.") || *capability == "library.curate"
+        }),
         "{paired:?}"
     );
+}
+
+/// A curator the indexer has no application for is said once nothing connects the two,
+/// and not while the curator asks the indexer for its searches.
+#[test]
+fn a_curator_reaching_the_indexer_itself_is_not_said_to_be_reached_by_nothing() {
+    let connected = shipped(&[], &Chosen::default(), |_| ());
+    let apart = shipped(&[], &Chosen::default(), |manifest| {
+        manifest
+            .wirings
+            .retain(|wiring| wiring.asks.as_deref() != Some("indexer.search"));
+    });
+    let said = |fillers: &crate::wiring::Fillers| {
+        unmatched(fillers)
+            .into_iter()
+            .any(|wiring| wiring.connection == "Bindery into Prowlarr")
+    };
+
+    assert!(!said(&connected));
+    assert!(said(&apart));
 }

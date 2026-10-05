@@ -42,6 +42,7 @@ async fn the_registration_carries_the_request_services_own_key() {
     let _ = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv"), seerr_with_settings()],
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_with_settings()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -107,6 +108,7 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -145,6 +147,7 @@ async fn a_stack_with_no_request_service_is_handed_nothing() {
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv")],
+        &fillers_of(vec![arr("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -178,6 +181,7 @@ async fn an_arr_that_will_not_say_where_it_files_is_left_out() {
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -199,7 +203,8 @@ async fn an_arr_publishing_no_port_is_left_out() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[portless, seerr_svc()],
+        &[portless.clone(), seerr_svc()],
+        &fillers_of(vec![portless, seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -215,6 +220,7 @@ async fn nothing_is_handed_over_where_there_is_no_request_service() {
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv")],
+        &fillers_of(vec![arr("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -236,6 +242,7 @@ async fn an_arr_that_cannot_be_read_is_not_handed_over_half_configured() {
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &[arr("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -243,5 +250,30 @@ async fn an_arr_that_cannot_be_read_is_not_handed_over_half_configured() {
     assert!(
         wirings.is_empty(),
         "an *arr nothing could be read from was handed over anyway: {wirings:?}"
+    );
+}
+
+/// A curator whose credential file leads away is refused as a request target rather
+/// than left out, so the operator sees why the request service was not handed it.
+#[tokio::test]
+async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(Fake::silent())
+        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+    let services = vec![seerr_svc()];
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &services,
+        &beside_a_stand_in(services.clone(), "movies"),
+        Some(stack_root()),
+    )
+    .await;
+
+    assert!(
+        matches!(wirings.as_slice(), [wiring]
+            if wiring.connection == crate::seed::as_request_target("kept the stand-in")
+                && matches!(wiring.state, crate::seed::State::Refused { .. })),
+        "{wirings:?}"
     );
 }

@@ -4,7 +4,7 @@
 //! reads and writes. The orchestration lives here so [`crate::app::dispatch`] stays a
 //! table of one-line calls rather than carrying the whole graph.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::app::targets::{project_directory, target_for};
 use crate::app::Ctx;
@@ -36,12 +36,12 @@ mod taken_back;
 mod linking;
 // The request gate's tokens, one per route, held raw by the request service alone.
 pub(crate) mod tokens;
-use fulfilment::seed_fulfilment_targets;
+use fulfilment::{fulfilling, seed_fulfilment_targets};
 pub(crate) mod identity;
 mod reset;
 
 use applications::{seed_applications, skipped};
-use arrs::{read_servarr_key, seed_arr, wanted_clients, ArrSeeding};
+use arrs::{seed_arr, wanted_clients, ArrSeeding};
 use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FIELD};
 // Reached by reconfiguration as well as by seeding: what the \*arrs that file media
 // are, and the record of what lemonfiber last wrote. One answer to each, rather than a
@@ -109,16 +109,12 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     wirings.extend(withheld(&mut manifest.services, &ctx.settings.unmanaged));
 
-    // What each of the stack's asks comes to, settled once for the whole pass. The
-    // connections below reach *whatever fills* what they ask for rather than a
-    // service this crate names, which is what makes something standing in for a
-    // bundled service a change to the manifest and the setting rather than a change
-    // here. Settled after withholding, because a service the operator manages
-    // themselves is not one this pass wires to.
-    // What is installed is read here too, because a plugin's service that claims what
-    // the stack asks for is a candidate like any other — and a record that is there and
-    // will not read refuses the seed rather than letting it wire past a contest nobody
-    // could see.
+    // What each of the stack's asks comes to, settled once for the whole pass and after
+    // withholding. The connections below reach *whatever fills* what they ask for, a
+    // plugin's service on the same terms as the stack's, which is what makes standing
+    // in for a bundled service a change to the manifest and the setting rather than a
+    // change here — and a record of what is installed that will not read refuses the
+    // seed rather than letting it wire past a contest nobody could see.
     let register = crate::app::plugins::read(ctx)?;
     let (installed, kept_back) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
     wirings.extend(kept_back);
@@ -169,12 +165,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // is `adopt`, which takes current state on as the new record, so an adopt pass
     // proceeds and re-forms it while an ordinary seed leaves the lost record untouched
     // rather than silently replacing it.
-    let loaded = load_baseline(ctx);
-    let lost = matches!(loaded, Loaded::Lost);
-    let mut baseline = match loaded {
-        Loaded::Formed(baseline) => baseline,
-        Loaded::Fresh | Loaded::Lost => crate::baseline::Baseline::new(),
-    };
+    let (mut baseline, lost) = load_baseline(ctx).starting();
     // Each \*arr's wiring is independent of the others, so the \*arrs are seeded at
     // once rather than in series: a pass's time then tracks the slowest \*arr, not
     // their sum. Each records what it wrote into its own baseline, read against the
@@ -195,10 +186,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         baseline.merge(&records);
     }
 
-    // Prowlarr's app sync: register each of those media-filing \*arrs back into
-    // Prowlarr, so it pushes them its indexers. Bindery is left out here — it is
-    // not one of Prowlarr's applications and is wired via Torznab instead.
-    wirings.extend(seed_applications(ctx, &manifest.services, project.as_deref()).await);
+    // The indexer's app sync: register each curator it asks for back into it, so it
+    // pushes them its indexers. A curator it has no application for is not left out:
+    // it is among the pairs reported above as reached by nothing.
+    wirings.extend(seed_applications(ctx, &fillers).await);
 
     // The book *arr, which the aggregator cannot register itself into: it keeps its own
     // list of aggregators and pulls from them, so it is told where one is instead.
@@ -211,6 +202,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         seed_media_server(
             ctx,
             &manifest.services,
+            &fillers,
             project.as_deref(),
             &filled,
             &mut baseline,
@@ -220,7 +212,16 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // The *arrs the request service hands a request to, and the credentials it held
     // before the gate taken back.
-    wirings.extend(seed_requests(ctx, &manifest.services, project.as_deref(), &mut baseline).await);
+    wirings.extend(
+        seed_requests(
+            ctx,
+            &manifest.services,
+            &fillers,
+            project.as_deref(),
+            &mut baseline,
+        )
+        .await,
+    );
 
     // The keys the stack's own services read out of the environment. Two of them are
     // configured that way and by no other means — the quality sync and the archive
@@ -231,7 +232,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // The subtitle finder, told which \*arrs to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly
     // like releases that happen to have none.
-    wirings.extend(subtitles::seed_subtitles(ctx, &manifest.services, project.as_deref()).await);
+    wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the
@@ -442,12 +443,13 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
 async fn seed_requests(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     baseline: &mut crate::baseline::Baseline,
 ) -> Vec<crate::seed::Wiring> {
-    taken_back::note_held(ctx, services, project, baseline).await;
-    let mut wirings = seed_fulfilment_targets(ctx, services, project).await;
-    wirings.extend(taken_back::seed_taken_back(ctx, services, project, baseline).await);
+    taken_back::note_held(ctx, services, fillers, project, baseline).await;
+    let mut wirings = seed_fulfilment_targets(ctx, services, fillers, project).await;
+    wirings.extend(taken_back::seed_taken_back(ctx, services, fillers, project, baseline).await);
     wirings
 }
 
@@ -462,6 +464,7 @@ const TEMP_PASSWORD_LOG_LINES: u32 = 200;
 async fn seed_media_server(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     filled: &std::collections::BTreeMap<String, Vec<String>>,
     baseline: &mut crate::baseline::Baseline,
@@ -482,7 +485,7 @@ async fn seed_media_server(
     wirings.extend(decline::seed_decline_key(ctx, services, project).await);
 
     // The request gate's routes, with the same session.
-    wirings.extend(gate::seed_gate_routes(ctx, services, project).await);
+    wirings.extend(gate::seed_gate_routes(ctx, services, fillers, project).await);
 
     // The second half: Seerr pointed at Jellyfin, through the gate where the stack runs
     // one, whose routes the step above wrote.

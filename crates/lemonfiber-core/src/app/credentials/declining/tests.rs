@@ -260,7 +260,14 @@ async fn a_rotation_lands_only_once_jellyfin_takes_the_key_and_the_service_holds
     let (ctx, at) = scene("decline-rotate-landed", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
 
-    let rotation = super::super::rotating::rotate(&ctx, &listed, &stack(true), Some(&at)).await;
+    let rotation = super::super::rotating::rotate(
+        &ctx,
+        &listed,
+        &stack(true),
+        &crate::wiring::Fillers::default(),
+        Some(&at),
+    )
+    .await;
 
     assert!(
         matches!(rotation.settled, Settled::Replaced { .. }),

@@ -62,6 +62,7 @@ pub(super) async fn rotate(
     ctx: &Ctx,
     held: &Held,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     target: Target,
 ) -> Rotation {
@@ -71,7 +72,16 @@ pub(super) async fn rotate(
     if ctx.dry_run {
         return would_rotate(held, RESETTING);
     }
-    reset(ctx, &held.name, &held.setting, services, project, target).await
+    reset(
+        ctx,
+        &held.name,
+        &held.setting,
+        services,
+        fillers,
+        project,
+        target,
+    )
+    .await
 }
 
 /// Replace the key of the \*arr `target` is, on a run that means it: what taking a key
@@ -79,12 +89,13 @@ pub(super) async fn rotate(
 pub(crate) async fn reset_arr(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     target: Target,
 ) -> Rotation {
     let name = format!("{} API key", target.name);
     let setting = published_as(&target.id);
-    reset(ctx, &name, &setting, services, project, target).await
+    reset(ctx, &name, &setting, services, fillers, project, target).await
 }
 
 /// The reset itself, recorded as `setting` and reported as `name`.
@@ -93,6 +104,7 @@ async fn reset(
     name: &str,
     setting: &str,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     target: Target,
 ) -> Rotation {
@@ -141,7 +153,7 @@ async fn reset(
             reach: reached.reach(),
         })
         .collect();
-    consumers.extend(copies(ctx, services, project, &target).await);
+    consumers.extend(copies(ctx, services, fillers, project, &target).await);
     Rotation::landed(
         name,
         &format!(
@@ -175,28 +187,27 @@ async fn written_after(
 async fn copies(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     target: &Target,
 ) -> Vec<Propagation> {
     let arr = target.name.as_str();
     let mut copies = Vec::new();
-    if let Some((prowlarr, state)) =
-        crate::seed::run::resync_application(ctx, services, project, arr).await
-    {
+    for (prowlarr, state) in crate::seed::run::resync_application(ctx, fillers, &target.id).await {
         copies.push(copy(
             format!("{prowlarr}, which supplies {arr} with indexers"),
             state,
         ));
     }
-    if let Some((bazarr, state)) =
-        crate::seed::run::rewatch(ctx, services, project, &target.id).await
-    {
+    for (bazarr, state) in crate::seed::run::rewatch(ctx, fillers, &target.id).await {
         copies.push(copy(
             format!("{bazarr}, which finds subtitles for {arr}"),
             state,
         ));
     }
-    if let Some(state) = crate::seed::run::reroute(ctx, services, project, &target.id).await {
+    if let Some(state) =
+        crate::seed::run::reroute(ctx, services, fillers, project, &target.id).await
+    {
         copies.push(copy(
             format!("the request gate, which reaches {arr} for the request service"),
             state,

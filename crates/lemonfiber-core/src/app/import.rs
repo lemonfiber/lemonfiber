@@ -232,6 +232,7 @@ fn theirs(container: &Container, ours: &Target) -> Option<Target> {
         base: format!("http://127.0.0.1:{port}"),
         config,
         version: ours.version,
+        confined_to: None,
     })
 }
 

@@ -34,6 +34,7 @@ fn sonarr(config: &Path) -> Target {
         base: "http://127.0.0.1:8989".to_owned(),
         config: config.to_path_buf(),
         version: 3,
+        confined_to: None,
     }
 }
 
@@ -158,6 +159,38 @@ async fn a_service_whose_key_is_not_generated_yet_is_skipped() {
     ));
 }
 
+/// A key a plugin's container keeps is read only from beneath the directory it owns: one
+/// there is proven like any other, and one the target names outside it is not read, so
+/// there is nothing to prove.
+#[tokio::test]
+async fn a_confined_key_is_read_only_from_beneath_its_directory() {
+    let config = PathBuf::from("/stack/config/kept/config.xml");
+    let http = Fake::by_path(vec![("8989", Answer::reply(200, SONARR_STATUS))]);
+    let confined = |within: &str| Target {
+        confined_to: Some(PathBuf::from(within)),
+        ..sonarr(&config)
+    };
+
+    let beneath = only(
+        confined("/stack/config/kept"),
+        Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]),
+        http.clone(),
+    )
+    .await;
+    let elsewhere = only(
+        confined("/stack/config/other"),
+        Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]),
+        http,
+    )
+    .await;
+
+    assert!(matches!(beneath, Verdict::Pass { .. }), "{beneath:?}");
+    assert!(
+        matches!(elsewhere, Verdict::Skipped { .. }),
+        "{elsewhere:?}"
+    );
+}
+
 #[tokio::test]
 async fn each_service_is_reported_independently() {
     // One up, one not answering: the run reports both, and the unreachable one
@@ -178,6 +211,7 @@ async fn each_service_is_reported_independently() {
         base: "http://127.0.0.1:7878".to_owned(),
         config: radarr_config,
         version: 3,
+        confined_to: None,
     };
 
     let check = CredentialsCheck::new(http, fs, vec![sonarr(&sonarr_config), radarr]);

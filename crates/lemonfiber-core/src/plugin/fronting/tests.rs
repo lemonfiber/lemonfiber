@@ -16,6 +16,7 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
         description: "Reads comics: in a browser".to_owned(),
         api: None,
         listens: None,
+        media_types: Vec::new(),
     }
 }
 
