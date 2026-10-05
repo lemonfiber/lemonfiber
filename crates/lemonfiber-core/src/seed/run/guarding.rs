@@ -6,6 +6,11 @@
 //! mints its password, records it, and only then turns authentication on; and an
 //! aggregator found running with none is taken on in place, every indexer it holds kept.
 //!
+//! **Nothing unknown is taken as guarded.** Authentication is lemonfiber's own only where
+//! the password it holds opens the configuration and a read presenting nothing is
+//! refused; an answer that does not say, a configuration whose indexers cannot be read,
+//! and a read that will not settle are each said as not guarded and never recorded.
+//!
 //! **What lemonfiber turned on is the operator's to turn off.** One found off again,
 //! where lemonfiber turned it on, is kept off and said as drift, and a reset is what
 //! turns it back on. One whose password lemonfiber does not hold, or that refuses the
@@ -16,7 +21,7 @@ use std::time::Duration;
 use lemonfiber_manifest::ApiKind;
 
 use super::Ctx;
-use crate::nzbhydra2::{Credential, Nzbhydra2};
+use crate::nzbhydra2::{Credential, Nzbhydra2, Unguarded};
 use crate::origin::Origin;
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
@@ -113,9 +118,18 @@ pub(super) async fn put_back(
 ) -> Option<Wiring> {
     let aggregator = aggregator(ctx, fillers)?;
     baseline.expected(&aggregator.id, FIELD)?;
-    let access = aggregator.client.access().await.ok()?;
+    let settled = |state| Some(Wiring::settled(connection(&aggregator.name), state));
+    let access = match aggregator.client.access().await {
+        Ok(access) => access,
+        Err(failure) => return settled(crate::seed::unreached(&failure)),
+    };
+    // Authentication that is on owes a reset nothing only where it guards: one that
+    // still answers anybody is said, never passed over as already done.
     if access.auth_configured {
-        return None;
+        return match refusing(&aggregator, State::AlreadyWired).await {
+            State::AlreadyWired => None,
+            unguarded => settled(unguarded),
+        };
     }
     let state = if confirm {
         turned_on(ctx, &aggregator).await
@@ -125,11 +139,12 @@ pub(super) async fn put_back(
             ours: None,
         }
     };
-    Some(Wiring::settled(connection(&aggregator.name), state))
+    settled(state)
 }
 
 /// An aggregator with authentication on: lemonfiber's own where the password it recorded
-/// opens it, and refused where there is no password recorded or it is refused.
+/// opens it and a read presenting nothing is refused, refused where there is no password
+/// recorded or it is refused, and not guarded where anybody is still answered.
 async fn held(ctx: &Ctx, aggregator: &Aggregator) -> State {
     let setting = crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY;
     let Some(password) = crate::app::targets::recorded_secret(ctx, setting) else {
@@ -143,13 +158,29 @@ async fn held(ctx: &Ctx, aggregator: &Aggregator) -> State {
         };
     };
     match aggregator.client.config(Some(admin(&password))).await {
-        Ok(_) => State::AlreadyWired,
+        Ok(_) => refusing(aggregator, State::AlreadyWired).await,
         Err(crate::ports::service::Failure::Unauthorised { .. }) => State::Refused {
             reason: format!(
                 "{name} refuses the password {setting} holds, and lemonfiber does not turn its \
                  authentication off or give it another administrator to get back in. Record \
                  the password it takes with `lemonfiber config set {setting} <password>`.",
                 name = aggregator.name,
+            ),
+        },
+        Err(failure) => crate::seed::unreached(&failure),
+    }
+}
+
+/// `guarded` where a read of the aggregator's configuration presenting nothing is refused;
+/// otherwise how it is not: answered, or not settled either way.
+async fn refusing(aggregator: &Aggregator, guarded: State) -> State {
+    match aggregator.client.exposed().await {
+        Ok(false) => guarded,
+        Ok(true) => State::Failed {
+            detail: format!(
+                "{} has authentication on and still answers its configuration to a caller \
+                 presenting nothing",
+                aggregator.name
             ),
         },
         Err(failure) => crate::seed::unreached(&failure),
@@ -169,7 +200,17 @@ async fn turned_on(ctx: &Ctx, aggregator: &Aggregator) -> State {
         Ok(config) => config,
         Err(failure) => return crate::seed::unreached(&failure),
     };
-    let before = crate::nzbhydra2::indexers(&config);
+    // Every indexer it holds is what the change is proven to keep, so a configuration
+    // whose indexers cannot be read is one the change could never be proven on.
+    let Some(before) = crate::nzbhydra2::indexers(&config) else {
+        return State::Failed {
+            detail: format!(
+                "{}'s configuration holds no list of indexers to show kept, so its \
+                 authentication was not turned on",
+                aggregator.name
+            ),
+        };
+    };
     let setting = crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY;
     let Some(password) = crate::secret::generate(ctx.seams.random.as_ref()) else {
         return State::Failed {
@@ -184,11 +225,26 @@ async fn turned_on(ctx: &Ctx, aggregator: &Aggregator) -> State {
             ),
         };
     }
-    if let Err(failure) = client.guard(config, admin(&password)).await {
-        if let Some(env) = ctx.settings.env_file.as_deref() {
-            let _ = crate::config::store::unset(env, setting);
+    match client.guard(config, admin(&password)).await {
+        Ok(()) => {}
+        Err(Unguarded::Untaken(failure)) => {
+            if let Some(env) = ctx.settings.env_file.as_deref() {
+                let _ = crate::config::store::unset(env, setting);
+            }
+            return crate::seed::unreached(&failure);
         }
-        return crate::seed::unreached(&failure);
+        // Sent, and whether it was taken cannot be told: the password stays recorded,
+        // because a service that did take it holds it from its next start, and the
+        // record is the only copy.
+        Err(Unguarded::Unknown(failure)) => {
+            return State::Failed {
+                detail: format!(
+                    "{} was handed its authentication and whether it took it cannot be told, \
+                     so the password stays recorded under {setting}: {failure}",
+                    aggregator.name
+                ),
+            };
+        }
     }
     // The restart is asked for at once, while the service still answers the way it did
     // before the change: the change takes effect with the restart, and nothing else
@@ -226,6 +282,15 @@ async fn proven(aggregator: &Aggregator, password: &str, before: &[String]) -> S
     let after = match client.config(Some(admin(password))).await {
         Ok(config) => crate::nzbhydra2::indexers(&config),
         Err(failure) => return crate::seed::unreached(&failure),
+    };
+    let Some(after) = after else {
+        return State::Failed {
+            detail: format!(
+                "{}'s configuration, read with the password, holds no list of indexers, so \
+                 nothing shows the ones it held were kept",
+                aggregator.name
+            ),
+        };
     };
     let lost: Vec<&str> = before
         .iter()

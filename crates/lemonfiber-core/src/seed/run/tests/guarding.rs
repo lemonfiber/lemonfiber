@@ -312,7 +312,11 @@ async fn authentication_already_on_is_kept_and_never_taken_back() {
                 "/internalapi/userinfos",
                 vec![guarded_as(true)],
             ),
-            (Method::Get, "/internalapi/config", vec![read]),
+            (
+                Method::Get,
+                "/internalapi/config",
+                vec![read, Answer::reply(401, "")],
+            ),
         ])
     };
     let held_open = answering(config(&["Dummy"]));
@@ -407,8 +411,8 @@ async fn turned_off_rehearsed_and_unreached_are_each_said() {
 }
 
 /// A reset turns back on what lemonfiber turned on and somebody turned off, and until it
-/// is confirmed says that it would; it leaves alone an aggregator it never turned on, one
-/// that is guarded, and one it cannot reach.
+/// is confirmed says that it would; it leaves alone an aggregator it never turned on and
+/// one that is guarded, and says it could not ask one it cannot reach.
 #[tokio::test]
 async fn a_reset_turns_it_back_on() {
     let mut lemonfibers = Baseline::new();
@@ -436,11 +440,18 @@ async fn a_reset_turns_it_back_on() {
         true,
     )
     .await;
-    let on = Fake::by_route_in_turn(vec![(
-        Method::Get,
-        "/internalapi/userinfos",
-        vec![guarded_as(true)],
-    )]);
+    let on = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(true)],
+        ),
+        (
+            Method::Get,
+            "/internalapi/config",
+            vec![Answer::reply(401, "")],
+        ),
+    ]);
     let on = put_back(&guarding_ctx(on, None), &services, &lemonfibers, true).await;
     let unreached = put_back(
         &guarding_ctx(Fake::silent(), None),
@@ -462,7 +473,10 @@ async fn a_reset_turns_it_back_on() {
     assert!(previewed.is_some_and(|wiring| matches!(wiring.state, State::WouldWire { .. })));
     assert_eq!(never, None);
     assert_eq!(on, None);
-    assert_eq!(unreached, None);
+    assert!(
+        unreached.is_some_and(|wiring| matches!(wiring.state, State::Skipped { .. })),
+        "an aggregator a reset could not ask was passed over in silence"
+    );
     assert_eq!(elsewhere, None);
 }
 
@@ -502,4 +516,225 @@ async fn a_plugin_declaring_the_aggregators_adapter_is_never_sent_the_password()
     assert_eq!(reset, None);
     assert!(http.requests().is_empty(), "{:?}", http.requests());
     assert_eq!(held(&env).as_deref(), Some("the-stacks-own"));
+}
+
+/// **Nothing unknown is taken as guarded.** Authentication configured and the
+/// configuration still answered to a caller presenting nothing, a reset over such an
+/// aggregator, a configuration holding no list of indexers before or after, and an
+/// answer to how it is guarded that does not say: each is said as not guarded, and
+/// none is recorded as lemonfiber's own.
+#[tokio::test]
+async fn authentication_on_that_still_answers_anybody_is_not_guarded() {
+    let answering = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(true)],
+        ),
+        (Method::Get, "/internalapi/config", vec![config(&["Dummy"])]),
+    ]);
+    let mut baseline = Baseline::new();
+
+    let open = guarded(
+        &guarding_ctx(answering, Some(settings_file("open-anyway", Some("kept")))),
+        &mut baseline,
+    )
+    .await;
+
+    assert!(
+        open.as_ref().is_some_and(|wiring| matches!(&wiring.state,
+            State::Failed { detail } if detail.contains("presenting nothing"))),
+        "{open:?}"
+    );
+    assert_eq!(baseline.expected("nzbhydra2", "authentication"), None);
+}
+
+/// A reset over an aggregator whose authentication is configured and that still answers
+/// anybody says it is not guarded rather than that nothing was owed.
+#[tokio::test]
+async fn a_reset_over_authentication_that_guards_nothing_says_so() {
+    let mut lemonfibers = Baseline::new();
+    lemonfibers.record("nzbhydra2", "authentication", "basic", "1");
+    let answering = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(true)],
+        ),
+        (Method::Get, "/internalapi/config", vec![config(&["Dummy"])]),
+    ]);
+
+    let put_back = super::super::guarding::put_back(
+        &guarding_ctx(answering, None),
+        &with_aggregator(),
+        &lemonfibers,
+        true,
+    )
+    .await;
+
+    assert!(
+        put_back
+            .as_ref()
+            .is_some_and(|wiring| matches!(&wiring.state,
+            State::Failed { detail } if detail.contains("presenting nothing"))),
+        "{put_back:?}"
+    );
+}
+
+/// A configuration holding no list of indexers is not one whose indexers can be shown
+/// kept: before the change nothing is changed, and after it the change is not proven.
+#[tokio::test]
+async fn a_configuration_with_no_list_of_indexers_proves_nothing() {
+    let listless = Answer::reply(
+        200,
+        serde_json::json!({ "auth": { "authType": "NONE", "users": [] } }).to_string(),
+    );
+    let before = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(false)],
+        ),
+        (
+            Method::Get,
+            "/internalapi/config",
+            vec![listless.clone(), Answer::reply(401, ""), listless],
+        ),
+        (
+            Method::Put,
+            "/internalapi/config",
+            vec![Answer::reply(200, r#"{"ok":true}"#)],
+        ),
+        (
+            Method::Get,
+            "/internalapi/control/restart",
+            vec![Answer::reply(200, "{}")],
+        ),
+    ]);
+    let unlisted = guarded(
+        &guarding_ctx(before.clone(), Some(settings_file("listless-before", None))),
+        &mut Baseline::new(),
+    )
+    .await;
+    let emptied = Answer::reply(
+        200,
+        serde_json::json!({ "auth": { "authType": "NONE", "users": [] }, "indexers": [] })
+            .to_string(),
+    );
+    let after = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(false)],
+        ),
+        (
+            Method::Get,
+            "/internalapi/config",
+            vec![
+                emptied,
+                Answer::reply(401, ""),
+                Answer::reply(
+                    200,
+                    serde_json::json!({ "auth": { "authType": "BASIC" } }).to_string(),
+                ),
+            ],
+        ),
+        (
+            Method::Put,
+            "/internalapi/config",
+            vec![Answer::reply(200, r#"{"ok":true}"#)],
+        ),
+        (
+            Method::Get,
+            "/internalapi/control/restart",
+            vec![Answer::reply(200, "{}")],
+        ),
+    ]);
+    let unproven = guarded(
+        &guarding_ctx(after, Some(settings_file("listless-after", None))),
+        &mut Baseline::new(),
+    )
+    .await;
+
+    assert!(
+        !matches!(
+            unlisted.as_ref().map(|wiring| &wiring.state),
+            Some(State::Wired)
+        ),
+        "{unlisted:?}"
+    );
+    assert!(
+        before
+            .requests()
+            .iter()
+            .all(|asked| asked.method != Method::Put),
+        "a configuration whose indexers could not be read was changed"
+    );
+    assert!(
+        !matches!(
+            unproven.as_ref().map(|wiring| &wiring.state),
+            Some(State::Wired)
+        ),
+        "{unproven:?}"
+    );
+}
+
+/// An answer to how the aggregator is guarded that does not say is not taken as either:
+/// nothing is changed and nothing is said guarded.
+#[tokio::test]
+async fn an_answer_that_does_not_say_how_it_is_guarded_changes_nothing() {
+    let unsaid = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![Answer::reply(200, r#"{"authType":"NONE"}"#)],
+        ),
+        (Method::Get, "/internalapi/config", vec![config(&["Dummy"])]),
+    ]);
+
+    let wiring = guarded(&guarding_ctx(unsaid.clone(), None), &mut Baseline::new()).await;
+
+    assert!(
+        wiring
+            .as_ref()
+            .is_some_and(|wiring| matches!(wiring.state, State::Failed { .. })),
+        "{wiring:?}"
+    );
+    assert!(unsaid
+        .requests()
+        .iter()
+        .all(|asked| asked.method == Method::Get));
+}
+
+/// A change the service may have taken, sent and answered unreadably, keeps the password
+/// it was given recorded, so lemonfiber is never locked out of a service holding it.
+#[tokio::test]
+async fn a_change_answered_unreadably_keeps_its_password() {
+    let env = settings_file("unreadable-change", None);
+    let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(false)],
+        ),
+        (Method::Get, "/internalapi/config", vec![config(&["Dummy"])]),
+        (
+            Method::Put,
+            "/internalapi/config",
+            vec![Answer::reply(200, "not json")],
+        ),
+    ]);
+
+    let wiring = guarded(&guarding_ctx(http, Some(env.clone())), &mut Baseline::new()).await;
+
+    assert!(
+        wiring
+            .as_ref()
+            .is_some_and(|wiring| matches!(wiring.state, State::Failed { .. })),
+        "{wiring:?}"
+    );
+    assert!(
+        held(&env).is_some(),
+        "the password the service may hold was forgotten"
+    );
 }

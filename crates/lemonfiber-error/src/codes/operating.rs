@@ -59,7 +59,7 @@ codes! {
         /// Raised when a setting's key or value spans more than one line.
         CONFIG_SPANS_LINES = "CONFIG-6",
         /// Raised when the Usenet indexer aggregator answers a read of its whole
-        /// configuration to a caller presenting nothing.
+        /// configuration to a caller presenting nothing, or will not say whether it does.
         AGGREGATOR_EXPOSED = "CONFIG-7",
     }
     /// The `DIAG` codes.

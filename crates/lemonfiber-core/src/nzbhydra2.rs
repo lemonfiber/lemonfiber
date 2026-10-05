@@ -63,6 +63,17 @@ struct Saved {
     error_messages: Vec<String>,
 }
 
+/// Why a configuration handed to the service was not shown taken.
+#[derive(Debug)]
+pub enum Unguarded {
+    /// Nothing changed: the configuration could not be guarded and was never sent, or the
+    /// service said it did not take it.
+    Untaken(Failure),
+    /// Whether the service took it cannot be told: it was sent, and nothing that says
+    /// came back.
+    Unknown(Failure),
+}
+
 /// A username and a password, as the service's authentication takes them.
 #[derive(Clone, Copy)]
 pub struct Credential<'a> {
@@ -162,13 +173,15 @@ impl Nzbhydra2 {
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] where the service is unreachable or refuses the configuration,
-    /// carrying its own words.
-    pub async fn guard(&self, mut config: Value, admin: Credential<'_>) -> Result<(), Failure> {
+    /// Returns [`Unguarded::Untaken`] where nothing changed — a configuration with no
+    /// authentication section to turn on, or one the service refuses in its own words —
+    /// and [`Unguarded::Unknown`] where it was sent and whether it was taken cannot be
+    /// told.
+    pub async fn guard(&self, mut config: Value, admin: Credential<'_>) -> Result<(), Unguarded> {
         let Some(auth) = config.get_mut("auth").and_then(Value::as_object_mut) else {
-            return Err(self
-                .endpoint
-                .refused("the service's configuration holds no authentication section"));
+            return Err(Unguarded::Untaken(self.endpoint.refused(
+                "the service's configuration holds no authentication section",
+            )));
         };
         auth.insert("authType".to_owned(), Value::from(BASIC));
         for restricted in RESTRICTED {
@@ -188,15 +201,24 @@ impl Nzbhydra2 {
         let response = self
             .endpoint
             .send(&self.request(Method::Put, CONFIG, None, Some(config.to_string())))
-            .await?;
-        let saved: Saved = self.endpoint.decode(
-            &response,
-            "what the service made of the configuration could not be read",
-        )?;
+            .await
+            .map_err(Unguarded::Unknown)?;
+        if response.status >= 400 && response.status < 500 {
+            return Err(Unguarded::Untaken(self.endpoint.refusal(&response)));
+        }
+        let saved: Saved = self
+            .endpoint
+            .decode(
+                &response,
+                "what the service made of the configuration could not be read",
+            )
+            .map_err(Unguarded::Unknown)?;
         if saved.ok {
             Ok(())
         } else {
-            Err(self.endpoint.refused(&saved.error_messages.join("; ")))
+            Err(Unguarded::Untaken(
+                self.endpoint.refused(&saved.error_messages.join("; ")),
+            ))
         }
     }
 
@@ -215,9 +237,10 @@ impl Nzbhydra2 {
     }
 }
 
-/// The name of every indexer a configuration holds, in the order it holds them.
+/// The name of every indexer a configuration holds, in the order it holds them, or
+/// nothing where it holds no list of indexers to read them from.
 #[must_use]
-pub fn indexers(config: &Value) -> Vec<String> {
+pub fn indexers(config: &Value) -> Option<Vec<String>> {
     config
         .get("indexers")
         .and_then(Value::as_array)
@@ -227,7 +250,6 @@ pub fn indexers(config: &Value) -> Vec<String> {
                 .map(str::to_owned)
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

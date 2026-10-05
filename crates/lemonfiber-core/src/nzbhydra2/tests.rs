@@ -1,7 +1,7 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::Method;
 
-use super::{indexers, Credential, Nzbhydra2};
+use super::{indexers, Credential, Nzbhydra2, Unguarded};
 use crate::ports::service::Failure;
 
 /// A client over `http`.
@@ -99,9 +99,9 @@ async fn guarding_keeps_everything_else_and_guards_every_part() {
     assert_eq!(at("/main/apiKey"), Some("unchanged".into()));
 }
 
-/// A configuration with nothing to turn on is refused before anything is sent, one the
-/// service will not take is refused in its own words, and an answer that says nothing
-/// readable is taken as no answer.
+/// A configuration with nothing to turn on is refused before anything is sent, and one
+/// the service rejects or says it will not take is refused in its own words: nothing
+/// changed. One sent and answered unreadably, or not answered, may have been taken.
 #[tokio::test]
 async fn a_configuration_that_cannot_be_guarded_is_refused() {
     let http = Fake::always(Answer::reply(
@@ -119,12 +119,25 @@ async fn a_configuration_that_cannot_be_guarded_is_refused() {
     let unread = client(Fake::always(Answer::reply(200, "not json")))
         .guard(serde_json::json!({ "auth": {} }), ADMIN)
         .await;
+    let rejected = client(Fake::always(Answer::reply(400, "bad request")))
+        .guard(serde_json::json!({ "auth": {} }), ADMIN)
+        .await;
+    let unanswered = client(Fake::silent())
+        .guard(serde_json::json!({ "auth": {} }), ADMIN)
+        .await;
 
-    assert!(matches!(unguardable, Err(Failure::Refused { detail, .. })
-        if detail.contains("no authentication section")));
+    assert!(
+        matches!(unguardable, Err(Unguarded::Untaken(Failure::Refused { detail, .. }))
+        if detail.contains("no authentication section"))
+    );
     assert!(unsent);
-    assert!(matches!(untaken, Err(Failure::Refused { detail, .. }) if detail == "first; second"));
-    assert!(unread.is_err());
+    assert!(
+        matches!(untaken, Err(Unguarded::Untaken(Failure::Refused { detail, .. }))
+        if detail == "first; second")
+    );
+    assert!(matches!(rejected, Err(Unguarded::Untaken(_))));
+    assert!(matches!(unread, Err(Unguarded::Unknown(_))));
+    assert!(matches!(unanswered, Err(Unguarded::Unknown(_))));
 }
 
 /// How the service is guarded is read off what it says, and a restart is asked for and
@@ -151,15 +164,19 @@ async fn access_and_the_restart_are_read_off_the_answer() {
     assert!(matches!(refused, Err(Failure::Unauthorised { .. })));
 }
 
-/// Every indexer a configuration holds is named, and one holding none or no list names
-/// none.
+/// Every indexer a configuration holds is named; one holding an empty list names none,
+/// and one holding no list is not read as holding none.
 #[test]
 fn the_indexers_are_named_in_the_order_held() {
     assert_eq!(
         indexers(
             &serde_json::json!({ "indexers": [{ "name": "A" }, { "host": "x" }, { "name": "B" }] })
         ),
-        vec!["A".to_owned(), "B".to_owned()]
+        Some(vec!["A".to_owned(), "B".to_owned()])
     );
-    assert!(indexers(&serde_json::json!({})).is_empty());
+    assert_eq!(
+        indexers(&serde_json::json!({ "indexers": [] })),
+        Some(Vec::new())
+    );
+    assert_eq!(indexers(&serde_json::json!({})), None);
 }

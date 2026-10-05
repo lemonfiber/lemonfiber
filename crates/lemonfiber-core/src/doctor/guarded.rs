@@ -4,7 +4,8 @@
 //! turns it on and keeps it on; this asks the same question changing nothing — whether a
 //! read of the configuration presenting nothing is refused — so an operator running a
 //! diagnosis is told when the accounts are open to anything that can reach the service,
-//! whoever turned the authentication off.
+//! whoever turned the authentication off — and when the service will not say, which is
+//! never taken as guarded.
 
 use std::sync::Arc;
 
@@ -80,11 +81,9 @@ async fn ran(check: &GuardedCheck) -> Vec<Finding> {
                 "{name} refuses a read of its configuration to anybody presenting nothing"
             )),
         },
-        Err(failure) => Verdict::Unverified {
-            reason: format!("{name} could not be asked who it answers: {failure}"),
-            remedy: Remedy::new("Check the service is up and has finished starting")
-                .with_detail("lemonfiber status"),
-        },
+        // Not knowing is not a pass: an aggregator that will not say who it answers may
+        // be answering anybody.
+        Err(failure) => Verdict::Warn(unknown(name, &failure)),
     };
     vec![finding(verdict)]
 }
@@ -92,6 +91,25 @@ async fn ran(check: &GuardedCheck) -> Vec<Finding> {
 /// The one finding this check produces, under the name anything answering it shares.
 fn finding(verdict: Verdict) -> Finding {
     Finding::in_category(Category::Config, CHECK, TITLE, verdict)
+}
+
+/// An aggregator that would not say whether it answers its configuration to a caller
+/// presenting nothing.
+fn unknown(name: &str, failure: &Failure) -> Problem {
+    Problem::new(
+        AGGREGATOR_EXPOSED,
+        Severity::Warning,
+        format!("{name} may answer its configuration to anybody"),
+        format!(
+            "{name} could not be asked whether it answers its configuration, the indexer \
+             accounts it holds and their keys among it, to anything that can reach it: \
+             {failure}"
+        ),
+        Remedy::new(
+            "Check the service is up and has finished starting, then run the diagnosis again",
+        )
+        .with_detail("lemonfiber status"),
+    )
 }
 
 /// An aggregator that answers its configuration to a caller presenting nothing.
