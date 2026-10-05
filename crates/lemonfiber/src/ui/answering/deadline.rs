@@ -83,3 +83,6 @@ where
         self.inner.size_hint()
     }
 }
+
+#[cfg(test)]
+mod tests;

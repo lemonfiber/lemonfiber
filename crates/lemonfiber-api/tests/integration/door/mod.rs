@@ -4,7 +4,7 @@
 //! a request carries and what a household answers, and two copies of that would
 //! answer the same question differently the first time one of them was updated.
 pub(crate) use std::fs;
-pub(crate) use std::net::{IpAddr, Ipv6Addr};
+pub(crate) use std::net::IpAddr;
 pub(crate) use std::path::PathBuf;
 pub(crate) use std::sync::atomic::{AtomicBool, Ordering};
 pub(crate) use std::sync::Arc;
@@ -203,8 +203,8 @@ pub(crate) async fn asked(
 }
 
 /// Where a request comes from when the surface is driven without a socket.
-pub(crate) fn unnamed() -> IpAddr {
-    IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+pub(crate) fn unnamed() -> Option<IpAddr> {
+    None
 }
 
 /// A device on the household network.

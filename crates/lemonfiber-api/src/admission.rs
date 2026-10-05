@@ -36,7 +36,7 @@ pub mod sessions;
 
 use sessions::Opened;
 
-use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -452,15 +452,10 @@ async fn opening(
     )
 }
 
-/// The address a request came from.
-///
-/// A surface answered without a socket — a test, driving the router directly — has no
-/// address to name, and every request it answers counts as one caller.
-fn peer(connected: Option<Extension<ConnectInfo<SocketAddr>>>) -> IpAddr {
-    connected.map_or(
-        IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-        |Extension(ConnectInfo(at))| at.ip(),
-    )
+/// The address a request came from, or nothing for a surface answered without a
+/// socket — a test, driving the router directly.
+fn peer(connected: Option<Extension<ConnectInfo<SocketAddr>>>) -> Option<IpAddr> {
+    connected.map(|Extension(ConnectInfo(at))| at.ip())
 }
 
 /// Too many wrong answers, and how long is left.

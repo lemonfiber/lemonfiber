@@ -80,11 +80,15 @@ pub enum Door {
     Member(String),
 }
 
+/// Where an attempt came from: the address it connected from, or nothing for a surface
+/// answered without a socket, every request to which counts as one caller.
+type Peer = Option<IpAddr>;
+
 /// What one attempt may try, once it has been counted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ticket {
     /// Where it came from.
-    peer: IpAddr,
+    peer: Peer,
     /// Whether the machine's own password may be tried.
     pub operator: bool,
     /// The member door it may try, where it named one and that door is open to it.
@@ -176,11 +180,11 @@ impl Pool {
 #[derive(Default)]
 struct Counted {
     /// What each address has got wrong.
-    wrong: HashMap<IpAddr, Wrong>,
+    wrong: HashMap<Peer, Wrong>,
     /// The pool addresses not yet proved at a door draw on.
     pool: Pool,
     /// The doors each address has been proved at this run, and until when that counts.
-    proved: HashMap<(IpAddr, Door), SystemTime>,
+    proved: HashMap<(Peer, Door), SystemTime>,
 }
 
 impl Counted {
@@ -192,7 +196,7 @@ impl Counted {
     }
 
     /// Whether this address has been proved at this door.
-    fn proved(&self, peer: IpAddr, door: &Door) -> bool {
+    fn proved(&self, peer: Peer, door: &Door) -> bool {
         self.proved.contains_key(&(peer, door.clone()))
     }
 }
@@ -209,9 +213,13 @@ pub struct Attempts {
 impl Attempts {
     /// How long is left before another answer is taken from this address, or nothing
     /// where one is.
-    pub async fn waiting(&self, peer: IpAddr, now: SystemTime) -> Option<Duration> {
+    pub async fn waiting(
+        &self,
+        peer: impl Into<Option<IpAddr>>,
+        now: SystemTime,
+    ) -> Option<Duration> {
         let counted = self.counted.lock().await;
-        counted.wrong.get(&canonical(peer))?.left(now)
+        counted.wrong.get(&canonical(peer.into()))?.left(now)
     }
 
     /// Take an attempt, or say how long is left before one is taken.
@@ -231,11 +239,11 @@ impl Attempts {
     /// at is shut.
     pub async fn taken(
         &self,
-        peer: IpAddr,
+        peer: impl Into<Option<IpAddr>>,
         name: Option<&str>,
         now: SystemTime,
     ) -> Result<Ticket, Duration> {
-        let peer = canonical(peer);
+        let peer = canonical(peer.into());
         let mut counted = self.counted.lock().await;
         counted.tidied(now);
         if let Some(left) = counted.wrong.get(&peer).and_then(|wrong| wrong.left(now)) {
@@ -293,8 +301,8 @@ impl Attempts {
 
 /// One address however it arrived: an IPv4 caller reaching a dual-stack socket is
 /// the same caller it is on an IPv4 one.
-fn canonical(peer: IpAddr) -> IpAddr {
-    peer.to_canonical()
+fn canonical(peer: Peer) -> Peer {
+    peer.map(|at| at.to_canonical())
 }
 
 /// The wait a run of wrong answers has earned.

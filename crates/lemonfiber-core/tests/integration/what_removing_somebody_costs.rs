@@ -26,11 +26,12 @@ const HOUSEHOLD: &str = r#"[
 ]"#;
 
 /// Two requests from Ana and one from somebody else, so the count is hers and not the
-/// household's.
+/// household's: one filed under her name alone, one under her id whatever name it
+/// shows, and one showing her name under somebody else's id.
 const REQUESTS: &str = r#"{"pageInfo":{"results":3},"results":[
     {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},"requestedBy":{"displayName":"ana"}},
-    {"status":2,"type":"movie","media":{"status":3,"externalServiceId":2},"requestedBy":{"displayName":"Ana"}},
-    {"status":2,"type":"movie","media":{"status":3,"externalServiceId":3},"requestedBy":{"displayName":"bo"}}
+    {"status":2,"type":"movie","media":{"status":3,"externalServiceId":2},"requestedBy":{"displayName":"Annie","jellyfinUserId":"9"}},
+    {"status":2,"type":"movie","media":{"status":3,"externalServiceId":3},"requestedBy":{"displayName":"Ana","jellyfinUserId":"5"}}
 ]}"#;
 
 /// Everything answering: the media server holds the household, and the request service
