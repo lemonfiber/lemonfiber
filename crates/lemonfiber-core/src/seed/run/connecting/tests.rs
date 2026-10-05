@@ -1,4 +1,4 @@
-use super::{pairings, unmatched, Connection, Unmade};
+use super::{made, pairings, unmatched, Connection, Unmade};
 use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
 use crate::seed::State;
 use crate::test_support::{a_placed, an_installed};
@@ -290,7 +290,9 @@ fn an_asker_withheld_or_an_ask_answered_elsewhere_is_not_paired() {
     assert!(paired.iter().all(|(by, _)| *by != "sonarr"), "{paired:?}");
     assert!(
         paired.iter().all(|(_, capability)| {
-            capability.starts_with("download.") || *capability == "library.curate"
+            capability.starts_with("download.")
+                || *capability == "library.curate"
+                || *capability == "indexer.search"
         }),
         "{paired:?}"
     );
@@ -373,4 +375,113 @@ fn a_plugin_asker_is_connected_to_nothing() {
           credential"
             .to_owned()
     ));
+}
+
+/// A service of `origin` speaking `kind`, filing television, reached at its id.
+fn a_service(
+    id: &str,
+    origin: &crate::origin::Origin,
+    kind: lemonfiber_manifest::ApiKind,
+) -> crate::wiring::Filler {
+    crate::wiring::Filler {
+        id: id.to_owned(),
+        name: id.to_owned(),
+        origin: origin.clone(),
+        address: Some(crate::wiring::Address {
+            host: id.to_owned(),
+            port: 8000,
+        }),
+        adapter: Some(speaking(kind)),
+        published: Some(8000),
+        key_file: None,
+        confined_to: None,
+        media_types: vec!["tv".to_owned()],
+    }
+}
+
+/// **Every credential crosses one gate, whichever connection carries it.** Each kind of
+/// connection the table makes, between an asker and a filler of each pair of origins:
+/// the stack's own to the stack's own, the stack's to a plugin's, a plugin's to its own
+/// plugin's, a plugin's to another plugin's, and a plugin's to the stack's. A credential
+/// reaches only the stack's own or the owner's own plugin, in both directions — the
+/// indexer's sync hands the filler the asker's key as well as the other way round.
+#[test]
+fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
+    use crate::origin::Origin;
+    use lemonfiber_manifest::ApiKind;
+
+    let stack = Origin::Bundled;
+    let one = Origin::Plugin {
+        named: "one".to_owned(),
+    };
+    let other = Origin::Plugin {
+        named: "other".to_owned(),
+    };
+    // What asks, what it asks for, what fills it, and whether the connection also hands
+    // the filler the asker's own key.
+    let kinds = [
+        (ApiKind::Servarr, "download.usenet", ApiKind::Sabnzbd, false),
+        (
+            ApiKind::Servarr,
+            "download.torrent",
+            ApiKind::Qbittorrent,
+            false,
+        ),
+        (ApiKind::Servarr, "library.curate", ApiKind::Servarr, true),
+        (ApiKind::Seerr, "library.curate", ApiKind::Servarr, false),
+        (ApiKind::Bazarr, "library.curate", ApiKind::Servarr, false),
+        (ApiKind::Bindery, "indexer.search", ApiKind::Servarr, false),
+    ];
+    // Whose the filler is, whose the asker is, and what the pairing comes to: made, or
+    // refused because the filler's credential may not reach the asker, or because the
+    // asker's may not reach the filler.
+    let rows = [
+        (&stack, &stack, None, None),
+        (&stack, &one, Some(Unmade::Asked), Some(Unmade::Asked)),
+        (&one, &one, None, None),
+        (&one, &other, Some(Unmade::Asked), Some(Unmade::Asked)),
+        (&one, &stack, None, Some(Unmade::Withheld)),
+    ];
+
+    let mut seen = std::collections::BTreeSet::new();
+    for (asks, capability, fills, both_ways) in kinds {
+        for (filler_is, asker_is, refused, refused_both_ways) in &rows {
+            let asker = a_service("asker", asker_is, asks);
+            let filler = a_service("filler", filler_is, fills);
+            let ask = crate::wiring::Ask {
+                by: asker.id.clone(),
+                capability: capability.to_owned(),
+                fillers: vec![filler.clone()],
+            };
+            let came = made(&asker, &ask, &filler);
+            let expected = if both_ways {
+                refused_both_ways
+            } else {
+                refused
+            };
+
+            let connection = came.map(|(connection, ..)| connection);
+            if let Some(why) = expected {
+                assert_eq!(
+                    connection,
+                    Err(*why),
+                    "{capability}: {filler_is:?}'s filler into {asker_is:?}'s asker"
+                );
+            } else {
+                assert!(
+                    connection.is_ok(),
+                    "{capability}: {filler_is:?}'s filler into {asker_is:?}'s asker came to \
+                     {connection:?}"
+                );
+                if let Ok(connection) = connection {
+                    seen.insert(format!("{connection:?}"));
+                }
+            }
+        }
+    }
+    assert_eq!(
+        seen.len(),
+        kinds.len(),
+        "a connection kind was never made: {seen:?}"
+    );
 }

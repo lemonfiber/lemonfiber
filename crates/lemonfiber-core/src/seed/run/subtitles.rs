@@ -10,7 +10,7 @@
 //! that is not running is skipped and completed on a later pass rather than holding
 //! up the other.
 
-use super::connecting::{pairings, Connection, Own, FILM, TELEVISION};
+use super::connecting::{pairings, Cleared, Connection, FILM, TELEVISION};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Subtitled, Subtitles as _, Watched};
@@ -34,7 +34,7 @@ pub(super) fn subtitled(media_types: &[String]) -> Option<Subtitled> {
 /// One subtitle finder, and every curator it is told about with where it reaches each.
 struct Watching<'a> {
     /// The finder that asks.
-    asker: Own<'a>,
+    asker: Cleared<'a>,
     /// Each curator, as the finder files it, and where it reaches it.
     curators: Vec<(&'a Filler, Subtitled, &'a Address)>,
 }
@@ -58,10 +58,10 @@ fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
 }
 
 /// The finder as a client holding the key it wrote for itself, or nothing where this
-/// machine cannot reach it or it has not written one yet — a service still starting
-/// rather than a fault, so a later run completes it. A finder is one of the stack's own
-/// services, whose credential file is never confined, so nothing here is refused.
-async fn finder(ctx: &Ctx, asker: Own<'_>) -> Option<crate::bazarr::Bazarr> {
+/// machine cannot reach it, it has not written one yet — a service still starting
+/// rather than a fault, so a later run completes it — or its file is not one it may be
+/// read from.
+async fn finder(ctx: &Ctx, asker: Cleared<'_>) -> Option<crate::bazarr::Bazarr> {
     let published = asker.published?;
     let key = crate::bazarr::api_key(
         &crate::app::targets::credential_file(ctx, &asker)

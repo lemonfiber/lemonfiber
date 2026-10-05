@@ -9,71 +9,77 @@
 //! it adopts in place of generating one — otherwise the key would live only in a
 //! database, and nothing outside the service could present it.
 
-use lemonfiber_manifest::Service;
-
+use super::connecting::{pairings, Connection};
 use super::Ctx;
+use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Aggregator, Aggregators as _};
+use crate::wiring::{Filler, Fillers};
 
 /// What this connection is called where it is reported.
-const CONNECTION: &str = "Indexers into Bindery";
-
-/// What this connection asks the stack for: a service that runs a search across the
-/// indexers it holds and answers with what they returned.
-const SEARCHES: &str = "indexer.search";
-
-/// Tell the book \*arr about the aggregator, where the stack has both.
-///
-/// Nothing where either is absent, or where the book \*arr has no key yet — the key is
-/// minted on the run that first reaches it, and a service started before that is
-/// completed by a later run rather than failed.
-pub(super) async fn seed_aggregators(
-    ctx: &Ctx,
-    services: &[Service],
-    project: Option<&std::path::Path>,
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
-) -> Vec<crate::seed::Wiring> {
-    let Some(client) = crate::app::targets::bindery_reader(ctx, services) else {
-        return Vec::new();
-    };
-    let Some(aggregator) = aggregator_to_pull_from(ctx, services, project, filled).await else {
-        return Vec::new();
-    };
-
-    vec![crate::seed::Wiring::settled(
-        CONNECTION.to_owned(),
-        told(&client, &aggregator, ctx.dry_run).await,
-    )]
+fn connection(asker: &str) -> String {
+    format!("Indexers into {asker}")
 }
 
-/// The aggregator as the book \*arr needs to be told about it: where it is on the
-/// stack's own network, and its key.
+/// Tell each book \*arr about the aggregator its ask for an indexer settles on, the
+/// stack's or a plugin's.
 ///
-/// A container name rather than a loopback address, because the service reading it is
-/// a container beside it.
+/// Which service that is comes from what the stack says the book \*arr asks for, not
+/// from a name written here, and it is reached where it says it listens on the stack's
+/// network with the key it wrote for itself. Only the stack's own book \*arr is told:
+/// it is handed the aggregator's key, and a plugin's service is handed no credential
+/// that is not its own. A pair nothing here connects is reported by the table, never
+/// dropped.
 ///
-/// Which service that is comes from what the stack says this link asks for, not from a
-/// name written here. Two of the stack's own services answer as an indexer, and which
-/// of them fills the ask is the manifest's default until the operator substitutes —
-/// at which point this reaches the other one with nothing here changed, which is the
-/// whole of what asking rather than naming buys.
-async fn aggregator_to_pull_from(
-    ctx: &Ctx,
-    services: &[Service],
-    project: Option<&std::path::Path>,
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
-) -> Option<Aggregator> {
-    let [chosen] = filled.get(SEARCHES)?.as_slice() else {
-        return None;
-    };
-    let aggregator = services.iter().find(|service| &service.id == chosen)?;
-    let port = aggregator.port?;
-    let target = super::target_for(aggregator, project?)?;
-    let key = super::arrs::read_servarr_key(ctx, &target.config).await?;
-    Some(Aggregator {
-        name: aggregator.name.clone(),
-        url: format!("http://{}:{port}", aggregator.id),
+/// Nothing for a book \*arr with no key yet — the key is minted on the run that first
+/// reaches it, and a service started before that is completed by a later run rather
+/// than failed — or for an aggregator that has not written its own key yet.
+pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
+    let mut wirings = Vec::new();
+    for pairing in pairings(fillers) {
+        let Ok((Connection::Aggregator, at, asker)) = pairing.made else {
+            continue;
+        };
+        let Some(client) = reader(ctx, fillers, &asker) else {
+            continue;
+        };
+        let connection = connection(&asker.name);
+        let key = match super::arrs::servarr_key(ctx, pairing.filler).await {
+            Beneath::Read(key) => key,
+            Beneath::Absent => continue,
+            Beneath::Escaped => {
+                wirings.push(super::arrs::refused(connection, pairing.filler));
+                continue;
+            }
+        };
+        let aggregator = Aggregator {
+            name: pairing.filler.name.clone(),
+            url: at.url(),
+            key,
+        };
+        wirings.push(crate::seed::Wiring::settled(
+            connection,
+            told(&client, &aggregator, ctx.dry_run).await,
+        ));
+    }
+    wirings
+}
+
+/// The book \*arr as a client holding the key lemonfiber minted for it, under the setting
+/// kept for it, where it publishes a port and the key is recorded.
+///
+/// The key is minted where the services are started, before this one has ever run, and
+/// the service adopts it from its environment then — so the recorded value is what both
+/// sides hold.
+fn reader(ctx: &Ctx, fillers: &Fillers, asker: &Filler) -> Option<crate::bindery::Bindery> {
+    let port = asker.published?;
+    let setting = fillers.setting(asker, crate::config::API_KEY_SUFFIX)?;
+    let key = crate::app::targets::recorded_secret(ctx, &setting)?;
+    Some(crate::bindery::Bindery::new(
+        ctx.seams.http.clone(),
+        crate::app::targets::loopback(port),
+        &asker.id,
         key,
-    })
+    ))
 }
 
 /// Point the service at the aggregator, leaving it alone where it already is.

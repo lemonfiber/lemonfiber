@@ -263,11 +263,6 @@ fn filling(capability: &str, service: &str) -> std::collections::BTreeMap<String
     std::collections::BTreeMap::from([(capability.to_owned(), vec![service.to_owned()])])
 }
 
-/// The stack's indexer ask, as the shipped manifest settles it.
-fn searched() -> std::collections::BTreeMap<String, Vec<String>> {
-    filling("indexer.search", "prowlarr")
-}
-
 /// The stack's identity ask, as the shipped manifest settles it.
 fn identified() -> std::collections::BTreeMap<String, Vec<String>> {
     filling("identity.source", "jellyfin")

@@ -5,13 +5,17 @@
 //! Never by which services they are, so a plugin standing in for a bundled service and naming the
 //! same adapter is connected exactly as the service it replaced was.
 //!
+//! **Every credential crosses one gate.** A connection hands the asker the filler's
+//! credential, and the indexer's also hands the filler the asker's; each is made only
+//! where [`crate::wiring::crosses`] lets that credential reach the one receiving it, so
+//! no pass judges for itself whom a credential may reach.
+//!
 //! **A pair this table has no connection for is reported, never dropped.** Something
 //! here fills what was asked for, and an operator reading a report that left it out
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::origin::Origin;
 use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
@@ -26,6 +30,9 @@ const TORRENT: &str = "download.torrent";
 /// each ask of every service that does it.
 const CURATES: &str = "library.curate";
 
+/// Searching across indexers, which the book \*arr asks of the service it pulls from.
+const SEARCHES: &str = "indexer.search";
+
 /// Television, as the stack manifest names the media a curator files.
 pub(super) const TELEVISION: &str = "tv";
 /// Film, likewise.
@@ -37,7 +44,7 @@ pub(super) const MUSIC: &str = "music";
 ///
 /// An ask for anything else is connected where it always was, by the pass that wires
 /// it, and is not reported here as reached by nothing.
-const ANSWERED: [&str; 3] = [USENET, TORRENT, CURATES];
+const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// What one asker and one filler come to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +62,9 @@ pub(super) enum Connection {
     },
     /// The filler, watched by the subtitle finder as this kind.
     Subtitles(Subtitled),
+    /// The filler, told to the asker as an aggregator it pulls indexers from, with the
+    /// filler's own key to read it with.
+    Aggregator,
 }
 
 impl Connection {
@@ -79,29 +89,23 @@ pub(super) enum Unmade {
     Unpaired,
     /// The two are connected for some media, and the filler files none of them.
     Files,
-    /// The connection would hand the asker's own credential to a plugin's service.
+    /// The connection would hand the asker's own credential to a filler the gate does
+    /// not let it reach.
     Withheld,
-    /// The asker is a plugin's service, and every connection here hands the asker the
-    /// filler's credential.
+    /// Every connection here hands the asker the filler's credential, and the gate does
+    /// not let it reach this asker.
     Asked,
 }
 
-/// One of the stack's own services, asking.
+/// An asker the gate let every credential its connection hands it reach.
 ///
-/// Built only from a service this build's stack ships, so whatever takes one — the
+/// Built only in [`made`], where the gate is asked, so whatever takes one — the
 /// indexer's sync, the subtitle finder, anything that reads a credential to hand an
-/// asker — is never handed a plugin's service to give one to.
+/// asker — is never handed a service the gate refused to give one to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Own<'a>(&'a Filler);
+pub(super) struct Cleared<'a>(&'a Filler);
 
-impl<'a> Own<'a> {
-    /// The service as one of the stack's own, or nothing where anything else brought it.
-    fn of(asker: &'a Filler) -> Option<Self> {
-        matches!(asker.origin, Origin::Bundled).then_some(Self(asker))
-    }
-}
-
-impl std::ops::Deref for Own<'_> {
+impl std::ops::Deref for Cleared<'_> {
     type Target = Filler;
 
     fn deref(&self) -> &Filler {
@@ -119,9 +123,9 @@ pub(super) struct Pairing<'a> {
     pub(super) ask: &'a Ask,
     /// One service that answers.
     pub(super) filler: &'a Filler,
-    /// The connection, with where the filler is reached for it and the asker as one of
-    /// the stack's own, or why there is none.
-    pub(super) made: Result<(Connection, &'a Address, Own<'a>), Unmade>,
+    /// The connection, with where the filler is reached for it and the asker as the gate
+    /// cleared it, or why there is none.
+    pub(super) made: Result<(Connection, &'a Address, Cleared<'a>), Unmade>,
 }
 
 /// The connection the table holds for an asker speaking `asker`, asking for
@@ -153,6 +157,7 @@ fn connection(
         (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => super::subtitles::subtitled(media)
             .map(Connection::Subtitles)
             .ok_or(Unmade::Files),
+        (ApiKind::Bindery, SEARCHES, ApiKind::Servarr) => Ok(Connection::Aggregator),
         _ => Err(Unmade::Unpaired),
     }
 }
@@ -188,20 +193,20 @@ fn made<'a>(
     asker: &'a Filler,
     ask: &Ask,
     filler: &'a Filler,
-) -> Result<(Connection, &'a Address, Own<'a>), Unmade> {
-    // Every connection here hands the asker the filler's credential, so a plugin's
-    // service asking is connected to nothing, whatever fills what it asked for.
-    let own = Own::of(asker).ok_or(Unmade::Asked)?;
+) -> Result<(Connection, &'a Address, Cleared<'a>), Unmade> {
+    // Every connection here hands the asker the filler's credential, so an asker that
+    // credential may not reach is connected to nothing, whatever fills what it asked for.
+    if !crate::wiring::crosses(&filler.origin, &asker.origin) {
+        return Err(Unmade::Asked);
+    }
     let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
     let asks = asker.adapter.as_ref().ok_or(Unmade::Unpaired)?.kind;
     let made = connection(asks, &ask.capability, speaks, &filler.media_types)?;
-    // A stranger's service is never handed a credential of the stack's own: what it
-    // would hold is not its to hold, and nothing could take it back.
-    if made.hands_over_the_askers_key() && matches!(filler.origin, Origin::Plugin { .. }) {
+    if made.hands_over_the_askers_key() && !crate::wiring::crosses(&asker.origin, &filler.origin) {
         return Err(Unmade::Withheld);
     }
-    Ok((made, at, own))
+    Ok((made, at, Cleared(asker)))
 }
 
 /// Every pairing that comes to nothing, each reported naming what fills and what asked.

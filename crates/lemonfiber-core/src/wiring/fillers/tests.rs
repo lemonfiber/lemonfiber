@@ -337,3 +337,17 @@ fn a_plugin_setting_another_service_takes_is_refused() {
     );
     assert_eq!(setting("sonarr", "_KEY").as_deref(), Some("SONARR_KEY"));
 }
+
+/// The gate lets a credential reach the stack's own services and the owner's own plugin,
+/// and nothing whose origin it cannot name as either.
+#[test]
+fn the_gate_lets_nothing_reach_an_origin_it_cannot_name() {
+    let unknown = Origin::Unknown {
+        why: "nothing recorded it".to_owned(),
+    };
+
+    assert!(super::crosses(&Origin::Bundled, &Origin::Bundled));
+    assert!(!super::crosses(&Origin::Bundled, &Origin::Operator));
+    assert!(!super::crosses(&Origin::Operator, &Origin::Operator));
+    assert!(!super::crosses(&unknown, &unknown));
+}
