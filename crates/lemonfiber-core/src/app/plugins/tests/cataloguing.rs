@@ -444,6 +444,17 @@ async fn an_unreadable_record_of_the_newest_index_resolves_nothing() {
             "not a record",
             "and it is left as it was"
         );
+
+        // One that is there and cannot be opened as a file is not read as none either,
+        // in a rehearsal too, where nothing would be written over it.
+        let (mut unopenable, _) = cataloguing(
+            "catalogue-unopenable",
+            release(&listed, Some(signing.signed(&listed))),
+            signing.key(),
+        );
+        assert!(std::fs::create_dir_all(newest(&unopenable)).is_ok());
+        unopenable.dry_run = true;
+        assert_eq!(refusal(by_name(&unopenable, "komga").await), "PLUGIN-30");
     }
 }
 
