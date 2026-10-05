@@ -555,3 +555,129 @@ async fn an_unread_record_calls_nothing_run_out() {
         "{findings:?}"
     );
 }
+
+/// Reading the household takes back what has run out, the way the next offer would: the
+/// offer nobody took up is removed, the reset nobody took up again is switched off, and
+/// the one still standing and the one already switched off are left alone.
+#[tokio::test]
+async fn reading_the_household_takes_back_what_has_run_out() {
+    let ran = running(
+        "read-takes-back",
+        Command::Household { member: None },
+        a_server(Answers::accepted()),
+        nothing,
+    )
+    .await;
+
+    assert_eq!(ran.deleted(), ["7"], "{:?}", ran.deleted());
+    let switched_off = ran.policies("5");
+    assert_eq!(
+        switched_off
+            .first()
+            .and_then(|policy| policy.get("IsDisabled")),
+        Some(&serde_json::json!(true)),
+        "{switched_off:?}"
+    );
+    assert!(ran.policies("11").is_empty() && ran.policies("9").is_empty());
+}
+
+/// A rehearsed read takes nothing back.
+#[tokio::test]
+async fn a_rehearsed_read_takes_nothing_back() {
+    let env = recorded_admin("read-rehearsed");
+    let http = a_server(Answers::accepted());
+    let said = dispatch(
+        Command::Household { member: None },
+        &context(&env, http.clone()).rehearsing(),
+    )
+    .await;
+    if let Some(directory) = env.parent() {
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    assert!(said.is_ok(), "{said:?}");
+    assert!(
+        http.requests()
+            .iter()
+            .all(|request| request.method != Method::Delete && !request.url.ends_with("/Policy")),
+        "a rehearsal took something back"
+    );
+}
+
+/// What could not be taken back is said, because it can still be claimed.
+#[tokio::test]
+async fn an_invitation_that_could_not_be_taken_back_is_said() {
+    let http = Fake::by_route(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+        ),
+        (
+            Method::Get,
+            "/System/ActivityLog",
+            Answer::reply(200, RECORDED),
+        ),
+        (Method::Delete, "/Users/", Answer::reply(500, "")),
+        (Method::Get, "/Users/", Answer::reply(200, ACCOUNT)),
+        (Method::Post, "/Policy", Answer::reply(204, "")),
+        (Method::Get, "/Users", Answer::reply(200, HOUSEHOLD)),
+        (Method::Get, "", Answer::Silent),
+        (Method::Post, "", Answer::Silent),
+    ]);
+    let ran = running(
+        "read-cannot-take-back",
+        Command::Household { member: None },
+        http,
+        nothing,
+    )
+    .await;
+    let Ok(Outcome::Household(report)) = ran.said else {
+        unreachable!("the household was read");
+    };
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding
+                .starts_with("bo's invitation ran out and could not be taken back")),
+        "{:?}",
+        report.findings
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| !finding.starts_with("cy's")),
+        "{:?}",
+        report.findings
+    );
+}
+
+/// `fay` was offered an account and has claimed it in time; `owner`'s offer ran out and
+/// it was claimed only afterwards.
+fn offered_to_fay_and_owner(directory: &std::path::Path) {
+    let _ = std::fs::write(
+        directory.join("invitations.json"),
+        r#"{"12":{"offered":"2026-10-03T10:00:00Z","lapses":"2999-01-01T00:00:00Z"},
+            "1":{"offered":"2026-01-01T10:00:00Z","lapses":"2026-01-03T10:00:00Z"}}"#,
+    );
+}
+
+/// Reading the household closes an offer seen taken up in time, and keeps one claimed
+/// only after it ran out, which is what keeps that one refused at the door.
+#[tokio::test]
+async fn reading_the_household_closes_an_offer_taken_up_in_time() {
+    let ran = running(
+        "read-closes",
+        Command::Household { member: None },
+        a_server(Answers::accepted()),
+        offered_to_fay_and_owner,
+    )
+    .await;
+
+    assert!(ran.said.is_ok(), "{:?}", ran.refusal());
+    assert!(!ran.kept.contains(r#""12""#), "{}", ran.kept);
+    assert!(ran.kept.contains(r#""1""#), "{}", ran.kept);
+}

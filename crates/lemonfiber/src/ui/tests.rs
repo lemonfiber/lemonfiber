@@ -368,6 +368,7 @@ fn as_served(random: &Chance) -> Option<Router> {
         jobs: Jobs::default(),
         admitting: Arc::clone(&admitting),
         live: Arc::clone(&live),
+        kept: Arc::default(),
     };
     let streaming = Arc::new(Streaming {
         token,

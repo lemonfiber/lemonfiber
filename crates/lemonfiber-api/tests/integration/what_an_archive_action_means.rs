@@ -239,6 +239,7 @@ fn routed() -> axum::Router {
             admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs: Jobs::default(),
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+            kept: Arc::default(),
         })
         // The subject the guard puts on every request it admits. Mounted here because a
         // test builds these routes without the layer that carries it, and a handler that

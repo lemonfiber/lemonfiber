@@ -73,8 +73,15 @@ pub(crate) async fn household(
 
     let mut findings = Vec::new();
     let (libraries, certificates) = named_by_the_server(&server, &mut findings).await;
-    let expired = standing::expired(ctx, &server, &accounts, &mut findings).await;
-    let declined = standing::declined(ctx, &server, &accounts, &mut findings).await;
+
+    // What is said about invitations names other people's accounts, so it is said only
+    // to whoever reads the whole household.
+    let mut about_invitations = Vec::new();
+    let (expired, declined) =
+        standing::invitations(ctx, &server, &accounts, &mut about_invitations).await;
+    if member.is_none() {
+        findings.append(&mut about_invitations);
+    }
 
     // A request service that will not answer costs the requests, not the household.
     // Who is here is the media server's fact, and reporting nobody because a second
@@ -94,33 +101,7 @@ pub(crate) async fn household(
             None
         }
     };
-    let (requests, asked) = match &reached {
-        Some(access) => {
-            let asked = access.seerr.requests().await.map_err(|_| {
-                "the request service's own record could not be read, so what the \
-                 household has asked for is not shown"
-                    .to_owned()
-            });
-            let requests = match asked {
-                Ok(requests) => requests,
-                Err(reason) => {
-                    findings.push(reason);
-                    Vec::new()
-                }
-            };
-            (
-                requests,
-                allowance::gathered(&access.seerr, &accounts).await,
-            )
-        }
-        None => (
-            Vec::new(),
-            allowance::Asked {
-                household: None,
-                members: BTreeMap::new(),
-            },
-        ),
-    };
+    let (requests, asked) = asked_of(reached.as_ref(), &accounts, &mut findings).await;
     if asked.household.is_none() {
         findings.push(
             "what the household may ask for could not be read, so no policy and no \
@@ -172,6 +153,33 @@ pub(crate) async fn household(
     );
     report.findings.append(&mut findings);
     Ok(report)
+}
+
+/// What the household asked for, and what each member may ask for, from the request
+/// service where it was reached.
+async fn asked_of(
+    reached: Option<&crate::app::targets::HouseholdAccess>,
+    accounts: &[Member],
+    findings: &mut Vec<String>,
+) -> (Vec<HouseholdRequest>, allowance::Asked) {
+    let Some(access) = reached else {
+        return (
+            Vec::new(),
+            allowance::Asked {
+                household: None,
+                members: BTreeMap::new(),
+            },
+        );
+    };
+    let requests = access.seerr.requests().await.unwrap_or_else(|_| {
+        findings.push(
+            "the request service's own record could not be read, so what the household \
+             has asked for is not shown"
+                .to_owned(),
+        );
+        Vec::new()
+    });
+    (requests, allowance::gathered(&access.seerr, accounts).await)
 }
 
 /// The half of this reading the household itself sees, and the block that goes with it.
@@ -246,37 +254,63 @@ pub(crate) async fn reaching(
 /// — the same courtesy the trace extends to a title. A session carries the id the media
 /// server assigned and means that account and no other, so it is compared whole.
 ///
-/// **The id is tried first, and exactly.** An identifier matched the forgiving way would
-/// be one that could find a different person whose name happened to contain it, and this
-/// narrowing decides whose requests somebody is shown — so the one reading it must never
-/// produce is a member handed another member's row.
+/// **An id names one account and nothing else.** Where `named` is an account's id it is
+/// compared whole against every account and never looked for inside a name: this
+/// narrowing decides whose requests somebody is shown, and the one reading it must never
+/// produce is a member handed another member's row because that row's name happened to
+/// contain their id.
 ///
 /// `named` arrives lower-cased, because the caller lower-cases it once rather than this
 /// doing it per account.
-fn names(account: &Member, named: &str) -> bool {
-    account.id.to_lowercase() == named || account.name.to_lowercase().contains(named)
+fn names(account: &Member, named: &str, by_id: bool) -> bool {
+    if by_id {
+        return account.id.to_lowercase() == named;
+    }
+    account.name.to_lowercase().contains(named)
 }
 
-/// The household, member by member, with what each asked for joined onto them.
+/// The id of the account a request is filed under, lower-cased, or the name it was
+/// asked under where no account answers to it.
 ///
-/// Members come out in name order, and each member's requests in the order the service
-/// gave them — newest first, so the ones still worth asking about lead.
-fn assemble(
-    accounts: Vec<Member>,
-    requests: Vec<HouseholdRequest>,
-    naming: &Naming<'_>,
-    member: Option<&str>,
-) -> HouseholdReport {
-    let wanted = member.map(str::to_lowercase);
+/// By the media server's id wherever the record carries one, because that is the one
+/// thing about the requester they cannot change: the name the request service shows is
+/// theirs to set, and joined on it a member could rename themselves after somebody else
+/// and have their requests, and their count, filed under that person. Only a record
+/// carrying no id at all is filed by name, which is all it has.
+///
+/// `ids` is every account's lower-cased name against its lower-cased id.
+fn whose(request: &HouseholdRequest, ids: &BTreeMap<String, String>) -> String {
+    if let Some(id) = &request.member_id {
+        return id.to_lowercase();
+    }
+    let named = request.member.to_lowercase();
+    ids.get(&named).cloned().unwrap_or(named)
+}
 
-    // Keyed by the lower-cased name: the media server treats two names differing only
-    // in case as the same person, so a join on the exact string would file a member's
-    // own requests under nobody.
-    let mut by_name: BTreeMap<String, Theirs> = BTreeMap::new();
+/// The requests, gathered under whoever made each one.
+///
+/// Keyed by the lower-cased id of the account a request is filed under, or by the name it
+/// was asked under where no account answers to it — see [`whose`].
+fn grouped(
+    requests: Vec<HouseholdRequest>,
+    accounts: &[Member],
+    naming: &Naming<'_>,
+) -> BTreeMap<String, Theirs> {
+    // Lower-cased either way: the media server treats two names differing only in case
+    // as the same person, so a join on the exact string would file a member's own
+    // requests under nobody.
+    let ids: BTreeMap<String, String> = accounts
+        .iter()
+        .map(|account| (account.name.to_lowercase(), account.id.to_lowercase()))
+        .collect();
+    let mut by_whom: BTreeMap<String, Theirs> = BTreeMap::new();
     for request in requests {
         let state = State::of(request.request_status, request.media_status);
         let made = request.made.clone();
-        let theirs = by_name.entry(request.member.to_lowercase()).or_default();
+        let theirs = by_whom.entry(whose(&request, &ids)).or_default();
+        if theirs.shown_as.is_empty() {
+            theirs.shown_as = request.member.to_lowercase();
+        }
         // Kept beside the requests rather than read back off them: what a period counts
         // is when something was asked for, and a request already fetched is still inside
         // the window that counted it.
@@ -297,19 +331,39 @@ fn assemble(
             refused: naming.reasons.of(request.id).cloned(),
         });
     }
+    by_whom
+}
+
+/// The household, member by member, with what each asked for joined onto them.
+///
+/// Members come out in name order, and each member's requests in the order the service
+/// gave them — newest first, so the ones still worth asking about lead.
+fn assemble(
+    accounts: Vec<Member>,
+    requests: Vec<HouseholdRequest>,
+    naming: &Naming<'_>,
+    member: Option<&str>,
+) -> HouseholdReport {
+    let wanted = member.map(str::to_lowercase);
+    let by_id = wanted.as_ref().is_some_and(|named| {
+        accounts
+            .iter()
+            .any(|account| account.id.to_lowercase() == *named)
+    });
+
+    let mut by_whom = grouped(requests, &accounts, naming);
 
     let mut members: Vec<HouseholdMember> = Vec::new();
     for account in accounts {
         // Taken before the narrowing below, so asking about one person does not leave
         // everybody else's requests looking like requests belonging to nobody.
-        let theirs = by_name
-            .remove(&account.name.to_lowercase())
+        let theirs = by_whom
+            .remove(&account.id.to_lowercase())
             .unwrap_or_default();
-        // An id is compared whole and a name is looked for inside one. The id is tried
-        // first and exactly, so a session naming an account reaches that account and
-        // nothing else: an identifier matched the forgiving way would be one that could
-        // find a *different* person whose name happened to contain it.
-        if wanted.as_ref().is_some_and(|named| !names(&account, named)) {
+        if wanted
+            .as_ref()
+            .is_some_and(|named| !names(&account, named, by_id))
+        {
             continue;
         }
         // An administrator is left out of the agreement: the request service treats
@@ -342,10 +396,13 @@ fn assemble(
 
     // Whatever is left was asked for by somebody the media server holds no account
     // under. Said rather than dropped: a request outliving the account that made it is
-    // exactly the kind of thing an operator is looking at this list to find.
-    let unclaimed: Vec<String> = by_name.into_keys().collect();
+    // exactly the kind of thing an operator is looking at this list to find. Said only
+    // to whoever reads the whole household, because it names other people.
+    let mut unclaimed: Vec<String> = by_whom.into_values().map(|left| left.shown_as).collect();
+    unclaimed.sort();
+    unclaimed.dedup();
     let mut findings = Vec::new();
-    if !unclaimed.is_empty() {
+    if member.is_none() && !unclaimed.is_empty() {
         findings.push(format!(
             "the media server holds no account under {}, so what they asked for is not \
              listed under anybody",
@@ -408,6 +465,9 @@ struct Theirs {
     requests: Vec<MemberRequest>,
     /// When each was asked for, as the request service timestamps it.
     made: Vec<String>,
+    /// The name the request service showed them by, lower-cased, for saying who asked
+    /// where nobody in the household did.
+    shown_as: String,
 }
 
 /// The household view where the requests could not be read at all — said plainly, so an

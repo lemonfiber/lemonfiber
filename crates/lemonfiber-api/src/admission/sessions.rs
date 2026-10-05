@@ -117,24 +117,40 @@ impl Sessions {
     ///
     /// An operator's is checked against the verifier as it stands **now** rather
     /// than as it stood then: that is the whole of how a password change reaches a
-    /// session somebody else is holding. A member's is not checked here at all —
-    /// the media server is what holds their account, and asking it is a separate
-    /// errand from remembering what was proved.
+    /// session somebody else is holding.
     pub async fn holds(
         &self,
         offered: Option<&str>,
         now: SystemTime,
         against: Option<&Credential>,
     ) -> Option<Opened> {
+        still(self.opened_for(offered, now).await?, against)
+    }
+
+    /// Who this secret was opened for, where it is still a session, before anything
+    /// about it is checked.
+    ///
+    /// Apart from [`Self::holds`] so a caller can read what to check against only for
+    /// the sessions that need it: an operator's is checked against the credential on
+    /// disk, and nothing else is.
+    pub async fn opened_for(&self, offered: Option<&str>, now: SystemTime) -> Option<Opened> {
         let offered = offered?;
         let mut held = self.held.lock().await;
         held.retain(|_, session| session.until > now);
-        match &held.get(offered)?.who {
-            Opened::Operator(opened) if Some(opened) == against => {
-                Some(Opened::Operator(opened.clone()))
-            }
-            Opened::Operator(_) => None,
-            Opened::Member(signed) => Some(Opened::Member(signed.clone())),
-        }
+        Some(held.get(offered)?.who.clone())
+    }
+}
+
+/// Whether what a session was opened for still stands against the credential on disk.
+///
+/// An operator's stands while the credential it was opened against is the one there; a
+/// member's is not checked here at all — the media server is what holds their account,
+/// and asking it is a separate errand from remembering what was proved.
+#[must_use]
+pub fn still(opened: Opened, against: Option<&Credential>) -> Option<Opened> {
+    match opened {
+        Opened::Operator(held) if Some(&held) == against => Some(Opened::Operator(held)),
+        Opened::Operator(_) => None,
+        member @ Opened::Member(_) => Some(member),
     }
 }

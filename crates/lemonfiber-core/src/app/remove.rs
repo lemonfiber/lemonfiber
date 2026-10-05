@@ -119,7 +119,7 @@ async fn what_it_costs(asking: Option<&super::targets::HouseholdAccess>, member:
         );
     }
     let requests = match asking {
-        Some(access) => theirs(access, &member.name).await,
+        Some(access) => theirs(access, member).await,
         None => 0,
     };
     Cost {
@@ -187,14 +187,21 @@ async fn their_account(access: &super::targets::HouseholdAccess, member: &Member
 
 /// How many requests this member has made, as the request service records them.
 ///
-/// Counted by name rather than by identifier because that is what the record carries,
-/// and matched without regard to case for the same reason the account was.
-async fn theirs(access: &super::targets::HouseholdAccess, name: &str) -> usize {
-    let asked = name.to_lowercase();
+/// Counted by the media server's id wherever a record carries one, because the name the
+/// request service shows is the requester's own to change; a record carrying none is
+/// counted by name, matched without regard to case for the same reason the account was.
+async fn theirs(access: &super::targets::HouseholdAccess, member: &Member) -> usize {
+    let id = member.id.to_lowercase();
+    let name = member.name.to_lowercase();
     access.seerr.requests().await.map_or(0, |requests| {
         requests
             .iter()
-            .filter(|request| request.member.to_lowercase() == asked)
+            .filter(|request| {
+                request.member_id.as_ref().map_or_else(
+                    || request.member.to_lowercase() == name,
+                    |by| by.to_lowercase() == id,
+                )
+            })
             .count()
     })
 }

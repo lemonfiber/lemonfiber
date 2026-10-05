@@ -28,6 +28,7 @@ fn asked(id: i64, made: Option<&str>, request_status: u8) -> HouseholdRequest {
         id,
         made: made.map(str::to_owned),
         member: "Ana".to_owned(),
+        member_id: None,
         kind: Some(crate::recyclarr::Kind::Radarr),
         item: None,
         request_status,

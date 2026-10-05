@@ -141,18 +141,49 @@ pub(crate) fn run_out(offered: &[Offered], cutoff: &str) -> Spent {
 
 /// The record with one offer written into it, and the ones no longer standing dropped.
 ///
-/// What is dropped is every account that is not an invitation any more — claimed, or gone —
-/// so the record holds the offers still out and nothing else.
+/// What is dropped is every account that is not an invitation any more: one that is gone,
+/// and one claimed while its offer still stood. **One claimed after its offer ran out is
+/// kept**, because nothing here can tell that from one claimed in time that nobody saw,
+/// and dropping it would admit whoever claimed a lapsed invitation the moment anybody else
+/// was invited.
 #[must_use]
-pub(crate) fn recorded(
-    mut offers: Offers,
-    household: &[Member],
-    member: &str,
-    offer: Offer,
-) -> Offers {
-    offers.retain(|id, _| household.iter().any(|held| &held.id == id && !held.claimed));
+pub(crate) fn recorded(offers: Offers, household: &[Member], member: &str, offer: Offer) -> Offers {
+    let mut offers = closed(offers, household, &offer.offered);
     offers.insert(member.to_owned(), offer);
     offers
+}
+
+/// The record with every offer that is no longer out taken off it, as it stands at `now`.
+///
+/// An offer is no longer out where its account is gone, or was claimed before the offer
+/// ran out. One claimed and run out stays: see [`recorded`].
+#[must_use]
+pub(crate) fn closed(mut offers: Offers, household: &[Member], now: &str) -> Offers {
+    offers.retain(|id, offer| {
+        household
+            .iter()
+            .any(|held| &held.id == id && (!held.claimed || lapsed(offer, now)))
+    });
+    offers
+}
+
+/// Whether this account's offer ran out while it was still out.
+///
+/// That is an invitation nobody was seen to claim in time, so whoever holds the account
+/// now is not one the household can vouch for. Nothing where the record holds no offer for
+/// it, which is every member who was not invited by this program or whose offer was seen
+/// taken up.
+#[must_use]
+pub(crate) fn lapsed_unseen(offers: &Offers, id: &str, now: &str) -> bool {
+    offers.get(id).is_some_and(|offer| lapsed(offer, now))
+}
+
+/// Whether an offer has run out at `now`.
+///
+/// One whose end cannot be read has, for the reason an undated invitation has: what is at
+/// stake is an account nobody was seen to claim.
+fn lapsed(offer: &Offer, now: &str) -> bool {
+    !comparable(&offer.lapses) || offer.lapses.as_str() <= now
 }
 
 /// Whether a recorded moment is one this can order against another.

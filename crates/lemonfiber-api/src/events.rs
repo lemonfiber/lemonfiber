@@ -19,6 +19,7 @@ pub mod wire;
 
 use std::convert::Infallible;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::extract::State;
@@ -37,6 +38,12 @@ use self::live::{Listening, Live};
 
 /// Where the stream is served.
 pub const PATH: &str = "/api/events";
+
+/// How long a stream's last yes to whether it may go on stands before it is asked again.
+///
+/// The beat, so a quiet stream is asked as often as it was before and a busy one no
+/// more often than a quiet one.
+pub const RECHECKED_EVERY: Duration = wire::BEAT;
 
 /// The header a client returning to the stream says where it got to in.
 pub const LAST_EVENT_ID: &str = "Last-Event-ID";
@@ -123,6 +130,7 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
             token: Arc::clone(&streaming.token),
             clock: Arc::clone(&streaming.clock),
             headers,
+            vouched: None,
         },
     )
 }
@@ -131,8 +139,13 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
 ///
 /// Admission is a question about a moment, and a stream spans hours of them. A session
 /// that expires, a password changed or taken away, a member removed: each is refused at
-/// the next request, and a stream has no next request — so it is asked again here, on
-/// every event and every beat, and ends at the first answer that is not yes.
+/// the next request, and a stream has no next request — so it is asked again here, and
+/// ends at the first answer that is not yes.
+///
+/// Asked at most once a [`RECHECKED_EVERY`] rather than before every event: a stream
+/// following a busy log says hundreds of things a minute, and asking before each would
+/// read the password from disk as often. A yes stands until the next asking, so what
+/// ends a session ends its stream within that long.
 ///
 /// What it holds is what admission reads and nothing more. The stream itself is not
 /// among it: a stream holding on to what it listens to would keep that open after
@@ -146,20 +159,28 @@ pub struct Staying {
     clock: Arc<dyn Clock>,
     /// What the client carried when it opened the stream.
     headers: HeaderMap,
+    /// Until when the last yes stands, where there has been one.
+    vouched: Option<tokio::time::Instant>,
 }
 
 impl Staying {
     /// Whether whoever opened the stream is still somebody it may be said to.
-    async fn still(&self) -> bool {
+    async fn still(&mut self) -> bool {
+        let asked = tokio::time::Instant::now();
+        if self.vouched.is_some_and(|until| asked < until) {
+            return true;
+        }
         let now = self.clock.now();
-        match self
+        let still = match self
             .admitting
             .carried(&self.headers, &self.token, now)
             .await
         {
             Knocking::Known(caller) => crate::serve::operator_only(&caller).is_none(),
             Knocking::Nobody | Knocking::Unconfirmed => false,
-        }
+        };
+        self.vouched = still.then(|| asked + RECHECKED_EVERY);
+        still
     }
 }
 
@@ -168,7 +189,7 @@ impl Staying {
 pub fn held(listening: Listening, staying: Staying) -> Response<Body> {
     let talking = futures_util::stream::unfold(
         (listening, staying),
-        |(mut listening, staying)| async move {
+        |(mut listening, mut staying)| async move {
             let said = listening.next().await?;
             if !staying.still().await {
                 return None;

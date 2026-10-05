@@ -22,6 +22,7 @@ use crate::events::live::Live;
 use crate::events::Streaming;
 use crate::guard::{Binding, Token};
 use crate::jobs::Jobs;
+use crate::read::kept::Kept;
 use crate::refusal::Refusal;
 use crate::serve::admitted;
 
@@ -53,6 +54,8 @@ pub struct Serving {
     /// which is what a follow's lines and a wait's words both need, and two
     /// streams would be two orders for one run of events.
     pub live: Arc<Live>,
+    /// The household each member read last, handed back to them for a few seconds.
+    pub kept: Arc<Kept>,
 }
 
 /// Every endpoint this surface answers, behind the guard they share.

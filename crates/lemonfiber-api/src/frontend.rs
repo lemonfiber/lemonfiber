@@ -14,6 +14,8 @@
 //! load and refuses to be framed. Neither costs anything to state and both stop
 //! being available to state once somebody is already relying on the absence.
 
+use std::borrow::Cow;
+
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{header, HeaderValue, Response, StatusCode};
@@ -66,10 +68,17 @@ pub fn content_type(path: &std::path::Path) -> &'static str {
 }
 
 /// One file of the app, with what it is and what it may do.
+///
+/// A file compiled into the binary is answered from where it already sits rather than
+/// copied first, so a page load costs no allocation the size of the app.
 #[must_use]
-pub fn served(asset: &Asset) -> Response<Body> {
-    let body = Body::from(asset.bytes.clone().into_owned());
-    let mut response = carrying(StatusCode::OK, content_type(&asset.path), body);
+pub fn served(asset: Asset) -> Response<Body> {
+    let sort = content_type(&asset.path);
+    let body = match asset.bytes {
+        Cow::Borrowed(kept) => Body::from(kept),
+        Cow::Owned(read) => Body::from(read),
+    };
+    let mut response = carrying(StatusCode::OK, sort, body);
     allowed(&mut response);
     response
 }
@@ -116,9 +125,7 @@ pub fn page(app: Option<Source>, asked: &str) -> Response<Body> {
     let Some(source) = app.filter(|source| source.holds_an_app()) else {
         return absent();
     };
-    source
-        .asset(asked)
-        .map_or_else(missing, |asset| served(&asset))
+    source.asset(asked).map_or_else(missing, served)
 }
 
 /// The routes that serve the app.

@@ -28,7 +28,7 @@ pub(crate) mod declining;
 mod offering;
 mod refusals;
 mod reissuing;
-mod standing;
+pub(crate) mod standing;
 
 pub(crate) use reissuing::reissue;
 

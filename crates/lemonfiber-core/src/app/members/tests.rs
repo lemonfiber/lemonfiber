@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::household;
+use super::{household, vouched_for};
 use crate::app::Ctx;
 use crate::test_support::{a_context, a_password, nowhere};
 
@@ -69,4 +69,58 @@ fn a_stack_whose_manifest_cannot_be_read_has_no_household() {
     };
 
     assert!(household(&context).is_none());
+}
+
+/// A context whose record holds one offer for account `a7f3`, running out `lapses_in`
+/// hours from now — in the past where negative.
+fn offered(tag: &str, lapses_in: i64) -> Ctx {
+    let (context, _) = ctx_with(tag, None);
+    let offers: crate::invitation::Offers = [(
+        "a7f3".to_owned(),
+        crate::invitation::Offer {
+            offered: context.hours_ago(48 - lapses_in),
+            lapses: context.hours_ago(-lapses_in),
+            decline: None,
+        },
+    )]
+    .into_iter()
+    .collect();
+    crate::app::record::keep_beside(&context, crate::invitation::RECORD, &offers);
+    context
+}
+
+/// What the record holds now.
+fn on_record(context: &Ctx) -> crate::invitation::Offers {
+    crate::app::record::beside(context, crate::invitation::RECORD)
+}
+
+/// An invitation that ran out before anybody was seen to take it up is refused, with
+/// nothing having swept the household since.
+#[test]
+fn an_invitation_that_ran_out_unseen_is_not_vouched_for() {
+    let context = offered("lapsed", -1);
+
+    assert!(!vouched_for(&context, "a7f3"));
+    assert!(
+        on_record(&context).contains_key("a7f3"),
+        "the refusal let go of what it rests on"
+    );
+}
+
+/// A member signing in while their offer still stands has taken it up, and is never
+/// judged against it again.
+#[test]
+fn signing_in_while_the_offer_stands_closes_it() {
+    let context = offered("in-time", 1);
+
+    assert!(vouched_for(&context, "a7f3"));
+    assert!(on_record(&context).is_empty(), "the offer was not closed");
+}
+
+#[test]
+fn an_account_never_offered_is_vouched_for() {
+    let context = offered("never-offered", 1);
+
+    assert!(vouched_for(&context, "b9c1"));
+    assert!(on_record(&context).contains_key("a7f3"));
 }

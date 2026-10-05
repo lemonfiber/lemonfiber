@@ -83,6 +83,9 @@ tokio-stream = "0.1"
 # already in the tree via axum.
 hyper = { version = "1", default-features = false, features = ["server", "http1"] }
 hyper-util = { version = "0.1", default-features = false, features = ["tokio", "service"] }
+# The body trait hyper reads a request through, taken directly so the web surface can
+# give a request's body a deadline to arrive by. Already in the tree via hyper.
+http-body = "1"
 # The service traits axum's own router is built on, so a test can call the assembled
 # router directly instead of putting a socket between itself and an endpoint. Already
 # in the tree via axum; only the combinators are taken.

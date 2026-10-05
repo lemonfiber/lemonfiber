@@ -10,12 +10,13 @@
 //! for the same absent submodule. Two fixtures for one missing thing would be two
 //! things to keep in step.
 
+use std::borrow::Cow;
 use std::path::Path;
 
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use lemonfiber_api::frontend::{absent, content_type, missing, page, routes, served, unanswered};
-use lemonfiber_core::frontend::Source;
+use lemonfiber_core::frontend::{Asset, Source};
 
 /// The app a build would embed, read from disk instead.
 fn app() -> Source {
@@ -209,7 +210,7 @@ async fn one_file_served_on_its_own_carries_the_same_guarantees() {
     let Some(asset) = app().asset("/assets/app.css") else {
         unreachable!("the fixture holds a stylesheet");
     };
-    let response = served(&asset);
+    let response = served(asset);
     assert_eq!(
         said(&response, header::CONTENT_TYPE),
         "text/css; charset=utf-8"
@@ -219,6 +220,29 @@ async fn one_file_served_on_its_own_carries_the_same_guarantees() {
     let body = to_bytes(response.into_body(), usize::MAX).await;
     let text = String::from_utf8(body.map(|bytes| bytes.to_vec()).unwrap_or_default());
     assert!(text.unwrap_or_default().contains("margin"));
+}
+
+/// A script as a binary carries it, for the one test that asks where its bytes go.
+static COMPILED_IN: &[u8] = b"console.log('kept where it was compiled');";
+
+#[tokio::test]
+async fn a_file_compiled_into_the_binary_is_answered_from_where_it_sits() {
+    // The bytes that come back are the ones in the binary, not a copy made for this
+    // answer: a page load would otherwise allocate and copy the whole app every time.
+    let asset = Asset {
+        path: "assets/app.js".into(),
+        bytes: Cow::Borrowed(COMPILED_IN),
+    };
+    let body = to_bytes(served(asset).into_body(), usize::MAX).await;
+    let Ok(body) = body else {
+        unreachable!("an answer this surface produces is one that can be read");
+    };
+    assert_eq!(body.as_ref(), COMPILED_IN);
+    assert_eq!(
+        body.as_ptr(),
+        COMPILED_IN.as_ptr(),
+        "the file was copied rather than answered from the binary"
+    );
 }
 
 // ── The routes themselves, driven without a socket ────────────────────────────
