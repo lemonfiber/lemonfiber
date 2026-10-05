@@ -74,6 +74,9 @@ use crate::ports::service::{
 };
 use crate::qbittorrent::Qbittorrent;
 
+/// The operation a seeding run's changes are journalled under.
+pub const OPERATION: &str = "seed";
+
 /// The administrator account name lemonfiber creates on the media server and
 /// signs Seerr in with — one source of truth, so a trace's later library read
 /// authenticates under the same name it was created with.
@@ -125,7 +128,7 @@ async fn wire_one<T>(
         Some(id) => {
             journal.record(Change {
                 at: at.to_owned(),
-                operation: "seed".to_owned(),
+                operation: OPERATION.to_owned(),
                 target: naming.service.to_owned(),
                 kind: Kind::Created {
                     resource: naming.resource.to_owned(),

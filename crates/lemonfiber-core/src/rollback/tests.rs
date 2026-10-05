@@ -28,7 +28,7 @@ fn everything_an_operation_made_is_every_run_of_it_and_nothing_else() {
         set("apply", "C", None, "3"),
     ];
 
-    let mine: Vec<&str> = everything(&held, "komga")
+    let mine: Vec<&str> = everything(&held, &|change| change.operation == "komga")
         .iter()
         .filter_map(|change| setting(change))
         .collect();
@@ -38,7 +38,7 @@ fn everything_an_operation_made_is_every_run_of_it_and_nothing_else() {
         1,
         "where one run of it is one entry"
     );
-    assert!(everything(&held, "nothing").is_empty());
+    assert!(everything(&held, &|change| change.operation == "nothing").is_empty());
 }
 
 /// A resource a service now holds, made by an operation of ours.

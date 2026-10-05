@@ -215,11 +215,31 @@ impl Fillers {
     }
 }
 
+impl Fillers {
+    /// Every setting a credential of one installed plugin's services is kept under.
+    ///
+    /// The ones [`Self::setting`] answers for and nothing else, so a name another service
+    /// here takes is never among them: what is taken away with a plugin is what was kept
+    /// for it.
+    #[must_use]
+    pub fn kept_for(&self, plugin: &str) -> Vec<String> {
+        self.services
+            .iter()
+            .filter(|one| matches!(&one.origin, Origin::Plugin { named } if named == plugin))
+            .flat_map(|one| {
+                crate::config::CREDENTIAL_SUFFIXES
+                    .iter()
+                    .filter_map(move |suffix| self.setting(one, suffix))
+            })
+            .collect()
+    }
+}
+
 /// The name a credential `filler` holds would be kept under, ending in `holds`, before
 /// anything is refused.
 fn spelled(filler: &Filler, holds: &str) -> String {
-    match filler.origin {
-        Origin::Plugin { .. } => crate::config::for_plugin(&filler.id, holds),
+    match &filler.origin {
+        Origin::Plugin { named } => crate::config::for_plugin(named, &filler.id, holds),
         _ => crate::config::for_service(&filler.id, holds),
     }
 }

@@ -305,19 +305,22 @@ pub(crate) fn for_service(id: &str, holds: &str) -> String {
     format!("{}{holds}", lemonfiber_manifest::environment_name(id))
 }
 
-/// A setting named for one installed plugin's service: [`PLUGIN_SETTING`], its id as an
-/// environment name spells it with every `_` written twice, and then what it holds.
+/// A setting named for one installed plugin's service: [`PLUGIN_SETTING`], the plugin's
+/// id and then the service's, each as an environment name spells it with every `_`
+/// written twice and one `_` between them, and then what it holds.
 ///
-/// Written twice so no two of these meet. Every ending in [`CREDENTIAL_SUFFIXES`] is one
-/// `_` and then a letter, so read from the left a `__` is the id's own `_` and the first
-/// `_` left over is where the id stops: the name gives back the id and the ending it was
-/// made of, and a service whose id runs on into another's ending — `a-api` beside `a`'s
-/// API key — spells a name of its own.
-pub(crate) fn for_plugin(id: &str, holds: &str) -> String {
-    format!(
-        "{PLUGIN_SETTING}{}{holds}",
-        lemonfiber_manifest::environment_name(id).replace('_', "__")
-    )
+/// The plugin is in it because a service's id is the plugin's choice, and a later
+/// plugin with a service of the same id is somebody else: keyed by the service alone,
+/// a password one plugin's service was given would be handed to the next.
+///
+/// Written twice so no two of these meet. A service's id is a DNS label, so it begins
+/// and ends with a letter or a digit, and every ending in [`CREDENTIAL_SUFFIXES`] is one
+/// `_` and then a letter. So read from the left, the first run of `_` of odd length ends
+/// where the plugin's id does, and the next one is where the service's id stops: the
+/// name gives back both ids and the ending it was made of.
+pub(crate) fn for_plugin(plugin: &str, id: &str, holds: &str) -> String {
+    let doubled = |named: &str| lemonfiber_manifest::environment_name(named).replace('_', "__");
+    format!("{PLUGIN_SETTING}{}_{}{holds}", doubled(plugin), doubled(id))
 }
 
 /// Every setting lemonfiber names.

@@ -52,27 +52,41 @@ pub fn plain(text: &str) -> String {
 /// The bidirectional embeddings, overrides and isolates say which way the text
 /// after them runs, so `\u{202e}` in a release name draws `gpj.exe` as `exe.jpg`
 /// — the name on the screen is not the name in the queue, and the operator is
-/// reading the attacker's version of it. The zero-width space and the byte-order
-/// mark draw nothing at all, which is how two names that differ by one of them
-/// read as the same name.
+/// reading the attacker's version of it. And the characters that draw nothing at
+/// all — the zero-width space, the byte-order mark, the soft hyphen, the word joiner
+/// and invisible operators, the grapheme joiner, the Hangul fillers, the interlinear
+/// annotation marks and the tag characters — which is how two names that differ by
+/// one of them read as the same name, and how text can ride along unseen.
 ///
 /// The marks that are *needed* to draw somebody's language are not here. A
 /// zero-width joiner holds an emoji sequence together and separates a Persian
 /// word's forms; the left-to-right and right-to-left marks settle which way a
 /// neutral character leans in mixed text. None of those reverses a run — that
 /// takes an override — and dropping them would misspell the name rather than
-/// disarm it.
+/// disarm it. Nor are the variation selectors, which choose how an emoji or an
+/// ideograph is drawn rather than hide anything.
 const fn obeyed(character: char) -> bool {
     matches!(
         character,
         '\u{0}'..='\u{1f}'
             | '\u{7f}'..='\u{9f}'
+            | '\u{ad}'
+            | '\u{34f}'
+            | '\u{115f}'..='\u{1160}'
+            | '\u{17b4}'..='\u{17b5}'
+            | '\u{180e}'
             | '\u{200b}'
             | '\u{2028}'
             | '\u{2029}'
             | '\u{202a}'..='\u{202e}'
-            | '\u{2066}'..='\u{2069}'
+            | '\u{2060}'..='\u{206f}'
+            | '\u{3164}'
             | '\u{feff}'
+            | '\u{ffa0}'
+            | '\u{fff0}'..='\u{fffb}'
+            | '\u{1bca0}'..='\u{1bca3}'
+            | '\u{1d173}'..='\u{1d17a}'
+            | '\u{e0000}'..='\u{e007f}'
     )
 }
 
@@ -110,9 +124,15 @@ pub fn escaped(document: &str) -> String {
     let mut written = String::with_capacity(document.len());
     for character in document.chars() {
         if obeyed(character) && !laid_out(character) {
-            written.push_str("\\u");
-            for shift in [12_u32, 8, 4, 0] {
-                written.push(digit((u32::from(character) >> shift) & 0xf));
+            // A character past the first plane is written as the two halves UTF-16
+            // spells it with, which is the only way JSON escapes one: four digits
+            // of the whole code point would be a different, nearer character.
+            let mut halves = [0_u16; 2];
+            for half in character.encode_utf16(&mut halves) {
+                written.push_str("\\u");
+                for shift in [12_u32, 8, 4, 0] {
+                    written.push(digit((u32::from(*half) >> shift) & 0xf));
+                }
             }
         } else {
             written.push(character);

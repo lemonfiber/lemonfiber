@@ -56,3 +56,30 @@ fn every_failure_says_which_program_it_meant() {
         assert!(!failure.problem().remedies.is_empty());
     }
 }
+
+/// A stand-in that starts no process answers a run with variables as it answers any
+/// run.
+#[tokio::test]
+async fn a_run_with_variables_is_a_run_where_nothing_overrides_it() {
+    struct Echo;
+
+    #[async_trait::async_trait]
+    impl super::Runner for Echo {
+        async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+            Ok(Output {
+                status: Some(0),
+                stdout: argv.join(" "),
+                stderr: String::new(),
+            })
+        }
+    }
+
+    let ran = super::Runner::run_with(
+        &Echo,
+        &["git".to_owned(), "status".to_owned()],
+        &[("GIT_TERMINAL_PROMPT".to_owned(), "0".to_owned())],
+    )
+    .await
+    .map(|output| output.stdout);
+    assert_eq!(ran.ok().as_deref(), Some("git status"));
+}

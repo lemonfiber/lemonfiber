@@ -166,23 +166,24 @@ pub fn build(
     argv.push("--file".to_owned());
     argv.push(stack.join("compose.yml").display().to_string());
 
-    for overlay in &settings.overlays {
-        argv.push("--file".to_owned());
-        argv.push(overlay.display().to_string());
-    }
-
     // Then the installed plugins' own documents, joined here against the very
     // directory this invocation names as the project root. Resolved per invocation
     // rather than carried resolved, because an operator's own stack and the embedded
     // one are different roots and a path settled anywhere else would be right for one
     // of them and silently wrong for the other.
     //
-    // After the operator's overlay, because Compose takes the later file as the one
-    // that wins and a stranger's plugin is not entitled to override a choice the
-    // operator made.
+    // Before the operator's overlay, because Compose takes the later file as the one
+    // that wins and merges a service declared twice into one. A stranger's plugin
+    // read last would win every key it wrote over the operator's own choices for a
+    // service of that name, and keep every key it did not write.
     for document in crate::plugin::documents(&settings.plugins, stack) {
         argv.push("--file".to_owned());
         argv.push(document.display().to_string());
+    }
+
+    for overlay in &settings.overlays {
+        argv.push("--file".to_owned());
+        argv.push(overlay.display().to_string());
     }
 
     // Sorted, because the plan holds an ordered set: the same request must

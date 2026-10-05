@@ -74,8 +74,7 @@ pub(crate) async fn update(
     let mut without = held.clone();
     without.forget(&was.plugin);
     let contests = super::standing::contested(ctx, &stack_manifest, &without, &would);
-    super::writing::unanswered(&would, without.installed())?;
-    super::writing::unshared(&would, without.installed())?;
+    unheld(ctx, &would, without.installed(), stack)?;
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
         crate::plugin::writes(&would, stack),
@@ -90,19 +89,21 @@ pub(crate) async fn update(
         &crate::plugin::approvals(&would.recipes),
     )?;
     let mut account = started(&was, &would, &manifest, changes, contests);
+    let at = crate::plugin::owner(&was.plugin);
+    let whose = |change: &crate::journal::Change| crate::plugin::owns(&was.plugin, change);
 
     // A reading and a rehearsal ask the reversal what it would put back, which judges it
     // whole and touches nothing.
     if !acting {
         account.went_back =
-            super::super::putting_back::everything(&ctx.clone().rehearsing(), &was.plugin).await?;
+            super::super::putting_back::everything(&ctx.clone().rehearsing(), &at, &whose).await?;
         return Ok(answering(held.installed().to_vec(), account, offer));
     }
 
     // Judged before anything is taken, for the reason a removal judges first: a refusal
     // heard after the containers were already off would leave the version the record
     // names with nothing of it running.
-    super::super::putting_back::admitted(ctx, &was.plugin)?;
+    super::super::putting_back::admitted(ctx, &at, &whose)?;
 
     // The first reading, before a byte moves, for the reason an install takes one: what
     // has to be told apart afterwards is a check this update broke from one that was
@@ -130,7 +131,7 @@ pub(crate) async fn update(
     // report a refusal about a machine that is neither version. The judgement above has
     // already passed, so what can still go wrong is the disk, and the answer to that is
     // the same as to a new version that does not hold — the old one goes back on.
-    match super::super::putting_back::everything(ctx, &was.plugin).await {
+    match super::super::putting_back::everything(ctx, &at, &whose).await {
         Ok(went_back) => account.went_back = went_back,
         Err(why) => {
             account.stopped = Some(format!(
@@ -379,4 +380,19 @@ fn stuck(was: &Installed) -> Problem {
         Remedy::new("Check the container engine is running, then try the update again"),
     )
     .in_state(State::Guided)
+}
+
+/// Refuse the new version anything another plugin or this machine already holds.
+///
+/// `others` is every installed plugin but the version being replaced, so an update is
+/// never held to what it replaces.
+fn unheld(
+    ctx: &Ctx,
+    would: &Installed,
+    others: &[Installed],
+    stack: &Path,
+) -> Result<(), Box<Problem>> {
+    super::writing::unanswered(would, others)?;
+    super::writing::unshared(would, others)?;
+    super::occupied::unoccupied(ctx, would, others, stack)
 }

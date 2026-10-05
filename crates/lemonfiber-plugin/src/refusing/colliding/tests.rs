@@ -1,4 +1,4 @@
-use super::super::tests::{names, without};
+use super::super::tests::{names, said, without, INSTALLABLE};
 
 /// The plugin's id and its service's id are written the same way in the fixture,
 /// so the service is reached through the table header above it.
@@ -75,11 +75,42 @@ fn an_id_a_port_and_a_name_the_stack_does_not_hold_are_refused_nothing() {
     assert!(!names(&said, &["wiring.hostname"]), "got: {said:?}");
 }
 
-/// A plugin declaring no hostname at all asks for none, and is refused none.
+/// A plugin declaring no hostname is proxied at its service's id, which is refused
+/// nothing where the stack's proxy answers on no such name.
 #[test]
-fn a_plugin_that_declares_no_hostname_is_refused_nothing_about_one() {
+fn a_plugin_that_declares_no_hostname_is_held_to_its_id() {
     let said = without(r#"hostname        = "comics""#, "");
     assert!(!names(&said, &["wiring.hostname"]), "got: {said:?}");
+    assert!(!names(&said, &["service komga.id"]), "got: {said:?}");
+}
+
+/// And refused where the stack's proxy already answers on that id: the default is a
+/// stanza lemonfiber writes as surely as a declared label is.
+#[test]
+fn a_service_proxied_at_an_id_the_stack_answers_on_is_refused() {
+    let said = said(
+        &INSTALLABLE
+            .replace(r#"hostname        = "comics""#, "")
+            .replace(SERVICE, "[[service]]\nid          = \"home\"")
+            .replace("service   = \"komga\"", "service   = \"home\""),
+    );
+    assert!(
+        names(&said, &["service home.id", "home", "no wiring names one"]),
+        "got: {said:?}"
+    );
+}
+
+/// A service on the operator's tier gets no stanza, so its id is no label at all.
+#[test]
+fn a_loopback_service_takes_no_label() {
+    let said = said(
+        &INSTALLABLE
+            .replace(r#"hostname        = "comics""#, "")
+            .replace(SERVICE, "[[service]]\nid          = \"home\"")
+            .replace("service   = \"komga\"", "service   = \"home\"")
+            .replace(r#"bind        = "lan""#, r#"bind        = "loopback""#),
+    );
+    assert!(!names(&said, &["service home.id"]), "got: {said:?}");
 }
 
 /// And a service with no listener publishes nothing, so it takes no port.

@@ -30,7 +30,19 @@ const HOUSEHOLD_ENTRY: &str = "services:\n  \
          - ${LAN_BIND:-0.0.0.0}:25600:25600\n    \
          volumes:\n    \
          - ${DATA_ROOT:-./data}:/data\n    \
-         - ./config/komga:/config\n";
+         - ./config/komga:/config\n    \
+         security_opt:\n    \
+         - no-new-privileges:true\n    \
+         cap_drop:\n    \
+         - ALL\n    \
+         cap_add:\n    \
+         - CHOWN\n    \
+         - DAC_OVERRIDE\n    \
+         - FOWNER\n    \
+         - SETGID\n    \
+         - SETUID\n    \
+         - KILL\n    \
+         pids_limit: 1024\n";
 
 /// One service, as installing a plugin settles it.
 fn placed() -> Placed {
@@ -289,7 +301,17 @@ fn services_are_written_in_the_order_the_record_keeps_them() {
 /// user override, an entrypoint, a command and an environment variable are each
 /// a key that is not in this set, so a generator that grew one would fail here
 /// rather than on somebody's machine.
-const KEYS: &[&str] = &["extends", "image", "profiles", "ports", "volumes"];
+const KEYS: &[&str] = &[
+    "extends",
+    "image",
+    "profiles",
+    "ports",
+    "volumes",
+    "security_opt",
+    "cap_drop",
+    "cap_add",
+    "pids_limit",
+];
 
 /// Every key one generated entry carries, read off the document itself.
 ///
@@ -377,6 +399,41 @@ fn a_generated_entry_carries_no_key_outside_the_permitted_set() {
     }
 }
 
+/// Every shape an entry is written in is bounded the same way: nothing gained after
+/// start, every capability dropped but the six given back, and a ceiling on processes.
+#[test]
+fn every_entry_is_bounded_alike_whatever_it_declared() {
+    for entry in shapes() {
+        assert_eq!(
+            list(&entry, "komga", "security_opt"),
+            ["no-new-privileges:true"],
+            "{entry}"
+        );
+        assert_eq!(list(&entry, "komga", "cap_drop"), ["ALL"], "{entry}");
+        assert_eq!(
+            list(&entry, "komga", "cap_add"),
+            [
+                "CHOWN",
+                "DAC_OVERRIDE",
+                "FOWNER",
+                "SETGID",
+                "SETUID",
+                "KILL"
+            ],
+            "{entry}"
+        );
+        let processes = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&entry)
+            .ok()
+            .and_then(|read| {
+                read.get("services")?
+                    .get("komga")?
+                    .get("pids_limit")?
+                    .as_u64()
+            });
+        assert_eq!(processes, Some(1024), "{entry}");
+    }
+}
+
 /// The reading above is shown finding a key that should not be there.
 ///
 /// Without this the gate is a measurement nobody has watched succeed: a reader
@@ -387,7 +444,8 @@ fn a_generated_entry_carries_no_key_outside_the_permitted_set() {
 fn the_reading_finds_a_key_the_permitted_set_does_not_carry() {
     let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
     for reach in [
-        "    cap_add: [NET_ADMIN]",
+        "    sysctls: {net.ipv4.ip_forward: 1}",
+        "    pid: host",
         "    devices: [/dev/net/tun]",
         "    network_mode: host",
         "    privileged: true",

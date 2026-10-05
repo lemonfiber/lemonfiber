@@ -23,6 +23,22 @@ use serde::{Deserialize, Serialize};
 pub use keeping::{horizon, kept, runs, RUNS_KEPT};
 pub use sealing::{is_sealed, Seal, KEY_FILE};
 
+/// Every operation lemonfiber journals its own changes under.
+///
+/// Held together because a journal on disk can carry a plugin's writes under the
+/// plugin's bare id, and whether such an entry is the plugin's is asked by whether that
+/// id is one of these. An operation missing here is one a plugin of the same name
+/// could take changes from on its way out.
+pub const OPERATIONS: [&str; 7] = [
+    crate::wizard::APPLY,
+    crate::seed::OPERATION,
+    crate::repair::OPERATION,
+    crate::wiring::OPERATION,
+    crate::app::putting_back::OPERATION,
+    crate::update::run::OPERATION,
+    crate::app::forwarding::OPERATION,
+];
+
 /// A change lemonfiber made, recorded so it can be reversed — exactly this one.
 ///
 /// Carries the four things a reversal and a readable history both need: when it

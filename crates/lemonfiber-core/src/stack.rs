@@ -24,6 +24,7 @@
 pub mod attached;
 pub mod closure;
 pub mod compose;
+pub mod declared;
 pub mod mounts;
 mod remembered;
 pub mod standing;
@@ -164,6 +165,36 @@ impl Source {
         self,
     ) -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
         attached::attached(&self.compose_files())
+    }
+
+    /// Every Compose file the operator's stack is run from, with its text: this stack's
+    /// own and every overlay layered over it.
+    ///
+    /// Not the documents lemonfiber writes for installed plugins, which sit inside an
+    /// operator's own stack directory: those are plugins, and the register is what says
+    /// which ones are on this machine. An overlay that cannot be read contributes
+    /// nothing, as a stack file that cannot be read does.
+    #[must_use]
+    pub(crate) fn run_from(self, overlays: &[PathBuf]) -> Vec<(PathBuf, String)> {
+        let written = match self {
+            Self::External(directory) => Some(directory.join(crate::plugin::OVERLAYS)),
+            Self::Embedded(_) => None,
+        };
+        let mut files: Vec<(PathBuf, String)> = self
+            .compose_files()
+            .into_iter()
+            .filter(|(path, _)| {
+                written
+                    .as_ref()
+                    .is_none_or(|written| !path.starts_with(written))
+            })
+            .collect();
+        for overlay in overlays {
+            if let Ok(text) = std::fs::read_to_string(overlay) {
+                files.push((overlay.clone(), text));
+            }
+        }
+        files
     }
 
     /// Whether this stack is lemonfiber's own rather than the operator's.

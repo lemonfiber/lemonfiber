@@ -41,12 +41,6 @@ const HOUSEHOLD_GROUP: &str = "Library";
 /// group the shipped dashboard keeps the stack's own automation in.
 const OPERATOR_GROUP: &str = "Automation";
 
-/// Whose region a plugin's wiring is written in, as the region's markers name it.
-#[must_use]
-pub fn owner(plugin: &str) -> String {
-    format!("plugin {plugin}")
-}
-
 /// The proxy stanza for every one of the plugin's services the household reaches.
 ///
 /// Empty where there is none, which is a plugin whose services are all operator

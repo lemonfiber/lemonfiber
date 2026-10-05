@@ -24,6 +24,8 @@ pub(super) struct Serving {
     fetch: Option<String>,
     /// Every git command it was asked, without the leading `git -c …`.
     asked: Mutex<Vec<Vec<String>>>,
+    /// The environment each was run with.
+    environments: Mutex<Vec<Vec<(String, String)>>>,
 }
 
 impl Serving {
@@ -32,7 +34,16 @@ impl Serving {
             listed: Ok(listed.to_owned()),
             fetch: None,
             asked: Mutex::new(Vec::new()),
+            environments: Mutex::new(Vec::new()),
         }
+    }
+
+    /// The environment each command was run with.
+    fn environments(&self) -> Vec<Vec<(String, String)>> {
+        self.environments
+            .lock()
+            .map(|environments| environments.clone())
+            .unwrap_or_default()
     }
 
     pub(super) fn asked(&self) -> Vec<Vec<String>> {
@@ -66,7 +77,7 @@ impl Runner for Serving {
         if argv.first().map(String::as_str) != Some("git") {
             return Ok(spoke(""));
         }
-        let rest: Vec<String> = argv.iter().skip(3).cloned().collect();
+        let rest = asked_of(argv);
         if let Ok(mut asked) = self.asked.lock() {
             asked.push(rest.clone());
         }
@@ -91,6 +102,25 @@ impl Runner for Serving {
             _ => spoke(""),
         })
     }
+
+    async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
+        if let Ok(mut environments) = self.environments.lock() {
+            environments.push(env.to_vec());
+        }
+        self.run(argv).await
+    }
+}
+
+/// What git was asked, without `git` and the `-c` pairs every command carries.
+pub(super) fn asked_of(argv: &[String]) -> Vec<String> {
+    let mut rest = argv.get(1..).unwrap_or_default();
+    while let [flag, _, after @ ..] = rest {
+        if flag != "-c" {
+            break;
+        }
+        rest = after;
+    }
+    rest.to_vec()
 }
 
 /// A context whose runner is `serving`.
@@ -142,6 +172,14 @@ async fn a_git_source_is_installed_at_the_commit_it_serves_and_recorded() {
             && one.contains(&"--depth".to_owned())
             && one.last().map(String::as_str) == Some(HEAD)),
         "the one commit was not what was fetched: {asked:?}"
+    );
+    let environments = serving.environments();
+    assert!(
+        environments.len() == asked.len()
+            && environments
+                .iter()
+                .all(|one| *one == super::super::git::environment()),
+        "a git command ran under this machine's own configuration: {environments:?}"
     );
     assert!(serving.left_nothing(), "the checkout was left behind");
 }
@@ -205,6 +243,7 @@ async fn a_source_that_will_not_answer_is_refused_with_what_git_said() {
         listed: Err("fatal: repository not found".to_owned()),
         fetch: None,
         asked: Mutex::new(Vec::new()),
+        environments: Mutex::new(Vec::new()),
     });
     let ctx = served("git-unreachable", &serving);
 
@@ -227,6 +266,7 @@ async fn a_commit_that_will_not_be_fetched_is_refused_and_leaves_nothing() {
         listed: Ok(format!("{HEAD}\tHEAD\n")),
         fetch: Some("fatal: couldn't find remote ref".to_owned()),
         asked: Mutex::new(Vec::new()),
+        environments: Mutex::new(Vec::new()),
     });
     let ctx = served("git-unfetched", &serving);
 
@@ -333,6 +373,7 @@ async fn a_git_source_is_asked_whether_it_still_answers_when_plugins_are_listed(
         listed: Err("fatal: repository not found".to_owned()),
         fetch: None,
         asked: Mutex::new(Vec::new()),
+        environments: Mutex::new(Vec::new()),
     });
     ctx.seams.runner = gone.clone();
     assert_eq!(
@@ -487,4 +528,74 @@ async fn a_machine_not_set_up_has_nowhere_to_check_out() {
         refusal(from_git(&ctx, "https://example.org/plugin-komga").await),
         "CONFIG-3"
     );
+}
+
+/// A git that takes a while to answer, counting how many are asked at once.
+#[derive(Default)]
+struct Slow {
+    /// How many are being asked now.
+    now: std::sync::atomic::AtomicUsize,
+    /// The most that were ever asked at once.
+    most: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait]
+impl Runner for Slow {
+    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        use std::sync::atomic::Ordering::SeqCst;
+        let now = self.now.fetch_add(1, SeqCst) + 1;
+        self.most.fetch_max(now, SeqCst);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        self.now.fetch_sub(1, SeqCst);
+        let url = asked_of(argv).get(2).cloned().unwrap_or_default();
+        Ok(if url.ends_with("gone") {
+            engine_refused("fatal: repository not found")
+        } else {
+            spoke("")
+        })
+    }
+}
+
+/// Listing what is installed asks the sources a few at a time rather than one after
+/// another, and answers for each in the record's order.
+#[tokio::test(start_paused = true)]
+async fn sources_are_asked_a_few_at_a_time_and_answered_in_order() {
+    let ctx = ctx("listed-at-once");
+    let at = source("listed-at-once", MANIFEST);
+    let one = report(installing(&ctx, &at).await).and_then(|done| done.installed.first().cloned());
+    let installed: Vec<crate::plugin::Installed> = (0..6)
+        .filter_map(|n| {
+            one.clone().map(|one| crate::plugin::Installed {
+                plugin: format!("plugin-{n}"),
+                from: if n == 4 {
+                    "https://example.org/gone".to_owned()
+                } else {
+                    format!("https://example.org/plugin-{n}")
+                },
+                ..one
+            })
+        })
+        .collect();
+    let slow = Arc::new(Slow::default());
+    let mut ctx = ctx;
+    ctx.seams.runner = slow.clone();
+
+    let started = tokio::time::Instant::now();
+    let said = super::super::fetching::standings(&ctx, &installed).await;
+
+    assert_eq!(
+        said.iter()
+            .map(|one| one.plugin.as_str())
+            .collect::<Vec<_>>(),
+        ["plugin-0", "plugin-1", "plugin-2", "plugin-3", "plugin-4", "plugin-5"]
+    );
+    assert!(matches!(
+        said.get(4).map(|one| &one.standing),
+        Some(crate::plugin::Fetchable::Unreachable { .. })
+    ));
+    assert_eq!(
+        slow.most.load(std::sync::atomic::Ordering::SeqCst),
+        super::super::git::AT_ONCE
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(6));
 }

@@ -230,18 +230,21 @@ fn a_plugins_credential_is_kept_apart_from_the_stacks() {
     );
     assert_eq!(
         setting("qbittorrent-two").as_deref(),
-        Some("PLUGIN_QBITTORRENT__TWO_PASSWORD")
+        Some("PLUGIN_NAMESAKE_QBITTORRENT__TWO_PASSWORD")
     );
 }
 
-/// Two plugins' services whose ids run into each other's endings never share a
-/// setting: `a-api` holding a key and `a` holding its API key are kept apart.
+/// Two services whose ids run into each other's endings never share a setting: `a-api`
+/// holding a key and `a` holding its API key are kept apart.
 #[test]
 fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
-    let installed = [
-        an_installed("first", vec![a_placed("a", &[], None, None)]),
-        an_installed("second", vec![a_placed("a-api", &[], None, None)]),
-    ];
+    let installed = [an_installed(
+        "first",
+        vec![
+            a_placed("a", &[], None, None),
+            a_placed("a-api", &[], None, None),
+        ],
+    )];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
     let spelled = |id: &str, holds: &str| {
         fillers
@@ -250,9 +253,41 @@ fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
             .unwrap_or_default()
     };
 
-    assert_eq!(spelled("a", "_API_KEY"), "PLUGIN_A_API_KEY");
-    assert_eq!(spelled("a-api", "_KEY"), "PLUGIN_A__API_KEY");
+    assert_eq!(spelled("a", "_API_KEY"), "PLUGIN_FIRST_A_API_KEY");
+    assert_eq!(spelled("a-api", "_KEY"), "PLUGIN_FIRST_A__API_KEY");
     assert_ne!(spelled("a", "_API_KEY"), spelled("a-api", "_KEY"));
+}
+
+/// A service of one plugin and a service of the same id another plugin brings later are
+/// two services, and a credential the first was given is never the second's.
+#[test]
+fn a_service_of_the_same_id_from_another_plugin_is_kept_apart() {
+    let first = [an_installed("first", vec![a_placed("x", &[], None, None)])];
+    let second = [an_installed("second", vec![a_placed("x", &[], None, None)])];
+    let setting = |installed: &[crate::plugin::Installed]| {
+        let fillers = shipped(installed, &Chosen::default(), |_| ());
+        fillers
+            .service("x")
+            .and_then(|one| fillers.setting(one, crate::config::PASSWORD_SUFFIX))
+    };
+
+    assert_eq!(setting(&first).as_deref(), Some("PLUGIN_FIRST_X_PASSWORD"));
+    assert_eq!(
+        setting(&second).as_deref(),
+        Some("PLUGIN_SECOND_X_PASSWORD")
+    );
+}
+
+/// A plugin's id may run on into its service's, and the two are still told apart where
+/// the plugin's id stops.
+#[test]
+fn a_plugin_id_running_into_its_services_is_kept_apart() {
+    let spelled = |plugin: &str, id: &str| {
+        crate::config::for_plugin(plugin, id, crate::config::PASSWORD_SUFFIX)
+    };
+    assert_eq!(spelled("a-", "b"), "PLUGIN_A___B_PASSWORD");
+    assert_ne!(spelled("a-", "b"), spelled("a", "b"));
+    assert_ne!(spelled("a-b", "c"), spelled("a", "b-c"));
 }
 
 /// Every ending a credential takes is one `_` and then a letter, which is what lets a
@@ -277,8 +312,13 @@ fn a_plugin_setting_another_service_takes_is_refused() {
     // Written alike once case and `-` or `_` are set aside, as a record kept before
     // that was refused at install may still be.
     let installed = [
-        an_installed("first", vec![a_placed("kept-one", &[], None, None)]),
-        an_installed("second", vec![a_placed("kept_one", &[], None, None)]),
+        an_installed(
+            "first",
+            vec![
+                a_placed("kept-one", &[], None, None),
+                a_placed("kept_one", &[], None, None),
+            ],
+        ),
         an_installed("third", vec![a_placed("apart", &[], None, None)]),
     ];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
@@ -293,7 +333,7 @@ fn a_plugin_setting_another_service_takes_is_refused() {
     assert_eq!(setting("apart", "_KEY"), None);
     assert_eq!(
         setting("apart", crate::config::PASSWORD_SUFFIX).as_deref(),
-        Some("PLUGIN_APART_PASSWORD")
+        Some("PLUGIN_THIRD_APART_PASSWORD")
     );
     assert_eq!(setting("sonarr", "_KEY").as_deref(), Some("SONARR_KEY"));
 }

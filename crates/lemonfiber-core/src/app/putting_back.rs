@@ -120,7 +120,7 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     carried_out(ctx, &paths, changes, &run, at).await
 }
 
-/// Put back every change one operation ever made.
+/// Put back every change `whose` claims, called `at` in what is said about it.
 ///
 /// The same machinery as an undo of a stamp and deliberately not a second one: what
 /// differs between taking a plugin off a machine and putting back a run somebody named
@@ -134,14 +134,18 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 /// Where there is nowhere to look for the record, where the judgement says a change
 /// cannot be put back — drift, or a later change that depends on it — or for any reason
 /// the executor underneath gives.
-pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
+pub(crate) async fn everything(
+    ctx: &Ctx,
+    at: &str,
+    whose: &(dyn Fn(&Change) -> bool + Sync),
+) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
-    let run = crate::rollback::everything(changes, operation);
-    carried_out(ctx, &paths, changes, &run, operation).await
+    let run = crate::rollback::everything(changes, whose);
+    carried_out(ctx, &paths, changes, &run, at).await
 }
 
 /// Whether [`everything`] would go ahead, asked without touching anything.
@@ -155,7 +159,11 @@ pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, B
 ///
 /// The ones [`everything`] would give before touching anything: nowhere to look for
 /// the record, or a change the judgement will not put back.
-pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
+pub(crate) fn admitted(
+    ctx: &Ctx,
+    at: &str,
+    whose: &dyn Fn(&Change) -> bool,
+) -> Result<(), Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
@@ -163,8 +171,8 @@ pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
     judged(
         ctx,
         changes,
-        &crate::rollback::everything(changes, operation),
-        operation,
+        &crate::rollback::everything(changes, whose),
+        at,
     )
     .map(drop)
 }
