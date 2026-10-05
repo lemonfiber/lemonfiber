@@ -161,6 +161,7 @@ fn substituting(
         held.setting().as_deref(),
         &stamp,
     )];
+    let mut writes = vec![(super::FILLS_KEY, substitution.setting.as_str())];
     if reasons != before {
         changes.push(super::recorded_why(
             &substitution,
@@ -168,16 +169,12 @@ fn substituting(
             reasons.as_deref(),
             &stamp,
         ));
+        writes.push((super::FILLS_WHY_KEY, reasons.as_deref().unwrap_or_default()));
     }
     crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
         .map_err(|failure| Box::new(failure.problem()))?;
-    kept(path, super::FILLS_KEY, &substitution.setting)?;
-    if reasons != before {
-        kept(
-            path,
-            super::FILLS_WHY_KEY,
-            reasons.as_deref().unwrap_or_default(),
-        )?;
+    for (key, value) in writes {
+        kept(path, key, value)?;
     }
 
     Ok(reading(true))

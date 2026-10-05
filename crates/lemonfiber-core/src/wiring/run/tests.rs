@@ -432,3 +432,15 @@ fn an_answer_carried_over_to_another_service_names_the_choice_itself() {
         vec!["the choice itself"]
     );
 }
+
+/// A record of what is installed that cannot be read refuses the choice, because a
+/// plugin's service may be the very claimant being chosen between.
+#[test]
+fn a_choice_over_a_record_that_will_not_read_is_refused() {
+    let (ctx, at) = ctx("record-unread");
+    assert!(std::fs::write(at.join("config").join("plugins.json"), "{ not json").is_ok());
+    let refused = substituting(&ctx, &fill("indexer.search", "nzbhydra2"))
+        .err()
+        .map(|problem| problem.code.as_str().to_owned());
+    assert_eq!(refused.as_deref(), Some("PLUGIN-4"));
+}
