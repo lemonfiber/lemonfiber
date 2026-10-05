@@ -1,5 +1,6 @@
 # Fuzz targets for what arrives from outside: a stack manifest, a plugin manifest,
-# and the parameters a request to the web API carries.
+# the parameters and the headers a request to the web API carries, the environment
+# file, compose files, and a backup archive read back.
 #
 # Deliberately its own workspace: the fuzz harness is built with a nightly
 # toolchain and a sanitizer, and it must not inherit the strict lint set the
@@ -20,9 +21,17 @@ libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
 
 serde_json = "1"
+flate2 = "1"
+tokio = { version = "1", features = ["rt"] }
+
+[dependencies.lemonfiber]
+path = "../crates/lemonfiber"
 
 [dependencies.lemonfiber-api]
 path = "../crates/lemonfiber-api"
+
+[dependencies.lemonfiber-core]
+path = "../crates/lemonfiber-core"
 
 [dependencies.lemonfiber-manifest]
 path = "../crates/lemonfiber-manifest"
@@ -75,6 +84,34 @@ bench = false
 [[bin]]
 name = "api_action_arguments"
 path = "fuzz_targets/api_action_arguments.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "api_guard"
+path = "fuzz_targets/api_guard.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "env_file"
+path = "fuzz_targets/env_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "compose_mounts"
+path = "fuzz_targets/compose_mounts.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "archive_restore"
+path = "fuzz_targets/archive_restore.rs"
 test = false
 doc = false
 bench = false

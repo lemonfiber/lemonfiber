@@ -122,6 +122,16 @@ fn a_total_is_inferred_from_what_is_left_and_how_far_along_it_is() {
 }
 
 #[test]
+fn a_figure_too_large_to_multiply_is_held_at_the_largest_there_is() {
+    // Both numbers are a download client's, and a client can report anything: what
+    // has to hold is an answer rather than a panic or a total that wrapped to a
+    // small number.
+    assert_eq!(done(u64::MAX, 50), u64::MAX);
+    assert_eq!(done(u64::MAX, 99), u64::MAX);
+    assert_eq!(done(u64::MAX / 2, 50), u64::MAX / 2);
+}
+
+#[test]
 fn a_title_is_matched_by_the_word_a_release_name_would_share() {
     assert_eq!(first_word("Tears of Steel (2012)"), "Tears");
     assert_eq!(first_word("Sintel"), "Sintel");

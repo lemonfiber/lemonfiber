@@ -43,7 +43,6 @@ rustls = { workspace = true }
 tokio-rustls = { workspace = true }
 clap = { workspace = true }
 etcetera = { workspace = true }
-color-eyre = { workspace = true }
 include_dir = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "io-util", "time"] }
 async-trait = { workspace = true }

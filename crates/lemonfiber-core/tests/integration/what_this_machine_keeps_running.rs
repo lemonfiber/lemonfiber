@@ -80,7 +80,7 @@ async fn installing_the_guard_hands_over_the_command_and_then_reads_it_back() {
         &ctx(Arc::clone(&manager)),
         Keeping::Install {
             what: Hostable::Watch,
-            forms: vec!["tv".to_owned(), "films".to_owned()],
+            forms: vec!["tv".to_owned(), "movies".to_owned()],
         },
     )
     .await;
@@ -88,7 +88,7 @@ async fn installing_the_guard_hands_over_the_command_and_then_reads_it_back() {
     let placed = manager.placed();
     assert_eq!(placed.len(), 1, "one service, and one only");
     assert!(placed.first().is_some_and(|one| {
-        one.arguments == vec!["watch".to_owned(), "tv".to_owned(), "films".to_owned()]
+        one.arguments == vec!["watch".to_owned(), "tv".to_owned(), "movies".to_owned()]
             && one.program == Path::new("/usr/local/bin/lemonfiber")
             && one.output == Path::new("/records/watch.log")
     }));

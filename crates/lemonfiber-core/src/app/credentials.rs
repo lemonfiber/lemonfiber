@@ -16,6 +16,7 @@
 
 mod declining;
 mod gating;
+pub(crate) mod pending;
 mod reading;
 mod resetting;
 mod revealing;

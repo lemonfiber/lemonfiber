@@ -374,7 +374,7 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
         ))
         .with_http(held);
     ctx.settings.env_file = Some(env_at(name, &a_password()));
-    crate::app::targets::record_secret(
+    let _ = crate::app::targets::record_secret(
         &ctx,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         &a_password(),

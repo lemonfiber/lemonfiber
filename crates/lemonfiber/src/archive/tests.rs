@@ -378,19 +378,19 @@ fn what_cannot_be_measured_contributes_nothing_rather_than_stopping_the_count() 
     use super::tree_size;
     let root = scratch("tree-size");
     // Absent: nothing to measure, and the estimate simply omits it.
-    assert_eq!(tree_size(&root.join("absent")), 0);
+    assert_eq!(tree_size(&root.join("absent"), &[]), 0);
     // A file counts its own length.
     write_file(&root.join("a/file"), "12345");
-    assert_eq!(tree_size(&root.join("a/file")), 5);
+    assert_eq!(tree_size(&root.join("a/file"), &[]), 5);
     // A directory counts everything beneath it.
-    assert_eq!(tree_size(&root.join("a")), 5);
+    assert_eq!(tree_size(&root.join("a"), &[]), 5);
     // Something that is neither a file nor a directory contributes nothing: a
     // symlink is not followed, so a loop cannot make the estimate diverge.
     #[cfg(unix)]
     {
         let link = root.join("a/link");
         let _ = std::os::unix::fs::symlink(root.join("a/file"), &link);
-        assert_eq!(tree_size(&link), 0);
+        assert_eq!(tree_size(&link, &[]), 0);
     }
 }
 
@@ -406,7 +406,7 @@ fn a_directory_that_will_not_open_contributes_nothing() {
     let _ = fs::set_permissions(&shut, fs::Permissions::from_mode(0o000));
     // Best effort: an entry that cannot be read is left out of the estimate
     // rather than aborting the measurement the caller's headroom absorbs.
-    let measured = tree_size(&shut);
+    let measured = tree_size(&shut, &[]);
     // Restore access so the scratch directory can be cleaned up later. Owner-only:
     // deleting it needs the owner's rwx and nobody else's anything.
     let _ = fs::set_permissions(&shut, fs::Permissions::from_mode(0o700));
@@ -435,6 +435,7 @@ async fn a_directory_item_is_packed_whole_and_comes_back() {
         source: paths.service_config(),
         archive_path: "services".to_owned(),
         label: "services".to_owned(),
+        left_out: Vec::new(),
     }];
     let plan = backup::plan(&paths, &Scope::WholeStack);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
@@ -507,28 +508,6 @@ async fn a_staging_left_by_an_interrupted_restore_is_cleared_first() {
     let targets = backup::destinations(&restored);
     assert!(tar.extract(&dest, &targets).await.is_ok());
     assert!(!stale_dir.join("left-over").exists());
-}
-
-#[tokio::test]
-async fn an_item_whose_source_is_not_there_is_left_out_rather_than_failing() {
-    // A stack an operator runs from their own directory, or a service that has
-    // not written its configuration yet, simply is not in the archive — the
-    // capture still succeeds.
-    let root = scratch("absent-item");
-    let paths = install(&root);
-    let dest = root.join("backups/partial.tar.gz");
-    let plan = backup::plan(&paths, &Scope::WholeStack);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
-    let items = vec![Item {
-        source: root.join("never-written"),
-        archive_path: "services".to_owned(),
-        label: "services".to_owned(),
-    }];
-
-    let tar = Tar;
-    assert!(tar.write(&dest, &manifest, &items).await.is_ok());
-    // It wrote an archive holding the manifest and nothing else.
-    assert!(tar.read_manifest(&dest).await.is_ok());
 }
 
 #[tokio::test]
@@ -735,48 +714,4 @@ async fn the_room_check_counts_the_bytes_that_are_really_there() {
 /// A link planted in a directory a container writes to is not followed into the
 /// archive, and is not kept as a link either: what it points at stays out of a file the
 /// operator keeps and restores, and the files beside it are captured as ever.
-#[cfg(unix)]
-#[tokio::test]
-async fn a_link_in_a_captured_directory_is_left_out() {
-    let root = scratch("linked-item");
-    let paths = install(&root);
-    let elsewhere = root.join("outside/private.txt");
-    write_file(&elsewhere, "not the stack's");
-    let linked = paths.service_config().join("sonarr/planted");
-    assert!(std::os::unix::fs::symlink(&elsewhere, &linked).is_ok());
-    let dest = root.join("backups/linked.tar.gz");
-    let items = vec![Item {
-        source: paths.service_config(),
-        archive_path: "services".to_owned(),
-        label: "services".to_owned(),
-    }];
-    let plan = backup::plan(&paths, &Scope::WholeStack);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
-    assert!(Tar.write(&dest, &manifest, &items).await.is_ok());
-
-    let names: Vec<String> = File::open(&dest)
-        .ok()
-        .map(|file| {
-            let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
-            archive
-                .entries()
-                .map(|entries| {
-                    entries
-                        .filter_map(Result::ok)
-                        .filter_map(|entry| {
-                            entry.path().ok().map(|path| path.display().to_string())
-                        })
-                        .collect()
-                })
-                .unwrap_or_default()
-        })
-        .unwrap_or_default();
-    assert!(
-        names.iter().any(|name| name.ends_with("sonarr/config.xml")),
-        "{names:?}"
-    );
-    assert!(
-        !names.iter().any(|name| name.ends_with("planted")),
-        "{names:?}"
-    );
-}
+mod leaving;

@@ -97,9 +97,44 @@ fn a_single_service_capture_takes_only_that_service() {
             source: paths.service_config().join("sonarr"),
             archive_path: format!("{}/sonarr", area::SERVICES),
             label: "sonarr configuration".to_owned(),
+            left_out: vec![PathBuf::from("MediaCover"), PathBuf::from("logs")],
         }]
     );
     assert!(plan.sensitive, "a service's config holds its API key");
+}
+
+#[test]
+fn what_a_service_rebuilds_is_left_out_of_the_capture_and_nothing_else_is() {
+    let whole = whole_stack_plan();
+    let left_out = |area: &str| {
+        whole
+            .items
+            .iter()
+            .find(|item| item.archive_path == area)
+            .map(|item| item.left_out.clone())
+            .unwrap_or_default()
+    };
+    let services = left_out(area::SERVICES);
+    assert!(
+        services.contains(&PathBuf::from("jellyfin/cache")),
+        "{services:?}"
+    );
+    assert_eq!(services.len(), super::REBUILT.len());
+    assert!(
+        left_out(area::CONFIG).is_empty(),
+        "lemonfiber's own configuration is taken whole"
+    );
+    assert!(
+        left_out(area::STACK).is_empty(),
+        "the materialised stack is taken whole"
+    );
+    let unnamed = plan(
+        &paths(),
+        &Scope::Service {
+            name: "seerr".to_owned(),
+        },
+    );
+    assert!(unnamed.items.iter().all(|item| item.left_out.is_empty()));
 }
 
 #[test]

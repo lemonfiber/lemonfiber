@@ -54,7 +54,7 @@ pub(crate) fn load(ctx: &Ctx) -> Halted {
 /// restart, and a removal alike. Only a stop is written down, and the actions that run
 /// nothing leave the record alone.
 pub(crate) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) {
-    if matches!(action, Action::Stop(_) | Action::Pull | Action::Config) {
+    if matches!(action, Action::Stop(_) | Action::Pull(_) | Action::Config) {
         return;
     }
     let mut record: Record = crate::app::record::beside(ctx, RECORD);

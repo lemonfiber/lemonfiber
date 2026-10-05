@@ -220,7 +220,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
         // that halts needs a data location as much as it needs a full volume.
         context.settings.data_root = Some(dir);
     }
-    crate::app::targets::record_secret(
+    let _ = crate::app::targets::record_secret(
         &context,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         &a_password(),

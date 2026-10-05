@@ -42,8 +42,9 @@ pub enum Action {
     Remove(Vec<String>),
     /// Restart named services, leaving the rest alone.
     Restart(Vec<String>),
-    /// Fetch newer images without applying them.
-    Pull,
+    /// Fetch newer images without applying them, for named services or, where none
+    /// are named, for the whole project.
+    Pull(Vec<String>),
     /// Resolve the project and print it, changing nothing.
     Config,
 }
@@ -58,7 +59,7 @@ impl Action {
             Self::Stop(_) => "stop",
             Self::Remove(_) => "rm",
             Self::Restart(_) => "restart",
-            Self::Pull => "pull",
+            Self::Pull(_) => "pull",
             Self::Config => "config",
         }
     }
@@ -92,7 +93,7 @@ impl Action {
                 services,
             ),
             Self::Restart(services) => fenced(vec!["restart".to_owned()], services),
-            Self::Pull => vec!["pull".to_owned()],
+            Self::Pull(services) => fenced(vec!["pull".to_owned()], services),
             Self::Config => vec!["config".to_owned()],
         }
     }
@@ -101,8 +102,8 @@ impl Action {
 /// A Compose invocation aimed at named services, or at the whole project where none
 /// are named.
 ///
-/// Starting, stopping and restarting differ in the words in front and in nothing
-/// else, and the part that is easy to get wrong is shared: a `--` fences the service
+/// Starting, stopping, restarting and fetching differ in the words in front and in
+/// nothing else, and the part that is easy to get wrong is shared: a `--` fences the service
 /// names off from option parsing, so one that begins with a dash is treated as a name
 /// and not as a flag.
 fn fenced(mut argv: Vec<String>, services: &[String]) -> Vec<String> {

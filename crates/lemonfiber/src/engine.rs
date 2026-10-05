@@ -92,7 +92,7 @@ pub(crate) async fn pull(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
     // Recorded under the action's own word rather than one written here, so a run
     // waiting behind a streamed pull is told the same thing as one waiting behind the
     // pull the dispatcher runs. They are the same operation to whoever is waiting.
-    let claim = match claimed(ctx, Action::Pull.name()).await {
+    let claim = match claimed(ctx, Action::Pull(Vec::new()).name()).await {
         Ok(claim) => claim,
         Err(problem) => return complain(&problem),
     };

@@ -59,7 +59,7 @@ pub(crate) use services::{
 };
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_jellyfin_admin,
-    wire_qbittorrent_password, wire_seerr_identity, IDENTITY,
+    wire_qbittorrent_password, wire_seerr_identity, Keep, IDENTITY,
 };
 
 use std::collections::BTreeMap;

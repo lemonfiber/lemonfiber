@@ -1,18 +1,19 @@
 """Check that `.github/workflows/release.yml` still carries every patch.
 
-`dist generate` writes that file, and five scripts then rewrite parts of what it
+`dist generate` writes that file, and scripts then rewrite parts of what it
 wrote: the release is left as a draft, every installer is checked against a
 pinned digest, every action is pinned to a commit, the tag reaches each command
 through the environment rather than as script, the token that can write a
 release belongs to the one job that writes one, a release is built only from a
-version tag on a commit on `main`, and the shell installer it publishes refuses a
-download it cannot check. `just release-workflow` applies all of it in order.
+version tag on a commit on `main`, the shell installer it publishes refuses a
+download it cannot check, and what the global build publishes is attested.
+`just release-workflow` applies all of it in order.
 
 Regenerating the file without running that recipe drops every patch at once, and
 the result is a workflow that reads as normal: it builds, it signs, it publishes.
 Nothing about it looks different until a release is already out.
 
-Ten claims are read from the tree, and each is a claim rather than a string:
+Twelve claims are read from the tree, and each is a claim rather than a string:
 
   applied      the file carries each patch's output verbatim, comments included
   draft        every `gh release create` carries `--draft`
@@ -30,6 +31,10 @@ Ten claims are read from the tree, and each is a claim rather than a string:
                  anything is built
   installer-refuses
                the global build rewrites the shell installer before uploading it
+  global-attested
+               the global build attests what it uploads, after the installer is
+                 rewritten and before the upload, holding the grants that
+                 signing one needs
   superseded-runs-cancel
                a pull request pushed again cancels the run it replaces, and a tag
                  is grouped by its own run so a release is never cancelled
@@ -50,6 +55,7 @@ import re
 import sys
 import tomllib
 
+import attest_the_global_artifacts as attested
 import cancel_superseded_runs as superseded
 import pin_release_actions
 import scope_release_permissions as permissions
@@ -264,7 +270,8 @@ WRITTEN = {
     "the release step's tag": by_env.CREATES_BY_ENV,
     "the tag trigger": cut_from.TRIGGER_VERSION,
     "the check that the tag is on main": cut_from.ON_MAIN,
-    "the installer's rewrite": cut_from.INSTALLER_REFUSES,
+    "the installer's rewrite and its attestation": attested.ATTESTED,
+    "the global build's grants": attested.GLOBAL_JOB_MAY_ATTEST,
 }
 
 
@@ -393,6 +400,35 @@ def claim_installer_refuses(workflow: dict, _cargo: dict) -> list[str]:
     return []
 
 
+ATTESTS = "actions/attest@"
+SIGNING_GRANTS = {"attestations": "write", "id-token": "write"}
+
+
+def claim_global_attested(workflow: dict, _cargo: dict) -> list[str]:
+    spec = (workflow.get("jobs") or {}).get("build-global-artifacts") or {}
+    job = spec.get("steps") or []
+    attests = [n for n, step in enumerate(job) if ATTESTS in str(step.get("uses") or "")]
+    if not attests:
+        return [
+            (
+                "the global build attests nothing, so the installer, the checksums and "
+                "the source archive are published with no provenance"
+            )
+        ]
+    problems = []
+    rewrites = [n for n, step in enumerate(job) if REWRITES_THE_INSTALLER in (step.get("run") or "")]
+    uploads = [n for n, step in enumerate(job) if "upload-artifact" in str(step.get("uses") or "")]
+    if not rewrites or attests[0] < rewrites[0]:
+        problems.append("the installer is attested before it is rewritten, so the attestation is of a file nobody gets")
+    if not uploads or attests[0] > uploads[0]:
+        problems.append("the global build uploads before it attests")
+    granted = spec.get("permissions") or {}
+    missing = [scope for scope, level in SIGNING_GRANTS.items() if granted.get(scope) != level]
+    if missing:
+        problems.append(f"the global build cannot sign an attestation without {missing}")
+    return problems
+
+
 def claim_allow_dirty(_workflow: dict, cargo: dict) -> list[str]:
     dist = cargo.get("workspace", {}).get("metadata", {}).get("dist", {})
     if "ci" in (dist.get("allow-dirty") or []):
@@ -449,6 +485,8 @@ CLAIMS = {
     "on-main": claim_on_main,
     "on-main-behind-a-condition": claim_on_main,
     "installer-refuses": claim_installer_refuses,
+    "global-attested": claim_global_attested,
+    "global-attested-with-grants": claim_global_attested,
     "superseded-runs-cancel": claim_superseded_runs_cancel,
 }
 
@@ -499,7 +537,12 @@ BREAKS = {
         c,
     ),
     "installer-refuses": lambda w, c: (
-        w.replace(cut_from.INSTALLER_REFUSES, cut_from.GLOBAL_BUILT),
+        w.replace(attested.ATTESTED, cut_from.GLOBAL_BUILT),
+        c,
+    ),
+    "global-attested": lambda w, c: (w.replace(attested.ATTESTED, cut_from.INSTALLER_REFUSES), c),
+    "global-attested-with-grants": lambda w, c: (
+        w.replace(attested.GLOBAL_JOB_MAY_ATTEST, attested.GLOBAL_JOB),
         c,
     ),
     "superseded-runs-cancel": lambda w, c: (w.replace(superseded.GROUPED, superseded.SCOPED), c),

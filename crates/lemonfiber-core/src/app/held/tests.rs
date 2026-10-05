@@ -62,7 +62,7 @@ fn ctx_with(server: &Server, tag: &str) -> Ctx {
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
         .with_http(server.transport());
     context.settings.env_file = Some(dir.join(".env"));
-    crate::app::targets::record_secret(
+    let _ = crate::app::targets::record_secret(
         &context,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         &a_password(),

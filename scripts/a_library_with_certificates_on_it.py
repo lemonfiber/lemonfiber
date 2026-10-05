@@ -21,7 +21,8 @@ Run it with a Docker daemon and nothing else:
     python3 scripts/a_library_with_certificates_on_it.py
 
 It starts its own container, drives it, prints what the server did, and takes the
-container away again. `--keep` leaves it up on the published port to poke at by hand.
+container away again. `--keep` leaves it up on the published port to poke at by hand,
+from this machine only.
 """
 
 import argparse
@@ -436,8 +437,10 @@ def main():
         "-d",
         "--name",
         CONTAINER,
+        # Loopback only: the account this drives is made with a password written in
+        # this file, so a server published past this machine is anybody's.
         "-p",
-        f"{chosen.port}:8096",
+        f"127.0.0.1:{chosen.port}:8096",
         "-v",
         f"{root / 'config'}:/config",
         "-v",

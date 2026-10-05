@@ -9,8 +9,11 @@
 //!
 //! [`reaching`] is here for the same reason read the other way round: what the
 //! dashboard offers is decided in the binary, and a guard outside it has to be able
-//! to read the answer.
+//! to read the answer. [`archive`] is here because a backup archive is read back from
+//! a file anybody could have handed the operator, and the fuzzer that holds its
+//! reader to that has to reach it from outside the binary.
 
+pub mod archive;
 pub mod carried;
 pub mod cli;
 pub mod codes;

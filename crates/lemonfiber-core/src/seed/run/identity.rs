@@ -23,8 +23,8 @@ pub(super) struct Admin(Result<String, crate::seed::State>);
 ///
 /// Both must be in the stack; without either there is nothing to wire. The admin
 /// password is the one credential minted rather than read — recorded on the run that
-/// mints it and read back on a later run. Recorded here, before the second half, so the
-/// steps between the two can sign in with it.
+/// mints it, before the wizard is given it, and read back on a later run. Recorded
+/// here, before the second half, so the steps between the two can sign in with it.
 pub(super) async fn seed_jellyfin_admin(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -35,21 +35,16 @@ pub(super) async fn seed_jellyfin_admin(
     let client =
         crate::jellyfin::Jellyfin::new(ctx.seams.http.clone(), &jellyfin.loopback, "jellyfin");
     let recorded = recorded_jellyfin_password(ctx);
+    let keep = |password: &str| record_jellyfin_password(ctx, password);
     let administered = crate::seed::wire_jellyfin_admin(
         &client,
         ctx.seams.random.as_ref(),
         recorded.as_deref(),
         ctx.dry_run,
+        &keep,
     )
     .await;
-    // A rehearsal mints nothing, so there is nothing here to record — the condition is
-    // already false. Written as a pair with the sign-in below rather than left to that
-    // coincidence, because a value that arrived from anywhere else would be recorded by
-    // a run that promised to write nothing.
-    if let (Ok((_, Some(password))), false) = (&administered, ctx.dry_run) {
-        record_jellyfin_password(ctx, password);
-    }
-    Some(Admin(administered.map(|(password, _)| password)))
+    Some(Admin(administered))
 }
 
 /// The second half: Seerr signed in through Jellyfin — at the request gate's Jellyfin
@@ -152,7 +147,10 @@ async fn changed_after_setup(
             Err(crate::app::credentials::Replacing::Refused) => {
                 "Jellyfin refused the password lemonfiber holds".to_owned()
             }
-            Err(crate::app::credentials::Replacing::Unproven(detail)) => detail,
+            Err(
+                crate::app::credentials::Replacing::Unproven(detail)
+                | crate::app::credentials::Replacing::Unkept(detail),
+            ) => detail,
         };
     let mut wiring = crate::seed::Wiring::settled(
         CHANGED.to_owned(),
@@ -239,9 +237,9 @@ pub(crate) fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
     crate::app::targets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
 }
 
-/// Record the minted Jellyfin admin password where a later run reads it back.
-/// Best-effort: a value that could not be written is reported by the next run
-/// re-minting rather than by failing the wiring that did land.
-pub(super) fn record_jellyfin_password(ctx: &Ctx, password: &str) {
-    crate::app::targets::record_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY, password);
+/// Record the minted Jellyfin admin password where a later run reads it back, or say
+/// why it could not be.
+fn record_jellyfin_password(ctx: &Ctx, password: &str) -> Result<(), String> {
+    crate::app::targets::record_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY, password)
+        .map_err(|failure| failure.to_string())
 }

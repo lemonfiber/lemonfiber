@@ -229,7 +229,7 @@ async fn a_generated_password_is_set_confirmed_and_handed_back() {
     let random = minting();
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false, &|_| Ok(())).await;
 
     assert!(matches!(wiring.state, State::Wired));
     // The value handed back for recording is the one that was set: it appears in
@@ -259,7 +259,7 @@ async fn a_rehearsed_pass_generates_no_password_and_asks_the_client_nothing() {
     let random = minting();
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, true).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, true, &|_| Ok(())).await;
 
     assert_eq!(
         wiring.state,
@@ -286,7 +286,7 @@ async fn without_randomness_the_password_is_not_set() {
     let random = lemonfiber_fixtures::ports::Chance::exactly(None);
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false, &|_| Ok(())).await;
 
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);
@@ -297,13 +297,37 @@ async fn without_randomness_the_password_is_not_set() {
 }
 
 #[tokio::test]
-async fn a_rejected_current_password_fails_and_records_nothing() {
+async fn a_password_that_cannot_be_recorded_is_never_set() {
+    let current = a_word();
+    let fake = Fake::in_turn(vec![ok(), Answer::reply(200, ""), ok()]);
+    let random = minting();
+
+    let (wiring, handed) =
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &current, false, &|_| {
+            Err("the disk is full".to_owned())
+        })
+        .await;
+
+    assert!(
+        matches!(&wiring.state, State::Failed { detail } if detail.contains("could not be recorded")),
+        "{:?}",
+        wiring.state
+    );
+    assert_eq!(handed, None);
+    assert!(
+        fake.requests().is_empty(),
+        "the client was given a password nothing recorded"
+    );
+}
+
+#[tokio::test]
+async fn a_rejected_current_password_fails_and_hands_nothing_back() {
     let wrong = a_word();
     let fake = Fake::in_turn(vec![Answer::reply(200, "Fails.")]);
     let random = minting();
 
     let (wiring, recorded) =
-        wire_qbittorrent_password(&qbittorrent(&fake), &random, &wrong, false).await;
+        wire_qbittorrent_password(&qbittorrent(&fake), &random, &wrong, false, &|_| Ok(())).await;
 
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);

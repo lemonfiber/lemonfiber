@@ -284,31 +284,6 @@ pub(crate) async fn indexer_aggregator(
     ))
 }
 
-/// Claim the listening server by making its first account, where nobody has.
-///
-/// The server gives its root account to whoever makes the first one, from anywhere on
-/// the network, so an unclaimed one is anybody's. Made here with a minted password,
-/// which is answered back to be recorded; nothing where the server already has an
-/// account or will not answer, and nothing where the randomness to mint one is
-/// unavailable.
-pub(crate) async fn claim_audiobookshelf(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-) -> Option<String> {
-    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Audiobookshelf)?;
-    let client =
-        crate::audiobookshelf::Audiobookshelf::new(ctx.seams.http.clone(), addr.loopback, &addr.id);
-    if client.has_account().await.ok()? {
-        return None;
-    }
-    let fresh = crate::secret::generate(ctx.seams.random.as_ref())?;
-    client
-        .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
-        .await
-        .ok()?;
-    Some(fresh)
-}
-
 /// Revoke the media server key filed under lemonfiber's name, where it can.
 ///
 /// Answers whether one was revoked. Nothing where lemonfiber does not hold the admin

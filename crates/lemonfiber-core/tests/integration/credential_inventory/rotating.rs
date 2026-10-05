@@ -166,6 +166,11 @@ async fn a_proven_replacement_is_recorded_and_every_consumer_is_accounted_for() 
     let now = recorded(&env, QBITTORRENT_PASSWORD_KEY);
     assert!(now.is_some(), "a password is still recorded");
     assert_ne!(now, Some(password), "and it is not the one it was");
+    assert_eq!(
+        recorded(&env, "QBITTORRENT_PASSWORD_PENDING"),
+        None,
+        "the replacement was moved into place, not left beside it"
+    );
 }
 
 /// A rotation the service could not be reached for leaves the existing password in
@@ -377,46 +382,67 @@ async fn a_replacement_jellyfin_will_not_take_leaves_the_recorded_password() {
     }
 }
 
-/// A rehearsal says what a real run would do and asks Jellyfin nothing.
+/// A replacement that was set and not proven stays recorded beside the password in
+/// force, because whether Jellyfin took it is what the failure left unknown; one that
+/// was refused outright is not kept at all.
 #[tokio::test]
-async fn a_rehearsed_administrator_rotation_asks_jellyfin_nothing() {
-    let (said, recorded, http) =
-        administrator_rotated("admin-rehearsed", administered(200, 204, 200), true).await;
-
-    assert!(said.starts_with("Some(Rehearsed"), "{said}");
-    assert_eq!(recorded, Some(the_administrator_password()));
-    assert!(http.requests().is_empty());
+async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_is_not() {
+    for (name, http, kept) in [
+        ("admin-pending-unproven", administered(200, 204, 401), true),
+        ("admin-pending-refused", administered(401, 204, 200), false),
+    ] {
+        let password = the_administrator_password();
+        let env = env_at(name, &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)]);
+        let _ = asked(
+            &ctx(env.clone(), Files::empty(), http),
+            Asking::Rotate {
+                credential: "jellyfin".to_owned(),
+            },
+        )
+        .await;
+        assert_eq!(
+            recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY),
+            Some(password),
+            "{name}"
+        );
+        assert_eq!(
+            recorded(&env, "JELLYFIN_ADMIN_PASSWORD_PENDING").is_some(),
+            kept,
+            "{name}"
+        );
+    }
 }
 
-/// Without a recorded password, or without randomness, nothing is asked of Jellyfin.
+/// A replacement that cannot be recorded is never set, so no password is in force that
+/// nothing recorded.
 #[tokio::test]
-async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
-    let http = administered(200, 204, 200);
-    let env = env_at("admin-unrecorded", &[]);
-    let unrecorded = asked(
-        &ctx(env, Files::empty(), http.clone()),
-        Asking::Rotate {
-            credential: "jellyfin".to_owned(),
-        },
-    )
-    .await;
-    let said = format!("{:?}", unrecorded.rotated.map(|one| one.settled));
-    assert!(said.contains("holds no administrator password"), "{said}");
-
-    let password = the_administrator_password();
-    let env = env_at(
-        "admin-unrandom",
-        &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)],
+async fn a_replacement_that_cannot_be_recorded_is_never_set() {
+    let password = the_torrent_password();
+    // Written by a later lemonfiber, which this one reads and refuses to write over.
+    let env = env_at("unrecordable", &[(QBITTORRENT_PASSWORD_KEY, &password)]);
+    let _ = std::fs::write(
+        &env,
+        format!("{QBITTORRENT_PASSWORD_KEY}={password}\nLEMONFIBER_CONFIG_VERSION=999.0.0\n"),
     );
-    let unrandom = asked(
-        &ctx(env.clone(), Files::empty(), http.clone()).with_random(Arc::new(FixedRandom(None))),
+    let http = Fake::by_path(vec![
+        ("/auth/login", Answer::reply(200, "Ok.")),
+        ("/app/setPreferences", Answer::reply(200, "")),
+    ]);
+    let inventory = asked(
+        &ctx(env.clone(), Files::empty(), http.clone()),
         Asking::Rotate {
-            credential: "jellyfin".to_owned(),
+            credential: "qBittorrent web UI password".to_owned(),
         },
     )
     .await;
-    let said = format!("{:?}", unrandom.rotated.map(|one| one.settled));
-    assert!(said.contains("no randomness"), "{said}");
-    assert_eq!(recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY), Some(password));
-    assert!(http.requests().is_empty());
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.contains("could not be recorded"), "{said}");
+    assert!(
+        !http
+            .requests()
+            .iter()
+            .any(|asked| asked.url.ends_with("/app/setPreferences")),
+        "a password was set that nothing recorded"
+    );
+    assert_eq!(recorded(&env, QBITTORRENT_PASSWORD_KEY), Some(password));
 }

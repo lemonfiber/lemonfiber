@@ -14,7 +14,6 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
 use lemonfiber_core::companion::Asked as Paired;
 
 mod acting;
-mod archive;
 mod authoring;
 mod context;
 mod dashboard;

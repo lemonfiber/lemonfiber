@@ -30,16 +30,39 @@
 //! read as a setting here and as a sentence at `/api/config`. A rule each call site
 //! decides for itself is a rule most of them will decide differently.
 
-const SECRET_MARKERS: &[&str] = &[
-    "KEY",
-    "PASS",
-    "SECRET",
-    "TOKEN",
-    "PRIVATE",
-    "CREDENTIAL",
-    "AUTH",
-    "USER",
+/// The words that name a credential itself: a setting called by one is secret, and a
+/// path segment after one is the credential it names.
+const KEY_MARKERS: &[&str] = &["KEY", "PASS", "SECRET", "TOKEN", "PRIVATE", "CREDENTIAL"];
+
+/// The words that name the account or the sign-in a credential belongs to: a setting
+/// called by one is secret too.
+///
+/// A path segment after one is not withheld, because a path names accounts and sign-ins
+/// by their routes: what follows `/Users/` is an account and what follows `/auth/` is
+/// `login`, and withholding either hides the route somebody came to read.
+const ACCOUNT_MARKERS: &[&str] = &["AUTH", "USER", "SESSION", "COOKIE"];
+
+/// Names that are a credential only as a whole word, being too short to look for
+/// inside a longer one: a session cookie is called `SID`, and `INSIDE` is not one.
+const SECRET_WORDS: &[&str] = &["SID"];
+
+/// Headers whose whole value is a credential, whatever it is written in.
+///
+/// A scheme comes first and the credential second — `Bearer …`, `Basic …` — and a
+/// cookie line is a list of pairs, so neither reads as a setting with one value after
+/// it. The rest of the line goes, rather than the next word.
+const SECRET_HEADERS: &[&str] = &[
+    "AUTHORIZATION",
+    "PROXY-AUTHORIZATION",
+    "COOKIE",
+    "SET-COOKIE",
 ];
+
+/// The shortest run that reads as a key where it stands as a path segment of its own.
+///
+/// Longer than any word or version a path is built from, and shorter than the keys
+/// and passkeys services put there: thirty-two hexadecimal digits is the usual shape.
+const KEY_LENGTH: usize = 20;
 
 /// What is shown in place of a secret.
 pub const REDACTED: &str = "(set, not shown)";
@@ -48,7 +71,18 @@ pub const REDACTED: &str = "(set, not shown)";
 #[must_use]
 pub fn is_secret(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
-    SECRET_MARKERS.iter().any(|marker| upper.contains(marker))
+    KEY_MARKERS
+        .iter()
+        .chain(ACCOUNT_MARKERS)
+        .any(|marker| upper.contains(marker))
+        || upper
+            .split(|character: char| !character.is_ascii_alphanumeric())
+            .any(|word| SECRET_WORDS.contains(&word))
+}
+
+/// Whether a name is a header whose whole value is a credential.
+fn hides_the_line(name: &str) -> bool {
+    SECRET_HEADERS.contains(&name.to_ascii_uppercase().as_str())
 }
 
 /// Whether a run of text is written the way a setting is named.
@@ -101,50 +135,94 @@ pub(crate) fn without_query(value: &str) -> String {
     }
 }
 
-/// A value with both of the things a URL can carry a credential in withheld.
+/// A value with every place a URL can carry a credential in withheld: the query, the
+/// login in front of the host, and a path segment that is a key.
 ///
-/// The query is one, and the other is the password a URL may carry in front of its host.
-/// Nothing in this stack hands one out — an indexer of the Torznab and Newznab families
-/// authenticates by a query parameter, which is why the key is a setting of its own — but
-/// an operator whose indexer sits behind a proxy that asks for a login can write one, and
-/// the client this stack sends with will use it.
+/// The login goes whole rather than only the password after its colon. A service
+/// reached as `https://<token>@host` authenticates by the name alone, so a rule that
+/// knew only about passwords printed the token; the URI syntax says where the login
+/// stands, so no guessing is involved in finding it.
 ///
-/// What separates it from the query is that no guessing is involved. The rule above takes
-/// a query wholesale precisely because a parameter's name belongs to whoever wrote the
-/// service; here the URI syntax itself says that everything after the first colon of a
-/// userinfo is a password, and that no application should render one as clear text. So
-/// this is a fact about the shape rather than a guess about somebody's vocabulary.
-///
-/// The username stays. It names the account, an operator whose login is refused needs to
-/// see which one, and it is not what the syntax calls a password.
+/// A path segment is the one place here that is read by shape. A key is put in a path
+/// where an API names the thing it acts on by it — `DELETE /Auth/Keys/<key>` revokes
+/// that key — and a tracker's announce address carries a passkey the same way. So a
+/// segment goes where the one in front of it names a credential, and where it is long
+/// and dense enough to read as one on its own.
 #[must_use]
 pub fn without_credentials(value: &str) -> String {
-    without_query(&without_password(value))
+    without_query(&without_path_keys(&without_login(value)))
 }
 
-/// The same value with the password half of any userinfo in it withheld, or the value
-/// itself where there is none to withhold.
-///
-/// Public because the rule has a second consumer that must not spell it again. A support
-/// bundle keeps the query rather than dropping it, so it cannot use the pair above and
-/// wrote its own half instead — which handled the query and never learned about this one.
-#[must_use]
-pub fn without_password(value: &str) -> String {
-    password_withheld(value).unwrap_or_else(|| value.to_owned())
-}
-
-/// The rebuilt value, where this one is a URL carrying a password before its host.
+/// Where a URL carries a login in front of its host: what stands before `://`, the
+/// login, and the rest of the value from its `@` on.
 ///
 /// Read out of the authority alone — what stands between `://` and the first `/`, `?` or
-/// `#` — so a colon in a path and a stray `@` in a query are not mistaken for a login.
-/// The last `@` in it rather than the first, because that is the one every client splits
-/// on, and splitting anywhere else would leave part of the password in what is shown.
-fn password_withheld(value: &str) -> Option<String> {
+/// `#` — so an `@` in a path or a query is not mistaken for a login. The last `@` in it
+/// rather than the first, because that is the one every client splits on.
+///
+/// Public because a support bundle marks a login rather than withholding it, and must
+/// find it where this does rather than by a rule of its own.
+#[must_use]
+pub fn login(value: &str) -> Option<(&str, &str, &str)> {
     let (scheme, rest) = value.split_once("://")?;
     let ends = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let at = rest.get(..ends)?.rfind('@')?;
-    let (user, _) = rest.get(..at)?.split_once(':')?;
-    Some(format!("{scheme}://{user}:{REDACTED}{}", rest.get(at..)?))
+    Some((scheme, rest.get(..at)?, rest.get(at..)?))
+}
+
+/// The same value with any login in front of its host withheld, or the value itself
+/// where there is none.
+fn without_login(value: &str) -> String {
+    login(value).map_or_else(
+        || value.to_owned(),
+        |(scheme, _, after)| format!("{scheme}://{REDACTED}{after}"),
+    )
+}
+
+/// The same value with every path segment that is a key withheld.
+fn without_path_keys(value: &str) -> String {
+    let Some((scheme, rest)) = value.split_once("://") else {
+        return value.to_owned();
+    };
+    let ends = rest.find(['?', '#']).unwrap_or(rest.len());
+    let (address, tail) = rest.split_at(ends);
+    let Some((authority, path)) = address.split_once('/') else {
+        return value.to_owned();
+    };
+    let mut after_a_name = false;
+    let segments: Vec<&str> = path
+        .split('/')
+        .map(|segment| {
+            let named = names_a_key(segment);
+            let keyed = (after_a_name && !named) || reads_as_key(segment);
+            after_a_name = named;
+            if keyed && !segment.is_empty() && !already_withheld(segment) {
+                REDACTED
+            } else {
+                segment
+            }
+        })
+        .collect();
+    format!("{scheme}://{authority}/{}{tail}", segments.join("/"))
+}
+
+/// Whether a path segment names a credential, so the segment after it is that credential.
+fn names_a_key(segment: &str) -> bool {
+    let upper = segment.to_ascii_uppercase();
+    KEY_MARKERS.iter().any(|marker| upper.contains(marker))
+}
+
+/// Whether a path segment reads as a key rather than as a name: long, built only of
+/// letters and digits, and carrying both.
+fn reads_as_key(segment: &str) -> bool {
+    segment.len() >= KEY_LENGTH
+        && segment
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
+        && segment.chars().any(|character| character.is_ascii_digit())
+        && segment
+            .chars()
+            .any(|character| character.is_ascii_alphabetic())
 }
 
 /// Whether what stands after a separator is the marker itself, left by an earlier pass
@@ -227,6 +305,9 @@ pub fn withheld_by(line: &str, vouched_for: &dyn Fn(&str) -> bool) -> String {
         return line.to_owned();
     }
     let named = name.trim();
+    if hides_the_line(named) {
+        return format!("{name}{separator} {REDACTED}");
+    }
     if !reads_as_name(named) || !reads_as_setting(named, value) || vouched_for(named) {
         // Not a setting line, or a setting whose value is vouched for — but prose can
         // still carry a credential, and so can a value that is an address: a service
@@ -245,15 +326,13 @@ pub fn withheld_by(line: &str, vouched_for: &dyn Fn(&str) -> bool) -> String {
 ///
 /// A query string is taken wholesale, because that is where the key nobody spotted
 /// actually lives, riding inside something that reads as an address. An address with no
-/// query is asked the other question the URI syntax answers — whether it carries a
-/// password in front of its host — because [`queried`] reaches that only as a
-/// side-effect of there being a query to strip, and an address without one went through
-/// here whole. `https://user:hunter2@indexer.example/api` was printed exactly as
-/// written. No guessing is involved either way: the syntax says everything after the
-/// first colon of a userinfo is a password, so `http://host:8080/path`, which has no
-/// userinfo, is left alone. The rest are a *field* written out mid-sentence, and that is
-/// what those rules look for. The two
-/// joined shapes need nothing more: prose does not put an equals sign or an internal
+/// query is asked the other questions [`without_credentials`] answers — whether it
+/// carries a login in front of its host, or a key in its path — because [`queried`]
+/// reaches those only where there is a query to strip. `http://host:8080/path`, which
+/// has neither, is left alone. A header whose value is a credential takes the rest of
+/// the line with it, since its scheme and its pairs are words a setting rule cannot
+/// read. The rest are a *field* written out mid-sentence, and that is what those rules
+/// look for. The two joined shapes need nothing more: prose does not put an equals sign or an internal
 /// colon inside a word, so finding one is already finding a setting. The spaced shape
 /// does need more, because a word followed by a colon is how English introduces a
 /// clause, and the marker words are ordinary English — `key`, `password`, `auth`. So
@@ -274,9 +353,16 @@ fn withheld_within(line: &str) -> String {
             safe.push(marked(token));
             continue;
         }
+        // `Authorization: Bearer …` — the scheme is a word and the credential the next
+        // one, and a cookie line is a list, so everything after the header goes.
+        if token.strip_suffix(':').is_some_and(hides_the_line) {
+            safe.push(token.to_owned());
+            safe.push(REDACTED.to_owned());
+            break;
+        }
         if let Some(named) = joined(token)
             .or_else(|| queried(token))
-            .or_else(|| password_withheld(token))
+            .or_else(|| addressed(token))
         {
             safe.push(named);
             continue;
@@ -338,11 +424,18 @@ fn joined(token: &str) -> Option<String> {
 /// Parameters and not a question mark on its own: a question mark with nothing that
 /// reads as a parameter after it is somebody asking a question in a log line.
 ///
-/// A password written in front of the host goes with the query, since a service quoting
-/// an address back at itself quotes whatever was configured into it.
+/// A login in front of the host and a key in the path go with the query, since a
+/// service quoting an address back at itself quotes whatever was configured into it.
 fn queried(token: &str) -> Option<String> {
     let (_, query) = token.split_once('?')?;
     query.contains('=').then(|| without_credentials(token))
+}
+
+/// One token that is an address carrying a login or a key in its path, with those
+/// withheld — or nothing where it carries neither.
+fn addressed(token: &str) -> Option<String> {
+    let shown = without_path_keys(&without_login(token));
+    (shown != token).then_some(shown)
 }
 
 /// Every line of `text`, each withheld where it carries a credential.

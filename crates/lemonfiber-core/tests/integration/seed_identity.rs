@@ -252,24 +252,45 @@ impl Requests for FakeReq {
     }
 }
 
-/// Run the identity driver, returning the resulting state and the password to
-/// record (present only when the account was newly minted).
+/// Run the identity driver, returning the resulting state and the password it
+/// recorded (present only where one was newly minted).
 async fn identity(
     media: FakeMedia,
     seerr: FakeReq,
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
+    identity_keeping(media, seerr, random, recorded, true).await
+}
+
+/// The same, against a record that takes what it is given or refuses everything.
+async fn identity_keeping(
+    media: FakeMedia,
+    seerr: FakeReq,
+    random: Option<Vec<u8>>,
+    recorded: Option<&str>,
+    takes: bool,
+) -> (State, Option<String>) {
     let random = lemonfiber_fixtures::ports::Chance::exactly(random);
-    match wire_jellyfin_admin(&media, &random, recorded, false).await {
-        Ok((password, minted)) => (
+    let kept = Mutex::new(None);
+    let keep = |password: &str| {
+        if !takes {
+            return Err("the disk is full".to_owned());
+        }
+        if let Ok(mut kept) = kept.lock() {
+            *kept = Some(password.to_owned());
+        }
+        Ok(())
+    };
+    let state = match wire_jellyfin_admin(&media, &random, recorded, false, &keep).await {
+        Ok(password) => {
             wire_seerr_identity(&seerr, &password, "http://jellyfin:8096", false)
                 .await
-                .state,
-            minted,
-        ),
-        Err(state) => (state, None),
-    }
+                .state
+        }
+        Err(state) => state,
+    };
+    (state, kept.lock().ok().and_then(|kept| kept.clone()))
 }
 
 /// The same two services, asked what the pass would do rather than asked to do it.
@@ -281,15 +302,22 @@ async fn would_identity(
     // Randomness is available on purpose: what proves nothing was minted is that
     // nothing came back, not that nothing could have.
     let random = lemonfiber_fixtures::ports::Chance::exactly(Some(RANDOM.to_vec()));
-    match wire_jellyfin_admin(&media, &random, recorded, true).await {
-        Ok((password, minted)) => (
+    let kept = Mutex::new(None);
+    let keep = |password: &str| {
+        if let Ok(mut kept) = kept.lock() {
+            *kept = Some(password.to_owned());
+        }
+        Ok(())
+    };
+    let state = match wire_jellyfin_admin(&media, &random, recorded, true, &keep).await {
+        Ok(password) => {
             wire_seerr_identity(&seerr, &password, "http://jellyfin:8096", true)
                 .await
-                .state,
-            minted,
-        ),
-        Err(state) => (state, None),
-    }
+                .state
+        }
+        Err(state) => state,
+    };
+    (state, kept.lock().ok().and_then(|kept| kept.clone()))
 }
 
 fn media(startup: Startup, create: Create) -> FakeMedia {
@@ -372,10 +400,7 @@ async fn a_fresh_stack_mints_the_admin_and_wires_the_identity() {
     )
     .await;
     assert_eq!(state, State::Wired);
-    assert!(
-        minted.is_some(),
-        "the minted password is handed back to record"
-    );
+    assert!(minted.is_some(), "the minted password was recorded");
 }
 
 #[tokio::test]
@@ -388,7 +413,32 @@ async fn a_rejected_admin_creation_fails_with_the_services_own_words() {
     )
     .await;
     assert!(matches!(state, State::Failed { .. }), "{state:?}");
-    assert!(minted.is_none(), "a failed creation records no password");
+    // Recorded before the wizard was given it, so a creation that landed and then
+    // answered badly is one lemonfiber still holds the password for. One that did not
+    // land is minted again over it by the next run, which finds the wizard waiting.
+    assert!(
+        minted.is_some(),
+        "the password was not recorded before it was set"
+    );
+}
+
+#[tokio::test]
+async fn a_password_that_cannot_be_recorded_is_never_given_to_the_wizard() {
+    // The creation would be refused with the service's own words, so a failure naming
+    // the record instead is one that stopped before the wizard was asked anything.
+    let (state, minted) = identity_keeping(
+        media(Startup::Fresh, Create::Rejects),
+        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        Some(RANDOM.to_vec()),
+        None,
+        false,
+    )
+    .await;
+    assert!(
+        matches!(&state, State::Failed { detail } if detail.contains("could not be recorded")),
+        "{state:?}"
+    );
+    assert!(minted.is_none());
 }
 
 #[tokio::test]

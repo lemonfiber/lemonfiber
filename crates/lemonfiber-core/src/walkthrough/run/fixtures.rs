@@ -212,7 +212,7 @@ pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = ctx_with(fake);
     ctx.settings.env_file = Some(dir.join(".env"));
-    crate::app::targets::record_secret(
+    let _ = crate::app::targets::record_secret(
         &ctx,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         &a_password(),

@@ -211,9 +211,18 @@ fn answered(ctx: &Ctx, what: Hostable, wanted: bool) {
 }
 
 /// What is to be installed, or why it cannot be described.
+///
+/// The forms are resolved against the stack before they go anywhere near a definition,
+/// and refused in the words every other command refuses them in. What is written is a
+/// command the manager runs at every login, so a word that names no form would be a
+/// guard that fails when it is needed — and one carrying a line break or a leading dash
+/// would be read by the manager or by the program as something other than a form.
 fn wanted(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Hosted, Box<Problem>> {
-    if what.takes_forms() && forms.is_empty() {
-        return Err(Box::new(nothing_to_guard()));
+    if what.takes_forms() {
+        if forms.is_empty() {
+            return Err(Box::new(nothing_to_guard()));
+        }
+        super::engine::resolved(ctx, forms)?;
     }
     let Some(program) = ctx.settings.program.clone() else {
         return Err(Box::new(no_program()));

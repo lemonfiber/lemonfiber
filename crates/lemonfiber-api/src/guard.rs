@@ -152,7 +152,7 @@ const fn digit(nibble: u8) -> char {
 /// A request without one is refused: `Host` is not optional in the version of
 /// HTTP a browser speaks, and its absence is not something to be lenient about.
 #[must_use]
-pub(crate) fn host_is_here(host: Option<&str>, at: &Binding) -> bool {
+pub fn host_is_here(host: Option<&str>, at: &Binding) -> bool {
     host.is_some_and(|host| names_here(host, at))
 }
 
@@ -163,7 +163,7 @@ pub(crate) fn host_is_here(host: Option<&str>, at: &Binding) -> bool {
 /// browser this check exists to catch, and a browser always speaks. A page served
 /// encrypted names itself `https`, and is held to the same address as one that is not.
 #[must_use]
-pub(crate) fn origin_is_here(origin: Option<&str>, at: &Binding) -> bool {
+pub fn origin_is_here(origin: Option<&str>, at: &Binding) -> bool {
     origin.is_none_or(|origin| {
         let stated = origin
             .strip_prefix("https://")

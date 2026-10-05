@@ -335,9 +335,16 @@ async fn seed_leaves_each_arrs_already_present_download_clients() {
     // threaded to the download clients; each arr already holds both clients.
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
-    let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+    let env = config_scratch("seed_leaves_each_arrs_already_present_download_clients");
+    let ctx = seed_ctx(
+        Some(TEMP_LOG),
+        true,
+        Vec::new(),
+        Some(vec![0x11; 24]),
+        Some(env.to_path_buf()),
+    )
+    .with_http(seeding())
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -367,9 +374,16 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     // command dispatches and reports every present client.
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
-    let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x22; 24]), None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+    let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
+    let ctx = seed_ctx(
+        Some(TEMP_LOG),
+        true,
+        Vec::new(),
+        Some(vec![0x22; 24]),
+        Some(env.to_path_buf()),
+    )
+    .with_http(seeding())
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -389,9 +403,16 @@ async fn seed_skips_download_clients_when_the_arr_key_is_not_readable() {
     // The clients' own credentials are in hand, but the arrs have not written
     // their keys, so registration is skipped for a re-run rather than failed.
     const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
-    let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+    let env = config_scratch("seed_skips_download_clients_when_the_arr_key_is_not_readable");
+    let ctx = seed_ctx(
+        Some(TEMP_LOG),
+        true,
+        Vec::new(),
+        Some(vec![0x11; 24]),
+        Some(env.to_path_buf()),
+    )
+    .with_http(seeding())
+    .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);

@@ -9,7 +9,6 @@ multiple-versions = "deny"
 skip = [
   { crate = "getrandom@0.2", reason = "ring, under rustls, is on the 0.2 line" },
   { crate = "hashbrown@0.16", reason = "kasuari, under ratatui, is on the 0.16 line" },
-  { crate = "miniz_oxide@0.8", reason = "backtrace, under color-eyre, is on the 0.8 line" },
   { crate = "syn@2", reason = "several proc-macro crates are on the 2.x line" },
   { crate = "windows-sys@0.52", reason = "ring is on the 0.52 line" },
   { crate = "windows-sys@0.59", reason = "rtoolbox, under rpassword, is on the 0.59 line" },

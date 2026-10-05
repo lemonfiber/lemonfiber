@@ -30,6 +30,14 @@ const MANIFEST: &str = "manifest.json";
 /// an interrupted restore leaves it beside the target rather than over it.
 const STAGING: &str = "restoring";
 
+/// How hard an archive is compressed: the fastest level there is.
+///
+/// A backup is taken with the whole stack down when an update takes one, so the time
+/// it takes is the household's downtime, and a service database compresses well at
+/// any level. The default level spends several times as long for a file a little
+/// smaller.
+const LEVEL: Compression = Compression::fast();
+
 mod unpack;
 
 use unpack::{fault, free_bytes, remove_any, stage, staging_for, tree_size, write_staging};
@@ -69,7 +77,7 @@ fn atomically(
 
     let result = (|| {
         let file = own_file(&staging)?;
-        let encoder = GzEncoder::new(file, Compression::default());
+        let encoder = GzEncoder::new(file, LEVEL);
         let mut builder = tar::Builder::new(encoder);
         pack(&mut builder)?;
         builder.into_inner()?.finish()?;
@@ -83,7 +91,8 @@ fn atomically(
     fs::rename(&staging, dest).map_err(fault)
 }
 
-/// A directory and everything beneath it that is a directory or a file, in name order.
+/// A directory and everything beneath it that is a directory or a file, in name order,
+/// apart from what `left_out` names.
 ///
 /// Written out rather than handed to `append_dir_all`, which follows a link to what it
 /// points at. A link is left out altogether rather than kept as a link: a restore
@@ -93,15 +102,19 @@ fn walked(
     builder: &mut tar::Builder<GzEncoder<File>>,
     name: &Path,
     source: &Path,
+    left_out: &[PathBuf],
 ) -> std::io::Result<()> {
     builder.append_dir(name, source)?;
     let mut entries = fs::read_dir(source)?.collect::<std::io::Result<Vec<_>>>()?;
     entries.sort_by_key(fs::DirEntry::file_name);
     for entry in entries {
+        if left_out.contains(&entry.path()) {
+            continue;
+        }
         let kind = entry.file_type()?;
         let at = name.join(entry.file_name());
         if kind.is_dir() {
-            walked(builder, &at, &entry.path())?;
+            walked(builder, &at, &entry.path(), left_out)?;
         } else if kind.is_file() {
             builder.append_path_with_name(entry.path(), &at)?;
         }
@@ -112,10 +125,11 @@ fn walked(
 /// The archive itself, created readable by its owner alone.
 ///
 /// The mode goes on at creation rather than after, so the bytes are never even briefly
-/// world-readable — the same reason [`crate::config`]'s store opens the settings file this
-/// way. A `.tar.gz` of a configuration directory holds everything that directory holds, so
-/// the container has to be as private as the tightest thing inside it; the entry modes
-/// below say what an extracted file gets and say nothing about who may read the archive.
+/// world-readable — the same reason the core's configuration store opens the settings
+/// file this way. A `.tar.gz` of a configuration directory holds everything that
+/// directory holds, so the container has to be as private as the tightest thing inside
+/// it; the entry modes below say what an extracted file gets and say nothing about who
+/// may read the archive.
 #[cfg(unix)]
 fn own_file(path: &Path) -> std::io::Result<File> {
     use std::os::unix::fs::OpenOptionsExt as _;
@@ -168,6 +182,14 @@ fn held(
     header.set_mode(0o600);
     header.set_cksum();
     builder.append_data(&mut header, name, body)
+}
+
+/// Where on this machine each path an item leaves out is.
+fn skipped(item: &Item) -> Vec<PathBuf> {
+    item.left_out
+        .iter()
+        .map(|path| item.source.join(path))
+        .collect()
 }
 
 /// One archive operation, on a thread that is allowed to block.
@@ -295,10 +317,16 @@ fn extracted(src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault> {
 impl Archive for Tar {
     async fn space(&self, dir: &Path, items: &[Item]) -> Result<Space, Fault> {
         let dir = dir.to_path_buf();
-        let sources: Vec<PathBuf> = items.iter().map(|item| item.source.clone()).collect();
+        let sources: Vec<(PathBuf, Vec<PathBuf>)> = items
+            .iter()
+            .map(|item| (item.source.clone(), skipped(item)))
+            .collect();
         away(move || {
             Ok(Space {
-                needed: sources.iter().map(|source| tree_size(source)).sum(),
+                needed: sources
+                    .iter()
+                    .map(|(source, left_out)| tree_size(source, left_out))
+                    .sum(),
                 available: free_bytes(&dir),
             })
         })
@@ -324,7 +352,13 @@ impl Archive for Tar {
                 builder.follow_symlinks(false);
                 for item in &items {
                     if item.source.is_dir() {
-                        walked(builder, Path::new(&item.archive_path), &item.source)?;
+                        let left_out = skipped(item);
+                        walked(
+                            builder,
+                            Path::new(&item.archive_path),
+                            &item.source,
+                            &left_out,
+                        )?;
                     }
                 }
                 Ok(())

@@ -131,12 +131,16 @@ pub(super) fn fault(error: impl std::fmt::Display) -> Fault {
     Fault::new(error.to_string())
 }
 
-/// The total size of a file, or of everything beneath a directory.
+/// The total size of a file, or of everything beneath a directory, apart from what
+/// `left_out` names.
 ///
 /// A best-effort estimate for the space check: an entry that cannot be read
 /// contributes nothing rather than aborting the measurement, since the headroom
 /// the caller keeps absorbs an estimate that is a little low.
-pub(super) fn tree_size(path: &Path) -> u64 {
+pub(super) fn tree_size(path: &Path, left_out: &[PathBuf]) -> u64 {
+    if left_out.iter().any(|skipped| skipped == path) {
+        return 0;
+    }
     let Ok(meta) = fs::symlink_metadata(path) else {
         return 0;
     };
@@ -151,7 +155,7 @@ pub(super) fn tree_size(path: &Path) -> u64 {
     };
     entries
         .filter_map(Result::ok)
-        .map(|entry| tree_size(&entry.path()))
+        .map(|entry| tree_size(&entry.path(), left_out))
         .sum()
 }
 

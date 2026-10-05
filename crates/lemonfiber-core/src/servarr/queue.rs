@@ -126,14 +126,17 @@ fn queued(record: QueueRecord, grabs: &BTreeMap<i64, u32>) -> Queued {
         status: record.tracked_download_status,
         state: record.tracked_download_state,
         // The service reports a single message and a list of them; the list is
-        // where an import failure explains itself, so it leads.
+        // where an import failure explains itself, so it leads. Withheld as it is
+        // read, because the message quotes what the download client was told — and
+        // a private tracker's announce address carries the operator's passkey.
         message: record
             .status_messages
             .into_iter()
             .flat_map(|message| message.messages)
             .next()
             .or(record.error_message)
-            .filter(|message| !message.trim().is_empty()),
+            .filter(|message| !message.trim().is_empty())
+            .map(|message| crate::config::store::withheld_text(&message)),
         download_id: record.download_id.filter(|id| !id.is_empty()),
         // At least the one that put it here. A history that could not be read, or
         // that has scrolled past this item's grabs, leaves the count at the single

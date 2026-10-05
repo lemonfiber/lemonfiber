@@ -72,8 +72,8 @@ fn what_is_written_down_is_where_it_went_and_not_what_it_carried() {
 /// the outbound listing; a file the operator is invited to read to check that
 /// listing is the last place it may survive.
 ///
-/// The account keeps its name. An operator whose login is refused needs to see
-/// which one it was, and a username is not what the URI syntax calls a password.
+/// The account goes with the password: a token can stand where the account does,
+/// and the address alone says where the request went.
 #[test]
 fn a_login_written_in_front_of_a_host_is_not_written_down() {
     // Assembled rather than written out: a run that reads as a real password in
@@ -95,7 +95,10 @@ fn a_login_written_in_front_of_a_host_is_not_written_down() {
             !said.contains(&password),
             "the operator's login survived into the record"
         );
-        assert!(said.contains("someone"), "the account was not named");
+        assert!(
+            !said.contains("someone"),
+            "the account survived into the record"
+        );
         assert!(
             said.contains("indexer.example"),
             "where the request went did not survive"
@@ -139,6 +142,27 @@ fn the_part_that_says_what_was_asked_for_is_taken_off() {
     assert!(
         plain.contains("https://a.example/x "),
         "an address carrying no query was not written exactly as it was"
+    );
+}
+
+/// A key the request names in its path is not written down, and the path around it is.
+#[test]
+fn a_key_named_in_the_path_is_not_written_down() {
+    let key = ["0123456789", "abcdef", "0123456789", "abcdef"].concat();
+    let revoking = Request {
+        method: Method::Delete,
+        url: format!("http://127.0.0.1:8096/Auth/Keys/{key}"),
+        headers: Vec::new(),
+        body: None,
+    };
+    let said = line(1, &revoking, Some(204));
+    assert!(
+        !said.contains(&key),
+        "the key survived into the record: {said}"
+    );
+    assert!(
+        said.contains("/Auth/Keys/"),
+        "where the request went did not survive"
     );
 }
 

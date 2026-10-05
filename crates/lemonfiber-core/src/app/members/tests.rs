@@ -22,7 +22,7 @@ fn ctx_with(tag: &str, admin_password: Option<&str>) -> (Ctx, Arc<Transport>) {
     let mut context = a_context().build().with_http(transport.clone());
     context.settings.env_file = Some(dir.join(".env"));
     if let Some(password) = admin_password {
-        crate::app::targets::record_secret(
+        let _ = crate::app::targets::record_secret(
             &context,
             crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
             password,

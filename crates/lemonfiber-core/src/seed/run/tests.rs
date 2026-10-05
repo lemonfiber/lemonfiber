@@ -434,6 +434,7 @@ mod aggregators;
 mod applications;
 mod arrs;
 mod baseline;
+mod claiming;
 mod cors;
 mod decline;
 mod gate;

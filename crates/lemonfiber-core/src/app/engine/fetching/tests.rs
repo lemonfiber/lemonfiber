@@ -16,9 +16,9 @@ fn refusing() -> crate::app::Ctx {
 #[test]
 fn a_fetch_is_refused_only_where_the_operator_switched_fetching_off() {
     let allowed = a_context().build();
-    assert!(!refused(&allowed, &Action::Pull));
+    assert!(!refused(&allowed, &Action::Pull(Vec::new())));
 
-    assert!(refused(&refusing(), &Action::Pull));
+    assert!(refused(&refusing(), &Action::Pull(Vec::new())));
 }
 
 /// Only the fetch. A start still runs — with `--pull never`, which is the other

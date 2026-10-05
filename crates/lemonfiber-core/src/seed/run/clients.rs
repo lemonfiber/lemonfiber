@@ -224,8 +224,8 @@ pub(super) async fn seed_passwords(
 /// connection reports that rather than setting another. Otherwise the temporary
 /// password is read from the container's own log; without it there is nothing to
 /// authenticate with, so the connection is skipped for a re-run once the container
-/// has announced one. A generated password that lands is recorded in the
-/// environment under `setting`, the client's own.
+/// has announced one. A generated password is recorded in the environment under
+/// `setting`, the client's own, before the client is given it.
 pub(super) async fn seed_qbittorrent_password(
     ctx: &Ctx,
     filler: &Filler,
@@ -279,22 +279,18 @@ pub(super) async fn seed_qbittorrent_password(
         return (wiring, None);
     };
 
-    let (wiring, recorded) = crate::seed::wire_qbittorrent_password(
+    let keep = |password: &str| {
+        crate::app::targets::record_secret(ctx, setting, password)
+            .map_err(|failure| failure.to_string())
+    };
+    crate::seed::wire_qbittorrent_password(
         &client,
         ctx.seams.random.as_ref(),
         &temporary,
         ctx.dry_run,
+        &keep,
     )
-    .await;
-
-    // A rehearsal generates nothing, so there is nothing here to record and the
-    // condition is already false. Said as a pair with the flag above rather than left
-    // to that, because a value arriving from anywhere else would be written down by a
-    // run that promised to write nothing.
-    if let Some(password) = recorded.as_ref().filter(|_| !ctx.dry_run) {
-        crate::app::targets::record_secret(ctx, setting, password);
-    }
-    (wiring, recorded)
+    .await
 }
 
 /// What setting one torrent client's web UI password is called where it is reported.
