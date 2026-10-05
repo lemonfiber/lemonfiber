@@ -12,7 +12,7 @@ const A_KEY_IS_ITS_SECRET: &str = "a key is its secret — a rehearsed one would
 /// cannot be rehearsed, because a key is its secret.
 pub(super) const fn keyed(asked: &Keyed) -> Asked {
     match asked {
-        Keyed::List => reads("key list"),
+        Keyed::List { .. } => reads("key list"),
         Keyed::Mint { .. } => cannot("key mint", A_KEY_IS_ITS_SECRET),
         Keyed::Revoke { .. } => reports("key revoke", &[kind::KEYS]),
     }

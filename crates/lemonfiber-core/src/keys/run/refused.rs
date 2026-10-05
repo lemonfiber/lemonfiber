@@ -1,8 +1,8 @@
 //! Every refusal asking the keys for something can meet, each in its own words.
 
 use crate::error::codes::key::{
-    BAD_NAME, NAME_TAKEN, NOT_A_PURPOSE, NOT_A_SCOPE, NOT_FOR_YOURSELF, NO_SECRET, NO_SUCH_KEY,
-    NO_SUCH_MEMBER, UNASKED, UNREADABLE,
+    BAD_NAME, MEMBERS_MAY_NOT_MINT, NAME_TAKEN, NOT_A_PURPOSE, NOT_A_SCOPE, NOT_FOR_YOURSELF,
+    NO_SECRET, NO_SUCH_KEY, NO_SUCH_MEMBER, UNASKED, UNREADABLE,
 };
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
 use crate::PRODUCT;
@@ -94,6 +94,35 @@ pub(super) fn name_taken(held: &Record) -> Problem {
         Remedy::new("Mint it under another name"),
     )
     .lies_in(Amiss::Asking)
+}
+
+/// Another member's key holds the name, which is not this member's to be told about.
+pub(super) fn name_held(name: &str) -> Problem {
+    Problem::new(
+        NAME_TAKEN,
+        Severity::Error,
+        format!("A key named {name} already exists"),
+        "A name identifies one key on this machine, so an alert or a journal entry naming it \
+         means the same key for good.",
+        Remedy::new("Mint it under another name"),
+    )
+    .lies_in(Amiss::Asking)
+}
+
+/// The operator has not allowed household members to mint keys.
+pub(super) fn members_may_not_mint() -> Problem {
+    Problem::new(
+        MEMBERS_MAY_NOT_MINT,
+        Severity::Warning,
+        "Whoever looks after this machine has not allowed household members to mint keys",
+        "A member's key carries that member's requests and viewing to whatever program holds \
+         it, so minting one is something the operator allows first. Nothing was minted.",
+        Remedy::new("Ask whoever looks after this machine to allow it").with_detail(format!(
+            "{PRODUCT} config set {} on",
+            crate::config::MEMBER_KEYS_KEY
+        )),
+    )
+    .lies_in(Amiss::Held)
 }
 
 /// No account in the household goes by the name a member's scope gave.

@@ -680,7 +680,9 @@ fn an_outcome_is_said_as_a_rehearsal_only_where_one_can_be() {
 fn asking_the_keys_rehearses_as_each_request_is() {
     use crate::keys::run::Asked as Keyed;
     use crate::keys::Minter;
-    let list = asked(&Command::Keys(Keyed::List));
+    let list = asked(&Command::Keys(Keyed::List {
+        by: Minter::Operator,
+    }));
     assert!(matches!(list.rehearsal, Rehearsal::Reads));
     let revoke = asked(&Command::Keys(Keyed::Revoke {
         name: "ha".to_owned(),

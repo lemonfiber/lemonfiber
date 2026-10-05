@@ -33,6 +33,7 @@ pub mod admitted;
 pub mod attempts;
 pub mod keyed;
 pub mod keyring;
+mod proving;
 pub mod remembered;
 pub mod sessions;
 
@@ -178,36 +179,6 @@ impl Admitting {
     /// The household as it stands now, where there is one to open.
     async fn household_now(&self) -> Option<Arc<dyn Household>> {
         opened(Arc::clone(self.household.as_ref()?)).await
-    }
-
-    /// Whether `password` is this machine's own, counted as every password offered is.
-    ///
-    /// For a write that asks for the password again in the same request, which a
-    /// session alone does not stand in for: the same two limits a sign-in meets, the
-    /// same slow check on a thread made for blocking, and a right answer forgiving
-    /// nothing but itself.
-    ///
-    /// # Errors
-    ///
-    /// How long is left, where the wrong answers so far have earned a wait.
-    pub async fn proves_the_operator(
-        &self,
-        password: &str,
-        peer: Option<IpAddr>,
-        now: SystemTime,
-    ) -> Result<bool, Duration> {
-        let ticket = self.attempts.taken(peer, None, now).await?;
-        let Some(held) = self.credential_now().await.filter(|_| ticket.operator) else {
-            return Ok(false);
-        };
-        let offered = password.to_owned();
-        let proved = tokio::task::spawn_blocking(move || held.verifies(&offered))
-            .await
-            .unwrap_or(false);
-        if proved {
-            self.attempts.right(&ticket, Door::Operator, now).await;
-        }
-        Ok(proved)
     }
 
     /// Who a name and a password prove somebody to be, or nothing.

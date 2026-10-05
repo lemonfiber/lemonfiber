@@ -62,6 +62,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          is off unless you turned it on",
     ),
     (
+        super::MEMBER_KEYS_KEY,
+        "whether household members may mint keys for themselves, which is off unless you \
+         turned it on",
+    ),
+    (
         super::QUIET_HOURS_KEY,
         "the hours you would rather not be woken for, which hold everything but the \
          alerts that cannot wait",
