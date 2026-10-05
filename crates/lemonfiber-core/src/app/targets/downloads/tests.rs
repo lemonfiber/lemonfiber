@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-use super::{download_targets, forwarded_client, read_transfers, torrent_client, DownloadKind};
+use super::{
+    download_targets, forwarded_client, read_transfers, torrent_client, DownloadKind,
+    DownloadTarget,
+};
 use crate::config::Settings;
 use crate::test_support::{a_context, a_password, a_placed, an_installed, env_at, stack};
 use crate::wiring::{Chosen, Fillers};
@@ -188,4 +191,31 @@ fn an_unreadable_register_leaves_the_stacks_own_services() {
                 .services()
                 .all(|one| one.origin == crate::origin::Origin::Bundled)
     }));
+}
+
+/// The torrent client is the first target that is one, whatever comes before it: a
+/// Usenet client declared first is passed over rather than taken for it.
+#[test]
+fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
+    let ctx = a_context().build();
+    let targets = [
+        DownloadTarget {
+            base: "http://127.0.0.1:8085".to_owned(),
+            kind: DownloadKind::Sabnzbd {
+                key: "usenet-key".to_owned(),
+            },
+            tunnelled: true,
+        },
+        DownloadTarget {
+            base: "http://127.0.0.1:8081".to_owned(),
+            kind: DownloadKind::Qbittorrent {
+                password: a_password(),
+            },
+            tunnelled: true,
+        },
+    ];
+
+    assert!(torrent_client(&ctx, &targets[..1]).is_none());
+    assert!(forwarded_client(&ctx, &targets[..1]).is_none());
+    assert!(torrent_client(&ctx, &targets).is_some());
 }
