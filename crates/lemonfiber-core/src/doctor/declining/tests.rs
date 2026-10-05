@@ -227,6 +227,35 @@ async fn a_second_key_under_the_service_s_name_does_not_hide_the_first_one_s_use
 }
 
 #[tokio::test]
+async fn an_unexplained_use_listed_first_outweighs_every_key_after_it() {
+    let at = scene("decline-key-first", &[], &[3_600]);
+    let used_unexplained = key(0, Some(86_400));
+    let undated = Dated {
+        created: Some(moment(0)),
+        last_used: Some("yesterday-ish".to_owned()),
+    };
+    let newer_unused = key(90_000, None);
+
+    let said = verdict(&at, Some(Ok(vec![used_unexplained, undated, newer_unused]))).await;
+
+    assert!(warned_unexplained(&said), "{said:?}");
+}
+
+#[tokio::test]
+async fn an_undated_use_listed_first_is_not_hidden_by_an_unused_key_after_it() {
+    let at = scene("decline-key-undated-first", &[], &[]);
+    let undated = Dated {
+        created: Some(moment(0)),
+        last_used: Some("yesterday-ish".to_owned()),
+    };
+    let newer_unused = key(90_000, None);
+
+    let said = verdict(&at, Some(Ok(vec![undated, newer_unused]))).await;
+
+    assert!(matches!(said, Verdict::Unverified { .. }), "{said:?}");
+}
+
+#[tokio::test]
 async fn a_last_use_the_server_dates_in_a_form_nobody_reads_is_unverified_never_a_pass() {
     let at = scene("decline-key-undated", &[], &[]);
     let odd = Dated {
