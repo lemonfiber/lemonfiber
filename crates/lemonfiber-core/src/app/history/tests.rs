@@ -1,4 +1,4 @@
-use super::{did, stamped};
+use super::{did, history, stamped};
 
 /// A region reads as what it was: something written into a file that was there.
 #[test]
@@ -61,5 +61,62 @@ fn a_key_reads_as_its_name_and_scope() {
             scope: "act".to_owned(),
         }),
         "revoked the key ha, with the scope act"
+    );
+}
+
+/// A setting the operator has edited since is read off the settings file as it stands,
+/// and the change that wrote it is said as no longer one a reversal can put back.
+///
+/// Driven beside the crate as well as from outside it, because the app layer is
+/// compiled twice and a read exercised in only one copy has its coverage counted from
+/// the other.
+#[test]
+fn a_setting_edited_since_is_read_off_the_settings_file() {
+    let root = lemonfiber_fixtures::scratch::Scratch::named("history-edited").kept();
+    let _ = std::fs::remove_dir_all(&root);
+    let env = root.join("config").join(".env");
+    let settings = crate::config::Settings {
+        env_file: Some(env.clone()),
+        stack_dir: Some(root.join("data").join("stack")),
+        ..crate::config::Settings::default()
+    };
+    let ctx = crate::test_support::a_context().settings(settings).build();
+    let journal = crate::app::targets::layout(&ctx).map(|paths| paths.journal());
+    let change = crate::journal::Change {
+        at: "2000".to_owned(),
+        operation: "config".to_owned(),
+        target: ".env".to_owned(),
+        kind: crate::journal::Kind::Set {
+            key: "DATA_ROOT".to_owned(),
+            previous: Some("/srv/before".to_owned()),
+            current: "/srv/written".to_owned(),
+        },
+    };
+    if let Some(journal) = &journal {
+        if let Some(dir) = journal.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(journal, serde_json::to_string(&change).unwrap_or_default());
+    }
+    if let Some(dir) = env.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/edited\n");
+
+    let report = history(&ctx).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&root);
+
+    assert!(
+        journal.is_some(),
+        "the context resolved nowhere to keep a journal"
+    );
+    assert_eq!(report.changes.len(), 1, "{report:?}");
+    assert!(
+        report
+            .changes
+            .first()
+            .and_then(|one| one.because.as_deref())
+            .is_some_and(|because| because.contains("/srv/edited")),
+        "{report:?}"
     );
 }
