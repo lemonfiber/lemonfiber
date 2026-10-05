@@ -40,7 +40,7 @@ use super::installed::Installed;
 /// document that declares it, and the entry lemonfiber writes extends the stack's
 /// own template by a relative path. A document kept anywhere else would name a
 /// template that is not there.
-const OVERLAYS: &str = "compose/plugins";
+pub(crate) const OVERLAYS: &str = "compose/plugins";
 
 /// The directory beneath the stack holding each service's own configuration.
 ///
