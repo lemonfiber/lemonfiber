@@ -5,7 +5,6 @@
 //! install — one is asked before an install or an update acts, and the other on the
 //! read of what is installed.
 
-use crate::error::Problem;
 use crate::plugin::{Installed, Register};
 
 use super::super::Ctx;
@@ -38,24 +37,16 @@ pub(crate) fn substituted(
 /// Read against the stack as it stands and the plugins already installed, so the answer
 /// is about this machine: an ask a plugin installed earlier has already contested is
 /// not this install's doing, and is not laid at its door.
-///
-/// # Errors
-///
-/// Where the stack's own manifest cannot be read. A rehearsal that could not say what
-/// the install would do to the wiring would be stating less than the install does.
 pub(crate) fn contested(
     ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
     held: &Register,
     would: &Installed,
-) -> Result<Vec<crate::wiring::Contest>, Box<Problem>> {
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    Ok(crate::wiring::contested_by(
-        &manifest,
+) -> Vec<crate::wiring::Contest> {
+    crate::wiring::contested_by(
+        manifest,
         held.installed(),
         would,
         &super::super::targets::chosen_fillers(ctx),
-    ))
+    )
 }

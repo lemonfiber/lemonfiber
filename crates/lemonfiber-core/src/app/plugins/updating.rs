@@ -45,7 +45,10 @@ pub(crate) async fn update(
     // The stamp the whole update is journalled under, taken before anything is decided
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
-    let would = Installed::of(&manifest).installed(path, &stamp);
+    let stack_manifest = super::writing::stack_manifest(ctx)?;
+    let would = Installed::of(&manifest)
+        .installed(path, &stamp)
+        .joining(&super::writing::joins(ctx, &stack_manifest));
     let Some(was) = held
         .installed()
         .iter()
@@ -61,7 +64,7 @@ pub(crate) async fn update(
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let mut without = held.clone();
     without.forget(&was.plugin);
-    let contests = super::standing::contested(ctx, &without, &would)?;
+    let contests = super::standing::contested(ctx, &stack_manifest, &without, &would);
     super::writing::unanswered(&would, without.installed())?;
     super::writing::unshared(&would, without.installed())?;
     let changes = crate::plugin::changes(&super::writing::landing(

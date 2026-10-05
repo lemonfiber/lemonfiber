@@ -104,6 +104,7 @@ pub(crate) fn a_placed(
         api,
         listens,
         media_types: Vec::new(),
+        networks: Vec::new(),
     }
 }
 

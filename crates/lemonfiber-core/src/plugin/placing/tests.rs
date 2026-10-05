@@ -29,6 +29,7 @@ fn placed(service: &str) -> Placed {
         api: None,
         listens: None,
         media_types: Vec::new(),
+        networks: Vec::new(),
     }
 }
 

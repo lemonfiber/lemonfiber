@@ -145,6 +145,26 @@ fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp:
     }
 }
 
+/// The stack's own manifest, which what a plugin's service joins and what installing it
+/// would leave contested are both read against.
+///
+/// # Errors
+///
+/// Returns the stack's own refusal where its manifest cannot be read. A rehearsal that
+/// could not say what the install would do to the wiring would be stating less than the
+/// install does.
+pub(crate) fn stack_manifest(ctx: &Ctx) -> Result<lemonfiber_manifest::Manifest, Box<Problem>> {
+    ctx.stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))
+}
+
+/// The stack's services as what a plugin's service could stand in for, with the networks
+/// its compose files put each on.
+pub(crate) fn joins(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> crate::plugin::Joins {
+    crate::plugin::Joins::of(manifest, &ctx.stack.attached())
+}
+
 /// What the install decided, less every region with nowhere to land.
 ///
 /// Settled before the account is stated as well as before the writes are carried out,

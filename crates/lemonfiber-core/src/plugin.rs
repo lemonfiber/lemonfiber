@@ -30,6 +30,7 @@ mod container;
 mod declared;
 mod fronting;
 mod installed;
+mod joining;
 mod register;
 // Where the plugin to install is, told apart by how the operator wrote it.
 mod source;
@@ -72,6 +73,7 @@ pub use container::{profile, written};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
 pub use installed::{answering, spelled_alike, Installed, Placed, Reached};
+pub use joining::Joins;
 pub use placing::{documents, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};

@@ -182,6 +182,15 @@ pub struct Placed {
     /// nothing named.
     #[serde(default)]
     pub media_types: Vec<String>,
+    /// The stack's own networks it joins beside the default one, because a stack service
+    /// it stands in for is on them.
+    ///
+    /// Settled at install from the stack it was installed beside and written down, so
+    /// the container lemonfiber writes for it stays a function of this record alone.
+    /// Defaulted for a record written before this was kept, which reads as joining none
+    /// and staying on the default network.
+    #[serde(default)]
+    pub networks: Vec<String>,
 }
 
 impl Placed {
@@ -206,6 +215,7 @@ impl Placed {
             api: service.api.clone(),
             listens: service.listens,
             media_types: service.media_types.clone(),
+            networks: Vec::new(),
         }
     }
 
@@ -396,6 +406,26 @@ impl Installed {
         Self {
             from: from.display().to_string(),
             installed_at: at.to_owned(),
+            ..self
+        }
+    }
+
+    /// The same record, with the networks each service joins beside the stack it is
+    /// installed beside.
+    ///
+    /// Apart from [`Self::of`] for the reason [`Self::installed`] is: the networks are a
+    /// fact about the stack on this machine, not about the manifest.
+    #[must_use]
+    pub fn joining(self, joins: &super::joining::Joins) -> Self {
+        Self {
+            services: self
+                .services
+                .into_iter()
+                .map(|placed| Placed {
+                    networks: joins.of_service(&placed),
+                    ..placed
+                })
+                .collect(),
             ..self
         }
     }

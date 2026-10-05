@@ -154,6 +154,11 @@ struct Entry {
     ports: Vec<String>,
     /// The library where it asked for it, and its own configuration directory.
     volumes: Vec<String>,
+    /// The stack's networks it joins, where it stands in for a stack service on more
+    /// than the default one. Listed with the default one where that service is on it,
+    /// because naming any network takes a service off the default unless it is named.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    networks: Vec<String>,
 }
 
 /// The template reference an entry extends.
@@ -203,6 +208,7 @@ fn entry(plugin: &str, placed: &Placed) -> Entry {
         profiles: vec![profile(plugin)],
         ports,
         volumes,
+        networks: placed.networks.iter().map(|name| literal(name)).collect(),
     }
 }
 
