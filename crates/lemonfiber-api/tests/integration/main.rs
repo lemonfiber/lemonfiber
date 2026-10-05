@@ -13,6 +13,7 @@ mod what_a_choice_of_filler_means;
 mod what_a_disturbing_diagnosis_means;
 mod what_a_follow_says;
 mod what_a_listener_hears;
+mod what_a_listener_hears_of_plugins;
 mod what_a_member_is_kept;
 mod what_a_member_may_ask_for;
 mod what_a_read_answers;

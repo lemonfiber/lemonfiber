@@ -45,7 +45,7 @@ pub(crate) fn wiring(
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be read, or
 /// when what it declares does not hold together. Boxed as the listings beside it are.
-fn listing(ctx: &Ctx) -> Result<WiringReport, Box<Problem>> {
+pub fn listing(ctx: &Ctx) -> Result<WiringReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())

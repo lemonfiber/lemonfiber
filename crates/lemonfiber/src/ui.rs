@@ -323,7 +323,7 @@ async fn serving(
     // Started before anything can ask to hear it. It gathers nothing until somebody
     // is listening, and gathers at once for the first to arrive.
     tokio::spawn(Arc::clone(&live).gathering(Arc::new(
-        lemonfiber_api::events::dashboard::Dashboard::against(Arc::clone(&ctx)),
+        lemonfiber_api::events::extending::Together::in_a_run(&ctx),
     )));
     let jobs = Jobs::default();
     // Work with no ending of its own is held only while somebody is still asking

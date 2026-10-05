@@ -12,6 +12,7 @@
 
 pub mod backlog;
 pub mod dashboard;
+pub mod extending;
 pub mod live;
 pub mod saying;
 pub mod stepping;
