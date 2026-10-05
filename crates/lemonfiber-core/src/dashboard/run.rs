@@ -152,7 +152,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
         Panel::unavailable(late_after(HOUSEHOLD, HOUSEHOLD_WITHIN)),
     );
     let named = named.settled(previous.map(|was| was.named.clone()), None);
-    let transfers = moving.unwrap_or_else(|| Panel::unavailable(late(DOWNLOADS)));
+    let transfers = moving.unwrap_or(Panel::unavailable(late(DOWNLOADS)));
     let (queue, answers) = queued.settled(
         previous.map(|was| (was.snapshot.queue.clone(), was.answers.clone())),
         (Panel::unavailable(late(QUEUES)), Vec::new()),
