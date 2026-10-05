@@ -41,7 +41,7 @@ pub mod service;
 pub mod time;
 
 pub use docker::{Engine, Images};
-pub use filesystem::{Eraser, FileSystem, Volume};
+pub use filesystem::{Confined, Eraser, FileSystem, Volume};
 pub use hosting::Host;
 pub use http::Http;
 pub use narration::Narrator;

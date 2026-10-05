@@ -209,7 +209,12 @@ async fn carried_out(
     let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let reached =
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
-    let carried = super::recover::carrying_out(&reached.left, &paths.env_file(), Vec::new())?;
+    let carried = super::recover::carrying_out(
+        ctx.seams.confined.as_ref(),
+        &reached.left,
+        &paths.env_file(),
+        Vec::new(),
+    )?;
 
     // The account rather than the instruction, which is the division `told` exists to
     // make: what a reversal is carried out *with* holds the values it puts back, and

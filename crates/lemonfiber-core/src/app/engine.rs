@@ -137,6 +137,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         super::materialise::materialise
     };
     let (stack, edits) = written(
+        ctx.seams.confined.as_ref(),
         ctx.stack,
         ctx.settings.stack_dir.as_deref(),
         record.as_deref(),

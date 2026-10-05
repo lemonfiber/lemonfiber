@@ -30,6 +30,10 @@ const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 /// The settings these name, spelled once.
 const DATA_ROOT: &str = lemonfiber_core::config::DATA_ROOT_KEY;
+
+/// The operator's home: a data location is judged against it, and none of the ones
+/// these tests move between lies in it.
+const HOME: &str = "/home/op";
 const TORRENT: &str = lemonfiber_core::config::TORRENT_KEY;
 const USENET: &str = lemonfiber_core::config::USENET_KEY;
 
@@ -116,8 +120,13 @@ fn over(
     )
 }
 
-/// A context over whatever settings, stack and transport a test hands it.
+/// A context over whatever settings, stack and transport a test hands it, for an
+/// operator whose home is [`HOME`] where the settings name none.
 fn stood_up(settings: Settings, stack: Source, http: Arc<Fake>, missing: Vec<&'static str>) -> Ctx {
+    let settings = Settings {
+        home: settings.home.or_else(|| Some(PathBuf::from(HOME))),
+        ..settings
+    };
     lemonfiber_testing::a_context()
         .engine(Arc::new(Reporting::holding(
             &["sonarr"],

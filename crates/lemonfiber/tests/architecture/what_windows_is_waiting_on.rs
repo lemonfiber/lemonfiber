@@ -35,9 +35,9 @@ const WINDOWS: &str = "x86_64-pc-windows-msvc";
 
 /// Everything a Windows build is waiting on.
 ///
-/// Two kinds, and the difference decides who can clear each. The first two are
+/// Two kinds, and the difference decides who can clear each. The first three are
 /// stable-compiler gaps: the calls exist, and reaching them means a compiler
-/// feature nobody outside the toolchain can turn on. The third is this workspace's
+/// feature nobody outside the toolchain can turn on. The fourth is this workspace's
 /// own: the Windows transport is a named pipe rather than a socket, and nothing
 /// here has written that arm yet.
 const WAITING: &[Blocked] = &[
@@ -45,6 +45,11 @@ const WAITING: &[Blocked] = &[
         at: "crates/lemonfiber-adapters/src/filesystem.rs",
         call: "file_index",
         why: "behind an unstable compiler feature, so no stable toolchain has it",
+    },
+    Blocked {
+        at: "crates/lemonfiber-adapters/src/filesystem/confined.rs",
+        call: "file_index",
+        why: "the same unstable feature, asked to tell an opened file from the one its name resolves to",
     },
     Blocked {
         at: "crates/lemonfiber-adapters/src/filesystem.rs",

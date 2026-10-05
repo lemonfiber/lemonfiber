@@ -580,6 +580,36 @@ fn a_write_that_cannot_be_moved_into_place_leaves_no_staging_file() {
     );
 }
 
+/// A link planted at the staging name is never written through, so a container that can
+/// write the directory cannot have a record's bytes or its owner-only mode land on a
+/// file of the operator's.
+#[cfg(unix)]
+#[test]
+fn a_link_planted_at_the_staging_name_is_never_followed() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let path = scratch("planted");
+    assert!(std::fs::create_dir_all(path.parent().unwrap_or(&path)).is_ok());
+    let operator = path.with_file_name("operator.env");
+    assert!(std::fs::write(&operator, "SECRET=kept\n").is_ok());
+    assert!(std::fs::set_permissions(&operator, std::fs::Permissions::from_mode(0o644)).is_ok());
+    let planted = path.with_file_name(".env.writing");
+    assert!(std::os::unix::fs::symlink(&operator, &planted).is_ok());
+
+    assert!(crate::config::store::write(&path, "minted\n").is_ok());
+
+    assert_eq!(
+        std::fs::read_to_string(&operator).ok().as_deref(),
+        Some("SECRET=kept\n")
+    );
+    let mode = std::fs::metadata(&operator).map(|meta| meta.permissions().mode() & 0o777);
+    assert_eq!(mode.ok(), Some(0o644), "the operator's file kept its mode");
+    assert_eq!(
+        std::fs::read_to_string(&*path).ok().as_deref(),
+        Some("minted\n")
+    );
+}
+
 /// A link where a record goes is replaced by the record rather than written through.
 #[cfg(unix)]
 #[test]
@@ -603,5 +633,55 @@ fn a_link_where_a_record_goes_is_replaced_rather_than_followed() {
     assert_eq!(
         std::fs::read_to_string(&*path).ok().as_deref(),
         Some("ours\n")
+    );
+}
+
+/// A link put back at the staging name after it was cleared is not created through: the
+/// create is refused, so the write is, and the file the link points at is untouched.
+///
+/// Asked of the create directly, because the moment between the clearing and the create
+/// cannot be staged from outside.
+#[cfg(unix)]
+#[test]
+fn a_link_at_the_staging_name_is_never_created_through() {
+    let path = scratch("relinked");
+    assert!(std::fs::create_dir_all(path.parent().unwrap_or(&path)).is_ok());
+    let operator = path.with_file_name("operator.env");
+    assert!(std::fs::write(&operator, "SECRET=kept\n").is_ok());
+    let staging = path.with_file_name(".env.writing");
+    assert!(std::os::unix::fs::symlink(&operator, &staging).is_ok());
+    let dangling = path.with_file_name(".gone.writing");
+    let nowhere = path.with_file_name("made-by-a-link");
+    assert!(std::os::unix::fs::symlink(&nowhere, &dangling).is_ok());
+
+    assert!(super::created(&staging).is_err());
+    assert!(super::created(&dangling).is_err());
+    assert_eq!(
+        std::fs::read_to_string(&operator).ok().as_deref(),
+        Some("SECRET=kept\n")
+    );
+    assert!(
+        !nowhere.exists(),
+        "a dangling link made nothing where it pointed"
+    );
+}
+
+/// Something at the staging name that will not be cleared fails the write cleanly: the
+/// refusal is the write's, and the record still reads as it was.
+#[test]
+fn something_kept_at_the_staging_name_fails_the_write_and_leaves_the_record() {
+    let path = scratch("held-staging");
+    assert!(crate::config::store::write(&path, "A=1\n").is_ok());
+    assert!(std::fs::create_dir_all(path.with_file_name(".env.writing").join("held")).is_ok());
+
+    let refused = crate::config::store::write(&path, "A=2\n");
+
+    assert!(
+        matches!(refused, Err(Failure::NotWritten { .. })),
+        "got: {refused:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&*path).ok().as_deref(),
+        Some("A=1\n")
     );
 }

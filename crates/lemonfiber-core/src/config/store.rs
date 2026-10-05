@@ -184,12 +184,9 @@ fn stamped(file: &mut EnvFile) {
 /// same thing. Written with `if let` rather than `map_err`, and without a block
 /// around the directory: a closure is a function of its own for coverage
 /// purposes, and one that only runs on failure is a symbol no passing test
-/// reaches in every build of this crate. The private-mode step is folded into the
-/// write's own result for the same reason — one failure path, already exercised,
-/// rather than a second that only a chmod refusal on a just-written file reaches.
-/// A path with no usable parent — a filesystem root, or a bare relative name whose
-/// parent is the empty string — is written in the current directory rather than
-/// under `create_dir_all("")`.
+/// reaches in every build of this crate. A path with no usable parent — a filesystem
+/// root, or a bare relative name whose parent is the empty string — is written in the
+/// current directory rather than under `create_dir_all("")`.
 ///
 /// # Errors
 ///
@@ -203,7 +200,7 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
     if let Err(err) = make_private_dir(parent) {
         return Err(unwritable(path, &err));
     }
-    if let Err(err) = write_owner_only(path, text).and_then(|()| make_private(path)) {
+    if let Err(err) = write_owner_only(path, text) {
         return Err(unwritable(path, &err));
     }
     settled(parent);
@@ -215,57 +212,73 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
 /// Never written in place. Every record here is read back as the only copy of what
 /// it holds — the settings, the journal, the credential, the register of plugins —
 /// and a file truncated and then refused the rest of its bytes by a full disk or a
-/// stop part-way is that record gone. So the text goes to a staging name beside the
+/// stop part-way is that record gone. So the text goes to a staging file beside the
 /// file, is flushed to the disk, and only then renamed over the file, which the
 /// filesystem does in one step: a reader sees the old record or the new one and
 /// never a part of either. A write that fails removes its staging file and leaves the
 /// record untouched, which is what the refusal says happened.
 ///
-/// The staging file is created owner-only where the platform tracks a file mode, so a
-/// secret is never even briefly world-readable, and the rename carries that mode onto
-/// the record. What was at `path` is replaced rather than written through, so a link
-/// there is replaced by the record rather than followed to wherever it pointed.
+/// Some of these records sit in a directory a container can write, so nothing here goes
+/// through a name somebody else could have put something at. Whatever is at the staging
+/// name is unlinked first, which removes a link rather than following it, and the staging
+/// file is then created new, which the kernel refuses through a link or over anything
+/// already there. It is made owner-only through its own handle rather than by its name,
+/// so a secret is never even briefly world-readable and no mode change lands on whatever
+/// a name points at. The rename replaces what was at `path` rather than writing through
+/// it, so a link there is replaced by the record rather than followed to wherever it
+/// pointed.
+///
+/// The staging name is the record's own with `.writing` after it. A container that can
+/// write the directory can therefore make its own record's write fail, by keeping
+/// something at that name that will not be unlinked or by putting a link back between the
+/// unlink and the create; and nothing outside the directory is ever followed, emptied or
+/// changed.
 fn write_owner_only(path: &Path, text: &str) -> std::io::Result<()> {
     use std::io::Write as _;
-    let staging = staging(path);
-    let written = staged(&staging).and_then(|mut file| {
-        file.write_all(text.as_bytes())?;
-        file.sync_all()
-    });
-    let moved = written.and_then(|()| std::fs::rename(&staging, path));
+    let (staging, mut file) = staged(path)?;
+    let moved = file
+        .write_all(text.as_bytes())
+        .and_then(|()| make_private(&file))
+        .and_then(|()| file.sync_all())
+        .and_then(|()| std::fs::rename(&staging, path));
     if moved.is_err() {
         let _ = std::fs::remove_file(&staging);
     }
     moved
 }
 
-/// The name a record is written under before it is moved into place.
+/// The staging file beside `path`: its name cleared of whatever was there, and a file
+/// created new under it.
 ///
-/// Beside the record rather than in a temporary directory, because a rename is one
-/// step only within one filesystem.
-fn staging(path: &Path) -> PathBuf {
+/// Beside the record rather than in a temporary directory, because a rename is one step
+/// only within one filesystem.
+fn staged(path: &Path) -> std::io::Result<(PathBuf, std::fs::File)> {
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(".writing");
-    path.with_file_name(name)
+    let staging = path.with_file_name(name);
+    let _ = std::fs::remove_file(&staging);
+    created(&staging).map(|file| (staging, file))
 }
 
-/// The staging file, created owner-only where the platform tracks a file mode, and
-/// emptied where a stop part-way left one behind.
+/// A file made new at `path`, owner-only from the moment it exists where the platform
+/// tracks a file mode.
 #[cfg(unix)]
-fn staged(path: &Path) -> std::io::Result<std::fs::File> {
+fn created(path: &Path) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt as _;
     std::fs::OpenOptions::new()
         .write(true)
-        .create(true)
-        .truncate(true)
+        .create_new(true)
         .mode(0o600)
         .open(path)
 }
 
-/// Where the platform has no owner-only mode to set at creation, an ordinary create.
+/// Where the platform has no owner-only mode to set at creation, a file made new.
 #[cfg(not(unix))]
-fn staged(path: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::File::create(path)
+fn created(path: &Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
 }
 
 /// Flush the directory a record was just renamed into, so the rename itself survives
@@ -302,17 +315,16 @@ pub(crate) fn make_private_dir(parent: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(parent)
 }
 
-/// Tighten a just-written file to its owner alone. Applied every write, so a file
-/// left `0644` by an earlier version is corrected the next time it is touched.
+/// Tighten a file being written to its owner alone, through its handle.
 #[cfg(unix)]
-fn make_private(path: &Path) -> std::io::Result<()> {
+fn make_private(file: &std::fs::File) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))
 }
 
 /// A no-op where the platform has no owner-only file mode to set.
 #[cfg(not(unix))]
-fn make_private(_path: &Path) -> std::io::Result<()> {
+fn make_private(_file: &std::fs::File) -> std::io::Result<()> {
     Ok(())
 }
 

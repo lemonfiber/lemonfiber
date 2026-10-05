@@ -33,6 +33,7 @@ fn ctx(env_file: std::path::PathBuf) -> Ctx {
         .settings(crate::config::Settings {
             env_file: Some(env_file),
             protocols: crate::config::Protocols::both(),
+            home: Some(std::path::PathBuf::from("/home/op")),
             ..crate::config::Settings::default()
         })
         .build()
@@ -659,4 +660,32 @@ async fn a_credential_a_plugin_replaced_is_never_shown() {
         .and_then(|outcome| serde_json::to_string(&outcome).ok())
         .unwrap_or_default();
     assert!(!json.is_empty() && !json.contains("the-old-one") && !json.contains("the-new-one"));
+}
+
+/// A setting nothing reads is refused rather than written, and the file is left
+/// exactly as it was.
+#[tokio::test]
+async fn a_setting_nothing_reads_is_refused_and_not_written() {
+    let path = env_at("unknown-key", "TZ=Europe/Amsterdam\n");
+    let ctx = ctx(path.clone());
+
+    let report = set(
+        &ctx,
+        Setting {
+            key: "COMPOSE_FILE".to_owned(),
+            value: "/tmp/evil.yml".to_owned(),
+            confirmed: true,
+            waiting: Waiting::Never,
+        },
+    )
+    .await;
+
+    assert!(
+        report.as_ref().is_ok_and(|report| !report.changed),
+        "{report:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&path).ok().as_deref(),
+        Some("TZ=Europe/Amsterdam\n")
+    );
 }

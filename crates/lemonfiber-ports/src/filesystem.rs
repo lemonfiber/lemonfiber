@@ -89,6 +89,21 @@ impl Fault {
             message: message.into(),
         }
     }
+
+    /// The refusal of a file somebody else's container can write that is not a plain
+    /// file of `within`'s own.
+    ///
+    /// One wording for the read that refuses it and the write that does, so an operator
+    /// meets one sentence about one thing.
+    #[must_use]
+    pub fn escaped(path: &Path, within: &Path) -> Self {
+        Self::new(format!(
+            "{} is a link, leads outside {}, or is not a plain file, and lemonfiber writes \
+             its own file there rather than following one",
+            path.display(),
+            within.display()
+        ))
+    }
 }
 
 /// What the platform reports about the filesystem behind a path.
@@ -278,8 +293,12 @@ pub trait FileSystem: Storage + Send + Sync {
     /// nothing is there, which is itself the answer the caller wants.
     async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault>;
 
-    /// Create an empty file, failing where its parent is not a writable
-    /// directory.
+    /// Create a new empty file, failing where its parent is not a writable
+    /// directory or where anything at all is already at that name.
+    ///
+    /// Never through what is there: a link at the name is refused rather than followed,
+    /// and a file at the name is left as it was rather than emptied, because the
+    /// directories this probes can be written by containers.
     ///
     /// # Errors
     ///
@@ -381,11 +400,19 @@ async fn read_beneath<F: FileSystem + ?Sized>(
     if !resolved.starts_with(&root) {
         return Beneath::Escaped;
     }
-    filesystem
-        .read(path)
-        .await
-        .map_or(Beneath::Absent, Beneath::Read)
+    match filesystem.read(path).await {
+        Some(text) if text.len() as u64 > READ_LIMIT => Beneath::Escaped,
+        Some(text) => Beneath::Read(text),
+        None => Beneath::Absent,
+    }
 }
+
+/// The most a file somebody else's container can write is read up to, in bytes.
+///
+/// Every file read this way is a small one a service keeps about itself — a key, a list
+/// of routes, a page of settings — so a mebibyte is room to spare. A container that grows
+/// one past it is refused rather than read into memory.
+pub const READ_LIMIT: u64 = 1024 * 1024;
 
 /// What reading a file somebody else's container can write came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -396,8 +423,9 @@ pub enum Beneath {
     /// service that has not written it.
     Absent,
     /// Something is there and it is not a plain file of the directory's own: a link, a
-    /// path that leads outside the directory, or something that is not a file at all.
-    /// Refused, and worth saying, because it is either a mistake or an attempt.
+    /// path that leads outside the directory, something that is not a file at all, or a
+    /// file larger than [`READ_LIMIT`]. Refused, and worth saying, because it is either a
+    /// mistake or an attempt.
     Escaped,
 }
 
@@ -468,6 +496,31 @@ pub trait Eraser: Send + Sync {
     /// Returns a [`Fault`] where the tree could not be removed, in the platform's own
     /// words — which is what the operator needs in order to finish it by hand.
     async fn erase(&self, path: &Path) -> Result<(), Fault>;
+}
+
+/// Reading and writing, from code that cannot wait, a file somebody else's container can
+/// write.
+///
+/// The same promise [`FileSystem::read_beneath`] makes, kept by the same implementation,
+/// for the callers that write the stack's own files out in one pass with nothing to await
+/// on the way. A trait of its own for the reason [`Eraser`] is one: those callers need
+/// nothing else of a filesystem.
+pub trait Confined: Send + Sync {
+    /// Read `path`, only where it is a plain file beneath `within` once every link on the
+    /// way is resolved, as [`FileSystem::read_beneath`] reads it.
+    fn read(&self, path: &Path, within: &Path) -> Beneath;
+
+    /// Write `contents` into `path` in place, creating it where it is not there, only
+    /// where it is a plain file beneath `within` once every link on the way is resolved.
+    ///
+    /// In place, because a container given one file follows that file rather than
+    /// whatever replaces it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where a link, a path leading outside `within` or something that
+    /// is not a plain file is where the file is expected, or where the write itself fails.
+    fn overwrite(&self, path: &Path, within: &Path, contents: &[u8]) -> Result<(), Fault>;
 }
 
 #[cfg(test)]

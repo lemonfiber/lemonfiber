@@ -173,11 +173,13 @@ async fn put_back(ctx: &Ctx, client: &Jellyfin, path: &Path, old: Option<&Key>, 
 
 /// The key the file at `path` holds, where it holds one.
 async fn read(ctx: &Ctx, path: &Path) -> Option<Key> {
-    ctx.seams
-        .filesystem
-        .read(path)
-        .await
-        .and_then(|text| Key::read(&text).ok())
+    crate::app::targets::read_owned(
+        ctx.seams.filesystem.as_ref(),
+        path,
+        crate::within::directory_of(path),
+    )
+    .await
+    .and_then(|text| Key::read(&text).ok())
 }
 
 #[cfg(test)]

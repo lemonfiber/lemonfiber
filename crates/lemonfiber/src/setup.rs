@@ -339,6 +339,7 @@ async fn drive(
         source: ctx.stack,
         stamp: &at,
         random: ctx.seams.random.as_ref(),
+        confined: ctx.seams.confined.as_ref(),
     };
     match core_setup::run(
         &mut wizard,

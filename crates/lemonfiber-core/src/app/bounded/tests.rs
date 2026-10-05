@@ -34,6 +34,7 @@ fn a_region_is_written_and_the_record_moves_with_it() {
     let record = dir.join("materialised.json");
 
     let done = put(
+        &lemonfiber_adapters::Disk,
         &dir.join("Caddyfile"),
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -58,6 +59,7 @@ fn a_file_the_operator_had_edited_is_written_into_and_still_read_as_theirs() {
     let _ = std::fs::write(dir.join("Caddyfile"), "their own {\n}\n");
 
     let done = put(
+        &lemonfiber_adapters::Disk,
         &dir.join("Caddyfile"),
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -75,6 +77,7 @@ fn taking_the_region_out_gives_back_the_file_and_the_record() {
     let record = dir.join("materialised.json");
     let file = dir.join("Caddyfile");
     let _ = put(
+        &lemonfiber_adapters::Disk,
         &file,
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -83,6 +86,7 @@ fn taking_the_region_out_gives_back_the_file_and_the_record() {
     );
 
     let taken = withdraw(
+        &lemonfiber_adapters::Disk,
         &file,
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -100,6 +104,7 @@ fn a_region_edited_since_is_left_where_it_is() {
     let dir = scratch("theirs", false);
     let file = dir.join("Caddyfile");
     let _ = put(
+        &lemonfiber_adapters::Disk,
         &file,
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -110,6 +115,7 @@ fn a_region_edited_since_is_left_where_it_is() {
     let _ = std::fs::write(&file, &edited);
 
     let taken = withdraw(
+        &lemonfiber_adapters::Disk,
         &file,
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -128,7 +134,14 @@ fn a_file_that_is_gone_has_nothing_left_to_take() {
     let _ = std::fs::remove_file(&file);
 
     assert_eq!(
-        withdraw(&file, "config/caddy/Caddyfile", "plugin komga", 0, None),
+        withdraw(
+            &lemonfiber_adapters::Disk,
+            &file,
+            "config/caddy/Caddyfile",
+            "plugin komga",
+            0,
+            None
+        ),
         Ok(Withdrawn::Done)
     );
 }
@@ -137,8 +150,24 @@ fn a_file_that_is_gone_has_nothing_left_to_take() {
 fn a_file_that_will_not_read_is_a_failure_rather_than_nothing() {
     let dir = scratch("unread", false);
 
-    assert!(withdraw(&dir, "config", "plugin komga", 0, None).is_err());
-    assert!(put(&dir.join("absent"), "config", "plugin komga", "x", None).is_err());
+    assert!(withdraw(
+        &lemonfiber_adapters::Disk,
+        &dir,
+        "config",
+        "plugin komga",
+        0,
+        None
+    )
+    .is_err());
+    assert!(put(
+        &lemonfiber_adapters::Disk,
+        &dir.join("absent"),
+        "config",
+        "plugin komga",
+        "x",
+        None
+    )
+    .is_err());
 }
 
 /// A file that reads and will not be written is a failure, and the record is left
@@ -153,6 +182,7 @@ fn a_file_that_will_not_be_written_is_a_failure_and_the_record_stays() {
     let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o444));
 
     let done = put(
+        &lemonfiber_adapters::Disk,
         &file,
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -177,6 +207,7 @@ fn a_region_leaves_the_file_readable_by_whoever_could_read_it() {
     let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644));
 
     let _ = put(
+        &lemonfiber_adapters::Disk,
         &file,
         "config/caddy/Caddyfile",
         "plugin komga",
@@ -197,5 +228,42 @@ fn the_record_is_kept_beside_the_settings_file() {
     assert_eq!(
         record_beside(std::path::Path::new("/etc/lemonfiber/.env")),
         std::path::PathBuf::from("/etc/lemonfiber/materialised.json")
+    );
+}
+
+/// A link planted where the region's file is expected is neither read nor written
+/// through, so a container cannot have a plugin's region land in a file of the
+/// operator's, nor that file's text carried back into its own.
+#[cfg(unix)]
+#[test]
+fn a_link_where_the_file_is_expected_is_neither_read_nor_written() {
+    let dir = scratch("put-planted", true);
+    let operator = dir.join("authorized_keys");
+    let _ = std::fs::write(&operator, "ssh-ed25519 theirs\n");
+    let _ = std::fs::remove_file(dir.join("Caddyfile"));
+    let _ = std::os::unix::fs::symlink(&operator, dir.join("Caddyfile"));
+
+    let put_through = put(
+        &lemonfiber_adapters::Disk,
+        &dir.join("Caddyfile"),
+        "config/caddy/Caddyfile",
+        "plugin komga",
+        "comics {\n}\n",
+        None,
+    );
+    let taken_through = withdraw(
+        &lemonfiber_adapters::Disk,
+        &dir.join("Caddyfile"),
+        "config/caddy/Caddyfile",
+        "plugin komga",
+        0,
+        None,
+    );
+
+    assert!(put_through.is_err_and(|why| why.contains("is a link")));
+    assert!(taken_through.is_err());
+    assert_eq!(
+        std::fs::read_to_string(&operator).ok().as_deref(),
+        Some("ssh-ed25519 theirs\n")
     );
 }

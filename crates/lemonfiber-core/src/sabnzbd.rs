@@ -38,7 +38,8 @@ const DOWNLOADING: &str = "Downloading";
 ///
 /// The `api_key` entry is matched by its exact name so a neighbouring `nzb_key`
 /// or a `#`-commented line is not read as the key. An entry that is present but
-/// empty is a first start not yet finished, and is `None` like an absent one.
+/// empty is a first start not yet finished, and is `None` like an absent one, as is one
+/// not spelled the way a generated key is: see [`crate::generated`].
 #[must_use]
 pub fn api_key(config_ini: &str) -> Option<String> {
     config_ini.lines().find_map(read_api_key)
@@ -50,8 +51,7 @@ fn read_api_key(line: &str) -> Option<String> {
     if name.trim() != "api_key" {
         return None;
     }
-    let key = value.trim();
-    (!key.is_empty()).then(|| key.to_owned())
+    crate::generated::key(value.trim())
 }
 
 /// A read-only client for one `SABnzbd`, for the dashboard's transfers panel.

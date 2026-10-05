@@ -219,7 +219,7 @@ async fn a_manifest_other_than_the_reviewed_one_is_refused() {
 
         assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-23");
         assert_eq!(counted(reading(&ctx).await), Some(0));
-        assert!(!super::super::fetching::checkout(REVIEWED).exists());
+        assert!(super::super::fetching::checkout(&ctx, REVIEWED).is_some_and(|at| !at.exists()));
     }
 }
 

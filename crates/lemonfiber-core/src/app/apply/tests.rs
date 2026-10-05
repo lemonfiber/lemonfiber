@@ -22,6 +22,7 @@ fn applying<'a>(paths: &'a Paths, source: Source, stamp: &'a str) -> Applying<'a
         source,
         stamp,
         random: &A_MACHINE,
+        confined: &lemonfiber_adapters::Disk,
     }
 }
 

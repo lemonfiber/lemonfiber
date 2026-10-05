@@ -42,7 +42,7 @@ pub(super) async fn invitations(
     let spent = expired(ctx, server, accounts, findings).await;
     let declined = declined(ctx, server, accounts, findings).await;
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
-    let removed = crate::app::invite::declining::removed_at_lapse(ctx, &offers);
+    let removed = crate::app::invite::declining::removed_at_lapse(ctx, &offers).await;
     close_taken_up(ctx, accounts, &removed);
     taken_back(ctx, server, &spent, &declined, findings).await;
     let mut expired: BTreeSet<String> = spent.every().map(|gone| gone.member.id.clone()).collect();
@@ -197,6 +197,7 @@ fn close_taken_up(ctx: &Ctx, accounts: &[Member], removed: &BTreeMap<String, Str
 /// A refusal recorded against an account still switched on is one whose write did not
 /// land; this reading holds the administrator's session, so it switches the account off
 /// rather than leave a declined invitation claimable. One it cannot switch off is said.
+/// A rehearsal switches nothing off: the account is still reported as declined.
 async fn declined(
     ctx: &Ctx,
     server: &crate::jellyfin::Jellyfin,
@@ -204,9 +205,10 @@ async fn declined(
     findings: &mut Vec<String>,
 ) -> BTreeSet<String> {
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
-    let declined = crate::app::invite::declining::declined(ctx, &offers);
+    let declined = crate::app::invite::declining::declined(ctx, &offers).await;
     for account in accounts {
-        if declined.contains(&account.id)
+        if !ctx.dry_run
+            && declined.contains(&account.id)
             && !account.claimed
             && !account.access.disabled
             && server.suspend(&account.id).await.is_err()

@@ -89,8 +89,15 @@ pub(crate) fn carry_out(
             .env_file
             .as_deref()
             .map(super::super::bounded::record_beside);
-        super::super::bounded::put(&write.path, key, owner, body, record.as_deref())
-            .map_err(|why| Box::new(unwritable(&write.path, &why)))?;
+        super::super::bounded::put(
+            ctx.seams.confined.as_ref(),
+            &write.path,
+            key,
+            owner,
+            body,
+            record.as_deref(),
+        )
+        .map_err(|why| Box::new(unwritable(&write.path, &why)))?;
     }
     Ok(())
 }

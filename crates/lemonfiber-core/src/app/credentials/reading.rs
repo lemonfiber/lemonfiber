@@ -46,17 +46,19 @@ pub(crate) async fn taken(
         .map(|entry| recorded(ctx, entry))
         .collect();
     for service in services {
-        let Some((config, read)) = project.and_then(|project| writes_its_own(service, project))
+        let Some((project, (config, read))) =
+            project.and_then(|project| Some((project, writes_its_own(service, project)?)))
         else {
             continue;
         };
         let setting = published_as(&service.id);
-        let held = ctx
-            .seams
-            .filesystem
-            .read(&config)
-            .await
-            .and_then(|text| read(&text));
+        let held = crate::app::targets::read_owned(
+            ctx.seams.filesystem.as_ref(),
+            &config,
+            &crate::app::targets::service_config_dir(project, &service.id),
+        )
+        .await
+        .and_then(|text| read(&text));
         let published = recorded_secret(ctx, &setting);
         taken.push(service_key(
             &service.name,

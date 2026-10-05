@@ -213,11 +213,9 @@ async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
         read(keyed_in("/stack/secret", Some("/stack/config/stand-in"))).await,
         Beneath::Escaped
     );
-    assert_eq!(
-        read(keyed_in("/stack/secret", None)).await,
-        Beneath::Read("the host's own".to_owned())
-    );
-    assert_eq!(read(keyed_in("/stack/absent", None)).await, Beneath::Absent);
+    // With no directory to hold it beneath — no stack on disk — nothing is read at all,
+    // rather than a file read wherever it leads.
+    assert_eq!(read(keyed_in("/stack/secret", None)).await, Beneath::Absent);
     let mut unkeyed = keyed_in("/stack/secret", None);
     unkeyed.key_file = None;
     assert_eq!(read(unkeyed).await, Beneath::Absent);
@@ -270,7 +268,7 @@ fn a_refused_credential_file_is_said_in_the_name_of_whoever_brought_it() {
     assert_eq!(
         super::escaped(&brought),
         "nzbget's credential file is a link, leads outside the directory its container \
-         owns, or is not a file at all, so it was not read"
+         owns, is not a file at all, or is too large to be one, so it was not read"
     );
     assert!(super::escaped(&keyed_in("/stack/secret", None)).starts_with("Stand-in's"));
 }

@@ -91,6 +91,7 @@ pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
         locations: Arc::new(Daemon::reaching(target.clone())),
         volume: Arc::new(Disk),
         eraser: Arc::new(Disk),
+        confined: Arc::new(Disk),
         occupancy: Arc::new(Disk),
         hosting: Arc::new(Unhosted),
         random: Arc::new(Os),

@@ -304,3 +304,19 @@ async fn a_key_nobody_dates_used_with_nothing_recorded_is_warned_of_saying_so() 
         "{said:?}"
     );
 }
+
+/// A link the service's container put where one of its records goes is not followed: the
+/// record reads as one that cannot be read, and the key's use as unaccounted for.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_record_that_is_a_link_is_not_followed() {
+    let at = scene("decline-key-linked", &[], &[]);
+    let elsewhere = at.with_file_name("decline-key-linked-elsewhere.json");
+    let _ = store::write(&elsewhere, &Lapses::default().written());
+    let _ = std::os::unix::fs::symlink(&elsewhere, at.join("lapses.json"));
+
+    let said = verdict(&at, Some(Ok(vec![key(0, Some(3_600))]))).await;
+    let _ = std::fs::remove_file(&elsewhere);
+
+    assert!(matches!(said, Verdict::Unverified { .. }), "{said:?}");
+}

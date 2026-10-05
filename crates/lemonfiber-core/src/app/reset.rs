@@ -29,6 +29,7 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
 
     let reverted = if confirm {
         super::materialise::reset_stack(
+            ctx.seams.confined.as_ref(),
             ctx.stack,
             into,
             record.as_deref(),
@@ -38,6 +39,7 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         .map(|(_, edits)| edits)
     } else {
         super::materialise::pending_reverts(
+            ctx.seams.confined.as_ref(),
             ctx.stack,
             into,
             record.as_deref(),

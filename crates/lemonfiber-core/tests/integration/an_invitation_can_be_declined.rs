@@ -281,6 +281,19 @@ async fn ana_stands(
     Vec<String>,
     Vec<lemonfiber_core::ports::http::Request>,
 ) {
+    ana_stands_in(tag, (disabled, refused, policy), false).await
+}
+
+/// The same, in rehearsal where `rehearsing`.
+async fn ana_stands_in(
+    tag: &str,
+    (disabled, refused, policy): (bool, bool, u16),
+    rehearsing: bool,
+) -> (
+    Option<MemberStanding>,
+    Vec<String>,
+    Vec<lemonfiber_core::ports::http::Request>,
+) {
     let env = recorded_admin(&format!("declined-{tag}"));
     let stack: &'static Path = Box::leak(stack_with_decline(tag).into_boxed_path());
     offered_and_maybe_refused(&env, stack, "ana-token", refused);
@@ -300,6 +313,7 @@ async fn ana_stands(
         })
         .build()
         .with_http(http.clone());
+    let ctx = if rehearsing { ctx.rehearsing() } else { ctx };
 
     let said = dispatch(Command::Household { member: None }, &ctx).await;
     gone(&env, stack);
@@ -342,6 +356,18 @@ async fn a_declined_account_still_switched_on_is_switched_off() {
             .any(|finding| finding.starts_with("ana declined their invitation")),
         "{findings:?}"
     );
+}
+
+/// A rehearsal switches nothing off: the account still stands as declined, and nothing
+/// is written to the media server.
+#[tokio::test]
+async fn a_rehearsal_switches_no_declined_account_off() {
+    let (standing, _, sent) = ana_stands_in("rehearsed", (false, true, 204), true).await;
+
+    assert_eq!(standing, Some(MemberStanding::Declined));
+    assert!(!sent
+        .iter()
+        .any(|request| request.url.contains("/Users/9/Policy")));
 }
 
 /// A declined account the media server will not switch off is said among the findings,

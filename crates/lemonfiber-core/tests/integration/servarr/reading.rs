@@ -158,11 +158,22 @@ fn a_key_not_generated_yet_is_absent_not_a_fault() {
 }
 
 #[test]
-fn a_multibyte_key_survives_intact() {
+fn a_multibyte_key_is_no_key_and_no_panic() {
     // The offsets are byte offsets at ASCII tag boundaries, so a key with
-    // multibyte characters is read whole rather than split mid-codepoint.
+    // multibyte characters is read whole rather than split mid-codepoint — and then
+    // refused, because no service spells a key it generated that way.
     let config = "<Config><ApiKey>café☃clé</ApiKey></Config>";
-    assert_eq!(api_key(config).as_deref(), Some("café☃clé"));
+    assert_eq!(api_key(config), None);
+}
+
+#[test]
+fn a_reference_to_another_setting_is_no_key() {
+    // A compromised service writing a reference to another setting where its key goes
+    // would otherwise have it published and expanded into that setting's value.
+    assert_eq!(
+        api_key("<Config><ApiKey>${WIREGUARD_PRIVATE_KEY}</ApiKey></Config>"),
+        None
+    );
 }
 
 #[test]

@@ -76,11 +76,24 @@ pub(crate) fn path(project: &Path, file: File) -> PathBuf {
 /// Matched on the token rather than the account, so an account offered again since it
 /// was declined, under a new token, is an invitation again rather than still declined.
 /// A record the service has not written, or one that cannot be read, declines nobody.
-pub(crate) fn declined(ctx: &Ctx, offers: &Offers) -> BTreeSet<String> {
-    crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
-        .and_then(|project| std::fs::read_to_string(path(&project, File::Refusals)).ok())
+pub(crate) async fn declined(ctx: &Ctx, offers: &Offers) -> BTreeSet<String> {
+    kept(ctx, File::Refusals)
+        .await
         .and_then(|text| Refusals::read(&text).ok())
         .map_or_else(BTreeSet::new, |refusals| refused(offers, &refusals))
+}
+
+/// What one of the decline service's records holds, where the stack is on disk and the
+/// service has written it.
+///
+/// The service writes its records into a directory it owns, so each is read never
+/// through a link, never waited on as a pipe, and never past a small file's size.
+async fn kept(ctx: &Ctx, file: File) -> Option<String> {
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
+    let record = path(&project, file);
+    let within = crate::within::directory_of(&record);
+    crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), &record, within).await
 }
 
 /// The accounts among `offers` whose token `refusals` records a refusal of.
@@ -103,9 +116,9 @@ fn refused(offers: &Offers, refusals: &Refusals) -> BTreeSet<String> {
 /// Matched on the offer's token, as a refusal is, so a removal recorded against an
 /// earlier offer of the same account says nothing about the one standing now. A record
 /// the service has not written, or one that cannot be read, removed nobody.
-pub(crate) fn removed_at_lapse(ctx: &Ctx, offers: &Offers) -> BTreeMap<String, String> {
-    crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
-        .and_then(|project| std::fs::read_to_string(path(&project, File::Lapses)).ok())
+pub(crate) async fn removed_at_lapse(ctx: &Ctx, offers: &Offers) -> BTreeMap<String, String> {
+    kept(ctx, File::Lapses)
+        .await
         .and_then(|text| Lapses::read(&text).ok())
         .map_or_else(BTreeMap::new, |lapses| removed(offers, &lapses))
 }

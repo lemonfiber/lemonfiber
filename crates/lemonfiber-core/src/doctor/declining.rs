@@ -17,7 +17,7 @@ use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::decline::UNEXPLAINED;
 use crate::error::{Problem, Remedy, Severity};
 use crate::jellyfin::Dated;
-use crate::ports::filesystem::FileSystem;
+use crate::ports::filesystem::{Beneath, FileSystem};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "services.decline-key";
@@ -161,11 +161,11 @@ fn graver(gravest: &Verdict, next: &Verdict) -> bool {
 /// nothing where it recorded nothing. A record that is not there is a record of nothing;
 /// one that is there and cannot be read is refused.
 async fn latest_recorded(files: &dyn FileSystem, decline: &Decline) -> Result<Option<u64>, ()> {
-    let refusals = match files.read(&decline.refusals).await {
+    let refusals = match kept(files, &decline.refusals).await? {
         Some(text) => Refusals::read(&text).map_err(|_| ())?,
         None => Refusals::default(),
     };
-    let lapses = match files.read(&decline.lapses).await {
+    let lapses = match kept(files, &decline.lapses).await? {
         Some(text) => Lapses::read(&text).map_err(|_| ())?,
         None => Lapses::default(),
     };
@@ -175,6 +175,22 @@ async fn latest_recorded(files: &dyn FileSystem, decline: &Decline) -> Result<Op
         .map(|refusal| refusal.at)
         .chain(lapses.lapses.iter().map(|lapse| lapse.at))
         .max())
+}
+
+/// What one of the service's records holds: nothing where it is not there, and a refusal
+/// where something other than a plain file of the service's own directory is.
+///
+/// The service writes its records into a directory it owns, so each is read never through
+/// a link, never waited on as a pipe, and never past a small file's size.
+async fn kept(files: &dyn FileSystem, record: &std::path::Path) -> Result<Option<String>, ()> {
+    match files
+        .read_beneath(record, crate::within::directory_of(record))
+        .await
+    {
+        Beneath::Read(text) => Ok(Some(text)),
+        Beneath::Absent => Ok(None),
+        Beneath::Escaped => Err(()),
+    }
 }
 
 /// Whether the key's last use is explained by its making or by something the service

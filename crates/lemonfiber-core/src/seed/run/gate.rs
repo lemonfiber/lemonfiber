@@ -69,12 +69,13 @@ pub(super) async fn seed_gate_routes(
         }));
     };
     let path = gating::path(project, File::Upstreams);
-    let current = ctx
-        .seams
-        .filesystem
-        .read(&path)
-        .await
-        .and_then(|text| Upstreams::read(&text).ok());
+    let current = crate::app::targets::read_owned(
+        ctx.seams.filesystem.as_ref(),
+        &path,
+        crate::within::directory_of(&path),
+    )
+    .await
+    .and_then(|text| Upstreams::read(&text).ok());
     let routes = arr_routes(ctx, fillers).await;
     // The Jellyfin lines the stack runs, which the gate forwards to and to no other.
     let majors: Vec<u32> = services

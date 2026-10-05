@@ -174,3 +174,66 @@ fn lapses_are_recorded_beside_the_refusals() {
         Path::new("/stack/config/decline/lapses.json")
     );
 }
+
+/// A context over a stack written to `project`, on the real disk.
+fn over(project: &Path) -> crate::app::Ctx {
+    crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            stack_dir: Some(project.to_path_buf()),
+            ..crate::config::Settings::default()
+        })
+        .build()
+}
+
+/// A pipe the decline service put where its record goes is refused at once rather than
+/// waited on, and a link there is not followed: either declines nobody.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_record_that_is_a_pipe_or_a_link_declines_nobody_and_never_waits() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("refusals-planted");
+    let record = path(&project, super::File::Refusals);
+    let _ = std::fs::create_dir_all(record.parent().unwrap_or(&project));
+    let offers: Offers = [("9".to_owned(), offer(Some("ana-token")))]
+        .into_iter()
+        .collect();
+    let made = tokio::process::Command::new("mkfifo")
+        .arg(&record)
+        .status()
+        .await;
+    assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
+
+    let piped = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        super::declined(&over(&project), &offers),
+    )
+    .await;
+
+    assert_eq!(piped.ok().map(|declined| declined.len()), Some(0));
+
+    let elsewhere = project.join("elsewhere.json");
+    let _ = std::fs::write(&elsewhere, "{}");
+    let _ = std::fs::remove_file(&record);
+    let _ = std::os::unix::fs::symlink(&elsewhere, &record);
+    assert!(super::declined(&over(&project), &offers).await.is_empty());
+}
+
+/// A stack compiled in, which is written out nowhere until a directory is chosen for it.
+static STACKLET: include_dir::Dir<'_> =
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
+
+/// With no record on disk, or no stack written out to hold one, there is nothing to read,
+/// and nobody is declined.
+#[tokio::test]
+async fn without_a_stack_on_disk_nobody_is_declined() {
+    let ctx = crate::test_support::a_context().build();
+    let offers: Offers = [("9".to_owned(), offer(Some("ana-token")))]
+        .into_iter()
+        .collect();
+
+    assert!(super::declined(&ctx, &offers).await.is_empty());
+
+    let unwritten = crate::test_support::a_context()
+        .over(crate::stack::Source::Embedded(&STACKLET))
+        .build();
+    assert!(super::declined(&unwritten, &offers).await.is_empty());
+}

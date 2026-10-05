@@ -160,11 +160,13 @@ fn key_in(routes: &Upstreams) -> Option<String> {
 
 /// The routes the file at `path` holds, where it reads.
 async fn read(ctx: &Ctx, path: &Path) -> Option<Upstreams> {
-    ctx.seams
-        .filesystem
-        .read(path)
-        .await
-        .and_then(|text| Upstreams::read(&text).ok())
+    crate::app::targets::read_owned(
+        ctx.seams.filesystem.as_ref(),
+        path,
+        crate::within::directory_of(path),
+    )
+    .await
+    .and_then(|text| Upstreams::read(&text).ok())
 }
 
 #[cfg(test)]

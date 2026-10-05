@@ -54,7 +54,11 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
     let (disposition, customised, overwritten) = match action {
         QualityAction::Show => (
             Disposition::Shown,
-            crate::app::materialise::recyclarr_customised(into, record.as_deref()),
+            crate::app::materialise::recyclarr_customised(
+                ctx.seams.confined.as_ref(),
+                into,
+                record.as_deref(),
+            ),
             None,
         ),
         QualityAction::Set {
@@ -80,12 +84,17 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             };
             (
                 disposition,
-                crate::app::materialise::recyclarr_customised(into, record.as_deref()),
+                crate::app::materialise::recyclarr_customised(
+                    ctx.seams.confined.as_ref(),
+                    into,
+                    record.as_deref(),
+                ),
                 None,
             )
         }
         QualityAction::Reapply => {
             let overwritten = crate::app::materialise::reapply_recyclarr(
+                ctx.seams.confined.as_ref(),
                 ctx.stack,
                 into,
                 record.as_deref(),

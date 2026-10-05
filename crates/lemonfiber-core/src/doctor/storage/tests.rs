@@ -665,9 +665,9 @@ fn writing_is_judged_by_the_class_that_owns_the_file() {
 
 #[tokio::test]
 async fn a_leftover_probe_link_does_not_read_as_an_inability_to_hardlink() {
-    // A previous run interrupted between the link and its cleanup leaves the
+    // A previous run interrupted between the link and its cleanup leaves its
     // link behind. Against a real filesystem that hardlinks fine, the check
-    // must clear it and still pass, not conclude the volume cannot link.
+    // still passes rather than concluding the volume cannot link.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("storage-leftover");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
@@ -685,7 +685,7 @@ async fn a_leftover_probe_link_does_not_read_as_an_inability_to_hardlink() {
     .run()
     .await;
     // A stale probe link must not be mistaken for a filesystem that cannot
-    // link: the check clears it first and still passes.
+    // link: each run names its own probe, so what was left is not in the way.
     assert!(matches!(
         verdict(&findings, "storage.hardlinks"),
         Some(Verdict::Pass { .. })

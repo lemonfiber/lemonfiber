@@ -78,13 +78,15 @@ impl Target {
     /// writes its key exactly the way the others do, and only what is built from it
     /// differs.
     ///
-    /// A plugin's is read only where it is a plain file beneath the directory its
-    /// container owns, which can hold a link put where the file is expected.
+    /// Read only where it is a plain file beneath the directory its container owns —
+    /// the one it names, or the one the file is in — which can hold a link put where
+    /// the file is expected.
     pub(crate) async fn key(&self, fs: &dyn FileSystem) -> Option<String> {
-        let config = match &self.confined_to {
-            Some(within) => fs.read_beneath(&self.config, within).await.text()?,
-            None => fs.read(&self.config).await?,
-        };
+        let within = self
+            .confined_to
+            .as_deref()
+            .unwrap_or(crate::within::directory_of(&self.config));
+        let config = crate::app::targets::read_owned(fs, &self.config, within).await?;
         api_key(&config)
     }
 }

@@ -266,8 +266,8 @@ async fn a_directory_that_will_not_take_a_file_is_reported_with_the_path() {
     assert_eq!(report.at.as_deref(), Some("/opt/lemonfiber/lemonfiber"));
     assert_eq!(
         files.removed(),
-        vec![PathBuf::from("/opt/lemonfiber/.lemonfiber-can-write")],
-        "the probe is taken away whatever it came to"
+        vec![PathBuf::from("/opt/lemonfiber/.lemonfiber-can-write"); 2],
+        "a leftover probe is cleared first, and the probe is taken away whatever it came to"
     );
 }
 
@@ -282,7 +282,7 @@ async fn a_probe_that_succeeded_is_taken_away_again() {
     assert_eq!(report.replaceable, Some(true));
     assert_eq!(
         files.removed(),
-        vec![PathBuf::from("/opt/lemonfiber/.lemonfiber-can-write")]
+        vec![PathBuf::from("/opt/lemonfiber/.lemonfiber-can-write"); 2]
     );
 }
 

@@ -39,6 +39,7 @@ fn ctx(env_file: PathBuf) -> Ctx {
     lemonfiber_testing::a_live_context()
         .settings(Settings {
             env_file: Some(env_file),
+            home: Some(PathBuf::from("/home/op")),
             ..Settings::default()
         })
         .build()

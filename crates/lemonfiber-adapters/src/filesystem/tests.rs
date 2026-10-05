@@ -417,3 +417,45 @@ async fn a_path_no_mount_holds_is_described_as_nothing_known() {
     assert_eq!((facts.total, facts.available), (0, 0));
     assert_eq!(facts.point, std::path::PathBuf::new());
 }
+
+/// Creating a probe never goes through what is already at its name: a file there is left
+/// as it was, and a link there is not followed to create or empty what it points at.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_new_file_is_never_made_through_what_is_already_there() {
+    let dir = scratch();
+    let kept = dir.join("kept");
+    let _ = std::fs::write(&kept, "the operator's");
+    let linked = dir.join("linked");
+    let _ = std::os::unix::fs::symlink(&kept, &linked);
+
+    assert!(Disk.touch(&kept).await.is_err());
+    assert!(Disk.touch(&linked).await.is_err());
+    assert_eq!(
+        std::fs::read_to_string(&kept).ok().as_deref(),
+        Some("the operator's")
+    );
+}
+
+/// A record is never written through a link at its name, so neither the bytes nor the
+/// owner-only mode reach the file the link points at.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_record_is_never_written_through_a_link_at_its_name() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = scratch();
+    let theirs = dir.join("theirs");
+    let _ = std::fs::write(&theirs, "kept");
+    let _ = std::fs::set_permissions(&theirs, std::fs::Permissions::from_mode(0o644));
+    let record = dir.join("record.json");
+    let _ = std::os::unix::fs::symlink(&theirs, &record);
+
+    Disk.write(&record, "ours").await;
+
+    assert_eq!(
+        std::fs::read_to_string(&theirs).ok().as_deref(),
+        Some("kept")
+    );
+    let mode = std::fs::metadata(&theirs).map(|meta| meta.permissions().mode() & 0o777);
+    assert_eq!(mode.ok(), Some(0o644));
+}
