@@ -171,10 +171,28 @@ fn substituting(
         ));
         writes.push((super::FILLS_WHY_KEY, reasons.as_deref().unwrap_or_default()));
     }
+    // What the choice moves goes with it: each plugin whose service it settles in for a
+    // stack service, or out of one, joins what that settles, so its document and the
+    // record it is written from are rewritten in the same journalled change.
+    let overwrites = crate::app::plugins::writing::rejoined(
+        ctx,
+        &manifest,
+        &installed,
+        &crate::wiring::Chosen::read(Some(&substitution.setting)),
+    );
+    changes.extend(
+        overwrites
+            .iter()
+            .map(|overwrite| super::overwritten(overwrite, &stamp)),
+    );
     crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
         .map_err(|failure| Box::new(failure.problem()))?;
     for (key, value) in writes {
         kept(path, key, value)?;
+    }
+    for overwrite in &overwrites {
+        crate::config::store::write(&overwrite.path, &overwrite.text)
+            .map_err(|err| Box::new(err.problem()))?;
     }
 
     Ok(reading(true))

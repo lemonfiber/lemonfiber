@@ -56,8 +56,15 @@ pub(crate) async fn update(
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
     let stack_manifest = super::writing::stack_manifest(ctx)?;
-    let (would, _) =
-        super::installing::settled(ctx, &stack_manifest, &manifest, path, from, &stamp);
+    let (would, _) = super::installing::settled(
+        ctx,
+        &stack_manifest,
+        held.installed(),
+        &manifest,
+        path,
+        from,
+        &stamp,
+    );
     let Some(was) = held
         .installed()
         .iter()

@@ -444,3 +444,89 @@ fn a_choice_over_a_record_that_will_not_read_is_refused() {
         .map(|problem| problem.code.as_str().to_owned());
     assert_eq!(refused.as_deref(), Some("PLUGIN-4"));
 }
+
+/// A media server a plugin brought, written into the layout at `at` as an install leaves
+/// it: recorded, and its document written, on no network of the stack's.
+fn a_plugin_media_server(ctx: &crate::app::Ctx, at: &std::path::Path) -> std::path::PathBuf {
+    let api = lemonfiber_manifest::Api {
+        kind: lemonfiber_manifest::ApiKind::Jellyfin,
+        key_source: lemonfiber_manifest::KeySource::ConfigXml,
+        path: Some("/config/config.xml".to_owned()),
+        version: None,
+    };
+    let server =
+        crate::test_support::a_placed("server", &["identity.source"], Some(api), Some(8097));
+    let installed = crate::test_support::an_installed("serving", vec![server]);
+    let mut register = crate::plugin::Register::empty();
+    assert!(register.record(installed.clone()).is_ok());
+    assert!(
+        crate::app::record::keep(crate::app::plugins::kept_at(ctx).as_deref(), &register).is_ok()
+    );
+    let document = crate::plugin::overlay(&at.join("data").join("stack"), "serving");
+    assert!(crate::config::store::write(&document, &crate::plugin::written(&installed)).is_ok());
+    document
+}
+
+/// What the record says the plugin's media server joins.
+fn joined(ctx: &crate::app::Ctx) -> Option<Vec<String>> {
+    crate::app::plugins::read(ctx)
+        .ok()?
+        .holds("serving")?
+        .services
+        .first()
+        .map(|placed| placed.networks.clone())
+}
+
+/// Choosing a plugin's media server for the identity the request service asks for
+/// rewrites its document and its record onto the networks the stack's is reached over,
+/// in the journalled change the choice is; choosing the stack's back takes them off.
+#[test]
+fn a_choice_moves_the_networks_of_the_plugin_it_settles_in() {
+    let (ctx, at) = ctx("rejoined");
+    let document = a_plugin_media_server(&ctx, &at);
+    let before = std::fs::read_to_string(&document).unwrap_or_default();
+
+    let chosen = agreed(&ctx, fill("identity.source", "server")).ok();
+    let written = std::fs::read_to_string(&document).unwrap_or_default();
+    let journal = crate::app::targets::layout(&ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .map(|journal| journal.changes().to_vec())
+        .unwrap_or_default();
+
+    assert_eq!(chosen.map(|report| report.applied), Some(true));
+    assert_eq!(
+        joined(&ctx),
+        Some(vec!["default".to_owned(), "gate-upstream".to_owned()])
+    );
+    assert!(written.contains("- gate-upstream"), "{written}");
+    assert!(!written.contains("decline-upstream"), "{written}");
+    assert!(journal.iter().any(|change| matches!(&change.kind,
+        crate::journal::Kind::Rewritten { path, previous, .. }
+            if *path == document.display().to_string() && *previous == before)));
+
+    let back = agreed(&ctx, fill("identity.source", "jellyfin")).ok();
+
+    assert_eq!(back.map(|report| report.applied), Some(true));
+    assert_eq!(joined(&ctx), Some(Vec::new()));
+    assert_eq!(std::fs::read_to_string(&document).ok(), Some(before));
+}
+
+/// A choice that moves no plugin's networks writes over nothing but the setting.
+#[test]
+fn a_choice_that_moves_no_networks_writes_over_nothing() {
+    let (ctx, at) = ctx("unmoved");
+    let document = a_plugin_media_server(&ctx, &at);
+    let before = std::fs::read_to_string(&document).unwrap_or_default();
+
+    let chosen = agreed(&ctx, fill("indexer.search", "nzbhydra2")).ok();
+    let journal = crate::app::targets::layout(&ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .map(|journal| journal.changes().to_vec())
+        .unwrap_or_default();
+
+    assert_eq!(chosen.map(|report| report.applied), Some(true));
+    assert_eq!(std::fs::read_to_string(&document).ok(), Some(before));
+    assert!(journal
+        .iter()
+        .all(|change| !matches!(change.kind, crate::journal::Kind::Rewritten { .. })));
+}

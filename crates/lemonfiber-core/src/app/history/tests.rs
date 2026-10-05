@@ -14,6 +14,19 @@ fn a_region_reads_as_whose_it_is_and_which_file_it_went_into() {
     );
 }
 
+/// A file written over reads as what it was: written over, naming the file.
+#[test]
+fn a_file_written_over_reads_as_which_file_it_was() {
+    assert_eq!(
+        did(&crate::journal::Kind::Rewritten {
+            path: "/stack/compose/plugins/komga.yml".to_owned(),
+            previous: String::new(),
+            written: 0,
+        }),
+        "wrote over /stack/compose/plugins/komga.yml"
+    );
+}
+
 /// Every stamp this build writes goes out as it was written.
 #[test]
 fn a_stamp_of_seconds_goes_out_as_written() {

@@ -165,6 +165,14 @@ fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
             },
         },
         Undo {
+            target: "komga".to_owned(),
+            action: Action::Rewind {
+                path: "/stack/compose/plugins/komga.yml".to_owned(),
+                previous: String::new(),
+                written: 0,
+            },
+        },
+        Undo {
             target: "sonarr".to_owned(),
             action: Action::Repin {
                 previous: "4.0.14".to_owned(),
@@ -214,6 +222,10 @@ fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
         "{said}"
     );
     assert!(said.contains("the version pinned back to 4.0.14"), "{said}");
+    assert!(
+        said.contains("/stack/compose/plugins/komga.yml written back as it was"),
+        "{said}"
+    );
     assert!(
         said.contains("downloadclient's tvCategory back to old-sonarr"),
         "{said}"

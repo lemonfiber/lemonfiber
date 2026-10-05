@@ -76,7 +76,7 @@ mod occupied;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;
-mod writing;
+pub(crate) mod writing;
 
 pub use listing::{installed, recorded};
 pub use offering::Consent;
@@ -350,7 +350,7 @@ pub(crate) fn read(ctx: &Ctx) -> Result<Register, Box<Problem>> {
 /// Where the record is kept: beside the environment file, in the configuration
 /// directory a backup captures, or nowhere when nothing is configured. Equal to
 /// [`crate::config::paths::Paths::plugins`].
-fn kept_at(ctx: &Ctx) -> Option<PathBuf> {
+pub(crate) fn kept_at(ctx: &Ctx) -> Option<PathBuf> {
     super::targets::beside_env(ctx, crate::config::paths::PLUGINS)
 }
 

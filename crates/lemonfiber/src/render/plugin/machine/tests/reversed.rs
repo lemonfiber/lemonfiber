@@ -422,6 +422,14 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         "put DOMAIN back"
     );
     assert_eq!(
+        undone(Action::Rewind {
+            path: "/stack/compose/plugins/komga.yml".to_owned(),
+            previous: String::new(),
+            written: 0
+        }),
+        "wrote /stack/compose/plugins/komga.yml back as it was"
+    );
+    assert_eq!(
         undone(Action::Repin {
             previous: "1.0.0".to_owned(),
             current: "1.1.0".to_owned()
