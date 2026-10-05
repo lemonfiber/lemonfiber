@@ -165,7 +165,9 @@ pub(crate) async fn remove(
     // which no journal entry covers because seeding keeps them rather than an install.
     // They go with the plugin: a later plugin is somebody else, and the next service to
     // take one of these ids would otherwise be handed this one's password.
-    forget_credentials(ctx, &kept);
+    if let Some(file) = ctx.settings.env_file.as_deref() {
+        forget_credentials(ctx, file, &kept);
+    }
 
     // Its route came out of the proxy's file with everything else it wrote, and the
     // proxy only reads that file when it starts. The stack is the one the judgement
@@ -191,10 +193,7 @@ pub(crate) async fn remove(
 ///
 /// Best effort, as keeping them is: the plugin is already off the record by here, and a
 /// setting that would not go is one nothing reads until a plugin of the same id arrives.
-fn forget_credentials(ctx: &Ctx, kept: &[String]) {
-    let Some(file) = ctx.settings.env_file.as_deref() else {
-        return;
-    };
+fn forget_credentials(ctx: &Ctx, file: &std::path::Path, kept: &[String]) {
     let held = kept
         .iter()
         .filter(|setting| super::super::targets::recorded_secret(ctx, setting).is_some());

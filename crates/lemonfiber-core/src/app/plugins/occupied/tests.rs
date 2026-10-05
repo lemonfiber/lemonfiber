@@ -105,7 +105,7 @@ fn every_clash_is_in_one_refusal() {
 /// Against the stack this build ships, the proxy's own ports are taken and a free one is
 /// not.
 #[test]
-fn the_shipped_stack_holds_the_proxys_ports() {
+fn the_shipped_stack_holds_the_proxy_s_ports() {
     let ctx = a_context().build();
     let scratch = std::env::temp_dir().join(format!("lemonfiber-occupied-{}", std::process::id()));
     let taken = an_installed("tools", vec![reached("web", 443, None)]);

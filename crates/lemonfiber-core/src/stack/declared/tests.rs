@@ -89,3 +89,20 @@ fn anchors_are_applied_first() {
     ));
     assert_eq!(ports, [(8096, "a".to_owned())]);
 }
+
+/// A merge key that holds no mapping is a file Compose would refuse, so it declares
+/// nothing rather than what reading around it would make of it.
+#[test]
+fn a_merge_that_cannot_be_applied_declares_nothing() {
+    assert_eq!(
+        declared("services:\n  a:\n    <<: 5\n    ports: [\"80:80\"]\n"),
+        (Vec::new(), Vec::new())
+    );
+}
+
+/// A service named by something other than a string is no name a service is known by.
+#[test]
+fn a_service_not_named_by_a_string_is_not_read() {
+    let (services, _) = declared("services:\n  1: {}\n  b: {}\n");
+    assert_eq!(services, ["b"]);
+}

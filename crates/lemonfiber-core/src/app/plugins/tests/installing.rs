@@ -422,6 +422,41 @@ async fn a_port_the_stacks_compose_files_publish_is_refused_before_anything_is_w
     assert!(!stack_of(&ctx).join("compose/plugins/komga.yml").exists());
 }
 
+/// A port the overlay publishes through a setting is read as the setting says, so a
+/// plugin on that port is refused even though no file spells the number out.
+#[tokio::test]
+async fn a_port_an_overlay_publishes_through_a_setting_is_refused() {
+    let mut ctx = ctx("occupied-setting");
+    let overlay = stack_of(&ctx).with_file_name("compose.override.yml");
+    assert!(overlay
+        .parent()
+        .is_some_and(|up| std::fs::create_dir_all(up).is_ok()));
+    assert!(std::fs::write(
+        &overlay,
+        "services:\n  theirs:\n    image: theirs\n    ports: [\"${THEIRS_PORT}:80\"]\n",
+    )
+    .is_ok());
+    assert!(ctx
+        .settings
+        .env_file
+        .as_deref()
+        .is_some_and(|env| crate::config::store::set(env, "THEIRS_PORT", "25600").is_ok()));
+    ctx.settings.overlays = vec![overlay];
+
+    let refused = installing(&ctx, &source("occupied-setting", MANIFEST))
+        .await
+        .err();
+
+    assert_eq!(
+        refused.as_ref().map(|one| one.code.to_string()).as_deref(),
+        Some("PLUGIN-28")
+    );
+    assert!(refused
+        .as_ref()
+        .and_then(|one| one.detail.as_deref())
+        .is_some_and(|detail| detail.contains("25600") && detail.contains("theirs")));
+}
+
 /// A service the operator's overlay declares is refused, naming the overlay.
 #[tokio::test]
 async fn a_service_the_overlay_declares_is_refused() {

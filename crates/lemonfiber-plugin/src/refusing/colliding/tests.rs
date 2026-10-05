@@ -47,6 +47,16 @@ fn a_hostname_the_stack_answers_on_is_refused() {
     assert!(names(&said, &["wiring.hostname", "watch"]), "got: {said:?}");
 }
 
+/// A wiring that names its service is held to the same names as one that names none.
+#[test]
+fn a_hostname_the_stack_answers_on_is_refused_where_the_wiring_names_its_service() {
+    let said = without(
+        "[[wiring]]\nhostname        = \"comics\"",
+        "[[wiring]]\nservice         = \"komga\"\nhostname        = \"watch\"",
+    );
+    assert!(names(&said, &["wiring.hostname", "watch"]), "got: {said:?}");
+}
+
 /// A stanza the shipped proxy writes out disabled is a name already spoken for.
 #[test]
 fn a_hostname_the_stack_answers_on_only_when_enabled_is_refused_too() {
