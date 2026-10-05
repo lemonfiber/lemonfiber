@@ -50,6 +50,7 @@ pub use asked::{
     TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
     TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
+pub(crate) use named::carried as reached;
 pub use named::{named, ByAKey, KEY_CALLABLE, OFFERED};
 pub use refused::Refused;
 
@@ -111,13 +112,16 @@ pub fn declined(refused: &Refused) -> Response {
     refused.why().saying(refused.said())
 }
 
+/// Where every action is asked for, by its name in place of `{action}`.
+pub const ACTION: &str = "/api/actions/{action}";
+
 /// The route every action is asked for through.
 ///
 /// Admission is not applied here. Whether a request may be answered at all is one
 /// question for the whole surface, asked once above the whole tree, which is what
 /// keeps an endpoint added later from arriving unguarded.
 pub fn routes() -> Router<Serving> {
-    Router::new().route("/api/actions/{action}", post(taken))
+    Router::new().route(ACTION, post(taken))
 }
 
 /// One action, carried out or refused.

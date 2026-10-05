@@ -1,0 +1,86 @@
+use super::{declared, served_at, Standing};
+use crate::admission::Caller;
+use lemonfiber_core::config::{Reaching, Settings, REACH_REGISTRY_KEY};
+
+/// A context where `refused` is switched off, or nothing is.
+fn reaching(refused: Option<&'static str>) -> lemonfiber_core::app::Ctx {
+    lemonfiber_testing::a_context()
+        .settings(Settings {
+            reaching: refused.map_or_else(Reaching::default, Reaching::without),
+            ..Settings::default()
+        })
+        .build()
+}
+
+/// Every path the surface serves a request at, as a capability is named.
+fn every_path() -> Vec<String> {
+    let mut paths: Vec<String> = crate::actions::OFFERED
+        .iter()
+        .map(|action| served_at(action))
+        .chain(
+            crate::read::table::OFFERED
+                .iter()
+                .map(|read| (*read).to_owned()),
+        )
+        .collect();
+    paths.sort();
+    paths
+}
+
+/// Every request the surface serves is declared, each under its own path, and a read
+/// and an action sharing a word are two capabilities.
+#[test]
+fn every_request_the_surface_serves_is_a_capability_of_its_own() {
+    let declared = declared(&reaching(None), &Caller::Operator);
+    let named: Vec<String> = declared.capabilities.keys().cloned().collect();
+    assert_eq!(named, every_path());
+    assert!(declared.capabilities.contains_key("/api/update"));
+    assert!(declared.capabilities.contains_key("/api/actions/update"));
+}
+
+#[test]
+fn the_operator_may_have_everything_the_stack_offers() {
+    let declared = declared(&reaching(None), &Caller::Operator);
+    assert!(
+        declared
+            .capabilities
+            .values()
+            .all(|standing| *standing == Standing::Available),
+        "{declared:?}"
+    );
+}
+
+/// A fetch is the stack's to offer once fetching is switched back on, and is said to
+/// be so rather than missing or forbidden.
+#[test]
+fn a_request_whose_setting_is_off_is_unconfigured_and_nothing_else_is() {
+    let declared = declared(&reaching(Some(REACH_REGISTRY_KEY)), &Caller::Machine);
+    let unconfigured: Vec<&str> = declared
+        .capabilities
+        .iter()
+        .filter(|(_, standing)| **standing == Standing::Unconfigured)
+        .map(|(path, _)| path.as_str())
+        .collect();
+    assert_eq!(unconfigured, ["/api/actions/pull"]);
+}
+
+/// A household member is offered what the core gives a member and nothing else, and
+/// what is forbidden is said to be theirs not to ask rather than missing.
+#[test]
+fn a_member_is_offered_what_the_core_gives_a_member() {
+    let member = Caller::Member("someone".to_owned());
+    let declared = declared(&reaching(Some(REACH_REGISTRY_KEY)), &member);
+    let available: Vec<&str> = declared
+        .capabilities
+        .iter()
+        .filter(|(_, standing)| **standing == Standing::Available)
+        .map(|(path, _)| path.as_str())
+        .collect();
+    assert_eq!(available, ["/api/held", "/api/requests"]);
+    assert_eq!(
+        declared.capabilities.get("/api/actions/pull"),
+        Some(&Standing::Unpermitted),
+        "what a member may not ask is unpermitted before it is unconfigured"
+    );
+    assert_eq!(declared.capabilities.len(), every_path().len());
+}

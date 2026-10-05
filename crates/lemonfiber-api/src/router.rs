@@ -97,6 +97,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::setup::routes())
         .merge(crate::admission::routes())
         .merge(crate::keys::routes())
+        .merge(crate::capabilities::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming))
         // Set after every route is merged, because it reaches only the routes already

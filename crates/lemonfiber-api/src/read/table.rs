@@ -313,6 +313,24 @@ pub struct Wanted {
     pub most: Option<String>,
 }
 
+impl Wanted {
+    /// Enough for every read to reach the command it names: the subjects a read cannot
+    /// be named without, and nothing that narrows one.
+    ///
+    /// For asking which command a request reaches without a request: what this carries
+    /// is never read, and nothing about a stack is in it. Held to every read in a test,
+    /// so a read that gains a required parameter is given one here too.
+    #[must_use]
+    pub fn naming_everything() -> Self {
+        Self {
+            member: Some("someone".to_owned()),
+            term: Some("Sintel".to_owned()),
+            what: Some("stack".to_owned()),
+            ..Self::default()
+        }
+    }
+}
+
 /// What a read was given, or why the request cannot be read as it stands.
 ///
 /// The one door a query string goes through. Which parameters a read takes is

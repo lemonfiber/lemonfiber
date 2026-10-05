@@ -64,6 +64,7 @@ use lemonfiber_core::wiring;
 
 use crate::actions::{named, Arguments, KEY_CALLABLE};
 use crate::admission::admitted::Admitted;
+use crate::capabilities::Capabilities;
 use crate::jobs::started::Started;
 use crate::read::answering;
 use crate::refusal::Refusal;
@@ -168,6 +169,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 /// another, and the guard compared two integers that agreed.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ADMISSION, schema_for!(Envelope<Admitted>));
+    describing(
+        kinds,
+        kind::CAPABILITIES,
+        schema_for!(Envelope<Capabilities>),
+    );
     describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
     describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, kind::JOB, schema_for!(Envelope<Started>));

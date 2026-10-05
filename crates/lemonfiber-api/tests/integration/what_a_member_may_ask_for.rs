@@ -122,6 +122,28 @@ async fn a_member_reaches_the_one_read_that_is_theirs() {
     let _ = fs::remove_dir_all(a_directory("member-own-read"));
 }
 
+/// What the stack can do is told to a member as it is theirs, through every layer a
+/// run puts in front of it: the read that is theirs is available, and an action that
+/// is not is said to be unpermitted rather than left out.
+#[tokio::test]
+async fn a_member_is_told_what_the_stack_can_do_as_it_is_theirs() {
+    let (router, carried) = as_a_member("member-capabilities").await;
+    let answer = asked(router, "GET", "/api/capabilities", &carried, "").await;
+
+    assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
+    assert!(
+        answer.body.contains(r#""/api/requests":"available""#),
+        "{}",
+        answer.body
+    );
+    assert!(
+        answer.body.contains(r#""/api/actions/up":"unpermitted""#),
+        "{}",
+        answer.body
+    );
+    let _ = fs::remove_dir_all(a_directory("member-capabilities"));
+}
+
 /// The actions door reaches the same decision the reads door does.
 ///
 /// A member starting the stack is the kind of thing the app would never offer and a

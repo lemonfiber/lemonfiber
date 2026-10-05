@@ -9,6 +9,7 @@
     "bandwidth": "ref:Sharing",
     "beside": "ref:BesideReport",
     "bundle": "ref:Bundle",
+    "capabilities": "ref:Capabilities",
     "catalogue": "ref:CatalogueReport",
     "certificate": "ref:CertificateReport",
     "clients": "ref:Guidance",
@@ -814,6 +815,25 @@
         }
       },
       "variants": []
+    },
+    "Capabilities": {
+      "fields": {
+        "capabilities": {
+          "type": [
+            "object{ref:CapabilityState}"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "CapabilityState": {
+      "fields": {},
+      "variants": [
+        "\"available\"",
+        "\"unconfigured\"",
+        "\"unpermitted\""
+      ]
     },
     "Capacity": {
       "fields": {
