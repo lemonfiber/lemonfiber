@@ -20,7 +20,9 @@ use crate::ports::service::{QueueDepth, Queues};
 use crate::queue::run::Answered;
 use crate::storage::{test_link, Linked};
 
-use crate::app::targets::{download_targets, protocol_of, read_transfers, servarr_targets};
+use crate::app::targets::{
+    download_targets, host_fillers, protocol_of, read_transfers, servarr_targets,
+};
 
 /// What the household has asked for, for the panel beside the door.
 ///
@@ -188,7 +190,7 @@ pub(super) async fn transfers(
         Ok(manifest) => manifest,
         Err(reason) => return Panel::unavailable(reason.clone()),
     };
-    let targets = download_targets(&manifest.services, project);
+    let targets = download_targets(ctx, &host_fillers(ctx, manifest, project)).await;
 
     // Read at once rather than in series, for the reason `doctor` runs its checks
     // that way: these are independent HTTP calls to different services, so a refresh

@@ -35,7 +35,7 @@ use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
 use crate::ports::service::{Rates, Wanted, Window};
 
 use crate::app::command::BandwidthAsked as Asked;
-use crate::app::targets::{download_targets, project_directory};
+use crate::app::targets::{download_targets, host_fillers, project_directory};
 use crate::app::Ctx;
 use reaching::Fetch;
 
@@ -67,8 +67,8 @@ pub(crate) async fn bandwidth(ctx: &Ctx, asked: &Asked) -> Result<Sharing, Box<P
         .manifest()
         .map_err(|err| Box::new(err.problem()))?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let targets = download_targets(&stack.services, project.as_deref());
-    let clients = reaching::opened(ctx, &targets).await;
+    let targets = download_targets(ctx, &host_fillers(ctx, &stack, project.as_deref())).await;
+    let clients = reaching::opened(ctx, &targets);
     let zone = zone(ctx);
 
     let metered = counting(ctx, &clients, &declared).await;

@@ -51,9 +51,3 @@ pub(crate) fn record_secret(ctx: &Ctx, key: &str, value: &str) -> Result<(), sto
         .ok_or(store::Failure::Nowhere)?;
     store::set(path, key, value)
 }
-
-/// The qBittorrent web UI password recorded at seeding — read back for the
-/// dashboard's transfers authentication and for a later seed run.
-pub(crate) fn recorded_qbittorrent_password(ctx: &Ctx) -> Option<String> {
-    recorded_secret(ctx, crate::config::QBITTORRENT_PASSWORD_KEY)
-}

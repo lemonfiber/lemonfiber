@@ -21,7 +21,7 @@ use crate::doctor::vpn::Forwarding;
 use crate::error::Diagnose;
 use crate::journal::{Change, Kind};
 
-use super::targets::{download_targets, torrent_client};
+use super::targets::{download_targets, forwarded_client, host_fillers};
 use super::Ctx;
 
 /// The setting a re-pushed port is journalled under, so a change to it reads like
@@ -117,8 +117,8 @@ pub async fn reconcile(ctx: &Ctx, granted: Option<u16>, project: Option<&Path>) 
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         return Pushed::Unchanged;
     };
-    let targets = download_targets(&manifest.services, project);
-    let Some(client) = torrent_client(ctx, &targets) else {
+    let targets = download_targets(ctx, &host_fillers(ctx, &manifest, project)).await;
+    let Some(client) = forwarded_client(ctx, &targets) else {
         return Pushed::Unchanged;
     };
     let forwarding = Forwarding {
@@ -134,15 +134,15 @@ pub async fn reconcile(ctx: &Ctx, granted: Option<u16>, project: Option<&Path>) 
     .await
 }
 
-/// What the torrent client says it is listening on, where there is one and it can
-/// be authenticated to.
+/// What the torrent client reached through the tunnel says it is listening on, where
+/// there is one and it can be authenticated to.
 pub(crate) async fn listening_port(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     project: Option<&std::path::Path>,
 ) -> Option<u16> {
-    let targets = download_targets(&manifest.services, project);
-    torrent_client(ctx, &targets)?.listen_port().await.ok()
+    let targets = download_targets(ctx, &host_fillers(ctx, manifest, project)).await;
+    forwarded_client(ctx, &targets)?.listen_port().await.ok()
 }
 
 /// What starting the stack does about the forwarded port.

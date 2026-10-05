@@ -86,42 +86,25 @@ impl Client {
     }
 }
 
-/// Every download client on this stack that can be opened, in the order the
-/// manifest declares them.
+/// Every download client on this machine that can be opened, in the order they are
+/// declared.
 ///
-/// A client lemonfiber cannot authenticate to is left out rather than reported as
-/// unlimited: it is not a client with no limits, it is a client nothing here can
-/// see, and the two must not render alike.
-pub(super) async fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
+/// A client lemonfiber cannot authenticate to is not among the targets at all, rather
+/// than reported as unlimited: it is not a client with no limits, it is a client
+/// nothing here can see, and the two must not render alike.
+pub(super) fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
     let mut clients = Vec::new();
     for target in targets {
-        match &target.kind {
-            DownloadKind::Qbittorrent => {
-                if let Some(password) = crate::app::targets::recorded_qbittorrent_password(ctx) {
-                    clients.push(Client::Torrent(Box::new(Qbittorrent::authenticated(
-                        ctx.seams.http.clone(),
-                        &target.base,
-                        password,
-                    ))));
-                }
-            }
-            DownloadKind::Sabnzbd { config } => {
-                if let Some(key) = ctx
-                    .seams
-                    .filesystem
-                    .read(config)
-                    .await
-                    .as_deref()
-                    .and_then(crate::sabnzbd::api_key)
-                {
-                    clients.push(Client::Usenet(Box::new(Sabnzbd::new(
-                        ctx.seams.http.clone(),
-                        &target.base,
-                        key,
-                    ))));
-                }
-            }
-        }
+        clients.push(match &target.kind {
+            DownloadKind::Qbittorrent { password } => Client::Torrent(Box::new(
+                Qbittorrent::authenticated(ctx.seams.http.clone(), &target.base, password.clone()),
+            )),
+            DownloadKind::Sabnzbd { key } => Client::Usenet(Box::new(Sabnzbd::new(
+                ctx.seams.http.clone(),
+                &target.base,
+                key.clone(),
+            ))),
+        });
     }
     clients
 }

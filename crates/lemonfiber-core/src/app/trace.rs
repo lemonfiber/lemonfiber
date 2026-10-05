@@ -108,7 +108,7 @@ pub(crate) async fn trace(
             searched(&mut report, &arr.name, asking(&service, kind).await);
         }
         if let Some(reason) = account_explainable(&report) {
-            let said = troubles(providers(ctx, &manifest.services).await);
+            let said = troubles(providers(ctx, &manifest).await);
             report.stall = Some(beside(reason, &said));
         }
         return Ok(report);

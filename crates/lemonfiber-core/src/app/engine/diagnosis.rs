@@ -327,7 +327,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         servarr_targets(&manifest.services, project.as_deref()),
         disruptive,
     );
-    let providers = deferring::providing(ctx, &manifest.services, project.as_deref());
+    let providers = deferring::providing(ctx, manifest, project.as_deref());
     let wiring = deferring::wired(ctx, stack, project.as_deref());
     // Where the stack is actually listening, asked of the container engine rather
     // than read out of the files that asked for it: a mapping edited by hand and

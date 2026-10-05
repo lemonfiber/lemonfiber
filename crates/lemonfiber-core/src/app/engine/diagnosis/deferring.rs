@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::app::targets::committed_bytes;
+use crate::app::targets::{committed_bytes, host_fillers};
 use crate::app::Ctx;
 use crate::doctor::deferred::Deferred;
 use crate::doctor::providers::ProvidersCheck;
@@ -43,15 +43,15 @@ pub(super) fn tunnel(
 /// What the accounts underneath the stack have left, built when it runs.
 pub(super) fn providing(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     project: Option<&Path>,
 ) -> Deferred {
-    let (ctx, services) = (ctx.clone(), services.to_vec());
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
     let project: Option<PathBuf> = project.map(Path::to_path_buf);
     Deferred::new(Category::Providers, CHECK_BUDGET, move || {
-        let (ctx, services, project) = (ctx.clone(), services.clone(), project.clone());
+        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
         async move {
-            Box::new(provider_accounts(&ctx, &services, project.as_deref()).await) as Box<dyn Check>
+            Box::new(provider_accounts(&ctx, &manifest, project.as_deref()).await) as Box<dyn Check>
         }
     })
 }
@@ -75,12 +75,13 @@ pub(super) fn stored(
     manifest: &lemonfiber_manifest::Manifest,
     project: Option<&Path>,
 ) -> Deferred {
-    let (ctx, services) = (ctx.clone(), manifest.services.clone());
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
     let project = project.map(Path::to_path_buf);
     Deferred::new(Category::Storage, FILESYSTEM_BUDGET, move || {
-        let (ctx, services, project) = (ctx.clone(), services.clone(), project.clone());
+        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
         async move {
-            let committed = committed_bytes(&ctx, &services, project.as_deref()).await;
+            let fillers = host_fillers(&ctx, &manifest, project.as_deref());
+            let committed = committed_bytes(&ctx, &fillers).await;
             Box::new(StorageCheck::new(
                 ctx.seams.filesystem.clone(),
                 ctx.settings.data_root.clone(),
@@ -144,9 +145,10 @@ async fn tunnelled(
             listening: crate::app::forwarding::listening_port(ctx, manifest, project).await,
             port_forward: ctx.settings.port_forward.clone(),
             disruptive,
-            client: crate::app::targets::torrent_client(
+            client: crate::app::targets::forwarded_client(
                 ctx,
-                &crate::app::targets::download_targets(&manifest.services, project),
+                &crate::app::targets::download_targets(ctx, &host_fillers(ctx, manifest, project))
+                    .await,
             ),
         },
     )
@@ -161,11 +163,12 @@ async fn tunnelled(
 /// warn about.
 async fn provider_accounts(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     project: Option<&Path>,
 ) -> ProvidersCheck {
+    let services = &manifest.services;
     ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, services, project)
+        crate::app::targets::usenet_client(ctx, &host_fillers(ctx, manifest, project))
             .await
             .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
         crate::app::targets::indexer_aggregator(ctx, services, project)

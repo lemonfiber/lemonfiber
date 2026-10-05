@@ -126,12 +126,10 @@ impl Held {
 pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder, String>) -> Held {
     let mut held = Held::default();
     for filler in fillers.speaking(ApiKind::Sabnzbd) {
-        match crate::app::targets::credential_file(ctx, filler).await {
-            Beneath::Read(text) => {
-                if let Some(key) = crate::sabnzbd::api_key(&text) {
-                    held.keys
-                        .insert(Holder::of(filler), Credential::ApiKey(key));
-                }
+        match crate::app::targets::usenet_key(ctx, filler).await {
+            Beneath::Read(key) => {
+                held.keys
+                    .insert(Holder::of(filler), Credential::ApiKey(key));
             }
             Beneath::Escaped => {
                 held.refused.insert(Holder::of(filler));
@@ -140,13 +138,10 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder,
         }
     }
     for filler in fillers.speaking(ApiKind::Qbittorrent) {
-        let Some(setting) = fillers.setting(filler, crate::config::PASSWORD_SUFFIX) else {
-            continue;
-        };
         let password = minted
             .get(&Holder::of(filler))
             .cloned()
-            .or_else(|| crate::app::targets::recorded_secret(ctx, &setting));
+            .or_else(|| crate::app::targets::recorded_password(ctx, fillers, filler));
         if let Some(password) = password {
             held.keys.insert(
                 Holder::of(filler),
