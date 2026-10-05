@@ -82,9 +82,9 @@ pub(super) async fn seed_taken_back(
     let project = gated(services, project)?;
     let base = super::identity::seerr_service(services)?;
     let owed = baseline.named(SEERR, HELD_KEY);
-    let jellyfin = jellyfin_admin(ctx, services);
+    let jellyfin = jellyfin_admin(ctx, fillers);
     let minted = match &jellyfin {
-        Some((client, _)) => client.filed_as(SEERR_APP).await.unwrap_or_default(),
+        Some((client, ..)) => client.filed_as(SEERR_APP).await.unwrap_or_default(),
         None => Vec::new(),
     };
     let count = owed.len() + minted.len();
@@ -98,7 +98,7 @@ pub(super) async fn seed_taken_back(
         }));
     }
     let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
-    let route = jellyfin.as_ref().map(|(_, route)| route.as_str());
+    let route = jellyfin.as_ref().map(|(_, route, _)| route.as_str());
     let direct = match still_direct(ctx, &seerr, fillers, project, route).await {
         Ok(direct) => direct,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
@@ -116,12 +116,12 @@ pub(super) async fn seed_taken_back(
     for arr in owed {
         unsettled.extend(replaced(ctx, services, fillers, project, &arr, baseline).await);
     }
-    if let Some((client, _)) = &jellyfin {
+    if let Some((client, _, server)) = &jellyfin {
         for key in &minted {
             if let Err(failure) = client.revoke(key).await {
                 unsettled.push(format!(
-                    "Seerr's own Jellyfin key could not be revoked: {failure}. It still opens \
-                     Jellyfin; the next run revokes it."
+                    "Seerr's own {server} key could not be revoked: {failure}. It still opens \
+                     {server}; the next run revokes it."
                 ));
             }
         }
@@ -229,19 +229,12 @@ fn gated<'a>(services: &[Service], project: Option<&'a Path>) -> Option<&'a Path
     project.filter(|_| crate::app::gating::service(services).is_some())
 }
 
-/// The media server as its administrator, with the route the gate reaches it on, where
-/// lemonfiber holds the administrator's password.
-fn jellyfin_admin(ctx: &Ctx, services: &[Service]) -> Option<(Jellyfin, String)> {
-    let jellyfin = super::identity::jellyfin_service(services)?;
-    let password = super::identity::recorded_jellyfin_password(ctx)?;
-    let client = Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    );
-    Some((client, jellyfin.id))
+/// The media server as its administrator, with the route the gate reaches it on and what
+/// it is called, where lemonfiber holds the administrator's password.
+fn jellyfin_admin(ctx: &Ctx, fillers: &Fillers) -> Option<(Jellyfin, String, String)> {
+    let server = crate::app::targets::MediaServer::of(fillers)?;
+    let client = server.administered(ctx)?;
+    Some((client, server.id().to_owned(), server.name().to_owned()))
 }
 
 /// How many credentials the request service holds, as a rehearsal says it.

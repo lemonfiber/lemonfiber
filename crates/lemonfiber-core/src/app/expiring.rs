@@ -237,7 +237,7 @@ async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
         Ok(manifest) => manifest,
         Err(err) => return came_to.missed(&err.problem().summary),
     };
-    let access = match household::reaching(ctx, &manifest.services).await {
+    let access = match household::reaching(ctx, &manifest).await {
         Ok(access) => access,
         Err(reason) => return came_to.missed(&reason),
     };

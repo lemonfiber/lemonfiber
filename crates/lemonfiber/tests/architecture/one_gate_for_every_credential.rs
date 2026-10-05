@@ -21,8 +21,21 @@ const GOVERNED: [&str; 2] = [
     "crates/lemonfiber-core/src/app/targets/",
 ];
 
-/// The readers of a service's credential that seeding hands on to another service.
+/// The readers of a service's credential that seeding hands on to another service, each
+/// called as a function of the service it reads.
+///
+/// The media server's administrator's password is read as a method of the server the
+/// lookup resolved, which names the request service it is handed to only where the gate
+/// lets it cross; [`the_media_server_names_its_asker_through_the_gate`] holds that.
 const READERS: [&str; 3] = ["servarr_key(", "usenet_key(", "recorded_password("];
+
+/// Whether `line` calls one of [`READERS`] as a function rather than as a method.
+fn reads(line: &str) -> bool {
+    READERS.iter().any(|reader| {
+        line.match_indices(reader)
+            .any(|(at, _)| !line.get(..at).is_some_and(|before| before.ends_with('.')))
+    })
+}
 
 /// Where seeding takes its pairs from the connecting table, which asks the gate.
 const FROM_THE_GATE: [&str; 2] = ["pairings(", "fulfilling("];
@@ -125,7 +138,7 @@ fn every_seed_pass_handing_a_credential_takes_its_pairs_from_the_gate() {
                 && !line.starts_with("fn ")
                 && !line.starts_with("async fn ")
                 && !line.starts_with("//")
-                && READERS.iter().any(|reader| line.contains(reader))
+                && reads(line)
         });
         if !reads {
             continue;
@@ -166,4 +179,25 @@ fn every_pass_beside_the_gate_still_reads_a_credential() {
             "{file} is let read beside the gate because it {why}, and reads no credential"
         );
     }
+}
+
+/// **The media server's administrator's password crosses the same gate.** It is handed
+/// once to the request service that asks for the server, and the lookup names that
+/// service only where `wiring::crosses` lets the password reach it.
+#[test]
+fn the_media_server_names_its_asker_through_the_gate() {
+    let media = sources()
+        .into_iter()
+        .find(|(path, _)| {
+            path.to_string_lossy().replace('\\', "/")
+                == "crates/lemonfiber-core/src/app/targets/media.rs"
+        })
+        .map(|(_, text)| production(&text).to_owned())
+        .unwrap_or_default();
+
+    assert!(
+        media.contains("asked_by") && media.contains("crate::wiring::crosses("),
+        "the media server names the service it hands its administrator's password to \
+         without asking wiring::crosses"
+    );
 }

@@ -10,33 +10,26 @@
 
 use super::Ctx;
 use crate::app::credentials::Replacing;
+use crate::app::targets::MediaServer;
 
-/// What this connection asks the stack for: a service that answers, for the services
-/// that ask, whether a person is who they say they are.
-const IDENTITY: &str = "identity.source";
-
-/// Jellyfin's administrator, as the first half of the identity left it: the password
-/// to go on with, or the state the identity rests in without one.
+/// The media server's administrator, as the first half of the identity left it: the
+/// password to go on with, or the state the identity rests in without one.
 pub(super) struct Admin(Result<String, crate::seed::State>);
 
-/// The first half of making whatever fills the identity source the one Seerr signs in
-/// against: the media server's administrator, minted where its wizard has not run.
+/// The first half of making whatever fills the identity source the one the request
+/// service signs in against: the media server's administrator, minted where its first-run
+/// setup has not run.
 ///
-/// Both must be in the stack; without either there is nothing to wire. The admin
-/// password is the one credential minted rather than read — recorded on the run that
-/// mints it, before the wizard is given it, and read back on a later run. Recorded
-/// here, before the second half, so the steps between the two can sign in with it.
-pub(super) async fn seed_jellyfin_admin(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
-) -> Option<Admin> {
-    seerr_service(services)?;
-    let jellyfin = identity_source(services, filled)?;
-    let client =
-        crate::jellyfin::Jellyfin::new(ctx.seams.http.clone(), &jellyfin.loopback, "jellyfin");
-    let recorded = recorded_jellyfin_password(ctx);
-    let keep = |password: &str| record_jellyfin_password(ctx, password);
+/// Nothing where the service asking is not a request service this build speaks to:
+/// without it there is nothing to wire. The admin password is the one credential minted
+/// rather than read — recorded under the server's own setting on the run that mints it,
+/// before the setup is given it, and read back on a later run. Recorded here, before the
+/// second half, so the steps between the two can sign in with it.
+pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: &MediaServer) -> Option<Admin> {
+    server.requests()?;
+    let client = server.client(ctx);
+    let recorded = server.recorded_password(ctx);
+    let keep = |password: &str| server.record_password(ctx, password);
     let administered = crate::seed::wire_jellyfin_admin(
         &client,
         ctx.seams.random.as_ref(),
@@ -48,32 +41,32 @@ pub(super) async fn seed_jellyfin_admin(
     Some(Admin(administered))
 }
 
-/// The second half: Seerr signed in through Jellyfin — at the request gate's Jellyfin
-/// route where the stack runs the gate, and at Jellyfin's own address where it does
-/// not — then, through the gate, handed the token it reaches Jellyfin with after that.
+/// The second half: the request service signed in through the media server — at the
+/// request gate's route to it where the stack runs the gate, and at the server's own
+/// address on the stack's network where it does not — then, through the gate, handed the
+/// token it reaches the server with after that.
 pub(super) async fn seed_jellyfin_identity(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     expected: &crate::baseline::Baseline,
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
+    server: Option<&MediaServer>,
     admin: Option<Admin>,
     project: Option<&std::path::Path>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let mut records = crate::baseline::Baseline::new();
-    let (Some(seerr_base), Some(jellyfin), Some(Admin(administered))) = (
-        seerr_service(services),
-        identity_source(services, filled),
-        admin,
-    ) else {
+    let (Some(server), Some(Admin(administered))) = (server, admin) else {
+        return (Vec::new(), records);
+    };
+    let Some(seerr_base) = server.requests() else {
         return (Vec::new(), records);
     };
     let gate = project.filter(|_| crate::app::gating::service(services).is_some());
     let server_url = match gate {
         Some(_) => {
-            let at = super::tokens::through_the_gate(&jellyfin.id);
+            let at = super::tokens::through_the_gate(server.id());
             format!("http://{}:{}{}", at.host, at.port, at.base)
         }
-        None => jellyfin.network_url.clone(),
+        None => server.network.url(),
     };
 
     let wiring = match administered {
@@ -93,10 +86,10 @@ pub(super) async fn seed_jellyfin_identity(
 
     let linked = match (gate, &wiring.state) {
         (Some(_), crate::seed::State::WouldWire { .. }) => {
-            Some(super::linking::would_link(&jellyfin.id))
+            Some(super::linking::would_link(server.id()))
         }
         (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => {
-            Some(super::linking::seed_media_server_link(ctx, &owner, &jellyfin.id, project).await)
+            Some(super::linking::seed_media_server_link(ctx, &owner, server.id(), project).await)
         }
         _ => None,
     };
@@ -105,7 +98,7 @@ pub(super) async fn seed_jellyfin_identity(
     // administrator's password, so that password is changed straight after it and the
     // one the request service saw opens nothing.
     let changed = (wiring.state == crate::seed::State::Wired && !ctx.dry_run)
-        .then(|| changed_after_setup(ctx, services));
+        .then(|| changed_after_setup(ctx, server));
     let changed = match changed {
         Some(changing) => Some(changing.await),
         None => None,
@@ -132,31 +125,50 @@ pub(super) async fn seed_jellyfin_identity(
 }
 
 /// What the report calls the change made after the request service was set up.
-const CHANGED: &str =
-    "Jellyfin's administrator password, changed once the request service was set up";
+fn changed(server: &MediaServer) -> String {
+    format!(
+        "{}'s administrator password, changed once the request service was set up",
+        server.name()
+    )
+}
 
 /// Change the administrator's password, and say how that went.
-async fn changed_after_setup(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-) -> crate::seed::Wiring {
-    let failed =
-        match crate::app::credentials::replace_jellyfin_password(ctx, services, false).await {
-            Ok(_) => {
-                return crate::seed::Wiring::settled(CHANGED.to_owned(), crate::seed::State::Wired)
-            }
-            Err(Replacing::Refused) => "Jellyfin refused the password lemonfiber holds".to_owned(),
-            Err(Replacing::Unproven(detail) | Replacing::Unkept(detail)) => detail,
-        };
+async fn changed_after_setup(ctx: &Ctx, server: &MediaServer) -> crate::seed::Wiring {
+    let failed = match crate::app::credentials::replace_jellyfin_password(ctx, server, false).await
+    {
+        Ok(_) => return crate::seed::Wiring::settled(changed(server), crate::seed::State::Wired),
+        Err(Replacing::Refused) => {
+            format!("{} refused the password lemonfiber holds", server.name())
+        }
+        Err(Replacing::Unproven(detail) | Replacing::Unkept(detail)) => detail,
+    };
     let mut wiring = crate::seed::Wiring::settled(
-        CHANGED.to_owned(),
+        changed(server),
         crate::seed::State::Failed { detail: failed },
     );
     wiring.escalate(
-        "The password the request service saw at setup still opens Jellyfin.".to_owned(),
-        "Run `lemonfiber credentials rotate jellyfin`.".to_owned(),
+        format!(
+            "The password the request service saw at setup still opens {}.",
+            server.name()
+        ),
+        rotated_by(server),
     );
     wiring
+}
+
+/// What replaces the administrator's password by hand: the rotation for the stack's own
+/// server, and the server itself for a plugin's, whose credentials lemonfiber does not
+/// rotate.
+fn rotated_by(server: &MediaServer) -> String {
+    match server.brought_by() {
+        None => format!("Run `lemonfiber credentials rotate {}`.", server.id()),
+        Some(_) => format!(
+            "Change the administrator's password in {} itself, then record it with \
+             `lemonfiber config set {} <password>`.",
+            server.name(),
+            server.setting
+        ),
+    }
 }
 
 /// The service the household's telling is recorded under.
@@ -195,29 +207,6 @@ pub(crate) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option
         .map(|addr| addr.loopback)
 }
 
-/// The addresses of whatever fills the identity source, if anything does.
-///
-/// The service is chosen by what it can do and then opened by what it is: the stack
-/// says which service answers the ask, and the adapter that speaks to it comes from
-/// that service's own declared shape. A filler this build has no adapter for is
-/// nothing to wire rather than something to guess at — which is the same answer the
-/// stack already gives for a service it declares no API for.
-pub(crate) fn identity_source(
-    services: &[lemonfiber_manifest::Service],
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
-) -> Option<crate::app::targets::ServiceAddr> {
-    let [fills_it] = filled.get(IDENTITY)?.as_slice() else {
-        return None;
-    };
-    let kind = services
-        .iter()
-        .find(|service| &service.id == fills_it)?
-        .api
-        .as_ref()?
-        .kind;
-    crate::app::targets::service_addr(services, kind).filter(|addr| &addr.id == fills_it)
-}
-
 /// Jellyfin's addresses, if the stack has it. Jellyfin's kind carries no key source of
 /// the usual sort: it is the one service lemonfiber sets an account on rather than reading
 /// a key from, so its password is generated.
@@ -231,11 +220,4 @@ pub(crate) fn jellyfin_service(
 /// can point Seerr at Jellyfin without minting again.
 pub(crate) fn recorded_jellyfin_password(ctx: &Ctx) -> Option<String> {
     crate::app::targets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
-}
-
-/// Record the minted Jellyfin admin password where a later run reads it back, or say
-/// why it could not be.
-fn record_jellyfin_password(ctx: &Ctx, password: &str) -> Result<(), String> {
-    crate::app::targets::record_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY, password)
-        .map_err(|failure| failure.to_string())
 }

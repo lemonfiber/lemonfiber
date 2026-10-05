@@ -1,13 +1,14 @@
 //! The request gate's routes: each upstream it answers for, and what it presents there.
 //!
 //! The gate holds the credentials the request service would otherwise hold: each
-//! fulfilling \*arr's own key, read from where the \*arr wrote it, and a Jellyfin key
-//! minted for the gate alone and filed under its name. They are handed over in one
+//! fulfilling \*arr's own key, read from where the \*arr wrote it, and a key minted for
+//! the gate alone in the media server, whichever service fills the identity source, and
+//! filed under its name. They are handed over in one
 //! owner-only file in the gate's configuration directory, never its environment, and
 //! written again whenever what they should hold has moved — an \*arr that regenerated
 //! its key reaches the gate on the next pass.
 //!
-//! **The file is what holds the Jellyfin key.** A key filed under the gate's name that
+//! **The file is what holds the media server's key.** A key filed under the gate's name that
 //! the file does not hold is one nothing holds, and is revoked, as the decline
 //! service's are.
 
@@ -18,27 +19,28 @@ use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstream, Upstreams};
 use super::minted;
 use super::Ctx;
 use crate::app::gating;
-use crate::app::targets::ServiceAddr;
+use crate::app::targets::MediaServer;
 use crate::jellyfin::{Jellyfin, GATE_APP};
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
 const CONNECTION: &str = "The request gate's routes";
 
-/// Hold the gate to a route for each fulfilling \*arr and one for Jellyfin, under a key
-/// of its own — or, where the stack no longer runs the gate, to no key at all.
+/// Hold the gate to a route for each fulfilling \*arr and one for the media server, under
+/// a key of its own — or, where the stack no longer runs the gate, to no key at all.
 pub(super) async fn seed_gate_routes(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
+    server: Option<&MediaServer>,
     project: Option<&Path>,
 ) -> Option<Wiring> {
-    let jellyfin = super::identity::jellyfin_service(services)?;
+    let server = server?;
     let gating = gating::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up; a rehearsal before the first run finds none recorded yet.
-    let Some(password) = super::identity::recorded_jellyfin_password(ctx) else {
-        let minting = ctx.dry_run && super::identity::seerr_service(services).is_some();
+    let Some(password) = server.recorded_password(ctx) else {
+        let minting = ctx.dry_run && server.requests().is_some();
         return (gating && minting).then(|| {
             settled(State::WouldWire {
                 yours: None,
@@ -46,13 +48,7 @@ pub(super) async fn seed_gate_routes(
             })
         });
     };
-    let client = Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    );
+    let client = server.signed_in(ctx, password);
     let filed = client.filed_as(GATE_APP).await;
     // A stack that does not run the gate asked for nothing here: a key list that could
     // not be read is left for the next run to retire from, not reported.
@@ -77,33 +73,27 @@ pub(super) async fn seed_gate_routes(
     .await
     .and_then(|text| Upstreams::read(&text).ok());
     let routes = arr_routes(ctx, fillers).await;
-    // The Jellyfin lines the stack runs, which the gate forwards to and to no other.
-    let majors: Vec<u32> = services
-        .iter()
-        .find(|service| service.id == jellyfin.id)
-        .map(lemonfiber_manifest::Service::majors)
-        .unwrap_or_default();
     let held = current
         .as_ref()
-        .and_then(|upstreams| upstreams.route(&jellyfin.id))
+        .and_then(|upstreams| upstreams.route(server.id()))
         .map(|route| route.credential.reveal().to_owned())
         .filter(|key| filed.contains(key));
     let state = match held {
         Some(key) => {
-            let wanted = Upstreams::of(with(&routes, to_jellyfin(&jellyfin, &majors, &key)));
+            let wanted = Upstreams::of(with(&routes, to_jellyfin(server, &key)));
             let others: Vec<&String> = filed.iter().filter(|one| **one != key).collect();
             kept(ctx, &client, current.as_ref(), &wanted, others, &path).await
         }
         None if ctx.dry_run => State::WouldWire {
             yours: Some(listed(current.as_ref())),
-            ours: Some(named(&with(&routes, to_jellyfin(&jellyfin, &majors, "")))),
+            ours: Some(named(&with(&routes, to_jellyfin(server, "")))),
         },
         None => {
             let key = match minted::mint(&client, GATE_APP).await {
                 Ok(key) => key,
                 Err(state) => return Some(settled(state)),
             };
-            let wanted = Upstreams::of(with(&routes, to_jellyfin(&jellyfin, &majors, &key)));
+            let wanted = Upstreams::of(with(&routes, to_jellyfin(server, &key)));
             if let Err(failure) = crate::config::store::write(&path, &wanted.written()) {
                 let _ = client.revoke(&key).await;
                 return Some(settled(State::Failed {
@@ -137,7 +127,9 @@ pub(crate) async fn reroute(
         .iter()
         .any(|fulfils| fulfils.filler.id == arr);
     routed.then_some(())?;
-    seed_gate_routes(ctx, services, fillers, project)
+    // Boxed, because it is carried across the routes being written.
+    let server = crate::app::targets::MediaServer::of(fillers).map(Box::new);
+    seed_gate_routes(ctx, services, fillers, server.as_deref(), project)
         .await
         .map(|wiring| wiring.state)
 }
@@ -207,21 +199,22 @@ async fn arr_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream
     routes
 }
 
-/// The route to `jellyfin`, forwarding to `majors` and presenting `key`.
-fn to_jellyfin(jellyfin: &ServiceAddr, majors: &[u32], key: &str) -> Upstream {
+/// The route to the media server, at its address on the stack's network, forwarding to
+/// the lines its image runs and presenting `key`.
+fn to_jellyfin(server: &MediaServer, key: &str) -> Upstream {
     Upstream {
-        route: jellyfin.id.clone(),
+        route: server.id().to_owned(),
         kind: Kind::Jellyfin,
-        address: jellyfin.network_url.clone(),
+        address: server.network.url(),
         credential: Credential::new(key),
-        majors: majors.to_vec(),
+        majors: server.filler.majors.clone(),
     }
 }
 
-/// `routes`, and the Jellyfin route after them.
-fn with(routes: &[Upstream], jellyfin: Upstream) -> Vec<Upstream> {
+/// `routes`, and the media server's route after them.
+fn with(routes: &[Upstream], media: Upstream) -> Vec<Upstream> {
     let mut all = routes.to_vec();
-    all.push(jellyfin);
+    all.push(media);
     all
 }
 

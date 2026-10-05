@@ -15,6 +15,7 @@
 
 mod downloads;
 mod layout;
+mod media;
 mod opening;
 mod secrets;
 mod servarr;
@@ -42,6 +43,7 @@ pub(crate) fn unsupported_here(
 
 pub(crate) use downloads::*;
 pub(crate) use layout::*;
+pub(crate) use media::*;
 pub(crate) use opening::*;
 pub(crate) use secrets::*;
 pub(crate) use servarr::*;

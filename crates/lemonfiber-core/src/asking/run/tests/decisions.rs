@@ -275,7 +275,12 @@ async fn a_choice_about_one_person_refuses_on_any_of_its_three_calls() {
 /// refusal, from somewhere else, which is a case that proves nothing about here.
 #[tokio::test]
 async fn a_name_with_no_media_server_behind_it_is_refused() {
-    let refused = found(&a_household("noserver"), &[], "alex").await;
+    let household = a_household("noserver");
+    let Ok(mut manifest) = household.stack.manifest() else {
+        unreachable!("the shipped stack does not read");
+    };
+    manifest.services.clear();
+    let refused = found(&household, &manifest, "alex").await;
 
     assert_eq!(
         refused.err().map(|problem| problem.code),

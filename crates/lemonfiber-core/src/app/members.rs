@@ -22,7 +22,7 @@ use crate::ports::service::Household;
 #[must_use]
 pub fn household(ctx: &Ctx) -> Option<Arc<dyn Household>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let server = jellyfin_reader(ctx, &manifest.services)?;
+    let server = jellyfin_reader(ctx, &manifest)?;
     Some(Arc::new(server))
 }
 

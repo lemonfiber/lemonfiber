@@ -58,7 +58,7 @@ pub(crate) async fn trace(
         .map_err(|err| Box::new(err.problem()))?;
     // The media server is resolved once, ahead of the match: the last stage of a trace is
     // the same read whichever \*arr the item turns up in.
-    let jellyfin = jellyfin_reader(ctx, &manifest.services);
+    let jellyfin = jellyfin_reader(ctx, &manifest);
 
     for arr in open_servarrs(ctx, &manifest.services).await {
         let (kind, service) = (arr.kind, arr.service);

@@ -31,7 +31,7 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
         .map_err(|err| Box::new(err.problem()))?;
 
     let mut findings = Vec::new();
-    let asking = match reaching(ctx, &manifest.services).await {
+    let asking = match reaching(ctx, &manifest).await {
         Ok(access) => access.seerr.asking().await.ok(),
         Err(reason) => {
             findings.push(reason);

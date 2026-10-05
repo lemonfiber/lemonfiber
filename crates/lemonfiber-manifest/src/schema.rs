@@ -319,14 +319,21 @@ impl Service {
     /// the tag does not open with a number.
     #[must_use]
     pub fn majors(&self) -> Vec<u32> {
-        let version = self.tag.strip_prefix('v').unwrap_or(&self.tag);
-        version
-            .split('.')
-            .next()
-            .and_then(|major| major.parse().ok())
-            .into_iter()
-            .collect()
+        majors(&self.tag)
     }
+}
+
+/// The majors an image pinned by `tag` runs: the first number of the tag, or nothing
+/// where the tag does not open with one.
+#[must_use]
+pub fn majors(tag: &str) -> Vec<u32> {
+    let version = tag.strip_prefix('v').unwrap_or(tag);
+    version
+        .split('.')
+        .next()
+        .and_then(|major| major.parse().ok())
+        .into_iter()
+        .collect()
 }
 
 /// A service this stack used to carry, and what became of it.

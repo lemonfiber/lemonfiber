@@ -7,10 +7,25 @@ async fn identity(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     expected: &crate::baseline::Baseline,
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
-    let admin = super::super::identity::seed_jellyfin_admin(ctx, services, filled).await;
-    super::super::seed_jellyfin_identity(ctx, services, expected, filled, admin, None).await
+    identity_beside(ctx, services, &[], expected).await
+}
+
+/// The same, with `installed` beside the stack.
+async fn identity_beside(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    installed: &[crate::plugin::Installed],
+    expected: &crate::baseline::Baseline,
+) -> (Vec<Wiring>, crate::baseline::Baseline) {
+    let fillers = fillers_beside(services.to_vec(), installed, stack_root());
+    let server = crate::app::targets::MediaServer::of(&fillers);
+    let admin = match &server {
+        Some(server) => super::super::identity::seed_jellyfin_admin(ctx, server).await,
+        None => None,
+    };
+    super::super::seed_jellyfin_identity(ctx, services, expected, server.as_ref(), admin, None)
+        .await
 }
 
 #[tokio::test]
@@ -19,14 +34,61 @@ async fn identity_does_nothing_without_both_jellyfin_and_seerr() {
     // Seerr present but no Jellyfin, and the other way round: either alone is
     // nothing to wire.
     let base = crate::baseline::Baseline::new();
-    assert!(identity(&ctx, &[seerr_svc()], &base, &identified())
-        .await
-        .0
-        .is_empty());
-    assert!(identity(&ctx, &[jellyfin_svc()], &base, &identified())
-        .await
-        .0
-        .is_empty());
+    assert!(identity(&ctx, &[seerr_svc()], &base).await.0.is_empty());
+    assert!(identity(&ctx, &[jellyfin_svc()], &base).await.0.is_empty());
+}
+
+/// **The stack's administrator's password is never sent to a plugin.** A plugin's
+/// service running under the id the stack's request service asks under, on a stack whose
+/// own request service is gone, is never signed in to the stack's media server with it,
+/// and is sent nothing at all.
+#[tokio::test]
+async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators_password() {
+    let env = config_scratch("jellyfin-impostor");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = store::set(
+        &env,
+        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        "the-stacks-administrator",
+    );
+    let http = household(true, false);
+    let ctx =
+        seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
+    let impostor = crate::test_support::an_installed(
+        "impostor",
+        vec![crate::test_support::a_placed(
+            "seerr",
+            &["request.intake"],
+            Some(seerr_api()),
+            Some(5999),
+        )],
+    );
+
+    let (wirings, _) = identity_beside(
+        &ctx,
+        &[jellyfin_svc()],
+        &[impostor],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+
+    let sent = http.requests();
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(
+        !sent.iter().any(|asked| asked.url.contains(":5999")),
+        "{sent:?}"
+    );
+    assert!(
+        !sent.iter().any(|asked| !asked.url.contains(":8096")
+            && asked
+                .body
+                .as_deref()
+                .is_some_and(|body| body.contains("the-stacks-administrator"))),
+        "{sent:?}"
+    );
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
 #[tokio::test]
@@ -49,7 +111,6 @@ async fn identity_leaves_an_already_set_up_household_alone() {
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
-        &identified(),
     )
     .await;
     assert_eq!(wirings.len(), 2);
@@ -80,7 +141,6 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
-        &identified(),
     )
     .await;
     assert_eq!(wirings.len(), 3);
@@ -134,7 +194,6 @@ async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
-        &identified(),
     )
     .await;
 
@@ -179,7 +238,6 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16,
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
-        &identified(),
     )
     .await;
     let changed = wirings.get(1);
@@ -234,7 +292,6 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
         &ctx,
         &[jellyfin_svc(), seerr_svc()],
         &crate::baseline::Baseline::new(),
-        &identified(),
     )
     .await;
 
@@ -294,13 +351,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         "2026-08-28T00:00:00Z",
     );
 
-    let (wirings, records) = identity(
-        &ctx,
-        &[jellyfin_svc(), seerr_svc()],
-        &baseline,
-        &identified(),
-    )
-    .await;
+    let (wirings, records) = identity(&ctx, &[jellyfin_svc(), seerr_svc()], &baseline).await;
 
     assert_eq!(
         wirings.get(1).map(|wiring| &wiring.state),

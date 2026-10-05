@@ -253,21 +253,6 @@ fn prowlarr() -> lemonfiber_manifest::Service {
     )
 }
 
-/// What one ask resolves to, as a pass hands it to the connection that asked.
-///
-/// These fixtures declare services rather than whole stacks, so the resolution is
-/// supplied the way the pass supplies it rather than settled again here: what a
-/// connection does with an answer is what these are about, and settling it twice
-/// would be testing the reader instead.
-fn filling(capability: &str, service: &str) -> std::collections::BTreeMap<String, Vec<String>> {
-    std::collections::BTreeMap::from([(capability.to_owned(), vec![service.to_owned()])])
-}
-
-/// The stack's identity ask, as the shipped manifest settles it.
-fn identified() -> std::collections::BTreeMap<String, Vec<String>> {
-    filling("identity.source", "jellyfin")
-}
-
 // ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
 
 /// A Seerr-shape service declaration.
@@ -293,8 +278,17 @@ fn jellyfin_api() -> lemonfiber_manifest::Api {
     }
 }
 
+/// The stack's media server, called what the stack calls it and serving its identity.
 fn jellyfin_svc() -> lemonfiber_manifest::Service {
-    manifest_service("jellyfin", Some(jellyfin_api()), Some(8096))
+    let mut jellyfin = manifest_service("jellyfin", Some(jellyfin_api()), Some(8096));
+    jellyfin.name = "Jellyfin".to_owned();
+    jellyfin.provides = vec!["identity.source".to_owned()];
+    jellyfin
+}
+
+/// The media server the shipped stack's identity ask settles on among `services`.
+fn served(services: &[lemonfiber_manifest::Service]) -> Option<crate::app::targets::MediaServer> {
+    crate::app::targets::MediaServer::of(&fillers_of(services.to_vec()))
 }
 
 /// A transport standing in for the household pair, routed by path: Jellyfin's

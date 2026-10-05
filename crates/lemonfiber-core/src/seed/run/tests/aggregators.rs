@@ -326,41 +326,6 @@ async fn a_plugin_under_the_book_arrs_id_is_never_told_the_indexers_key() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
-/// The same rule on the other converted connection: what the request service signs
-/// in against is whatever fills the identity ask, and an ask nothing settles is
-/// nothing to wire.
-///
-/// The last case is the one worth having. A filler this build has no adapter for
-/// is a service it cannot speak to, and the stack already answers that way for a
-/// service it declares no API for — so the two agree rather than one of them
-/// guessing at a protocol from a name.
-#[test]
-fn the_identity_source_is_whatever_fills_the_ask_and_nothing_where_that_is_unsettled() {
-    let apiless = manifest_service("lockbox", None, Some(9000));
-    let services = [jellyfin_svc(), seerr_with_settings(), apiless];
-
-    assert_eq!(
-        super::super::identity::identity_source(&services, &identified()).map(|addr| addr.id),
-        Some("jellyfin".to_owned())
-    );
-
-    for unsettled in [
-        std::collections::BTreeMap::new(),
-        std::collections::BTreeMap::from([(
-            "identity.source".to_owned(),
-            vec!["jellyfin".to_owned(), "lockbox".to_owned()],
-        )]),
-        filling("identity.source", "plex"),
-        filling("identity.source", "lockbox"),
-    ] {
-        assert_eq!(
-            super::super::identity::identity_source(&services, &unsettled).map(|addr| addr.id),
-            None,
-            "an ask settled as {unsettled:?} was wired to something anyway"
-        );
-    }
-}
-
 /// A service that will not answer is reported, in its own words.
 #[tokio::test]
 async fn a_book_arr_that_refuses_is_reported() {

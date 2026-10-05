@@ -69,7 +69,7 @@ const CLOSED: &str = r#"{"CorsHosts":["http://192.168.1.20:5055"]}"#;
 
 /// The one wiring this pass reports, and the configurations it wrote.
 async fn seeded_cors(ctx: &Ctx, http: &Fake) -> (Option<State>, Vec<String>) {
-    let wiring = super::super::cors::seed_cors(ctx, &stack()).await;
+    let wiring = super::super::cors::seed_cors(ctx, &stack(), served(&stack()).as_ref()).await;
     let written = http
         .requests()
         .into_iter()
@@ -144,7 +144,7 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
     let mut ctx = cors_ctx("cors-nowhere", true, http.clone());
     ctx.settings.household_host = None;
 
-    let wiring = super::super::cors::seed_cors(&ctx, &stack()).await;
+    let wiring = super::super::cors::seed_cors(&ctx, &stack(), served(&stack()).as_ref()).await;
 
     assert!(
         wiring
@@ -162,13 +162,16 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
 async fn without_a_credential_or_a_media_server_nothing_is_asked() {
     let http = serving(OPEN, CLOSED);
     let ctx = cors_ctx("cors-uncredentialled", false, http.clone());
-    assert!(super::super::cors::seed_cors(&ctx, &stack())
-        .await
-        .is_none());
+    assert!(
+        super::super::cors::seed_cors(&ctx, &stack(), served(&stack()).as_ref())
+            .await
+            .is_none()
+    );
 
     let mut rehearsing = cors_ctx("cors-uncredentialled-rehearsed", false, http.clone());
     rehearsing.dry_run = true;
-    let wiring = super::super::cors::seed_cors(&rehearsing, &stack()).await;
+    let wiring =
+        super::super::cors::seed_cors(&rehearsing, &stack(), served(&stack()).as_ref()).await;
     assert_eq!(
         wiring.map(|one| one.state),
         Some(State::WouldWire {
@@ -177,16 +180,20 @@ async fn without_a_credential_or_a_media_server_nothing_is_asked() {
         })
     );
 
-    assert!(
-        super::super::cors::seed_cors(&rehearsing, &[published(jellyfin_svc())])
-            .await
-            .is_none()
-    );
-    assert!(
-        super::super::cors::seed_cors(&ctx, &[published(seerr_svc())])
-            .await
-            .is_none()
-    );
+    assert!(super::super::cors::seed_cors(
+        &rehearsing,
+        &[published(jellyfin_svc())],
+        served(&[published(jellyfin_svc())]).as_ref()
+    )
+    .await
+    .is_none());
+    assert!(super::super::cors::seed_cors(
+        &ctx,
+        &[published(seerr_svc())],
+        served(&[published(seerr_svc())]).as_ref()
+    )
+    .await
+    .is_none());
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
@@ -264,7 +271,8 @@ async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
         let http = serving(OPEN, CLOSED);
         let ctx = cors_ctx(name, true, http.clone());
 
-        let wiring = super::super::cors::seed_cors(&ctx, &services).await;
+        let wiring =
+            super::super::cors::seed_cors(&ctx, &services, served(&services).as_ref()).await;
 
         assert!(
             wiring
@@ -308,7 +316,8 @@ async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
     )
     .is_ok());
 
-    let wiring = super::super::cors::seed_cors(&ctx, &[published(jellyfin_svc())]).await;
+    let services = [published(jellyfin_svc())];
+    let wiring = super::super::cors::seed_cors(&ctx, &services, served(&services).as_ref()).await;
     let written: Vec<String> = http
         .requests()
         .into_iter()

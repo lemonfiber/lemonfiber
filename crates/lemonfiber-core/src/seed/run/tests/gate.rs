@@ -135,12 +135,10 @@ fn holding(arrs: &[(&str, &str)], key: &str) -> Upstreams {
     Upstreams::of(upstreams)
 }
 
-/// Where the gate reaches Jellyfin, as the seed step resolves it.
+/// Where the gate reaches Jellyfin: at its id on the stack's network, on the port it
+/// says it listens on there.
 fn jellyfin_svc_network_url() -> String {
-    let services = [jellyfin_svc()];
-    crate::seed::run::identity::jellyfin_service(&services)
-        .map(|jellyfin| jellyfin.network_url)
-        .unwrap_or_default()
+    "http://jellyfin:8096".to_owned()
 }
 
 /// Where the gate reads its routes, under `project`.
@@ -162,10 +160,13 @@ async fn seeded(
     gating: bool,
     project: &std::path::Path,
 ) -> (Option<State>, Vec<String>) {
+    let fillers = fillers_at(stack(gating), project);
+    let server = crate::app::targets::MediaServer::of(&fillers);
     let wiring = super::super::gate::seed_gate_routes(
         ctx,
         &stack(gating),
-        &fillers_at(stack(gating), project),
+        &fillers,
+        server.as_ref(),
         Some(project),
     )
     .await;
@@ -394,6 +395,7 @@ async fn a_stack_without_jellyfin_has_no_routes() {
         &ctx,
         &services,
         &fillers_of(services.clone()),
+        served(&services).as_ref(),
         None
     )
     .await
@@ -407,9 +409,14 @@ async fn without_a_stack_directory_nothing_is_minted() {
     let http = serving(&[&[]], 204, 204);
     let (ctx, _) = gate_ctx("gate-routes-no-project", true, ARRS, None, http.clone());
 
-    let wiring =
-        super::super::gate::seed_gate_routes(&ctx, &stack(true), &fillers_of(stack(true)), None)
-            .await;
+    let wiring = super::super::gate::seed_gate_routes(
+        &ctx,
+        &stack(true),
+        &fillers_of(stack(true)),
+        served(&stack(true)).as_ref(),
+        None,
+    )
+    .await;
 
     assert_eq!(
         wiring.map(|one| one.state),

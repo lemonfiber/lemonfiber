@@ -73,7 +73,7 @@ pub(crate) async fn offer(
     let Reaching {
         server,
         reachable,
-        services,
+        manifest,
     } = reaching(ctx, &name).await?;
 
     let held = held(ctx, &server).await;
@@ -143,12 +143,12 @@ pub(crate) async fn offer(
     let decline = if standing == InvitationStanding::Joined {
         None
     } else {
-        declining::issued(ctx, &services, &held.household, &member).await
+        declining::issued(ctx, &manifest.services, &held.household, &member).await
     };
 
     let narrowed = allowed.as_ref().map(|_| member.id.as_str());
     let Told { linked, requesting } =
-        told(ctx, &services, &to_link(&held, &member), narrowed).await;
+        told(ctx, &manifest, &to_link(&held, &member), narrowed).await;
     let applied = applied(&server, &allowance, allowed.as_ref(), requesting).await;
 
     Ok(Invitation {
@@ -382,11 +382,11 @@ struct Told {
 /// the person cannot do yet is worth a line; it is not worth the account.
 async fn told(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     members: &[String],
     narrowed: Option<&str>,
 ) -> Told {
-    let Some(access) = crate::app::targets::seerr_reader(ctx, services).await else {
+    let Some(access) = crate::app::targets::seerr_reader(ctx, manifest).await else {
         return Told {
             linked: Linked::NotTried,
             requesting: Linked::NotTried,
@@ -420,8 +420,9 @@ struct Reaching {
     server: crate::jellyfin::Jellyfin,
     /// Where a *person* opens it.
     reachable: crate::door::Address,
-    /// The stack's services, which the request service is found among.
-    services: Vec<lemonfiber_manifest::Service>,
+    /// The stack, whose request service and media server are found in it — boxed,
+    /// because it is carried across every await of an invitation.
+    manifest: Box<lemonfiber_manifest::Manifest>,
 }
 
 /// Everything an invitation or a reissue needs before it touches anything.
@@ -436,25 +437,24 @@ async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::P
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    let Some(jellyfin) = super::seed::identity::jellyfin_service(&manifest.services) else {
-        return Err(Box::new(no_media_server()));
+    // Only the client and the port are carried on: the server as the lookup resolved
+    // it is not held across what follows.
+    let (server, port) = {
+        let Some(media) = super::targets::hosted(ctx, &manifest) else {
+            return Err(Box::new(no_media_server()));
+        };
+        let Some(server) = media.administered(ctx) else {
+            return Err(Box::new(no_credential()));
+        };
+        (server, media.port)
     };
-    let Some(password) = super::seed::identity::recorded_jellyfin_password(ctx) else {
-        return Err(Box::new(no_credential()));
-    };
-    let Some(reachable) = household_address(ctx, jellyfin.port).await else {
+    let Some(reachable) = household_address(ctx, port).await else {
         return Err(Box::new(nowhere_to_send()));
     };
     Ok(Reaching {
-        server: crate::jellyfin::Jellyfin::authenticated(
-            ctx.seams.http.clone(),
-            &jellyfin.loopback,
-            "jellyfin",
-            crate::config::JELLYFIN_ADMIN_USER,
-            &password,
-        ),
+        server,
         reachable,
-        services: manifest.services,
+        manifest: Box::new(manifest),
     })
 }
 
