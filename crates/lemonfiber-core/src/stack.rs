@@ -25,6 +25,7 @@ pub mod attached;
 pub mod closure;
 pub mod compose;
 pub mod mounts;
+mod remembered;
 pub mod standing;
 
 use std::path::{Path, PathBuf};
@@ -98,6 +99,11 @@ impl Source {
     /// Returns [`Failure`] when the manifest cannot be read or used, and
     /// [`Failure::Invalid`] when it parses and breaks the contract.
     pub fn checked_manifest(self, today: Date) -> Result<Manifest, Failure> {
+        remembered::remembered(self, today, || self.checking(today))
+    }
+
+    /// The manifest parsed and checked against the contract, afresh.
+    fn checking(self, today: Date) -> Result<Manifest, Failure> {
         let manifest = self.manifest()?;
         let mut violations: Vec<String> = validate(&manifest, today)
             .iter()

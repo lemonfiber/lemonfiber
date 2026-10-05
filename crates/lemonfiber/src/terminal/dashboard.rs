@@ -10,8 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::dashboard::run::gather;
-use lemonfiber_core::dashboard::Snapshot;
+use lemonfiber_core::dashboard::run::{paced, Gathered};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::walkthrough::{Line as Step, Narrator};
@@ -145,7 +144,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     let (keys, mut typed) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 
-    let mut snapshot: Option<Snapshot> = None;
+    let mut gathered: Option<Gathered> = None;
     // Read here rather than deeper in, because this is the edge: what a run explains
     // is decided where a test can reach it, and only this knows where the answer
     // came from. The same division the log viewer makes over the same question.
@@ -153,7 +152,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     if !crate::render::glossary::wanted() {
         acting = acting.without_explanations();
     }
-    let mut refreshing = gathering(&ctx, snapshot.as_ref(), Duration::ZERO);
+    let mut refreshing = gathering(&ctx, None, Duration::ZERO);
     // The one thing this screen is waiting on the core for — an action or a read —
     // held rather than sent down a channel for two reasons. One at a time is the
     // screen's own rule, so a second replaces the first and the answer nobody is
@@ -163,7 +162,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     // Every way out carries what is still running away with it, because each of them
     // can be taken with an action in flight.
     let (outcome, leaving, after) = loop {
-        if let Some(snapshot) = snapshot.as_ref() {
+        if let Some(snapshot) = gathered.as_ref().map(|gathered| &gathered.snapshot) {
             if let Err(err) = screen.draw(snapshot, &acting) {
                 break (
                     complain(&drawing("dashboard", &err.to_string())),
@@ -186,11 +185,14 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                     Wanted::Nothing => {}
                     Wanted::Gather => {
                         refreshing.abort();
-                        refreshing = gathering(&ctx, snapshot.as_ref(), Duration::ZERO);
+                        // Asked for by hand, so every panel is read afresh rather
+                        // than only the ones whose pace has come round.
+                        let due = gathered.as_ref().map(Gathered::due_now);
+                        refreshing = gathering(&ctx, due.as_ref(), Duration::ZERO);
                     }
                     // Opening them is the asking, so what was opened is recorded.
                     Wanted::Words => {
-                        if let Some(snapshot) = snapshot.as_ref() {
+                        if let Some(snapshot) = gathered.as_ref().map(|gathered| &gathered.snapshot) {
                             let area = screen.area();
                             super::learned(&crate::dashboard::showing(snapshot), area, ctx.dry_run);
                         }
@@ -214,15 +216,15 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                     }
                 }
             },
-            gathered = &mut refreshing => {
-                if let Ok(fresh) = gathered {
+            read = &mut refreshing => {
+                if let Ok(fresh) = read {
                     // The services go to the screen's own state as well as to the
                     // panels, because the lists that name one are built from what the
                     // panels are already showing rather than from a read of their own.
-                    acting.gathered(&fresh.services);
-                    snapshot = Some(fresh);
+                    acting.gathered(&fresh.snapshot.services);
+                    gathered = Some(fresh);
                 }
-                refreshing = gathering(&ctx, snapshot.as_ref(), TICK);
+                refreshing = gathering(&ctx, gathered.as_ref(), TICK);
             }
             done = carried(&mut carrying) => {
                 carrying = None;
@@ -324,7 +326,7 @@ fn carry(command: Command, ctx: Arc<Ctx>) -> tokio::task::JoinHandle<Answer> {
 
 /// Gather afresh after `delay`, carrying forward what the last gather read.
 ///
-/// One way to begin a gather, and it takes the last snapshot rather than being told
+/// One way to begin a gather, and it takes the last gather rather than being told
 /// whether to. A source that answered a moment ago and did not this time has told
 /// the screen something, and a gather begun without the last reading blanks a figure
 /// the operator can still use — permanently, since the next tick carries the blanked
@@ -332,13 +334,13 @@ fn carry(command: Command, ctx: Arc<Ctx>) -> tokio::task::JoinHandle<Answer> {
 /// stale would have done to the very figure it was asked about.
 fn gathering(
     ctx: &Arc<Ctx>,
-    previous: Option<&Snapshot>,
+    previous: Option<&Gathered>,
     delay: Duration,
-) -> tokio::task::JoinHandle<Snapshot> {
+) -> tokio::task::JoinHandle<Gathered> {
     let ctx = Arc::clone(ctx);
     let previous = previous.cloned();
     tokio::spawn(async move {
         tokio::time::sleep(delay).await;
-        gather(&ctx, previous.as_ref()).await
+        paced(&ctx, previous.as_ref()).await
     })
 }

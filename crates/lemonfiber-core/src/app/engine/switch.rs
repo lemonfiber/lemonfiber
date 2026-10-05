@@ -58,7 +58,7 @@ pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<LifecycleRepor
     // "down" would be half of what is in the way.
     let claim = lock::claimed(ctx, SWITCH).await?;
     let outcome = moving(ctx, forms).await;
-    lock::released(ctx, claim).await;
+    lock::released(claim).await;
     outcome
 }
 

@@ -33,13 +33,16 @@ pub(crate) fn jellyfin_reader(
 ) -> Option<Jellyfin> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
     let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
-    Some(Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        addr.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    ))
+    Some(
+        Jellyfin::authenticated(
+            ctx.seams.http.clone(),
+            addr.loopback,
+            "jellyfin",
+            crate::config::JELLYFIN_ADMIN_USER,
+            password,
+        )
+        .remembering(std::sync::Arc::clone(&ctx.sessions)),
+    )
 }
 
 /// One \*arr a read can be made against: the service it files, a client already carrying

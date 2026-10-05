@@ -195,6 +195,18 @@ impl VpnCheck {
     }
 }
 
+/// The budget the tunnel check runs under, whether or not it may disturb the tunnel.
+///
+/// Known before the check is built, because a diagnosis builds it only once it runs
+/// and the budget has to cover the building too.
+pub(crate) const fn budget_for(disruptive: bool) -> std::time::Duration {
+    if disruptive {
+        crate::doctor::CHECK_BUDGET.saturating_add(killswitch::DISTURBANCE)
+    } else {
+        crate::doctor::CHECK_BUDGET
+    }
+}
+
 #[async_trait]
 impl Check for VpnCheck {
     fn category(&self) -> Category {
@@ -210,11 +222,7 @@ impl Check for VpnCheck {
     /// stack whose killswitch is never proven — and the check refusing to disturb
     /// anything is the only safe thing it could do at that point.
     fn budget(&self) -> std::time::Duration {
-        if self.disruptive {
-            crate::doctor::CHECK_BUDGET + killswitch::DISTURBANCE
-        } else {
-            crate::doctor::CHECK_BUDGET
-        }
+        budget_for(self.disruptive)
     }
 
     fn mender(&self) -> Option<&dyn crate::doctor::Mend> {

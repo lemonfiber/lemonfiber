@@ -132,3 +132,31 @@ async fn a_refusal_is_an_answer_and_is_never_retried() {
     assert!(answered.is_ok_and(|response| response.status == 401));
     assert_eq!(asked.load(Ordering::SeqCst), 1);
 }
+
+/// A transport whose service takes the connection and then says nothing.
+struct Silent {
+    asked: Arc<AtomicU32>,
+}
+
+#[async_trait]
+impl Http for Silent {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        Err(Unreachable {
+            connected: true,
+            ..Unreachable::once(&request.url, "operation timed out")
+        })
+    }
+}
+
+/// Asking again would spend the whole wait twice more to hear the same silence.
+#[tokio::test]
+async fn a_service_that_took_the_connection_and_said_nothing_is_asked_once() {
+    let asked = Arc::new(AtomicU32::new(0));
+    let retrying = Retrying::around(Silent {
+        asked: Arc::clone(&asked),
+    });
+    let failure = retrying.send(&request(Method::Get)).await.err();
+    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    assert_eq!(failure.map(|failure| failure.attempts), Some(1));
+}

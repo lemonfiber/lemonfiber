@@ -188,6 +188,15 @@ impl LogQuery {
     /// them noticed it.
     pub(crate) const LAST_WORDS: u32 = 20;
 
+    /// The most existing lines of each service a read that keeps them begins with.
+    ///
+    /// A read that gathers the whole scrollback before it answers any of it holds
+    /// every line in memory at once, so the number a caller writes is that much
+    /// memory. Ten thousand lines is days of an ordinary service's output, and the
+    /// ceiling is one for every reader that keeps what it reads: the HTTP read and
+    /// a support bundle ask the same engine the same question.
+    pub const AT_MOST: u32 = 10_000;
+
     /// The last `tail` lines, and then nothing more.
     #[must_use]
     pub const fn recent(tail: u32) -> Self {

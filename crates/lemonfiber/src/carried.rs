@@ -8,7 +8,12 @@ use include_dir::{include_dir, Dir};
 /// Embedding it means the common install has one thing to fetch rather than
 /// two, and `build.rs` has already refused to produce this binary if the
 /// manifest is one it could not read.
-pub static STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+///
+/// What runs of it, rather than the whole submodule: `build/carried.rs` chooses the
+/// files and copies them beside this build's other outputs, and that copy is what is
+/// embedded — so an operator's stack directory is written with the stack and not
+/// with the CI, scripts and hooks of the repository it is published from.
+pub static STACK: Dir<'_> = include_dir!("$OUT_DIR/stack");
 
 /// The app this binary serves a browser.
 ///

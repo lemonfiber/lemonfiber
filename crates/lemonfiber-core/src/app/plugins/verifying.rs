@@ -50,7 +50,7 @@ pub(crate) async fn looked(ctx: &Ctx) -> Result<(Stack, Vec<Finding>), Box<Probl
 /// a second question would compare the install against the very reading it was meant
 /// to change — and would report every install as having broken nothing.
 pub(crate) async fn again(ctx: &Ctx, stack: &Stack) -> Vec<Finding> {
-    let checks = super::super::engine::assembling(ctx, stack, false).await;
+    let checks = super::super::engine::assembling(ctx, stack, false);
     examined(ctx, stack, &checks).await
 }
 

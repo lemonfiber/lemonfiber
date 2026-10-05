@@ -320,8 +320,8 @@ async fn serving(
         .with_steps(Arc::new(steps));
     let (ctx, token) = (Arc::new(ctx), Arc::new(token));
     tokio::spawn(carrying.carrying());
-    // Started before anything can ask to hear it, so a client that connects at
-    // once is not waiting on a first pass that has not been asked for.
+    // Started before anything can ask to hear it. It gathers nothing until somebody
+    // is listening, and gathers at once for the first to arrive.
     tokio::spawn(Arc::clone(&live).gathering(Arc::new(
         lemonfiber_api::events::dashboard::Dashboard::against(Arc::clone(&ctx)),
     )));

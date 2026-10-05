@@ -42,9 +42,9 @@ pub(crate) enum VpnReading {
 /// — the one thing that proves traffic leaves through it. The same containers and
 /// exec-reads the leak check uses, shaped for a panel rather than a verdict.
 ///
-/// Every read costs a round-trip into a container, so on the refresh loop this
-/// wants caching — the tunnel's address changes rarely. That caching arrives with
-/// the loop; until then the panel reads afresh each time.
+/// Every read costs a round-trip into a container and a request to each IP-echo
+/// service, so the dashboard reads this at the VPN panel's own pace rather than on
+/// every refresh — the tunnel's address changes rarely.
 pub(crate) async fn read_vpn(
     engine: &dyn Engine,
     project: &str,

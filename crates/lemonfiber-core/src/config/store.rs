@@ -287,7 +287,7 @@ fn settled(_parent: &Path) {}
 /// tracks ownership. The mode is set as the directory is created, so an existing
 /// one — a parent like `~/.config` this does not own — is left exactly as it was.
 #[cfg(unix)]
-fn make_private_dir(parent: &Path) -> std::io::Result<()> {
+pub(crate) fn make_private_dir(parent: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::DirBuilderExt as _;
     std::fs::DirBuilder::new()
         .recursive(true)
@@ -298,7 +298,7 @@ fn make_private_dir(parent: &Path) -> std::io::Result<()> {
 /// Elsewhere there is no owner-only notion to honour, so this is an ordinary
 /// recursive create.
 #[cfg(not(unix))]
-fn make_private_dir(parent: &Path) -> std::io::Result<()> {
+pub(crate) fn make_private_dir(parent: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(parent)
 }
 

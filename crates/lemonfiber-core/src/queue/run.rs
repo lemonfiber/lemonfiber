@@ -24,6 +24,7 @@ use crate::queue::{category, Fetching, Importing, Item, Stall, Stuck, Thresholds
 pub const CHECK: &str = "queue";
 
 /// What one service answered when asked for its queue.
+#[derive(Debug, Clone)]
 pub enum Answered {
     /// It answered, with these items.
     Queue(Vec<Queued>),

@@ -1,7 +1,17 @@
 use std::path::PathBuf;
 
-use super::{outsized, FLOOR};
+use super::{Outsized, FLOOR};
 use crate::ports::occupancy::Occupant;
+use crate::space::survey::Survey;
+
+/// What a walk of these files names as out of line, read the way a reckoning reads it.
+fn outsized(walk: &[Occupant]) -> Vec<Outsized> {
+    let mut survey = Survey::beneath(std::path::Path::new("/d"), Vec::new());
+    for occupant in walk {
+        survey.add(occupant.clone());
+    }
+    super::outsized(survey.typical(), survey.largest())
+}
 
 /// A walked file of a given size, whose identity no case here turns on.
 fn file(path: &str, bytes: u64) -> Occupant {

@@ -331,3 +331,42 @@ async fn a_rejected_current_password_fails_and_hands_nothing_back() {
     assert!(matches!(wiring.state, State::Failed { .. }));
     assert_eq!(recorded, None);
 }
+
+/// A client reading with the recorded password.
+fn reading(fake: &Arc<Fake>) -> Qbittorrent {
+    let http: Arc<dyn Http> = fake.clone();
+    Qbittorrent::authenticated(http, "http://127.0.0.1:8081", a_word())
+}
+
+/// How many times the client was asked to sign in.
+fn logins(fake: &Fake) -> usize {
+    fake.requests()
+        .iter()
+        .filter(|request| request.url.ends_with("/auth/login"))
+        .count()
+}
+
+/// A read carries the session the transport already holds, and signs in only where
+/// the client says it holds none — then reads again under the new one.
+#[tokio::test]
+async fn a_read_signs_in_only_where_the_session_has_gone() {
+    use lemonfiber_core::ports::service::Transfers as _;
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, "[]"),
+        Answer::reply(403, "Forbidden"),
+        ok(),
+        Answer::reply(200, "[]"),
+    ]);
+    let client = reading(&fake);
+
+    assert!(
+        client.transfers().await.is_ok(),
+        "read under the session held"
+    );
+    assert_eq!(logins(&fake), 0);
+    assert!(
+        client.transfers().await.is_ok(),
+        "read again once signed in"
+    );
+    assert_eq!(logins(&fake), 1);
+}

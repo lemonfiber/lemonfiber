@@ -16,6 +16,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use lemonfiber_ports::filesystem::Fault;
 use lemonfiber_ports::occupancy::{Occupancy, Occupant};
+use tokio::sync::mpsc::Receiver;
 
 /// A walk over a tree a test wrote down.
 pub struct Walking {
@@ -45,9 +46,18 @@ impl Walking {
 
 #[async_trait]
 impl Occupancy for Walking {
-    async fn beneath(&self, root: &Path) -> Result<Vec<Occupant>, Fault> {
-        beneath(self, root)
+    async fn beneath(&self, root: &Path) -> Result<Receiver<Occupant>, Fault> {
+        sent(beneath(self, root)?).await
     }
+}
+
+/// These files, sent as a walk sends them.
+async fn sent(found: Vec<Occupant>) -> Result<Receiver<Occupant>, Fault> {
+    let (sender, receiver) = tokio::sync::mpsc::channel(found.len().max(1));
+    for occupant in found {
+        let _ = sender.send(occupant).await;
+    }
+    Ok(receiver)
 }
 
 /// What this fixture holds under a root, or the refusal it was built to give.

@@ -17,8 +17,8 @@ use crate::error::codes::space::ANOTHER_OFFER;
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
 use crate::ports::service::{Queued, Queues, Seeded, Seeding};
 use crate::space::{
-    reckon, Left, Level, Measured, Reckoning, Reclaimed, Role, Stalled, Volume, HALTED,
-    NOWHERE_TO_MEASURE, WALK_REFUSED,
+    reckon, Counting, Left, Level, Measured, Reckoning, Reclaimed, Role, Stalled, Survey, Tally,
+    Volume, HALTED, NOWHERE_TO_MEASURE, WALK_REFUSED,
 };
 
 use crate::app::targets::{
@@ -188,22 +188,35 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
     let watched = watched(ctx, true).await?;
     let project = watched.project.as_deref();
 
-    let data = ctx
+    // What the client is holding is read before the walk, because the walk keeps the
+    // files of those downloads and of nothing else in particular.
+    let holder = torrent_client(ctx, &download_targets(&watched.stack.services, project));
+    let held = holding(holder.as_ref()).await;
+
+    let mut data = Survey::beneath(
+        &watched.root,
+        held.iter().map(|download| download.name.clone()),
+    );
+    let walking = ctx
         .seams
         .occupancy
         .beneath(&watched.root)
         .await
         .map_err(|fault| Box::new(unreadable(&watched.root, &fault.message)))?;
+    walked(walking, |occupant| data.add(occupant)).await;
     // The services' own files are read best-effort. Where they cannot be walked the
     // line for them is absent rather than the whole reckoning being refused: what an
     // operator came here for is where the media went.
-    let services = match watched.services.as_deref() {
-        Some(at) => ctx.seams.occupancy.beneath(at).await.unwrap_or_default(),
-        None => Vec::new(),
+    let mut services = Tally::default();
+    let services_walked = match watched.services.as_deref() {
+        Some(at) => ctx.seams.occupancy.beneath(at).await.ok(),
+        None => None,
     };
+    if let Some(walking) = services_walked {
+        let mut counting = Counting::default();
+        walked(walking, |occupant| counting.add(&occupant, &mut services)).await;
+    }
 
-    let holder = torrent_client(ctx, &download_targets(&watched.stack.services, project));
-    let held = holding(holder.as_ref()).await;
     let (awaited, stalled) = queued(ctx, &watched.stack.services, project).await;
     let marked = marked(ctx, &held);
     Ok(Gathered {
@@ -220,6 +233,16 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
         },
         holder,
     })
+}
+
+/// Every file a walk sends, handed to `each` as it arrives.
+pub(crate) async fn walked(
+    mut walking: tokio::sync::mpsc::Receiver<crate::ports::occupancy::Occupant>,
+    mut each: impl FnMut(crate::ports::occupancy::Occupant),
+) {
+    while let Some(occupant) = walking.recv().await {
+        each(occupant);
+    }
 }
 
 /// The moment this reading was taken, in seconds since the epoch.

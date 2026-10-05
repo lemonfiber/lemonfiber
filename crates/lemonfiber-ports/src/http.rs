@@ -102,6 +102,12 @@ pub struct Unreachable {
     /// How many times it was tried before giving up, which is what separates a
     /// service that was busy from one that is down. One where nothing retried it.
     pub attempts: u32,
+    /// Whether a connection was made before it failed.
+    ///
+    /// A service that took the connection and then said nothing within the wait is
+    /// not a blip a moment's pause cures: asking it again costs the whole wait
+    /// again. Only a connection that was never made is worth trying again.
+    pub connected: bool,
 }
 
 impl Unreachable {
@@ -112,6 +118,7 @@ impl Unreachable {
             url: url.to_owned(),
             reason: reason.to_owned(),
             attempts: 1,
+            connected: false,
         }
     }
 }

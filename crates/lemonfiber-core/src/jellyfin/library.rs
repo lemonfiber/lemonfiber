@@ -35,8 +35,7 @@ impl Library for Jellyfin {
         // the two ends of the trace agree on what "a title matches" means. The token, not
         // a query string, carries the term, so nothing here has to be URL-encoded.
         let path = format!("/Items?Recursive=true&IncludeItemTypes={}", item_type(kind));
-        let request = self.as_admin(Method::Get, &path, None).await?;
-        let response = self.endpoint.send(&request).await?;
+        let response = self.as_admin(Method::Get, &path, None).await?;
         let page: ItemPage = self
             .endpoint
             .decode(&response, "the library could not be read")?;
@@ -57,10 +56,9 @@ impl Library for Jellyfin {
         // only files the scan can see have changed — a rewritten rating whose file kept
         // its modification time needs a forced per-item refresh instead. Driven with the
         // rest of what a limit does to a library in `.docs/architecture/parental-controls.md`.
-        let request = self
+        let response = self
             .as_admin(Method::Post, "/Library/Refresh", None)
             .await?;
-        let response = self.endpoint.send(&request).await?;
         self.endpoint.expect_success(&response)
     }
 }

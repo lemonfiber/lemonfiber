@@ -19,7 +19,6 @@
 //! something.
 
 use std::collections::BTreeSet;
-use std::path::Path;
 
 use serde::Serialize;
 
@@ -88,8 +87,9 @@ impl Candidate {
 /// Which completed downloads are on disk, and what each one is.
 ///
 /// `awaited` is what the services still have in their queues, `marked` is what the
-/// operator has asked to be left alone, and `occupants` is the walk of the data
-/// root. A download the walk could not match to any file is left out entirely.
+/// operator has asked to be left alone, and `occupants` is what the walk of the data
+/// root found of the downloads the client is holding. A download the walk could not
+/// match to any file is left out entirely.
 #[must_use]
 pub fn candidates(
     held: &[Seeded],
@@ -180,16 +180,8 @@ pub fn ratio_reads(hundredths: u32) -> Option<String> {
 fn belonging<'a>(occupants: &'a [Occupant], name: &str) -> Vec<&'a Occupant> {
     occupants
         .iter()
-        .filter(|occupant| under(&occupant.path, name))
+        .filter(|occupant| crate::space::survey::belongs(&occupant.path, name))
         .collect()
-}
-
-/// Whether a path is this download's: a directory of that name above it, or the
-/// file itself named that.
-fn under(path: &Path, name: &str) -> bool {
-    let wanted = std::ffi::OsStr::new(name);
-    path.components().any(|part| part.as_os_str() == wanted)
-        || path.file_stem().is_some_and(|stem| stem == wanted)
 }
 
 #[cfg(test)]

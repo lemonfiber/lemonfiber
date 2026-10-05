@@ -1,4 +1,4 @@
-use super::{checksum, decide, diff, shown, Decision, Materialised};
+use super::{checksum, decide, diff, shown, Decision, Materialised, Seen};
 use crate::config::store::REDACTED;
 
 #[test]
@@ -159,4 +159,52 @@ fn a_diff_of_added_and_removed_lines_leaves_the_matching_ends_out() {
     assert_eq!(diff("keep\ntail\n", "keep\nnew\ntail\n"), "+ new\n");
     // Identical content has no diff.
     assert_eq!(diff("same\n", "same\n"), "");
+}
+
+/// How a file stood, for the comparisons below.
+const fn stood(from: u32, regions: bool) -> Seen {
+    Seen {
+        length: 120,
+        written: 1_700_000_000_000_000_000,
+        from,
+        regions,
+    }
+}
+
+#[test]
+fn only_a_recorded_file_standing_exactly_as_it_was_seen_is_current_unread() {
+    let mut record = Materialised::new();
+    record.record("compose.yaml", 7);
+    record.saw("compose.yaml", Some(stood(3, false)));
+    assert!(record.unchanged("compose.yaml", Some(stood(3, false))));
+
+    let written_since = Seen {
+        written: 1_700_000_000_000_000_001,
+        ..stood(3, false)
+    };
+    assert!(!record.unchanged("compose.yaml", Some(written_since)));
+    assert!(
+        !record.unchanged("compose.yaml", Some(stood(4, false))),
+        "made from newer shipped content"
+    );
+    assert!(
+        !record.unchanged("compose.yaml", None),
+        "not there to look at"
+    );
+
+    record.saw("stack.toml", Some(stood(3, false)));
+    assert!(
+        !record.unchanged("stack.toml", Some(stood(3, false))),
+        "seen but never recorded"
+    );
+
+    record.record("media.yml", 9);
+    record.saw("media.yml", Some(stood(3, true)));
+    assert!(
+        !record.unchanged("media.yml", Some(stood(3, true))),
+        "a region is always read"
+    );
+
+    record.saw("compose.yaml", None);
+    assert!(!record.unchanged("compose.yaml", Some(stood(3, false))));
 }

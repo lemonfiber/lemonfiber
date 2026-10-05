@@ -27,13 +27,13 @@ const TIMES_TYPICAL: u64 = 8;
 ///
 /// Without it, a tidy collection of small files reports its largest as an anomaly
 /// every run, which teaches the operator that this line means nothing.
-const FLOOR: u64 = 20 * 1024 * 1024 * 1024;
+pub(crate) const FLOOR: u64 = 20 * 1024 * 1024 * 1024;
 
 /// How many are named, at most.
 ///
 /// A handful is a highlight; a hundred is a directory listing, which is the thing
 /// this exists instead of.
-const MOST: usize = 5;
+pub(crate) const MOST: usize = 5;
 
 /// One file far larger than the rest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -48,24 +48,18 @@ pub struct Outsized {
 
 /// The files far enough out of line with the rest to be worth pointing at.
 ///
-/// Largest first, and at most a handful of them.
+/// `typical` is the size of the walk's middle file and `largest` its largest files
+/// at or above [`FLOOR`], largest first, which is all of the walk this reads — see
+/// [`crate::space::survey::Survey`]. Largest first, and at most a handful of them.
 #[must_use]
-pub fn outsized(occupants: &[Occupant]) -> Vec<Outsized> {
-    let Some(typical) = middle(occupants) else {
+pub fn outsized(typical: Option<u64>, largest: &[Occupant]) -> Vec<Outsized> {
+    let Some(typical) = typical else {
         return Vec::new();
     };
-    let mut over: Vec<&Occupant> = occupants
+    largest
         .iter()
         .filter(|occupant| occupant.bytes >= FLOOR)
         .filter(|occupant| occupant.bytes / typical >= TIMES_TYPICAL)
-        .collect();
-    over.sort_by(|left, right| {
-        right
-            .bytes
-            .cmp(&left.bytes)
-            .then_with(|| left.path.cmp(&right.path))
-    });
-    over.into_iter()
         .take(MOST)
         .map(|occupant| Outsized {
             path: occupant.path.display().to_string(),
@@ -73,20 +67,6 @@ pub fn outsized(occupants: &[Occupant]) -> Vec<Outsized> {
             times_typical: occupant.bytes / typical,
         })
         .collect()
-}
-
-/// The size of the middle file, or nothing where there is nothing to compare
-/// against.
-///
-/// The middle rather than the mean, because the mean of a library holding one
-/// enormous file is dragged towards that file — the comparison would then be
-/// against the thing being looked for, which is how an outlier hides itself. A
-/// walk whose middle file is empty gives no ratio to compare against, so nothing
-/// is reported rather than everything.
-fn middle(occupants: &[Occupant]) -> Option<u64> {
-    let mut sizes: Vec<u64> = occupants.iter().map(|occupant| occupant.bytes).collect();
-    sizes.sort_unstable();
-    sizes.get(sizes.len() / 2).copied().filter(|size| *size > 0)
 }
 
 #[cfg(test)]

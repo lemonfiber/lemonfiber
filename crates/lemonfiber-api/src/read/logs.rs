@@ -28,7 +28,7 @@ use super::{enveloped, went_wrong};
 /// the reading of it rather than on the gathering, because the honest answer to a
 /// request for four billion lines is that it will not be answered, and quietly
 /// gathering fewer would answer a different request.
-const AT_MOST: u32 = 10_000;
+const AT_MOST: u32 = LogQuery::AT_MOST;
 
 /// What is said to a request whose line count is not a number, or is past the
 /// ceiling. One sentence, because both are the same mistake about the same word.

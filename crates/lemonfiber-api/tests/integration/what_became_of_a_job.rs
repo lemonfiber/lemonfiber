@@ -526,7 +526,7 @@ async fn a_guard_nobody_asks_about_is_let_go_on_the_second_look() {
 }
 
 #[tokio::test]
-async fn work_that_has_already_finished_is_not_let_go_by_a_sweep() {
+async fn finished_work_is_kept_while_it_is_asked_about_and_forgotten_once_it_is_not() {
     let jobs = Jobs::default();
     let job = minted();
     jobs.start(&job, "up", Command::Forms, Arc::new(ctx()))
@@ -537,13 +537,53 @@ async fn work_that_has_already_finished_is_not_let_go_by_a_sweep() {
         "{standing:?}"
     );
 
-    assert_eq!(jobs.sweep().await, 0);
-    assert_eq!(jobs.sweep().await, 0);
+    assert_eq!(
+        jobs.sweep().await,
+        0,
+        "a finished piece is not counted as let go"
+    );
     assert_eq!(
         jobs.about(job.as_str()).await.map(|work| work.standing),
         standing,
-        "what it came to is what it stands for"
+        "what it came to is kept for whoever asks"
     );
+    assert_eq!(jobs.sweep().await, 0);
+    assert!(
+        jobs.about(job.as_str()).await.is_some(),
+        "the ask renewed it"
+    );
+    jobs.sweep().await;
+    jobs.sweep().await;
+    assert!(
+        jobs.about(job.as_str()).await.is_none(),
+        "nobody asked for a whole lease, so the run no longer holds it"
+    );
+}
+
+#[tokio::test]
+async fn the_register_holds_a_bounded_amount_of_finished_work() {
+    let jobs = Jobs::default();
+    let mut names = Vec::new();
+    for count in 0..=lemonfiber_api::jobs::FINISHED_AT_MOST {
+        let bytes = u64::try_from(count)
+            .unwrap_or_default()
+            .to_be_bytes()
+            .to_vec();
+        let Some(job) = Job::mint(&Chance::exactly(Some(bytes))) else {
+            unreachable!("eight bytes were given for eight asked");
+        };
+        jobs.start(&job, "forms", Command::Forms, Arc::new(ctx()))
+            .await;
+        settled(&jobs, job.as_str()).await;
+        names.push(job);
+    }
+    let first = names.first().map(Job::as_str).unwrap_or_default();
+    let last = names.last().map(Job::as_str).unwrap_or_default();
+    assert!(
+        jobs.about(first).await.is_none(),
+        "the finished work that began first made room"
+    );
+    assert!(jobs.about(last).await.is_some(), "the newest is held");
 }
 
 #[tokio::test]
@@ -557,9 +597,11 @@ async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
 
     tokio::time::sleep(BEAT * 20).await;
     beating.abort();
+    // Ended on the second look and forgotten two looks later, nobody having asked
+    // about it in between: the run holds neither the work nor its name.
     assert_eq!(
         jobs.about(job.as_str()).await.map(|work| work.standing),
-        Some(Standing::Ended)
+        None
     );
 }
 

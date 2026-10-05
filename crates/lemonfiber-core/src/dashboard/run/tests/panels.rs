@@ -100,7 +100,7 @@ async fn a_stack_that_cannot_be_read_also_leaves_the_dashboard_disconnected() {
 }
 
 /// The address a gathered door came out with, at whichever step it is missing.
-fn addressed(door: &Panel<super::super::FrontDoorReport>) -> Option<String> {
+fn addressed(door: &Panel<crate::model::FrontDoorReport>) -> Option<String> {
     filled(door)
         .and_then(|door| door.address.as_ref())
         .map(|address| address.url.clone())

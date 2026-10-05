@@ -26,6 +26,7 @@
 //! credential that reached a URL in spite of all this is withheld here too rather
 //! than only where somebody remembered.
 
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -35,12 +36,11 @@ use crate::error::withheld::{withheld, without_credentials};
 use crate::ports::http::{Http, Request, Response, Unreachable};
 use crate::ports::time::Clock;
 
-/// How many lines are kept.
-///
-/// A record that grows without end is a disk problem somebody meets months later,
-/// and one that is trimmed is still an answer to "what has this been doing" — which
-/// is the question, rather than "what has it ever done". The oldest go first.
-const KEPT: usize = 500;
+mod inside;
+mod ledger;
+
+pub use inside::Inside;
+pub use ledger::Ledger;
 
 /// A transport that writes down what it sent.
 pub struct Recording<H> {
@@ -49,16 +49,60 @@ pub struct Recording<H> {
     /// Where the record is kept, or nothing where this machine will not say where
     /// its own files go — in which case nothing is written and nothing pretends to
     /// have been.
-    at: Option<PathBuf>,
+    ledger: Option<Arc<Ledger>>,
     /// What the time is, asked through the port so a test can say.
     clock: Arc<dyn Clock>,
 }
 
 impl<H> Recording<H> {
-    /// Wrap a transport so what it sends is written down.
-    pub const fn around(inner: H, at: Option<PathBuf>, clock: Arc<dyn Clock>) -> Self {
-        Self { inner, at, clock }
+    /// Wrap a transport so what it sends is written down at `at`.
+    #[must_use]
+    pub fn around(inner: H, at: Option<PathBuf>, clock: Arc<dyn Clock>) -> Self {
+        Self::sharing(inner, at.map(|at| Arc::new(Ledger::at(at))), clock)
     }
+
+    /// Wrap a transport so what it sends is written down in a record something else
+    /// writes to as well.
+    pub const fn sharing(inner: H, ledger: Option<Arc<Ledger>>, clock: Arc<dyn Clock>) -> Self {
+        Self {
+            inner,
+            ledger,
+            clock,
+        }
+    }
+}
+
+/// Whether a request to this address leaves the machine at all.
+///
+/// The question the record answers is what left, and a service of the stack's own
+/// reached on this machine's loopback address went nowhere. Written down, those
+/// reads would be most of the record — the dashboard alone makes dozens a second —
+/// and would push a request that really did leave out of it within a minute.
+pub(crate) fn leaves_this_machine(url: &str) -> bool {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host_and_port = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let host = match host_and_port.strip_prefix('[') {
+        Some(bracketed) => bracketed.split(']').next().unwrap_or_default(),
+        None => host_and_port.split(':').next().unwrap_or_default(),
+    };
+    let named_here =
+        host.eq_ignore_ascii_case("localhost") || host.to_ascii_lowercase().ends_with(".localhost");
+    let addressed_here = host
+        .parse::<IpAddr>()
+        .is_ok_and(|address| address.is_loopback() || address.is_unspecified());
+    !(named_here || addressed_here)
+}
+
+/// What the time is, as the record writes it: whole seconds since the epoch.
+pub(crate) fn stamped(clock: &dyn Clock) -> u64 {
+    clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default()
 }
 
 /// One line of the record.
@@ -90,14 +134,6 @@ fn line(at: u64, request: &Request, answered: Option<u16>) -> String {
     )
 }
 
-/// The record as it stands after this line, oldest dropped.
-fn kept(existing: &str, added: &str) -> String {
-    let mut lines: Vec<&str> = existing.lines().filter(|line| !line.is_empty()).collect();
-    lines.push(added);
-    let from = lines.len().saturating_sub(KEPT);
-    lines.get(from..).unwrap_or_default().join("\n") + "\n"
-}
-
 #[async_trait]
 impl<H: Http + Send + Sync> Http for Recording<H> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
@@ -110,22 +146,16 @@ async fn send<H: Http + Send + Sync>(
     request: &Request,
 ) -> Result<Response, Unreachable> {
     let answer = recording.inner.send(request).await;
-    let Some(at) = recording.at.as_ref() else {
+    let Some(ledger) = recording
+        .ledger
+        .as_ref()
+        .filter(|_| leaves_this_machine(&request.url))
+    else {
         return answer;
     };
-    let when = recording
-        .clock
-        .now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|since| since.as_secs())
-        .unwrap_or_default();
     let status = answer.as_ref().ok().map(|answered| answered.status);
-    let existing = tokio::fs::read_to_string(at).await.unwrap_or_default();
-    // A record that could not be written is not worth failing a request over:
-    // the operator asked for the thing the request does, and telling them it
-    // could not be done because a log was unwritable would be this feature
-    // getting in the way of the product it is meant to make trustworthy.
-    let _ = crate::config::store::write(at, &kept(&existing, &line(when, request, status)));
+    let when = stamped(recording.clock.as_ref());
+    ledger.note(line(when, request, status)).await;
     answer
 }
 

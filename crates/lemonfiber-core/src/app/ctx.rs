@@ -129,6 +129,11 @@ pub struct Ctx {
     /// A field rather than a constant read in place, so a test can sign an index with a
     /// key it made.
     pub catalogue_key: Option<Box<crate::plugin::Key>>,
+    /// The media server sessions this context has signed in to.
+    ///
+    /// Held for the life of the context rather than of a client, so a surface that
+    /// reads the household every minute signs in once rather than every minute.
+    pub sessions: Arc<crate::jellyfin::Sessions>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -199,6 +204,7 @@ impl Ctx {
             // half of this and not something a default could stand in for.
             archives: None,
             catalogue_key: crate::plugin::catalogue::carried().map(Box::new),
+            sessions: Arc::default(),
         }
     }
 
@@ -289,11 +295,21 @@ impl Ctx {
     /// what actually left rather than what a caller asked for — three attempts at
     /// one request are three things that went, and an operator checking what was
     /// sent is owed all three.
+    ///
+    /// The engine is wrapped into the same record, because the address the tunnel
+    /// leaves by is fetched from inside a container rather than sent from here, and
+    /// that fetch is the request that most often leaves the house.
     #[must_use]
-    pub fn recording_at(self, at: std::path::PathBuf) -> Self {
-        let http: Arc<dyn Http> = Arc::new(crate::recording::Recording::around(
+    pub fn recording_at(mut self, at: std::path::PathBuf) -> Self {
+        let ledger = Arc::new(crate::recording::Ledger::at(at));
+        let http: Arc<dyn Http> = Arc::new(crate::recording::Recording::sharing(
             Arc::clone(&self.seams.http),
-            Some(at),
+            Some(Arc::clone(&ledger)),
+            Arc::clone(&self.seams.clock),
+        ));
+        self.seams.engine = Arc::new(crate::recording::Inside::around(
+            Arc::clone(&self.seams.engine),
+            ledger,
             Arc::clone(&self.seams.clock),
         ));
         self.with_http(http)

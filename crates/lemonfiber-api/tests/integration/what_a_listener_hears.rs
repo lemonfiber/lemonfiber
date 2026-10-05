@@ -344,6 +344,38 @@ async fn the_gather_comes_round_again_on_the_tick() {
     assert_eq!(round_again, TICK);
 }
 
+/// Nobody listening is nothing gathered, and the first to arrive is gathered for at once.
+///
+/// A gather asks every service, the engine and the disks; a server left running
+/// with no browser open must not ask them every second for a screen nobody sees.
+#[tokio::test(start_paused = true)]
+async fn nothing_is_gathered_while_nobody_is_listening() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let counting = Arc::new(Counting(AtomicUsize::new(0)));
+    let gathering =
+        tokio::spawn(Arc::clone(&live).gathering(Arc::clone(&counting) as Arc<dyn Gathers>));
+
+    tokio::time::sleep(TICK * 30).await;
+    assert_eq!(counting.0.load(Ordering::SeqCst), 0, "nobody was listening");
+
+    let began = Instant::now();
+    let mut listening = live.listening(None).await;
+    let first = listening.next().await;
+    assert!(first.is_some_and(|said| said.contains(r#""data":0"#)));
+    assert_eq!(began.elapsed(), Duration::ZERO, "gathered for at once");
+
+    drop(listening);
+    tokio::time::sleep(TICK * 2).await;
+    let after_leaving = counting.0.load(Ordering::SeqCst);
+    tokio::time::sleep(TICK * 30).await;
+    gathering.abort();
+    assert_eq!(
+        counting.0.load(Ordering::SeqCst),
+        after_leaving,
+        "the last listener leaving stops the gathering"
+    );
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_listener_arriving_is_gathered_for_rather_than_made_to_wait() {
     let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));

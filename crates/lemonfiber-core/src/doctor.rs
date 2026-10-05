@@ -20,6 +20,7 @@ pub mod bindings;
 mod bundled;
 pub mod contributed;
 pub mod credentials;
+pub(crate) mod deferred;
 pub mod environment;
 mod examining;
 #[cfg(test)]
@@ -278,7 +279,7 @@ pub enum Overall {
 ///
 /// Generous enough for a container command over a busy daemon, bounded because a
 /// wait with no end is indistinguishable from a hang.
-const CHECK_BUDGET: Duration = Duration::from_secs(15);
+pub(crate) const CHECK_BUDGET: Duration = Duration::from_secs(15);
 
 /// How long a check that waits on a filesystem may run.
 ///

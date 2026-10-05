@@ -131,6 +131,7 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
     // the second wall behind that.
     let unreachable = |error: reqwest::Error| Unreachable {
         url: without_credentials(&request.url),
+        connected: !error.is_connect(),
         reason: withheld_query(&error.without_url().to_string(), query),
         attempts: 1,
     };

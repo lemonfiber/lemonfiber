@@ -12,16 +12,17 @@
 //! reports what it found, identity and all, and the counting happens where a fake
 //! can drive every case of it.
 //!
-//! The cost of that choice is a list rather than a running sum: a library of two
-//! hundred thousand files is a few tens of megabytes held while the reckoning is
-//! made, and it is held once, for a command somebody asked for rather than a loop
-//! that runs every second.
+//! They cross one at a time, as the walk finds them, rather than as one list. A
+//! library of two hundred thousand files held whole is a few tens of megabytes, and
+//! what the reckoning reads from it is much less: each caller folds the files in as
+//! they arrive and keeps only what it reads.
 //!
 //! See `.docs/architecture/ports-and-adapters.md`.
 
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
+use tokio::sync::mpsc::Receiver;
 
 use crate::filesystem::{Fault, Identity};
 
@@ -50,7 +51,9 @@ pub struct Occupant {
 /// that trait would gain a method it never calls.
 #[async_trait]
 pub trait Occupancy: Send + Sync {
-    /// Every file beneath `root`, recursively.
+    /// Every file beneath `root`, recursively, sent as the walk finds it.
+    ///
+    /// In no particular order. The walk ends where the receiver is dropped.
     ///
     /// Directories themselves are not reported: what they occupy is their own
     /// metadata rather than content, and an operator asking where their disk went
@@ -63,5 +66,5 @@ pub trait Occupancy: Send + Sync {
     /// Returns a [`Fault`] where the tree could not be walked at all — a root that
     /// exists and cannot be read, which is a permission problem the operator has to
     /// hear about rather than an empty answer to hand them.
-    async fn beneath(&self, root: &Path) -> Result<Vec<Occupant>, Fault>;
+    async fn beneath(&self, root: &Path) -> Result<Receiver<Occupant>, Fault>;
 }

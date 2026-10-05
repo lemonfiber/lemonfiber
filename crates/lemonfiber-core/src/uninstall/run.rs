@@ -23,8 +23,8 @@ mod removing;
 
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::uninstall::{
-    against, beside, naming, reclaimable, Manifest, Removal, Tier, Uninstall, ANOTHER_READING,
-    BESIDE, NEEDS_AGREEING,
+    against, naming, reclaimable, Manifest, Removal, Tier, Uninstall, ANOTHER_READING, BESIDE,
+    NEEDS_AGREEING,
 };
 
 use crate::app::command::Removing;
@@ -89,16 +89,7 @@ fn held(asked: &Removing, manifest: &Manifest) -> Result<(), Box<Problem>> {
 async fn survey(ctx: &Ctx, tier: Tier) -> Manifest {
     let gathered = gathering::gather(ctx, tier).await;
 
-    let types: Vec<String> = gathered
-        .services
-        .iter()
-        .flat_map(|service| service.media_types.clone())
-        .collect();
-    let foreign = gathered
-        .root
-        .as_ref()
-        .map(|root| beside(root, &gathered.walked, &types))
-        .unwrap_or_default();
+    let foreign = gathered.walked.foreign();
 
     let items = lines::items(tier, &ctx.settings.project, &gathered, &foreign);
     let bytes = reclaimable(&items);

@@ -27,7 +27,7 @@
 //! could not link is what somebody is quoted when they think about moving it; what
 //! it occupies is what the volume has lost.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -37,6 +37,7 @@ pub mod letting;
 pub mod level;
 pub mod outsized;
 pub(crate) mod run;
+pub mod survey;
 pub mod tally;
 pub mod unpacked;
 pub mod volume;
@@ -46,6 +47,7 @@ pub use category::{Category, Consumption, Reclaim};
 pub use letting::{Gone, Letting, WHAT_GOES};
 pub use level::Level;
 pub use outsized::Outsized;
+pub use survey::Survey;
 pub use tally::{Counting, Tally};
 pub use volume::{Freshness, Role, Volume};
 pub use waste::{ratio_reads, Candidate, Standing, RATIO_CONSEQUENCE};
@@ -111,10 +113,10 @@ pub struct Measured {
     pub volumes: Vec<Volume>,
     /// The data location, which the walk below is relative to.
     pub root: PathBuf,
-    /// Every file beneath the data location.
-    pub data: Vec<Occupant>,
-    /// Every file the services keep of their own.
-    pub services: Vec<Occupant>,
+    /// What the walk beneath the data location found, kept as the reckoning reads it.
+    pub data: Survey,
+    /// What the services keep of their own.
+    pub services: Tally,
     /// What the download clients still have to write.
     pub landing: u64,
     /// The completed downloads the clients are still holding.
@@ -174,19 +176,22 @@ impl Reckoning {
     /// else reclaimable is named in the report and left with the operator, because
     /// what it costs is not this product's to weigh.
     #[must_use]
-    pub fn offering<'a>(&self, measured: &'a Measured) -> Vec<&'a Occupant> {
+    pub fn offering(&self, measured: &Measured) -> Vec<Occupant> {
         let taking: BTreeSet<&str> = self
             .candidates
             .iter()
             .filter(|candidate| candidate.offered())
             .map(|candidate| candidate.name.as_str())
             .collect();
-        let mut offered: Vec<&Occupant> = measured
+        let unpacking = measured.data.unpacking();
+        let mut offered: Vec<Occupant> = measured
             .data
+            .holding()
             .iter()
             .filter(|occupant| belongs_to_any(&occupant.path, &taking))
+            .cloned()
             .collect();
-        offered.extend(unpacked::already_unpacked(&measured.data));
+        offered.extend(unpacked::already_unpacked(&unpacking).into_iter().cloned());
         offered.sort_by(|left, right| left.path.cmp(&right.path));
         offered.dedup_by(|left, right| left.path == right.path);
         offered
@@ -195,11 +200,7 @@ impl Reckoning {
 
 /// Whether a walked file belongs to any of these named downloads.
 fn belongs_to_any(path: &Path, names: &BTreeSet<&str>) -> bool {
-    names.iter().any(|name| {
-        let wanted = std::ffi::OsStr::new(name);
-        path.components().any(|part| part.as_os_str() == wanted)
-            || path.file_stem().is_some_and(|stem| stem == wanted)
-    })
+    names.iter().any(|name| survey::belongs(path, name))
 }
 
 /// Judge what was measured.
@@ -214,7 +215,7 @@ pub fn reckon(measured: &Measured) -> Reckoning {
         &measured.held,
         &measured.awaited,
         &measured.marked,
-        &measured.data,
+        measured.data.holding(),
     );
     let level = Level::worst(measured.volumes.iter().map(|volume| volume.level));
     let mut reckoned = Reckoning {
@@ -224,7 +225,7 @@ pub fn reckon(measured: &Measured) -> Reckoning {
         level,
         consumption: consumption(measured),
         reclaimable: reclaimable(measured, &candidates),
-        outsized: outsized::outsized(&measured.data),
+        outsized: outsized::outsized(measured.data.typical(), measured.data.largest()),
         interrupted: interrupted(measured, &candidates),
         candidates,
         agreement: String::new(),
@@ -241,15 +242,13 @@ pub fn reckon(measured: &Measured) -> Reckoning {
 /// the whole report — which is the difference between a total that matches the
 /// volume and one that is twice it.
 fn consumption(measured: &Measured) -> Vec<Consumption> {
-    let mut counting = Counting::default();
-    let mut lines: Vec<Consumption> = trees(&measured.root, &measured.data)
+    let mut lines: Vec<Consumption> = measured
+        .data
+        .trees()
         .into_iter()
-        .map(|(name, files)| Consumption::of(Category::Tree(name), counting.count(&files)))
+        .map(|(name, tally)| Consumption::of(Category::Tree(name), tally))
         .collect();
-    lines.push(Consumption::of(
-        Category::Services,
-        Counting::default().count(&measured.services),
-    ));
+    lines.push(Consumption::of(Category::Services, measured.services));
     lines.push(Consumption::of(
         Category::Landing,
         Tally {
@@ -281,7 +280,7 @@ fn reclaimable(measured: &Measured, candidates: &[Candidate]) -> Vec<Consumption
         Consumption::of(
             Category::Extracted,
             Counting::default().count(
-                &unpacked::already_unpacked(&measured.data)
+                &unpacked::already_unpacked(&measured.data.unpacking())
                     .into_iter()
                     .cloned()
                     .collect::<Vec<Occupant>>(),
@@ -315,6 +314,7 @@ fn standing_tally(
         .collect();
     let files: Vec<Occupant> = measured
         .data
+        .holding()
         .iter()
         .filter(|occupant| belongs_to_any(&occupant.path, &names))
         .cloned()
@@ -345,41 +345,6 @@ fn interrupted(measured: &Measured, candidates: &[Candidate]) -> Vec<Interrupted
         .collect()
 }
 
-/// One entry per directory directly beneath the root, holding the files under it.
-///
-/// Per directory rather than one figure for everything, because several libraries
-/// commonly share a volume and a single total says nothing about which of them is
-/// growing. A file sitting directly in the root, under no directory at all, is
-/// grouped under the root's own name so that nothing walked goes unaccounted for.
-fn trees(root: &Path, occupants: &[Occupant]) -> Vec<(String, Vec<Occupant>)> {
-    let mut grouped: BTreeMap<String, Vec<Occupant>> = BTreeMap::new();
-    for occupant in occupants {
-        grouped
-            .entry(tree_of(root, &occupant.path))
-            .or_default()
-            .push(occupant.clone());
-    }
-    grouped.into_iter().collect()
-}
-
-/// Which tree a walked file belongs to.
-///
-/// Named components only, so that a path this walk did not take from beneath the
-/// root — which nothing should produce, and which must not be lost if something
-/// does — is named by the first directory in it rather than by the separator at
-/// the front of it.
-fn tree_of(root: &Path, path: &Path) -> String {
-    let under = path.strip_prefix(root).unwrap_or(path);
-    let mut parts = under
-        .components()
-        .filter(|part| matches!(part, std::path::Component::Normal(_)));
-    match (parts.next(), parts.next()) {
-        // A file directly in the root has no directory of its own to be named by.
-        (Some(_), None) | (None, _) => "the data location itself".to_owned(),
-        (Some(first), Some(_)) => first.as_os_str().to_string_lossy().into_owned(),
-    }
-}
-
 /// What this offer names itself.
 ///
 /// Built from every path an answer would take and what each occupies, so an answer
@@ -387,7 +352,7 @@ fn tree_of(root: &Path, path: &Path) -> String {
 /// has finished seeding since the offer was read, or an archive part that has been
 /// unpacked beside, makes this a different name, and the answer is refused rather
 /// than acting on something nobody saw.
-fn naming(offered: &[&Occupant]) -> String {
+fn naming(offered: &[Occupant]) -> String {
     let words: Vec<String> = offered
         .iter()
         .map(|occupant| format!("{}:{}", occupant.path.display(), occupant.bytes))

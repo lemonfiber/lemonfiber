@@ -7,8 +7,9 @@
 //!
 //! What the last gather said is kept, because that is what the gather wants: a
 //! source that answered a moment ago and did not this time has its figure
-//! carried forward marked stale rather than blanked, and that carrying is done
-//! by handing the previous snapshot back in.
+//! carried forward marked stale rather than blanked, and a panel read at its own
+//! pace is carried forward until it is due — both done by handing the previous
+//! gather back in.
 //!
 //! What is newest is said from the same gather. The household's requests and what
 //! is wrong are already in the snapshot, so naming the newest of each kind costs no
@@ -21,7 +22,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::changelog::Record;
-use lemonfiber_core::dashboard::run::gather;
+use lemonfiber_core::dashboard::run::{paced, Gathered};
 use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::news::{Newest, News};
@@ -34,8 +35,8 @@ use super::wire::{Nature, Rendered};
 pub struct Dashboard {
     /// What the gather reaches the outside world through.
     ctx: Arc<Ctx>,
-    /// The snapshot the next gather replaces, where there has been one.
-    last: Mutex<Option<Snapshot>>,
+    /// The gather the next one replaces, where there has been one.
+    last: Mutex<Option<Gathered>>,
     /// The record of releases this build carries, read once because it is compiled in.
     record: Option<Record>,
     /// What the stream last said was newest, so it says so again only on a change.
@@ -66,13 +67,14 @@ impl Gathers for Dashboard {
 /// and what is new where a listener has just arrived or it has changed.
 async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
     let mut last = dashboard.last.lock().await;
-    let snapshot = gather(&dashboard.ctx, last.as_ref()).await;
+    let gathered = paced(&dashboard.ctx, last.as_ref()).await;
+    let snapshot = &gathered.snapshot;
     let mut said: Vec<Rendered> =
-        Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, &snapshot))
+        Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, snapshot))
             .into_iter()
             .collect();
-    said.extend(newly(dashboard, &snapshot, joined).await);
-    *last = Some(snapshot);
+    said.extend(newly(dashboard, snapshot, joined).await);
+    *last = Some(gathered);
     said
 }
 

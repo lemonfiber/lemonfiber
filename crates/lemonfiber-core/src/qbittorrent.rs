@@ -26,6 +26,10 @@ use crate::ports::service::{Download, Failure, Seeded, Seeding, Transfers};
 /// The service name a failure is reported against.
 const SERVICE: &str = "qbittorrent";
 
+/// The status qBittorrent answers a read with when the session it carries is not
+/// signed in.
+const SIGNED_OUT: u16 = 403;
+
 /// The phrase qBittorrent logs its temporary password after.
 const TEMP_MARKER: &str = "A temporary password is provided for this session:";
 
@@ -159,19 +163,7 @@ impl Qbittorrent {
     /// Returns [`Failure`] where qBittorrent cannot be reached, rejects the
     /// password, or answers with something unreadable.
     pub async fn listen_port(&self) -> Result<u16, Failure> {
-        let password = self
-            .password
-            .as_deref()
-            .ok_or_else(|| self.endpoint.unauthorised())?;
-        self.login(password).await?;
-
-        let request = Request {
-            method: Method::Get,
-            url: self.endpoint.url("/api/v2/app/preferences"),
-            headers: Vec::new(),
-            body: None,
-        };
-        let response = self.endpoint.send(&request).await?;
+        let response = self.read("/app/preferences").await?;
         let preferences: Preferences = self
             .endpoint
             .decode(&response, "the preferences could not be read")?;
@@ -229,20 +221,34 @@ impl Qbittorrent {
         self.endpoint.send(&request).await
     }
 
+    /// A read under the web UI API, sent under the session the transport already
+    /// holds and signing in first only where qBittorrent says it holds none.
+    ///
+    /// The session cookie outlives the client, so a reading every second carries the
+    /// one session rather than opening a new one each time. Signing in before every
+    /// read would also spend the client's failed-login allowance within seconds of a
+    /// recorded password going stale, and qBittorrent answers that with a ban.
+    async fn read(&self, path: &str) -> Result<crate::ports::http::Response, Failure> {
+        let password = self
+            .password
+            .as_deref()
+            .ok_or_else(|| self.endpoint.unauthorised())?;
+        let response = self.get(path).await?;
+        if response.status != SIGNED_OUT {
+            return Ok(response);
+        }
+        self.login(password).await?;
+        self.get(path).await
+    }
+
     /// Every completed torrent the client is holding, as it reports them.
     ///
     /// One listing behind both the read of what is being seeded and the removal of
     /// one of them, so the two cannot come to disagree about what the client holds.
-    /// It authenticates nothing: each caller logs in first, because a client holding
-    /// no password is a refusal about the caller rather than about the listing.
+    /// Read under the session the transport holds, so whatever follows it — a removal
+    /// by the hash it names — is sent signed in.
     async fn completed(&self) -> Result<Vec<CompletedInfo>, Failure> {
-        let request = Request {
-            method: Method::Get,
-            url: self.endpoint.url("/api/v2/torrents/info?filter=completed"),
-            headers: Vec::new(),
-            body: None,
-        };
-        let response = self.endpoint.send(&request).await?;
+        let response = self.read("/torrents/info?filter=completed").await?;
         self.endpoint
             .decode(&response, "the completed torrent list could not be read")
     }
@@ -271,12 +277,6 @@ impl Qbittorrent {
     /// is holding nothing of that name or more than one of it, refuses the removal,
     /// or is still holding it afterwards.
     pub(crate) async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
-        let password = self
-            .password
-            .as_deref()
-            .ok_or_else(|| self.endpoint.unauthorised())?;
-        self.login(password).await?;
-
         let holding = self.completed().await?;
         let named: Vec<&CompletedInfo> = holding
             .iter()
@@ -410,20 +410,9 @@ mod fetching;
 mod throttling;
 
 async fn transfers(qbittorrent: &Qbittorrent) -> Result<Vec<Download>, Failure> {
-    let Some(password) = qbittorrent.password.as_deref() else {
-        return Err(qbittorrent.endpoint.unauthorised());
-    };
-    qbittorrent.login(password).await?;
-
-    let request = Request {
-        method: Method::Get,
-        url: qbittorrent
-            .endpoint
-            .url("/api/v2/torrents/info?filter=downloading"),
-        headers: Vec::new(),
-        body: None,
-    };
-    let response = qbittorrent.endpoint.send(&request).await?;
+    let response = qbittorrent
+        .read("/torrents/info?filter=downloading")
+        .await?;
     let torrents: Vec<TorrentInfo> = qbittorrent
         .endpoint
         .decode(&response, "the torrent list could not be read")?;
@@ -431,10 +420,6 @@ async fn transfers(qbittorrent: &Qbittorrent) -> Result<Vec<Download>, Failure> 
 }
 
 async fn seeding(qbittorrent: &Qbittorrent) -> Result<Vec<Seeded>, Failure> {
-    let Some(password) = qbittorrent.password.as_deref() else {
-        return Err(qbittorrent.endpoint.unauthorised());
-    };
-    qbittorrent.login(password).await?;
     let torrents = qbittorrent.completed().await?;
     Ok(torrents.into_iter().map(seeded_of).collect())
 }

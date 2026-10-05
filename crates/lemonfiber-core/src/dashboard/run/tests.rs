@@ -56,7 +56,9 @@ const LIBRARY: [&str; 7] = [
 ];
 
 /// The door a gather filled, or nothing where its panel could not be filled.
-const fn filled(door: &Panel<super::FrontDoorReport>) -> Option<&super::FrontDoorReport> {
+const fn filled(
+    door: &Panel<crate::model::FrontDoorReport>,
+) -> Option<&crate::model::FrontDoorReport> {
     match door {
         Panel::Ready(door) => Some(door),
         Panel::Unavailable { .. } => None,
@@ -161,6 +163,7 @@ fn vpn_panel_with(egress_matches: bool) -> Panel<Vpn> {
     })
 }
 
+mod pacing;
 mod panels;
 mod refreshing;
 mod tunnel;

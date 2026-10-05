@@ -87,7 +87,7 @@ pub(super) async fn apply(
     // Compose verbs it issues along the way.
     let claim = engine::claimed(ctx, OPERATION).await?;
     let run = moved(ctx, manifest, &taking).await;
-    engine::released(ctx, claim).await;
+    engine::released(claim).await;
     let (backup, edits, applied, halted) = run?;
 
     // Recorded before the report is built, so a run that is reported is a run that is

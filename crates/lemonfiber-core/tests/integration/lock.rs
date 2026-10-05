@@ -183,7 +183,7 @@ async fn the_second_operation_waits_for_its_turn_rather_than_being_turned_away()
     let (second, ()) = tokio::join!(claimed(&second_ctx, "down"), async {
         tokio::time::sleep(Duration::from_secs(1)).await;
         if let Some(claim) = first {
-            released(&ctx(&files), claim).await;
+            released(claim).await;
         }
     });
 
@@ -209,7 +209,8 @@ async fn the_second_operation_waits_for_its_turn_rather_than_being_turned_away()
 async fn a_claim_records_what_the_run_holding_it_is_doing() {
     let files = Arc::new(Remembering::default());
 
-    assert!(claimed(&ctx(&files), "up").await.is_ok());
+    let held = claimed(&ctx(&files), "up").await;
+    assert!(held.is_ok());
 
     let marker = files.at(&lockfile()).unwrap_or_default();
     let lines: Vec<&str> = marker.lines().collect();
@@ -423,7 +424,7 @@ async fn giving_the_stack_back_lets_the_next_run_have_it() {
 
     assert!(held.is_ok());
     if let Ok(claim) = held {
-        released(&ctx(&files), claim).await;
+        released(claim).await;
     }
 
     // Looked at before claiming again, because claiming again writes the marker
@@ -438,6 +439,48 @@ async fn giving_the_stack_back_lets_the_next_run_have_it() {
     );
 }
 
+/// Whether `holds` comes true while the runtime is given a few turns to run what
+/// is waiting.
+async fn eventually(holds: impl Fn() -> bool) -> bool {
+    for _ in 0..64 {
+        if holds() {
+            return true;
+        }
+        tokio::task::yield_now().await;
+    }
+    holds()
+}
+
+/// Work ended before it finishes gives the stack back all the same.
+///
+/// A browser releasing the job it was handed aborts the task at its next await, and
+/// the line that releases the claim is never reached. A claim this server's own
+/// process holds is never taken as abandoned, so a claim left behind would refuse
+/// every later operation until the server restarted.
+#[tokio::test]
+async fn work_ended_before_it_finishes_gives_the_stack_back() {
+    let files = Arc::new(Remembering::default());
+    let holding = Arc::clone(&files);
+    let work = tokio::spawn(async move {
+        let _held = claimed(&ctx(&holding), "up").await;
+        std::future::pending::<()>().await;
+    });
+    assert!(
+        eventually(|| files.at(&lockfile()).is_some()).await,
+        "the work took the stack"
+    );
+
+    work.abort();
+    let _ended = work.await;
+    assert!(
+        eventually(|| files.at(&lockfile()).is_none()).await,
+        "the claim was given back once the work ended"
+    );
+
+    let next = claimed(&ctx(&files), "down").await;
+    assert!(next.is_ok(), "the next operation has the stack at once");
+}
+
 /// A run that was killed leaves the stack claimed for as long as the wait lasts, and
 /// `--force` is how an operator who knows it is gone says so without sitting through
 /// one.
@@ -448,10 +491,8 @@ async fn forcing_takes_the_stack_without_waiting_for_a_run_that_is_gone() {
         .write(&lockfile(), &written(somebody_else(), 1, "up"))
         .await;
 
-    assert!(
-        claimed(&ctx(&files).forcing(), "down").await.is_ok(),
-        "forcing takes it"
-    );
+    let forced = claimed(&ctx(&files).forcing(), "down").await;
+    assert!(forced.is_ok(), "forcing takes it");
     assert!(
         claimed(&ctx(&files), "up").await.is_err(),
         "and having taken it, holds it"
@@ -484,7 +525,7 @@ async fn a_machine_that_keeps_no_settings_is_not_blocked_by_the_lock() {
 
     assert!(held.is_ok());
     if let Ok(claim) = held {
-        released(&ctx_without_settings(&files), claim).await;
+        released(claim).await;
     }
     assert!(files.at(&lockfile()).is_none(), "nothing was written");
 }

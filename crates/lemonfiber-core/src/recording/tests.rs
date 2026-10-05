@@ -1,4 +1,4 @@
-use super::{kept, line, Recording, KEPT};
+use super::{leaves_this_machine, line, Recording};
 use crate::ports::http::{Http, Method, Request};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Stopped;
@@ -176,19 +176,55 @@ fn at(url: &str) -> Request {
     }
 }
 
-/// The record is bounded, and it is the oldest that goes.
+/// A request to this machine's own loopback address went nowhere, and every
+/// other address is somewhere it went.
 #[test]
-fn the_record_keeps_what_is_recent_rather_than_growing_for_ever() {
-    let existing = (0..KEPT + 10)
-        .map(|n| format!("line {n}"))
-        .collect::<Vec<String>>()
-        .join("\n");
-    let after = kept(&existing, "the newest");
+fn only_what_leaves_the_machine_counts_as_having_left() {
+    for here in [
+        "http://127.0.0.1:8989/api/v3/queue",
+        "http://localhost:8096/Users",
+        "http://LOCALHOST/",
+        "http://jellyfin.localhost/",
+        "http://[::1]:8080/api",
+        "http://0.0.0.0:7878",
+        "http://user:secret@127.0.0.2:9696/api?apikey=x",
+    ] {
+        assert!(!leaves_this_machine(here), "{here} left nowhere");
+    }
+    for away in [
+        "https://api.github.com/repos",
+        "https://ifconfig.me",
+        "http://192.168.1.20:8080/api",
+        "http://[2001:db8::1]:80/",
+        "https://localhost.example/",
+    ] {
+        assert!(leaves_this_machine(away), "{away} left the machine");
+    }
+}
 
-    let lines: Vec<&str> = after.lines().collect();
-    assert_eq!(lines.len(), KEPT);
-    assert_eq!(lines.last(), Some(&"the newest"));
-    assert!(!after.contains("line 0\n"), "the oldest went");
+/// A request to a service on this machine's loopback address is not written down.
+///
+/// The dashboard reads the stack's own services dozens of times a second, and a
+/// record holding those would push a request that really left out of it within a
+/// minute.
+#[tokio::test]
+async fn a_request_that_stayed_on_this_machine_is_not_written_down() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("stayed");
+    let _ = std::fs::remove_dir_all(&dir);
+    let at_file = dir.join("outbound.log");
+    let transport = Recording::around(
+        Shared(Fake::always(Answer::Reply(200, String::new()))),
+        Some(at_file.clone()),
+        Stopped::at(1),
+    );
+
+    let answered = transport
+        .send(&at("http://127.0.0.1:8989/api/v3/queue"))
+        .await;
+    assert_eq!(answered.map(|response| response.status), Ok(200));
+    assert!(!at_file.exists(), "a loopback read was written down");
+
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// What went out is written down where the run was told to write it.

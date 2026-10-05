@@ -50,8 +50,7 @@ pub(super) async fn holdings(
         "/Users/{member}/Items?Recursive=true&IncludeItemTypes={kinds}\
          &SortBy=DateCreated&SortOrder=Descending&Limit={most}"
     );
-    let request = jellyfin.as_admin(Method::Get, &asked, None).await?;
-    let response = jellyfin.endpoint.send(&request).await?;
+    let response = jellyfin.as_admin(Method::Get, &asked, None).await?;
     let held: ItemsResource = jellyfin
         .endpoint
         .decode(&response, "what the household holds could not be read")?;

@@ -612,3 +612,5 @@ fn reapply_leaves_an_external_stack_alone() {
     );
     assert!(!into.exists(), "nothing was written for an external stack");
 }
+
+mod freshness;

@@ -13,13 +13,22 @@
 //! `sysinfo` lives here and nowhere else, which an architecture test enforces.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use async_trait::async_trait;
+use sysinfo::{DiskRefreshKind, Disks};
 
 use lemonfiber_ports::filesystem::{
-    Beneath, Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, Storage,
+    pick, Beneath, Eraser, Fault, FileSystem, Identity, Mount, Ownership, Presence, Storage,
     StorageFacts, Volume,
 };
+
+/// How long the platform is given to describe the volume behind a path.
+///
+/// Five seconds, against a reading that takes milliseconds. A network mount whose
+/// server has gone away can leave the read waiting without end, and an answer of
+/// nothing known is better than a caller that never gets one.
+const DESCRIBED_WITHIN: Duration = Duration::from_secs(5);
 
 /// The filesystem on this machine, reached through the standard library.
 #[derive(Debug, Default, Clone, Copy)]
@@ -160,21 +169,49 @@ async fn made_room_for(path: &Path) {
 
 #[async_trait]
 impl Storage for Disk {
+    /// Read on a thread that may block, and for [`DESCRIBED_WITHIN`] at most.
+    ///
+    /// Every read here is a system call that can wait on a disk or a server, and on
+    /// the runtime's own thread that wait is every other task's. A reading that runs
+    /// out of time describes nothing, which is what a path no mount could be found
+    /// for already reads as.
     async fn describe(&self, path: &Path) -> StorageFacts {
-        let disks = sysinfo::Disks::new_with_refreshed_list();
-        let mounts: Vec<Mount> = disks
-            .list()
-            .iter()
-            .map(|disk| Mount {
+        let asked = path.to_path_buf();
+        let reading = tokio::task::spawn_blocking(move || described(&asked));
+        let read = tokio::time::timeout(DESCRIBED_WITHIN, reading).await;
+        read.ok()
+            .and_then(Result::ok)
+            .unwrap_or_else(|| pick(&[], path))
+    }
+}
+
+/// The volume behind a path, with only that volume's space read.
+///
+/// The mounts are listed without reading any of their sizes, and only the one the
+/// path sits on is then asked for its space. Reading every mount's size asks every
+/// mount on the machine, and one that will not answer holds up the answer about a
+/// path that was never on it.
+fn described(path: &Path) -> StorageFacts {
+    let mut disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing());
+    let chosen = disks
+        .list_mut()
+        .iter_mut()
+        .filter(|disk| path.starts_with(disk.mount_point()))
+        .max_by_key(|disk| disk.mount_point().components().count());
+    let mounts: Vec<Mount> = chosen
+        .into_iter()
+        .map(|disk| {
+            disk.refresh_specifics(DiskRefreshKind::nothing().with_storage());
+            Mount {
                 point: disk.mount_point().to_path_buf(),
                 kind: disk.file_system().to_string_lossy().into_owned(),
                 removable: disk.is_removable(),
                 available: disk.available_space(),
                 total: disk.total_space(),
-            })
-            .collect();
-        lemonfiber_ports::filesystem::pick(&mounts, path)
-    }
+            }
+        })
+        .collect();
+    pick(&mounts, path)
 }
 
 #[async_trait]

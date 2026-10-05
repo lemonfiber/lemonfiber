@@ -62,7 +62,7 @@ pub(crate) async fn stop_seeding(
         &gathered.measured.held,
         &gathered.measured.awaited,
         &gathered.measured.marked,
-        &gathered.measured.data,
+        gathered.measured.data.holding(),
     );
     let offer = offering(standing_of(held, &accounted));
 

@@ -54,10 +54,9 @@ impl Jellyfin {
                 .refused("the server configuration is not an object"));
         };
         fields.insert(CORS_HOSTS.to_owned(), serde_json::json!([origin]));
-        let writing = self
+        let response = self
             .as_admin(Method::Post, CONFIGURATION, Some(configuration.to_string()))
             .await?;
-        let response = self.endpoint.send(&writing).await?;
         self.endpoint.expect_success(&response)?;
         let kept = self.cors_hosts().await?;
         if kept != [origin] {
@@ -70,8 +69,7 @@ impl Jellyfin {
 
     /// The server's whole configuration, as it answers it.
     async fn configuration(&self) -> Result<serde_json::Value, Failure> {
-        let reading = self.as_admin(Method::Get, CONFIGURATION, None).await?;
-        let response = self.endpoint.send(&reading).await?;
+        let response = self.as_admin(Method::Get, CONFIGURATION, None).await?;
         self.endpoint
             .decode(&response, "the server configuration could not be read")
     }

@@ -11,7 +11,7 @@
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-use crate::materialised::{checksum, decide, diff, Decision, Materialised};
+use crate::materialised::{checksum, decide, diff, Decision, Materialised, Seen};
 use crate::model::StackEdit;
 use crate::quality::Selection;
 use crate::stack::{Failure, Source};
@@ -194,18 +194,30 @@ fn write_stack(
             None => Cow::Borrowed(content),
         };
         let target = into.join(&relative);
+        // A file that stands exactly as lemonfiber last left it, made from the same
+        // shipped content, is current without being read or checksummed again — which
+        // is most of them on most runs.
+        let from = checksum(&content);
+        if record.unchanged(&key, Seen::of(&target, from, false)) {
+            continue;
+        }
         let on_disk = std::fs::read(&target).ok();
         let content = carrying_regions(content, on_disk.as_deref());
         let desired = checksum(&content);
         let actual = on_disk.as_deref().map(checksum);
+        let regions = crate::region::holds(&content);
         match decide(record.checksum(&key), actual, desired) {
             Decision::Write if writing => {
                 write(&target, &content)?;
                 record.record(&key, desired);
+                record.saw(&key, Seen::of(&target, from, regions));
             }
             // Already what lemonfiber would write: recorded so the next run reads it as
             // lemonfiber's own rather than the operator's.
-            Decision::Fresh if writing => record.record(&key, desired),
+            Decision::Fresh if writing => {
+                record.record(&key, desired);
+                record.saw(&key, Seen::of(&target, from, regions));
+            }
             // A preview touches nothing and records nothing.
             Decision::Write | Decision::Fresh => {}
             // The operator's edit. An ordinary materialise leaves it, its record kept at
@@ -217,6 +229,7 @@ fn write_stack(
                 if pass == Pass::Reset {
                     write(&target, &content)?;
                     record.record(&key, desired);
+                    record.saw(&key, Seen::of(&target, from, regions));
                 }
                 edits.push(StackEdit {
                     path: key.into_owned(),

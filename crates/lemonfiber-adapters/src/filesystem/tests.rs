@@ -408,3 +408,12 @@ async fn a_directory_or_a_file_outside_is_refused_and_nothing_is_absent() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A path no mount holds is described as nothing known, rather than as some other
+/// volume's figures.
+#[tokio::test]
+async fn a_path_no_mount_holds_is_described_as_nothing_known() {
+    let facts = Disk.describe(Path::new("not/an/absolute/path")).await;
+    assert_eq!((facts.total, facts.available), (0, 0));
+    assert_eq!(facts.point, std::path::PathBuf::new());
+}

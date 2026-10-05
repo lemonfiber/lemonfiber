@@ -12,10 +12,24 @@ use super::port_forward::{parse_grant, Grant};
 use super::FORWARDED_PORT_FILE;
 use crate::ports::docker::{Container, Engine, Lifecycle};
 
+/// How many seconds an echo is given to answer from inside the container.
+///
+/// Five, against a lookup that answers in well under one through a working tunnel.
+/// A tunnel whose kill switch is dropping packets answers nothing at all, and
+/// without a bound of its own the fetch waits out the whole TCP timeout before the
+/// panel and the leak check can say so.
+pub(super) const ECHO_WITHIN_SECONDS: u8 = 5;
+
 /// The command that asks an endpoint for the caller's address, run inside a
 /// container.
 pub(super) fn wget(url: String) -> Vec<String> {
-    vec!["wget".to_owned(), "-qO-".to_owned(), url]
+    vec![
+        "wget".to_owned(),
+        "-T".to_owned(),
+        ECHO_WITHIN_SECONDS.to_string(),
+        "-qO-".to_owned(),
+        url,
+    ]
 }
 
 /// The command that reads the gateway's forwarded-port status file from inside
@@ -147,3 +161,6 @@ pub(super) async fn read_grant(engine: &dyn Engine, gateway: Option<&Container>)
         Ok(output) => parse_grant(&output.stdout),
     }
 }
+
+#[cfg(test)]
+mod tests;

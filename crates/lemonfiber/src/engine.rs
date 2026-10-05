@@ -100,7 +100,7 @@ pub(crate) async fn pull(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(code) => code,
     };
-    released(ctx, claim).await;
+    released(claim).await;
     code
 }
 
@@ -262,7 +262,7 @@ pub(crate) async fn start(
         match narrated(ctx, forms, services, json).await {
             Ok(status) => status,
             Err(code) => {
-                released(ctx, claim).await;
+                released(claim).await;
                 return code;
             }
         }
@@ -272,7 +272,7 @@ pub(crate) async fn start(
     // has still started something, and which services came up is the first thing an
     // operator needs in order to do anything about the ones that did not.
     let outcome = started(ctx, forms, services, status).await;
-    released(ctx, claim).await;
+    released(claim).await;
     match outcome {
         Ok(report) => {
             let outcome = Outcome::Lifecycle(report);

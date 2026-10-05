@@ -13,7 +13,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
-use crate::ports::http::{Http, Method, Request};
+use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::Failure;
 use crate::recyclarr::Kind;
 
@@ -22,9 +22,11 @@ mod household;
 mod keys;
 mod library;
 mod password;
+mod sessions;
 mod setup;
 
 pub use keys::{DECLINE_APP, GATE_APP, SEERR_APP};
+pub use sessions::Sessions;
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access
 /// token — its own scheme, named as it parses it. The values only have to be present and
@@ -44,6 +46,15 @@ fn carrying(token: &str) -> String {
     format!(r#"MediaBrowser Token="{token}""#)
 }
 
+/// A request carrying a token.
+fn carried(request: &Request, token: &str) -> Request {
+    let mut carried = request.clone();
+    carried
+        .headers
+        .push((AUTHORIZATION_HEADER.to_owned(), carrying(token)));
+    carried
+}
+
 /// A client for one Jellyfin — its first-run setup, and, once lemonfiber holds the
 /// household's admin credential, reading its library to answer a trace.
 pub struct Jellyfin {
@@ -52,6 +63,9 @@ pub struct Jellyfin {
     /// setup-only client, which never signs in — the setup endpoints take no key.
     username: String,
     password: String,
+    /// The sessions already signed in to, so a read does not sign in again for each
+    /// request it makes.
+    sessions: Arc<Sessions>,
 }
 
 impl Jellyfin {
@@ -63,6 +77,7 @@ impl Jellyfin {
             endpoint: Endpoint::new(http, base, service),
             username: String::new(),
             password: String::new(),
+            sessions: Arc::default(),
         }
     }
 
@@ -80,7 +95,19 @@ impl Jellyfin {
             endpoint: Endpoint::new(http, base, service),
             username: username.into(),
             password: password.into(),
+            sessions: Arc::default(),
         }
+    }
+
+    /// The same client, signing in through sessions that outlive it.
+    ///
+    /// A client is built for each reading, and a reading every few seconds would
+    /// otherwise sign in afresh every few seconds — a password hashed by the media
+    /// server each time, and a sign-in written to its activity log each time.
+    #[must_use]
+    pub fn remembering(mut self, sessions: Arc<Sessions>) -> Self {
+        self.sessions = sessions;
+        self
     }
 
     /// A request to a path on Jellyfin. The setup endpoints are unauthenticated —
@@ -90,23 +117,40 @@ impl Jellyfin {
         self.endpoint.json_request(method, path, body)
     }
 
-    /// A request signed in as the household admin, which every read and every rescan is.
+    /// A request sent signed in as the household admin, which every read and every
+    /// rescan is, and what it answered.
     ///
-    /// Jellyfin mints its token from a username and password rather than a stored key, so
-    /// each of these is the sign-in exchange first and then the request under the token it
-    /// hands back.
+    /// Jellyfin mints its token from a username and password rather than a stored key.
+    /// A token already minted for this server and this credential is carried rather
+    /// than minted again, and one the server no longer accepts is minted afresh once
+    /// and the request sent again — a server restored from a backup, or a session an
+    /// administrator ended, is a token gone stale rather than a credential refused.
     async fn as_admin(
         &self,
         method: Method,
         path: &str,
         body: Option<String>,
-    ) -> Result<Request, Failure> {
+    ) -> Result<Response, Failure> {
+        let request = self.request(method, path, body);
+        let held = self
+            .sessions
+            .held(self.endpoint.url(""), &self.username, &self.password);
+        if let Some(token) = held {
+            let response = self.endpoint.send(&carried(&request, &token)).await?;
+            if !matches!(response.status, 401 | 403) {
+                return Ok(response);
+            }
+            self.sessions
+                .forget(self.endpoint.url(""), &self.username, &self.password);
+        }
         let token = self.sign_in().await?;
-        let mut request = self.request(method, path, body);
-        request
-            .headers
-            .push((AUTHORIZATION_HEADER.to_owned(), carrying(&token)));
-        Ok(request)
+        self.sessions.keep(
+            self.endpoint.url(""),
+            &self.username,
+            &self.password,
+            &token,
+        );
+        self.endpoint.send(&carried(&request, &token)).await
     }
 
     /// Whether Jellyfin signs the household admin in with the password this client holds.

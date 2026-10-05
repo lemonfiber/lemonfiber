@@ -307,12 +307,19 @@ pub(super) fn a_reckoning() -> lemonfiber_core::space::Reckoning {
             1_700_000_000,
         )],
         root: std::path::PathBuf::from("/srv/media"),
-        data: vec![lemonfiber_core::ports::occupancy::Occupant {
-            path: std::path::PathBuf::from("/srv/media/downloads/A.Release/a.mkv"),
-            bytes: 90_000_000_000,
-            identity: Some(lemonfiber_core::ports::filesystem::Identity { file: 41, links: 1 }),
-        }],
-        services: Vec::new(),
+        data: {
+            let mut survey = lemonfiber_core::space::Survey::beneath(
+                std::path::Path::new("/srv/media"),
+                ["A.Release".to_owned()],
+            );
+            survey.add(lemonfiber_core::ports::occupancy::Occupant {
+                path: std::path::PathBuf::from("/srv/media/downloads/A.Release/a.mkv"),
+                bytes: 90_000_000_000,
+                identity: Some(lemonfiber_core::ports::filesystem::Identity { file: 41, links: 1 }),
+            });
+            survey
+        },
+        services: lemonfiber_core::space::Tally::default(),
         landing: 35_000_000_000,
         held: vec![lemonfiber_core::ports::service::Seeded {
             name: "A.Release".to_owned(),

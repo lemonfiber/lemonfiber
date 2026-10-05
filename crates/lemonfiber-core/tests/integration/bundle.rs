@@ -162,6 +162,32 @@ async fn a_bundle_holds_the_recent_logs_with_the_keys_in_them_replaced() {
         .contains("the last 5 lines of each service"));
 }
 
+/// A window past the ceiling is held to it, and the bundle says the window it holds.
+///
+/// A bundle keeps every line it reads until it is written, so the number a caller
+/// writes is that much memory; asking for four billion lines is asking for the most
+/// any reader here keeps.
+#[tokio::test]
+async fn a_window_past_the_ceiling_is_held_to_it_and_says_so() {
+    let context = ctx(Source::External(project()), true, None);
+    let wanted = Wanted {
+        lines: u32::MAX,
+        ..Wanted::default()
+    };
+    let contents = collect(&context, LEMONFIBER, &wanted)
+        .await
+        .unwrap_or_default();
+    let said = format!(
+        "the last {} lines of each service",
+        lemonfiber_core::ports::docker::LogQuery::AT_MOST
+    );
+    assert!(
+        contents.manifest().contains(&said),
+        "{}",
+        contents.manifest()
+    );
+}
+
 /// A value shaped the way a generated key is, built from character ranges rather than
 /// written for the reason every credential-shaped fixture here is built.
 fn key_shaped() -> String {
