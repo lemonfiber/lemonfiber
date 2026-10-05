@@ -261,6 +261,8 @@ pub(super) fn refusal(filler: &crate::wiring::Filler) -> crate::seed::State {
 /// A Servarr application's API key, read from the configuration file it wrote it
 /// to, or nothing where it has not written one yet.
 pub(super) async fn read_servarr_key(ctx: &Ctx, config: &Path) -> Option<String> {
-    let text = ctx.seams.filesystem.read(config).await?;
+    let within = crate::within::directory_of(config);
+    let text =
+        crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), config, within).await?;
     crate::servarr::api_key(&text)
 }

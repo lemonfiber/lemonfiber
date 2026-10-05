@@ -248,7 +248,8 @@ impl Due {
 /// through the screen, which is the one channel that needs no configuring and cannot
 /// be down. The history and the outbox are written only where this refresh changed
 /// them: a store rewritten every second with what it already held is a flush to the
-/// disk for nothing.
+/// disk for nothing. A rehearsal writes neither: what it found is shown, and the
+/// records stay as they were for the run that is not one.
 async fn told(
     ctx: &Ctx,
     reach: Reach,
@@ -265,10 +266,10 @@ async fn told(
         .take(SHOWN_ALERTS)
         .cloned()
         .collect();
-    if conditions != found {
+    if !ctx.dry_run && conditions != found {
         conditions::save(ctx, conditions);
     }
-    if outbox != owed {
+    if !ctx.dry_run && outbox != owed {
         outbox::save(ctx, &outbox);
     }
     alerts
@@ -337,7 +338,8 @@ fn carried_link(linked: Asked<Hardlink>, last: Option<&Snapshot>) -> Hardlink {
 
 /// The data location's free space and whether imports into it link, each where it
 /// is due — and neither where no location is configured, since then there is nothing
-/// to read.
+/// to read. A rehearsal never probes, since the probe writes: it carries what an
+/// earlier refresh found, or says it does not know.
 async fn volume(
     ctx: &Ctx,
     root: Option<&std::path::Path>,
@@ -348,7 +350,11 @@ async fn volume(
     };
     tokio::join!(
         when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, root)),
-        when(due.is(Paced::Hardlink), PANEL_WITHIN, linking(ctx, root)),
+        when(
+            due.is(Paced::Hardlink) && !ctx.dry_run,
+            PANEL_WITHIN,
+            linking(ctx, root)
+        ),
     )
 }
 

@@ -30,6 +30,7 @@ use crate::config::store::{self, is_secret};
 use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
 use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
 use crate::journal::{Change, Journal, Kind, Seal};
+use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
 use crate::quality::{Preset, Selection};
 use crate::stack::{self, Source};
@@ -53,6 +54,8 @@ pub struct Applying<'a> {
     pub stamp: &'a str,
     /// Where the key the journal's credentials are sealed under is drawn from.
     pub random: &'a dyn Random,
+    /// How the stack's files are written into directories containers can write.
+    pub confined: &'a dyn Confined,
 }
 
 /// Write a reviewed setup to disk, driving the lifecycle and recording each
@@ -190,6 +193,7 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
     // there to leave. It rewrites the shipped config to itself, so an install that
     // chose nothing gets the file the stack ships.
     super::materialise::materialise(
+        applying.confined,
         applying.source,
         Some(&paths.stack()),
         Some(&paths.materialised()),

@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::config::REACH_PLUGIN_SOURCE_KEY;
 use crate::error::codes::plugin::{NO_REVISION, SOURCE_OFF, UNFETCHED};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, Severity, State};
 use crate::plugin::{Fetchable, Installed, Installs, Register, Source, Sourced};
 
 /// Where an install came from, where that is not the directory it read.
@@ -61,8 +61,12 @@ pub(super) async fn installed(
         return Err(Box::new(switched_off(url)));
     }
     let commit = resolved(ctx, url, revision).await?;
-    let into = checkout(&commit);
-    let _ = tokio::fs::remove_dir_all(&into).await;
+    let Some(into) = checkout(ctx, &commit) else {
+        return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
+    };
+    if let Err(why) = made_fresh(&into) {
+        return Err(Box::new(unfetched(url, &why.to_string())));
+    }
     let result = match fetched(ctx, url, &commit, &into).await {
         Ok(()) => match as_reviewed(&into, vouched).await {
             Ok(()) => {
@@ -280,10 +284,50 @@ async fn standing(ctx: &Ctx, from: &str) -> Fetchable {
     }
 }
 
-/// Where one commit is checked out while it is installed, and removed from after.
+/// The directory under lemonfiber's own data directory checkouts are made in.
+const CHECKOUTS: &str = "checkouts";
+
+/// Where one commit is checked out while it is installed, and removed from after:
+/// nothing where this machine has not been set up and so has no data directory.
 ///
-/// Named for the commit and this process, so two runs never share one, and one this run
-/// finds already there is removed before anything is fetched into it rather than read.
-pub(super) fn checkout(commit: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("lemonfiber-plugin-{commit}-{}", std::process::id()))
+/// Under lemonfiber's own data directory rather than the shared temporary one, where any
+/// other user of the machine could make the directory first and hold what is fetched
+/// into it. Named for the commit and this process, so two runs never share one.
+pub(super) fn checkout(ctx: &Ctx, commit: &str) -> Option<PathBuf> {
+    let paths = crate::app::targets::layout(ctx)?;
+    Some(
+        paths
+            .data_dir()
+            .join(CHECKOUTS)
+            .join(format!("{commit}-{}", std::process::id())),
+    )
+}
+
+/// Make `into` new and empty, readable by its owner alone where the platform tracks a
+/// mode, or say why not.
+///
+/// One this run finds already there is removed first, and the directory is then created
+/// rather than taken over: a directory somebody else made at the name between the two
+/// is refused rather than fetched into.
+fn made_fresh(into: &Path) -> std::io::Result<()> {
+    let _ = std::fs::remove_dir_all(into);
+    private_dir(into.parent().unwrap_or(into), true)?;
+    private_dir(into, false)
+}
+
+/// Create the directory `at` owner-only, with its parents where `parents`; failing where
+/// `at` is already there and `parents` is not asked for.
+#[cfg(unix)]
+fn private_dir(at: &Path, parents: bool) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt as _;
+    std::fs::DirBuilder::new()
+        .recursive(parents)
+        .mode(0o700)
+        .create(at)
+}
+
+/// Where the platform tracks no mode, an ordinary create.
+#[cfg(not(unix))]
+fn private_dir(at: &Path, parents: bool) -> std::io::Result<()> {
+    std::fs::DirBuilder::new().recursive(parents).create(at)
 }

@@ -47,11 +47,20 @@ fn no_redirect() -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::none()
 }
 
+/// The most of an answer's body that is read, in bytes.
+///
+/// Enough for the largest answer any service here gives — a whole library listed by an
+/// \*arr runs to tens of megabytes on a large one — and a bound on what a service that
+/// answers without end, or announces more than that, can make this process hold.
+const BODY_LIMIT: usize = 128 * 1024 * 1024;
+
 /// An HTTP client backed by `reqwest`, with rustls so the static Linux build
 /// needs no system TLS library.
 #[derive(Debug, Clone)]
 pub struct Web {
     client: reqwest::Client,
+    /// The most of an answer's body read before it is refused.
+    limit: usize,
 }
 
 impl Web {
@@ -87,7 +96,15 @@ impl Web {
                 .timeout(REQUEST_TIMEOUT)
                 .build()
                 .unwrap_or_default(),
+            limit: BODY_LIMIT,
         }
+    }
+
+    /// The same client, reading no more than `bytes` of any answer's body.
+    #[must_use]
+    pub const fn limited(mut self, bytes: usize) -> Self {
+        self.limit = bytes;
+        self
     }
 }
 
@@ -100,12 +117,16 @@ impl Default for Web {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        sent(&self.client, request).await
+        sent(&self.client, request, self.limit).await
     }
 }
 
 /// The request built, sent, and read back — or the one failure that says why not.
-async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, Unreachable> {
+async fn sent(
+    client: &reqwest::Client,
+    request: &Request,
+    limit: usize,
+) -> Result<Response, Unreachable> {
     let mut builder = match request.method {
         Method::Get => client.get(&request.url),
         Method::Post => client.post(&request.url),
@@ -140,7 +161,7 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
     // still leaves the status known — but the port reports one Response or
     // none, so a truncated body is a failure to reach rather than a partial
     // answer.
-    let response = builder.send().await.map_err(unreachable)?;
+    let mut response = builder.send().await.map_err(unreachable)?;
     let status = response.status().as_u16();
     // Read before the body, because reading the body consumes the response. A header
     // whose value is not text is dropped rather than lossily rendered: what a caller
@@ -157,7 +178,29 @@ async fn sent(client: &reqwest::Client, request: &Request) -> Result<Response, U
                 .map(|value| (name.as_str().to_owned(), value.to_owned()))
         })
         .collect();
-    let body = response.text().await.map_err(unreachable)?;
+    // Refused before a byte of it is read where it announces more than the limit, and
+    // as soon as it passes the limit where it announces nothing or less than it sends.
+    let oversized = || Unreachable {
+        url: without_credentials(&request.url),
+        reason: format!("the answer was larger than {limit} bytes, so it was not read"),
+        attempts: 1,
+        // The service answered: asking again would only be sent the same answer.
+        connected: true,
+    };
+    if response
+        .content_length()
+        .is_some_and(|announced| announced > limit as u64)
+    {
+        return Err(oversized());
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(unreachable)? {
+        if bytes.len() + chunk.len() > limit {
+            return Err(oversized());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let body = String::from_utf8_lossy(&bytes).into_owned();
     Ok(Response {
         status,
         headers,

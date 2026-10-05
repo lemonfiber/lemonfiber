@@ -44,12 +44,12 @@ use crate::ports::service::{
 ///
 /// Nothing where the file holds no key yet: Seerr writes one when it is initialised,
 /// which is the run that gives it an owner, so a stack seeded before that has none to
-/// publish rather than an empty one to publish wrongly.
+/// publish rather than an empty one to publish wrongly. Nothing either where what it
+/// holds is not spelled the way a generated key is: see [`crate::generated`].
 #[must_use]
 pub fn api_key(settings_json: &str) -> Option<String> {
     let settings: serde_json::Value = serde_json::from_str(settings_json).ok()?;
-    let key = settings.get("main")?.get("apiKey")?.as_str()?;
-    (!key.is_empty()).then(|| key.to_owned())
+    crate::generated::key(settings.get("main")?.get("apiKey")?.as_str()?)
 }
 
 /// The address a fresh Seerr owner is filed under. Seerr requires an address on

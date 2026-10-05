@@ -76,6 +76,7 @@ pub mod door;
 mod endpoint;
 pub mod filling;
 pub mod frontend;
+pub mod generated;
 pub mod glossary;
 pub mod health;
 pub mod household;

@@ -16,7 +16,7 @@ use std::path::Path;
 use crate::recyclarr::Kind;
 
 use super::downloads::{download_targets, DownloadKind};
-use super::layout::project_directory;
+use super::layout::{project_directory, read_owned, service_config_dir};
 use super::secrets::recorded_secret;
 use super::servarr::{servarr_targets, target_for};
 
@@ -158,27 +158,17 @@ pub(crate) struct ServiceAddr {
 
 /// What the file a service's credential is read from holds.
 ///
-/// A plugin's is read only where it is a plain file beneath the directory its container
-/// owns: whatever runs there can write that directory, and a link put where the file is
-/// expected would otherwise have lemonfiber read any file on the host and hand it to the
-/// container as its own credential. Absent where the service names no such file.
+/// Read only where it is a plain file beneath the directory its container owns: whatever
+/// runs there can write that directory, and a link put where the file is expected would
+/// otherwise have lemonfiber read any file on the host and hand it to the container as its
+/// own credential. Absent where the service names no such file.
 pub(crate) async fn credential_file(
     ctx: &Ctx,
     filler: &crate::wiring::Filler,
 ) -> crate::ports::filesystem::Beneath {
-    use crate::ports::filesystem::Beneath;
-
-    let Some(file) = filler.key_file.as_deref() else {
-        return Beneath::Absent;
-    };
-    match filler.confined_to.as_deref() {
-        Some(within) => ctx.seams.filesystem.read_beneath(file, within).await,
-        None => ctx
-            .seams
-            .filesystem
-            .read(file)
-            .await
-            .map_or(Beneath::Absent, Beneath::Read),
+    match (filler.key_file.as_deref(), filler.confined_to.as_deref()) {
+        (Some(file), Some(within)) => ctx.seams.filesystem.read_beneath(file, within).await,
+        _ => crate::ports::filesystem::Beneath::Absent,
     }
 }
 
@@ -191,7 +181,7 @@ pub(crate) fn escaped(filler: &crate::wiring::Filler) -> String {
     };
     format!(
         "{whose}'s credential file is a link, leads outside the directory its container \
-         owns, or is not a file at all, so it was not read"
+         owns, is not a file at all, or is too large to be one, so it was not read"
     )
 }
 
@@ -343,7 +333,8 @@ pub(crate) async fn seerr_key(
         service,
         service.api.as_ref().and_then(|api| api.path.as_deref()),
     )?;
-    crate::seerr::api_key(&ctx.seams.filesystem.read(&path).await?)
+    let within = service_config_dir(project?, &service.id);
+    crate::seerr::api_key(&read_owned(ctx.seams.filesystem.as_ref(), &path, &within).await?)
 }
 
 /// The subtitle finder's own key, read from the configuration it writes.
@@ -364,5 +355,6 @@ pub(crate) async fn bazarr_key(
         service,
         service.api.as_ref().and_then(|api| api.path.as_deref()),
     )?;
-    crate::bazarr::api_key(&ctx.seams.filesystem.read(&path).await?)
+    let within = service_config_dir(project?, &service.id);
+    crate::bazarr::api_key(&read_owned(ctx.seams.filesystem.as_ref(), &path, &within).await?)
 }

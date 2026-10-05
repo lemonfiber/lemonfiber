@@ -175,3 +175,66 @@ async fn what_was_said_once_is_not_said_again_on_the_next_refresh() {
         "nothing new was invented: {repeated:?}"
     );
 }
+
+/// A rehearsed refresh shows what it found and keeps none of it: no record of the
+/// conditions it raised or the alerts it owes is written anywhere.
+#[tokio::test]
+async fn a_rehearsed_refresh_keeps_nothing() {
+    let ctx = ctx_remembering("rehearsed", Reporting::absent()).rehearsing();
+    let dir = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .and_then(std::path::Path::parent)
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+
+    let snapshot = gather(&ctx, None).await;
+
+    assert!(!snapshot.alerts.is_empty(), "something was found to say");
+    let kept: Vec<_> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .collect();
+    assert!(kept.is_empty(), "a rehearsal wrote {kept:?}");
+}
+
+/// A rehearsal never runs the hardlink probe, since the probe writes into the data
+/// root: it says it does not know where a refresh that is not one would probe.
+#[tokio::test]
+async fn a_rehearsal_never_probes_the_data_root() {
+    let root = lemonfiber_fixtures::scratch::Scratch::new("refresh-unprobed");
+    let on_disk = |rehearsing: bool| {
+        let ctx = a_context()
+            .engine(Arc::new(Reporting::absent()))
+            .filesystem(Arc::new(lemonfiber_adapters::Disk))
+            .settings(Settings {
+                data_root: Some(root.to_path_buf()),
+                ..Settings::default()
+            })
+            .build()
+            .with_patience(Duration::ZERO);
+        if rehearsing {
+            ctx.rehearsing()
+        } else {
+            ctx
+        }
+    };
+    let hardlink = |snapshot: &crate::dashboard::Snapshot| match &snapshot.storage {
+        Panel::Ready(storage) => Some(storage.hardlink),
+        Panel::Unavailable { .. } => None,
+    };
+
+    let rehearsed = gather(&on_disk(true), None).await;
+    let made: Vec<_> = std::fs::read_dir(&*root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .collect();
+    let probed = gather(&on_disk(false), None).await;
+
+    assert_eq!(hardlink(&rehearsed), Some(Hardlink::Unknown));
+    assert!(made.is_empty(), "a rehearsal made {made:?}");
+    assert_eq!(hardlink(&probed), Some(Hardlink::Linking));
+}

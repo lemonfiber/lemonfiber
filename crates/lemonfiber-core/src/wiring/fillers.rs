@@ -61,9 +61,11 @@ pub struct Filler {
     /// Where on this machine the file its credential is read from sits, where its
     /// adapter names one and the stack has been written to disk.
     pub key_file: Option<std::path::PathBuf>,
-    /// The directory a plugin's container owns, which its credential file has to stay
-    /// beneath when it is read; nothing for the stack's own services, whose images are
-    /// the stack's.
+    /// The directory its container owns, which its credential file has to stay beneath
+    /// when it is read, where the stack has been written to disk.
+    ///
+    /// Every service's, the stack's own included: whatever runs in a container can write
+    /// the directory mounted into it, whoever published the image.
     pub confined_to: Option<std::path::PathBuf>,
     /// The media it files, which decides which of an asker's connections it comes to.
     pub media_types: Vec<String>,
@@ -241,7 +243,8 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
                 service.api.as_ref().and_then(|api| api.path.as_deref()),
             )
         }),
-        confined_to: None,
+        confined_to: project
+            .map(|project| crate::app::targets::service_config_dir(project, &service.id)),
         media_types: service.media_types.clone(),
     }
 }

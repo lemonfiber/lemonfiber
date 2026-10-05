@@ -52,9 +52,12 @@ pub struct Seen {
 impl Seen {
     /// How the file at `path` stands now, made from content with checksum `from`, or
     /// nothing where it cannot be looked at.
+    ///
+    /// Looked at without following a link at its name, so a link a container put there
+    /// is seen as itself and never as the file lemonfiber wrote.
     #[must_use]
     pub fn of(path: &std::path::Path, from: u32, regions: bool) -> Option<Self> {
-        let meta = std::fs::metadata(path).ok()?;
+        let meta = std::fs::symlink_metadata(path).ok()?;
         Some(Self {
             length: meta.len(),
             written: changed(&meta)?,

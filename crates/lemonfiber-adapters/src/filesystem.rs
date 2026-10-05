@@ -42,8 +42,13 @@ impl FileSystem for Disk {
             .map_err(|error| fault(&error))
     }
 
+    /// Created new, which the kernel refuses where anything is at the name — a link
+    /// included, so nothing a link points at is created or emptied through it.
     async fn touch(&self, path: &Path) -> Result<(), Fault> {
-        tokio::fs::File::create(path)
+        tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
             .await
             .map(drop)
             .map_err(|error| fault(&error))
@@ -70,13 +75,13 @@ impl FileSystem for Disk {
         tokio::fs::read_to_string(path).await.ok()
     }
 
-    /// Opened once, refusing a link at the file itself, and then checked by what was
-    /// opened rather than by its name: the name, resolved, has to lie beneath `within`
-    /// and to name the very file the handle holds. A link swapped in on the way after
-    /// the open resolves somewhere else, or names another file, and either is refused —
-    /// so there is no moment between a look and a read for it to change under.
+    /// The confined read, on a thread that may block: it never waits on a
+    /// pipe, but it is still a disk read.
     async fn read_beneath(&self, path: &Path, within: &Path) -> Beneath {
-        read_beneath(path, within).await
+        let (path, within) = (path.to_path_buf(), within.to_path_buf());
+        tokio::task::spawn_blocking(move || confined::read(&path, &within))
+            .await
+            .unwrap_or(Beneath::Absent)
     }
 
     /// One syscall, which is the whole point: `create_new` asks the kernel to create
@@ -134,6 +139,9 @@ async fn written(path: &Path, contents: &str) {
 }
 
 /// Write `contents` to a file readable by its owner alone.
+///
+/// Never through a link at its name, and tightened through the handle rather than by the
+/// name, so a link put there after the open cannot turn the mode change onto another file.
 #[cfg(unix)]
 async fn private(path: &Path, contents: &str) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
@@ -143,11 +151,13 @@ async fn private(path: &Path, contents: &str) -> std::io::Result<()> {
         .create(true)
         .truncate(true)
         .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
         .open(path)
         .await?;
     file.write_all(contents.as_bytes()).await?;
     file.flush().await?;
-    tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))
+        .await
 }
 
 /// Where the platform tracks no file mode, an ordinary write.
@@ -353,80 +363,7 @@ pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
     }
 }
 
-/// Read `path`, a plain file beneath `within`, opening it once and checking what was
-/// opened.
-async fn read_beneath(path: &Path, within: &Path) -> Beneath {
-    use tokio::io::AsyncReadExt as _;
-
-    let Ok(mut file) = no_follow().open(path).await else {
-        return unopened(path).await;
-    };
-    let (Ok(opened), Ok(root), Ok(resolved)) = (
-        file.metadata().await,
-        tokio::fs::canonicalize(within).await,
-        tokio::fs::canonicalize(path).await,
-    ) else {
-        return Beneath::Absent;
-    };
-    let named = tokio::fs::metadata(&resolved).await;
-    let plain = opened.is_file() && named.is_ok_and(|named| same_file(&opened, &named));
-    if !plain || !resolved.starts_with(&root) {
-        return Beneath::Escaped;
-    }
-    let mut text = String::new();
-    match file.read_to_string(&mut text).await {
-        Ok(_) => Beneath::Read(text),
-        Err(_) => Beneath::Absent,
-    }
-}
-
-/// Why a file that would not open was not read: a link at its last name, which the open
-/// refused to follow, or nothing there to open at all.
-async fn unopened(path: &Path) -> Beneath {
-    match tokio::fs::symlink_metadata(path).await {
-        Ok(meta) if meta.file_type().is_symlink() => Beneath::Escaped,
-        Ok(_) | Err(_) => Beneath::Absent,
-    }
-}
-
-/// Opening for reading, refusing to follow a link at the last name of the path.
-#[cfg(unix)]
-fn no_follow() -> tokio::fs::OpenOptions {
-    let mut options = tokio::fs::OpenOptions::new();
-    // Not blocking, as well: a pipe put where the file is expected would otherwise hold
-    // the open until something wrote to it. A plain file is opened the same either way.
-    options
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    options
-}
-
-/// Opening for reading. Windows has no flag for it, so a link at the last name is
-/// caught by the file it opened not being the one the name resolves to.
-#[cfg(windows)]
-fn no_follow() -> tokio::fs::OpenOptions {
-    let mut options = tokio::fs::OpenOptions::new();
-    options.read(true);
-    options
-}
-
-/// Whether two readings are of one file: the same device and the same number on it.
-#[cfg(unix)]
-fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt as _;
-
-    one.dev() == other.dev() && one.ino() == other.ino()
-}
-
-/// Whether two readings are of one file: the same volume and the same index on it.
-#[cfg(windows)]
-fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt as _;
-
-    one.volume_serial_number() == other.volume_serial_number()
-        && one.file_index() == other.file_index()
-        && one.file_index().is_some()
-}
+mod confined;
 
 #[cfg(test)]
 mod tests;

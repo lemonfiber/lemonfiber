@@ -176,7 +176,7 @@ fn no_line_a_pipe_receives_repeats_the_one_before_it() {
 fn a_run_nobody_is_watching_says_where_to_go_rather_than_taking_the_screen() {
     let home = machine("configured");
 
-    let settled = piped(&home, &["config", "set", "explanations", "on"]);
+    let settled = piped(&home, &["config", "set", "LEMONFIBER_EXPLANATIONS", "on"]);
     assert!(
         settled.is_ok(),
         "the machine could not be set up: {settled:?}"

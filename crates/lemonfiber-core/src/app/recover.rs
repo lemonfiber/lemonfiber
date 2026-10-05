@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use crate::config::store;
 use crate::error::{Diagnose, Problem, Remedy, Severity};
 use crate::journal::{is_sealed, Action, Undo};
+use crate::ports::filesystem::Confined;
 use crate::ports::service::Client as _;
 use crate::repair;
 
@@ -132,8 +133,13 @@ pub struct Reached {
 /// would not answer, where a reversal meets both. An unreachable service announces itself
 /// in every other reading of the stack; a reversal that deliberately did not write is
 /// something an operator can find out no other way.
-pub fn undo(undos: &[Undo], env_file: &Path, already: Vec<String>) -> Result<(), Box<Problem>> {
-    let carried = carrying_out(undos, env_file, already)?;
+pub fn undo(
+    confined: &dyn Confined,
+    undos: &[Undo],
+    env_file: &Path,
+    already: Vec<String>,
+) -> Result<(), Box<Problem>> {
+    let carried = carrying_out(confined, undos, env_file, already)?;
     if !carried.unread.is_empty() {
         return Err(Box::new(not_opened(&carried.unread)));
     }
@@ -191,6 +197,7 @@ pub struct Carried {
 ///
 /// Returns a [`Problem`] where a reversal could not be carried out at all.
 pub(crate) fn carrying_out(
+    confined: &dyn Confined,
     undos: &[Undo],
     env_file: &Path,
     already: Vec<String>,
@@ -200,7 +207,9 @@ pub(crate) fn carrying_out(
         ..Carried::default()
     };
     for undo in undos {
-        match carry_out(&undo.action, env_file).map_err(|fault| Box::new(fault.problem()))? {
+        match carry_out(confined, &undo.action, env_file)
+            .map_err(|fault| Box::new(fault.problem()))?
+        {
             Step::Done => carried.done.push(undo.clone()),
             Step::BeyondReach(resource) => carried.beyond_reach.push(resource),
             Step::TheirsNow(key) => carried.theirs.push(key),
@@ -232,7 +241,7 @@ enum Step {
 }
 
 /// Carry out one undo against the filesystem or the environment file.
-fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
+fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Result<Step, Fault> {
     match action {
         Action::Restore { key, value, wrote } => put_back(env_file, key, value.as_deref(), wrote),
         Action::Delete { path } => remove(Path::new(path)),
@@ -243,7 +252,14 @@ fn carry_out(action: &Action, env_file: &Path) -> Result<Step, Fault> {
             written,
         } => {
             let record = super::bounded::record_beside(env_file);
-            match super::bounded::withdraw(Path::new(path), key, owner, *written, Some(&record)) {
+            match super::bounded::withdraw(
+                confined,
+                Path::new(path),
+                key,
+                owner,
+                *written,
+                Some(&record),
+            ) {
                 Ok(super::bounded::Withdrawn::Done) => Ok(Step::Done),
                 // Somebody's work now, like a setting chosen since: left, and named.
                 Ok(super::bounded::Withdrawn::TheirsNow) => Ok(Step::TheirsNow(path.clone())),

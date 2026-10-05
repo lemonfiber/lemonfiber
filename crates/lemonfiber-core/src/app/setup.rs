@@ -278,11 +278,11 @@ pub(crate) fn recovered(
     match Recovery::of(&journal).resolve(choice) {
         Resolution::Resume => resume(wizard, applying),
         Resolution::RollBack(undos) => {
-            crate::app::recover::undo(&undos, &env, Vec::new())?;
+            crate::app::recover::undo(applying.confined, &undos, &env, Vec::new())?;
             resume(wizard, applying)
         }
         Resolution::StartOver(undos) => {
-            crate::app::recover::undo(&undos, &env, Vec::new())?;
+            crate::app::recover::undo(applying.confined, &undos, &env, Vec::new())?;
             clear_progress(paths);
             let _ = std::fs::remove_file(paths.journal());
             Ok(())

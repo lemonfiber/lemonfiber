@@ -39,7 +39,8 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-# The flag that refuses to open a file through a link; confined to `filesystem.rs`.
+# The flags that refuse to open a file through a link or to wait on a pipe; confined to
+# the filesystem module.
 libc = { workspace = true }
 
 [dev-dependencies]

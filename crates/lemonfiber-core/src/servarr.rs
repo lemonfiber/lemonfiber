@@ -270,7 +270,8 @@ impl crate::ports::service::Maintenance for Servarr {
 /// value is wanted, so a full XML dependency would be weight for nothing. An
 /// absent or empty element reads as "not generated yet" — a service still
 /// completing its first start, to be skipped and picked up on a later run — which
-/// is `None`, never a fault.
+/// is `None`, never a fault. So does one not spelled the way a generated key is, since
+/// the file is the container's to write: see [`crate::generated`].
 #[must_use]
 pub fn api_key(config_xml: &str) -> Option<String> {
     const OPEN: &str = "<ApiKey>";
@@ -278,8 +279,7 @@ pub fn api_key(config_xml: &str) -> Option<String> {
     let after_open = config_xml.find(OPEN)? + OPEN.len();
     let rest = config_xml.get(after_open..)?;
     let close = rest.find(CLOSE)?;
-    let key = rest.get(..close)?.trim();
-    (!key.is_empty()).then(|| key.to_owned())
+    crate::generated::key(rest.get(..close)?.trim())
 }
 
 /// The registration document for a download client, per the download-client

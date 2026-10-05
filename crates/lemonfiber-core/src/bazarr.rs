@@ -112,8 +112,7 @@ fn read_api_key(line: &str) -> Option<String> {
     if name.trim() != "apikey" {
         return None;
     }
-    let key = value.trim().trim_matches('\'').trim_matches('"');
-    (!key.is_empty()).then(|| key.to_owned())
+    crate::generated::key(value.trim().trim_matches('\'').trim_matches('"'))
 }
 
 /// A client for one Bazarr.

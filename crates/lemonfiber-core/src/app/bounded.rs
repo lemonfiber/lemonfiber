@@ -19,6 +19,8 @@
 use std::path::Path;
 
 use crate::materialised::{checksum, Materialised};
+use crate::ports::filesystem::Confined;
+use crate::within::{directory_of, read_unlinked, write_unlinked};
 
 /// Where the record of what lemonfiber materialised is kept, beside the settings file.
 ///
@@ -31,21 +33,28 @@ pub(crate) fn record_beside(env_file: &Path) -> std::path::PathBuf {
 /// Write `owner`'s region holding `body` into the file at `path`.
 ///
 /// The file has to be there already: a region is written into a file the stack has,
-/// never into one this brings into being.
+/// never into one this brings into being. It is read the way it is written, never
+/// through a link, because the directory it is in is one a container can write to.
 ///
 /// # Errors
 ///
-/// Where the file cannot be read or written, in the operating system's own words.
+/// Where the file is not there, is not a plain file, or cannot be read or written.
 pub(crate) fn put(
+    confined: &dyn Confined,
     path: &Path,
     key: &str,
     owner: &str,
     body: &str,
     record: Option<&Path>,
 ) -> Result<(), String> {
-    let before = std::fs::read_to_string(path).map_err(|why| why.to_string())?;
+    let Some(before) = read_unlinked(confined, path, directory_of(path))? else {
+        return Err(format!(
+            "{} is not there, and a region is only written into a file the stack already has",
+            path.display()
+        ));
+    };
     let after = crate::region::put(&before, owner, body);
-    rewritten(path, key, &before, &after, record)
+    rewritten(confined, path, (key, &before), &after, record)
 }
 
 /// What taking a region back out came to.
@@ -70,21 +79,20 @@ pub(crate) enum Withdrawn {
 ///
 /// Where the file is there and cannot be read or written.
 pub(crate) fn withdraw(
+    confined: &dyn Confined,
     path: &Path,
     key: &str,
     owner: &str,
     written: u32,
     record: Option<&Path>,
 ) -> Result<Withdrawn, String> {
-    let before = match std::fs::read_to_string(path) {
-        Ok(text) => text,
-        Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(Withdrawn::Done),
-        Err(why) => return Err(why.to_string()),
+    let Some(before) = read_unlinked(confined, path, directory_of(path))? else {
+        return Ok(Withdrawn::Done);
     };
     match crate::region::within(&before, owner) {
         Some(body) if checksum(body.as_bytes()) == written => {
             let after = crate::region::without(&before, owner).unwrap_or_default();
-            rewritten(path, key, &before, &after, record).map(|()| Withdrawn::Done)
+            rewritten(confined, path, (key, &before), &after, record).map(|()| Withdrawn::Done)
         }
         _ => Ok(Withdrawn::TheirsNow),
     }
@@ -99,9 +107,9 @@ pub(crate) fn written(body: &str) -> u32 {
 /// Write the file's new text, and carry the record of what was materialised with it
 /// where the record was holding the file as it stood.
 fn rewritten(
+    confined: &dyn Confined,
     path: &Path,
-    key: &str,
-    before: &str,
+    (key, before): (&str, &str),
     after: &str,
     record: Option<&Path>,
 ) -> Result<(), String> {
@@ -111,7 +119,8 @@ fn rewritten(
     //
     // And never through a link, because the directory it is in is one a container can
     // write to.
-    crate::within::write_unlinked(path, after.as_bytes()).map_err(|why| why.to_string())?;
+    write_unlinked(confined, path, directory_of(path), after.as_bytes())
+        .map_err(|why| why.to_string())?;
     let mut kept: Materialised = super::record::kept(record);
     if kept.checksum(key) == Some(checksum(before.as_bytes())) {
         kept.record(key, checksum(after.as_bytes()));

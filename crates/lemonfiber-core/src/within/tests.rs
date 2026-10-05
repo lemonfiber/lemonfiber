@@ -64,31 +64,54 @@ fn one_file_is_a_file_in_the_directory_and_not_under_it() {
     assert_eq!(one_file(""), None);
 }
 
-/// A file written in place is written, and a link where it goes — or where its
-/// directory goes — is refused rather than followed.
+/// A file written in place is written, and a link where it goes — or a linked
+/// directory on the way out of the directory it is held beneath — is refused rather
+/// than followed, for the read before a write as for the write.
 #[cfg(unix)]
 #[test]
 fn a_write_in_place_refuses_a_link_rather_than_following_it() {
+    let disk = lemonfiber_adapters::Disk;
     let root = lemonfiber_fixtures::scratch::Scratch::unmade("write-unlinked");
     let dir = root.join("config");
     assert!(std::fs::create_dir_all(&dir).is_ok());
 
     let own = dir.join("Caddyfile");
-    assert!(super::write_unlinked(&own, b"ours").is_ok());
-    assert_eq!(std::fs::read_to_string(&own).ok().as_deref(), Some("ours"));
+    assert!(super::write_unlinked(&disk, &own, &dir, b"ours").is_ok());
+    assert_eq!(
+        super::read_unlinked(&disk, &own, &dir),
+        Ok(Some("ours".to_owned()))
+    );
+    assert_eq!(
+        super::read_unlinked(&disk, &dir.join("absent"), &dir),
+        Ok(None)
+    );
 
     let target = root.join("elsewhere");
     assert!(std::fs::write(&target, "theirs").is_ok());
     let planted = dir.join("planted");
     assert!(std::os::unix::fs::symlink(&target, &planted).is_ok());
-    assert!(super::write_unlinked(&planted, b"ours").is_err());
+    assert!(super::write_unlinked(&disk, &planted, &dir, b"ours").is_err());
+    assert!(super::read_unlinked(&disk, &planted, &dir).is_err_and(|why| why.contains("is a link")));
 
-    let linked_dir = root.join("linked");
-    assert!(std::os::unix::fs::symlink(&dir, &linked_dir).is_ok());
-    assert!(super::write_unlinked(&linked_dir.join("Caddyfile"), b"ours").is_err());
+    let up = dir.join("up");
+    assert!(std::os::unix::fs::symlink(&*root, &up).is_ok());
+    assert!(super::write_unlinked(&disk, &up.join("elsewhere"), &dir, b"ours").is_err());
 
     assert_eq!(
         std::fs::read_to_string(&target).ok().as_deref(),
         Some("theirs")
+    );
+}
+
+/// A file is held beneath the directory it is in, and a bare name beneath this one.
+#[test]
+fn a_file_is_held_beneath_the_directory_it_is_in() {
+    assert_eq!(
+        super::directory_of(std::path::Path::new("config/caddy/Caddyfile")),
+        std::path::Path::new("config/caddy")
+    );
+    assert_eq!(
+        super::directory_of(std::path::Path::new("Caddyfile")),
+        std::path::Path::new(".")
     );
 }

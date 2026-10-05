@@ -52,7 +52,41 @@ pub(crate) fn config_path(
     let inside = CONFIG_MOUNTS
         .iter()
         .find_map(|mount| path.strip_prefix(mount))?;
-    Some(project.join(CONFIG_DIR).join(&service.id).join(inside))
+    Some(service_config_dir(project, &service.id).join(inside))
+}
+
+/// The directory on this machine one of the stack's own services owns: its configuration
+/// directory, mounted into its container, and so a directory whatever runs there can
+/// write anything into.
+pub(crate) fn service_config_dir(project: &Path, id: &str) -> PathBuf {
+    project.join(CONFIG_DIR).join(id)
+}
+
+/// A file one of the stack's services wrote, read only where it is a plain file beneath
+/// `within`, the directory its container owns: nothing where it is not there yet, or
+/// where something other than such a file is.
+///
+/// The container can write that directory, so a plain read would follow a link put where
+/// the file is expected to any file on the host, or wait for ever on a pipe.
+pub(crate) async fn read_owned(
+    files: &dyn crate::ports::filesystem::FileSystem,
+    path: &Path,
+    within: &Path,
+) -> Option<String> {
+    files.read_beneath(path, within).await.text()
+}
+
+/// The directory a file of the stack is held beneath when it is read or written: its
+/// service's configuration directory where it lies in one, since the container owns
+/// everything inside that, and the project root otherwise.
+pub(crate) fn held_beneath(project: &Path, relative: &Path) -> PathBuf {
+    let mut parts = relative.components();
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(top), Some(service), Some(_)) if top.as_os_str() == CONFIG_DIR => {
+            project.join(top).join(service)
+        }
+        _ => project.to_path_buf(),
+    }
 }
 
 /// The host path an installed plugin's service has its credential read from.

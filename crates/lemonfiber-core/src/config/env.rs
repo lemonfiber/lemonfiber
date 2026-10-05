@@ -18,8 +18,10 @@ enum Line {
     Entry {
         /// The key, trimmed.
         key: String,
-        /// The value, as written, with no unquoting.
+        /// The value it spells, read the way Compose reads it.
         value: String,
+        /// The text after the `=`, exactly as written, which is what is written back.
+        raw: String,
         /// Anything before the key on the line, such as indentation.
         indent: String,
     },
@@ -84,10 +86,12 @@ impl EnvFile {
                 out.push('\n');
             }
             match line {
-                Line::Entry { key, value, indent } => {
+                Line::Entry {
+                    key, raw, indent, ..
+                } => {
                     // `write!` to a String cannot fail; the result is discarded
                     // rather than unwrapped so no panic path exists here.
-                    let _ = write!(out, "{indent}{key}={value}");
+                    let _ = write!(out, "{indent}{key}={raw}");
                 }
                 Line::Verbatim(text) => out.push_str(text),
             }
@@ -98,7 +102,7 @@ impl EnvFile {
         out
     }
 
-    /// The value of a setting, as written.
+    /// The value of a setting, as Compose reads it.
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         self.lines.iter().rev().find_map(|line| match line {
@@ -109,6 +113,9 @@ impl EnvFile {
 
     /// Set a value, in place where the key already exists.
     ///
+    /// Written so Compose reads back exactly `value`: quoted, with nothing in it
+    /// expanded, wherever it holds anything but plain characters.
+    ///
     /// Rewriting in place is what keeps a setting underneath the comment that
     /// explains it. A new key is appended, because there is nowhere better to
     /// put it that would not be a guess. The *last* occurrence is rewritten, so
@@ -117,11 +124,15 @@ impl EnvFile {
     pub fn set(&mut self, key: &str, value: &str) {
         for line in self.lines.iter_mut().rev() {
             if let Line::Entry {
-                key: k, value: v, ..
+                key: k,
+                value: v,
+                raw,
+                ..
             } = line
             {
                 if k == key {
                     value.clone_into(v);
+                    *raw = quoted::written(value);
                     return;
                 }
             }
@@ -130,6 +141,7 @@ impl EnvFile {
         self.lines.push(Line::Entry {
             key: key.to_owned(),
             value: value.to_owned(),
+            raw: quoted::written(value),
             indent: String::new(),
         });
         self.trailing_newline = true;
@@ -190,11 +202,14 @@ impl Line {
 
         Self::Entry {
             key: key.to_owned(),
-            value: value.to_owned(),
+            value: quoted::read(value),
+            raw: value.to_owned(),
             indent,
         }
     }
 }
+
+mod quoted;
 
 #[cfg(test)]
 mod tests;

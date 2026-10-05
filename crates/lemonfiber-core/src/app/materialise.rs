@@ -11,8 +11,10 @@
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
+use crate::app::targets::held_beneath;
 use crate::materialised::{checksum, decide, diff, Decision, Materialised, Seen};
 use crate::model::StackEdit;
+use crate::ports::filesystem::Confined;
 use crate::quality::Selection;
 use crate::stack::{Failure, Source};
 
@@ -48,6 +50,7 @@ const RECYCLARR_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 /// Returns [`Failure`] when there is nowhere to write an embedded stack to, or when
 /// a file cannot be written.
 pub(crate) fn materialise(
+    confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -55,6 +58,7 @@ pub(crate) fn materialise(
     unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     write_stack(
+        confined,
         source,
         into,
         record_path,
@@ -74,13 +78,22 @@ pub(crate) fn materialise(
 ///
 /// Returns [`Failure`] when there is nowhere to write to, or a file cannot be written.
 pub(crate) fn reset_stack(
+    confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
     selection: Option<&Selection>,
     unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
-    write_stack(source, into, record_path, selection, unmanaged, Pass::Reset)
+    write_stack(
+        confined,
+        source,
+        into,
+        record_path,
+        selection,
+        unmanaged,
+        Pass::Reset,
+    )
 }
 
 /// Where the stack would live and which files the operator has edited, without
@@ -96,6 +109,7 @@ pub(crate) fn reset_stack(
 ///
 /// Returns [`Failure`] where there is nowhere the stack could live to read from.
 pub(crate) fn would_materialise(
+    confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -103,6 +117,7 @@ pub(crate) fn would_materialise(
     unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     write_stack(
+        confined,
         source,
         into,
         record_path,
@@ -120,6 +135,7 @@ pub(crate) fn would_materialise(
 ///
 /// Returns [`Failure`] only where there is nowhere the stack could live to read from.
 pub(crate) fn pending_reverts(
+    confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -127,6 +143,7 @@ pub(crate) fn pending_reverts(
     unmanaged: &[(String, String)],
 ) -> Result<Vec<StackEdit>, Failure> {
     write_stack(
+        confined,
         source,
         into,
         record_path,
@@ -152,6 +169,7 @@ enum Pass {
 /// only collecting what a reset would revert. An operator's edit is always returned with
 /// its diff; the pass decides whether it was preserved, reverted, or merely previewed.
 fn write_stack(
+    confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -201,14 +219,15 @@ fn write_stack(
         if record.unchanged(&key, Seen::of(&target, from, false)) {
             continue;
         }
-        let on_disk = std::fs::read(&target).ok();
+        let within = held_beneath(into, &relative);
+        let on_disk = on_disk(confined, &target, &within);
         let content = carrying_regions(content, on_disk.as_deref());
         let desired = checksum(&content);
         let actual = on_disk.as_deref().map(checksum);
         let regions = crate::region::holds(&content);
         match decide(record.checksum(&key), actual, desired) {
             Decision::Write if writing => {
-                write(&target, &content)?;
+                write(confined, (&target, &within), &content)?;
                 record.record(&key, desired);
                 record.saw(&key, Seen::of(&target, from, regions));
             }
@@ -227,7 +246,7 @@ fn write_stack(
             Decision::Preserve => {
                 let yours = on_disk.unwrap_or_default();
                 if pass == Pass::Reset {
-                    write(&target, &content)?;
+                    write(confined, (&target, &within), &content)?;
                     record.record(&key, desired);
                     record.saw(&key, Seen::of(&target, from, regions));
                 }
@@ -290,17 +309,30 @@ fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) 
 /// False where there is nothing to judge against: no record of what lemonfiber
 /// wrote, or no config on disk. It is the same comparison [`decide`] makes — on-disk
 /// against the record — read without writing anything.
-pub(crate) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Path>) -> bool {
+pub(crate) fn recyclarr_customised(
+    confined: &dyn Confined,
+    into: Option<&Path>,
+    record_path: Option<&Path>,
+) -> bool {
     let Some(into) = into else {
         return false;
     };
     let Some(recorded) = load(record_path).checksum(RECYCLARR_CONFIG) else {
         return false;
     };
-    match std::fs::read(into.join(RECYCLARR_CONFIG)) {
-        Ok(bytes) => checksum(&bytes) != recorded,
-        Err(_) => false,
-    }
+    let within = held_beneath(into, Path::new(RECYCLARR_CONFIG));
+    on_disk(confined, &into.join(RECYCLARR_CONFIG), &within)
+        .is_some_and(|bytes| checksum(&bytes) != recorded)
+}
+
+/// What a stack file holds on disk, read never through a link: nothing where it is not
+/// there, or where something other than a plain file of its directory's own is, which the
+/// write that follows then refuses by name.
+fn on_disk(confined: &dyn Confined, target: &Path, within: &Path) -> Option<Vec<u8>> {
+    crate::within::read_unlinked(confined, target, within)
+        .ok()
+        .flatten()
+        .map(String::into_bytes)
 }
 
 /// Re-assert the recorded preset over the Recyclarr config, overwriting a hand-edit
@@ -323,6 +355,7 @@ pub(crate) fn recyclarr_customised(into: Option<&Path>, record_path: Option<&Pat
 ///
 /// Returns [`Failure`] when there is nowhere to write, or the config cannot be written.
 pub(crate) fn reapply_recyclarr(
+    confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -348,6 +381,7 @@ pub(crate) fn reapply_recyclarr(
         return Err(Failure::NowhereToWrite);
     };
     let target = into.join(RECYCLARR_CONFIG);
+    let within = held_beneath(into, Path::new(RECYCLARR_CONFIG));
     let desired = crate::recyclarr::rewrite(&String::from_utf8_lossy(shipped), selection);
 
     // Read before the write, and read once. The same comparison `recyclarr_customised`
@@ -355,12 +389,11 @@ pub(crate) fn reapply_recyclarr(
     // matches it — but holding the content rather than the verdict, because what is
     // about to be overwritten cannot be read back afterwards.
     let recorded = load(record_path).checksum(RECYCLARR_CONFIG);
-    let theirs = std::fs::read(&target)
-        .ok()
+    let theirs = on_disk(confined, &target, &within)
         .filter(|bytes| recorded.is_some_and(|was| was != checksum(bytes)));
 
     if !rehearse {
-        write(&target, desired.as_bytes())?;
+        write(confined, (&target, &within), desired.as_bytes())?;
         let mut record = load(record_path);
         record.record(RECYCLARR_CONFIG, checksum(desired.as_bytes()));
         save(record_path, &record);
@@ -399,19 +432,28 @@ fn save(record_path: Option<&Path>, record: &Materialised) {
 /// Write one stack file, making its parent directory first. Both ways it can fail —
 /// the directory or the file — funnel through one place that names the file, so
 /// there is a single wording of the failure rather than one per step.
-fn write(target: &Path, content: &[u8]) -> Result<(), Failure> {
-    write_file(target, content).map_err(|error| Failure::NotWritten {
+fn write(
+    confined: &dyn Confined,
+    (target, within): (&Path, &Path),
+    content: &[u8],
+) -> Result<(), Failure> {
+    write_file(confined, (target, within), content).map_err(|error| Failure::NotWritten {
         path: target.to_path_buf(),
         reason: error.to_string(),
     })
 }
 
-/// The filesystem writes themselves: the parent directory, then the file. The
-/// parent is made with a statement-level `?` rather than one inside an `if`, which a
-/// coverage pass reads as a branch that the always-present parent never leaves.
-fn write_file(target: &Path, content: &[u8]) -> std::io::Result<()> {
+/// The filesystem writes themselves: the parent directory, then the file, held beneath
+/// `within`. The parent is made with a statement-level `?` rather than one inside an
+/// `if`, which a coverage pass reads as a branch that the always-present parent never
+/// leaves.
+fn write_file(
+    confined: &dyn Confined,
+    (target, within): (&Path, &Path),
+    content: &[u8],
+) -> std::io::Result<()> {
     target.parent().map_or(Ok(()), std::fs::create_dir_all)?;
-    crate::within::write_unlinked(target, content)
+    crate::within::write_unlinked(confined, target, within, content)
 }
 
 #[cfg(test)]

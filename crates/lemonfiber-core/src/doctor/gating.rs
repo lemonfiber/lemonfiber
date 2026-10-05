@@ -71,7 +71,8 @@ async fn ran(files: &dyn FileSystem, gate: Option<&Gate>) -> Vec<Finding> {
                 .to_owned(),
         })];
     };
-    let Some(text) = files.read(&gate.record).await else {
+    let within = crate::within::directory_of(&gate.record);
+    let Some(text) = crate::app::targets::read_owned(files, &gate.record, within).await else {
         return vec![finding(Verdict::Pass {
             note: Some("the request gate has refused nothing and removed nothing".to_owned()),
         })];

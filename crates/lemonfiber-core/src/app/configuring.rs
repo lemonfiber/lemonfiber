@@ -12,6 +12,8 @@
 //! replaces is still the one on disk. A proposal that does not clear all of that
 //! leaves the file exactly as it was and says which of them it failed.
 
+mod allowed;
+mod data_root;
 mod proving;
 
 use crate::config::{env::EnvFile, port_forward_from_env, store};
@@ -255,6 +257,11 @@ async fn weighed(ctx: &Ctx, held: &EnvFile, key: &str, value: &str, confirmed: b
         return review.blocked(format!(
             "you declared this unmanaged, so lemonfiber does not write it: {because}"
         ));
+    }
+    // A name nothing reads, or a value that would hand the containers the machine, is
+    // refused before anything about it is worked out.
+    if let Some(why) = allowed::refusal(ctx, held, key, value).await {
+        return review.blocked(why);
     }
     // What the change comes to on this machine — where the library would land, what
     // is still coming down, what was edited underneath, what it opens and keeps —

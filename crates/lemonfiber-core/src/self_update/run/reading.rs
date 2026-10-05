@@ -66,9 +66,11 @@ pub(super) async fn installed(
 /// Asked by trying, because permission bits are not the whole answer: an immutable
 /// flag, a read-only mount and a container's own layer each refuse a write that the
 /// bits say is allowed. Whatever it comes to, the probe is taken away again — a run
-/// interrupted between the two leaves a file whose name says what it was for.
+/// interrupted between the two leaves a file whose name says what it was for, which the
+/// next clears before it tries, since a probe is only ever created new.
 pub(super) async fn replaceable(files: &dyn FileSystem, at: Option<&Path>) -> Option<bool> {
     let probe = at.and_then(probe_beside)?;
+    files.remove(&probe).await;
     let written = files.touch(&probe).await.is_ok();
     files.remove(&probe).await;
     Some(written)

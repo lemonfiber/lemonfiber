@@ -14,6 +14,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::ports::filesystem::{Beneath, Confined, Fault};
+
 /// Where `asked` lands beneath a directory, or nothing where it leads outside one.
 ///
 /// Split on the separator a request uses rather than handed to the platform's own
@@ -54,28 +56,57 @@ pub(crate) fn one_file(asked: &str) -> Option<PathBuf> {
     Some(PathBuf::from(only.as_os_str()))
 }
 
-/// Write `contents` to `path` in place, refusing where the file or the directory it is
-/// in is a link.
+/// Write `contents` to `path` in place, only where it is a plain file beneath `within`.
 ///
 /// In place, because some of what lemonfiber writes this way is a file a container is
 /// given on its own, and a container given one file follows that file rather than
-/// whatever replaces it. Not through a link, because the directories these files sit
-/// in are ones containers can write to: a link planted there would turn lemonfiber's
-/// write into a write anywhere the operator can.
+/// whatever replaces it. Never through a link, at the file or on the way to it, because
+/// the directories these files sit in are ones containers can write to: a link planted
+/// there would turn lemonfiber's write into a write anywhere the operator can.
 ///
 /// # Errors
 ///
-/// Where the file or its directory is a link, or the write itself fails.
-pub(crate) fn write_unlinked(path: &Path, contents: &[u8]) -> std::io::Result<()> {
-    let linked =
-        |at: &Path| std::fs::symlink_metadata(at).is_ok_and(|meta| meta.file_type().is_symlink());
-    if linked(path) || path.parent().is_some_and(linked) {
-        return Err(std::io::Error::other(format!(
-            "{} is a link, and lemonfiber writes its own file there rather than following one",
-            path.display()
-        )));
+/// Where the file is not a plain file beneath `within`, or the write itself fails.
+pub(crate) fn write_unlinked(
+    confined: &dyn Confined,
+    path: &Path,
+    within: &Path,
+    contents: &[u8],
+) -> std::io::Result<()> {
+    confined
+        .overwrite(path, within, contents)
+        .map_err(|fault| std::io::Error::other(fault.message))
+}
+
+/// Read `path`, only where it is a plain file beneath `within`: what it holds, or
+/// nothing where it is not there.
+///
+/// # Errors
+///
+/// Where something other than a plain file of `within`'s own is there, in the words a
+/// write to it would be refused in.
+pub(crate) fn read_unlinked(
+    confined: &dyn Confined,
+    path: &Path,
+    within: &Path,
+) -> Result<Option<String>, String> {
+    match confined.read(path, within) {
+        Beneath::Read(text) => Ok(Some(text)),
+        Beneath::Absent => Ok(None),
+        Beneath::Escaped => Err(Fault::escaped(path, within).message),
     }
-    std::fs::write(path, contents)
+}
+
+/// The directory a file sits in, which is what a file lemonfiber writes into a
+/// container's directory is held beneath.
+///
+/// The directory itself is safe to name: it is the one mounted into the container, and a
+/// container can write what is in its mount but cannot replace the mount.
+#[must_use]
+pub(crate) fn directory_of(path: &Path) -> &Path {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
 }
 
 #[cfg(test)]

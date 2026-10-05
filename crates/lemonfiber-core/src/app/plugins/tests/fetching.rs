@@ -126,7 +126,7 @@ async fn a_git_source_is_installed_at_the_commit_it_serves_and_recorded() {
         "the one commit was not what was fetched: {asked:?}"
     );
     assert!(
-        !super::super::fetching::checkout(HEAD).exists(),
+        super::super::fetching::checkout(&ctx, HEAD).is_some_and(|at| !at.exists()),
         "the checkout was left behind"
     );
 }
@@ -219,7 +219,7 @@ async fn a_commit_that_will_not_be_fetched_is_refused_and_leaves_nothing() {
         refusal(from_git(&ctx, "https://example.org/plugin-komga").await),
         "PLUGIN-16"
     );
-    assert!(!super::super::fetching::checkout(HEAD).exists());
+    assert!(super::super::fetching::checkout(&ctx, HEAD).is_some_and(|at| !at.exists()));
 }
 
 /// A git that cannot be run at all is a source that could not be fetched.
@@ -270,7 +270,7 @@ async fn a_rehearsed_git_install_records_nothing_and_leaves_nothing() {
         Some((false, HEAD.to_owned()))
     );
     assert!(!record_of(&ctx).exists());
-    assert!(!super::super::fetching::checkout(HEAD).exists());
+    assert!(super::super::fetching::checkout(&ctx, HEAD).is_some_and(|at| !at.exists()));
 }
 
 /// A listing with lines that are not a commit and a name is read past them.
@@ -391,4 +391,56 @@ async fn a_record_naming_no_source_is_not_asked() {
         said.first().map(|one| &one.standing),
         Some(crate::plugin::Fetchable::Unasked { .. })
     ));
+}
+
+/// A checkout is made under lemonfiber's own data directory rather than the temporary
+/// directory every user of the machine shares.
+#[test]
+fn a_checkout_is_made_under_lemonfibers_own_data_directory() {
+    let ctx = ctx("git-where");
+    let data = crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().to_path_buf());
+
+    let at = super::super::fetching::checkout(&ctx, HEAD);
+
+    assert!(
+        at.as_ref()
+            .zip(data.as_ref())
+            .is_some_and(|(at, data)| at.starts_with(data.join("checkouts"))),
+        "{at:?} under {data:?}"
+    );
+}
+
+/// Where the checkout cannot be made, nothing is fetched and the refusal says so.
+#[tokio::test]
+async fn a_checkout_that_cannot_be_made_is_refused_before_anything_is_fetched() {
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let ctx = served("git-unmade", &serving);
+    let data = crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().to_path_buf());
+    // A file where the directory checkouts are made in would go.
+    let _ = data.map(|data| {
+        let _ = std::fs::create_dir_all(&data);
+        std::fs::write(data.join("checkouts"), "in the way")
+    });
+
+    assert_eq!(
+        refusal(from_git(&ctx, "https://example.org/plugin-komga").await),
+        "PLUGIN-16"
+    );
+    assert!(!serving
+        .asked()
+        .iter()
+        .any(|one| one.contains(&"fetch".to_owned())));
+}
+
+/// A machine not set up has no data directory to check anything out in.
+#[tokio::test]
+async fn a_machine_not_set_up_has_nowhere_to_check_out() {
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let mut ctx = a_context().build();
+    ctx.seams.runner = serving.clone();
+
+    assert_eq!(
+        refusal(from_git(&ctx, "https://example.org/plugin-komga").await),
+        "CONFIG-3"
+    );
 }

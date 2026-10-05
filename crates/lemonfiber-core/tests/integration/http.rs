@@ -28,6 +28,10 @@ enum Reply {
     /// An empty response carrying one header whose value is text and one whose value
     /// is not, so what the reading does with each can be looked at.
     Unreadable,
+    /// A response announcing a body of this many bytes, and sending none of it.
+    Announcing(u64),
+    /// A response announcing no length at all, sending this body and closing.
+    Unannounced(&'static str),
 }
 
 /// A running fake server on localhost, and the request it captured.
@@ -127,6 +131,12 @@ async fn served(listener: &TcpListener, reply: Reply, captured: &Arc<Mutex<Strin
                 b"HTTP/1.1 200 X\r\nContent-Type: text/plain\r\nX-Served-By: \xff\xfe".to_vec();
             said.extend_from_slice(b"\r\nContent-Length: 0\r\n\r\n");
             said
+        }
+        Reply::Announcing(length) => {
+            format!("HTTP/1.1 200 X\r\nContent-Length: {length}\r\n\r\n").into_bytes()
+        }
+        Reply::Unannounced(body) => {
+            format!("HTTP/1.1 200 X\r\nConnection: close\r\n\r\n{body}").into_bytes()
         }
     };
     let _ = socket.write_all(&bytes).await;
@@ -451,4 +461,42 @@ async fn a_removal_is_sent_as_a_removal() {
 
     assert_eq!(response.ok().map(|answer| answer.status), Some(204));
     assert!(sent.starts_with("DELETE "), "a DELETE was sent: {sent:?}");
+}
+
+/// An answer within the limit is read whole; one announcing more than the limit is
+/// refused before a byte of it is read, and one that announces nothing is refused as
+/// soon as it passes the limit — so no service can make this process hold an answer
+/// without end.
+#[tokio::test]
+async fn an_answer_past_the_limit_is_refused_rather_than_held() {
+    let within = serve(Reply::Whole(200, "short")).await;
+    let read = Web::new().limited(16).send(&asking(&within.base)).await;
+    within.stop().await;
+    assert_eq!(
+        read.map(|response| response.body).ok().as_deref(),
+        Some("short")
+    );
+
+    let announcing = serve(Reply::Announcing(1_000_000)).await;
+    let refused = Web::new().limited(16).send(&asking(&announcing.base)).await;
+    announcing.stop().await;
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|failure| failure.reason.contains("larger than 16 bytes")),
+        "{refused:?}"
+    );
+
+    let unannounced = serve(Reply::Unannounced("a body a good deal longer than sixteen")).await;
+    let refused = Web::new()
+        .limited(16)
+        .send(&asking(&unannounced.base))
+        .await;
+    unannounced.stop().await;
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|failure| failure.reason.contains("larger than 16 bytes")),
+        "{refused:?}"
+    );
 }

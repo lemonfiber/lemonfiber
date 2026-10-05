@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use crate::docker::{Engine, Images, Locations};
-use crate::filesystem::{Eraser, Volume};
+use crate::filesystem::{Confined, Eraser, Volume};
 use crate::hosting::Host;
 use crate::http::Http;
 use crate::nntp::Nntp;
@@ -51,6 +51,8 @@ pub struct Seams {
     pub volume: Arc<dyn Volume>,
     /// How what this machine keeps is removed.
     pub eraser: Arc<dyn Eraser>,
+    /// How a file a container can write is read and written by code that cannot wait.
+    pub confined: Arc<dyn Confined>,
     /// How the disk is asked where it went.
     pub occupancy: Arc<dyn Occupancy>,
     /// How this machine is asked to keep something running.

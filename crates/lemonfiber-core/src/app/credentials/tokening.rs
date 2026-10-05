@@ -281,13 +281,13 @@ fn consumer(route: &Route) -> String {
 /// service it reaches.
 async fn routes(ctx: &Ctx, services: &[Service], project: &Path) -> Vec<Route> {
     let path = gating::path(project, File::Upstreams);
-    let Some(upstreams) = ctx
-        .seams
-        .filesystem
-        .read(&path)
-        .await
-        .and_then(|text| Upstreams::read(&text).ok())
-    else {
+    let Some(upstreams) = crate::app::targets::read_owned(
+        ctx.seams.filesystem.as_ref(),
+        &path,
+        crate::within::directory_of(&path),
+    )
+    .await
+    .and_then(|text| Upstreams::read(&text).ok()) else {
         return Vec::new();
     };
     upstreams

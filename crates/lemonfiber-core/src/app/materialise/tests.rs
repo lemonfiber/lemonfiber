@@ -8,6 +8,9 @@ use crate::stack::{Failure, Source};
 
 static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
+/// The real disk, which every file here is written to.
+const DISK: lemonfiber_adapters::Disk = lemonfiber_adapters::Disk;
+
 /// A clean scratch directory for one test, and the record path beside it.
 fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, PathBuf) {
     let into = lemonfiber_fixtures::scratch::Scratch::unmade(name).within("stack");
@@ -30,7 +33,14 @@ fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
     let (into, record) = scratch("write-and-leave");
     let source = Source::Embedded(&STACKLET);
 
-    let first = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let first = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
     let (path, edits) = first.unwrap_or((PathBuf::new(), Vec::new()));
     assert_eq!(path, into.path());
     assert!(edits.is_empty(), "a fresh materialise reports no edits");
@@ -44,8 +54,15 @@ fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
     );
 
     // A second run finds every file exactly as it left it: nothing to report.
-    let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or((PathBuf::new(), Vec::new()));
+    let (_, again) = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or((PathBuf::new(), Vec::new()));
     assert!(again.is_empty(), "an unchanged file is left, not reported");
 }
 
@@ -55,9 +72,17 @@ fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
 fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
     let (into, record) = scratch("region-kept");
     let source = Source::Embedded(&STACKLET);
-    let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let _ = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
     let file = into.join("compose.yaml");
     let _ = super::super::bounded::put(
+        &DISK,
         &file,
         "compose.yaml",
         "plugin komga",
@@ -66,8 +91,15 @@ fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
     );
     let with_region = read(&file);
 
-    let edits = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .map(|(_, edits)| edits.len());
+    let edits = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .map(|(_, edits)| edits.len());
 
     assert_eq!(
         edits.ok(),
@@ -83,10 +115,18 @@ fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
 fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
     let (into, record) = scratch("region-reset");
     let source = Source::Embedded(&STACKLET);
-    let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let _ = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
     let file = into.join("compose.yaml");
     let shipped = read(&file);
     let _ = super::super::bounded::put(
+        &DISK,
         &file,
         "compose.yaml",
         "plugin komga",
@@ -95,7 +135,14 @@ fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
     );
     let _ = std::fs::write(&file, read(&file).replace("sonarr", "my-own-sonarr"));
 
-    let _ = reset_stack(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let _ = reset_stack(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
 
     assert_eq!(
         read(&file),
@@ -107,14 +154,28 @@ fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
 fn an_edited_file_is_preserved_and_reported_with_a_diff() {
     let (into, record) = scratch("preserve-edit");
     let source = Source::Embedded(&STACKLET);
-    let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let _ = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
 
     // The operator edits a materialised file by hand.
     let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
     let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-    let (_, edits) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or((PathBuf::new(), Vec::new()));
+    let (_, edits) = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or((PathBuf::new(), Vec::new()));
     assert_eq!(edits.len(), 1, "only the edited file is reported");
     let edit = edits.first();
     assert!(edit.is_some_and(|edit| edit.path == "compose.yaml"));
@@ -130,16 +191,30 @@ fn an_edited_file_is_preserved_and_reported_with_a_diff() {
 fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
     let (into, record) = scratch("reset-revert");
     let source = Source::Embedded(&STACKLET);
-    let (_, _) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or((PathBuf::new(), Vec::new()));
+    let (_, _) = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or((PathBuf::new(), Vec::new()));
     let shipped = read(&into.join("compose.yaml"));
 
     // The operator edits a file, then resets.
     let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
     let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-    let (_, reverted) = reset_stack(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or((PathBuf::new(), Vec::new()));
+    let (_, reverted) = reset_stack(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or((PathBuf::new(), Vec::new()));
     assert_eq!(reverted.len(), 1, "the reverted edit is named");
     assert!(reverted
         .first()
@@ -147,8 +222,15 @@ fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
     // The edit is gone: the file is lemonfiber's own again.
     assert_eq!(read(&into.join("compose.yaml")), shipped);
     // And a following materialise sees no drift — the reset re-recorded it.
-    let (_, again) = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or((PathBuf::new(), Vec::new()));
+    let (_, again) = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or((PathBuf::new(), Vec::new()));
     assert!(
         again.is_empty(),
         "the reverted file is no longer read as drift"
@@ -159,13 +241,27 @@ fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
 fn a_preview_names_the_reverts_but_writes_nothing() {
     let (into, record) = scratch("reset-preview");
     let source = Source::Embedded(&STACKLET);
-    let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let _ = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
 
     let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
     let _ = std::fs::write(into.join("compose.yaml"), edited);
 
-    let pending = pending_reverts(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or_default();
+    let pending = pending_reverts(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or_default();
     assert_eq!(pending.len(), 1, "the edit that would be reverted is named");
     // The preview touched nothing: the operator's edit is still there.
     assert_eq!(read(&into.join("compose.yaml")), edited);
@@ -178,8 +274,15 @@ fn a_preview_of_a_stack_never_written_writes_nothing() {
     let (into, record) = scratch("unwritten-preview");
     let source = Source::Embedded(&STACKLET);
 
-    let pending = pending_reverts(source, Some(&into), Some(&record), Some(&balanced()), &[])
-        .unwrap_or_default();
+    let pending = pending_reverts(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    )
+    .unwrap_or_default();
 
     assert!(pending.is_empty(), "{pending:?}");
     assert!(!into.join("compose.yaml").exists(), "nothing was written");
@@ -191,6 +294,7 @@ fn an_external_stack_is_returned_and_nothing_is_written() {
     let (into, record) = scratch("external");
     let external = Path::new("/some/operator/stack");
     let (path, edits) = materialise(
+        &DISK,
         Source::External(external),
         Some(&into),
         Some(&record),
@@ -206,6 +310,7 @@ fn an_external_stack_is_returned_and_nothing_is_written() {
 #[test]
 fn an_embedded_stack_with_nowhere_to_write_is_refused() {
     let refusal = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         None,
         None,
@@ -225,6 +330,7 @@ fn a_file_where_a_directory_must_go_is_a_write_failure() {
         let _ = std::fs::write(&into, "not a directory");
     }
     let failure = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -238,6 +344,7 @@ fn a_file_where_a_directory_must_go_is_a_write_failure() {
 fn without_a_record_path_the_stack_is_still_written() {
     let (into, _) = scratch("no-record");
     let (_, edits) = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         None,
@@ -255,6 +362,7 @@ fn a_chosen_preset_is_carried_into_the_recyclarr_config() {
     let maximum = Selection::everywhere(Preset::Maximum);
 
     let (_, edits) = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -276,6 +384,7 @@ fn a_chosen_preset_is_carried_into_the_recyclarr_config() {
 fn the_default_choice_leaves_the_shipped_recyclarr_config_untouched() {
     let (into, record) = scratch("recyclarr-default");
     let (_, edits) = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -297,6 +406,7 @@ fn no_selection_writes_the_rest_but_skips_the_recyclarr_config() {
     // to the shipped default.
     let (into, record) = scratch("recyclarr-none");
     let (_, edits) = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -317,6 +427,7 @@ fn no_selection_does_not_revert_an_applied_preset() {
     let (into, record) = scratch("recyclarr-no-revert");
     // A preset was applied on a prior up.
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -329,6 +440,7 @@ fn no_selection_does_not_revert_an_applied_preset() {
     // A later command carrying no choice leaves the applied preset exactly as it
     // is — not written back to the shipped default.
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -345,27 +457,28 @@ fn no_selection_does_not_revert_an_applied_preset() {
 fn a_config_is_customised_only_once_it_differs_from_the_record() {
     let (into, record) = scratch("customised");
     // Nothing written yet: nothing to be customised against.
-    assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
 
     // Applied and untouched: lemonfiber's own, not customised.
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
         Some(&balanced()),
         &[],
     );
-    assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
 
     // The operator tunes it by hand: now it is customised.
     let recyclarr = into.join("config/recyclarr/recyclarr.yml");
     let _ = std::fs::write(&recyclarr, "# mine\n");
-    assert!(recyclarr_customised(Some(&into), Some(&record)));
+    assert!(recyclarr_customised(&DISK, Some(&into), Some(&record)));
 
     // Deleted while the record persists: nothing on disk to be customised, so a
     // reapply would simply write it again.
     let _ = std::fs::remove_file(&recyclarr);
-    assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
 }
 
 #[test]
@@ -373,6 +486,7 @@ fn reapply_overwrites_a_customised_config_and_records_it() {
     let (into, record) = scratch("reapply");
     let maximum = Selection::everywhere(Preset::Maximum);
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -382,10 +496,11 @@ fn reapply_overwrites_a_customised_config_and_records_it() {
     let recyclarr = into.join("config/recyclarr/recyclarr.yml");
     // The operator hand-edits it.
     let _ = std::fs::write(&recyclarr, "# mine\n");
-    assert!(recyclarr_customised(Some(&into), Some(&record)));
+    assert!(recyclarr_customised(&DISK, Some(&into), Some(&record)));
 
     // Reapply re-asserts the recorded preset over the edit.
     let overwritten = reapply_recyclarr(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -408,7 +523,7 @@ fn reapply_overwrites_a_customised_config_and_records_it() {
     );
     assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
     // Recorded as lemonfiber's own again: no longer customised.
-    assert!(!recyclarr_customised(Some(&into), Some(&record)));
+    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
 }
 
 /// The diff of a replaced config reaches a terminal, its scrollback and any bug
@@ -418,6 +533,7 @@ fn a_credential_in_the_config_a_reapply_replaces_is_named_and_never_printed() {
     let (into, record) = scratch("reapply-secret");
     let maximum = Selection::everywhere(Preset::Maximum);
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -429,6 +545,7 @@ fn a_credential_in_the_config_a_reapply_replaces_is_named_and_never_printed() {
     let _ = std::fs::write(&recyclarr, format!("    api_key: {key}\n"));
 
     let overwritten = reapply_recyclarr(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -451,6 +568,7 @@ fn a_reapply_over_a_config_already_in_lemonfibers_own_hand_replaces_nothing() {
     let (into, record) = scratch("reapply-clean");
     let maximum = Selection::everywhere(Preset::Maximum);
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -459,6 +577,7 @@ fn a_reapply_over_a_config_already_in_lemonfibers_own_hand_replaces_nothing() {
     );
 
     let overwritten = reapply_recyclarr(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -478,6 +597,7 @@ fn a_rehearsed_reapply_writes_nothing() {
     let (into, record) = scratch("reapply-dry");
     let maximum = Selection::everywhere(Preset::Maximum);
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -488,6 +608,7 @@ fn a_rehearsed_reapply_writes_nothing() {
     let _ = std::fs::write(&recyclarr, "# mine\n");
 
     let overwritten = reapply_recyclarr(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -525,6 +646,7 @@ fn a_file_beneath_a_declared_area_is_never_written() {
     let theirs = declared("config/recyclarr");
 
     let (_, edits) = materialise(
+        &DISK,
         source,
         Some(&into),
         Some(&record),
@@ -557,12 +679,20 @@ fn a_reset_does_not_revert_a_file_the_operator_declared_unmanaged() {
     let (into, record) = scratch("unmanaged-reset");
     let source = Source::Embedded(&STACKLET);
     let theirs = declared("compose.yaml");
-    let _ = materialise(source, Some(&into), Some(&record), Some(&balanced()), &[]);
+    let _ = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
 
     let mine = "services:\n  sonarr:\n    image: an-image-of-my-own\n";
     let _ = std::fs::write(into.join("compose.yaml"), mine);
 
     let (_, reverted) = reset_stack(
+        &DISK,
         source,
         Some(&into),
         Some(&record),
@@ -586,6 +716,7 @@ fn a_reapply_leaves_a_quality_config_declared_unmanaged_exactly_as_it_is() {
     let (into, record) = scratch("unmanaged-reapply");
     let maximum = Selection::everywhere(Preset::Maximum);
     let _ = materialise(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -596,6 +727,7 @@ fn a_reapply_leaves_a_quality_config_declared_unmanaged_exactly_as_it_is() {
     let _ = std::fs::write(&recyclarr, "# mine\n");
 
     let overwritten = reapply_recyclarr(
+        &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
         Some(&record),
@@ -613,6 +745,7 @@ fn a_reapply_leaves_a_quality_config_declared_unmanaged_exactly_as_it_is() {
 fn reapply_leaves_an_external_stack_alone() {
     let (into, record) = scratch("reapply-external");
     let overwritten = reapply_recyclarr(
+        &DISK,
         Source::External(Path::new("/some/operator/stack")),
         Some(&into),
         Some(&record),
@@ -626,6 +759,37 @@ fn reapply_leaves_an_external_stack_alone() {
         "an external stack is the operator's, left untouched"
     );
     assert!(!into.exists(), "nothing was written for an external stack");
+}
+
+/// A link a container planted where one of its stack files goes is neither read into a
+/// diff nor written through: the pass refuses that file by name and the file the link
+/// points at keeps what it held.
+#[cfg(unix)]
+#[test]
+fn a_link_planted_where_a_stack_file_goes_is_neither_read_nor_written() {
+    let (into, record) = scratch("planted-link");
+    let source = Source::Embedded(&STACKLET);
+    let operator = into.with_file_name("authorized_keys");
+    assert!(std::fs::create_dir_all(into.parent().unwrap_or(&into)).is_ok());
+    assert!(std::fs::write(&operator, "ssh-ed25519 theirs\n").is_ok());
+    let recyclarr = into.join("config").join("recyclarr");
+    let _ = std::fs::create_dir_all(&recyclarr);
+    let _ = std::os::unix::fs::symlink(&operator, recyclarr.join("recyclarr.yml"));
+
+    let refused = materialise(
+        &DISK,
+        source,
+        Some(&into),
+        Some(&record),
+        Some(&balanced()),
+        &[],
+    );
+
+    assert!(
+        matches!(&refused, Err(Failure::NotWritten { reason, .. }) if reason.contains("is a link")),
+        "got: {refused:?}"
+    );
+    assert_eq!(read(&operator), "ssh-ed25519 theirs\n");
 }
 
 mod freshness;

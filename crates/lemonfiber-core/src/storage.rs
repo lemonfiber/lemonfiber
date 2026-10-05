@@ -13,18 +13,16 @@
 //! data-location step ask the same question, so they ask it through here rather
 //! than each keeping a probe of its own to drift.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ports::filesystem::{FileSystem, Identity};
 
-/// The name of the file the probe creates, and the second name it links it to.
+/// What the name of every file the probe creates starts with.
 ///
-/// Fixed and unmistakable so that a probe interrupted mid-run leaves something a
-/// person recognises as lemonfiber's rather than a mystery file in their media.
+/// Unmistakable, so that a probe interrupted mid-run leaves something a person
+/// recognises as lemonfiber's rather than a mystery file in their media.
 const PROBE: &str = ".lemonfiber-hardlink-probe";
-
-/// The second name the probe file is linked to.
-const LINKED: &str = ".lemonfiber-hardlink-probe.link";
 
 /// What a location that cannot hardlink costs, in concrete terms — stated the
 /// same way wherever it is reported, at setup and in a later diagnosis, because
@@ -59,19 +57,13 @@ pub enum Linked {
 /// file — the empirical test, never inferred from the filesystem's name.
 ///
 /// `dir` must be a directory that already exists; a caller testing a location not
-/// yet created resolves it to a real ancestor first. Both probe names are cleared
-/// before and after, so a run interrupted between the link and its cleanup does
-/// not read as an inability to link on the next.
+/// yet created resolves it to a real ancestor first. Both names are this run's own,
+/// so two probes running at once never take each other's files away, and a run
+/// interrupted before its cleanup leaves nothing in the way of the next. The probe
+/// file is created new, which is refused through a link, because the directory is one
+/// containers can write to.
 pub(crate) async fn test_link(filesystem: &dyn FileSystem, dir: &Path) -> Linked {
-    let probe = dir.join(PROBE);
-    let linked = dir.join(LINKED);
-
-    // A run killed between the link and the cleanup below leaves the link behind,
-    // and a link to a name that already exists fails — which would read as "cannot
-    // hardlink" on a filesystem that hardlinks fine. Clearing both names first
-    // makes the probe robust to its own interrupted past.
-    filesystem.remove(&linked).await;
-    filesystem.remove(&probe).await;
+    let (probe, linked) = names(dir);
 
     if let Err(fault) = filesystem.touch(&probe).await {
         return Linked::Unwritable {
@@ -97,6 +89,18 @@ pub(crate) async fn test_link(filesystem: &dyn FileSystem, dir: &Path) -> Linked
     filesystem.remove(&linked).await;
     filesystem.remove(&probe).await;
     result
+}
+
+/// The probe file's name under `dir` and the second name it is linked to, both this
+/// run's own: named for this process and a count of the probes it has made.
+fn names(dir: &Path) -> (PathBuf, PathBuf) {
+    static MADE: AtomicU64 = AtomicU64::new(0);
+    let name = format!(
+        "{PROBE}-{}-{}",
+        std::process::id(),
+        MADE.fetch_add(1, Ordering::Relaxed)
+    );
+    (dir.join(&name), dir.join(format!("{name}.link")))
 }
 
 /// Whether two entries name the same underlying file.

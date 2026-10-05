@@ -172,6 +172,7 @@ fn applying<'a>(ctx: &'a Ctx, paths: &'a Paths, stamp: &'a str) -> Applying<'a> 
         source: ctx.stack,
         stamp,
         random: ctx.seams.random.as_ref(),
+        confined: ctx.seams.confined.as_ref(),
     }
 }
 

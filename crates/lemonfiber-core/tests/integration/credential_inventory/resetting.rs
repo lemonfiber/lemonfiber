@@ -67,8 +67,16 @@ impl Resetting {
 
 #[async_trait]
 impl FileSystem for Resetting {
+    /// A path resolves the way `rest` resolves it, and one `rest` does not hold resolves as
+    /// a disk would resolve it if it were there: beneath the deepest directory above it
+    /// that `rest` resolves. The configurations this holds are among those.
     async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        self.now().canonicalize(path).await
+        for above in path.ancestors() {
+            if let Ok(real) = self.now().canonicalize(above).await {
+                return Ok(real.join(path.strip_prefix(above).unwrap_or(path)));
+            }
+        }
+        Ok(path.to_path_buf())
     }
 
     async fn touch(&self, path: &Path) -> Result<(), Fault> {

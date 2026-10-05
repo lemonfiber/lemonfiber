@@ -41,13 +41,13 @@ fn removing_a_key_drops_its_line_and_keeps_the_rest() {
 
 #[test]
 fn a_value_spanning_lines_is_more_settings_rather_than_one_value() {
-    // Why the writer refuses rather than escaping: there is no escape. The
-    // renderer puts the value straight after the `=`, so what a break makes
-    // is a second setting, and this shows it happening.
+    // Why the writer refuses rather than escaping: a break in the value is a break
+    // in the file, quoted or not, so what it makes is a second setting, and this
+    // shows it happening.
     let mut file = EnvFile::parse("TZ=UTC\n");
     file.set("INDEXER_APIKEY", "abc\nPUID=0");
 
-    assert_eq!(EnvFile::parse(&file.render()).get("PUID"), Some("0"));
+    assert!(EnvFile::parse(&file.render()).get("PUID").is_some());
     assert!(!is_one_line("abc\nPUID=0"));
     assert!(!is_one_line("abc\rPUID=0"));
     assert!(is_one_line("abc"));
@@ -155,5 +155,37 @@ fn a_key_that_is_not_a_key_is_left_alone() {
     let text = "not-a-key=value\n";
     let file = EnvFile::parse(text);
     assert_eq!(file.keys(), Vec::<&str>::new());
+    assert_eq!(file.render(), text);
+}
+
+/// A value a container wrote about itself cannot have Compose fill it with another
+/// setting: what is written reads back, to lemonfiber and to Compose alike, as exactly
+/// the text it was — the reference, the dollar, the quote — and nothing else on the
+/// line or around it moves.
+#[test]
+fn a_value_holding_a_reference_is_written_so_nothing_expands_it() {
+    let mut file = EnvFile::parse("# keys\nWIREGUARD_PRIVATE_KEY=secret\n");
+    let planted = "${WIREGUARD_PRIVATE_KEY}$it's\"";
+
+    file.set("SONARR_API_KEY", planted);
+    let text = file.render();
+
+    assert_eq!(
+        text,
+        "# keys\nWIREGUARD_PRIVATE_KEY=secret\nSONARR_API_KEY=\"\\${WIREGUARD_PRIVATE_KEY}\\$it's\\\"\"\n"
+    );
+    assert_eq!(EnvFile::parse(&text).get("SONARR_API_KEY"), Some(planted));
+}
+
+/// A setting an operator quoted by hand is read as the value they meant, not with its
+/// quotes, and is written back exactly as they spelled it while nothing changes it.
+#[test]
+fn a_hand_quoted_setting_is_read_as_meant_and_kept_as_spelled() {
+    let text = "TZ=\"Europe/Amsterdam\"\nNOTE='$HOME' # literal\nPASS=a$$b\n";
+    let file = EnvFile::parse(text);
+
+    assert_eq!(file.get("TZ"), Some("Europe/Amsterdam"));
+    assert_eq!(file.get("NOTE"), Some("$HOME"));
+    assert_eq!(file.get("PASS"), Some("a$b"));
     assert_eq!(file.render(), text);
 }

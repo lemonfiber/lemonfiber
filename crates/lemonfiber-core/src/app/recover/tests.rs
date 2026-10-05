@@ -182,6 +182,7 @@ fn restoring_a_setting_writes_its_earlier_value_back() {
     assert!(store::set(&env, "TZ", "Pacific/Auckland").is_ok());
 
     assert!(undo(
+        &lemonfiber_adapters::Disk,
         &[restore("TZ", Some("Europe/Amsterdam"), "Pacific/Auckland")],
         &env,
         Vec::new()
@@ -198,7 +199,13 @@ fn restoring_a_setting_that_was_not_there_removes_it() {
     let env = dir.join(".env");
     assert!(store::set(&env, "USENET", "on").is_ok());
 
-    assert!(undo(&[restore("USENET", None, "on")], &env, Vec::new()).is_ok());
+    assert!(undo(
+        &lemonfiber_adapters::Disk,
+        &[restore("USENET", None, "on")],
+        &env,
+        Vec::new()
+    )
+    .is_ok());
 
     let file = store::read(&env).unwrap_or_default();
     assert_eq!(file.get("USENET"), None);
@@ -210,7 +217,13 @@ fn removing_a_made_directory_takes_it_off_disk() {
     let made = dir.join("made");
     assert!(std::fs::create_dir_all(&made).is_ok());
 
-    assert!(undo(&[delete(&made)], &dir.join(".env"), Vec::new()).is_ok());
+    assert!(undo(
+        &lemonfiber_adapters::Disk,
+        &[delete(&made)],
+        &dir.join(".env"),
+        Vec::new()
+    )
+    .is_ok());
 
     assert!(!made.exists(), "the directory was removed");
 }
@@ -220,7 +233,13 @@ fn a_directory_a_stop_never_made_is_treated_as_already_undone() {
     let dir = scratch("gone");
     let never = dir.join("never-made");
 
-    assert!(undo(&[delete(&never)], &dir.join(".env"), Vec::new()).is_ok());
+    assert!(undo(
+        &lemonfiber_adapters::Disk,
+        &[delete(&never)],
+        &dir.join(".env"),
+        Vec::new()
+    )
+    .is_ok());
 }
 
 #[test]
@@ -257,7 +276,13 @@ fn a_full_rollback_restores_the_settings_and_removes_the_directory() {
     journal.record(write("USENET"));
     journal.record(write("TORRENT"));
 
-    assert!(undo(&journal.rewind(), &env, Vec::new()).is_ok());
+    assert!(undo(
+        &lemonfiber_adapters::Disk,
+        &journal.rewind(),
+        &env,
+        Vec::new()
+    )
+    .is_ok());
 
     // Read back through a readable file, so a read failure could not pass this
     // off as "no settings" — every setting is restored to absent, the directory
@@ -285,6 +310,7 @@ fn a_version_move_is_left_standing_and_reported() {
     let env_dir = scratch("repin");
     let env = env_dir.join(".env");
     let carried = super::carrying_out(
+        &lemonfiber_adapters::Disk,
         &[Undo {
             target: "sonarr".to_owned(),
             action: Action::Repin {
@@ -326,21 +352,36 @@ fn a_region_is_taken_out_left_where_edited_and_refused_where_unwritable() {
     )
     .is_ok());
 
-    let edited = super::carrying_out(&[withdraw(&file, "something else\n")], &env, Vec::new());
+    let edited = super::carrying_out(
+        &lemonfiber_adapters::Disk,
+        &[withdraw(&file, "something else\n")],
+        &env,
+        Vec::new(),
+    );
     assert_eq!(
         edited.ok().map(|carried| carried.theirs),
         Some(vec![file.display().to_string()]),
         "a region that is not what was written is named and left"
     );
 
-    let taken = super::carrying_out(&[withdraw(&file, "komga\n")], &env, Vec::new());
+    let taken = super::carrying_out(
+        &lemonfiber_adapters::Disk,
+        &[withdraw(&file, "komga\n")],
+        &env,
+        Vec::new(),
+    );
     assert_eq!(taken.ok().map(|carried| carried.done.len()), Some(1));
     assert_eq!(
         std::fs::read_to_string(&file).ok().as_deref(),
         Some("watch\n")
     );
 
-    let unreadable = super::carrying_out(&[withdraw(&dir, "komga\n")], &env, Vec::new());
+    let unreadable = super::carrying_out(
+        &lemonfiber_adapters::Disk,
+        &[withdraw(&dir, "komga\n")],
+        &env,
+        Vec::new(),
+    );
     assert!(
         matches!(unreadable, Err(problem) if problem.code == super::NOT_WITHDRAWN),
         "a file that cannot be read back is a region that could not be taken out"
@@ -358,7 +399,13 @@ fn a_directory_holding_something_else_is_named_and_left_where_it_is() {
     assert!(std::fs::create_dir_all(made.join("inside")).is_ok());
     let env = dir.join(".env");
 
-    let carried = super::carrying_out(&[delete(&made)], &env, Vec::new()).ok();
+    let carried = super::carrying_out(
+        &lemonfiber_adapters::Disk,
+        &[delete(&made)],
+        &env,
+        Vec::new(),
+    )
+    .ok();
 
     assert_eq!(
         carried.map(|carried| (carried.done.len(), carried.still_holding)),
@@ -368,7 +415,7 @@ fn a_directory_holding_something_else_is_named_and_left_where_it_is() {
     assert!(made.exists(), "and it is left where it is");
     assert!(
         matches!(
-            undo(&[delete(&made)], &env, Vec::new()),
+            undo(&lemonfiber_adapters::Disk, &[delete(&made)], &env, Vec::new()),
             Err(problem) if problem.code == super::STILL_HOLDING
         ),
         "and a reversal that has to refuse over what it left says which directory"
@@ -390,7 +437,12 @@ fn a_directory_the_machine_refuses_to_remove_stops_the_reversal() {
     // the parent it sits in is not writable, so removing the entry is not allowed.
     let locked = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o500));
 
-    let stopped = undo(&[delete(&made)], &dir.join(".env"), Vec::new());
+    let stopped = undo(
+        &lemonfiber_adapters::Disk,
+        &[delete(&made)],
+        &dir.join(".env"),
+        Vec::new(),
+    );
 
     let _ = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o700));
     assert!(locked.is_ok(), "the parent was made unwritable");
@@ -414,7 +466,12 @@ fn a_service_made_change_is_reported_at_the_end_without_stopping_the_rest() {
     // A setting to reverse and a service resource that only the service can
     // undo: the setting is still reversed, and the service resource is reported
     // at the end rather than stopping the reversible work before it.
-    let outcome = undo(&[restore("USENET", None, "on"), created], &env, Vec::new());
+    let outcome = undo(
+        &lemonfiber_adapters::Disk,
+        &[restore("USENET", None, "on"), created],
+        &env,
+        Vec::new(),
+    );
 
     assert!(matches!(outcome, Err(problem) if problem.code == super::NEEDS_SERVICE));
     let file = store::read(&env).unwrap_or_default();
@@ -430,6 +487,7 @@ fn a_setting_that_cannot_be_rewritten_stops_the_reversal() {
     assert!(std::fs::create_dir_all(&env).is_ok());
 
     let stopped = undo(
+        &lemonfiber_adapters::Disk,
         &[restore("TZ", Some("Europe/Amsterdam"), "Pacific/Auckland")],
         &env,
         Vec::new(),
@@ -482,7 +540,7 @@ fn a_second_reversal_does_not_write_over_what_the_operator_set() {
 
     // The operator watches the repair and asks for it back.
     assert!(
-        undo(&undos, &env, Vec::new()).is_ok(),
+        undo(&lemonfiber_adapters::Disk, &undos, &env, Vec::new()).is_ok(),
         "the first is carried out"
     );
     assert_eq!(
@@ -493,7 +551,7 @@ fn a_second_reversal_does_not_write_over_what_the_operator_set() {
 
     // Then they choose a third value themselves, which is theirs.
     assert!(store::set(&env, "QBITTORRENT_PORT", "49152").is_ok());
-    let again = undo(&undos, &env, Vec::new());
+    let again = undo(&lemonfiber_adapters::Disk, &undos, &env, Vec::new());
 
     assert!(
         matches!(&again, Err(problem) if problem.code == super::NOT_PUT_BACK),
@@ -520,6 +578,7 @@ fn a_credential_whose_record_will_not_open_is_named_rather_than_written() {
     assert!(store::set(&env, "INDEXER_APIKEY", "chosen-since").is_ok());
 
     let refused = undo(
+        &lemonfiber_adapters::Disk,
         &[restore(
             "INDEXER_APIKEY",
             Some("sealed:1:00"),
@@ -554,8 +613,11 @@ fn a_reversal_asked_for_twice_over_puts_the_same_value_back_once() {
     assert!(store::set(&env, "QBITTORRENT_PORT", "51413").is_ok());
     let undos = crate::repair::undoing(&[moved_the_port("6881", "51413")]);
 
-    assert!(undo(&undos, &env, Vec::new()).is_ok());
-    assert!(undo(&undos, &env, Vec::new()).is_ok(), "and again");
+    assert!(undo(&lemonfiber_adapters::Disk, &undos, &env, Vec::new()).is_ok());
+    assert!(
+        undo(&lemonfiber_adapters::Disk, &undos, &env, Vec::new()).is_ok(),
+        "and again"
+    );
 
     assert_eq!(port(&env).as_deref(), Some("6881"));
 }
@@ -568,7 +630,12 @@ fn a_setting_that_cannot_be_removed_stops_the_reversal() {
     let env = dir.join("env-is-a-directory");
     assert!(std::fs::create_dir_all(&env).is_ok());
 
-    let stopped = undo(&[restore("USENET", None, "on")], &env, Vec::new());
+    let stopped = undo(
+        &lemonfiber_adapters::Disk,
+        &[restore("USENET", None, "on")],
+        &env,
+        Vec::new(),
+    );
 
     assert!(stopped.is_err(), "the key could not be removed");
 }

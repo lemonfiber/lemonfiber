@@ -36,13 +36,14 @@ impl Kept {
     /// unreadable, which every token then fails and is replaced.
     pub(crate) async fn read(ctx: &Ctx, project: &Path) -> Self {
         let path = gating::path(project, File::Tokens);
-        let accepted = ctx
-            .seams
-            .filesystem
-            .read(&path)
-            .await
-            .and_then(|text| Tokens::read(&text).ok())
-            .unwrap_or_else(|| Tokens::of(Vec::new()));
+        let accepted = crate::app::targets::read_owned(
+            ctx.seams.filesystem.as_ref(),
+            &path,
+            crate::within::directory_of(&path),
+        )
+        .await
+        .and_then(|text| Tokens::read(&text).ok())
+        .unwrap_or_else(|| Tokens::of(Vec::new()));
         Self { path, accepted }
     }
 

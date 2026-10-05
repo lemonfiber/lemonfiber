@@ -93,7 +93,7 @@ pub(crate) async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held 
     };
     // A declined invitation is kept until the operator acts on it, so the sweep goes
     // around it, as it does around the one being offered.
-    let declined = super::declining::declined(ctx, &offers);
+    let declined = super::declining::declined(ctx, &offers).await;
     let waiting: Vec<_> = offered(household.clone(), &records, &offers)
         .into_iter()
         .filter(|invitation| !declined.contains(&invitation.member.id))

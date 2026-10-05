@@ -6,6 +6,7 @@ use super::*;
 fn with_config(path: &std::path::Path) -> Ctx {
     let settings = Settings {
         env_file: Some(path.to_path_buf()),
+        home: Some(std::path::PathBuf::from("/home/op")),
         ..Settings::default()
     };
     a_context()
@@ -162,7 +163,10 @@ async fn a_lifecycle_command_with_a_config_file_reports_no_edits_for_an_external
 async fn showing_settings_withholds_credentials() {
     let path = config_scratch("secrets");
     let ctx = with_config(&path);
-    for (key, value) in [("DATA_ROOT", "/media"), ("WIREGUARD_PRIVATE_KEY", "abc123")] {
+    for (key, value) in [
+        ("DATA_ROOT", "/srv/media"),
+        ("WIREGUARD_PRIVATE_KEY", "abc123"),
+    ] {
         let _ = dispatch(
             Command::ConfigSet(Setting::to(key, value).agreed(true)),
             &ctx,
@@ -174,7 +178,7 @@ async fn showing_settings_withholds_credentials() {
     assert_eq!(
         shown,
         vec![
-            ("DATA_ROOT".to_owned(), "/media".to_owned()),
+            ("DATA_ROOT".to_owned(), "/srv/media".to_owned()),
             (
                 "WIREGUARD_PRIVATE_KEY".to_owned(),
                 crate::config::store::REDACTED.to_owned()
@@ -190,7 +194,7 @@ async fn a_configuration_answer_serialises_under_its_own_kind() {
     let path = config_scratch("envelope");
     let ctx = with_config(&path);
     let _ = dispatch(
-        Command::ConfigSet(Setting::to("DATA_ROOT", "/media").agreed(true)),
+        Command::ConfigSet(Setting::to("DATA_ROOT", "/media/library").agreed(true)),
         &ctx,
     )
     .await;
@@ -230,7 +234,7 @@ async fn settings_that_cannot_be_saved_reach_the_operator() {
     let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500));
 
     let ctx = with_config(&dir.join(".env"));
-    let refusal = dispatch(Command::ConfigSet(Setting::to("A", "1")), &ctx)
+    let refusal = dispatch(Command::ConfigSet(Setting::to("TZ", "UTC")), &ctx)
         .await
         .err()
         .map(|problem| problem.code);

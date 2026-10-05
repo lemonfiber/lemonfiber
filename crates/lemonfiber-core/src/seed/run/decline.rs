@@ -63,13 +63,14 @@ pub(super) async fn seed_decline_key(
         }));
     };
     let path = declining::path(project, File::Key);
-    let held = ctx
-        .seams
-        .filesystem
-        .read(&path)
-        .await
-        .and_then(|text| Key::read(&text).ok())
-        .filter(|key| filed.iter().any(|one| one == key.reveal()));
+    let held = crate::app::targets::read_owned(
+        ctx.seams.filesystem.as_ref(),
+        &path,
+        crate::within::directory_of(&path),
+    )
+    .await
+    .and_then(|text| Key::read(&text).ok())
+    .filter(|key| filed.iter().any(|one| one == key.reveal()));
     let state = match held {
         Some(key) => kept(ctx, &client, &filed, key.reveal()).await,
         None if ctx.dry_run => return Some(would_mint()),

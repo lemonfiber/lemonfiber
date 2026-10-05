@@ -220,7 +220,12 @@ fn a_record_whose_key_is_gone_is_refused_rather_than_put_back_as_it_reads() {
     assert!(std::fs::remove_file(layout.journal_key()).is_ok());
 
     let undos = journal_at(&layout.journal()).unwrap_or_default().rewind();
-    let refused = undo(&undos, &layout.env_file(), Vec::new());
+    let refused = undo(
+        &lemonfiber_adapters::Disk,
+        &undos,
+        &layout.env_file(),
+        Vec::new(),
+    );
 
     let problem = refused.err();
     assert_eq!(
