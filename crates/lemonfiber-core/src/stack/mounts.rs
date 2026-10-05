@@ -136,6 +136,46 @@ fn services_in(text: &str) -> Option<Vec<(String, Value)>> {
     )
 }
 
+/// What one compose file says of one service's networks.
+///
+/// Read here, beside the volumes, because this is where the stack's compose files are
+/// parsed: a second reader of the same files would be a second opinion about what they
+/// say.
+pub(super) struct Networking {
+    /// The service as the file names it.
+    pub(super) service: String,
+    /// Whether it takes another container's network in place of its own.
+    pub(super) borrowed: bool,
+    /// The networks it names, in either syntax.
+    pub(super) named: Vec<String>,
+}
+
+/// What a compose file says of each of its services' networks, or nothing where it is
+/// not one this can read.
+pub(super) fn networking(text: &str) -> Vec<Networking> {
+    services_in(text)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(service, declared)| Networking {
+            borrowed: declared.get("network_mode").is_some(),
+            named: match declared.get("networks") {
+                Some(Value::Sequence(names)) => names
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect(),
+                Some(Value::Mapping(names)) => names
+                    .keys()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect(),
+                _ => Vec::new(),
+            },
+            service,
+        })
+        .collect()
+}
+
 /// The volume entries one service declares, in either syntax.
 ///
 /// The long form's `source` is the host side; the short form's is everything

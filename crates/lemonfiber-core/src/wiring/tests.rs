@@ -554,6 +554,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             api: None,
             listens: None,
             media_types: Vec::new(),
+            networks: Vec::new(),
         }],
         provides: vec![capability.to_owned()],
         contributions: Vec::new(),

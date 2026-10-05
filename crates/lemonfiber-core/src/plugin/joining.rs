@@ -1,0 +1,96 @@
+//! The networks a plugin's service joins beside the stack's own.
+//!
+//! The stack keeps some reach on networks of its own: the request service reaches the
+//! curators it hands requests to and the media server it signs in against only through
+//! the request gate, over a network the gate shares with those services alone. A
+//! plugin's service standing in for one of them is reached that way only if it is on
+//! the same networks, so it joins them — exactly the networks of the stack services it
+//! stands in for, and no other.
+//!
+//! **What it stands in for is read from what it declared, never from a name.** A stack
+//! service it stands in for speaks the adapter it names, provides a capability it
+//! provides, and — where the stack service files media — files a medium the plugin's
+//! service files too. A film curator stands in for the stack's film curator and not for
+//! its music one; a service naming no adapter, or no capability the stack's services
+//! provide, stands in for nothing and stays on the default network alone. The networks
+//! themselves are the stack's: a plugin has no field in which to name one.
+//!
+//! **Declared rather than settled.** What a plugin's service joins follows from what it
+//! provides, not from whether the operator has chosen it to fill an ask, because the
+//! choice is a setting that changes without the container being written again, and a
+//! container whose networks lagged its choice would be the one the request service
+//! could not reach.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use lemonfiber_manifest::{ApiKind, Manifest};
+
+use super::installed::Placed;
+use crate::stack::attached::DEFAULT;
+
+/// The stack's services as what a plugin's service could stand in for, each with the
+/// networks it is on.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Joins {
+    /// Every stack service that speaks an adapter, in the manifest's order.
+    standing: Vec<Standing>,
+}
+
+/// One stack service, as what a plugin's service could stand in for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Standing {
+    /// The adapter it speaks.
+    speaks: ApiKind,
+    /// What it provides.
+    provides: Vec<String>,
+    /// The media it files.
+    files: Vec<String>,
+    /// The networks it is on.
+    on: BTreeSet<String>,
+}
+
+impl Joins {
+    /// The stack's services and the networks its compose files put each on.
+    #[must_use]
+    pub fn of(manifest: &Manifest, attached: &BTreeMap<String, BTreeSet<String>>) -> Self {
+        let standing = manifest
+            .services
+            .iter()
+            .filter_map(|service| {
+                Some(Standing {
+                    speaks: service.api.as_ref()?.kind,
+                    provides: service.provides.clone(),
+                    files: service.media_types.clone(),
+                    on: attached.get(&service.id)?.clone(),
+                })
+            })
+            .collect();
+        Self { standing }
+    }
+
+    /// The networks `placed` joins: every network a stack service it stands in for is
+    /// on, or nothing where that is the default network alone, which it is on already.
+    #[must_use]
+    pub fn of_service(&self, placed: &Placed) -> Vec<String> {
+        let Some(speaks) = placed.api.as_ref().map(|api| api.kind) else {
+            return Vec::new();
+        };
+        let joined: BTreeSet<&String> = self
+            .standing
+            .iter()
+            .filter(|one| one.speaks == speaks)
+            .filter(|one| one.provides.iter().any(|it| placed.provides.contains(it)))
+            .filter(|one| {
+                one.files.is_empty() || one.files.iter().any(|it| placed.media_types.contains(it))
+            })
+            .flat_map(|one| &one.on)
+            .collect();
+        if joined.iter().all(|network| *network == DEFAULT) {
+            return Vec::new();
+        }
+        joined.into_iter().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests;

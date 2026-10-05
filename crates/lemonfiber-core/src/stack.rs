@@ -21,6 +21,7 @@
 //! Construction and lifecycle arrive with the compose driver. See
 //! `.docs/architecture/module-layout.md`.
 
+pub mod attached;
 pub mod closure;
 pub mod compose;
 pub mod mounts;
@@ -146,6 +147,17 @@ impl Source {
     #[must_use]
     pub(crate) fn crowded_mounts(self) -> Vec<mounts::Crowded> {
         mounts::crowded(&self.compose_files())
+    }
+
+    /// Every service this stack's compose files declare, with the networks it is on.
+    ///
+    /// Read afresh each time, like the mounts, and for both kinds of stack: a fork's
+    /// networks are the fork's, and a plugin joining it joins what the fork wrote.
+    #[must_use]
+    pub(crate) fn attached(
+        self,
+    ) -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
+        attached::attached(&self.compose_files())
     }
 
     /// Whether this stack is lemonfiber's own rather than the operator's.

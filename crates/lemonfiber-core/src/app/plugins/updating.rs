@@ -45,7 +45,9 @@ pub(crate) async fn update(
     // The stamp the whole update is journalled under, taken before anything is decided
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
-    let would = Installed::of(&manifest).installed(path, &stamp);
+    let would = Installed::of(&manifest)
+        .installed(path, &stamp)
+        .joining(&super::writing::joins(ctx)?);
     let Some(was) = held
         .installed()
         .iter()

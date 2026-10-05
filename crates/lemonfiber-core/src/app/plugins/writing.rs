@@ -154,6 +154,21 @@ fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp:
 /// or the operator declared the area it sits in unmanaged, which is the one statement
 /// that lemonfiber writes nothing there and has to hold for a plugin as it does for
 /// everything else.
+/// The stack's services as what a plugin's service could stand in for, with the networks
+/// its compose files put each on.
+///
+/// # Errors
+///
+/// Returns the stack's own refusal where its manifest cannot be read, since what a
+/// plugin's service joins is read off it.
+pub(crate) fn joins(ctx: &Ctx) -> Result<crate::plugin::Joins, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+    Ok(crate::plugin::Joins::of(&manifest, &ctx.stack.attached()))
+}
+
 pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
     planned
         .into_iter()

@@ -32,6 +32,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             api: None,
             listens: None,
             media_types: Vec::new(),
+            networks: Vec::new(),
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

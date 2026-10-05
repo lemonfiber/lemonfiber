@@ -217,7 +217,9 @@ async fn install(
     // from a git source is recorded as coming from that source, at the one commit that
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
-    let settled = Installed::of(&manifest).installed(path, &stamp);
+    let settled = Installed::of(&manifest)
+        .installed(path, &stamp)
+        .joining(&writing::joins(ctx)?);
     let (would, named) = match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);

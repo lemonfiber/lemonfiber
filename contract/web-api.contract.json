@@ -11817,6 +11817,14 @@
               "type": "string",
               "default": ""
             },
+            "networks": {
+              "description": "The stack's own networks it joins beside the default one, because a stack service\nit stands in for is on them.\n\nSettled at install from the stack it was installed beside and written down, so\nthe container lemonfiber writes for it stays a function of this record alone.\nDefaulted for a record written before this was kept, which reads as joining none\nand staying on the default network.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
             "provides": {
               "description": "Every core capability this one service fills, which is what makes it a candidate\nwhen the stack asks for one.\n\nPer service rather than read off the plugin's whole list, because a wiring\nreaches a service and not a plugin: of a plugin's two services, the one that\nfills a capability is the one an ask for it would reach. Defaulted for a record\nwritten before this was kept, which reads as filling nothing — a service nothing\nis wired to, rather than one wired to on a guess.",
               "type": "array",
