@@ -20511,6 +20511,11 @@
       "status": 400,
       "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
     },
+    "PLUGIN-4": {
+      "name": "UNRECORDED",
+      "status": 500,
+      "description": "The record of what is installed cannot be read."
+    },
     "READ-1": {
       "name": "UNWANTED",
       "status": 400,
@@ -20610,6 +20615,51 @@
       "name": "ANOTHER_OFFER",
       "status": 400,
       "description": "Raised when an agreement names an offer that is not the one standing now."
+    },
+    "STACK-1": {
+      "name": "STACK_UNREADABLE",
+      "status": 500,
+      "description": "Raised when a stack directory holds no readable manifest."
+    },
+    "STACK-2": {
+      "name": "STACK_UNUSABLE",
+      "status": 500,
+      "description": "Raised when a manifest is readable and this build cannot use it."
+    },
+    "STACK-3": {
+      "name": "STACK_NOT_EMBEDDED",
+      "status": 500,
+      "description": "Raised when the embedded stack is not intact."
+    },
+    "STACK-4": {
+      "name": "STACK_NOT_SET_UP",
+      "status": 500,
+      "description": "Raised when lemonfiber has nowhere to write the stack."
+    },
+    "STACK-5": {
+      "name": "STACK_NOT_WRITTEN",
+      "status": 500,
+      "description": "Raised when the stack could not be written to disk."
+    },
+    "STACK-6": {
+      "name": "STACK_INVALID",
+      "status": 500,
+      "description": "Raised when a manifest parses and breaks the contract."
+    },
+    "STACK-7": {
+      "name": "STACK_MALFORMED",
+      "status": 500,
+      "description": "Raised when a manifest is not TOML at all."
+    },
+    "STACK-8": {
+      "name": "STACK_UNRECOGNISED",
+      "status": 500,
+      "description": "Raised when a manifest declares names this build does not know."
+    },
+    "STACK-9": {
+      "name": "STACK_NEEDS_NEWER",
+      "status": 500,
+      "description": "Raised when a stack names a newer lemonfiber than the one running."
     }
   }
 }

@@ -22,6 +22,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
+use crate::error::codes::plugin::UNRECORDED;
+use crate::error::{Amiss, Code};
+
 mod fillers;
 pub(crate) mod run;
 mod settling;
@@ -29,6 +32,22 @@ mod settling;
 pub use fillers::{Address, Ask, Filler, Fillers};
 use settling::claimants;
 pub use settling::{contested_by, filled, settle, unfilled};
+
+/// Every code the wiring, or the record of what is installed, is refused with where
+/// something it is read from cannot be read.
+///
+/// The stack's manifest and the record are what the wiring is settled over, so both
+/// sets are here; the record's is the whole of what reading what is installed is
+/// refused with for that reason. An empty listing says nothing is there, which is a
+/// different sentence from *this could not be read*, so a client has to be able to
+/// name each of these.
+pub const UNREAD: [&[Code]; 2] = [&crate::stack::FAILURES, &[UNRECORDED]];
+
+/// Where the fault lies in a read refused for something it could not read.
+///
+/// In the machine: nothing about the request was wrong, and the same request is
+/// answered once the file is put right.
+pub const UNREAD_AMISS: Amiss = Amiss::Answering;
 
 /// The setting holding which service the operator chose to fill a capability.
 ///

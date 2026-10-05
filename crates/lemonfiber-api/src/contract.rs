@@ -60,6 +60,7 @@ use lemonfiber_core::model::{
     kind::{self, Kind},
     Envelope, SetupReport, API_VERSION,
 };
+use lemonfiber_core::wiring;
 
 use crate::admission::admitted::Admitted;
 use crate::jobs::started::Started;
@@ -163,6 +164,9 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 /// a client answers by reading again rather than by reporting a failure, so a client
 /// has to be able to name them as it names this surface's own.
 ///
+/// And the refusals of the plugins and wiring reads where what they are read from could
+/// not be read, which a client has to tell apart from an empty answer by name.
+///
 /// A code the registry does not declare cannot be built, so every refusal is found;
 /// one missing here would be a code no client can name, and a test counts them.
 fn refusals() -> BTreeMap<String, Listed> {
@@ -172,7 +176,12 @@ fn refusals() -> BTreeMap<String, Listed> {
     let moved = agreement::MOVED
         .iter()
         .map(|code| (*code, answering(agreement::MOVED_AMISS)));
+    let unread = wiring::UNREAD
+        .iter()
+        .flat_map(|codes| codes.iter())
+        .map(|code| (*code, answering(wiring::UNREAD_AMISS)));
     own.chain(moved)
+        .chain(unread)
         .filter_map(|(code, status)| {
             let declared = declared(code)?;
             Some((

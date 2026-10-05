@@ -41,8 +41,9 @@ use naming::{diagnosing, following, household, moving, narrowed, removing, setti
 /// them moves.
 pub use naming::{A_SHELF, MOST_AT_ONCE};
 
+use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::{
-    AlertAction, Asking, BandwidthAsked, Command, Keeping, MigrateAction, QualityAction,
+    AlertAction, Asking, BandwidthAsked, Command, Keeping, Linking, MigrateAction, QualityAction,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
@@ -194,6 +195,19 @@ pub const UNINSTALL: &str = "/api/uninstall";
 /// declaration goes.
 pub const BANDWIDTH: &str = "/api/bandwidth";
 
+/// Every plugin installed on this machine, and what each install decided.
+///
+/// The reading half of the word. Installing, updating and removing one are acts on a
+/// running stack, so each belongs behind a named action rather than a door a browser
+/// opens by asking.
+pub const PLUGINS: &str = "/api/plugins";
+
+/// What this stack wires to what, how each link was settled, and what nothing fills.
+///
+/// The reading half again. Choosing which service fills a capability is a setting
+/// changed and journalled, so it is asked for at the door changes are asked for.
+pub const WIRING: &str = "/api/wiring";
+
 /// Which app to watch on, for each kind of device somebody in the house has.
 ///
 /// The same answer on every machine — the client landscape belongs to the
@@ -263,6 +277,8 @@ pub const OFFERED: &[&str] = &[
     MIGRATION,
     HISTORY,
     UPDATE,
+    PLUGINS,
+    WIRING,
 ];
 
 /// What a read was given, mirroring the flags its command takes.
@@ -394,6 +410,11 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         // declared.
         BANDWIDTH => Ok(Command::Bandwidth(BandwidthAsked::default())),
         CLIENTS => Ok(Command::Clients),
+        // Nothing asked of either, because what is installed and what reaches what are
+        // properties of the machine rather than of the caller. A record that will not
+        // read is refused by the command, never answered as an empty one.
+        PLUGINS => Ok(Command::Plugins(Installing::Installed)),
+        WIRING => Ok(Command::Wiring(Linking::Read)),
         _ => Err(Refusal::NoSuchRead),
     }
 }
