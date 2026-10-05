@@ -145,7 +145,9 @@ async fn reset(
         Ok(identity) => identity,
         Err(failure) => return lost(name, &failure.to_string()),
     };
-    record_secret(ctx, setting, &new);
+    if let Err(failure) = record_secret(ctx, setting, &new) {
+        return unkept(name, &failure);
+    }
     let mut consumers: Vec<Propagation> = super::reading::service_consumers(&target.name, setting)
         .into_iter()
         .map(|(consumer, reached)| Propagation {
@@ -239,6 +241,20 @@ fn lost(name: &str, reason: &str) -> Rotation {
                 "the service replaced its key and the new one did not answer: {reason}. The old \
                  key no longer works; run `lemonfiber seed` once the service answers, which \
                  hands the new key to everything that reads it."
+            )),
+        },
+    )
+}
+
+/// A reset the service made and answered to, whose new key could not be recorded.
+fn unkept(name: &str, failure: &crate::config::store::Failure) -> Rotation {
+    Rotation::stopped(
+        name,
+        Settled::ReplacedUnproven {
+            detail: crate::config::store::withheld_text(&format!(
+                "the service replaced its key and answered to the new one, but the new key could \
+                 not be recorded: {failure}. The old key no longer works; run `lemonfiber seed`, \
+                 which reads the new key and hands it to everything that reads it."
             )),
         },
     )

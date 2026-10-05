@@ -81,6 +81,9 @@ struct Machine {
     /// What Compose says to the whole-stack start behind the run, where a test is
     /// about it refusing that.
     bringing_back: Mutex<Option<Result<Output, RunFailure>>>,
+    /// What Compose says to the fetch in front of the stop, where a test is about it
+    /// failing.
+    fetch: Mutex<Option<Result<Output, RunFailure>>>,
     /// How many whole-stack invocations have been asked for.
     ///
     /// The stop in front of the capture is the first and the start that puts
@@ -101,8 +104,25 @@ impl Machine {
             start: Mutex::new(None),
             stack: Mutex::new(None),
             bringing_back: Mutex::new(None),
+            fetch: Mutex::new(None),
             stack_actions: Mutex::new(0),
         })
+    }
+
+    /// The same machine, with Compose failing the fetch in front of the stop.
+    fn failing_the_fetch(self: Arc<Self>, said: Result<Output, RunFailure>) -> Arc<Self> {
+        if let Ok(mut fetch) = self.fetch.lock() {
+            *fetch = Some(said);
+        }
+        self
+    }
+
+    /// Every Compose invocation, in order, as the subcommand it ran and what it named.
+    fn asked(&self) -> Vec<Vec<String>> {
+        self.seen
+            .lock()
+            .map(|seen| seen.clone())
+            .unwrap_or_default()
     }
 
     /// The same machine, with Compose refusing the first start it is asked for.
@@ -178,6 +198,14 @@ impl Runner for Machine {
     async fn run(&self, argv: &[String]) -> Result<Output, RunFailure> {
         if let Ok(mut seen) = self.seen.lock() {
             seen.push(argv.to_vec());
+        }
+        if argv.iter().any(|word| word == "pull") {
+            return self
+                .fetch
+                .lock()
+                .ok()
+                .and_then(|mut said| said.take())
+                .unwrap_or_else(|| Ok(spoke("")));
         }
         let Some(service) = fenced(argv) else {
             let nth = self.stack_actions.lock().map_or(1, |mut asked| {

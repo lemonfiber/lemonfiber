@@ -43,6 +43,12 @@ fn an_argument_goes_out_quoted_and_comes_back_as_it_was() {
         "/media/My Films",
         "a \"quoted\" form",
         "back\\slash",
+        "%h",
+        "50%% done",
+        "$HOME",
+        "a$$b",
+        "%$",
+        "[Service] ExecStartPre=/bin/true",
     ] {
         assert_eq!(quoted(&quoting(word)), vec![word.to_owned()]);
     }
@@ -62,6 +68,69 @@ fn the_unit_says_what_it_runs_where_it_writes_and_that_it_stays_ended() {
     assert!(text.contains("Restart=no"));
     assert!(text.contains("WantedBy=default.target"));
     assert!(text.contains("Description=lemonfiber: closes requests nobody ruled on"));
+}
+
+#[test]
+fn a_sign_systemd_would_expand_is_written_doubled_wherever_it_appears() {
+    let mut hosted = a_command(PathBuf::from("/r/100%/expiring.log"));
+    hosted.arguments = vec!["%h".to_owned(), "$HOME".to_owned()];
+    hosted.about = "keeps 100% of it".to_owned();
+    let text = written(&hosted);
+    assert!(text.contains("ExecStart=\"/nowhere/lemonfiber\" \"%%h\" \"$$HOME\""));
+    assert!(text.contains("StandardOutput=append:/r/100%%/expiring.log"));
+    assert!(text.contains("Description=lemonfiber: keeps 100%% of it"));
+}
+
+#[test]
+fn a_value_on_one_line_stays_inside_the_one_directive_it_was_written_into() {
+    let mut hosted = a_command(PathBuf::from("/r/expiring.log"));
+    hosted.arguments = vec!["[Service] ExecStartPre=/bin/true".to_owned()];
+    let text = written(&hosted);
+    assert_eq!(text.matches("[Service]").count(), 2);
+    assert!(!text.lines().any(|line| line.starts_with("ExecStartPre=")));
+}
+
+#[tokio::test]
+async fn a_value_with_a_line_break_in_it_is_never_written_or_handed_to_systemd() {
+    let dir = units("systemd-line-break");
+    let path = |name: &str| PathBuf::from(name);
+    let broken = [
+        ("an argument", {
+            let mut one = a_command(dir.join("expiring.log"));
+            one.arguments =
+                vec!["tv\n[Service]\nExecStartPre=/bin/sh -c 'touch /tmp/owned'".to_owned()];
+            one
+        }),
+        ("the program", {
+            let mut one = a_command(dir.join("expiring.log"));
+            one.program = path("/bin/lemonfiber\rExecStartPre=/bin/true");
+            one
+        }),
+        (
+            "the output",
+            a_command(path("/r/x.log\nExecStartPre=/bin/true")),
+        ),
+        ("the description", {
+            let mut one = a_command(dir.join("expiring.log"));
+            one.about = "closes\u{0}requests".to_owned();
+            one
+        }),
+    ];
+    for (which, hosted) in broken {
+        let (systemd, runner) = over(&dir, Vec::new());
+        assert!(
+            matches!(
+                systemd.place(&hosted).await,
+                Err(Failure::Unwritable { ref reason, .. }) if reason.contains("control character")
+            ),
+            "{which} with a control character in it was not refused"
+        );
+        assert!(runner.seen().is_empty(), "{which}: systemctl was asked");
+        assert!(
+            !dir.join("lemonfiber-expiring.service").exists(),
+            "{which}: a unit was written"
+        );
+    }
 }
 
 #[tokio::test]
@@ -153,6 +222,22 @@ async fn what_is_installed_is_read_back_out_of_the_unit_that_was_written() {
             output: Some(log),
         })
     );
+}
+
+#[tokio::test]
+async fn a_doubled_sign_is_read_back_single() {
+    let dir = units("systemd-signs");
+    let (systemd, _) = over(&dir, vec![spoke(0, ""), spoke(0, ""), spoke(0, "active\n")]);
+    let log = dir.join("100%").join("expiring.log");
+    let mut hosted = a_command(log.clone());
+    hosted.arguments = vec!["%h".to_owned(), "$HOME".to_owned()];
+    assert!(systemd.place(&hosted).await.is_ok());
+    let held = systemd.standing("expiring").await;
+    assert_eq!(
+        held.as_ref().map(|held| held.runs.clone()),
+        Ok(Some("/nowhere/lemonfiber %h $HOME".to_owned()))
+    );
+    assert_eq!(held.map(|held| held.output), Ok(Some(log)));
 }
 
 #[tokio::test]

@@ -263,6 +263,26 @@ async fn a_queue_item_carries_what_the_service_said_went_wrong() {
 }
 
 #[tokio::test]
+async fn a_passkey_the_service_quotes_in_its_message_is_withheld_as_it_is_read() {
+    let passkey = ["0123456789", "abcdef", "0123456789", "abcdef"].concat();
+    let fake = Fake::always(Answer::reply(
+        200,
+        format!(
+            r#"{{"totalRecords":1,"records":[{{"title":"Some.Release","trackedDownloadStatus":"warning",
+               "errorMessage":"Tracker https://tracker.example/{passkey}/announce: unregistered torrent"}}]}}"#
+        ),
+    ));
+    let read = sonarr(&fake).queue().await.ok().unwrap_or_default();
+    let message = read.items.first().and_then(|item| item.message.clone());
+    assert!(
+        message
+            .as_deref()
+            .is_some_and(|said| !said.contains(&passkey) && said.ends_with("unregistered torrent")),
+        "{message:?}"
+    );
+}
+
+#[tokio::test]
 async fn a_service_that_offers_only_blank_detail_carries_none_rather_than_empty() {
     // An empty string is not a cause. Carrying one would put a blank line where an
     // explanation belongs, which reads as though the service explained itself.

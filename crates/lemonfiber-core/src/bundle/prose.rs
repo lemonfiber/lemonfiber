@@ -73,20 +73,13 @@ fn spoken(word: &str, marks: &Marks, terms: &Terms) -> String {
 ///
 /// The whole of the userinfo rather than the half after its colon: a service reached
 /// as `https://<token>@host` authenticates by the name alone, and a rule that only knew
-/// about passwords would print the token. Only the authority is read — an `@` in a path
-/// or a query is somebody's address or a parameter, and the rules for those are below.
+/// about passwords would print the token. Found where every other surface finds it, and
+/// marked here rather than withheld so the same login is recognised where it recurs.
 pub(super) fn without_userinfo(word: &str, marks: &Marks) -> String {
-    let Some((scheme, rest)) = word.split_once("://") else {
-        return word.to_owned();
-    };
-    let ends = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-    let authority = rest.get(..ends).unwrap_or_default();
-    let Some(at) = authority.rfind('@') else {
-        return word.to_owned();
-    };
-    let userinfo = authority.get(..at).unwrap_or_default();
-    let after = rest.get(at..).unwrap_or_default();
-    format!("{scheme}://{}{after}", marks.of(userinfo))
+    crate::error::withheld::login(word).map_or_else(
+        || word.to_owned(),
+        |(scheme, userinfo, after)| format!("{scheme}://{}{after}", marks.of(userinfo)),
+    )
 }
 
 /// Every run of an encoding's alphabet that reads as encoded, or carries an identifier

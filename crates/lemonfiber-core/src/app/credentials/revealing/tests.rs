@@ -41,7 +41,7 @@ fn a_value() -> String {
 async fn asking_once_prints_the_warning_and_not_the_value() {
     let ctx = keeping("once");
     let secret = a_value();
-    record_secret(&ctx, "A_TEST_PASS", &secret);
+    let _ = record_secret(&ctx, "A_TEST_PASS", &secret);
 
     let revealed = reveal(&ctx, &line("A_TEST_PASS"), false).await;
 
@@ -53,7 +53,7 @@ async fn asking_once_prints_the_warning_and_not_the_value() {
 async fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
     let ctx = keeping("again");
     let secret = a_value();
-    record_secret(&ctx, "A_TEST_PASS", &secret);
+    let _ = record_secret(&ctx, "A_TEST_PASS", &secret);
 
     let revealed = reveal(&ctx, &line("A_TEST_PASS"), true).await;
 
@@ -66,7 +66,7 @@ async fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
 #[tokio::test]
 async fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
     let ctx = keeping("plugin");
-    record_secret(&ctx, "comics/api_key", &a_value());
+    let _ = record_secret(&ctx, "comics/api_key", &a_value());
     let mut held = line("comics/api_key");
     held.from = crate::origin::Origin::Plugin {
         named: "comics".to_owned(),

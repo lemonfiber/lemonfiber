@@ -14,7 +14,7 @@ use crate::stack::compose::Action;
 
 /// Whether this action would ask a registry for anything the operator has refused.
 pub(crate) fn refused(ctx: &Ctx, action: &Action) -> bool {
-    matches!(action, Action::Pull) && !ctx.settings.reaching.allows(REACH_REGISTRY_KEY)
+    matches!(action, Action::Pull(_)) && !ctx.settings.reaching.allows(REACH_REGISTRY_KEY)
 }
 
 /// What a fetch is told when this operator has switched fetching off.

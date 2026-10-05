@@ -72,16 +72,12 @@ fn a_displayed_address_keeps_its_address_and_loses_what_it_carries() {
     // reads their own settings back from.
     let behind = without_credentials(&format!("https://operator:{key}@indexer.example/api"));
     assert!(
-        !behind.contains(&key),
-        "the password in front of the host survived into the displayed address"
-    );
-    assert!(
-        behind.starts_with("https://operator:"),
-        "the account went with the password beside it"
+        !behind.contains(&key) && !behind.contains("operator"),
+        "the login in front of the host survived into the displayed address"
     );
     assert!(
         behind.ends_with("@indexer.example/api"),
-        "the host and the path went with the password in front of them"
+        "the host and the path went with the login in front of them"
     );
 }
 

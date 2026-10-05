@@ -96,7 +96,11 @@ async fn only_a_stop_is_written_and_a_stop_lets_nothing_go() {
     );
 
     after(&ctx, &Action::Stop(gluetun.clone()), &gluetun).await;
-    for action in [Action::Stop(gluetun.clone()), Action::Pull, Action::Config] {
+    for action in [
+        Action::Stop(gluetun.clone()),
+        Action::Pull(Vec::new()),
+        Action::Config,
+    ] {
         before(&ctx, &action, &gluetun);
         assert!(load(&ctx).holds(&exited("gluetun")), "{action:?}");
     }

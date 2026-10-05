@@ -562,7 +562,9 @@ async fn a_stack_without_the_request_service_or_the_media_server_has_nothing_to_
 async fn without_the_administrators_password_the_arr_keys_are_still_replaced() {
     let http = household(&sonarr_gated(), 200, &keys(true), 204, 201);
     let (mut ctx, project) = taking("no-admin-landed", &http, false);
-    ctx.settings.env_file = None;
+    // A settings file to record the replaced key in, holding no administrator password.
+    let env = config_scratch("taken-no-admin-landed");
+    ctx.settings.env_file = Some(env.to_path_buf());
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert_eq!(baseline.expected("seerr", OWED_SONARR), None, "{state:?}");
     assert!(http.asked_for("/command"));

@@ -16,8 +16,7 @@
 //! the purpose. The dashboard is published to the household network and holds no
 //! credential of any service, so a media server API key filed under lemonfiber's name,
 //! and a listening server token in the environment file, are retired rather than
-//! published. The listening server's first account is still made, because an unclaimed
-//! one is anybody's to take.
+//! published.
 //!
 //! A service that has not written its key yet is left out rather than published as
 //! empty: the quality sync refuses its whole configuration over one undefined variable,
@@ -58,26 +57,46 @@ pub(super) async fn publish_keys(
 ) -> crate::seed::Wiring {
     let mut published = written_down(ctx, services, project).await;
 
-    // Before anything is written: claiming the listening server makes an account and
-    // mints its password, and retiring revokes a key, so a rehearsal that got past here
-    // would have changed the very things it promised only to describe.
+    // Before anything is written: retiring revokes a key, so a rehearsal that got past
+    // here would have changed the very thing it promised only to describe.
     if ctx.dry_run {
         return would_publish(published, held);
     }
 
-    claimed(ctx, services).await;
     retired(ctx, services).await;
     published.extend(from_the_clients(held));
 
-    if published.is_empty() {
-        return crate::seed::Wiring::settled(CONNECTION.to_owned(), nothing_to_publish());
-    }
+    let state = if published.is_empty() {
+        nothing_to_publish()
+    } else {
+        recorded(ctx, published)
+    };
+    crate::seed::Wiring::settled(CONNECTION.to_owned(), state)
+}
 
-    for (name, key) in published {
-        crate::app::targets::record_secret(ctx, &name, &key);
+/// Record every key, and say which could not be recorded where any could not.
+///
+/// A key left out is a consumer left reading a stale one, so the connection is not
+/// called wired over it; the rest are still recorded, since each one that lands is a
+/// consumer that works.
+fn recorded(ctx: &Ctx, published: Vec<(String, String)>) -> crate::seed::State {
+    let unrecorded: Vec<String> = published
+        .into_iter()
+        .filter_map(|(name, key)| {
+            crate::app::targets::record_secret(ctx, &name, &key)
+                .err()
+                .map(|failure| format!("{name} ({failure})"))
+        })
+        .collect();
+    if unrecorded.is_empty() {
+        return crate::seed::State::Wired;
     }
-
-    crate::seed::Wiring::settled(CONNECTION.to_owned(), crate::seed::State::Wired)
+    crate::seed::State::Failed {
+        detail: format!(
+            "these keys could not be recorded: {}",
+            unrecorded.join(", ")
+        ),
+    }
 }
 
 /// Why there is nothing to publish yet, in both tenses: the services write their keys
@@ -158,17 +177,6 @@ async fn written_down(
         seerr,
     ));
     found
-}
-
-/// Make the listening server's first account, recording the password it was made with.
-async fn claimed(ctx: &Ctx, services: &[Service]) {
-    if let Some(password) = crate::app::targets::claim_audiobookshelf(ctx, services).await {
-        crate::app::targets::record_secret(
-            ctx,
-            crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
-            &password,
-        );
-    }
 }
 
 /// Revoke the media server key filed under lemonfiber's name, and forget the media

@@ -365,22 +365,37 @@ pub(super) fn describe_application(service: &str, application: &Application) -> 
     format!("{} indexer sync via {service}", application.name)
 }
 
-/// Replace qBittorrent's temporary web UI password with a generated one, and hand
-/// the generated value back so the surface can record it where the forwarded-port
-/// push reads it.
+/// Where a minted password is recorded before any service is given it, or why it could
+/// not be: a service set to a password nothing recorded is one lemonfiber is locked out
+/// of, so nothing here sets one this refused.
+pub type Keep<'a> = &'a (dyn Fn(&str) -> Result<(), String> + Sync);
+
+/// A connection whose minted password could not be recorded, and so was never set.
+fn unkept(why: &str) -> State {
+    let detail = format!(
+        "the password lemonfiber generated could not be recorded, so it was not set: {why}"
+    );
+    State::Failed { detail }
+}
+
+/// Replace qBittorrent's temporary web UI password with a generated one, recorded
+/// through `keep` before the client is given it, and hand the generated value back for
+/// the connections that sign in with it next.
 ///
 /// Unlike every other connection, this one is a credential lemonfiber mints
 /// rather than reads. Generating it needs randomness the operating system might
 /// withhold; without it there is nothing to set, and the connection fails rather
 /// than falling back to a guessable secret on the client the forwarded port
 /// authenticates to. The client sets the password and confirms it by
-/// authenticating again; only a confirmed change is wired, and only then is the
-/// value returned to record — an unset or unconfirmed one records nothing.
+/// authenticating again; only a confirmed change is wired and handed back. One that
+/// was recorded and then not taken is replaced by the next run, which finds the
+/// recorded password refused and starts again from the temporary one.
 pub async fn wire_qbittorrent_password(
     client: &Qbittorrent,
     random: &dyn Random,
     temporary: &str,
     rehearsing: bool,
+    keep: Keep<'_>,
 ) -> (Wiring, Option<String>) {
     let connection = "qBittorrent web UI password".to_owned();
     // Above the generating, not below it. A password minted to describe a rehearsal is
@@ -411,6 +426,9 @@ pub async fn wire_qbittorrent_password(
         );
     };
 
+    if let Err(why) = keep(&password) {
+        return (Wiring::settled(connection, unkept(&why)), None);
+    }
     match client.replace_password(temporary, &password).await {
         Ok(()) => (Wiring::settled(connection, State::Wired), Some(password)),
         Err(failure) => (Wiring::settled(connection, unreached(&failure)), None),
@@ -421,14 +439,14 @@ pub async fn wire_qbittorrent_password(
 pub const IDENTITY: &str = "Jellyfin as Seerr's identity";
 
 /// The first half of making Jellyfin the identity source for Seerr: Jellyfin's admin
-/// credential, and the password to record where it was newly minted.
+/// credential.
 ///
 /// Jellyfin has no key to read, so — like qBittorrent — its admin password is one
-/// lemonfiber mints, sets by driving the first-run wizard, and hands back for the
-/// surface to record; a wizard already run by the household leaves its password
-/// unknown, so the wiring is skipped rather than reset. The minted password is handed
-/// back whenever the account was created, even if Seerr could not then be reached,
-/// because the account now holds it.
+/// lemonfiber mints, records through `keep`, and only then sets by driving the
+/// first-run wizard; a wizard already run by the household leaves its password
+/// unknown, so the wiring is skipped rather than reset. One recorded and then not
+/// taken is replaced by the next run, which finds the wizard still waiting and mints
+/// again.
 ///
 /// Apart from the second half, [`wire_seerr_identity`], because what Seerr is pointed
 /// at may need this credential first: the request gate's Jellyfin key is minted with it.
@@ -441,14 +459,15 @@ pub async fn wire_jellyfin_admin(
     random: &dyn Random,
     recorded: Option<&str>,
     rehearsing: bool,
-) -> Result<(String, Option<String>), State> {
+    keep: Keep<'_>,
+) -> Result<String, State> {
     let completed = match jellyfin.startup_completed().await {
         Ok(done) => done,
         Err(failure) => return Err(unreached(&failure)),
     };
     if completed {
         return match recorded {
-            Some(password) => Ok((password.to_owned(), None)),
+            Some(password) => Ok(password.to_owned()),
             None => Err(State::Skipped {
                 reason: "Jellyfin was set up outside lemonfiber, so its admin password is unknown; a later run cannot complete this until it is set up through lemonfiber".to_owned(),
             }),
@@ -468,8 +487,9 @@ pub async fn wire_jellyfin_admin(
             detail: "no randomness was available to generate a password".to_owned(),
         });
     };
+    keep(&password).map_err(|why| unkept(&why))?;
     match jellyfin.create_admin(ADMIN, &password).await {
-        Ok(()) => Ok((password.clone(), Some(password))),
+        Ok(()) => Ok(password),
         Err(failure) => Err(unreached(&failure)),
     }
 }

@@ -341,7 +341,8 @@ typos:
 # `github.ref_name` into five `run:` blocks, and a git tag may carry a `$(...)`.
 # The release starts only on a `v` version tag, refuses a tagged commit that is
 # not on `main`, and rewrites the shell installer before it is uploaded so that
-# it refuses a download it cannot check.
+# it refuses a download it cannot check — and then attests it, with the checksum
+# list and the source archive beside it, which `dist` leaves unattested.
 #
 # `verify_release_workflow.py` reads the result and says whether each patch is in
 # it; CI runs the same script on every pull request, so a regeneration that
@@ -358,6 +359,7 @@ release-workflow:
     python3 scripts/cancel_superseded_runs.py
     python3 scripts/the_tag_a_shell_never_sees.py
     python3 scripts/the_commit_a_release_is_cut_from.py
+    python3 scripts/attest_the_global_artifacts.py
     python3 scripts/verify_release_workflow.py
 
 # Coverage, and a merge gate in CI: 100% of applicable lines.

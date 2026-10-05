@@ -141,7 +141,7 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
         ))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
-    crate::app::targets::record_secret(
+    let _ = crate::app::targets::record_secret(
         &context,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         &a_password(),

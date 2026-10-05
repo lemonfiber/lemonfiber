@@ -140,14 +140,22 @@ async fn a_rehearsed_seed_names_what_it_would_do_and_records_none_of_it() {
 }
 
 #[tokio::test]
-async fn seed_sets_the_password_even_with_nowhere_to_record_it() {
+async fn seed_sets_no_password_with_nowhere_to_record_it() {
+    // A password nothing recorded is one lemonfiber would be locked out of the client
+    // by, so a machine with no settings file to keep it in sets none.
     let ctx = seed_ctx(Some(TEMP_LOG), true, exchange(), Some(vec![0x11; 24]), None);
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
-    let wired = report
+    let password = report
         .wirings
         .iter()
-        .any(|wiring| wiring.state == crate::seed::State::Wired);
-    assert!(wired, "the password is set even with nowhere to record it");
+        .find(|wiring| wiring.connection.ends_with("web UI password"));
+    assert!(
+        password.is_some_and(|wiring| matches!(
+            &wiring.state,
+            crate::seed::State::Failed { detail } if detail.contains("could not be recorded")
+        )),
+        "the password connection did not fail over the record"
+    );
 }
 
 #[tokio::test]

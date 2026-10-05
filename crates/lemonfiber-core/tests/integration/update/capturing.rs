@@ -2,6 +2,7 @@
 
 use super::{asking, behind, came_to, ctx, reported, Coming, Kept, Machine, SONARR};
 use lemonfiber_core::app::{dispatch, Waiting};
+use lemonfiber_core::config::{Reaching, REACH_REGISTRY_KEY};
 use lemonfiber_core::ports::process::Failure as RunFailure;
 use lemonfiber_core::update::{Ending, Reversal, State};
 
@@ -40,6 +41,73 @@ async fn a_confirmed_run_captures_before_anything_opens_its_state_on_the_new_ima
             .ends_with(&["up".to_owned(), "--detach".to_owned()]),
         "the stack was left down: {:?}",
         machine.last()
+    );
+}
+
+/// The new images are fetched while everything is still running, so the stack is down
+/// for the capture and the starts and not for the downloads as well.
+#[tokio::test]
+async fn the_images_are_fetched_before_anything_stops() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    assert!(report.is_some_and(|report| report.state == State::Updated));
+    let asked = machine.asked();
+    let at = |word: &str| {
+        asked
+            .iter()
+            .position(|argv| argv.iter().any(|one| one == word))
+    };
+    let (fetched, stopped) = (at("pull"), at("stop"));
+    assert!(
+        fetched.is_some() && fetched < stopped,
+        "the fetch did not come before the stop: {asked:?}"
+    );
+    assert!(
+        fetched
+            .and_then(|at| asked.get(at))
+            .is_some_and(|argv| argv.ends_with(&["--".to_owned(), "sonarr".to_owned()])),
+        "the fetch was not aimed at what the run moves: {asked:?}"
+    );
+}
+
+/// A fetch that did not land leaves each start to fetch for itself, as it always has.
+#[tokio::test]
+async fn a_fetch_that_fails_still_lets_the_run_take_its_steps() {
+    let machine = Machine::coming(Coming::Answering).failing_the_fetch(Err(RunFailure::Unusable {
+        program: "docker".to_owned(),
+        reason: "the registry did not answer".to_owned(),
+    }));
+    let archive = Kept::writing(true);
+    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    assert!(report.is_some_and(|report| report.state == State::Updated));
+    assert_eq!(machine.started(), vec!["sonarr".to_owned()]);
+}
+
+/// A machine where fetching is switched off fetches nothing ahead of the stop, and the
+/// run still takes its steps.
+#[tokio::test]
+async fn a_machine_that_fetches_nothing_is_not_fetched_for() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let mut context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    context.settings.reaching = Reaching::without(REACH_REGISTRY_KEY);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    assert!(report.is_some_and(|report| report.state == State::Updated));
+    assert!(
+        !machine
+            .asked()
+            .iter()
+            .any(|argv| argv.iter().any(|word| word == "pull")),
+        "a machine that fetches nothing was fetched for"
     );
 }
 

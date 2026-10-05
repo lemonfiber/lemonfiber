@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::{asked, ctx, env_at, recorded, the_service_key, SERVICE_CONFIG};
+use super::{asked, ctx, env_at, recorded, sealed, the_service_key, SERVICE_CONFIG};
 use lemonfiber_adapters::Disk;
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::config::{store, Settings};
@@ -392,4 +392,31 @@ async fn a_reset_key_reaches_the_subtitle_finder_and_the_gate() {
         watched.contains(&the_new_key()),
         "the finder was not given the new key"
     );
+}
+
+/// A reset the service made and answered to whose new key cannot be recorded says the
+/// old key is gone and what finishes the job.
+#[tokio::test]
+async fn a_reset_key_that_cannot_be_recorded_says_what_finishes_the_job() {
+    let env = env_at(
+        "reset-unrecordable",
+        &[("SONARR_API_KEY", &the_service_key())],
+    );
+    sealed(&env);
+    let http = Fake::by_route(vec![
+        (Method::Post, "/command", Answer::reply(201, "{}")),
+        (
+            Method::Get,
+            "/system/status",
+            Answer::reply(200, SONARR_STATUS),
+        ),
+    ]);
+
+    let inventory = rotated(env.clone(), Resetting::over(&http), http.clone()).await;
+
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.starts_with("Some(ReplacedUnproven"), "{said}");
+    assert!(said.contains("could not be recorded"), "{said}");
+    assert!(said.contains("lemonfiber seed"), "{said}");
+    assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(the_service_key()));
 }

@@ -110,7 +110,7 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
 }
 
 /// The listening server, whose key is one lemonfiber makes an account for.
-fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
+pub(super) fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
     manifest_service(
         "audiobookshelf",
         Some(lemonfiber_manifest::Api {
@@ -320,9 +320,8 @@ async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
 /// A rehearsal names the settings it would fill and none of their values, and touches
 /// no service on the way.
 ///
-/// Claiming the listening server and revoking the media server's key are both writes,
-/// so a rehearsal asks neither server anything; what it reports is what the services
-/// already wrote down.
+/// Revoking the media server's key is a write, so a rehearsal asks no server anything;
+/// what it reports is what the services already wrote down.
 #[tokio::test]
 async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -395,86 +394,6 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
     assert!(
         !written.contains("SEERR_API_KEY"),
         "a key was published for an entry naming no file: {written}"
-    );
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
-}
-
-/// A listening server with no account gets one, and its password is kept.
-///
-/// Its root account goes to whoever makes the first one, from anywhere on the
-/// network, so it is claimed here. Nothing is signed in for: no token is published,
-/// since nothing in the stack reads one.
-#[tokio::test]
-async fn a_listening_server_with_no_account_is_given_one() {
-    let env = recorded_admin("listening-fresh");
-    let http = Fake::by_path(vec![
-        ("/status", Answer::reply(200, r#"{"isInit":false}"#)),
-        ("/init", Answer::reply(200, "")),
-    ]);
-    let ctx = seed_ctx(None, true, Vec::new(), Some(vec![9; 32]), Some(env.clone()))
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
-
-    let wiring = super::super::published::publish_keys(
-        &ctx,
-        &[audiobookshelf_svc()],
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        &Held::default(),
-    )
-    .await;
-
-    assert!(is_skipped(&wiring), "{wiring:?}");
-    let written = std::fs::read_to_string(&env).unwrap_or_default();
-    assert!(
-        !written.contains("AUDIOBOOKSHELF_API_KEY"),
-        "a token was published for a dashboard that reads none: {written}"
-    );
-    assert!(
-        written.contains("AUDIOBOOKSHELF_PASSWORD="),
-        "the password it was made with was not kept: {written}"
-    );
-    assert!(
-        http.requests()
-            .iter()
-            .any(|asked| asked.url.contains("/init")),
-        "no account was made"
-    );
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
-}
-
-/// A listening server that already has an account is left as it is.
-///
-/// Somebody made that account, and its password is theirs: making a second is refused
-/// by the server, and recording a password for an account this did not make would be
-/// recording one that signs in to nothing.
-#[tokio::test]
-async fn a_listening_server_somebody_already_claimed_is_left_alone() {
-    let env = recorded_admin("set-up-elsewhere");
-    let http = Fake::by_path(vec![("/status", Answer::reply(200, r#"{"isInit":true}"#))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
-
-    let wiring = super::super::published::publish_keys(
-        &ctx,
-        &[audiobookshelf_svc()],
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        &Held::default(),
-    )
-    .await;
-
-    assert!(is_skipped(&wiring), "{wiring:?}");
-    let written = std::fs::read_to_string(&env).unwrap_or_default();
-    assert!(
-        !written.contains("AUDIOBOOKSHELF_PASSWORD"),
-        "a password was recorded for an account somebody else made: {written}"
-    );
-    assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|asked| asked.url.contains("/init")),
-        "a second account was asked for"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }

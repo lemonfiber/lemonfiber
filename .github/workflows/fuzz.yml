@@ -2,8 +2,11 @@
 #
 # `stack.toml` is the one file users are invited to edit by hand, a `plugin.toml`
 # is written by somebody else, and a request to the web API carries whatever its
-# sender put in it. Each must be answered with a diagnostic or a refusal, never a
-# panic. These targets exist to find the inputs nobody thought to write a test for.
+# sender put in it, headers included. The environment file holds values services
+# wrote, a stack the operator points lemonfiber at holds compose files they wrote,
+# and a backup archive is read back from a file anybody could have handed over.
+# Each must be answered with a diagnostic or a refusal, never a panic. These
+# targets exist to find the inputs nobody thought to write a test for.
 #
 # Two modes. Every pull request that touches the parser or the harness builds
 # the targets and gives each a short smoke run, which is enough to catch a
@@ -14,9 +17,14 @@ name: fuzz
 on:
   pull_request:
     paths:
+      - "crates/lemonfiber/**"
+      - "crates/lemonfiber-adapters/**"
       - "crates/lemonfiber-api/**"
+      - "crates/lemonfiber-core/**"
+      - "crates/lemonfiber-error/**"
       - "crates/lemonfiber-manifest/**"
       - "crates/lemonfiber-plugin/**"
+      - "crates/lemonfiber-ports/**"
       - "fuzz/**"
       - ".github/workflows/fuzz.yml"
       # Everything these targets are built from, not only the crate they exercise.
@@ -61,6 +69,10 @@ jobs:
           - plugin_from_toml
           - api_read_query
           - api_action_arguments
+          - api_guard
+          - env_file
+          - compose_mounts
+          - archive_restore
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

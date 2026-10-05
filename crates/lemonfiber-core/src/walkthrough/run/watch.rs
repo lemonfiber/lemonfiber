@@ -139,7 +139,7 @@ async fn speed_of(ctx: &Ctx, title: &str) -> Option<Speed> {
             return Some(Speed {
                 // What is left plus what is done, which is the only total either client
                 // offers — neither reports the release's own size directly.
-                total: left + done(left, download.progress),
+                total: left.saturating_add(done(left, download.progress)),
                 left,
                 rate: download.speed.unwrap_or_default(),
             });
@@ -151,11 +151,16 @@ async fn speed_of(ctx: &Ctx, title: &str) -> Option<Speed> {
 /// How much of a download of `left` remaining bytes at `progress` percent is already
 /// done. A progress of a hundred leaves nothing to infer, and one of zero leaves the
 /// total unknowable, so both read as nothing done rather than as a divide by zero.
-const fn done(left: u64, progress: u8) -> u64 {
+///
+/// Worked in a width the product cannot overflow, and held at the largest count there
+/// is where the answer would not fit: both numbers are what a download client said, and
+/// a client can say anything.
+fn done(left: u64, progress: u8) -> u64 {
     if progress == 0 || progress >= 100 {
         return 0;
     }
-    left * progress as u64 / (100 - progress as u64)
+    let done = u128::from(left) * u128::from(progress) / u128::from(100 - progress);
+    u64::try_from(done).unwrap_or(u64::MAX)
 }
 
 /// The first word of a title, which is what a release name and a library title reliably

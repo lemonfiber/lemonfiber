@@ -71,7 +71,7 @@ struct Composed {
 /// Only bringing the stack up or fetching for it applies the operator's preset;
 /// stopping, restarting or resolving leaves the on-disk config exactly as it is.
 fn carries_quality(action: &Action) -> bool {
-    matches!(action, Action::Up | Action::Pull)
+    matches!(action, Action::Up | Action::Pull(_))
 }
 
 /// Resolve the named forms to their plan and the `docker compose` argument vector
@@ -196,6 +196,7 @@ pub(crate) fn addressed(action: &Action, plan: &Plan) -> Vec<String> {
         | Action::Stop(named)
         | Action::Remove(named)
         | Action::Restart(named)
+        | Action::Pull(named)
             if !named.is_empty() =>
         {
             named.clone()
@@ -206,7 +207,7 @@ pub(crate) fn addressed(action: &Action, plan: &Plan) -> Vec<String> {
         | Action::Stop(_)
         | Action::Remove(_)
         | Action::Restart(_)
-        | Action::Pull
+        | Action::Pull(_)
         | Action::Config => plan.services.clone(),
     }
 }
@@ -383,7 +384,7 @@ pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Ma
         return;
     }
     if let Some(key) = crate::secret::generate(ctx.seams.random.as_ref()) {
-        super::targets::record_secret(ctx, crate::config::BINDERY_API_KEY, &key);
+        let _ = super::targets::record_secret(ctx, crate::config::BINDERY_API_KEY, &key);
     }
 }
 
@@ -393,7 +394,7 @@ pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Ma
 /// lifecycle command and a streamed pull resolve the same names the same way
 /// and refuse them in the same words — three paths to one answer is three ways
 /// for them to differ about which services a form holds.
-fn resolved(
+pub(super) fn resolved(
     ctx: &Ctx,
     forms: &[String],
 ) -> Result<(lemonfiber_manifest::Manifest, Plan), Box<Problem>> {

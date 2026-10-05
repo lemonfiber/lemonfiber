@@ -14,14 +14,13 @@ fn a_login_in_front_of_a_host_is_withheld_even_where_the_address_carries_no_quer
     // side-effect of there being a query to strip, so an address with none went
     // through whole — printed on the terminal, in `--json`, and from the API.
     // Pinned whole rather than asserted absent: what has to hold is that the host
-    // and the account survive, and "does not contain the password" is true of the
-    // empty string.
+    // survives, and "does not contain the password" is true of the empty string.
     let secret = a_credential();
     assert_eq!(
         withheld(&format!(
             "upstream https://ana:{secret}@indexer.example/api refused"
         )),
-        format!("upstream https://ana:{REDACTED}@indexer.example/api refused"),
+        format!("upstream https://{REDACTED}@indexer.example/api refused"),
     );
 }
 
@@ -339,46 +338,128 @@ fn an_address_keeps_its_address_and_loses_its_query() {
 }
 
 #[test]
-fn a_password_written_in_front_of_a_host_is_withheld_and_the_account_is_not() {
-    // An indexer behind a proxy that asks for a login, written the one way a URL can
-    // carry one. The host, the path and the account survive, because each of those is
-    // what somebody checks when a login is refused.
+fn a_login_written_in_front_of_a_host_is_withheld_whole() {
+    // A password after the account, and a token standing where the account goes: a
+    // service reached as `https://<token>@host` authenticates by the name alone, so
+    // the whole login goes and the host and the path stay.
     let secret = a_credential();
-    let shown = without_credentials(&format!("https://operator:{secret}@indexer.example/api"));
-    assert!(
-        !shown.contains(&secret),
-        "the password in front of the host survived into the shown address"
-    );
-    assert!(
-        shown.starts_with("https://operator:"),
-        "the account went with the password beside it"
-    );
-    assert!(
-        shown.ends_with("@indexer.example/api"),
-        "the host and the path went with the password in front of them"
-    );
+    for written in [
+        format!("https://operator:{secret}@indexer.example/api"),
+        format!("https://{secret}@indexer.example/api"),
+    ] {
+        assert_eq!(
+            without_credentials(&written),
+            format!("https://{REDACTED}@indexer.example/api")
+        );
+    }
 }
 
 #[test]
-fn a_password_goes_whether_or_not_the_address_also_carries_a_query() {
+fn a_login_goes_whether_or_not_the_address_also_carries_a_query() {
     // Both halves on one value, and the sentence around it kept: this is the shape a
     // service logs when the address it was configured with was refused.
     let secret = a_credential();
     let shown = withheld(&format!(
-        "prowlarr refused https://operator:{secret}@indexer.example/api?t=caps&apikey={secret}"
+        "prowlarr refused https://{secret}@indexer.example/api?t=caps&apikey={secret}"
     ));
     assert!(
         !shown.contains(&secret),
         "a credential carried in two places survived in one of them"
     );
     assert!(
-        shown.starts_with("prowlarr refused https://operator:"),
-        "the sentence and the account went with the password"
+        shown.starts_with("prowlarr refused https://"),
+        "the sentence went with the login"
     );
     assert!(
         shown.contains("@indexer.example/api?"),
         "the host and the fact of a query went with what they carried"
     );
+}
+
+/// A key standing as a path segment of its own: thirty-two hexadecimal digits, the
+/// shape a media server's key and a tracker's passkey both take.
+fn a_key() -> String {
+    ["0123456789", "abcdef", "0123456789", "abcdef"].concat()
+}
+
+#[test]
+fn a_key_in_a_path_is_withheld_and_the_rest_of_the_path_is_not() {
+    let key = a_key();
+    assert_eq!(
+        without_credentials(&format!("http://127.0.0.1:8096/Auth/Keys/{key}")),
+        format!("http://127.0.0.1:8096/Auth/Keys/{REDACTED}")
+    );
+    assert_eq!(
+        without_credentials(&format!("https://tracker.example/{key}/announce")),
+        format!("https://tracker.example/{REDACTED}/announce")
+    );
+    assert_eq!(
+        without_credentials(&format!("http://127.0.0.1:8096/Auth/Keys/{}", "short")),
+        format!("http://127.0.0.1:8096/Auth/Keys/{REDACTED}"),
+        "a segment after one naming a key is that key, however short"
+    );
+    // Short and named after nothing: the path an operator needs to read.
+    for kept in [
+        "http://localhost:8989/api/v3/series/12345",
+        "https://indexer.example/api/v3/system/status",
+        "http://127.0.0.1:8096/Users/AuthenticateByName",
+        // After an account or a sign-in rather than a key: a route, not a credential.
+        "http://127.0.0.1:8080/api/v2/auth/login",
+        "http://127.0.0.1:8096/Users/Me",
+    ] {
+        assert_eq!(without_credentials(kept), kept, "{kept}");
+    }
+}
+
+#[test]
+fn a_tracker_message_quoting_its_announce_address_loses_the_passkey() {
+    let key = a_key();
+    let shown = withheld(&format!(
+        "Tracker error: https://tracker.example/{key}/announce answered unregistered torrent"
+    ));
+    assert!(!shown.contains(&key), "the passkey survived: {shown}");
+    assert!(shown.contains("answered unregistered torrent"), "{shown}");
+}
+
+#[test]
+fn a_header_carrying_a_credential_loses_the_rest_of_its_line() {
+    let secret = a_credential();
+    for (line, kept) in [
+        (format!("Authorization: Bearer {secret}"), "Authorization:"),
+        (format!("authorization: Basic {secret}"), "authorization:"),
+        (
+            format!("Proxy-Authorization: Basic {secret}"),
+            "Proxy-Authorization:",
+        ),
+        (format!("Cookie: SID={secret}; theme=dark"), "Cookie:"),
+        (
+            format!("Set-Cookie: session={secret}; Path=/"),
+            "Set-Cookie:",
+        ),
+        (
+            format!("the request sent Authorization: Bearer {secret} and was refused"),
+            "the request sent Authorization:",
+        ),
+    ] {
+        // Named by what is kept rather than by the line, which holds the credential.
+        let shown = withheld(&line);
+        assert!(!shown.contains(&secret), "{kept} kept its credential");
+        assert!(shown == format!("{kept} {REDACTED}"), "{kept}");
+        assert!(withheld(&shown) == shown, "a second pass changed {kept}");
+    }
+}
+
+#[test]
+fn a_session_cookie_written_as_a_pair_loses_its_value() {
+    let secret = a_credential();
+    for (name, line) in [
+        ("SID", format!("qBittorrent answered SID={secret}")),
+        ("session", format!("signed in with session={secret}")),
+    ] {
+        assert!(!withheld(&line).contains(&secret), "{name}");
+    }
+    assert!(is_secret("SID") && is_secret("qbt_sid") && is_secret("SESSION_TOKEN"));
+    assert!(!is_secret("INSIDE") && !is_secret("RESIDENT"));
 }
 
 #[test]
@@ -387,9 +468,6 @@ fn an_address_that_carries_no_password_is_shown_exactly_as_it_was_written() {
     // a path apart because it held a colon would hide the value somebody came to read.
     for kept in [
         "https://indexer.example/api",
-        // A username and no password: the syntax says a password is what stands after
-        // the first colon, and there is none.
-        "https://operator@indexer.example/api",
         // Colons and an at-sign, none of them in an authority.
         "https://indexer.example/api/v3:search/user@host",
         "/srv/media/tv",

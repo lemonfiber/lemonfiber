@@ -52,7 +52,6 @@ bollard = { version = "0.21", features = ["ssh"] }
 # zone the stack already names in `TZ` is read from the same database the containers use.
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-zoneinfo"] }
 clap = { version = "4", features = ["derive"] }
-color-eyre = "0.6"
 etcetera = "0.11"
 # The operating system's CSPRNG, for every secret lemonfiber mints itself.
 getrandom = "0.4"
@@ -202,6 +201,11 @@ install-updater = false
 [profile.dev]
 debug = "line-tables-only"
 
+# The profile releases are built with. One codegen unit lets the optimiser see each
+# crate whole, and the symbol table is stripped because nothing reads it from a
+# shipped binary: a panic's message carries its own file and line.
 [profile.dist]
 inherits = "release"
 lto = "thin"
+codegen-units = 1
+strip = "symbols"

@@ -102,6 +102,45 @@ pub struct Item {
     pub archive_path: String,
     /// What a listing calls it, in the operator's terms.
     pub label: String,
+    /// What beneath the source is not copied, as paths relative to it.
+    pub left_out: Vec<PathBuf>,
+}
+
+/// What each service writes as it runs and rebuilds when it is missing, by service and
+/// by path beneath the directory its configuration is kept in — left out of every
+/// capture.
+///
+/// A cache, a scratch area and a log are no part of what breaks, and they are the bulk
+/// of a configuration directory: Jellyfin's cache alone grows to tens of gigabytes. A
+/// capture holding them takes as long as copying them, and an update takes one with
+/// the whole stack down, so their size would be the stack's downtime. The cover art
+/// the \*arrs keep is fetched again on their next refresh.
+pub const REBUILT: &[(&str, &str)] = &[
+    ("audiobookshelf", "metadata/cache"),
+    ("audiobookshelf", "metadata/logs"),
+    ("bazarr", "log"),
+    ("jellyfin", "cache"),
+    ("jellyfin", "log"),
+    ("lidarr", "MediaCover"),
+    ("lidarr", "logs"),
+    ("prowlarr", "logs"),
+    ("radarr", "MediaCover"),
+    ("radarr", "logs"),
+    ("sabnzbd", "logs"),
+    ("sonarr", "MediaCover"),
+    ("sonarr", "logs"),
+];
+
+/// What a capture leaves out of the service configuration directory, or out of one
+/// service's directory within it.
+fn rebuilt(service: Option<&str>) -> Vec<PathBuf> {
+    REBUILT
+        .iter()
+        .filter_map(|(owner, path)| match service {
+            None => Some(Path::new(owner).join(path)),
+            Some(named) => (named == *owner).then(|| PathBuf::from(path)),
+        })
+        .collect()
 }
 
 /// The record written inside an archive, and read back to decide a restore.
@@ -258,9 +297,9 @@ mod area {
 /// Whole-stack takes lemonfiber's configuration (which defines the expected
 /// state), every service's configuration and database, and the materialised
 /// stack. A single service takes only its own configuration directory. Neither
-/// takes the media library, downloads, images or logs — those live outside this
-/// layout entirely, so excluding them is structural rather than a filter that
-/// could be forgotten.
+/// takes the media library, downloads or images — those live outside this layout
+/// entirely, so excluding them is structural rather than a filter that could be
+/// forgotten — and neither takes what [`REBUILT`] names inside it.
 ///
 /// The set is marked sensitive when it carries credentials: lemonfiber's `.env`
 /// holds the VPN key and provider passwords, and each service's configuration
@@ -274,22 +313,26 @@ pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
                 source: paths.config_dir().to_path_buf(),
                 archive_path: area::CONFIG.to_owned(),
                 label: "lemonfiber configuration".to_owned(),
+                left_out: Vec::new(),
             },
             Item {
                 source: paths.service_config(),
                 archive_path: area::SERVICES.to_owned(),
                 label: "service configuration".to_owned(),
+                left_out: rebuilt(None),
             },
             Item {
                 source: paths.stack(),
                 archive_path: area::STACK.to_owned(),
                 label: "materialised stack".to_owned(),
+                left_out: Vec::new(),
             },
         ],
         Scope::Service { name } => vec![Item {
             source: paths.service_config().join(name),
             archive_path: format!("{}/{name}", area::SERVICES),
             label: format!("{name} configuration"),
+            left_out: rebuilt(Some(name)),
         }],
         // The only scope that reads nothing from `paths`: an existing setup keeps
         // its configuration where it keeps it, and the survey is what found out
@@ -300,6 +343,7 @@ pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
                 source: PathBuf::from(&tree.host_path),
                 archive_path: tree.archive_path.clone(),
                 label: tree.host_path.clone(),
+                left_out: Vec::new(),
             })
             .collect(),
     };

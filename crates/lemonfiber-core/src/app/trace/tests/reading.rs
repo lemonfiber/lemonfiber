@@ -24,7 +24,7 @@ fn ctx_with_jellyfin(fake: &Fake, tag: &str) -> Ctx {
     let _ = std::fs::create_dir_all(&dir);
     let mut context = ctx_with(fake);
     context.settings.env_file = Some(dir.join(".env"));
-    crate::app::targets::record_secret(
+    let _ = crate::app::targets::record_secret(
         &context,
         crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
         &a_password(),

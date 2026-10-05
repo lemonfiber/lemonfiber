@@ -10,7 +10,9 @@
 //! The whole stack comes down for the capture, because a capture is refused while
 //! anything might be writing to a database — so a run that reaches the end brings it
 //! back up, and one that halted leaves it where it stopped for the operator to decide
-//! about with the report in front of them.
+//! about with the report in front of them. The new images are fetched before it comes
+//! down, so the time it is down is the capture and the starts rather than the downloads
+//! as well.
 //!
 //! Services are moved in the order the manifest declares them rather than in the
 //! order they read, because that order is where its dependencies are written down —
@@ -205,6 +207,7 @@ async fn moved(
     ),
     Box<Problem>,
 > {
+    fetched(ctx, taking).await;
     let edits = whole(ctx, &Action::Stop(Vec::new())).await?;
     // From here the stack is down, so anything that fails before it is brought back
     // has to say so itself: the operator has no other way to learn it.
@@ -234,6 +237,22 @@ async fn moved(
             .map(|cause| unrestored(&cause)),
     };
     Ok((archive.path.display().to_string(), edits, applied, halted))
+}
+
+/// Fetch the image each step moves onto, while the stack is still running.
+///
+/// Best effort, and nothing is reported from it: a fetch that did not land leaves the
+/// start that follows to fetch for itself, which reports what it could not fetch the
+/// way it always has. A machine where fetching is switched off fetches nothing here,
+/// and its starts are told never to.
+async fn fetched(ctx: &Ctx, taking: &[Step]) {
+    let services = taking
+        .iter()
+        .map(|step| step.change.service.clone())
+        .collect();
+    if let Ok(invocation) = engine::invocation(ctx, &[], &Action::Pull(services)) {
+        let _ = ctx.seams.runner.run(&invocation.command).await;
+    }
 }
 
 /// Run one Compose action over the whole stack, and the operator's own edits it left

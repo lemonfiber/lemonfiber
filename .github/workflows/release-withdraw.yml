@@ -13,10 +13,12 @@
 # passes over one whose first line is this: it is not offered, not counted as
 # available, and nothing is said about what it changed or carries (N14-R3).
 #
-# Run by hand, from `main`, in the `release` environment, because it is the
-# maintainer's decision and nothing about a release should be able to take it.
-# Running it again replaces the first line rather than adding a second, so the
-# reason can be corrected.
+# Run by hand, from `main`, by a maintainer, in the `release` environment, because
+# it is the maintainer's decision and nothing about a release should be able to
+# take it. The gate holds the first two, as `release-dispatch` holds them for a
+# cut: the environment's own rule admits a run from any `v*` tag, and write
+# access is enough to dispatch a workflow. Running it again replaces the first
+# line rather than adding a second, so the reason can be corrected.
 name: release-withdraw
 
 on:
@@ -35,7 +37,31 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Gate to maintainers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          perm=$(gh api "repos/${REPO}/collaborators/${ACTOR}/permission" --jq '.permission')
+          case "$perm" in
+            admin|maintain) echo "${ACTOR} is a maintainer (${perm})." ;;
+            *) echo "::error::${ACTOR} lacks maintainer permission (${perm}); withdrawal refused."; exit 1 ;;
+          esac
+      - name: Dispatched from main
+        env:
+          DISPATCHED_FROM: ${{ github.ref }}
+        run: |
+          [ "$DISPATCHED_FROM" = "refs/heads/main" ] \
+            || { echo "::error::dispatched from ${DISPATCHED_FROM}; a withdrawal is dispatched from refs/heads/main."; exit 1; }
+
   withdraw:
+    needs: gate
     runs-on: ubuntu-latest
     environment: release
     permissions:

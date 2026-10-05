@@ -39,6 +39,10 @@ const WRITES: &str = "StandardOutput=";
 /// How systemd is told to append to a file rather than take over one.
 const APPEND: &str = "append:";
 
+/// Why a definition holding a control character is not written.
+const UNREPRESENTABLE: &str =
+    "a value in it holds a line break or another control character, which a unit cannot carry";
+
 /// A user service, written into a directory and managed through `systemctl`.
 pub struct Systemd {
     units: PathBuf,
@@ -96,13 +100,13 @@ impl Systemd {
 
 /// The unit systemd reads, one value to a line so it can be read back.
 fn written(hosted: &Hosted) -> String {
-    let out = hosted.output.to_string_lossy();
+    let out = specified(&hosted.output.to_string_lossy());
     let runs: Vec<String> = std::iter::once(hosted.program.to_string_lossy().into_owned())
         .chain(hosted.arguments.iter().cloned())
         .map(|word| quoting(&word))
         .collect();
     let runs = runs.join(" ");
-    let about = &hosted.about;
+    let about = specified(&hosted.about);
     format!(
         "[Unit]\n\
          Description=lemonfiber: {about}\n\
@@ -119,9 +123,39 @@ fn written(hosted: &Hosted) -> String {
     )
 }
 
-/// One argument as systemd reads them, with the two characters it escapes escaped.
+/// Whether every value the unit would carry can be carried by one line of it.
+///
+/// A unit is read a line at a time, so a line break inside a value ends it and starts
+/// a directive of the value's choosing — an `ExecStartPre=` that runs before the
+/// command, or a section header that moves everything after it. No escape inside a
+/// quoted word stops that, so a value holding one is refused rather than written.
+fn representable(hosted: &Hosted) -> bool {
+    std::iter::once(hosted.program.to_string_lossy())
+        .chain(std::iter::once(hosted.output.to_string_lossy()))
+        .chain(hosted.arguments.iter().map(|word| word.as_str().into()))
+        .chain(std::iter::once(hosted.about.as_str().into()))
+        .all(|value| !value.chars().any(char::is_control))
+}
+
+/// A value with the specifier sign doubled, which systemd expands in every value it
+/// reads — the description, the command and the path it writes to alike.
+fn specified(value: &str) -> String {
+    value.replace('%', "%%")
+}
+
+/// One argument as systemd reads them: quoted, with the two characters it escapes
+/// escaped, the specifier sign doubled, and the dollar sign doubled so it is not read
+/// as the start of a variable.
 fn quoting(word: &str) -> String {
-    format!("\"{}\"", word.replace('\\', "\\\\").replace('"', "\\\""))
+    format!(
+        "\"{}\"",
+        specified(&word.replace('\\', "\\\\").replace('"', "\\\"")).replace('$', "$$")
+    )
+}
+
+/// A value read back out of a unit, with the specifier sign single again.
+fn unspecified(value: &str) -> String {
+    value.replace("%%", "%")
 }
 
 /// The arguments of a quoted command line, with those escapes taken back out.
@@ -138,7 +172,7 @@ fn quoted(line: &str) -> Vec<String> {
             escaping = true;
         } else if letter == '"' {
             if inside {
-                found.push(std::mem::take(&mut word));
+                found.push(unspecified(&std::mem::take(&mut word)).replace("$$", "$"));
             }
             inside = !inside;
         } else if inside {
@@ -170,6 +204,12 @@ impl Host for Systemd {
 /// Write the unit, enable and start it, and take it away again if that refuses.
 async fn placed(systemd: &Systemd, hosted: &Hosted) -> Result<Placed, Failure> {
     let at = systemd.at(&hosted.name);
+    if !representable(hosted) {
+        return Err(Failure::Unwritable {
+            at,
+            reason: UNREPRESENTABLE.to_owned(),
+        });
+    }
     put(&at, &written(hosted))?;
     systemd.reread().await;
     let unit = Systemd::unit(&hosted.name);
@@ -212,8 +252,11 @@ async fn standing_of(systemd: &Systemd, name: &str) -> Result<Held, Failure> {
             present: Path::new(at).exists(),
         }),
         runs: (!arguments.is_empty()).then(|| arguments.join(" ")),
-        output: after(&text, WRITES)
-            .and_then(|value| value.strip_prefix(APPEND).map(PathBuf::from)),
+        output: after(&text, WRITES).and_then(|value| {
+            value
+                .strip_prefix(APPEND)
+                .map(|path| PathBuf::from(unspecified(path)))
+        }),
     })
 }
 

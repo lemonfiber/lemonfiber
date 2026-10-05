@@ -1,6 +1,6 @@
 //! Seeing a credential once, and replacing one.
 
-use super::{asked, ctx, env_at, recorded, silent, the_torrent_password};
+use super::{asked, ctx, env_at, recorded, sealed, silent, the_torrent_password, Sealing};
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::config::{JELLYFIN_ADMIN_PASSWORD_KEY, QBITTORRENT_PASSWORD_KEY};
 use lemonfiber_core::credential::Rotation;
@@ -166,6 +166,11 @@ async fn a_proven_replacement_is_recorded_and_every_consumer_is_accounted_for() 
     let now = recorded(&env, QBITTORRENT_PASSWORD_KEY);
     assert!(now.is_some(), "a password is still recorded");
     assert_ne!(now, Some(password), "and it is not the one it was");
+    assert_eq!(
+        recorded(&env, "QBITTORRENT_PASSWORD_PENDING"),
+        None,
+        "the replacement was moved into place, not left beside it"
+    );
 }
 
 /// A rotation the service could not be reached for leaves the existing password in
@@ -377,6 +382,71 @@ async fn a_replacement_jellyfin_will_not_take_leaves_the_recorded_password() {
     }
 }
 
+/// A replacement that was set and not proven stays recorded beside the password in
+/// force, because whether Jellyfin took it is what the failure left unknown; one that
+/// was refused outright is not kept at all.
+#[tokio::test]
+async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_is_not() {
+    for (name, http, kept) in [
+        ("admin-pending-unproven", administered(200, 204, 401), true),
+        ("admin-pending-refused", administered(401, 204, 200), false),
+    ] {
+        let password = the_administrator_password();
+        let env = env_at(name, &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)]);
+        let _ = asked(
+            &ctx(env.clone(), Files::empty(), http),
+            Asking::Rotate {
+                credential: "jellyfin".to_owned(),
+            },
+        )
+        .await;
+        assert_eq!(
+            recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY),
+            Some(password),
+            "{name}"
+        );
+        assert_eq!(
+            recorded(&env, "JELLYFIN_ADMIN_PASSWORD_PENDING").is_some(),
+            kept,
+            "{name}"
+        );
+    }
+}
+
+/// A replacement that cannot be recorded is never set, so no password is in force that
+/// nothing recorded.
+#[tokio::test]
+async fn a_replacement_that_cannot_be_recorded_is_never_set() {
+    let password = the_torrent_password();
+    // Written by a later lemonfiber, which this one reads and refuses to write over.
+    let env = env_at("unrecordable", &[(QBITTORRENT_PASSWORD_KEY, &password)]);
+    let _ = std::fs::write(
+        &env,
+        format!("{QBITTORRENT_PASSWORD_KEY}={password}\nLEMONFIBER_CONFIG_VERSION=999.0.0\n"),
+    );
+    let http = Fake::by_path(vec![
+        ("/auth/login", Answer::reply(200, "Ok.")),
+        ("/app/setPreferences", Answer::reply(200, "")),
+    ]);
+    let inventory = asked(
+        &ctx(env.clone(), Files::empty(), http.clone()),
+        Asking::Rotate {
+            credential: "qBittorrent web UI password".to_owned(),
+        },
+    )
+    .await;
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.contains("could not be recorded"), "{said}");
+    assert!(
+        !http
+            .requests()
+            .iter()
+            .any(|asked| asked.url.ends_with("/app/setPreferences")),
+        "a password was set that nothing recorded"
+    );
+    assert_eq!(recorded(&env, QBITTORRENT_PASSWORD_KEY), Some(password));
+}
+
 /// A rehearsal says what a real run would do and asks Jellyfin nothing.
 #[tokio::test]
 async fn a_rehearsed_administrator_rotation_asks_jellyfin_nothing() {
@@ -419,4 +489,99 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
     assert!(said.contains("no randomness"), "{said}");
     assert_eq!(recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY), Some(password));
     assert!(http.requests().is_empty());
+}
+
+/// The media server's replacement is not set either where it cannot be recorded.
+#[tokio::test]
+async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
+    let password = the_administrator_password();
+    let env = env_at(
+        "admin-unrecordable",
+        &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)],
+    );
+    sealed(&env);
+    let http = administered(200, 204, 200);
+
+    let (said, _, _) = rotated_over(&env, "jellyfin", http.clone()).await;
+
+    assert!(said.contains("could not be recorded"), "{said}");
+    assert!(
+        !http.asked_for("/Password"),
+        "a password was set that nothing recorded"
+    );
+    assert_eq!(recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY), Some(password));
+}
+
+/// A replacement the service took that could not then be moved into place stays under
+/// its pending name, says so, and leaves the record it would have replaced alone — the
+/// next command asks the service and moves it.
+#[tokio::test]
+async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
+    let torrent = the_torrent_password();
+    let administrator = the_administrator_password();
+    for (name, setting, password, credential, inner, at) in [
+        (
+            "unmoved-torrent",
+            QBITTORRENT_PASSWORD_KEY,
+            torrent,
+            "qBittorrent web UI password",
+            Fake::by_path(vec![
+                ("/auth/login", Answer::reply(200, "Ok.")),
+                ("/app/setPreferences", Answer::reply(200, "")),
+            ]),
+            "/app/setPreferences",
+        ),
+        (
+            "unmoved-administrator",
+            JELLYFIN_ADMIN_PASSWORD_KEY,
+            administrator,
+            "jellyfin",
+            administered(200, 204, 200),
+            "/Users/admin-id/Password",
+        ),
+    ] {
+        let env = env_at(name, &[(setting, &password)]);
+        let http = Arc::new(Sealing {
+            inner,
+            env: env.clone(),
+            at,
+        });
+
+        let inventory = asked(
+            &ctx(env.clone(), Files::empty(), http),
+            Asking::Rotate {
+                credential: credential.to_owned(),
+            },
+        )
+        .await;
+
+        let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+        assert!(said.starts_with("Some(ReplacedUnproven"), "{name}: {said}");
+        assert!(
+            said.contains("could not be moved into place"),
+            "{name}: {said}"
+        );
+        assert_eq!(recorded(&env, setting), Some(password), "{name}");
+        assert!(
+            recorded(&env, &format!("{setting}_PENDING")).is_some(),
+            "{name}: the replacement the service holds has no record"
+        );
+    }
+}
+
+/// One rotation of `credential` over this transport, against the settings at `env`.
+async fn rotated_over(
+    env: &std::path::Path,
+    credential: &str,
+    http: Arc<Fake>,
+) -> (String, Option<String>, Arc<Fake>) {
+    let inventory = asked(
+        &ctx(env.to_path_buf(), Files::empty(), http.clone()),
+        Asking::Rotate {
+            credential: credential.to_owned(),
+        },
+    )
+    .await;
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    (said, recorded(env, JELLYFIN_ADMIN_PASSWORD_KEY), http)
 }

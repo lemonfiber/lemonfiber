@@ -103,7 +103,7 @@ fn stopping_named_services_is_not_the_operator_putting_the_stack_down() {
         Action::Stop(named(&["sonarr"])),
         Action::Start(named(&["sonarr"])),
         Action::Restart(named(&["sonarr"])),
-        Action::Pull,
+        Action::Pull(Vec::new()),
         Action::Config,
     ] {
         noted(&ctx, &action, &named(&["tv"]), &ran(Some(0), false));

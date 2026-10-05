@@ -233,7 +233,7 @@ fn every_action_says_what_it_is_called() {
     assert_eq!(Action::Stop(Vec::new()).name(), "stop");
     assert_eq!(Action::Remove(Vec::new()).name(), "rm");
     assert_eq!(Action::Restart(Vec::new()).name(), "restart");
-    assert_eq!(Action::Pull.name(), "pull");
+    assert_eq!(Action::Pull(Vec::new()).name(), "pull");
     assert_eq!(Action::Config.name(), "config");
 }
 
@@ -258,7 +258,12 @@ fn each_action_becomes_its_own_subcommand() {
         "a container has to be stopped before it can be removed, and the question \
          it would otherwise ask is put to a terminal nobody is watching"
     );
-    assert_eq!(ending(&Action::Pull).as_deref(), Some("pull"));
+    assert_eq!(ending(&Action::Pull(Vec::new())).as_deref(), Some("pull"));
+    assert_eq!(
+        ending(&Action::Pull(vec!["sonarr".to_owned()])).as_deref(),
+        Some("pull -- sonarr"),
+        "fetching for part of the stack names only that part, fenced the same way"
+    );
     assert_eq!(ending(&Action::Config).as_deref(), Some("config"));
     assert_eq!(
         ending(&Action::Restart(vec!["sonarr".to_owned()])).as_deref(),
@@ -290,7 +295,7 @@ fn every_action_reports_the_name_it_runs_under() {
         (Action::Down, "down"),
         (Action::Stop(Vec::new()), "stop"),
         (Action::Restart(Vec::new()), "restart"),
-        (Action::Pull, "pull"),
+        (Action::Pull(Vec::new()), "pull"),
         (Action::Config, "config"),
     ] {
         assert_eq!(action.name(), name);

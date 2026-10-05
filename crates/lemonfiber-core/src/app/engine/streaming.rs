@@ -123,7 +123,7 @@ pub async fn pull_progress(
     ctx: &Ctx,
     forms: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
-    let command = compose(ctx, forms, &Action::Pull)?.command;
+    let command = compose(ctx, forms, &Action::Pull(Vec::new()))?.command;
     ctx.seams
         .runner
         .stream(&command)

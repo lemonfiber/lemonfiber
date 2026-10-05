@@ -349,6 +349,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // costs. The line above is news from a run nobody saw; this one is about the
     // run the operator is in the middle of asking for.
     disturbance::said(&command, ctx).await;
+    // Before anything signs in with a credential lemonfiber minted: a rotation that
+    // stopped part-way left its replacement beside it, and which of the two the
+    // service takes is settled here so every command after it signs in with that one.
+    credentials::pending::settled(ctx).await;
     routed(rehearsal::carried(command, ctx), ctx)
         .await
         .map(|outcome| {
@@ -421,7 +425,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
         Command::Restart { forms, services } => restarted(ctx, &forms, services).await,
-        Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull).await,
+        Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),
         Command::ConfigShow => configuring::get(ctx, None).await.map(Outcome::Config),

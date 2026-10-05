@@ -107,7 +107,7 @@ async fn nothing_but_a_start_is_held_to_it() {
         Action::Down,
         Action::Stop(Vec::new()),
         Action::Restart(Vec::new()),
-        Action::Pull,
+        Action::Pull(Vec::new()),
         Action::Config,
     ] {
         assert!(

@@ -176,6 +176,31 @@ async fn a_guard_named_against_nothing_is_refused_by_name() {
 }
 
 #[tokio::test]
+async fn a_guard_named_against_a_word_that_is_no_form_installs_nothing() {
+    for word in [
+        "tv\nExecStartPre=/bin/sh -c 'touch /tmp/owned'\nDescription=",
+        "[Service]",
+        "--stack-dir=/elsewhere",
+        "films",
+    ] {
+        let manager = Fake::with(Manager::Systemd);
+        let refused = hosting(
+            &a_machine(Arc::clone(&manager)),
+            Keeping::Install {
+                what: Hostable::Watch,
+                forms: vec![word.to_owned()],
+            },
+        )
+        .await;
+        assert!(
+            refused.is_err_and(|problem| problem.code == crate::error::codes::form::NO_SUCH_FORM),
+            "{word:?} was not refused as a form the stack does not have"
+        );
+        assert!(manager.placed().is_empty(), "{word:?} reached the manager");
+    }
+}
+
+#[tokio::test]
 async fn a_machine_that_will_not_say_where_it_keeps_things_installs_nothing() {
     let without_program = machine(
         Settings {

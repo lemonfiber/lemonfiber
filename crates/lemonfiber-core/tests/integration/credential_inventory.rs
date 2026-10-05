@@ -25,7 +25,7 @@ use lemonfiber_core::app::{dispatch, Asking, Command, Ctx, Outcome};
 use lemonfiber_core::config::{store, Protocols, Settings};
 use lemonfiber_core::credential::Inventory;
 use lemonfiber_core::ports::filesystem::FileSystem;
-use lemonfiber_core::ports::http::Http;
+use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::Reporting;
 
@@ -58,6 +58,41 @@ fn env_at(name: &str, settings: &[(&str, &str)]) -> PathBuf {
         );
     }
     path
+}
+
+/// Leave the settings file as a later lemonfiber wrote it, which this one reads and
+/// refuses to write over: a record that will not be written, from here on.
+fn sealed(path: &Path) {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let mut kept: String = text
+        .lines()
+        .filter(|line| !line.starts_with("LEMONFIBER_CONFIG_VERSION="))
+        .collect::<Vec<_>>()
+        .join("\n");
+    kept.push('\n');
+    assert!(
+        std::fs::write(path, format!("{kept}LEMONFIBER_CONFIG_VERSION=999.0.0\n")).is_ok(),
+        "the scratch settings file is sealed"
+    );
+}
+
+/// A transport that seals the settings file once it has carried a request for `at`:
+/// a record that was written before that request and will not be written after it.
+struct Sealing {
+    inner: Arc<Fake>,
+    env: PathBuf,
+    at: &'static str,
+}
+
+#[async_trait::async_trait]
+impl Http for Sealing {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        let answer = self.inner.send(request).await;
+        if request.url.contains(self.at) {
+            sealed(&self.env);
+        }
+        answer
+    }
 }
 
 /// What one setting reads as now, straight off the file rather than off a report.
@@ -139,6 +174,7 @@ fn beside(name: &str, register: &str) -> PathBuf {
 }
 
 mod listing;
+mod pending;
 mod plugins;
 mod republishing;
 mod resetting;

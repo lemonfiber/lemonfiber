@@ -1,10 +1,12 @@
 //! Replacing a credential in the order that leaves a working one at every moment.
 //!
-//! The ordering is the whole feature. A replacement is set on the live service and
-//! proven there *before* lemonfiber's record of the old one is overwritten, so a
-//! rotation that fails anywhere leaves the operator with the credential they started
-//! with rather than with neither. Every path out of here that is not a landed
-//! replacement writes nothing at all.
+//! The ordering is the whole feature. A replacement lemonfiber mints is recorded under a
+//! pending name *before* the service is given it, and moved over the credential it
+//! replaces only once the service has taken it and signed in with it (see
+//! [`super::pending`]). A key a service minted for itself is proven against the service
+//! first and published only once it answers. Either way a rotation that fails anywhere
+//! leaves the operator with the credential they started with rather than with neither,
+//! and never with a password set on a service that nothing recorded.
 //!
 //! Two credentials can genuinely be replaced from here and the rest cannot, and the
 //! difference is not arbitrary. lemonfiber can replace what it minted and set itself
@@ -18,6 +20,7 @@ use std::path::Path;
 
 use lemonfiber_manifest::{ApiKind, Service};
 
+use super::pending::{forgotten, kept, pending, promoted};
 use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for};
 use crate::app::Ctx;
 use crate::config;
@@ -26,14 +29,21 @@ use crate::ports::service::{Client, Failure};
 use crate::seed::run::published_as;
 
 /// What a rehearsal says about replacing the credential lemonfiber mints itself.
-const MINTING: &str = "a real run would generate a new web UI password, set it on the \
-     torrent client, sign in with it to prove the client had taken it, and only then \
-     record it. Nothing was generated here, and nothing was set.";
+const MINTING: &str = "a real run would generate a new web UI password, record it beside \
+     the one in force, set it on the torrent client, sign in with it to prove the client had \
+     taken it, and only then put it in place of the old one. Nothing was generated here, and \
+     nothing was set.";
 
 /// What a rehearsal says about replacing the media server's administrator password.
-const ADMINISTERING: &str = "a real run would generate a new administrator password, set it \
-     on Jellyfin, sign in with it to prove Jellyfin took it, and only then record it. Nothing \
-     was generated here, and nothing was set.";
+const ADMINISTERING: &str = "a real run would generate a new administrator password, record \
+     it beside the one in force, set it on Jellyfin, sign in with it to prove Jellyfin took \
+     it, and only then put it in place of the old one. Nothing was generated here, and nothing \
+     was set.";
+
+/// What a rotation the torrent client refused at its first sign-in left behind.
+const REFUSED_BY_THE_CLIENT: &str = "qBittorrent refused the password lemonfiber holds, so \
+     there was nothing to change it with. Nothing was written; the recorded password is the \
+     one it was before.";
 
 /// What a rehearsal says about handing a service's own key back out.
 const REPUBLISHING: &str = "a real run would read the key the service wrote for itself, \
@@ -159,9 +169,10 @@ fn elsewhere(setting: &str) -> String {
 /// Replace qBittorrent's web UI password with a freshly minted one.
 ///
 /// The client sets the replacement and then signs in with it, so a set the service
-/// accepted but did not apply is caught rather than called done. Only that confirmed
-/// change reaches the record — which is what leaves a failed rotation with the old
-/// password still recorded and still the one the service takes.
+/// accepted but did not apply is caught rather than called done. The replacement is
+/// recorded under its pending name before it is set and moved into place only once it
+/// is proven — which is what leaves a failed rotation with the old password still
+/// recorded and still the one the service takes.
 async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
     // The address and the password it authenticates with are one condition rather
     // than two: a stack with no torrent client has no password recorded for one
@@ -192,27 +203,44 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
         );
     };
 
+    if let Err(failure) = record_secret(ctx, &pending(&held.setting), &replacement) {
+        return unproven(held, &unrecorded(&failure));
+    }
     let client = crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), &addr.loopback);
     match client.replace_password(&current, &replacement).await {
-        Ok(()) => {
-            record_secret(ctx, &held.setting, &replacement);
-            Rotation::landed(
+        Ok(()) => match promoted(ctx, &held.setting, &replacement) {
+            Ok(()) => Rotation::landed(
                 &held.name,
                 "qBittorrent took the replacement and signed in with it",
                 reached(&held.setting),
+            ),
+            Err(detail) => Rotation::stopped(&held.name, Settled::ReplacedUnproven { detail }),
+        },
+        Err(Failure::Unauthorised { .. }) => {
+            forgotten(ctx, &held.setting);
+            Rotation::stopped(
+                &held.name,
+                Settled::Refused {
+                    detail: REFUSED_BY_THE_CLIENT.to_owned(),
+                },
             )
         }
-        Err(Failure::Unauthorised { .. }) => Rotation::stopped(
-            &held.name,
-            Settled::Refused {
-                detail: "qBittorrent refused the password lemonfiber holds, so there was nothing \
-                         to change it with. Nothing was written; the recorded password is the \
-                         one it was before."
-                    .to_owned(),
-            },
-        ),
-        Err(failure) => unproven(held, &said(&failure)),
+        // The replacement stays under its pending name: whether the client took it is
+        // what the failure leaves unknown, and the next command asks.
+        Err(failure) => {
+            kept(ctx, &held.setting, &replacement);
+            unproven(held, &said(&failure))
+        }
     }
+}
+
+/// Why a rotation that could not record its replacement set nothing.
+fn unrecorded(failure: &config::store::Failure) -> String {
+    crate::config::store::withheld_text(&format!(
+        "the replacement could not be recorded: {failure}. It was not set on the service, \
+         because a password lemonfiber has no record of is one it would be locked out by; \
+         the existing credential is the one still in force."
+    ))
 }
 
 /// Replace the media server's administrator password with a freshly minted one.
@@ -234,6 +262,9 @@ async fn administrator(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation
             },
         ),
         Err(Replacing::Unproven(detail)) => unproven(held, &detail),
+        Err(Replacing::Unkept(detail)) => {
+            Rotation::stopped(&held.name, Settled::ReplacedUnproven { detail })
+        }
     }
 }
 
@@ -251,11 +282,13 @@ pub(crate) enum Replacing {
     Refused,
     /// Nothing usable answered, or there was nothing to replace with; why, in words.
     Unproven(String),
+    /// Jellyfin took the replacement and it could not be moved into place; why, in words.
+    Unkept(String),
 }
 
-/// Mint a new administrator password, set it on Jellyfin, prove it by signing in with
-/// it, and only then record it — the order that leaves the recorded password the one in
-/// force wherever this stops.
+/// Mint a new administrator password, record it under its pending name, set it on
+/// Jellyfin and prove it by signing in with it, and only then move it into place — the
+/// order that leaves the recorded password the one in force wherever this stops.
 pub(crate) async fn replace_jellyfin_password(
     ctx: &Ctx,
     services: &[Service],
@@ -282,6 +315,10 @@ pub(crate) async fn replace_jellyfin_password(
                 .to_owned(),
         ));
     };
+    let setting = config::JELLYFIN_ADMIN_PASSWORD_KEY;
+    if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
+        return Err(Replacing::Unproven(unrecorded(&failure)));
+    }
     let client = crate::jellyfin::Jellyfin::authenticated(
         ctx.seams.http.clone(),
         &addr.loopback,
@@ -290,12 +327,17 @@ pub(crate) async fn replace_jellyfin_password(
         current,
     );
     match client.replace_password(&replacement).await {
-        Ok(()) => {
-            record_secret(ctx, config::JELLYFIN_ADMIN_PASSWORD_KEY, &replacement);
-            Ok(Replaced::Done)
+        Ok(()) => promoted(ctx, setting, &replacement)
+            .map(|()| Replaced::Done)
+            .map_err(Replacing::Unkept),
+        Err(Failure::Unauthorised { .. }) => {
+            forgotten(ctx, setting);
+            Err(Replacing::Refused)
         }
-        Err(Failure::Unauthorised { .. }) => Err(Replacing::Refused),
-        Err(failure) => Err(Replacing::Unproven(said(&failure))),
+        Err(failure) => {
+            kept(ctx, setting, &replacement);
+            Err(Replacing::Unproven(said(&failure)))
+        }
     }
 }
 
@@ -356,7 +398,9 @@ async fn republished(
     );
     match service.identity().await {
         Ok(identity) => {
-            record_secret(ctx, &held.setting, &key);
+            if let Err(failure) = record_secret(ctx, &held.setting, &key) {
+                return unproven(held, &unpublished(&failure));
+            }
             Rotation::landed(
                 &held.name,
                 &format!(
@@ -384,6 +428,15 @@ async fn republished(
         ),
         Err(failure) => unproven(held, &said(&failure)),
     }
+}
+
+/// Why a key the service answered to was not handed out.
+fn unpublished(failure: &config::store::Failure) -> String {
+    crate::config::store::withheld_text(&format!(
+        "the service answered to the key it holds, but the key could not be published where \
+         the rest of the stack reads it: {failure}. The existing credential is the one still \
+         in force."
+    ))
 }
 
 /// A rotation that could not be proven, and so changed nothing.

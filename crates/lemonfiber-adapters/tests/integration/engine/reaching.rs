@@ -51,7 +51,7 @@ async fn a_client_is_built_for_each_remote_transport_by_a_run_that_uses_one() {
             "{endpoint} answered, and nothing is listening there: {said}"
         );
         assert!(
-            said.contains(endpoint),
+            said.contains(&lemonfiber_error::withheld::without_credentials(endpoint)),
             "a refusal from somewhere else says which somewhere: {said}"
         );
     }

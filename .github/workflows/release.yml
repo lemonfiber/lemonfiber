@@ -269,6 +269,10 @@ jobs:
       - plan
       - build-local-artifacts
     runs-on: "ubuntu-22.04"
+    permissions:
+      "attestations": "write"
+      "contents": "read"
+      "id-token": "write"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
@@ -315,6 +319,13 @@ jobs:
       # that is published refuses a download it cannot check.
       - name: The installer refuses what it cannot check
         run: python3 scripts/the_installer_refuses_what_it_cannot_check.py target/distrib/lemonfiber-installer.sh
+      # `dist` attests what each platform built and nothing this job makes. Here,
+      # after the installer is rewritten and before the upload, so the attestation
+      # is of the file that is published.
+      - name: Attest the global artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ steps.cargo-dist.outputs.paths }}
       - name: "Upload artifacts"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

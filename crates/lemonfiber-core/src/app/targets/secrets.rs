@@ -30,14 +30,26 @@ pub(crate) fn chosen_fillers(ctx: &Ctx) -> crate::wiring::Chosen {
         .because(recorded_secret(ctx, crate::wiring::FILLS_WHY_KEY).as_deref())
 }
 
-/// The write side of [`recorded_secret`]: record a credential lemonfiber minted
-/// where a later run — and the dashboard — reads it back, or nowhere when there is
-/// no environment file to keep it in. Best-effort, like the other records seeding
-/// keeps: a run that cannot persist it still set the secret on the service.
-pub(crate) fn record_secret(ctx: &Ctx, key: &str, value: &str) {
-    if let Some(path) = ctx.settings.env_file.as_deref() {
-        let _ = store::set(path, key, value);
-    }
+/// The write side of [`recorded_secret`]: record a credential where a later run — and
+/// the dashboard — reads it back.
+///
+/// A failure is the caller's to act on rather than this one's to swallow. A secret
+/// lemonfiber mints is recorded *before* any service is given it, because the record
+/// is the only copy lemonfiber will ever have: a service holding a password nothing
+/// recorded is a service lemonfiber is locked out of. So a machine with no file to
+/// keep it in is a failure too.
+///
+/// # Errors
+///
+/// Returns the [`store::Failure`] that stopped it being recorded, or
+/// [`store::Failure::Nowhere`] where there is no environment file.
+pub(crate) fn record_secret(ctx: &Ctx, key: &str, value: &str) -> Result<(), store::Failure> {
+    let path = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .ok_or(store::Failure::Nowhere)?;
+    store::set(path, key, value)
 }
 
 /// The qBittorrent web UI password recorded at seeding — read back for the

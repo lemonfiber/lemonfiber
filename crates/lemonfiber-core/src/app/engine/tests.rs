@@ -217,7 +217,7 @@ fn an_action_is_aimed_at_what_it_names_or_else_at_its_plan() {
         Action::Stop(Vec::new()),
         Action::Remove(Vec::new()),
         Action::Restart(Vec::new()),
-        Action::Pull,
+        Action::Pull(Vec::new()),
         Action::Config,
     ] {
         assert_eq!(

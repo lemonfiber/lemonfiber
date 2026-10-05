@@ -93,7 +93,7 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
             .recording_at(paths.outbound())
             .with_archives(Archiving {
                 paths,
-                vault: Arc::new(crate::archive::Tar),
+                vault: Arc::new(lemonfiber::archive::Tar),
             }),
     };
 

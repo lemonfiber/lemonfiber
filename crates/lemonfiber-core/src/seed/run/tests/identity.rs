@@ -123,6 +123,34 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
+/// A fresh household on a machine with nowhere to record the administrator's password
+/// is not given one: a password nothing recorded is one lemonfiber is locked out by.
+#[tokio::test]
+async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
+    let http = household(false, false);
+    let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None).with_http(http.clone());
+
+    let (wirings, _) = identity(
+        &ctx,
+        &[jellyfin_svc(), seerr_svc()],
+        &crate::baseline::Baseline::new(),
+        &identified(),
+    )
+    .await;
+
+    assert!(
+        wirings.first().is_some_and(|wiring| matches!(
+            &wiring.state,
+            crate::seed::State::Failed { detail } if detail.contains("could not be recorded")
+        )),
+        "the administrator connection did not fail over the record"
+    );
+    assert!(
+        !http.asked_for("/Startup/User"),
+        "the wizard was given a password nothing recorded"
+    );
+}
+
 /// A password change Jellyfin refuses after the request service's setup is said, with
 /// what it leaves open and how to close it, and the minted password stays recorded.
 #[tokio::test]
