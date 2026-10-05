@@ -42,19 +42,30 @@ fn a_curator_the_request_gate_reaches_joins_the_gates_network() {
     );
 }
 
-/// A media server joins every network the stack's media server is on, so the request
-/// gate and the decline service each reach it as they reach the stack's.
+/// A media server joins the networks the request gate reaches the stack's on, and not
+/// the one the stack's media server shares with the decline service alone: the decline
+/// service reaches Jellyfin by name, never whatever serves identity, so a stand-in is
+/// never reached over that network and is given no route to the decline service.
 #[test]
-fn a_media_server_joins_every_network_the_stacks_is_on() {
+fn a_media_server_joins_the_gates_network_and_not_the_decline_services() {
     let joins = shipped();
 
     assert_eq!(
         joins.of_service(&placed(ApiKind::Jellyfin, &["identity.source"], &[])),
-        vec![
-            "decline-upstream".to_owned(),
-            "default".to_owned(),
-            "gate-upstream".to_owned()
-        ]
+        vec!["default".to_owned(), "gate-upstream".to_owned()]
+    );
+}
+
+/// A request service joins the two networks the stack's request service is on and not
+/// the default one, which it is kept off so it reaches the curators and the media
+/// server only through the gate.
+#[test]
+fn a_request_service_joins_its_own_networks_and_not_the_default_one() {
+    let joins = shipped();
+
+    assert_eq!(
+        joins.of_service(&placed(ApiKind::Seerr, &["request.intake"], &[])),
+        vec!["requests".to_owned(), "requests-gate".to_owned()]
     );
 }
 

@@ -15,6 +15,11 @@
 //! provide, stands in for nothing and stays on the default network alone. The networks
 //! themselves are the stack's: a plugin has no field in which to name one.
 //!
+//! **A network kept for a link by name is not joined.** Where every other service on a
+//! network reaches the stack service by name, the network carries a link that is about
+//! that one service and never about whatever stands in for it, so a stand-in is never
+//! reached over it and is given no route to what is on it.
+//!
 //! **Declared rather than settled.** What a plugin's service joins follows from what it
 //! provides, not from whether the operator has chosen it to fill an ask, because the
 //! choice is a setting that changes without the container being written again, and a
@@ -61,7 +66,12 @@ impl Joins {
                     speaks: service.api.as_ref()?.kind,
                     provides: service.provides.clone(),
                     files: service.media_types.clone(),
-                    on: attached.get(&service.id)?.clone(),
+                    on: attached
+                        .get(&service.id)?
+                        .iter()
+                        .filter(|network| !by_name_only(manifest, attached, &service.id, network))
+                        .cloned()
+                        .collect(),
                 })
             })
             .collect();
@@ -90,6 +100,28 @@ impl Joins {
         }
         joined.into_iter().cloned().collect()
     }
+}
+
+/// Whether every other service on `network` reaches `id` by name, which makes the
+/// network one kept for links about that service alone.
+fn by_name_only(
+    manifest: &Manifest,
+    attached: &BTreeMap<String, BTreeSet<String>>,
+    id: &str,
+    network: &str,
+) -> bool {
+    let mut others = attached
+        .iter()
+        .filter(|(other, on)| other.as_str() != id && on.contains(network))
+        .map(|(other, _)| other)
+        .peekable();
+    others.peek().is_some()
+        && others.all(|other| {
+            manifest
+                .wirings
+                .iter()
+                .any(|wiring| wiring.by == *other && wiring.to.as_deref() == Some(id))
+        })
 }
 
 #[cfg(test)]

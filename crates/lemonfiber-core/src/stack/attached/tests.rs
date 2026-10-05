@@ -54,3 +54,27 @@ fn the_shipped_stack_keeps_the_gates_upstreams_apart() {
     assert!(!gate_upstream("lidarr"));
     assert_eq!(found.get("qbittorrent"), Some(&set(&[])));
 }
+
+/// A plugin's own entry is never read as the stack's statement of who reaches whom: a
+/// stack service named again in a plugin's file keeps only the networks the stack's
+/// files put it on.
+#[test]
+fn a_plugins_entry_adds_nothing_to_what_the_stack_puts_a_service_on() {
+    let files = vec![
+        (
+            PathBuf::from("/srv/stack/compose/tv.yml"),
+            "services:\n  sonarr:\n    networks: [default]\n".to_owned(),
+        ),
+        (
+            PathBuf::from("/srv/stack/compose/plugins/brought.yml"),
+            "services:\n  sonarr:\n    networks: [default, gate-upstream]\n  brought:\n    \
+             networks: [default, gate-upstream]\n"
+                .to_owned(),
+        ),
+    ];
+
+    let found = attached(&files);
+
+    assert_eq!(found.get("sonarr"), Some(&set(&["default"])));
+    assert_eq!(found.get("brought"), None);
+}

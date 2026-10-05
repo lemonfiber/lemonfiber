@@ -74,6 +74,7 @@ pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
 pub use installed::{answering, spelled_alike, Installed, Placed, Reached};
 pub use joining::Joins;
+pub(crate) use placing::OVERLAYS;
 pub use placing::{documents, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recorded::{Answer, Asked, Recording};

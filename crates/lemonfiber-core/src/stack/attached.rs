@@ -7,7 +7,7 @@
 //! in the manifest says so.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::mounts::Networking;
 
@@ -24,7 +24,7 @@ pub const DEFAULT: &str = "default";
 #[must_use]
 pub(crate) fn attached(files: &[(PathBuf, String)]) -> BTreeMap<String, BTreeSet<String>> {
     let mut declared: BTreeMap<String, Declared> = BTreeMap::new();
-    for (_, text) in files {
+    for (_, text) in files.iter().filter(|(path, _)| !brought(path)) {
         for Networking {
             service,
             borrowed,
@@ -47,6 +47,16 @@ pub(crate) fn attached(files: &[(PathBuf, String)]) -> BTreeMap<String, BTreeSet
             (name, on)
         })
         .collect()
+}
+
+/// Whether the file is a plugin's own document rather than one of the stack's.
+///
+/// A plugin's entry is written from what lemonfiber worked out, so reading it back as
+/// the stack's statement would let one plugin's networks become what every later
+/// stand-in for a stack service of the same name is put on.
+fn brought(path: &Path) -> bool {
+    path.parent()
+        .is_some_and(|directory| directory.ends_with(crate::plugin::OVERLAYS))
 }
 
 /// What the files declaring one service say of its networks, together.
