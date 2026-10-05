@@ -519,7 +519,8 @@ async fn a_plugin_declaring_the_aggregators_adapter_is_never_sent_the_password()
 }
 
 /// **Nothing unknown is taken as guarded.** Authentication configured and the
-/// configuration still answered to a caller presenting nothing, a reset over such an
+/// configuration still answered to a caller presenting nothing, or answered neither way,
+/// a reset over such an
 /// aggregator, a configuration holding no list of indexers before or after, and an
 /// answer to how it is guarded that does not say: each is said as not guarded, and
 /// none is recorded as lemonfiber's own.
@@ -541,10 +542,37 @@ async fn authentication_on_that_still_answers_anybody_is_not_guarded() {
     )
     .await;
 
+    let unsettled = Fake::by_route_in_turn(vec![
+        (
+            Method::Get,
+            "/internalapi/userinfos",
+            vec![guarded_as(true)],
+        ),
+        (
+            Method::Get,
+            "/internalapi/config",
+            vec![config(&["Dummy"]), Answer::reply(500, "")],
+        ),
+    ]);
+    let undecided = guarded(
+        &guarding_ctx(
+            unsettled,
+            Some(settings_file("open-unsettled", Some("kept"))),
+        ),
+        &mut baseline,
+    )
+    .await;
+
     assert!(
         open.as_ref().is_some_and(|wiring| matches!(&wiring.state,
             State::Failed { detail } if detail.contains("presenting nothing"))),
         "{open:?}"
+    );
+    assert!(
+        undecided
+            .as_ref()
+            .is_some_and(|wiring| matches!(wiring.state, State::Failed { .. })),
+        "{undecided:?}"
     );
     assert_eq!(baseline.expected("nzbhydra2", "authentication"), None);
 }
