@@ -83,9 +83,9 @@ impl Ledger {
 /// Append these lines to the record, under its lock, and cut it back where it has
 /// grown past [`TRIM_AT`].
 fn appended(at: &Path, lines: &[String]) -> std::io::Result<()> {
-    if let Some(parent) = at.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        crate::config::store::make_private_dir(parent)?;
-    }
+    // A record named with no directory is kept where the process stands, and an
+    // empty directory is one there is nothing to make.
+    crate::config::store::make_private_dir(at.parent().unwrap_or(Path::new("")))?;
     let mut file = opened(at)?;
     file.lock()?;
     let mut text = lines.join("\n");

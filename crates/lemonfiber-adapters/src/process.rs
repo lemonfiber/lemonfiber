@@ -95,9 +95,10 @@ async fn waited(child: &mut Child, stdout: &mut Vec<u8>, stderr: &mut Vec<u8>) -
 /// Everything a reader produces, read into a buffer this borrows: a read abandoned
 /// part-way leaves what had arrived in it.
 async fn drained<R: AsyncRead + Unpin>(reader: Option<R>, into: &mut Vec<u8>) {
-    if let Some(mut reader) = reader {
+    let reading = reader.map(|mut reader| async move {
         let _read = reader.read_to_end(into).await;
-    }
+    });
+    futures_util::future::OptionFuture::from(reading).await;
 }
 
 /// Turn an I/O error from spawning a program into the failure that names its
