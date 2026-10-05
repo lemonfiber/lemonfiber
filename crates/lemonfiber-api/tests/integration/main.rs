@@ -19,6 +19,7 @@ mod what_a_listener_hears_of_plugins;
 mod what_a_member_is_kept;
 mod what_a_member_may_ask_for;
 mod what_a_mint_takes;
+mod what_a_plugin_action_means;
 mod what_a_read_answers;
 mod what_a_read_refuses;
 mod what_a_rehearsal_answers;

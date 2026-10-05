@@ -52,6 +52,7 @@ use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 use lemonfiber_core::agreement;
+use lemonfiber_core::app::plugins::REFUSALS;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::error::codes::declared;
@@ -194,7 +195,8 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 ///
 /// And the refusals of the plugins and wiring reads where what they are read from could
 /// not be read, which a client has to tell apart from an empty answer by name, and of a
-/// choice of what fills a capability, each at the status its fault is answered with.
+/// choice of what fills a capability and of an install, an update or a removal, each at
+/// the status its fault is answered with.
 ///
 /// A code the registry does not declare cannot be built, so every refusal is found;
 /// one missing here would be a code no client can name, and a test counts them.
@@ -212,9 +214,13 @@ fn refusals() -> BTreeMap<String, Listed> {
     let choosing = wiring::REFUSED
         .iter()
         .map(|(code, amiss)| (*code, answering(*amiss)));
+    let installing = REFUSALS
+        .iter()
+        .map(|(code, amiss)| (*code, answering(*amiss)));
     own.chain(moved)
         .chain(unread)
         .chain(choosing)
+        .chain(installing)
         .filter_map(|(code, status)| {
             let declared = declared(code)?;
             Some((

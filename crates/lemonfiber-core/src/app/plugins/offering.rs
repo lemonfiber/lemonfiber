@@ -15,7 +15,7 @@
 use serde::Serialize;
 
 use crate::error::codes::plugin::{PLUGIN_OFFER_MOVED, UNAPPROVED};
-use crate::error::{Amiss, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::{Changing, Installed};
 use crate::wiring::Contest;
 
@@ -211,7 +211,6 @@ fn unapproved(plugin: &str, missing: &[&str]) -> Problem {
             .with_detail(missing.join(", ")),
     )
     .in_state(State::Guided)
-    .lies_in(Amiss::Asking)
 }
 
 /// An approval naming a pair the recipes do not carry, said through the sanitiser
@@ -229,7 +228,6 @@ fn approves_nothing(plugin: &str, stray: &str) -> Problem {
         Remedy::new("Read it again, and approve only the pairs it lists"),
     )
     .in_state(State::Guided)
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

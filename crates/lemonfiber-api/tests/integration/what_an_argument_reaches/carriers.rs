@@ -1,11 +1,12 @@
 //! Where each argument is carried in the command it reaches, and how to give one.
 
 use super::acting::{
-    exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CAPABILITY, CARRIES, DOWNLOAD, FOLLOWED,
-    HOURS, ITEM, KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON,
-    REMOVAL, SEASON, SHARE, STAMP, UNRATED, WAITING, WARNED,
+    exactly_what, AGE, ALLOWED, APPROVAL, ARCHIVE, AT_THE_CAP, CAPABILITY, CARRIES, DOWNLOAD,
+    FOLLOWED, HOURS, ITEM, KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, PLUGIN,
+    POLICY, REASON, REMOVAL, SEASON, SHARE, SOURCE, STAMP, UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
+use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::{Answer, Chosen, Decision, Filling, Keeping, Linking};
 use lemonfiber_core::app::{Command, MigrateAction, QualityAction, Setting, Waiting};
@@ -211,6 +212,14 @@ fn carries_offer(command: &Command) -> bool {
         Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
             agreement.as_deref() == Some(OFFER)
         }
+        // And a plugin's install, update and removal, the same way: the offer is the only
+        // yes, so dropped none could act, and kept silently one would act on terms nobody
+        // read.
+        Command::Plugins(
+            Installing::Install { consent, .. }
+            | Installing::Update { consent, .. }
+            | Installing::Remove { consent, .. },
+        ) => consent.agreement.as_deref() == Some(OFFER),
         _ => false,
     }
 }
@@ -595,6 +604,50 @@ fn give_capability(given: &mut Arguments) {
     given.capability = Some(CAPABILITY.to_owned());
 }
 
+/// Whether the command has the plugin it was told to act on.
+fn carries_plugin(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Plugins(
+            Installing::Update { plugin, .. } | Installing::Remove { plugin, .. }
+        ) if plugin == PLUGIN
+    )
+}
+
+fn give_plugin(given: &mut Arguments) {
+    given.plugin = Some(PLUGIN.to_owned());
+}
+
+/// Whether the command has the source a plugin comes from, read the way the command
+/// line reads one.
+fn carries_source(command: &Command) -> bool {
+    let read = lemonfiber_core::plugin::Source::named(SOURCE);
+    matches!(
+        command,
+        Command::Plugins(
+            Installing::Install { source, .. } | Installing::Update { source, .. }
+        ) if *source == read
+    )
+}
+
+fn give_source(given: &mut Arguments) {
+    given.source = Some(SOURCE.to_owned());
+}
+
+/// Whether the command has the approval it was given, apart from the offer.
+fn carries_approved(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Plugins(
+            Installing::Install { consent, .. } | Installing::Update { consent, .. }
+        ) if consent.approved == [APPROVAL]
+    )
+}
+
+fn give_approved(given: &mut Arguments) {
+    given.approved = vec![APPROVAL.to_owned()];
+}
+
 fn give_policy(given: &mut Arguments) {
     given.policy = Some(POLICY.to_owned());
 }
@@ -637,7 +690,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 43] = [
+pub(super) const SWEEPS: [Sweep; 46] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -672,6 +725,9 @@ pub(super) const SWEEPS: [Sweep; 43] = [
     ("request", give_request, carries_request),
     ("reason", give_reason, carries_reason),
     ("capability", give_capability, carries_capability),
+    ("plugin", give_plugin, carries_plugin),
+    ("source", give_source, carries_source),
+    ("approved", give_approved, carries_approved),
     ("tier", give_tier, carries_tier),
     ("kept", give_kept, carries_kept),
     ("down", give_down, carries_down),

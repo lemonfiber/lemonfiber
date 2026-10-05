@@ -21,9 +21,7 @@
 
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{
-    Command, Filling, Hostable, Keeping, Linking, Removing, Setting, Waiting, HOSTABLE,
-};
+use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
@@ -31,6 +29,7 @@ use lemonfiber_core::uninstall::{Tier, TIERS};
 use lemonfiber_core::update::run::Asked;
 
 mod choosing;
+mod extending;
 mod household;
 mod migrating;
 mod sharing;
@@ -92,6 +91,9 @@ pub const OFFERED: &[&str] = &[
     "accept",
     "search",
     "wiring-fill",
+    "plugin-install",
+    "plugin-update",
+    "plugin-remove",
 ];
 
 /// One action a key may call, as the contract publishes it.
@@ -241,13 +243,17 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
     if sharing::about_the_line(action) {
         return Ok(sharing::asked_for(action, given));
     }
-    // And again, twice: one field and nothing to refuse for the first, two fields and
-    // one refusal for the second.
+    // And again, three times: one field and nothing to refuse, two fields and one
+    // refusal, and a plugin or a capability's filler with a missing subject the only
+    // thing to refuse.
     if migrating::about_a_setup_already_here(action) {
         return Ok(migrating::asked_for(action, &given));
     }
     if choosing::about_the_quality(action) {
         return choosing::asked_for(action, &given);
+    }
+    if extending::about_extending(action) {
+        return extending::asked_for(action, given);
     }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
@@ -279,8 +285,6 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         download,
         kept,
         tier,
-        capability,
-        reason,
         ..
     } = given;
     match action {
@@ -372,37 +376,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         "walkthrough" => Ok(Command::Walkthrough {
             item: item.filter(|named| !named.trim().is_empty()),
         }),
-        // Both halves are required, and nothing here decides anything about either:
-        // whether the service can fill the capability is the core's answer. Unanswered
-        // it is the reading, with the name its yes is given by.
-        "wiring-fill" => filling(capability, service, reason, offer),
         _ => Err(unknown(action)),
-    }
-}
-
-/// Which capability is being filled, by which service, why, and the offer answered.
-///
-/// Named apart for the reason the setting is: both subjects are required and each is
-/// refused by its own name.
-fn filling(
-    capability: Option<String>,
-    service: Option<String>,
-    reason: Option<String>,
-    offer: Option<String>,
-) -> Result<Command, Refused> {
-    let missing = |argument: &str| Refused::Missing {
-        action: "wiring-fill".to_owned(),
-        argument: argument.to_owned(),
-    };
-    match (capability, service) {
-        (Some(capability), Some(service)) => Ok(Command::Wiring(Linking::Fill(Filling {
-            capability,
-            service,
-            reason,
-            agreement: offer.filter(|given| !given.trim().is_empty()),
-        }))),
-        (None, _) => Err(missing("capability")),
-        (_, None) => Err(missing("service")),
     }
 }
 

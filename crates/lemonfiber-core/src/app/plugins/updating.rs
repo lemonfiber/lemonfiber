@@ -359,7 +359,6 @@ fn another_plugin(named: &str, holds: &str) -> Problem {
         )),
     )
     .in_state(State::Guided)
-    .lies_in(crate::error::Amiss::Asking)
 }
 
 /// The installed version's containers would not come off, and nothing else was touched.

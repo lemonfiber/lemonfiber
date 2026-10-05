@@ -181,7 +181,7 @@ fn the_contract_lists_every_refusal_at_the_status_it_is_answered_with() {
     // This surface's own, the core's refusals of an offer that has moved, which
     // `contract/refusals` holds to their status, and what the plugins and wiring reads
     // are refused with where what they read could not be read, and what a choice of
-    // filler is refused with.
+    // filler and a plugin's install, update or removal are refused with.
     let unread: usize = lemonfiber_core::wiring::UNREAD
         .iter()
         .map(|codes| codes.len())
@@ -192,6 +192,7 @@ fn the_contract_lists_every_refusal_at_the_status_it_is_answered_with() {
             + lemonfiber_core::agreement::MOVED.len()
             + unread
             + lemonfiber_core::wiring::REFUSED.len()
+            + lemonfiber_core::app::plugins::REFUSALS.len()
     );
     for code in lemonfiber_core::wiring::UNREAD
         .iter()

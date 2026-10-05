@@ -65,6 +65,8 @@ mod newest;
 mod installing;
 // The yes to an install, an update or a removal, and the approval of what a recipe sends.
 mod offering;
+// Where the fault lies in each refusal, as the published list gives it.
+mod refusals;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;
@@ -72,6 +74,7 @@ mod writing;
 
 pub use listing::{installed, recorded};
 pub use offering::Consent;
+pub use refusals::REFUSALS;
 
 /// What is asked about the plugins on this machine.
 ///
@@ -164,6 +167,15 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 /// cannot be written. Every one of those after the first write puts the install back
 /// before it answers.
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
+    Box::pin(asked(ctx, action)).await.map_err(|mut problem| {
+        refusals::place(&mut problem);
+        problem
+    })
+}
+
+/// What is installed, or what installing, updating or removing one came to, before its
+/// refusal is placed where the published list says its fault lies.
+async fn asked(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     match action {
         Asked::Installed => listing::installed(ctx).await,

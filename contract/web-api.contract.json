@@ -21347,15 +21347,145 @@
       "status": 400,
       "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
     },
+    "PLUGIN-10": {
+      "name": "NOTHING_TO_REMOVE",
+      "status": 404,
+      "description": "Nothing by that name is installed on this machine."
+    },
+    "PLUGIN-11": {
+      "name": "NOTHING_TO_UPDATE",
+      "status": 404,
+      "description": "Nothing by that id is installed, so there is no version to replace."
+    },
+    "PLUGIN-12": {
+      "name": "STUCK",
+      "status": 500,
+      "description": "The version installed would not come off, so nothing else was touched."
+    },
+    "PLUGIN-13": {
+      "name": "ANSWERED",
+      "status": 400,
+      "description": "Raised when a plugin's service would answer on a label another plugin's already does."
+    },
+    "PLUGIN-14": {
+      "name": "TWO_SOURCES",
+      "status": 400,
+      "description": "Raised when a plugin is installed from a source other than the one its name is already installed from."
+    },
+    "PLUGIN-15": {
+      "name": "SOURCE_OFF",
+      "status": 400,
+      "description": "Raised when a plugin is named from a git source and fetching from one is switched off."
+    },
+    "PLUGIN-16": {
+      "name": "UNFETCHED",
+      "status": 500,
+      "description": "Raised when a git source could not be reached or would not hand over a revision."
+    },
+    "PLUGIN-17": {
+      "name": "NO_REVISION",
+      "status": 404,
+      "description": "Raised when a git source holds no branch, tag or commit by the name given."
+    },
+    "PLUGIN-18": {
+      "name": "CATALOGUE_OFF",
+      "status": 400,
+      "description": "Raised when a plugin is installed by name and asking the catalogue is switched off."
+    },
+    "PLUGIN-19": {
+      "name": "CATALOGUE_UNREACHABLE",
+      "status": 500,
+      "description": "Raised when the catalogue's index or its signature could not be fetched."
+    },
+    "PLUGIN-2": {
+      "name": "UNREADABLE",
+      "status": 404,
+      "description": "The source names no plugin this build can read."
+    },
+    "PLUGIN-20": {
+      "name": "SIGNATURE_UNVERIFIED",
+      "status": 500,
+      "description": "Raised when the catalogue's index has no signature, one that does not verify, or none this build carries a key to check."
+    },
+    "PLUGIN-21": {
+      "name": "CATALOGUE_UNREADABLE",
+      "status": 500,
+      "description": "Raised when the catalogue's index verified and is not one this build reads."
+    },
+    "PLUGIN-22": {
+      "name": "NOT_CATALOGUED",
+      "status": 404,
+      "description": "Raised when the catalogue holds no plugin by the name given."
+    },
+    "PLUGIN-23": {
+      "name": "NOT_AS_REVIEWED",
+      "status": 500,
+      "description": "Raised when what the catalogue's origin served is not what the catalogue reviewed."
+    },
+    "PLUGIN-24": {
+      "name": "SPELLED_ALIKE",
+      "status": 400,
+      "description": "Raised when a plugin's service would be named, where lemonfiber keeps what a service holds, as another installed plugin's service already is."
+    },
     "PLUGIN-25": {
       "name": "PLUGIN_OFFER_MOVED",
       "status": 400,
       "description": "Raised when an install, an update or a removal answers an offer that was read against a plugin, a stack or a record that has since moved."
     },
+    "PLUGIN-26": {
+      "name": "UNAPPROVED",
+      "status": 400,
+      "description": "Raised when a value a recipe would carry to a destination was not approved as itself, or an approval names a pair the recipe does not carry."
+    },
+    "PLUGIN-27": {
+      "name": "ANOTHER_PLUGIN",
+      "status": 400,
+      "description": "Raised when the source an update names holds a different plugin from the one it was asked to update."
+    },
+    "PLUGIN-29": {
+      "name": "CATALOGUE_REPLACED",
+      "status": 500,
+      "description": "Raised when the catalogue's index verifies and is older than the newest one this machine has verified."
+    },
+    "PLUGIN-3": {
+      "name": "REFUSED",
+      "status": 400,
+      "description": "The manifest is read and this build refuses what it declares."
+    },
+    "PLUGIN-30": {
+      "name": "NEWEST_UNKEPT",
+      "status": 500,
+      "description": "Raised when the record of the newest catalogue index this machine verified cannot be read or written."
+    },
     "PLUGIN-4": {
       "name": "UNRECORDED",
       "status": 500,
       "description": "The record of what is installed cannot be read."
+    },
+    "PLUGIN-5": {
+      "name": "ALREADY",
+      "status": 400,
+      "description": "The plugin is installed already."
+    },
+    "PLUGIN-6": {
+      "name": "NOWHERE",
+      "status": 500,
+      "description": "There is no stack on this machine to put a plugin's container in."
+    },
+    "PLUGIN-7": {
+      "name": "UNWRITABLE",
+      "status": 500,
+      "description": "A directory or a document the install decided on would not land."
+    },
+    "PLUGIN-8": {
+      "name": "UNRECORDABLE",
+      "status": 500,
+      "description": "The wiring went down and the record of what is installed did not."
+    },
+    "PLUGIN-9": {
+      "name": "UNPROVED",
+      "status": 500,
+      "description": "The plugin's own service would not start, so nothing about it could be proved."
     },
     "READ-1": {
       "name": "UNWANTED",
