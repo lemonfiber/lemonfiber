@@ -58,6 +58,9 @@ codes! {
         CONFIG_TOO_NEW = "CONFIG-5",
         /// Raised when a setting's key or value spans more than one line.
         CONFIG_SPANS_LINES = "CONFIG-6",
+        /// Raised when the Usenet indexer aggregator answers a read of its whole
+        /// configuration to a caller presenting nothing.
+        AGGREGATOR_EXPOSED = "CONFIG-7",
     }
     /// The `DIAG` codes.
     diag {

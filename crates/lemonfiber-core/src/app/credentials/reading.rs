@@ -120,19 +120,22 @@ fn declared(plugin: &Installed) -> Vec<Held> {
 /// INI — and every one of them is a file under the service's own configuration
 /// directory, named by the manifest, so the shape decides only which reader opens it.
 ///
-/// The rest write no key for anybody to read. Two of them have no account at all
-/// until lemonfiber makes one, and the torrent client authenticates with a password
-/// rather than a key; all of those are on the declared list instead, which is where a
-/// credential lemonfiber minted belongs.
+/// The rest are not read here. Two of them have no account at all until lemonfiber
+/// makes one, the torrent client authenticates with a password rather than a key, and
+/// the Usenet indexer aggregator is reached with the administrator lemonfiber gives it
+/// rather than with the key it writes; all of those are on the declared list instead,
+/// which is where a credential lemonfiber minted belongs.
 fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
     match kind {
         ApiKind::Servarr => Some(crate::servarr::api_key),
         ApiKind::Bazarr => Some(crate::bazarr::api_key),
         ApiKind::Seerr => Some(crate::seerr::api_key),
         ApiKind::Sabnzbd => Some(crate::sabnzbd::api_key),
-        ApiKind::Qbittorrent | ApiKind::Bindery | ApiKind::Jellyfin | ApiKind::Audiobookshelf => {
-            None
-        }
+        ApiKind::Qbittorrent
+        | ApiKind::Bindery
+        | ApiKind::Jellyfin
+        | ApiKind::Audiobookshelf
+        | ApiKind::Nzbhydra2 => None,
     }
 }
 

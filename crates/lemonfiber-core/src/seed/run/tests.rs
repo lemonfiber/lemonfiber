@@ -452,6 +452,7 @@ mod claiming;
 mod cors;
 mod decline;
 mod gate;
+mod guarding;
 mod identity;
 mod linking;
 mod passwords;

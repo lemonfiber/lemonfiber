@@ -43,6 +43,7 @@
         }
       },
       "occupied": [
+        "config.aggregator-guarded",
         "config.credential-permissions",
         "config.download-client",
         "config.household-telling",

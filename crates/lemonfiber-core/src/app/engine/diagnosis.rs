@@ -19,6 +19,7 @@ use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::declining::{Decline, DeclineKeyCheck};
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::gating::{Gate, GateRecordCheck};
+use crate::doctor::guarded::GuardedCheck;
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
@@ -252,6 +253,31 @@ fn household_telling(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Te
     TellingCheck::new(requests, recorded)
 }
 
+/// Whether the stack's Usenet indexer aggregator keeps its configuration to itself, asked
+/// of the one the stack ships where this machine can reach it.
+fn guarded(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> GuardedCheck {
+    GuardedCheck::new(
+        services
+            .iter()
+            .filter(|service| {
+                service
+                    .api
+                    .as_ref()
+                    .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Nzbhydra2)
+            })
+            .find_map(|service| {
+                Some((
+                    std::sync::Arc::new(crate::nzbhydra2::Nzbhydra2::new(
+                        ctx.seams.http.clone(),
+                        crate::app::targets::loopback(service.port?),
+                        &service.id,
+                    )) as std::sync::Arc<dyn crate::doctor::guarded::Exposure>,
+                    service.name.clone(),
+                ))
+            }),
+    )
+}
+
 /// The checks this stack is examined by, built and ready to run.
 ///
 /// Assembled apart from the running of them because a repair has to ask the very same
@@ -373,6 +399,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
             .unwrap_or_default(),
     );
     let telling = household_telling(ctx, &manifest.services);
+    let guarded = guarded(ctx, &manifest.services);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
     let decline = decline_key(ctx, &manifest.services, project.as_deref());
     // Whether the stack would actually come back after a restart, which is a different
@@ -401,6 +428,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(releases),
         Box::new(wiring),
         Box::new(telling),
+        Box::new(guarded),
         Box::new(gate),
         Box::new(decline),
         Box::new(permissions),
@@ -423,3 +451,6 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     }
     checks
 }
+
+#[cfg(test)]
+mod tests;

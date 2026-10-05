@@ -28,6 +28,7 @@ mod fulfilment;
 mod gate;
 // The Jellyfin keys minted for the services lemonfiber builds.
 mod claiming;
+mod guarding;
 mod minted;
 mod published;
 pub(crate) use published::published_as;
@@ -52,6 +53,7 @@ pub(crate) use arrs::servarr_arrs;
 pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, seed_passwords, Held};
 pub(crate) use gate::reroute;
+pub(crate) use guarding::exposure;
 use identity::seed_jellyfin_identity;
 pub(crate) use reset::reset_connections;
 pub(crate) use subtitles::rewatch;
@@ -232,6 +234,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // The listening server's first account, which is anybody's until somebody makes it.
     wirings.extend(claiming::claimed(ctx, &manifest.services).await);
+
+    // The Usenet indexer aggregator's authentication, without which it hands the indexer
+    // accounts it holds to anything that can reach it.
+    wirings.extend(guarding::guarded(ctx, &fillers, &mut baseline).await);
 
     // The subtitle finder, told which \*arrs to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly
