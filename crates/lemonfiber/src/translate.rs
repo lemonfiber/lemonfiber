@@ -64,9 +64,13 @@ pub(crate) fn wiring(fill: Option<WiringCommand>) -> Command {
         Some(WiringCommand::Fill {
             capability,
             service,
+            reason,
+            offer,
         }) => Linking::Fill(Filling {
             capability,
             service,
+            reason,
+            agreement: offer,
         }),
     })
 }

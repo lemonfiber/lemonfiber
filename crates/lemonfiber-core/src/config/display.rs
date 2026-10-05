@@ -153,6 +153,12 @@ pub const SHOWN: &[(&str, &str)] = &[
          nobody can find",
     ),
     (
+        crate::wiring::FILLS_WHY_KEY,
+        "what the operator said about each of those choices, in their own words and with no \
+         credential in it — the reason a substitution was made, which is worth as little as \
+         the choice it explains if nobody can read it",
+    ),
+    (
         super::INDEXER_URL_KEY,
         "where searches are sent, and the first thing to check when none come back",
     ),

@@ -274,5 +274,7 @@ what to do about it, is written for operators at
 - `WIRE-2`
 - `WIRE-3`
 - `WIRE-4`
+- `WIRE-5`
+- `WIRE-6`
 - `WIRING-1`
 - `WORD-1`

@@ -19,14 +19,15 @@ pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
-/// Which service the operator chose to fill each capability, as the environment
-/// file records it.
+/// Which service the operator chose to fill each capability, and what they said about
+/// each choice, as the environment file records them.
 ///
 /// Read through the same seam every other recorded answer is, and answering with
 /// nothing chosen where there is no file: a stack that has never been substituted in
 /// is wired by what its own manifest says, which is the state every stack starts in.
 pub(crate) fn chosen_fillers(ctx: &Ctx) -> crate::wiring::Chosen {
     crate::wiring::Chosen::read(recorded_secret(ctx, crate::wiring::FILLS_KEY).as_deref())
+        .because(recorded_secret(ctx, crate::wiring::FILLS_WHY_KEY).as_deref())
 }
 
 /// The write side of [`recorded_secret`]: record a credential lemonfiber minted

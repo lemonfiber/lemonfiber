@@ -284,6 +284,7 @@ fn a_substitution_names_the_capability_both_services_and_everything_that_asked()
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),
+            why: None,
         }))
     );
 }

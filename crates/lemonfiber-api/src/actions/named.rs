@@ -21,7 +21,9 @@
 
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
+use lemonfiber_core::app::{
+    Command, Filling, Hostable, Keeping, Linking, Removing, Setting, Waiting, HOSTABLE,
+};
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
@@ -87,6 +89,7 @@ pub const OFFERED: &[&str] = &[
     "undo",
     "accept",
     "search",
+    "wiring-fill",
 ];
 
 /// The actions that must be told what to act on.
@@ -235,6 +238,8 @@ fn carried(action: &str, given: Arguments) -> Result<Command, Refused> {
         download,
         kept,
         tier,
+        capability,
+        reason,
         ..
     } = given;
     match action {
@@ -326,7 +331,37 @@ fn carried(action: &str, given: Arguments) -> Result<Command, Refused> {
         "walkthrough" => Ok(Command::Walkthrough {
             item: item.filter(|named| !named.trim().is_empty()),
         }),
+        // Both halves are required, and nothing here decides anything about either:
+        // whether the service can fill the capability is the core's answer. Unanswered
+        // it is the reading, with the name its yes is given by.
+        "wiring-fill" => filling(capability, service, reason, offer),
         _ => Err(unknown(action)),
+    }
+}
+
+/// Which capability is being filled, by which service, why, and the offer answered.
+///
+/// Named apart for the reason the setting is: both subjects are required and each is
+/// refused by its own name.
+fn filling(
+    capability: Option<String>,
+    service: Option<String>,
+    reason: Option<String>,
+    offer: Option<String>,
+) -> Result<Command, Refused> {
+    let missing = |argument: &str| Refused::Missing {
+        action: "wiring-fill".to_owned(),
+        argument: argument.to_owned(),
+    };
+    match (capability, service) {
+        (Some(capability), Some(service)) => Ok(Command::Wiring(Linking::Fill(Filling {
+            capability,
+            service,
+            reason,
+            agreement: offer.filter(|given| !given.trim().is_empty()),
+        }))),
+        (None, _) => Err(missing("capability")),
+        (_, None) => Err(missing("service")),
     }
 }
 

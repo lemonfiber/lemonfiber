@@ -176,8 +176,10 @@ pub(super) fn a_substitution() -> SubstitutionReport {
                 capability: "indexer.proxy".to_owned(),
             }],
             setting: "indexer.search=nzbhydra2".to_owned(),
+            why: Some("hydra searches the trackers prowlarr cannot".to_owned()),
         },
         applied: true,
+        agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned(),
     }
 }
 

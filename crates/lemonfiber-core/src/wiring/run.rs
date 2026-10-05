@@ -8,11 +8,13 @@
 //! for the same reason: an operator told afterwards that something stopped being
 //! filled has been told about a thing they can no longer choose.
 
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Amiss, Problem, Remedy, Severity};
 
 use super::Refused;
 use crate::app::Ctx;
-use crate::error::codes::wire::{CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER};
+use crate::error::codes::wire::{
+    CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE, WIRING_MOVED,
+};
 use crate::error::Diagnose;
 use crate::model::{SubstitutionReport, WiringReport};
 
@@ -66,21 +68,39 @@ fn listing(ctx: &Ctx) -> Result<WiringReport, Box<Problem>> {
     })
 }
 
+/// The parts a choice's offer is named over, in the order it is built, as a refusal
+/// names them.
+///
+/// The choice itself is one of them: an answer carried over to a different service or
+/// capability is not an answer to this reading, however much else it shares.
+const OFFERED: [&str; 4] = [
+    "the choice itself",
+    "what fills it now",
+    "what asks for it",
+    "what it would leave unfilled",
+];
+
 /// Choose which service fills a capability, and say what that costs.
 ///
-/// A rehearsal works the whole thing out and writes nothing, which is the same
-/// answer with `applied` false: what a substitution would leave unfilled is exactly
-/// what somebody wants to know before agreeing to it.
+/// Answered with no agreement, it is the reading: the whole change worked out, with
+/// the name it goes by, and nothing written. Answered with that name, the reading is
+/// worked out again from the wiring as it stands and the change is made only where
+/// the two agree. A rehearsal checks the name the same way and writes nothing either.
 ///
 /// # Errors
 ///
-/// Returns the [`Problem`] for a stack that cannot be read, a service this stack does
-/// not have, one that cannot do the thing, a capability nothing asks for, one the
-/// named service already fills, or a settings file that could not be written.
+/// Returns the [`Problem`] for a reason that cannot be recorded, a stack that cannot be
+/// read, a service this stack does not have, one that cannot do the thing, a capability
+/// nothing asks for, one the named service already fills, an agreement naming a
+/// reading that has since moved, or a settings file that could not be written.
 fn substituting(
     ctx: &Ctx,
     filling: &crate::app::Filling,
 ) -> Result<SubstitutionReport, Box<Problem>> {
+    let reason = filling.reason.as_deref().filter(|said| !said.is_empty());
+    if let Some(said) = reason {
+        reasonable(said)?;
+    }
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -88,7 +108,7 @@ fn substituting(
 
     let held = crate::app::targets::chosen_fillers(ctx);
     let installed = crate::app::plugins::read(ctx)?;
-    let substitution = super::substitute(
+    let mut substitution = super::substitute(
         &manifest,
         installed.installed(),
         &held,
@@ -96,45 +116,104 @@ fn substituting(
         &filling.service,
     )
     .map_err(|refused| Box::new(problem(&refused)))?;
+    substitution.why = reason.map(str::to_owned);
 
+    let standing = offer(&substitution);
+    let reading = |applied| SubstitutionReport {
+        rehearsed: false,
+        substitution: substitution.clone(),
+        applied,
+        agreement: standing.clone(),
+    };
+    let Some(answered) = filling.agreement.as_deref() else {
+        return Ok(reading(false));
+    };
+    let moved = crate::agreement::differs(answered, &standing, &OFFERED);
+    if !moved.is_empty() {
+        return Err(Box::new(offer_moved(
+            &filling.capability,
+            &moved,
+            &standing,
+        )));
+    }
     if ctx.dry_run {
-        return Ok(SubstitutionReport {
-            rehearsed: false,
-            substitution,
-            applied: false,
-        });
+        return Ok(reading(false));
     }
 
     // The record of the change goes down before the change does, so a run stopped
     // between the two leaves a journal entry for a setting that still holds its old
     // value — which unwinds to the value it already has. The other order leaves a
     // changed setting nothing can put back.
-    let previous = held.setting();
     let (Some(path), Some(paths)) = (
         ctx.settings.env_file.as_deref(),
         crate::app::targets::layout(ctx),
     ) else {
         return Err(Box::new(nowhere_to_record()));
     };
-    crate::app::recover::journalled(
-        &paths.journal(),
-        &[super::recorded(
+    // The reasons are written only where they change, so a choice made with nothing
+    // said, over choices that had nothing said either, leaves no trace of a setting
+    // that holds nothing.
+    let reasons = held.reasons_with(&filling.capability, reason);
+    let before = held.reasons();
+    let stamp = ctx.stamp();
+    let mut changes = vec![super::recorded(
+        &substitution,
+        held.setting().as_deref(),
+        &stamp,
+    )];
+    if reasons != before {
+        changes.push(super::recorded_why(
             &substitution,
-            previous.as_deref(),
-            &ctx.stamp(),
-        )],
-        ctx.seams.random.as_ref(),
-    )
-    .map_err(|failure| Box::new(failure.problem()))?;
-    if let Err(err) = crate::config::store::set(path, super::FILLS_KEY, &substitution.setting) {
-        return Err(Box::new(err.problem()));
+            before.as_deref(),
+            reasons.as_deref(),
+            &stamp,
+        ));
+    }
+    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        .map_err(|failure| Box::new(failure.problem()))?;
+    kept(path, super::FILLS_KEY, &substitution.setting)?;
+    if reasons != before {
+        kept(
+            path,
+            super::FILLS_WHY_KEY,
+            reasons.as_deref().unwrap_or_default(),
+        )?;
     }
 
-    Ok(SubstitutionReport {
-        rehearsed: false,
-        substitution,
-        applied: true,
-    })
+    Ok(reading(true))
+}
+
+/// One setting written, or the settings file's own refusal.
+fn kept(path: &std::path::Path, key: &str, value: &str) -> Result<(), Box<Problem>> {
+    crate::config::store::set(path, key, value).map_err(|err| Box::new(err.problem()))
+}
+
+/// What a reading of a choice names itself, part by part.
+fn offer(substitution: &crate::wiring::Substitution) -> String {
+    let choice = [substitution.capability.as_str(), substitution.now.as_str()];
+    let was = [substitution.was.as_deref().unwrap_or_default()];
+    let asked: Vec<&str> = substitution.asked_by.iter().map(String::as_str).collect();
+    let left: Vec<String> = substitution
+        .leaves_unfilled
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    let left: Vec<&str> = left.iter().map(String::as_str).collect();
+    crate::agreement::parted(&[&choice, &was, &asked, &left])
+}
+
+/// A reason that can be recorded beside a choice: one line of printable text, and no
+/// longer than a reason may be.
+///
+/// A control character is refused with the line breaks, because the reason is printed
+/// back to a terminal, and one that carried an escape sequence would be rewriting the
+/// screen it is shown on.
+fn reasonable(said: &str) -> Result<(), Box<Problem>> {
+    let long = said.chars().count() > crate::wiring::REASON_MOST;
+    if long || said.chars().any(char::is_control) {
+        return Err(Box::new(unreasonable(long)));
+    }
+    Ok(())
 }
 
 /// A refusal in the form an operator can act on.
@@ -152,7 +231,8 @@ fn problem(refused: &Refused) -> Problem {
              declares, and that name is not one of them.",
             Remedy::new("List the services this stack has").with_detail("lemonfiber catalogue"),
         )
-        .or_try(listing),
+        .or_try(listing)
+        .lies_in(Amiss::Naming),
         Refused::DoesNotProvide {
             service,
             capability,
@@ -166,7 +246,8 @@ fn problem(refused: &Refused) -> Problem {
             Remedy::new("See which services declare it")
                 .with_detail("lemonfiber plugin capabilities"),
         )
-        .or_try(listing),
+        .or_try(listing)
+        .lies_in(Amiss::Asking),
         Refused::NothingAsks(capability) => Problem::new(
             NOTHING_ASKS,
             Severity::Warning,
@@ -174,7 +255,8 @@ fn problem(refused: &Refused) -> Problem {
             "Nothing was changed. Choosing who fills a capability nothing asks for \
              would record a setting no wiring reads.",
             listing,
-        ),
+        )
+        .lies_in(Amiss::Asking),
         Refused::AlreadyFills {
             service,
             capability,
@@ -185,7 +267,8 @@ fn problem(refused: &Refused) -> Problem {
             "Nothing was changed, and nothing needed to be.",
             listing,
         )
-        .in_state(crate::error::State::Guided),
+        .in_state(crate::error::State::Guided)
+        .lies_in(Amiss::Asking),
     }
 }
 
@@ -199,6 +282,51 @@ fn nowhere_to_record() -> Problem {
          this run has no settings file to put it in.",
         Remedy::new("Set this machine up first").with_detail("lemonfiber setup"),
     )
+}
+
+/// A choice answering a reading of the wiring that has since moved.
+///
+/// Every part that moved is named, because an operator told only that something
+/// changed has to read the whole choice again to find out what.
+fn offer_moved(capability: &str, moved: &[&str], standing: &str) -> Problem {
+    crate::agreement::moved(
+        Problem::new(
+            WIRING_MOVED,
+            Severity::Error,
+            format!("That choice was agreed to against a different reading of {capability}"),
+            format!(
+                "Since it was read, {} changed, so nothing was changed. Agreeing to it now \
+                 would be agreeing to something nobody saw.",
+                moved.join(" and ")
+            ),
+            Remedy::new("Read the choice again, and answer the name it prints")
+                .with_detail(format!("the offer standing now is {standing}")),
+        )
+        .in_state(crate::error::State::Guided),
+    )
+}
+
+/// A reason that cannot be recorded beside a choice.
+fn unreasonable(long: bool) -> Problem {
+    let why = if long {
+        format!(
+            "A reason is read on one line beside the choice it explains, and may be at most \
+             {} characters.",
+            crate::wiring::REASON_MOST
+        )
+    } else {
+        "A reason is read on one line beside the choice it explains, so it may hold no \
+         line break or other control character."
+            .to_owned()
+    };
+    Problem::new(
+        UNREASONABLE,
+        Severity::Error,
+        "That reason cannot be recorded with the choice",
+        format!("{why} Nothing was changed."),
+        Remedy::new("Say why in one shorter line, or make the choice with no reason"),
+    )
+    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

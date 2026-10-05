@@ -15,11 +15,11 @@ mod takers;
 
 pub(crate) use takers::unwanted;
 pub use takers::{
-    TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CHECK,
-    TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT,
-    TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST,
-    TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_TERM, TAKES_TIER,
-    TAKES_WAITING,
+    TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING,
+    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
+    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
+    TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 
 use lemonfiber_core::app::Waiting;
@@ -109,8 +109,11 @@ pub struct Arguments {
     pub days: Option<u32>,
     /// The request being ruled on, by the number the request service files it under.
     pub request: Option<i64>,
-    /// Why a request is being turned down.
+    /// Why a request is being turned down, or why a service was chosen to fill a
+    /// capability.
     pub reason: Option<String>,
+    /// The capability whose filler is being chosen.
+    pub capability: Option<String>,
     /// Which of the four removals an uninstall was asked for.
     ///
     /// A word rather than a level, for the reason `policy` is a word: they are four

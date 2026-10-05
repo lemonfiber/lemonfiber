@@ -8140,12 +8140,24 @@
             "null|string"
           ],
           "required": false
+        },
+        "why": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
         }
       },
       "variants": []
     },
     "SubstitutionReport": {
       "fields": {
+        "agreement": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
         "applied": {
           "type": [
             "boolean"
@@ -9799,6 +9811,12 @@
     "STACK-6": 500,
     "STACK-7": 500,
     "STACK-8": 500,
-    "STACK-9": 500
+    "STACK-9": 500,
+    "WIRE-1": 404,
+    "WIRE-2": 400,
+    "WIRE-3": 400,
+    "WIRE-4": 500,
+    "WIRE-5": 400,
+    "WIRE-6": 400
   }
 }

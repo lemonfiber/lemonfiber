@@ -175,11 +175,50 @@ pub(crate) fn substituted(report: &SubstitutionReport) -> Lines {
         lines.put(format!("  was      {was}"));
     }
     lines.put(format!("  asked by {}", made.asked_by.join(", ")));
-    if !report.applied {
-        lines.spaced("Nothing was written. Run it without --dry-run to make the change.");
+    if let Some(why) = &made.why {
+        lines.put(format!("  because  {why}"));
     }
     lines.extend(cost(&made.leaves_unfilled, report.applied));
+    if !report.applied {
+        lines.extend(answering(report));
+    }
     lines
+}
+
+/// The name to answer with, under what the change would cost, so nobody reaches it
+/// without passing that.
+fn answering(report: &SubstitutionReport) -> Lines {
+    let made = &report.substitution;
+    let mut lines = Lines::default();
+    lines.spaced(if report.rehearsed {
+        "Nothing was written, because this was a rehearsal. To make the change, answer \
+         this offer by name:"
+    } else {
+        "Nothing has been changed. To make the change, answer this offer by name:"
+    });
+    let reason = made
+        .why
+        .as_deref()
+        .map(|why| format!(" --reason {}", quoted(why)))
+        .unwrap_or_default();
+    lines.put(format!(
+        "  lemonfiber wiring fill {} {}{reason} --offer {}",
+        made.capability, made.now, report.agreement
+    ));
+    lines
+}
+
+/// Words an operator typed, quoted so a shell hands them back as one argument.
+fn quoted(said: &str) -> String {
+    let mut held = String::from('"');
+    for letter in said.chars() {
+        if matches!(letter, '"' | '\\' | '$' | '`') {
+            held.push('\\');
+        }
+        held.push(letter);
+    }
+    held.push('"');
+    held
 }
 
 /// What the change leaves with nothing filling it, said before it is agreed to.

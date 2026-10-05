@@ -5,10 +5,10 @@
 //! same question differently the first time one of them was updated.
 pub(crate) use lemonfiber_api::actions::{
     named, Arguments, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
-    TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
-    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD,
+    TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET,
+    TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
+    TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -111,6 +111,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         days: takes(TAKES_POLICY).then_some(PERIOD),
         request: takes(TAKES_REQUEST).then_some(WAITING),
         reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
+        capability: takes(TAKES_CAPABILITY).then(|| CAPABILITY.to_owned()),
         kept: takes(TAKES_KEPT).then(|| KEPT.to_owned()),
         tier: takes(TAKES_TIER).then(|| REMOVAL.to_owned()),
         down: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
@@ -125,6 +126,9 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         dry_run: false.into(),
     }
 }
+
+/// A capability a choice of filler is about.
+pub(crate) const CAPABILITY: &str = "indexer.search";
 
 /// A backup name, as one is written under.
 pub(crate) const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";

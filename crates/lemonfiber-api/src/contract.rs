@@ -165,7 +165,8 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 /// has to be able to name them as it names this surface's own.
 ///
 /// And the refusals of the plugins and wiring reads where what they are read from could
-/// not be read, which a client has to tell apart from an empty answer by name.
+/// not be read, which a client has to tell apart from an empty answer by name, and of a
+/// choice of what fills a capability, each at the status its fault is answered with.
 ///
 /// A code the registry does not declare cannot be built, so every refusal is found;
 /// one missing here would be a code no client can name, and a test counts them.
@@ -180,8 +181,12 @@ fn refusals() -> BTreeMap<String, Listed> {
         .iter()
         .flat_map(|codes| codes.iter())
         .map(|code| (*code, answering(wiring::UNREAD_AMISS)));
+    let choosing = wiring::REFUSED
+        .iter()
+        .map(|(code, amiss)| (*code, answering(*amiss)));
     own.chain(moved)
         .chain(unread)
+        .chain(choosing)
         .filter_map(|(code, status)| {
             let declared = declared(code)?;
             Some((

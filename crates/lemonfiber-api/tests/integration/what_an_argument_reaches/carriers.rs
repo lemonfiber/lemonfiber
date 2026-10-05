@@ -1,13 +1,13 @@
 //! Where each argument is carried in the command it reaches, and how to give one.
 
 use super::acting::{
-    exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CARRIES, DOWNLOAD, FOLLOWED, HOURS, ITEM,
-    KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON, REMOVAL,
-    SEASON, SHARE, STAMP, UNRATED, WAITING, WARNED,
+    exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CAPABILITY, CARRIES, DOWNLOAD, FOLLOWED,
+    HOURS, ITEM, KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON,
+    REMOVAL, SEASON, SHARE, STAMP, UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
-use lemonfiber_core::app::{Answer, Chosen, Decision, Keeping};
+use lemonfiber_core::app::{Answer, Chosen, Decision, Filling, Keeping, Linking};
 use lemonfiber_core::app::{Command, MigrateAction, QualityAction, Setting, Waiting};
 use lemonfiber_core::bundle::run::Wanted;
 use lemonfiber_core::bundle::Filenames;
@@ -205,6 +205,12 @@ fn carries_offer(command: &Command) -> bool {
         // dropped, nothing could be stopped; kept silently, what stopped is something
         // nobody read the list of.
         Command::Migrate(MigrateAction::Replace { offer }) => offer.as_deref() == Some(OFFER),
+        // And choosing what fills a capability, where the offer's own name is the only
+        // yes: dropped, no choice could be made; kept silently, one nobody read the cost
+        // of.
+        Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
+            agreement.as_deref() == Some(OFFER)
+        }
         _ => false,
     }
 }
@@ -238,6 +244,7 @@ fn carries_agreed(command: &Command) -> bool {
 fn carries_service(command: &Command) -> bool {
     matches!(command, Command::Backup { service: Some(_) })
         || matches!(command, Command::Update(asked) if asked.service.is_some())
+        || matches!(command, Command::Wiring(Linking::Fill(filling)) if filling.service == "sonarr")
 }
 
 /// Whether the command has the archive it was named in it, as a name rather than a
@@ -570,7 +577,22 @@ fn carries_reason(command: &Command) -> bool {
             answer: Answer::TurnedDown { reason },
             ..
         }) if reason == REASON
+    ) || matches!(
+        command,
+        Command::Wiring(Linking::Fill(Filling { reason: Some(reason), .. })) if reason == REASON
     )
+}
+
+/// Whether the command has the capability a choice of filler is about.
+fn carries_capability(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Wiring(Linking::Fill(filling)) if filling.capability == CAPABILITY
+    )
+}
+
+fn give_capability(given: &mut Arguments) {
+    given.capability = Some(CAPABILITY.to_owned());
 }
 
 fn give_policy(given: &mut Arguments) {
@@ -615,7 +637,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 42] = [
+pub(super) const SWEEPS: [Sweep; 43] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -649,6 +671,7 @@ pub(super) const SWEEPS: [Sweep; 42] = [
     ("days", give_days, carries_limit),
     ("request", give_request, carries_request),
     ("reason", give_reason, carries_reason),
+    ("capability", give_capability, carries_capability),
     ("tier", give_tier, carries_tier),
     ("kept", give_kept, carries_kept),
     ("down", give_down, carries_down),

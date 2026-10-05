@@ -14,7 +14,7 @@ use super::reaching::{
     OFFLINE_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
     REACH_PLUGIN_SOURCE_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY,
 };
-use crate::wiring::FILLS_KEY;
+use crate::wiring::{FILLS_KEY, FILLS_WHY_KEY};
 
 /// The setting recording that a Usenet provider is configured.
 ///
@@ -371,4 +371,5 @@ pub const SETTINGS: &[&str] = &[
     BINDERY_API_KEY,
     FRONT_DOOR_KEY,
     FILLS_KEY,
+    FILLS_WHY_KEY,
 ];

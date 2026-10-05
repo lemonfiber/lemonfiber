@@ -427,6 +427,12 @@ codes! {
         NOTHING_ASKS = "WIRE-3",
         /// The setting recording the choice could not be written.
         CHOICE_UNWRITABLE = "WIRE-4",
+        /// Raised when a choice answers an offer that was read against a wiring that has
+        /// since moved.
+        WIRING_MOVED = "WIRE-5",
+        /// Raised when the reason given for a choice is longer than a reason may be, or
+        /// holds a line break or another control character.
+        UNREASONABLE = "WIRE-6",
     }
     /// The `WIRING` codes.
     wiring {

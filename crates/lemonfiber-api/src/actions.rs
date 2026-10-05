@@ -45,10 +45,10 @@ use crate::router::Serving;
 
 pub use asked::{
     Arguments, Disturbing, Running, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
-    TAKES_BUNDLING, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
-    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD,
+    TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET,
+    TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
+    TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 pub use named::{named, OFFERED};
 pub use refused::Refused;
@@ -94,6 +94,9 @@ pub const fn answering(command: &Command) -> Answering {
         // the answer that matters — whether the machine says it is running it — would
         // arrive after the moment somebody was looking.
         | Command::Hosting(_)
+        // Choosing what fills a capability writes one setting and its journal entry,
+        // both lemonfiber's own files, and asks nothing of a service.
+        | Command::Wiring(_)
         | Command::Restore {
             consent: RestoreConsent::List,
             ..

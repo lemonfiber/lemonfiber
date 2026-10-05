@@ -42,6 +42,7 @@ fn everything(confirm: bool) -> Arguments {
         days: Some(30),
         request: Some(7),
         reason: Some("there is no room this month".to_owned()),
+        capability: Some("indexer.search".to_owned()),
         tier: Some("services".to_owned()),
         kept: Some("watch".to_owned()),
         down: Some("37%".to_owned()),

@@ -210,10 +210,15 @@ fn substituting(applied: bool, leaves: Vec<Unfilled>) -> SubstitutionReport {
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: leaves,
             setting: "indexer.search=nzbhydra2".to_owned(),
+            why: None,
         },
         applied,
+        agreement: OFFER.to_owned(),
     }
 }
+
+/// The name a reading of the substitution goes by.
+const OFFER: &str = "1a2b3c4d-5e6f7a8b-9c0d1e2f";
 
 #[test]
 fn a_substitution_that_landed_says_what_now_fills_it_and_what_did() {
@@ -226,13 +231,52 @@ fn a_substitution_that_landed_says_what_now_fills_it_and_what_did() {
     assert!(said.contains("asked by bindery"), "{said}");
 }
 
-/// A rehearsal says what it would do and that it wrote nothing, which is the
-/// difference somebody reading the same lines twice has to be able to see.
+/// A reading says what it would do, that it changed nothing, and the name to answer
+/// with, under what the change would cost.
 #[test]
-fn a_rehearsal_says_it_wrote_nothing() {
+fn a_reading_says_it_changed_nothing_and_how_to_answer_it() {
     let said = substituted(&substituting(false, Vec::new())).text();
     assert!(said.contains("would fill"), "{said}");
-    assert!(said.contains("Nothing was written."), "{said}");
+    assert!(said.contains("Nothing has been changed."), "{said}");
+    assert!(
+        said.contains(&format!(
+            "lemonfiber wiring fill indexer.search nzbhydra2 --offer {OFFER}"
+        )),
+        "{said}"
+    );
+}
+
+/// A rehearsal says it was one, and still gives the name to answer with.
+#[test]
+fn a_rehearsal_says_it_wrote_nothing() {
+    let report = SubstitutionReport {
+        rehearsed: true,
+        ..substituting(false, Vec::new())
+    };
+    let said = substituted(&report).text();
+    assert!(said.contains("because this was a rehearsal"), "{said}");
+    assert!(said.contains(&format!("--offer {OFFER}")), "{said}");
+}
+
+/// The reason is said beside the choice, and handed back on the line that answers
+/// the offer, quoted so a shell takes it as one argument.
+#[test]
+fn a_reason_is_said_and_handed_back_quoted() {
+    let mut report = substituting(false, Vec::new());
+    report.substitution.why = Some(r#"it's "faster" at $5 \ `month`"#.to_owned());
+    let said = substituted(&report).text();
+    assert!(said.contains(r#"because  it's "faster""#), "{said}");
+    assert!(
+        said.contains(r#"--reason "it's \"faster\" at \$5 \\ \`month\`" --offer"#),
+        "{said}"
+    );
+}
+
+/// A choice made says nothing about answering an offer.
+#[test]
+fn a_choice_made_gives_no_name_to_answer_with() {
+    let said = substituted(&substituting(true, Vec::new())).text();
+    assert!(!said.contains("--offer"), "{said}");
 }
 
 /// The one thing an operator cannot find out afterwards is said before they

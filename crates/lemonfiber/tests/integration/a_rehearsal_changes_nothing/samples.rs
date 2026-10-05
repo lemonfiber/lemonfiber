@@ -156,6 +156,8 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             Command::Wiring(Linking::Fill(Filling {
                 capability: "indexer.search".to_owned(),
                 service: "nzbhydra2".to_owned(),
+                reason: None,
+                agreement: None,
             })),
         ),
         (
