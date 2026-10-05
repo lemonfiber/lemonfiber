@@ -58,11 +58,14 @@ mod standing;
 mod fetching;
 // Installing by name: the catalogue's index verified, and the name resolved through it.
 mod cataloguing;
+// What is installed, read off the record alone or with each source asked.
+mod listing;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;
 mod writing;
 
+pub use listing::{installed, recorded};
 use twice::already;
 use writing::{carry_out, nowhere_to_write};
 
@@ -136,18 +139,7 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     match action {
-        Asked::Installed => Ok(Installs {
-            rehearsed: false,
-            substituted: standing::substituted(
-                held.installed(),
-                &super::targets::chosen_fillers(ctx),
-            ),
-            sources: fetching::standings(ctx, held.installed()).await,
-            installed: held.installed().to_vec(),
-            install: None,
-            removal: None,
-            update: None,
-        }),
+        Asked::Installed => listing::installed(ctx).await,
         // Boxed, because each carries a whole install's worth of state across its awaits
         // — the stack's checks read twice, a reversal, a record — and every command the
         // dispatcher runs would otherwise be as large as the one that installs.

@@ -31,6 +31,7 @@ use crate::error::{Amiss, Code};
 mod chosen;
 mod fillers;
 pub(crate) mod run;
+pub use run::listing;
 mod settling;
 
 pub use chosen::{Chosen, REASON_MOST};
