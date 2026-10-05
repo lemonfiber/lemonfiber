@@ -82,14 +82,13 @@ pub(crate) fn account_explainable(report: &TraceReport) -> Option<String> {
 /// already the judgment, and two paths to one verdict is one way for them to disagree.
 /// Reading it costs the providers nothing — every figure in it comes from the services
 /// that have been using the accounts.
-pub(crate) async fn providers(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-) -> Vec<Finding> {
+pub(crate) async fn providers(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Finding> {
+    let services = &manifest.services;
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = crate::app::targets::host_fillers(ctx, manifest, project.as_deref());
     ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, services, project.as_deref())
+        crate::app::targets::usenet_client(ctx, &fillers)
             .await
             .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
         crate::app::targets::indexer_aggregator(ctx, services, project.as_deref())

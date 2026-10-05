@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer as Replies, Fake};
@@ -7,10 +6,7 @@ use super::{answer, holding, opened, said, DownloadKind, DownloadTarget, Fetch};
 use crate::bandwidth::{Answer, Held, Period, Pulling, Verdict};
 use crate::config::Settings;
 use crate::ports::service::{Failure, Hours, Rates, Throttled, Wanted};
-use crate::test_support::{a_context, a_password, env_at, SeedFs};
-
-/// A `SABnzbd` configuration with a key in it, as the client writes one.
-const KEYED: &str = "[misc]\napi_key = the-key\n";
+use crate::test_support::{a_context, a_password, env_at};
 
 /// The three parts of an answer, where the client answered at all.
 fn parts(answer: &Answer) -> Option<(Held, Held, Option<Period>)> {
@@ -117,21 +113,25 @@ fn a_client_with_no_schedule_of_its_own_is_judged_against_the_active_figure() {
     );
 }
 
-/// The torrent client as a read target.
+/// The torrent client as a read target, holding the password recorded for it.
 fn torrent() -> DownloadTarget {
     DownloadTarget {
         base: "http://127.0.0.1:8081".to_owned(),
-        kind: DownloadKind::Qbittorrent,
+        kind: DownloadKind::Qbittorrent {
+            password: a_password(),
+        },
+        tunnelled: true,
     }
 }
 
-/// The Usenet client, pointed at the configuration its key is read from.
+/// The Usenet client as a read target, holding the key it wrote.
 fn usenet() -> DownloadTarget {
     DownloadTarget {
         base: "http://127.0.0.1:8080".to_owned(),
         kind: DownloadKind::Sabnzbd {
-            config: PathBuf::from("/srv/config/sabnzbd/sabnzbd.ini"),
+            key: "usenet-key".to_owned(),
         },
+        tunnelled: false,
     }
 }
 
@@ -140,32 +140,14 @@ fn both() -> Vec<DownloadTarget> {
     vec![torrent(), usenet()]
 }
 
-#[tokio::test]
-async fn both_kinds_of_client_are_opened_by_what_each_authenticates_with() {
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env_at("bandwidth-open", &a_password())),
-            ..Settings::default()
-        })
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(KEYED))));
+#[test]
+fn both_kinds_of_client_are_opened_by_what_each_authenticates_with() {
+    let ctx = a_context().build();
     let names: Vec<&str> = opened(&ctx, &both())
-        .await
         .iter()
         .map(super::Client::name)
         .collect();
     assert_eq!(names, ["qbittorrent", "sabnzbd"]);
-}
-
-#[tokio::test]
-async fn a_client_lemonfiber_cannot_authenticate_to_is_left_out_rather_than_read_as_open() {
-    // It is not a client with no limits; it is a client nothing here can see,
-    // and reporting the two alike would be a report reading better than the
-    // stack is. One has no recorded password and the other has written no key.
-    let ctx = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
-    assert!(opened(&ctx, &both()).await.is_empty());
 }
 
 #[tokio::test]
@@ -177,7 +159,7 @@ async fn a_client_that_would_not_answer_is_reported_with_what_it_said() {
         })
         .build()
         .with_http(Fake::silent());
-    let clients = opened(&ctx, &[torrent()]).await;
+    let clients = opened(&ctx, &[torrent()]);
     assert_eq!(clients.len(), 1, "the torrent client opened");
 
     for client in &clients {
@@ -240,7 +222,7 @@ async fn a_cap_makes_whether_the_client_is_fetching_part_of_what_it_answers() {
     // client still running something has not stopped, and one running nothing
     // that would start the next thing handed to it has not either.
     let ctx = a_stack("bandwidth-pulling", a_client_that_answers("[{}]", "false"));
-    let clients = &opened(&ctx, &[torrent()]).await;
+    let clients = &opened(&ctx, &[torrent()]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -251,7 +233,7 @@ async fn a_cap_makes_whether_the_client_is_fetching_part_of_what_it_answers() {
     }
 
     let idle = a_stack("bandwidth-idle", a_client_that_answers("[]", "true"));
-    let clients = &opened(&idle, &[torrent()]).await;
+    let clients = &opened(&idle, &[torrent()]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -270,7 +252,7 @@ async fn a_cap_makes_whether_the_client_is_fetching_part_of_what_it_answers() {
 async fn stopping_and_starting_are_two_named_requests_rather_than_one_flag() {
     let http = a_client_that_answers("[]", "true");
     let ctx = a_stack("bandwidth-stopping", http.clone());
-    let clients = &opened(&ctx, &[torrent()]).await;
+    let clients = &opened(&ctx, &[torrent()]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -299,7 +281,7 @@ async fn a_client_that_will_not_say_whether_it_is_fetching_reports_nothing_rathe
     // "Stopped" is exactly the wrong thing to say about a client nobody could
     // reach: it is the answer that reads as a cap being kept.
     let ctx = a_stack("bandwidth-unfetchable", Fake::silent());
-    let clients = &opened(&ctx, &[torrent()]).await;
+    let clients = &opened(&ctx, &[torrent()]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -321,7 +303,7 @@ async fn what_a_client_has_moved_is_nothing_where_it_would_not_say() {
         })
         .build()
         .with_http(Fake::silent());
-    let clients = &opened(&ctx, &[torrent()]).await;
+    let clients = &opened(&ctx, &[torrent()]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -346,15 +328,12 @@ async fn the_usenet_client_is_asked_on_its_own_shape_rather_than_the_torrent_one
     // and it has no upload and keeps no hours. A stack that reached it the
     // torrent client's way would report a working client as silent, and the
     // household would be held to a limit nothing had ever put on it.
-    let ctx = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(KEYED))))
-        .with_http(Fake::by_path(vec![
-            ("mode=queue", Replies::reply(200, QUEUED)),
-            ("mode=get_config", Replies::reply(200, UNSCHEDULED)),
-            ("mode=server_stats", Replies::reply(200, DAILY)),
-        ]));
-    let clients = opened(&ctx, &[usenet()]).await;
+    let ctx = a_context().build().with_http(Fake::by_path(vec![
+        ("mode=queue", Replies::reply(200, QUEUED)),
+        ("mode=get_config", Replies::reply(200, UNSCHEDULED)),
+        ("mode=server_stats", Replies::reply(200, DAILY)),
+    ]));
+    let clients = opened(&ctx, &[usenet()]);
     assert_eq!(clients.len(), 1, "the Usenet client opened");
 
     for client in &clients {

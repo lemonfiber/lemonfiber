@@ -12,7 +12,7 @@
 
 use super::choose::Chosen;
 use super::walk::Walk;
-use crate::app::targets::{download_targets, project_directory, read_transfers};
+use crate::app::targets::{download_targets, host_fillers, project_directory, read_transfers};
 use crate::app::Ctx;
 use crate::ports::docker::LogQuery;
 use crate::ports::service::{Added, Pipeline, QueueItem, TraceEvent};
@@ -129,7 +129,8 @@ async fn speed_of(ctx: &Ctx, title: &str) -> Option<Speed> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let needle = first_word(title).to_lowercase();
-    for target in download_targets(&manifest.services, project.as_deref()) {
+    let fillers = host_fillers(ctx, &manifest, project.as_deref());
+    for target in download_targets(ctx, &fillers).await {
         let carrying = read_transfers(ctx, &target)
             .await
             .into_iter()

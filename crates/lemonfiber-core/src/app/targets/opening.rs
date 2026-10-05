@@ -15,10 +15,10 @@ use std::path::Path;
 
 use crate::recyclarr::Kind;
 
-use super::downloads::download_targets;
+use super::downloads::{download_targets, DownloadKind};
 use super::layout::project_directory;
 use super::secrets::recorded_secret;
-use super::servarr::{servarr_targets, target_for, DownloadKind};
+use super::servarr::{servarr_targets, target_for};
 
 /// The household's Jellyfin as a reading client, for the last stage of a trace —
 /// whether the item is finally in the library. Present only where the stack has a
@@ -223,25 +223,22 @@ pub(crate) fn service_addr(
     })
 }
 
-/// The stack's Usenet download client, as a reader of the accounts behind it.
+/// The first Usenet download client among `fillers`, as a reader of the accounts behind
+/// it.
 ///
-/// Nothing where the stack has no Usenet client, or where the client has not written
-/// its key yet — a service still starting holds nothing to report, the same skip every
-/// read here makes.
-pub(crate) async fn usenet_client(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
-) -> Option<Sabnzbd> {
-    let (base, config) = download_targets(services, project)
+/// Nothing where there is no Usenet client, or where the client has not written its key
+/// yet — a service still starting holds nothing to report, the same skip every read here
+/// makes.
+pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Option<Sabnzbd> {
+    download_targets(ctx, fillers)
+        .await
         .into_iter()
         .find_map(|target| match target.kind {
-            DownloadKind::Sabnzbd { config } => Some((target.base, config)),
-            DownloadKind::Qbittorrent => None,
-        })?;
-    let text = ctx.seams.filesystem.read(&config).await?;
-    let key = crate::sabnzbd::api_key(&text)?;
-    Some(Sabnzbd::new(ctx.seams.http.clone(), base, key))
+            DownloadKind::Sabnzbd { key } => {
+                Some(Sabnzbd::new(ctx.seams.http.clone(), target.base, key))
+            }
+            DownloadKind::Qbittorrent { .. } => None,
+        })
 }
 
 /// The Servarr-shape service that files no media of its own — the indexer aggregator,

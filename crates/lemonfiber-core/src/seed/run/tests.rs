@@ -6,7 +6,7 @@ use super::arrs::servarr_arrs;
 use super::baseline::escalate_broken_roots;
 use super::clients::{category_for, Held};
 use super::{withheld, withheld_brought};
-use crate::app::targets::{project_directory, recorded_qbittorrent_password, servarr_targets};
+use crate::app::targets::{project_directory, recorded_secret, servarr_targets};
 use crate::app::{dispatch, Command, Ctx, Outcome};
 use crate::config::{store, Settings};
 use crate::model::VersionReport;

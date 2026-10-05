@@ -12,7 +12,7 @@
 //! only place this arises — who wrote an API declaration and got no feature working
 //! against it, with nothing anywhere saying why. That case is named now.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::doctor::credentials::Target;
 use crate::model::UnsupportedReport;
@@ -144,29 +144,6 @@ fn missing_from(
         );
     }
     None
-}
-
-/// Which download client a target is — and so which protocol its transfers move
-/// over and which credential reaches it. `SABnzbd` carries the config file its key
-/// is read from, so a resolved target always has one and the read never has to
-/// check; qBittorrent carries nothing, reached with the recorded password instead.
-pub(crate) enum DownloadKind {
-    /// qBittorrent: torrents, reached with the recorded web UI password.
-    Qbittorrent,
-    /// `SABnzbd`: Usenet, reached with the key read from this config file.
-    Sabnzbd {
-        /// The config file `SABnzbd`'s key is read from.
-        config: PathBuf,
-    },
-}
-
-/// A download client the dashboard reads active transfers from: where to reach it
-/// on the host, and which client it is.
-pub(crate) struct DownloadTarget {
-    /// Where to reach it on the host.
-    pub base: String,
-    /// Which client, so the caller picks the adapter, its credential and protocol.
-    pub kind: DownloadKind,
 }
 
 #[cfg(test)]

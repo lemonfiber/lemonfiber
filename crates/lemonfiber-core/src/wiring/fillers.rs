@@ -173,6 +173,11 @@ impl Fillers {
         self.services.iter().find(|one| one.id == id)
     }
 
+    /// Every service on this machine, the stack's first, each in the order it is declared.
+    pub fn services(&self) -> impl Iterator<Item = &Filler> {
+        self.services.iter()
+    }
+
     /// Every service lemonfiber speaks to through this adapter, the stack's first.
     pub fn speaking(&self, kind: ApiKind) -> impl Iterator<Item = &Filler> {
         self.services.iter().filter(move |one| one.speaks(kind))

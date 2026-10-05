@@ -22,7 +22,8 @@ use crate::space::{
 };
 
 use crate::app::targets::{
-    committed_bytes, download_targets, project_directory, servarr_targets, torrent_client,
+    committed_bytes, download_targets, host_fillers, project_directory, servarr_targets,
+    torrent_client,
 };
 use crate::app::Ctx;
 
@@ -137,7 +138,7 @@ async fn watched(ctx: &Ctx, projecting: bool) -> Result<Watched, Box<Problem>> {
     let services = project.as_ref().map(|at| at.join(SERVICE_FILES));
 
     let landing = if projecting {
-        committed_bytes(ctx, &stack.services, project.as_deref()).await
+        committed_bytes(ctx, &host_fillers(ctx, &stack, project.as_deref())).await
     } else {
         0
     };
@@ -190,7 +191,8 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
 
     // What the client is holding is read before the walk, because the walk keeps the
     // files of those downloads and of nothing else in particular.
-    let holder = torrent_client(ctx, &download_targets(&watched.stack.services, project));
+    let fillers = host_fillers(ctx, &watched.stack, project);
+    let holder = torrent_client(ctx, &download_targets(ctx, &fillers).await);
     let held = holding(holder.as_ref()).await;
 
     let mut data = Survey::beneath(

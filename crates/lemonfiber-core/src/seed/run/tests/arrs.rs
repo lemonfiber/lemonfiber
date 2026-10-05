@@ -298,23 +298,23 @@ fn an_arr_with_no_category_is_told_about_no_client() {
 }
 
 #[test]
-fn a_recorded_qbittorrent_password_is_read_back_or_read_as_absent() {
+fn a_recorded_password_is_read_back_or_read_as_absent() {
     // Nowhere to read from.
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    assert!(recorded_qbittorrent_password(&ctx).is_none());
+    assert!(recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).is_none());
 
     let path = config_scratch("qbt-readback");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
     let _ = store::set(&path, "SOMETHING_ELSE", "x");
     assert!(
-        recorded_qbittorrent_password(&ctx).is_none(),
+        recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).is_none(),
         "no password recorded"
     );
     // An empty value is not a password.
     let _ = store::set(&path, crate::config::QBITTORRENT_PASSWORD_KEY, "");
     assert!(
-        recorded_qbittorrent_password(&ctx).is_none(),
+        recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).is_none(),
         "an empty value is absent"
     );
     // The value recorded on an earlier run is handed back.
@@ -324,7 +324,7 @@ fn a_recorded_qbittorrent_password_is_read_back_or_read_as_absent() {
         "minted-earlier",
     );
     assert_eq!(
-        recorded_qbittorrent_password(&ctx).as_deref(),
+        recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).as_deref(),
         Some("minted-earlier")
     );
 }

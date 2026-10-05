@@ -33,9 +33,9 @@
 
 use std::time::Duration;
 
-use lemonfiber_manifest::Service;
-
-use crate::app::targets::{download_targets, project_directory, protocol_of, read_transfers};
+use crate::app::targets::{
+    chosen_fillers, download_targets, project_directory, protocol_of, read_transfers,
+};
 use crate::app::Ctx;
 use crate::dashboard::Protocol;
 use crate::error::Problem;
@@ -44,6 +44,7 @@ use crate::plural::s;
 use crate::ports::service::Download;
 use crate::stack::closure::{everything, resolve};
 use crate::stack::compose::Action;
+use crate::wiring::Fillers;
 
 /// Whether a teardown lets what is still coming down finish before it stops.
 ///
@@ -112,14 +113,15 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
             return Vec::new();
         };
         let profiles: Vec<String> = plan.profiles.into_iter().collect();
-        let stopping: Vec<Service> = manifest
+        let mut stopping = manifest;
+        stopping
             .services
-            .iter()
-            .filter(|service| profiles.contains(&service.profile))
-            .cloned()
-            .collect();
+            .retain(|service| profiles.contains(&service.profile));
+        // The stack's own services alone: a plugin's runs under a profile of its own that
+        // no form names, so stopping a form never stops it.
         let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-        download_targets(&stopping, project.as_deref())
+        let fillers = Fillers::of(&stopping, &[], &chosen_fillers(ctx), project.as_deref());
+        download_targets(ctx, &fillers).await
     };
 
     // Asked at once rather than one client after another, for the reason the

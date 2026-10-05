@@ -37,7 +37,7 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
             stored(&ctx, manifest, None),
             tunnel(&ctx, manifest, None, false),
             tunnel(&ctx, manifest, None, true),
-            providing(&ctx, &manifest.services, None),
+            providing(&ctx, manifest, None),
             wired(&ctx, stack, None),
         ] {
             assert!(
