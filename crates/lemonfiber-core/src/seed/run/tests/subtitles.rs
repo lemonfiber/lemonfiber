@@ -519,3 +519,21 @@ async fn a_finder_naming_no_configuration_file_has_no_key_to_publish() {
     assert!(named.is_some_and(|key| key == "finder-key"));
     assert!(unnamed.is_none());
 }
+
+/// A finder that will not take the key a replacement hands it says so in its own
+/// words, rather than the replacement reading as handed on.
+#[tokio::test]
+async fn a_replaced_key_a_finder_will_not_take_is_said_as_failed() {
+    let http = Fake::by_path(vec![("/api/system/settings", Answer::reply(500, ""))]);
+    let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
+
+    let rewatched = super::super::rewatch(&ctx, &fillers_of(subtitle_stack()), "sonarr").await;
+
+    assert!(
+        matches!(
+            rewatched.as_slice(),
+            [(_, crate::seed::State::Failed { .. })]
+        ),
+        "{rewatched:?}"
+    );
+}

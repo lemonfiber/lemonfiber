@@ -86,22 +86,20 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     let mut wanted = Vec::new();
     let mut passed = Vec::new();
     for (curator, kind, reached) in curators {
-        match super::arrs::servarr_key(ctx, curator).await {
-            Beneath::Read(key) => wanted.push(Application {
-                name: curator.name.clone(),
-                kind: *kind,
-                prowlarr_url: back.url(),
-                base_url: reached.clone(),
-                api_key: key,
-            }),
-            Beneath::Absent => {
-                passed.push(skipped(synced(&curator.name, &asker.name), &curator.name));
-            }
-            Beneath::Escaped => passed.push(super::arrs::refused(
-                synced(&curator.name, &asker.name),
-                curator,
-            )),
-        }
+        // A curator registered here is one of the stack's own — a plugin's is never handed
+        // the indexer's key — and its credential file is never confined, so its key is
+        // read or not written yet and nothing here is refused.
+        let Beneath::Read(key) = super::arrs::servarr_key(ctx, curator).await else {
+            passed.push(skipped(synced(&curator.name, &asker.name), &curator.name));
+            continue;
+        };
+        wanted.push(Application {
+            name: curator.name.clone(),
+            kind: *kind,
+            prowlarr_url: back.url(),
+            base_url: reached.clone(),
+            api_key: key,
+        });
     }
     let client = crate::prowlarr::Prowlarr::new(
         ctx.seams.http.clone(),

@@ -61,28 +61,42 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     assert!(wirings.is_empty(), "{wirings:?}");
 }
 
-/// A curator whose credential file a plugin's container pointed away is refused on
-/// its application, and the others are registered as ever.
+/// A plugin's curator is never registered into the indexer, which would hand it the
+/// indexer's own key and every indexer behind it: nothing is asked of the indexer about
+/// it, the pair is said as reached by nothing with why, and the stack's own curators are
+/// registered as ever.
 #[tokio::test]
-async fn app_sync_refuses_a_curator_whose_key_file_leads_away() {
+async fn app_sync_never_registers_a_plugin_curator() {
+    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
     let fillers = beside_a_stand_in(vec![prowlarr(), arr("sonarr", 8989, "tv")], "movies");
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
+    let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
+        .into_iter()
+        .filter(|wiring| wiring.connection.starts_with("kept"))
+        .collect();
 
     assert!(
-        wirings.iter().any(|wiring| wiring.connection
-            == "kept the stand-in indexer sync via prowlarr the app"
-            && matches!(&wiring.state, crate::seed::State::Refused { reason }
-                if reason.starts_with("kept's credential file"))),
+        wirings
+            .iter()
+            .all(|wiring| wiring.connection.starts_with("sonarr the app")),
         "{wirings:?}"
     );
-    assert!(wirings
-        .iter()
-        .any(|wiring| wiring.connection.starts_with("sonarr the app")
-            && wiring.state == crate::seed::State::AlreadyWired));
+    assert!(!wirings.is_empty());
+    assert!(http.requests().iter().all(|asked| {
+        !asked.url.contains("kept") && !asked.body.as_deref().unwrap_or_default().contains("kept")
+    }));
+    assert!(
+        matches!(said.as_slice(), [wiring]
+            if wiring.connection == "kept the stand-in into prowlarr the app"
+                && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
+                    if reason.contains("is a plugin's service"))),
+        "{said:?}"
+    );
 }
 
 /// What replacing a curator's key owes each indexer is its application held to the new
@@ -121,22 +135,21 @@ async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
     assert!(resynced.is_empty(), "{resynced:?}");
 }
 
-/// A curator whose credential file leads away is refused on its resync rather than
-/// passed over, so the replacement says the indexer was not handed the key.
+/// Replacing a plugin's curator's key owes the indexer nothing: it was never registered
+/// there, so there is no application to hold to the new key.
 #[tokio::test]
-async fn a_replaced_key_read_from_a_file_leading_away_is_refused_on_its_resync() {
+async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
+    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
     let fillers = beside_a_stand_in(vec![prowlarr(), arr("sonarr", 8989, "tv")], "movies");
 
     let resynced = super::super::resync_application(&ctx, &fillers, "kept").await;
 
-    assert!(
-        matches!(resynced.as_slice(), [(prowlarr, crate::seed::State::Refused { reason })]
-            if prowlarr == "prowlarr the app" && reason.starts_with("kept's credential file")),
-        "{resynced:?}"
-    );
+    assert!(resynced.is_empty(), "{resynced:?}");
+    assert!(http.requests().is_empty());
 }
 
 #[tokio::test]

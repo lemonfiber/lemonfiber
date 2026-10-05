@@ -11,6 +11,7 @@
 
 use lemonfiber_manifest::ApiKind;
 
+use crate::origin::Origin;
 use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
@@ -56,6 +57,17 @@ pub(super) enum Connection {
     Subtitles(Subtitled),
 }
 
+impl Connection {
+    /// Whether making it hands the filler the asker's own credential.
+    ///
+    /// The indexer gives every application it syncs its own API key, and that key opens
+    /// every indexer it holds. Every other connection hands the asker the filler's
+    /// credential, which is the filler's to give.
+    const fn hands_over_the_askers_key(self) -> bool {
+        matches!(self, Self::Application(_))
+    }
+}
+
 /// Why one asker and one filler come to nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Unmade {
@@ -67,6 +79,8 @@ pub(super) enum Unmade {
     Unpaired,
     /// The two are connected for some media, and the filler files none of them.
     Files,
+    /// The connection would hand the asker's own credential to a plugin's service.
+    Withheld,
 }
 
 /// One asker, one of the services that fills what it asked for, and what lemonfiber
@@ -151,7 +165,13 @@ fn made<'a>(
     let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
     let asks = asker.adapter.as_ref().ok_or(Unmade::Unpaired)?.kind;
-    connection(asks, &ask.capability, speaks, &filler.media_types).map(|made| (made, at))
+    let made = connection(asks, &ask.capability, speaks, &filler.media_types)?;
+    // A stranger's service is never handed a credential of the stack's own: what it
+    // would hold is not its to hold, and nothing could take it back.
+    if made.hands_over_the_askers_key() && matches!(filler.origin, Origin::Plugin { .. }) {
+        return Err(Unmade::Withheld);
+    }
+    Ok((made, at))
 }
 
 /// Every pairing that comes to nothing, each reported naming what fills and what asked.
@@ -206,6 +226,11 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
         Unmade::Files => format!(
             "{fills} and files {}, which lemonfiber does not hand {asker}",
             pairing.filler.media_types.join(" and ")
+        ),
+        Unmade::Withheld => format!(
+            "{fills} and is a plugin's service; {asker} hands every service it registers its \
+             own API key, which opens every indexer it holds, so lemonfiber does not register a \
+             plugin's service in it"
         ),
     }
 }
