@@ -72,6 +72,29 @@ async fn both_arrs_are_handed_to_the_subtitle_finder() {
     }
 }
 
+/// A plugin's service asking where the stack's subtitle finder would is never handed a
+/// curator's key: nothing is asked of it or of any curator, and a replaced key owes it
+/// nothing.
+#[tokio::test]
+async fn a_plugin_finder_is_never_handed_a_curators_key() {
+    let http = Fake::by_path(vec![(
+        "/api/system/settings",
+        Answer::reply(200, WATCHING_NOTHING),
+    )]);
+    let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG));
+    let fillers = asked_by_a_plugin(
+        &bazarr_svc(),
+        vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+    );
+
+    let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
+    let rewatched = super::super::subtitles::rewatch(&ctx, &fillers, "sonarr").await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(rewatched.is_empty(), "{rewatched:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
 /// The key the finder is reached with is its own, not the one filed beside it.
 ///
 /// Its configuration holds an `apikey` under `auth` and another under each \*arr,

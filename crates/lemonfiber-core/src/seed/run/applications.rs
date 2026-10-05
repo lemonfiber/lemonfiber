@@ -3,7 +3,7 @@
 //! The indexer needs to know what to search on behalf of, which is the one connection
 //! that runs from the indexer outward rather than into it.
 
-use super::connecting::{pairings, Connection, FILM, MUSIC, TELEVISION};
+use super::connecting::{pairings, Connection, Own, FILM, MUSIC, TELEVISION};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::Application;
@@ -13,7 +13,7 @@ use crate::wiring::{Filler, Fillers};
 /// wiring that says why it is not told yet.
 struct Syncing<'a> {
     /// The indexer that asks.
-    asker: &'a Filler,
+    asker: Own<'a>,
     /// Each curator, with the application it comes to.
     curators: Vec<(&'a Filler, crate::ports::service::ApplicationKind, String)>,
 }
@@ -23,17 +23,14 @@ struct Syncing<'a> {
 fn syncing(fillers: &Fillers) -> Vec<Syncing<'_>> {
     let mut found: Vec<Syncing<'_>> = Vec::new();
     for pairing in pairings(fillers) {
-        let Ok((Connection::Application(kind), at)) = pairing.made else {
+        let Ok((Connection::Application(kind), at, asker)) = pairing.made else {
             continue;
         };
         let reached = at.url();
-        match found
-            .iter_mut()
-            .find(|one| one.asker.id == pairing.asker.id)
-        {
+        match found.iter_mut().find(|one| one.asker.id == asker.id) {
             Some(one) => one.curators.push((pairing.filler, kind, reached)),
             None => found.push(Syncing {
-                asker: pairing.asker,
+                asker,
                 curators: vec![(pairing.filler, kind, reached)],
             }),
         }
@@ -60,7 +57,7 @@ pub(super) async fn seed_applications(ctx: &Ctx, fillers: &Fillers) -> Vec<crate
 /// What one indexer comes to: each curator's application wired, or skipped where a key
 /// it needs is not written yet. Only `only` where one is named.
 async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate::seed::Wiring> {
-    let asker = syncing.asker;
+    let asker = &*syncing.asker;
     let curators: Vec<_> = syncing
         .curators
         .iter()

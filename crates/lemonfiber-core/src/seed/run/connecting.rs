@@ -81,6 +81,32 @@ pub(super) enum Unmade {
     Files,
     /// The connection would hand the asker's own credential to a plugin's service.
     Withheld,
+    /// The asker is a plugin's service, and every connection here hands the asker the
+    /// filler's credential.
+    Asked,
+}
+
+/// One of the stack's own services, asking.
+///
+/// Built only from a service this build's stack ships, so whatever takes one — the
+/// indexer's sync, the subtitle finder, anything that reads a credential to hand an
+/// asker — is never handed a plugin's service to give one to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Own<'a>(&'a Filler);
+
+impl<'a> Own<'a> {
+    /// The service as one of the stack's own, or nothing where anything else brought it.
+    fn of(asker: &'a Filler) -> Option<Self> {
+        matches!(asker.origin, Origin::Bundled).then_some(Self(asker))
+    }
+}
+
+impl std::ops::Deref for Own<'_> {
+    type Target = Filler;
+
+    fn deref(&self) -> &Filler {
+        self.0
+    }
 }
 
 /// One asker, one of the services that fills what it asked for, and what lemonfiber
@@ -93,8 +119,9 @@ pub(super) struct Pairing<'a> {
     pub(super) ask: &'a Ask,
     /// One service that answers.
     pub(super) filler: &'a Filler,
-    /// The connection, with where the filler is reached for it, or why there is none.
-    pub(super) made: Result<(Connection, &'a Address), Unmade>,
+    /// The connection, with where the filler is reached for it and the asker as one of
+    /// the stack's own, or why there is none.
+    pub(super) made: Result<(Connection, &'a Address, Own<'a>), Unmade>,
 }
 
 /// The connection the table holds for an asker speaking `asker`, asking for
@@ -158,10 +185,13 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
 
 /// What one asker and one filler come to.
 fn made<'a>(
-    asker: &Filler,
+    asker: &'a Filler,
     ask: &Ask,
     filler: &'a Filler,
-) -> Result<(Connection, &'a Address), Unmade> {
+) -> Result<(Connection, &'a Address, Own<'a>), Unmade> {
+    // Every connection here hands the asker the filler's credential, so a plugin's
+    // service asking is connected to nothing, whatever fills what it asked for.
+    let own = Own::of(asker).ok_or(Unmade::Asked)?;
     let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
     let asks = asker.adapter.as_ref().ok_or(Unmade::Unpaired)?.kind;
@@ -171,7 +201,7 @@ fn made<'a>(
     if made.hands_over_the_askers_key() && matches!(filler.origin, Origin::Plugin { .. }) {
         return Err(Unmade::Withheld);
     }
-    Ok((made, at))
+    Ok((made, at, own))
 }
 
 /// Every pairing that comes to nothing, each reported naming what fills and what asked.
@@ -231,6 +261,10 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
             "{fills} and is a plugin's service; {asker} hands every service it registers its \
              own API key, which opens every indexer it holds, so lemonfiber does not register a \
              plugin's service in it"
+        ),
+        Unmade::Asked => format!(
+            "{fills} and {asker} is a plugin's service, which lemonfiber never hands another \
+             service's credential"
         ),
     }
 }

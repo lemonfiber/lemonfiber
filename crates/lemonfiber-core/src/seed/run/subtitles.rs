@@ -10,7 +10,7 @@
 //! that is not running is skipped and completed on a later pass rather than holding
 //! up the other.
 
-use super::connecting::{pairings, Connection, FILM, TELEVISION};
+use super::connecting::{pairings, Connection, Own, FILM, TELEVISION};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Subtitled, Subtitles as _, Watched};
@@ -34,7 +34,7 @@ pub(super) fn subtitled(media_types: &[String]) -> Option<Subtitled> {
 /// One subtitle finder, and every curator it is told about with where it reaches each.
 struct Watching<'a> {
     /// The finder that asks.
-    asker: &'a Filler,
+    asker: Own<'a>,
     /// Each curator, as the finder files it, and where it reaches it.
     curators: Vec<(&'a Filler, Subtitled, &'a Address)>,
 }
@@ -43,16 +43,13 @@ struct Watching<'a> {
 fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
     let mut found: Vec<Watching<'_>> = Vec::new();
     for pairing in pairings(fillers) {
-        let Ok((Connection::Subtitles(which), at)) = pairing.made else {
+        let Ok((Connection::Subtitles(which), at, asker)) = pairing.made else {
             continue;
         };
-        match found
-            .iter_mut()
-            .find(|one| one.asker.id == pairing.asker.id)
-        {
+        match found.iter_mut().find(|one| one.asker.id == asker.id) {
             Some(one) => one.curators.push((pairing.filler, which, at)),
             None => found.push(Watching {
-                asker: pairing.asker,
+                asker,
                 curators: vec![(pairing.filler, which, at)],
             }),
         }
@@ -64,10 +61,10 @@ fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
 /// machine cannot reach it or it has not written one yet — a service still starting
 /// rather than a fault, so a later run completes it. A finder is one of the stack's own
 /// services, whose credential file is never confined, so nothing here is refused.
-async fn finder(ctx: &Ctx, asker: &Filler) -> Option<crate::bazarr::Bazarr> {
+async fn finder(ctx: &Ctx, asker: Own<'_>) -> Option<crate::bazarr::Bazarr> {
     let published = asker.published?;
     let key = crate::bazarr::api_key(
-        &crate::app::targets::credential_file(ctx, asker)
+        &crate::app::targets::credential_file(ctx, &asker)
             .await
             .text()?,
     )?;

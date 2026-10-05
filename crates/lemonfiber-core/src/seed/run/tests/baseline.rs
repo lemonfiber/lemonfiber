@@ -369,7 +369,7 @@ async fn a_reset_preview_reads_nothing_where_the_client_list_cannot_be_read() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     // The service will not answer its client list, so the preview has nothing to
     // compare against and reports nothing rather than guessing.
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-unread");
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-silent");
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,

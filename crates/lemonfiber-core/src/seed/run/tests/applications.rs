@@ -99,6 +99,25 @@ async fn app_sync_never_registers_a_plugin_curator() {
     );
 }
 
+/// A plugin's service asking where the stack's indexer would is never handed a curator's
+/// key: nothing is asked of it or of any curator, and a replaced key owes it nothing.
+#[tokio::test]
+async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
+    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let http = seeding();
+    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+    let fillers = asked_by_a_plugin(&prowlarr(), vec![arr("sonarr", 8989, "tv")]);
+
+    let wirings = super::super::seed_applications(&ctx, &fillers).await;
+    let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(resynced.is_empty(), "{resynced:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
 /// What replacing a curator's key owes each indexer is its application held to the new
 /// one, and nothing for a curator no indexer registers.
 #[tokio::test]
