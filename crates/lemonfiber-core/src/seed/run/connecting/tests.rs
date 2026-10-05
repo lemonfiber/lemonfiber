@@ -69,7 +69,7 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
         .map(|pairing| {
             (
                 pairing.filler.id.clone(),
-                pairing.made.ok().map(|(connection, _)| connection),
+                pairing.made.ok().map(|(connection, _, _)| connection),
             )
         })
         .collect();
@@ -92,7 +92,7 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
         .iter()
         .filter(|pairing| pairing.ask.capability == "library.curate")
         .filter_map(|pairing| {
-            let connection = pairing.made.ok().map(|(connection, _)| connection);
+            let connection = pairing.made.ok().map(|(connection, _, _)| connection);
             connection.is_some().then(|| {
                 (
                     pairing.asker.id.clone(),
@@ -270,7 +270,7 @@ fn an_asker_naming_no_adapter_is_connected_to_nothing() {
     let sonarrs: Vec<Result<Connection, Unmade>> = pairings(&fillers)
         .iter()
         .filter(|pairing| pairing.ask.by == "sonarr")
-        .map(|pairing| pairing.made.map(|(connection, _)| connection))
+        .map(|pairing| pairing.made.map(|(connection, _, _)| connection))
         .collect();
     assert_eq!(sonarrs, vec![Err(Unmade::Unpaired); 2]);
 }
@@ -314,4 +314,63 @@ fn a_curator_reaching_the_indexer_itself_is_not_said_to_be_reached_by_nothing() 
 
     assert!(!said(&connected));
     assert!(said(&apart));
+}
+
+/// A plugin's service asking is connected to nothing, whatever fills what it asked for —
+/// one of the stack's own or another plugin's — and each pair is said with why.
+#[test]
+fn a_plugin_asker_is_connected_to_nothing() {
+    let mut curator = a_placed(
+        "kept",
+        &["library.curate"],
+        Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
+        Some(8990),
+    );
+    curator.media_types = vec!["movies".to_owned()];
+    let asker = a_placed(
+        "prowlarr",
+        &[],
+        Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
+        Some(9696),
+    );
+    let installed = vec![
+        an_installed("asking", vec![asker]),
+        an_installed("kept", vec![curator]),
+    ];
+    let fillers = shipped(&installed, &Chosen::default(), |manifest| {
+        manifest.services.retain(|service| service.id != "prowlarr");
+    });
+
+    let made: Vec<(&str, Result<Connection, Unmade>)> = pairings(&fillers)
+        .iter()
+        .filter(|pairing| pairing.ask.by == "prowlarr")
+        .map(|pairing| {
+            (
+                pairing.filler.id.as_str(),
+                pairing.made.map(|(connection, _, _)| connection),
+            )
+        })
+        .collect();
+    let said: Vec<String> = unmatched(&fillers)
+        .into_iter()
+        .filter(|wiring| wiring.connection.ends_with("into prowlarr the stand-in"))
+        .filter_map(|wiring| match wiring.state {
+            State::Unmatched { reason } => Some(reason),
+            _ => None,
+        })
+        .collect();
+
+    assert!(made.iter().any(|(id, _)| *id == "sonarr"), "{made:?}");
+    assert!(made.iter().any(|(id, _)| *id == "kept"), "{made:?}");
+    assert!(
+        made.iter().all(|(_, made)| *made == Err(Unmade::Asked)),
+        "{made:?}"
+    );
+    assert_eq!(said.len(), made.len(), "{said:?}");
+    assert!(said.contains(
+        &"Sonarr fills library.curate, which prowlarr the stand-in asks for, and prowlarr the \
+          stand-in is a plugin's service, which lemonfiber never hands another service's \
+          credential"
+            .to_owned()
+    ));
 }

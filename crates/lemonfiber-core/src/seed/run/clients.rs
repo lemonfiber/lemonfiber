@@ -165,7 +165,7 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder,
 pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
     pairings(fillers)
         .iter()
-        .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _))))
+        .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _, _))))
         .filter(|pairing| held.refused.contains(&Holder::of(pairing.filler)))
         .map(|pairing| {
             super::arrs::refused(

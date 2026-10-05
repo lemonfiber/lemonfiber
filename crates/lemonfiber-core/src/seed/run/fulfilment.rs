@@ -41,7 +41,7 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
     pairings(fillers)
         .into_iter()
         .filter_map(|pairing| match pairing.made {
-            Ok((Connection::Fulfilment { television }, at)) => Some(Fulfils {
+            Ok((Connection::Fulfilment { television }, at, _)) => Some(Fulfils {
                 filler: pairing.filler,
                 at,
                 television,

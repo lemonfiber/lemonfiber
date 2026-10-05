@@ -223,6 +223,20 @@ fn beside_a_stand_in(
     )
 }
 
+/// The stack's `services` beside a plugin's service standing where `asker`, one of the
+/// stack's own, would ask: the same id, adapter and port, brought by a plugin.
+fn asked_by_a_plugin(
+    asker: &lemonfiber_manifest::Service,
+    services: Vec<lemonfiber_manifest::Service>,
+) -> crate::wiring::Fillers {
+    let stand_in = crate::test_support::a_placed(&asker.id, &[], asker.api.clone(), asker.listens);
+    fillers_beside(
+        services,
+        &[crate::test_support::an_installed("asking", vec![stand_in])],
+        stack_root(),
+    )
+}
+
 /// A filesystem holding every Servarr key, the stand-in's resolving away from beneath
 /// the directory its container owns.
 fn leading_away_from_the_stand_in() -> SeedFs {
