@@ -129,3 +129,56 @@ async fn a_choice_nobody_made_leaves_the_accounts_own_answer_standing() {
         "an offer naming no libraries changed which ones are open: {written}"
     );
 }
+
+/// Two decline keys, one with nothing in it, and Seerr's: what the server lists for the
+/// decline service's dates.
+const DECLINE_KEYS: &str = r#"{"Items":[
+  {"AppName":"lemonfiber-decline","AccessToken":"first","DateCreated":"2026-10-05T00:00:00Z","DateLastActivity":"2026-10-05T01:00:00Z"},
+  {"AppName":"lemonfiber-decline","AccessToken":"second","DateCreated":"2026-10-05T02:00:00Z"},
+  {"AppName":"lemonfiber-decline","AccessToken":"","DateCreated":"2026-10-05T03:00:00Z"},
+  {"AppName":"Jellyseerr","AccessToken":"seerr","DateCreated":"2026-10-05T04:00:00Z","DateLastActivity":"2026-10-05T05:00:00Z"}
+]}"#;
+
+/// Every key filed under the decline service's name is dated, not only the newest, so a
+/// second key filed beside it cannot hide the first one's use; a key with nothing in it
+/// and another service's are not.
+#[tokio::test]
+async fn every_key_filed_under_the_decline_service_s_name_is_dated() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, DECLINE_KEYS),
+    ]);
+
+    let dated = reader(&fake)
+        .dated(lemonfiber_core::jellyfin::DECLINE_APP)
+        .await
+        .ok();
+
+    assert_eq!(
+        dated,
+        Some(vec![
+            lemonfiber_core::jellyfin::Dated {
+                created: Some("2026-10-05T00:00:00Z".to_owned()),
+                last_used: Some("2026-10-05T01:00:00Z".to_owned()),
+            },
+            lemonfiber_core::jellyfin::Dated {
+                created: Some("2026-10-05T02:00:00Z".to_owned()),
+                last_used: None,
+            },
+        ])
+    );
+}
+
+/// A key list that cannot be read is a failure, not a list with no decline key in it.
+#[tokio::test]
+async fn an_unreadable_key_list_is_no_list_of_dates() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, "not json"),
+    ]);
+
+    assert!(reader(&fake)
+        .dated(lemonfiber_core::jellyfin::DECLINE_APP)
+        .await
+        .is_err());
+}

@@ -129,3 +129,48 @@ fn refusals_are_recorded_beside_the_table() {
         Path::new("/stack/config/decline/refusals.json")
     );
 }
+
+#[test]
+fn an_account_is_removed_at_its_lapse_only_for_the_offer_standing_now() {
+    use lemonfiber_sidecar::decline::{Lapse, Lapses, Left, Outcome};
+
+    let offers: Offers = [
+        ("9".to_owned(), offer(Some("ana-token"))),
+        ("10".to_owned(), offer(Some("bo-token"))),
+        ("11".to_owned(), offer(Some("cy-token"))),
+        ("12".to_owned(), offer(None)),
+    ]
+    .into_iter()
+    .collect();
+    let lapse = |token: &str, account: &str, name: &str, outcome| Lapse {
+        token: TokenHash::of(token),
+        account: account.to_owned(),
+        name: name.to_owned(),
+        issued: 1,
+        at: 2,
+        outcome,
+    };
+    let lapses = Lapses::default()
+        .with(lapse("ana-token", "9", "ana", Outcome::Removed))
+        .with(lapse("an-older-token", "10", "bo", Outcome::Removed))
+        .with(lapse("cy-token", "11", "cy", Outcome::Left(Left::Claimed)))
+        .with(lapse("bo-token", "somebody-else", "bo", Outcome::Removed));
+
+    let removed = super::removed(&offers, &lapses);
+
+    assert_eq!(
+        removed.into_iter().collect::<Vec<_>>(),
+        vec![("9".to_owned(), "ana".to_owned())]
+    );
+}
+
+#[test]
+fn lapses_are_recorded_beside_the_refusals() {
+    assert_eq!(
+        path(
+            Path::new("/stack"),
+            lemonfiber_sidecar::decline::File::Lapses
+        ),
+        Path::new("/stack/config/decline/lapses.json")
+    );
+}

@@ -74,6 +74,32 @@ impl Jellyfin {
             .collect())
     }
 
+    /// When each key filed under `app` was made and last used, as the server dates each,
+    /// and none where no key is filed under it.
+    ///
+    /// Every one is answered, not only the newest: a second key filed under the same name
+    /// would otherwise hide the uses of the first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, or answers
+    /// the key list with something unreadable.
+    pub async fn dated(&self, app: &str) -> Result<Vec<Dated>, Failure> {
+        let response = self.as_admin(Method::Get, KEYS, None).await?;
+        let keys: Keys = self
+            .endpoint
+            .decode(&response, "the key list could not be read")?;
+        Ok(keys
+            .items
+            .into_iter()
+            .filter(|key| key.app_name == app && !key.access_token.is_empty())
+            .map(|key| Dated {
+                created: key.created,
+                last_used: key.last_used,
+            })
+            .collect())
+    }
+
     /// Mint a key filed under `app`, and answer it.
     ///
     /// Jellyfin answers a mint with no body, so the new key is the one under `app` the
@@ -142,11 +168,25 @@ struct Keys {
     items: Vec<Key>,
 }
 
-/// One key in that list: what made it, and the value itself.
+/// One key in that list: what made it, the value itself, and when it was made and
+/// last used.
 #[derive(Deserialize)]
 struct Key {
     #[serde(rename = "AppName", default)]
     app_name: String,
     #[serde(rename = "AccessToken", default)]
     access_token: String,
+    #[serde(rename = "DateCreated", default)]
+    created: Option<String>,
+    #[serde(rename = "DateLastActivity", default)]
+    last_used: Option<String>,
+}
+
+/// When a key was made and last used, as the server writes each moment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dated {
+    /// When it was made.
+    pub created: Option<String>,
+    /// When it was last used, absent where the server says it never was.
+    pub last_used: Option<String>,
 }

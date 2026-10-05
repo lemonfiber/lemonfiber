@@ -1,4 +1,7 @@
-use super::{File, Health, Invitation, Key, Refusal, Refusals, Table, TokenHash, FORMAT};
+use super::{
+    Claimed, File, Health, Invitation, Key, Lapse, Lapses, Left, Outcome, Refusal, Refusals, Table,
+    TokenHash, FORMAT,
+};
 
 fn invitation(token: &str, lapses: u64) -> Invitation {
     Invitation {
@@ -20,7 +23,10 @@ fn a_token_is_held_as_its_sha256_in_lowercase_hex() {
 
 #[test]
 fn the_table_finds_an_invitation_by_its_token_and_nothing_else() {
-    let table = Table::of(vec![invitation("one", 2_000), invitation("two", 2_000)]);
+    let table = Table::of(
+        Claimed::HasPassword,
+        vec![invitation("one", 2_000), invitation("two", 2_000)],
+    );
 
     assert_eq!(
         table.find(&TokenHash::of("two")).map(|one| one.lapses),
@@ -39,14 +45,28 @@ fn an_invitation_is_open_until_it_lapses() {
 
 #[test]
 fn a_table_reads_back_as_it_was_written() {
-    let table = Table::of(vec![invitation("one", 2_000)]);
+    let table = Table::of(Claimed::HasPassword, vec![invitation("one", 2_000)]);
 
     assert_eq!(Table::read(&table.written()), Ok(table));
 }
 
 #[test]
+fn a_table_naming_no_strategy_is_one_under_which_nothing_is_removed() {
+    let unsaid = format!("{{\"format\": {FORMAT}, \"invitations\": []}}");
+
+    assert_eq!(
+        Table::read(&unsaid).map(|table| table.claimed),
+        Ok(Claimed::Unknown)
+    );
+}
+
+#[test]
 fn the_written_table_holds_no_token() {
-    let written = Table::of(vec![invitation("a-token-nobody-should-see", 2_000)]).written();
+    let written = Table::of(
+        Claimed::HasPassword,
+        vec![invitation("a-token-nobody-should-see", 2_000)],
+    )
+    .written();
 
     assert!(!written.contains("a-token-nobody-should-see"));
     assert!(written.ends_with('\n'));
@@ -140,6 +160,7 @@ fn every_file_has_its_own_name() {
     assert_eq!(File::Table.name(), "invitations.json");
     assert_eq!(File::Key.name(), "jellyfin.key");
     assert_eq!(File::Refusals.name(), "refusals.json");
+    assert_eq!(File::Lapses.name(), "lapses.json");
 }
 
 #[test]
@@ -171,4 +192,80 @@ fn health_says_which_key_the_service_holds_and_reads_back() {
             .as_deref(),
         Some(r#"{"key":null}"#)
     );
+}
+
+fn lapse(token: &str, at: u64, outcome: Outcome) -> Lapse {
+    Lapse {
+        token: TokenHash::of(token),
+        account: "8c7a".to_owned(),
+        name: "Ana".to_owned(),
+        issued: 1_000,
+        at,
+        outcome,
+    }
+}
+
+#[test]
+fn a_strategy_this_build_does_not_know_is_read_as_unknown_rather_than_refused() {
+    let later = format!(
+        "{{\"format\": {FORMAT}, \"claimed\": \"asks-a-crystal-ball\", \"invitations\": []}}"
+    );
+
+    assert_eq!(
+        Table::read(&later).map(|table| table.claimed),
+        Ok(Claimed::Unknown)
+    );
+}
+
+#[test]
+fn the_strategy_a_table_names_reads_back_as_it_was_written() {
+    let table = Table {
+        claimed: Claimed::OwnWrites,
+        ..Table::of(Claimed::HasPassword, vec![invitation("one", 2_000)])
+    };
+
+    assert!(table.written().contains("\"own-writes\""));
+    assert_eq!(Table::read(&table.written()), Ok(table));
+}
+
+#[test]
+fn an_invitation_is_taken_back_once() {
+    let lapses = Lapses::default()
+        .with(lapse("one", 2_100, Outcome::Removed))
+        .with(lapse("one", 2_200, Outcome::SwitchedOff));
+
+    assert_eq!(lapses.lapses.len(), 1);
+    assert_eq!(
+        lapses.of(&TokenHash::of("one")).map(|one| one.outcome),
+        Some(Outcome::Removed)
+    );
+}
+
+#[test]
+fn the_latest_lapse_of_an_account_is_the_one_last_recorded_against_it() {
+    let lapses = Lapses::default()
+        .with(lapse("first", 2_100, Outcome::SwitchedOff))
+        .with(lapse("second", 4_100, Outcome::Left(Left::Claimed)));
+
+    assert_eq!(lapses.latest_for("8c7a").map(|one| one.at), Some(4_100));
+    assert!(lapses.latest_for("somebody-else").is_none());
+}
+
+#[test]
+fn lapses_read_back_as_they_were_written_and_say_why_one_was_left() {
+    let lapses = Lapses::default()
+        .with(lapse("one", 2_100, Outcome::Removed))
+        .with(lapse("two", 2_100, Outcome::Left(Left::Reoffered)));
+
+    let written = lapses.written();
+    assert!(written.contains("\"removed\""));
+    assert!(written.contains("\"reoffered\""));
+    assert_eq!(Lapses::read(&written), Ok(lapses));
+}
+
+#[test]
+fn lapses_in_another_format_are_refused() {
+    let refused = Lapses::read("{\"format\": 0, \"lapses\": []}").err();
+
+    assert_eq!(refused.map(|one| one.file), Some(File::Lapses.name()));
 }

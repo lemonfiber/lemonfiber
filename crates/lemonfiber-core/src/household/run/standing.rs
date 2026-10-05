@@ -1,35 +1,97 @@
 //! Where each account stands: an invitation out or run out, a member, or switched off.
 //!
+//! **An invitation taken back is still one that ran out.** The decline service takes an
+//! invitation back the minute its window closes: an account nobody was seen in is
+//! removed, and a reset is switched off. Neither is a member who vanished or one the
+//! operator suspended, so a switched-off account whose offer ran out reads as expired, and
+//! a removed one is still listed, as expired, until the next invitation is recorded.
+//!
 //! Apart from the reading because it is the one part of it that reads the household's
 //! invitations the way an offer does — the same dates, the same window, the same rule that
 //! an invitation nothing can date has run out — and a second copy of that rule here would
 //! be one able to call an invitation standing that the next offer takes back.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::app::Ctx;
 use crate::invitation::{
-    closed, offered, run_out, Offers, Spent, HOURS_OF_RECORD, HOURS_TO_CLAIM, RECORD,
+    closed, lapsed_unseen, offered, run_out, Offers, Spent, HOURS_OF_RECORD, HOURS_TO_CLAIM, RECORD,
 };
 use crate::model::MemberStanding;
-use crate::ports::service::{Household as _, Member};
+use crate::ports::service::{Access, Household as _, Member};
+
+/// Where the invitations of a household stand, by the account's id.
+pub(super) struct Invitations {
+    /// The ones that ran out, read before any was taken back, so this reading still says
+    /// what it found.
+    pub(super) expired: BTreeSet<String>,
+    /// The ones the invitee declined.
+    pub(super) declined: BTreeSet<String>,
+    /// The accounts the decline service removed when their window closed, as they are
+    /// listed in their place: unclaimed, switched off, able to watch nothing.
+    pub(super) removed: Vec<Member>,
+}
 
 /// Where the invitations among these accounts stand, with what has run out taken back.
-///
-/// Which have run out and which were declined, by the account's id: the run-out ones
-/// read before any was taken back, so this reading still says what it found.
 pub(super) async fn invitations(
     ctx: &Ctx,
     server: &crate::jellyfin::Jellyfin,
     accounts: &[Member],
     findings: &mut Vec<String>,
-) -> (BTreeSet<String>, BTreeSet<String>) {
+) -> Invitations {
     let spent = expired(ctx, server, accounts, findings).await;
     let declined = declined(ctx, server, accounts, findings).await;
-    close_taken_up(ctx, accounts);
+    let offers: Offers = crate::app::record::beside(ctx, RECORD);
+    let removed = crate::app::invite::declining::removed_at_lapse(ctx, &offers);
+    close_taken_up(ctx, accounts, &removed);
     taken_back(ctx, server, &spent, &declined, findings).await;
-    let expired = spent.every().map(|gone| gone.member.id.clone()).collect();
-    (expired, declined)
+    let mut expired: BTreeSet<String> = spent.every().map(|gone| gone.member.id.clone()).collect();
+    expired.extend(switched_off_at_lapse(accounts, &offers, &ctx.hours_ago(0)));
+    expired.extend(removed.keys().cloned());
+    Invitations {
+        expired,
+        declined,
+        removed: listed_as_removed(accounts, removed),
+    }
+}
+
+/// The switched-off accounts whose offer ran out before anybody claimed it.
+///
+/// Whoever switched one off — the decline service at its lapse, or a sweep here — it is
+/// an invitation that ran out, and the operator's next move is the same one: offer it
+/// again.
+fn switched_off_at_lapse<'a>(
+    accounts: &'a [Member],
+    offers: &'a Offers,
+    now: &'a str,
+) -> impl Iterator<Item = String> + 'a {
+    accounts
+        .iter()
+        .filter(move |account| {
+            !account.claimed
+                && account.access.disabled
+                && !account.access.administrator
+                && lapsed_unseen(offers, &account.id, now)
+        })
+        .map(|account| account.id.clone())
+}
+
+/// The removed accounts the media server no longer holds, each as the account it was.
+fn listed_as_removed(accounts: &[Member], removed: BTreeMap<String, String>) -> Vec<Member> {
+    removed
+        .into_iter()
+        .filter(|(id, _)| !accounts.iter().any(|held| &held.id == id))
+        .map(|(id, name)| Member {
+            id,
+            name,
+            claimed: false,
+            access: Access {
+                disabled: true,
+                ..Access::default()
+            },
+            last_seen: None,
+        })
+        .collect()
 }
 
 /// The invitations among these accounts that have run out.
@@ -110,14 +172,20 @@ async fn taken_back(
 /// Seen here because this reading holds both halves at once: what was offered, and which
 /// accounts are claimed now. One taken up in time is closed so the door never judges it
 /// against its offer; one claimed only after it ran out is kept, which is what keeps it
-/// refused there. A rehearsal writes nothing.
-fn close_taken_up(ctx: &Ctx, accounts: &[Member]) {
+/// refused there. One the decline service removed at its lapse is kept too, so it is
+/// still listed as run out; the next offer takes it off. A rehearsal writes nothing.
+fn close_taken_up(ctx: &Ctx, accounts: &[Member], removed: &BTreeMap<String, String>) {
     if ctx.dry_run {
         return;
     }
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
     let held = offers.len();
-    let open = closed(offers, accounts, &ctx.hours_ago(0));
+    let mut open = closed(offers.clone(), accounts, &ctx.hours_ago(0));
+    for (id, offer) in offers {
+        if removed.contains_key(&id) {
+            open.entry(id).or_insert(offer);
+        }
+    }
     if open.len() != held {
         crate::app::record::keep_beside(ctx, RECORD, &open);
     }
@@ -157,9 +225,10 @@ async fn declined(
 /// declined.
 ///
 /// Declined first, because the person said so and the account is kept for that reason:
-/// switched off by the decline service, or about to be. Then switched off, because it
-/// overrides the rest: an account nobody can sign in to is neither a member who can nor
-/// an invitation somebody could take up.
+/// switched off by the decline service, or about to be. Then run out, because an
+/// invitation taken back at its lapse is switched off or gone and is still one nobody
+/// took up. Then switched off, because it overrides the rest: an account nobody can sign
+/// in to is neither a member who can nor an invitation somebody could take up.
 pub(super) fn standing(
     account: &Member,
     expired: &BTreeSet<String>,
@@ -167,12 +236,12 @@ pub(super) fn standing(
 ) -> MemberStanding {
     if !account.claimed && declined.contains(&account.id) {
         MemberStanding::Declined
+    } else if !account.claimed && expired.contains(&account.id) {
+        MemberStanding::Expired
     } else if account.access.disabled {
         MemberStanding::Suspended
     } else if account.claimed {
         MemberStanding::Active
-    } else if expired.contains(&account.id) {
-        MemberStanding::Expired
     } else {
         MemberStanding::Invited
     }

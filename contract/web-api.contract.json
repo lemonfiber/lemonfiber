@@ -4287,7 +4287,7 @@
               "const": "invited"
             },
             {
-              "description": "Offered, and the offer ran out before anybody claimed it. The next invitation\ntakes it back.",
+              "description": "Offered, and the offer ran out before anybody claimed it. The stack takes it back\nwithin a minute: an account nobody was seen in is removed and still listed as\nthis until the next invitation, and a reset is switched off and kept.",
               "type": "string",
               "const": "expired"
             },
@@ -4302,7 +4302,7 @@
               "const": "active"
             },
             {
-              "description": "Switched off — by the operator, by the media server after too many wrong\npasswords, or when a reset ran out unclaimed. The account and what they watched\nare kept, and a reissue switches it back on.",
+              "description": "Switched off — by the operator, or by the media server after too many wrong\npasswords. The account and what they watched are kept, and a reissue switches\nit back on.",
               "type": "string",
               "const": "suspended"
             }
@@ -7790,7 +7790,7 @@
               "const": "invited"
             },
             {
-              "description": "Offered, and the offer ran out before anybody claimed it. The next invitation\ntakes it back.",
+              "description": "Offered, and the offer ran out before anybody claimed it. The stack takes it back\nwithin a minute: an account nobody was seen in is removed and still listed as\nthis until the next invitation, and a reset is switched off and kept.",
               "type": "string",
               "const": "expired"
             },
@@ -7805,7 +7805,7 @@
               "const": "active"
             },
             {
-              "description": "Switched off — by the operator, by the media server after too many wrong\npasswords, or when a reset ran out unclaimed. The account and what they watched\nare kept, and a reissue switches it back on.",
+              "description": "Switched off — by the operator, or by the media server after too many wrong\npasswords. The account and what they watched are kept, and a reissue switches\nit back on.",
               "type": "string",
               "const": "suspended"
             }

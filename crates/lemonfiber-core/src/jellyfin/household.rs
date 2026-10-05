@@ -43,6 +43,11 @@ struct UserResource {
     /// is missing on every unclaimed invitation and on nothing else.
     #[serde(rename = "LastActivityDate", default)]
     last_activity: Option<String>,
+    /// When somebody last signed in to the account. Read beside the last activity
+    /// because either one set is somebody having been in it, and an account somebody
+    /// has been in holds what they watched.
+    #[serde(rename = "LastLoginDate", default)]
+    last_login: Option<String>,
 }
 
 /// What one account is allowed, as the media server names its fields.
@@ -85,7 +90,7 @@ impl UserResource {
                 administrator: policy.administrator,
                 disabled: policy.disabled,
             },
-            last_seen: self.last_activity,
+            last_seen: self.last_activity.or(self.last_login),
         }
     }
 }
