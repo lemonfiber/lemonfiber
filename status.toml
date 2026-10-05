@@ -10,12 +10,12 @@ What is built in **this repo** against what the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
 asks for. Read this before reconstructing state from the source.
 
-This tracks the `lemonfiber` binary's milestones, **M2–M15**. A milestone is not
+This tracks the `lemonfiber` binary's milestones, **M2–M16**. A milestone is not
 one version: M4 spans `0.3.0` and `0.4.0`, M5 spans three, M6 spans `0.8.0` and
 `1.0.0` with fifteen versions in between, and M10 is scoped by no version manifest at
-all. Nor do the numbers run in ship order — M14 ships at `0.16.0`–`0.18.0`, ahead of
-M11's `0.19.0`–`0.20.0`. M0–M1 live in the `spec` and `lemonfiber-media-stack` repos and are
-recorded here for context. Milestones M11, M12, M13 and M15 are not started — their
+all. Nor do the numbers run in ship order — M14 ships at `0.16.0`–`0.18.0` and M16 at
+`0.19.0`, ahead of M11's `0.20.0`–`0.21.0`. M0–M1 live in the `spec` and `lemonfiber-media-stack` repos and are
+recorded here for context. Milestones M11, M12, M13, M15 and M16 are not started — their
 sections point at the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
 Every other milestone has a table, and several hold rows that landed ahead of the
@@ -2217,7 +2217,7 @@ state = "open"
 
 [[milestone.part]]
 prose = '''
-`0.19.0` and `0.20.0`. Cross-seeding, announce-driven grabbing, quality-profile sync,
+`0.20.0` and `0.21.0`. Cross-seeding, announce-driven grabbing, quality-profile sync,
 subtitles, queue self-healing, library cleanup, transcoding, playback statistics. Not
 started. See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m11--ecosystem-glue).
 
@@ -2236,7 +2236,7 @@ state = "open"
 
 [[milestone.part]]
 prose = '''
-`0.21.0`. Remote access over a self-hosted overlay, and one account across the services
+`0.22.0`. Remote access over a self-hosted overlay, and one account across the services
 the household touches. Not started.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m12--safely-reachable).
 
@@ -2249,7 +2249,7 @@ state = "open"
 
 [[milestone.part]]
 prose = '''
-`0.22.0`. Exported metrics and dashboards, and uptime monitoring the stack raises
+`0.23.0`. Exported metrics and dashboards, and uptime monitoring the stack raises
 against itself. Not started.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m13--see-everything).
 
@@ -2629,7 +2629,7 @@ state = "open"
 
 [[milestone.part]]
 prose = '''
-`0.23.0`. The container engine behind an abstraction rather than an assumption, Podman
+`0.24.0`. The container engine behind an abstraction rather than an assumption, Podman
 as a first-class alternative, services as plain processes, and an existing install
 moving across keeping its configuration and data. Not started.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m15--runs-anywhere).
@@ -2641,4 +2641,19 @@ above the port names an engine, and two things still do: the port is `ports::doc
 and lifecycle goes through Compose as a subprocess, which is Docker's tool by name.
 One implementation behind a port named for it is the assumption the milestone exists
 to lift, not a first step into it.
+
+---
+'''
+
+[[milestone]]
+name = "M16 — The household's library"
+state = "open"
+
+[[milestone.part]]
+prose = '''
+`0.19.0`. A member finds a title, sees its artwork and what it is, asks for it, and
+plays it on their own media-server account under their own limits: the grant and the
+guarded front door, the reads behind each title, and a member's own search and ask.
+Not started.
+See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m16--the-households-library).
 '''
