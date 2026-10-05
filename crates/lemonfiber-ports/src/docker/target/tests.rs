@@ -56,9 +56,14 @@ fn only_a_remote_run_has_a_host_to_name() {
         Target::at("unix:///var/run/docker.sock", Origin::Variable).host(),
         None
     );
+    // The login goes whole, the account name with it: a token can stand where the
+    // account goes, and the host is what tells one remote run from another.
     assert_eq!(
         Target::at("ssh://media@nas.local", Origin::Variable).host(),
-        Some("ssh://media@nas.local".to_owned())
+        Some(format!(
+            "ssh://{}@nas.local",
+            lemonfiber_error::withheld::REDACTED
+        ))
     );
 }
 

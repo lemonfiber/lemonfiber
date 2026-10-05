@@ -352,13 +352,8 @@ impl Archive for Tar {
                 builder.follow_symlinks(false);
                 for item in &items {
                     if item.source.is_dir() {
-                        let left_out = skipped(item);
-                        walked(
-                            builder,
-                            Path::new(&item.archive_path),
-                            &item.source,
-                            &left_out,
-                        )?;
+                        let at = Path::new(&item.archive_path);
+                        walked(builder, at, &item.source, &skipped(item))?;
                     }
                 }
                 Ok(())

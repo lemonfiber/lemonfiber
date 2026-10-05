@@ -1,7 +1,7 @@
 //! Handing a service's own key out again: the indexer aggregator's, which files no
 //! media and so is not reset.
 
-use super::{asked, ctx, env_at, recorded, silent, the_service_key, SERVICE_CONFIG};
+use super::{asked, ctx, env_at, recorded, sealed, silent, the_service_key, SERVICE_CONFIG};
 use lemonfiber_core::app::Asking;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -164,4 +164,30 @@ async fn a_rehearsed_republish_reads_no_key_and_asks_the_service_nothing() {
         reached.is_empty(),
         "a rehearsal asked the service to identify itself: {reached:?}"
     );
+}
+
+/// A key the service answers to that cannot be published leaves the one in force, and
+/// says it was not handed out.
+#[tokio::test]
+async fn a_key_that_cannot_be_published_is_not_called_handed_out() {
+    let stale = format!("{}{}", "0000stale", "keykeykeykey");
+    let env = env_at("unpublishable", &[("PROWLARR_API_KEY", &stale)]);
+    sealed(&env);
+    let http = Fake::by_path(vec![(
+        "/system/status",
+        Answer::reply(200, PROWLARR_STATUS),
+    )]);
+    let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http);
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "Prowlarr API key".to_owned(),
+        },
+    )
+    .await;
+
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.contains("could not be published"), "{said}");
+    assert_eq!(recorded(&env, "PROWLARR_API_KEY"), Some(stale));
 }

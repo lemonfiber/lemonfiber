@@ -154,7 +154,7 @@ async fn seed_sets_no_password_with_nowhere_to_record_it() {
             &wiring.state,
             crate::seed::State::Failed { detail } if detail.contains("could not be recorded")
         )),
-        "{password:?}"
+        "the password connection did not fail over the record"
     );
 }
 

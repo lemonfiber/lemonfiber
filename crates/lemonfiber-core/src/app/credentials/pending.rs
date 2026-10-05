@@ -86,16 +86,25 @@ pub(crate) async fn settled(ctx: &Ctx) {
     if ctx.dry_run {
         return;
     }
-    for (setting, kind) in MINTED {
-        let Some(replacement) = recorded_secret(ctx, &pending(setting)) else {
-            continue;
-        };
-        let Ok(manifest) = ctx.stack.manifest() else {
-            return;
-        };
-        let Some(addr) = service_addr(&manifest.services, kind) else {
-            continue;
-        };
+    let left: Vec<(&str, ApiKind, String)> = MINTED
+        .into_iter()
+        .filter_map(|(setting, kind)| {
+            Some((setting, kind, recorded_secret(ctx, &pending(setting))?))
+        })
+        .collect();
+    if left.is_empty() {
+        return;
+    }
+    // A stack that cannot be read has no service to ask, which leaves both for later.
+    let services = ctx
+        .stack
+        .manifest()
+        .map(|manifest| manifest.services)
+        .unwrap_or_default();
+    let asked = left.into_iter().filter_map(|(setting, kind, replacement)| {
+        Some((setting, kind, service_addr(&services, kind)?, replacement))
+    });
+    for (setting, kind, addr, replacement) in asked {
         let current = recorded_secret(ctx, setting).unwrap_or_default();
         match taken(ctx, kind, &addr, &current).await {
             Some(true) => forgotten(ctx, setting),

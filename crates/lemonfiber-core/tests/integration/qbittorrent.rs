@@ -310,8 +310,7 @@ async fn a_password_that_cannot_be_recorded_is_never_set() {
 
     assert!(
         matches!(&wiring.state, State::Failed { detail } if detail.contains("could not be recorded")),
-        "{:?}",
-        wiring.state
+        "the connection did not fail over the record"
     );
     assert_eq!(handed, None);
     assert!(

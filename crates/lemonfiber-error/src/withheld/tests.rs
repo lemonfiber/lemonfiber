@@ -441,24 +441,22 @@ fn a_header_carrying_a_credential_loses_the_rest_of_its_line() {
             "the request sent Authorization:",
         ),
     ] {
+        // Named by what is kept rather than by the line, which holds the credential.
         let shown = withheld(&line);
-        assert!(
-            !shown.contains(&secret),
-            "{line} kept its credential: {shown}"
-        );
-        assert_eq!(shown, format!("{kept} {REDACTED}"), "{line}");
-        assert_eq!(withheld(&shown), shown, "a second pass changed {shown}");
+        assert!(!shown.contains(&secret), "{kept} kept its credential");
+        assert!(shown == format!("{kept} {REDACTED}"), "{kept}");
+        assert!(withheld(&shown) == shown, "a second pass changed {kept}");
     }
 }
 
 #[test]
 fn a_session_cookie_written_as_a_pair_loses_its_value() {
     let secret = a_credential();
-    for line in [
-        format!("qBittorrent answered SID={secret}"),
-        format!("signed in with session={secret}"),
+    for (name, line) in [
+        ("SID", format!("qBittorrent answered SID={secret}")),
+        ("session", format!("signed in with session={secret}")),
     ] {
-        assert!(!withheld(&line).contains(&secret), "{line}");
+        assert!(!withheld(&line).contains(&secret), "{name}");
     }
     assert!(is_secret("SID") && is_secret("qbt_sid") && is_secret("SESSION_TOKEN"));
     assert!(!is_secret("INSIDE") && !is_secret("RESIDENT"));

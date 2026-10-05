@@ -2,6 +2,7 @@
 
 use super::{asking, behind, came_to, ctx, reported, Coming, Kept, Machine, SONARR};
 use lemonfiber_core::app::{dispatch, Waiting};
+use lemonfiber_core::config::{Reaching, REACH_REGISTRY_KEY};
 use lemonfiber_core::ports::process::Failure as RunFailure;
 use lemonfiber_core::update::{Ending, Reversal, State};
 
@@ -87,6 +88,27 @@ async fn a_fetch_that_fails_still_lets_the_run_take_its_steps() {
 
     assert!(report.is_some_and(|report| report.state == State::Updated));
     assert_eq!(machine.started(), vec!["sonarr".to_owned()]);
+}
+
+/// A machine where fetching is switched off fetches nothing ahead of the stop, and the
+/// run still takes its steps.
+#[tokio::test]
+async fn a_machine_that_fetches_nothing_is_not_fetched_for() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let mut context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    context.settings.reaching = Reaching::without(REACH_REGISTRY_KEY);
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    assert!(report.is_some_and(|report| report.state == State::Updated));
+    assert!(
+        !machine
+            .asked()
+            .iter()
+            .any(|argv| argv.iter().any(|word| word == "pull")),
+        "a machine that fetches nothing was fetched for"
+    );
 }
 
 #[tokio::test]

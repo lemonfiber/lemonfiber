@@ -9,6 +9,7 @@
 //! here changing, which is the test of whether the wiring was really converted.
 
 use super::Ctx;
+use crate::app::credentials::Replacing;
 
 /// What this connection asks the stack for: a service that answers, for the services
 /// that ask, whether a person is who they say they are.
@@ -144,13 +145,8 @@ async fn changed_after_setup(
             Ok(_) => {
                 return crate::seed::Wiring::settled(CHANGED.to_owned(), crate::seed::State::Wired)
             }
-            Err(crate::app::credentials::Replacing::Refused) => {
-                "Jellyfin refused the password lemonfiber holds".to_owned()
-            }
-            Err(
-                crate::app::credentials::Replacing::Unproven(detail)
-                | crate::app::credentials::Replacing::Unkept(detail),
-            ) => detail,
+            Err(Replacing::Refused) => "Jellyfin refused the password lemonfiber holds".to_owned(),
+            Err(Replacing::Unproven(detail) | Replacing::Unkept(detail)) => detail,
         };
     let mut wiring = crate::seed::Wiring::settled(
         CHANGED.to_owned(),
