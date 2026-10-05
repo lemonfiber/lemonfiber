@@ -414,6 +414,10 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
         // One engine chunk is not one line. Splitting here rather than at the
         // reader means every consumer gets lines, and none of them reimplements
         // the splitting.
+        //
+        // A reader that leaves part-way through a chunk is noticed at the top of the
+        // loop, where `closed` then answers at once; the rest of the chunk's lines
+        // fail to send without waiting on anything.
         let text = chunk.to_string();
         for line in text.lines() {
             let (at, line) = split_timestamp(line);
@@ -423,9 +427,7 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
                 at,
                 line,
             };
-            if sender.send(sending).await.is_err() {
-                return;
-            }
+            let _delivered = sender.send(sending).await;
         }
     }
 }

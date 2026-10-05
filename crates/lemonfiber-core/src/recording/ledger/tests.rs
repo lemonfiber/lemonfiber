@@ -80,3 +80,24 @@ async fn a_record_that_cannot_be_written_is_passed_over() {
     assert!(at.is_dir(), "nothing was written over what was there");
     let _ = at.parent().map(std::fs::remove_dir_all);
 }
+
+/// A record whose directory cannot be made is let go: noting a line returns, and
+/// nothing is written in place of what stood where the directory would go.
+#[tokio::test]
+async fn a_record_with_nowhere_to_go_is_let_go() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("nowhere-to-go");
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let blocking = dir.join("a-file");
+    let _ = std::fs::write(&blocking, "not a directory");
+
+    Ledger::at(blocking.join("outbound.log"))
+        .note("1 lost".to_owned())
+        .await;
+
+    assert_eq!(
+        std::fs::read_to_string(&blocking).ok().as_deref(),
+        Some("not a directory")
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

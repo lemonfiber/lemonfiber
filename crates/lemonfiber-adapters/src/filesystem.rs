@@ -181,7 +181,7 @@ impl Storage for Disk {
         let read = tokio::time::timeout(DESCRIBED_WITHIN, reading).await;
         read.ok()
             .and_then(Result::ok)
-            .unwrap_or_else(|| pick(&[], path))
+            .unwrap_or_else(StorageFacts::unknown)
     }
 }
 

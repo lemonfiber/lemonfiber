@@ -175,3 +175,6 @@ async fn provider_accounts(
         ctx.seams.clock.now(),
     )
 }
+
+#[cfg(test)]
+mod tests;

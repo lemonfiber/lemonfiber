@@ -71,6 +71,14 @@ impl Check for Deferred {
     }
 }
 
+impl Deferred {
+    /// The check a run built, where one has.
+    #[cfg(test)]
+    pub(crate) fn built(&self) -> Option<&dyn Check> {
+        self.built.get().map(AsRef::as_ref)
+    }
+}
+
 /// The check, built here where no run has built it yet.
 ///
 /// The one place it is settled: a run is what builds it, so every run asks here.

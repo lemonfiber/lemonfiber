@@ -92,11 +92,11 @@ async fn waited(child: &mut Child, stdout: &mut Vec<u8>, stderr: &mut Vec<u8>) -
     }
 }
 
-/// Everything a reader produces, appended a read at a time so a read abandoned
-/// part-way leaves what came before it in place.
+/// Everything a reader produces, read into a buffer this borrows: a read abandoned
+/// part-way leaves what had arrived in it.
 async fn drained<R: AsyncRead + Unpin>(reader: Option<R>, into: &mut Vec<u8>) {
     if let Some(mut reader) = reader {
-        while reader.read_buf(into).await.is_ok_and(|read| read > 0) {}
+        let _read = reader.read_to_end(into).await;
     }
 }
 

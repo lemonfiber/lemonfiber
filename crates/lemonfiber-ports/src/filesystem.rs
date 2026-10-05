@@ -120,6 +120,21 @@ pub struct StorageFacts {
     pub total: u64,
 }
 
+impl StorageFacts {
+    /// Facts about no filesystem: an unknown type and no capacity, which a caller
+    /// reads as nothing to name and nothing to measure.
+    #[must_use]
+    pub const fn unknown() -> Self {
+        Self {
+            point: PathBuf::new(),
+            kind: FsKind::Unknown(String::new()),
+            removable: false,
+            available: 0,
+            total: 0,
+        }
+    }
+}
+
 /// The filesystem types whose hardlink behaviour lemonfiber can speak to by name.
 ///
 /// Recognised from the type name the platform reports. The name explains a
@@ -243,13 +258,7 @@ pub fn pick(mounts: &[Mount], path: &Path) -> StorageFacts {
             available: mount.available,
             total: mount.total,
         },
-        None => StorageFacts {
-            point: PathBuf::new(),
-            kind: FsKind::Unknown(String::new()),
-            removable: false,
-            available: 0,
-            total: 0,
-        },
+        None => StorageFacts::unknown(),
     }
 }
 

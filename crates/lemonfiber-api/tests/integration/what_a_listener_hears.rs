@@ -416,6 +416,26 @@ async fn the_stream_is_fed_by_the_gather_that_answers_the_dashboard() {
     assert!(listening.next().await.is_some(), "and the one after it");
 }
 
+/// A stack whose household reads is heard with it: the dashboard carries the
+/// household's panel ready, and what is newest is said from that same reading.
+#[tokio::test]
+async fn a_household_that_reads_is_heard_from_the_gather_that_read_it() {
+    let live = Live::opening(Stopped::today().as_ref());
+    let mut listening = live.listening(None).await;
+    let ctx = lemonfiber_testing::a_context()
+        .runner(Arc::new(Idle))
+        .build()
+        .with_http(Fake::silent());
+    let dashboard = Dashboard::against(Arc::new(ctx));
+
+    live.refresh(&dashboard).await;
+
+    let heard = listening.next().await.unwrap_or_default();
+    assert!(heard.contains(r#""household":{"panel":"ready""#), "{heard}");
+    let news = listening.next().await.unwrap_or_default();
+    assert_eq!(named(&news), Some("news"), "{news}");
+}
+
 /// The name an event goes by on the wire, or nothing where it is a beat.
 fn named(said: &str) -> Option<&str> {
     said.lines().find_map(|line| line.strip_prefix("event: "))
