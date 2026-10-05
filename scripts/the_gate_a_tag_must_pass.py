@@ -300,9 +300,10 @@ def unproven_warned(said: str) -> str:
 
 
 def claimed() -> Step:
-    """Whether a recording refutes, or the contract refuses, a bundled claim."""
+    """Whether every bundled capability is claimed, and no recording refutes or the
+    contract refuses a claim."""
     ok, said = ran(*CLAIMS, cwd=ROOT)
-    return Step("no bundled claim is refuted by its recording", ok,
+    return Step("every bundled capability is claimed and none is refuted", ok,
                 unproven_warned(said) if ok else said)
 
 
@@ -461,12 +462,13 @@ def self_test() -> int:
 
     # A bundled claim nothing could show passes the gate and is still said: each
     # unproven line is kept as a warning, and nothing else the judge printed is.
-    judged = unproven_warned("unproven: sonarr provides library.manage\ndemonstrated: x\n2 unproven")
+    judged = unproven_warned(
+        "unproven: sonarr library.curate probe wanted: no recording\ndemonstrated: x\n1 unproven")
     code, said = decide([Step(MUST_ASK[0], True, judged), *passed[1:]])
     joined = "\n".join(said)
     if code != 0:
         broken.append("an unproven bundled claim refused the tag")
-    if "sonarr provides library.manage" not in joined:
+    if "sonarr library.curate probe wanted" not in joined:
         broken.append("an unproven bundled claim was dropped from a run that passed")
     if "demonstrated: x" in joined:
         broken.append("the judge's ordinary output was printed from a run that passed")

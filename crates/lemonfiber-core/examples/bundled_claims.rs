@@ -1,9 +1,9 @@
 //! Judges every claim the embedded stack makes against the recordings it carries.
 //!
 //! The release gate runs it, and so does `just bundled-claims`. It exits non-zero where
-//! a recording refutes a probe or the contract refuses a claim, naming the service, the
-//! capability and the probe; a probe nothing could be judged against, and a capability
-//! nothing claims, are listed as unproven and refuse nothing.
+//! a recording refutes a probe, the contract refuses a claim, or a service provides a
+//! capability nothing claims, naming the service, the capability and the probe; a
+//! probe nothing could be judged against is listed as unproven and refuses nothing.
 
 use std::path::Path;
 

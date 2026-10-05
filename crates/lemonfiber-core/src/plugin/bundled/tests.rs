@@ -170,22 +170,34 @@ fn a_claim_the_contract_will_not_bind_is_refused() {
         .any(|refused| refused.message.contains("binds no probe catalogue")));
 }
 
-/// A capability provided with no claim is named as unclaimed and refuses nothing.
+/// A capability provided with no claim is named as unclaimed and refuses the stack, even
+/// with nothing else wrong: a declaration nothing demonstrates is one nothing holds.
 #[test]
-fn a_capability_with_no_claim_is_unclaimed() {
+fn a_capability_with_no_claim_refuses_the_stack() {
     let mut manifest = claiming(CLAIM);
     for service in &mut manifest.services {
         service.claim = Vec::new();
     }
     let report = judged(&manifest, Path::new("/lemonfiber/no/such/stack"));
 
-    assert!(report.holds());
+    assert!(!report.holds(), "{report:?}");
+    assert!(
+        report.refused.is_empty() && report.judged.is_empty(),
+        "{report:?}"
+    );
     assert_eq!(
         report.unclaimed,
         vec![super::Unclaimed {
             service: "jellyfin".to_owned(),
             capability: "media.serve".to_owned(),
         }]
+    );
+    assert_eq!(
+        said(&report),
+        vec![
+            "refused: jellyfin provides media.serve, and no claim demonstrates it".to_owned(),
+            "1 refused, 0 refuted, 0 unproven, 0 demonstrated".to_owned(),
+        ]
     );
 }
 
@@ -218,19 +230,23 @@ fn the_report_says_each_answer_worst_first_with_a_count() {
     );
     assert!(
         lines
-            .get(1)
+            .get(2)
             .is_some_and(|line| line.starts_with("refuted: jellyfin media.serve probe guarded")),
         "{lines:?}"
     );
-    assert!(lines
-        .iter()
-        .any(|line| line.contains("sonarr provides library.manage, and no claim")));
+    assert!(
+        lines
+            .get(1)
+            .is_some_and(|line| line
+                == "refused: sonarr provides library.manage, and no claim demonstrates it"),
+        "{lines:?}"
+    );
     assert!(lines
         .iter()
         .any(|line| line.starts_with("unproven: jellyfin media.serve probe catalogue")));
     assert_eq!(
         lines.last().map(String::as_str),
-        Some("1 refused, 1 refuted, 2 unproven, 0 demonstrated")
+        Some("2 refused, 1 refuted, 1 unproven, 0 demonstrated")
     );
 }
 
