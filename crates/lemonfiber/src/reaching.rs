@@ -68,6 +68,10 @@ pub const ACTS: &[Reach] = &[
         through: "invite",
     },
     Reach {
+        request: "downloads",
+        through: "downloads-pause",
+    },
+    Reach {
         request: "undo",
         through: "undo",
     },
@@ -251,10 +255,9 @@ pub const ASKS: &[Reach] = &[
 /// named twice for one screen.
 pub const SHOWS: &[&str] = &["ps"];
 
-/// The requests the dashboard reaches a second way, having already reached them as a
-/// question.
+/// The requests the dashboard reaches a second way, having already reached them once.
 ///
-/// Four requests, nine actions. `update` is the plainest of them: `/api/update` reads
+/// Five requests, nine actions. `update` is the plainest of them: `/api/update` reads
 /// what moving something forward would come to — the services and their steps, or
 /// where this copy stands — and taking those steps is a write, offered beside the
 /// reading it is decided from. `quality` is on [`ASKS`] as a read — the preset in
@@ -279,7 +282,11 @@ pub const SHOWS: &[&str] = &["ps"];
 /// that is one form of that request rather than a second request, which is exactly
 /// what this list exists to keep apart.
 ///
-/// None of the eight is an entry in [`ACTS`], because each request is already
+/// `downloads` is the one reached first as an action rather than as a question. Pausing
+/// every download client is its entry in [`ACTS`], and letting them all go again is the
+/// same request read the other way, offered beside it.
+///
+/// None of the nine is an entry in [`ACTS`], because each request is already
 /// reached: [`reached`] is what the parity table's terminal column is held against in
 /// both directions, and a request named there twice would leave a reader of one row
 /// with two claims to reconcile against it.
@@ -320,6 +327,10 @@ pub const ALSO: &[Reach] = &[
     Reach {
         request: "trace",
         through: "search",
+    },
+    Reach {
+        request: "downloads",
+        through: "downloads-resume",
     },
 ];
 

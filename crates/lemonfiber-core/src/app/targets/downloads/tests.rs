@@ -3,8 +3,8 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{
-    download_targets, forwarded_client, read_transfers, torrent_client, DownloadKind,
-    DownloadTarget,
+    declared_downloads, download_targets, forwarded_client, read_transfers, torrent_client,
+    DownloadKind, DownloadTarget,
 };
 use crate::config::Settings;
 use crate::test_support::{a_context, a_password, a_placed, an_installed, env_at, stack};
@@ -218,4 +218,44 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
     assert!(torrent_client(&ctx, &targets[..1]).is_none());
     assert!(forwarded_client(&ctx, &targets[..1]).is_none());
     assert!(torrent_client(&ctx, &targets).is_some());
+}
+
+/// Every download client is declared, the ones nothing here can reach included: a
+/// torrent client publishing no port, and one whose password is not recorded, are
+/// named with nothing to reach them by, where the read leaves both out.
+#[tokio::test]
+async fn every_download_client_is_declared_whether_or_not_it_is_reached() {
+    let api = lemonfiber_manifest::Api {
+        kind: lemonfiber_manifest::ApiKind::Qbittorrent,
+        key_source: lemonfiber_manifest::KeySource::ConfigIni,
+        path: None,
+        version: None,
+    };
+    let unpublished = a_placed("portless", &["download.torrent"], Some(api), None);
+    let fillers = stack()
+        .manifest()
+        .map(|manifest| {
+            Fillers::of(
+                &manifest,
+                &[an_installed("seeding", vec![unpublished])],
+                &Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default();
+    let (ctx, _) = holding("declared-unpublished", false, &fillers);
+    let declared = declared_downloads(&ctx, &fillers).await;
+    assert!(declared
+        .iter()
+        .any(|client| client.id == "portless" && client.target.is_none()));
+    assert!(declared
+        .iter()
+        .any(|client| client.id == "qbittorrent" && client.target.is_some()));
+    assert_eq!(
+        download_targets(&ctx, &fillers).await.len(),
+        declared
+            .iter()
+            .filter(|client| client.target.is_some())
+            .count()
+    );
 }

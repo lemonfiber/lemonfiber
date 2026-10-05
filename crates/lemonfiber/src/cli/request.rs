@@ -16,7 +16,7 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawRemoving, RawSetup, RawTrace, RawUi, UpdateCommand,
+    RawDoctor, RawDownloads, RawRemoving, RawSetup, RawTrace, RawUi, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -470,6 +470,8 @@ pub enum Request {
     /// here shapes this machine's traffic. It sets limits inside lemonfiber's own
     /// download clients and nowhere else.
     Bandwidth(RawBandwidth),
+    /// Pause every download client the stack runs, or let them all fetch again.
+    Downloads(RawDownloads),
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt your current edits as lemonfiber's expected state.

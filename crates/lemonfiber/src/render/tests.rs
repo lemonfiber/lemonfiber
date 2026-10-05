@@ -338,6 +338,9 @@ fn the_rest_of_them() -> Vec<Outcome> {
         Outcome::Bandwidth(lemonfiber_core::bandwidth::weigh(
             &lemonfiber_core::bandwidth::Measured::default(),
         )),
+        // A pause that reached one client and could not open the other, so both lines
+        // of a report are drawn.
+        Outcome::Pausing(a_pause()),
         // A removal that took the whole of what it found, with every paragraph a
         // manifest can carry present: a line going and a line kept, something
         // beside the library, a volume worth a note, a download still coming
@@ -438,4 +441,28 @@ fn a_handoff() -> Outcome {
         sessions: Vec::new(),
         rehearsed: false,
     })
+}
+
+/// A pause that stopped the torrent client and could not reach the Usenet one.
+fn a_pause() -> lemonfiber_core::bandwidth::Pauses {
+    use lemonfiber_core::bandwidth::{Paused, Pauses, Pausing, Pulling};
+    Pauses {
+        asked: Pausing::Pause,
+        clients: vec![
+            Paused {
+                client: "qbittorrent".to_owned(),
+                was: Some(Pulling::Fetching),
+                now: Some(Pulling::Stopped),
+                unreached: None,
+            },
+            Paused {
+                client: "sabnzbd".to_owned(),
+                was: None,
+                now: None,
+                unreached: Some("it would not answer".to_owned()),
+            },
+        ],
+        caution: None,
+        rehearsed: false,
+    }
 }

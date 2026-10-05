@@ -3,16 +3,31 @@ use crate::actions::Arguments;
 use lemonfiber_core::app::Command;
 
 #[test]
-fn only_the_one_action_is_about_the_line() {
-    assert!(about_the_line("bandwidth"));
+fn only_the_lines_own_actions_are_about_the_line() {
+    for action in ["bandwidth", "downloads-pause", "downloads-resume"] {
+        assert!(about_the_line(action), "{action}");
+    }
     assert!(!about_the_line("space"));
     assert!(!about_the_line("household"));
 }
 
 #[test]
+fn a_pause_and_a_resume_name_every_download_client_at_once() {
+    use lemonfiber_core::bandwidth::Pausing;
+    assert_eq!(
+        asked_for("downloads-pause", Arguments::default()),
+        Command::Downloads(Pausing::Pause)
+    );
+    assert_eq!(
+        asked_for("downloads-resume", Arguments::default()),
+        Command::Downloads(Pausing::Resume)
+    );
+}
+
+#[test]
 fn nothing_given_is_the_reading_every_surface_makes_first() {
     assert_eq!(
-        asked_for(Arguments::default()),
+        asked_for("bandwidth", Arguments::default()),
         Command::Bandwidth(lemonfiber_core::app::BandwidthAsked::default())
     );
 }
@@ -30,7 +45,7 @@ fn every_word_reaches_the_command_as_it_was_written() {
         ..Arguments::default()
     };
     assert_eq!(
-        asked_for(given),
+        asked_for("bandwidth", given),
         Command::Bandwidth(lemonfiber_core::app::BandwidthAsked {
             down: Some("50%".to_owned()),
             up: Some("2MiB".to_owned()),

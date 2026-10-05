@@ -50,6 +50,7 @@ fn diagnosis(
             | Outcome::Space(_)
             | Outcome::StopSeeding(_)
             | Outcome::Bandwidth(_)
+            | Outcome::Pausing(_)
             | Outcome::Status(_)
             | Outcome::Repair(_)
             | Outcome::Undo(_)

@@ -53,6 +53,7 @@ Commands:
   space         Account for the disk: where the room went, when it runs out, what can go
   stop-seeding  Stop seeding one completed download, and let its files go with it
   bandwidth     Account for the line: what it carries, what the stack takes, what that costs
+  downloads     Pause every download client the stack runs, or let them all fetch again
   seed          Wire the stack's services to each other, idempotently
   adopt         Adopt your current edits as lemonfiber's expected state
   reset         Put the stack back to lemonfiber's own state, reverting every edit you made
@@ -135,6 +136,7 @@ Options:
 - [`lemonfiber space`](commands/space.md)
 - [`lemonfiber stop-seeding`](commands/stop-seeding.md)
 - [`lemonfiber bandwidth`](commands/bandwidth.md)
+- [`lemonfiber downloads`](commands/downloads.md)
 - [`lemonfiber seed`](commands/seed.md)
 - [`lemonfiber adopt`](commands/adopt.md)
 - [`lemonfiber reset`](commands/reset.md)

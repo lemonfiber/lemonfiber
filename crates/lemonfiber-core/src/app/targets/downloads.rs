@@ -74,31 +74,65 @@ pub(crate) fn host_fillers(ctx: &Ctx, manifest: &Manifest, project: Option<&Path
 /// client that publishes no port, or whose credential is not in hand, is left out: a
 /// read that cannot authenticate has nothing to read.
 pub(crate) async fn download_targets(ctx: &Ctx, fillers: &Fillers) -> Vec<DownloadTarget> {
-    let mut targets = Vec::new();
+    declared_downloads(ctx, fillers)
+        .await
+        .into_iter()
+        .filter_map(|declared| declared.target)
+        .collect()
+}
+
+/// A download client this machine declares, by the id it runs under, with what reaches
+/// it where anything does.
+pub(crate) struct DeclaredDownload {
+    /// The id its container runs under.
+    pub id: String,
+    /// Where the host reaches it and the credential it answers to, or nothing where it
+    /// publishes no port or its credential is not in hand.
+    pub target: Option<DownloadTarget>,
+}
+
+/// Every download client among `fillers`, in the order they are declared, whether or
+/// not anything here can reach it.
+///
+/// For the requests that owe an answer about every client the stack runs: one that
+/// could not be reached is named as not reached rather than left out, where a read
+/// leaves it out because it has nothing to read. A client that publishes no port has
+/// its credential left unread.
+pub(crate) async fn declared_downloads(ctx: &Ctx, fillers: &Fillers) -> Vec<DeclaredDownload> {
+    let mut declared = Vec::new();
     for filler in fillers.services() {
-        let Some(port) = filler.published else {
+        if !(filler.speaks(ApiKind::Qbittorrent) || filler.speaks(ApiKind::Sabnzbd)) {
             continue;
+        }
+        let target = match filler.published {
+            Some(port) => answering(ctx, fillers, filler)
+                .await
+                .map(|kind| DownloadTarget {
+                    base: loopback(port),
+                    kind,
+                    tunnelled: tunnelled(filler),
+                }),
+            None => None,
         };
-        let kind = if filler.speaks(ApiKind::Qbittorrent) {
-            let Some(password) = recorded_password(ctx, fillers, filler) else {
-                continue;
-            };
-            DownloadKind::Qbittorrent { password }
-        } else if filler.speaks(ApiKind::Sabnzbd) {
-            let Beneath::Read(key) = usenet_key(ctx, filler).await else {
-                continue;
-            };
-            DownloadKind::Sabnzbd { key }
-        } else {
-            continue;
-        };
-        targets.push(DownloadTarget {
-            base: loopback(port),
-            kind,
-            tunnelled: tunnelled(filler),
+        declared.push(DeclaredDownload {
+            id: filler.id.clone(),
+            target,
         });
     }
-    targets
+    declared
+}
+
+/// Which download client `filler` is, with the credential it answers to, or nothing
+/// where that credential is not in hand.
+async fn answering(ctx: &Ctx, fillers: &Fillers, filler: &Filler) -> Option<DownloadKind> {
+    if filler.speaks(ApiKind::Qbittorrent) {
+        return recorded_password(ctx, fillers, filler)
+            .map(|password| DownloadKind::Qbittorrent { password });
+    }
+    match usenet_key(ctx, filler).await {
+        Beneath::Read(key) => Some(DownloadKind::Sabnzbd { key }),
+        _ => None,
+    }
 }
 
 /// The password recorded for this torrent client, under the setting kept for it alone,

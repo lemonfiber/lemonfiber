@@ -17,7 +17,7 @@ mod reports;
 pub(crate) use reporting::{complain, no_config_home, reported};
 
 use reports::{
-    accounting, adopting, carrying, forgetting, installing, letting_go, lifecycle, moving,
+    accounting, adopting, carrying, forgetting, installing, letting_go, lifecycle, moving, pausing,
     removing, removing_it, replacing, rotating, setting_up, sharing, standing,
 };
 pub(crate) use reports::{repairing, reset_exit, seed_exit, upgrade_exit};
@@ -148,6 +148,9 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // client and did not take is a setting the operator believes is in force
         // while the household's evening goes on being ruined.
         Outcome::Bandwidth(report) => sharing(report),
+        // A client that was asked to pause and read back fetching is a pause the
+        // operator believes is in force while the line is still being taken.
+        Outcome::Pausing(report) => pausing(report),
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.

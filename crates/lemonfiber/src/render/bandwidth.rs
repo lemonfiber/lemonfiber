@@ -11,7 +11,9 @@
 //! viewing and that it will meddle with the machine, and a report that leaves both
 //! to be inferred is a report that gets read as doing them.
 
-use lemonfiber_core::bandwidth::{Answer, Cap, Capacity, Held, Holding, Metered, Reached, Sharing};
+use lemonfiber_core::bandwidth::{
+    Answer, Cap, Capacity, Held, Holding, Metered, Pauses, Pausing, Reached, Sharing,
+};
 use lemonfiber_core::bytes::{a_second, humanize};
 
 use super::Lines;
@@ -166,6 +168,36 @@ fn direction(way: &str, held: &Held) -> Lines {
     ));
     if held.verdict.worth_saying() {
         lines.put(format!("      {}", held.verdict.means()));
+    }
+    lines
+}
+
+/// What pausing or resuming every download client came to, client by client.
+///
+/// Each client is shown with what it read back rather than with what it was asked,
+/// so one that went on fetching after a pause is named as fetching.
+pub(crate) fn pausing(report: &Pauses) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(match (report.rehearsed, report.asked) {
+        (true, Pausing::Pause) => "Pausing every download client would ask:",
+        (true, Pausing::Resume) => "Resuming every download client would ask:",
+        (false, Pausing::Pause) => "Every download client was asked to pause:",
+        (false, Pausing::Resume) => "Every download client was asked to resume:",
+    });
+    for client in &report.clients {
+        let said = match (&client.unreached, client.now, client.was) {
+            (Some(why), _, _) => format!("not reached — {why}"),
+            (None, Some(now), _) => now.means().to_owned(),
+            (None, None, Some(was)) => format!("{} now", was.means()),
+            (None, None, None) => "said nothing about what it is doing".to_owned(),
+        };
+        lines.put(format!("  {:12} {said}", client.client));
+    }
+    if let Some(caution) = report.caution.as_deref() {
+        lines.spaced(caution);
+    }
+    if !report.whole() {
+        lines.spaced("Not every client ended up where it was asked to be.");
     }
     lines
 }

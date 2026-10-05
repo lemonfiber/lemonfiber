@@ -278,6 +278,8 @@ codes! {
         UNREADABLE = "RATE-3",
         /// Raised when there is no download client to limit.
         NOTHING_TO_LIMIT = "RATE-4",
+        /// Raised when there is no download client to pause or resume.
+        NOTHING_TO_PAUSE = "RATE-5",
     }
     /// The `REISSUE` codes.
     reissue {

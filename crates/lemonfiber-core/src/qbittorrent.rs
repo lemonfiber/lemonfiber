@@ -23,8 +23,8 @@ use crate::endpoint::{describe, form_content_type, form_encoded, Endpoint};
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Download, Failure, Seeded, Seeding, Transfers};
 
-/// The service name a failure is reported against.
-const SERVICE: &str = "qbittorrent";
+/// The name the stack knows this client under, which a failure is reported against.
+pub(crate) const SERVICE: &str = "qbittorrent";
 
 /// The status qBittorrent answers a read with when the session it carries is not
 /// signed in.

@@ -10360,6 +10360,147 @@
         }
       }
     },
+    "pausing": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/PausingReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "PausedClient": {
+          "description": "What one download client said about being paused or resumed.",
+          "type": "object",
+          "properties": {
+            "client": {
+              "description": "The client, by the name the stack knows it under.",
+              "type": "string"
+            },
+            "now": {
+              "description": "What it read back after it was asked. Absent on a rehearsal, which asks nothing,\nand where the client could not be reached.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Pulling"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unreached": {
+              "description": "Why it could not be reached, in its own words where it gave any.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "was": {
+              "description": "Whether it was fetching before it was asked, where it said.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Pulling"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "client"
+          ]
+        },
+        "Pausing": {
+          "description": "Which of the two was asked for.",
+          "oneOf": [
+            {
+              "description": "Stop every download client fetching.",
+              "type": "string",
+              "const": "pause"
+            },
+            {
+              "description": "Let every download client fetch again.",
+              "type": "string",
+              "const": "resume"
+            }
+          ]
+        },
+        "PausingReport": {
+          "description": "What pausing or resuming every download client came to.",
+          "type": "object",
+          "properties": {
+            "asked": {
+              "description": "Which of the two was asked for.",
+              "$ref": "#/$defs/Pausing"
+            },
+            "caution": {
+              "description": "What a resume runs into where a spent cap had stopped the clients: they are let\ngo as asked, and the cap stops them again the next time the line is checked.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "clients": {
+              "description": "Every download client the stack runs, in the order the stack declares them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PausedClient"
+              }
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what each client is doing now, with nothing asked\nof any of them.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "asked",
+            "clients",
+            "rehearsed"
+          ]
+        },
+        "Pulling": {
+          "description": "Whether a client is fetching at all, where a cap made it a question.\n\nApart from the limits above rather than folded in with them, because it answers\na different question and a client held to a crawl is not a client that stopped.\nA word that named both would be the vocabulary this whole path exists to avoid.",
+          "oneOf": [
+            {
+              "description": "It is fetching, or would start on the next thing handed to it.",
+              "type": "string",
+              "const": "fetching"
+            },
+            {
+              "description": "Nothing is moving and nothing new would start.",
+              "type": "string",
+              "const": "stopped"
+            }
+          ]
+        }
+      }
+    },
     "plugins": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",

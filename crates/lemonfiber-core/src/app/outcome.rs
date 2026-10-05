@@ -174,6 +174,8 @@ outcomes! {
     StopSeeding(crate::space::Letting) => STOP_SEEDING [rehearsed],
     /// How the line is shared, what that costs, and whether the clients keep to it.
     Bandwidth(crate::bandwidth::Sharing) => BANDWIDTH [rehearsed],
+    /// What pausing or resuming every download client came to, client by client.
+    Pausing(crate::bandwidth::Pauses) => PAUSING [rehearsed],
     /// What each service is doing.
     Status(StatusReport) => STATUS,
     /// What the diagnostic checks found.

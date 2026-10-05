@@ -583,3 +583,26 @@ fn adopting_and_rehearsing_it_both_exit_successfully() {
         std::process::ExitCode::SUCCESS
     );
 }
+
+#[test]
+fn a_pause_a_client_did_not_take_is_not_reported_as_a_pause() {
+    use lemonfiber_core::bandwidth::{Paused, Pauses, Pausing, Pulling};
+    let report = |now: Option<Pulling>, rehearsed: bool| {
+        Outcome::Pausing(Pauses {
+            asked: Pausing::Pause,
+            clients: vec![Paused {
+                client: "qbittorrent".to_owned(),
+                was: Some(Pulling::Fetching),
+                now,
+                unreached: None,
+            }],
+            caution: None,
+            rehearsed,
+        })
+    };
+    let succeeded = std::process::ExitCode::SUCCESS;
+    assert_eq!(settled(&report(Some(Pulling::Stopped), false)), succeeded);
+    assert_ne!(settled(&report(Some(Pulling::Fetching), false)), succeeded);
+    assert_ne!(settled(&report(None, false)), succeeded);
+    assert_eq!(settled(&report(None, true)), succeeded);
+}

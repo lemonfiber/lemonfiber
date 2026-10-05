@@ -207,11 +207,10 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
     }
     // Built from the finished report rather than by each renderer, because what a
     // report explains is a property of what it ended up saying — a renderer that
-    // had to remember to do this would be a renderer that could forget.
-    //
-    // After the `json` return, never before it: a footnote is prose for a person,
-    // and appending it to a machine-readable answer would corrupt the one thing
-    // that answer exists to be.
+    // had to remember to do this would be a renderer that could forget. After the
+    // `json` return, never before it: a footnote is prose for a person, and appending
+    // it to a machine-readable answer would corrupt the one thing that answer exists
+    // to be.
     let notes = glossary::footnotes(&lines.text(), glossary::wanted(), glossary::known());
     lines.extend(notes);
     lines
@@ -266,6 +265,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Space(report) => space::reckoning(report),
         Outcome::StopSeeding(offer) => space::letting(offer),
         Outcome::Bandwidth(report) => bandwidth::sharing(report),
+        Outcome::Pausing(report) => bandwidth::pausing(report),
         Outcome::Lifecycle(report) => stack::lifecycle(report),
         Outcome::Status(report) => stack::status(report),
         Outcome::Doctor(report) => doctor::diagnosis(report),

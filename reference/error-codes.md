@@ -166,6 +166,7 @@ what to do about it, is written for operators at
 - `RATE-2`
 - `RATE-3`
 - `RATE-4`
+- `RATE-5`
 - `READ-1`
 - `READ-2`
 - `READ-3`
