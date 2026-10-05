@@ -112,3 +112,16 @@ fn a_stray_approval_is_repeated_with_nothing_a_terminal_obeys() {
         problem.summary.contains("token[2J@elsewhere") && !problem.summary.contains('\u{1b}')
     }));
 }
+
+/// The plugin, which a stranger writes, is sealed rather than checksummed; and it is
+/// sealed over the bytes that were read, so a manifest read differently names another
+/// offer.
+#[test]
+fn the_plugin_is_sealed_over_the_bytes_that_were_read() {
+    let would = crate::test_support::an_installed("komga", Vec::new());
+    let offer = super::installing("aaaa", &would, &[], &[]);
+    let plugin = offer.split('-').next().unwrap_or_default();
+    assert_eq!(plugin.len(), 32, "{offer}");
+    let other = super::installing("bbbb", &would, &[], &[]);
+    assert_ne!(other.split('-').next(), Some(plugin));
+}

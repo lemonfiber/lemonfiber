@@ -157,6 +157,8 @@ what to do about it, is written for operators at
 - `PLUGIN-25`
 - `PLUGIN-26`
 - `PLUGIN-27`
+- `PLUGIN-29`
+- `PLUGIN-30`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

@@ -26,8 +26,9 @@ pub(super) struct Fetched<'a> {
     pub(super) url: &'a str,
     /// The one commit the named revision resolved to.
     pub(super) commit: &'a str,
-    /// What signed the catalogue index it was resolved through, where it was.
-    pub(super) signed: Option<&'a str>,
+    /// What the catalogue vouched for, where it was resolved through one: the manifest
+    /// the install reads is held to it, in the one read the install makes.
+    pub(super) vouched: Option<&'a Vouched<'a>>,
 }
 
 /// What the catalogue vouched for, which the fetched commit is held to.
@@ -52,7 +53,7 @@ pub(super) struct Fetching<'a> {
 /// at what it serves by default.
 ///
 /// Where the catalogue vouched for it, the manifest the commit holds has to be the one
-/// the catalogue reviewed before anything is read.
+/// the catalogue reviewed, which the install holds it to in the one read it makes.
 ///
 /// # Errors
 ///
@@ -79,36 +80,18 @@ pub(super) async fn fetched(
         return Err(Box::new(unfetched(url, &why.to_string())));
     }
     let result = match fetched_into(ctx, url, &commit, &into).await {
-        Ok(()) => match as_reviewed(&into, source.vouched).await {
-            Ok(()) => {
-                let from = Fetched {
-                    url,
-                    commit: &commit,
-                    signed: source.vouched.map(|vouched| vouched.signed),
-                };
-                super::carried(ctx, held, &into, Some(&from), errand, consent).await
-            }
-            Err(problem) => Err(problem),
-        },
+        Ok(()) => {
+            let from = Fetched {
+                url,
+                commit: &commit,
+                vouched: source.vouched,
+            };
+            super::carried(ctx, held, &into, Some(&from), errand, consent).await
+        }
         Err(problem) => Err(problem),
     };
     let _ = tokio::fs::remove_dir_all(&into).await;
     result
-}
-
-/// Whether the manifest a checkout holds is the one the catalogue reviewed, where the
-/// catalogue vouched for it at all.
-async fn as_reviewed(into: &Path, vouched: Option<&Vouched<'_>>) -> Result<(), Box<Problem>> {
-    let Some(vouched) = vouched else {
-        return Ok(());
-    };
-    let manifest = tokio::fs::read(into.join("plugin.toml"))
-        .await
-        .unwrap_or_default();
-    if vouched.entry.holds(&manifest) {
-        return Ok(());
-    }
-    Err(Box::new(super::cataloguing::not_as_reviewed(vouched.entry)))
 }
 
 /// The one commit a revision names on a source, or the one it serves by default.

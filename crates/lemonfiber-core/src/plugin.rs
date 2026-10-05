@@ -68,7 +68,7 @@ use thiserror::Error;
 use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
-    claimed, read, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
+    claimed, read, read_digested, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
     FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use container::{profile, written};

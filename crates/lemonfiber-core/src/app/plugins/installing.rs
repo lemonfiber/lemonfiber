@@ -63,7 +63,7 @@ pub(super) async fn install(
     from: Option<&Fetched<'_>>,
     consent: &Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let manifest = accepted(path)?;
+    let (manifest, digest) = accepted(path, from)?;
 
     // One stamp for the run, taken before anything is decided, so the record says it
     // was installed at the moment its changes are journalled under. A plugin fetched
@@ -91,7 +91,7 @@ pub(super) async fn install(
     let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
     let contests = standing::contested(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
-    let offer = offering::installing(&manifest, &would, &changes, &contests);
+    let offer = offering::installing(&digest, &would, &changes, &contests);
     let acting = offering::acting(
         ctx,
         consent,
@@ -217,8 +217,8 @@ pub(super) fn settled(
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);
             (
-                match fetched.signed {
-                    Some(signed) => fetched_at.vouched(signed),
+                match fetched.vouched {
+                    Some(vouched) => fetched_at.vouched(vouched.signed),
                     None => fetched_at,
                 },
                 PathBuf::from(fetched.url),
@@ -228,21 +228,33 @@ pub(super) fn settled(
     }
 }
 
-/// The manifest at this path, read and held to everything this build refuses.
+/// The manifest at this path, read and held to everything this build refuses, and the
+/// SHA-256 of the bytes it was read from.
 ///
 /// One gate for an install and an update, so a version an update brings on is refused
 /// for exactly what an install of it would be. A refusal is total: none of a refused
-/// manifest is acted on.
+/// manifest is acted on. Where the catalogue vouched for the source, the bytes read
+/// here are the ones held to what it reviewed, so what is checked and what is installed
+/// are one read and not two.
 ///
 /// # Errors
 ///
-/// Where the path holds no manifest this build can read, or one it refuses.
-pub(super) fn accepted(path: &Path) -> Result<lemonfiber_plugin::Manifest, Box<Problem>> {
-    let manifest =
-        crate::plugin::read(path).map_err(|unreadable| Box::new(unreadable_source(&unreadable)))?;
+/// Where the path holds no manifest this build can read, where the catalogue vouched
+/// for a different one, or where this build refuses it.
+pub(super) fn accepted(
+    path: &Path,
+    from: Option<&Fetched<'_>>,
+) -> Result<(lemonfiber_plugin::Manifest, String), Box<Problem>> {
+    let (manifest, digest) = crate::plugin::read_digested(path)
+        .map_err(|unreadable| Box::new(unreadable_source(&unreadable)))?;
+    if let Some(vouched) = from.and_then(|fetched| fetched.vouched) {
+        if !vouched.entry.reviewed(&digest) {
+            return Err(Box::new(super::cataloguing::not_as_reviewed(vouched.entry)));
+        }
+    }
     let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     if refusals.is_empty() {
-        Ok(manifest)
+        Ok((manifest, digest))
     } else {
         Err(Box::new(refused(&manifest.plugin.id, &refusals)))
     }

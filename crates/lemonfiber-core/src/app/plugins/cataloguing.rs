@@ -7,6 +7,9 @@
 //! key are refused alike, before the name is looked up, and nothing is fetched from any
 //! origin it names.
 //!
+//! **Nothing is resolved through a release the catalogue replaced.** An index older
+//! than the newest one this machine has verified is refused, though it verifies.
+//!
 //! **What is installed is what was reviewed.** The index names one commit and the
 //! digest of the manifest there; the commit is fetched and its manifest held to that
 //! digest before the install reads a line of it. What the origin serves by default
@@ -43,7 +46,8 @@ const HOPS: usize = 3;
 ///
 /// Where asking the catalogue is switched off, where its index or signature cannot be
 /// fetched, where the signature does not verify or there is no key to verify it
-/// against, where the index cannot be read, where it holds no plugin by that name,
+/// against, where the index cannot be read, where it is older than the newest one this
+/// machine verified or that cannot be known, where it holds no plugin by that name,
 /// where the commit it names holds a manifest other than the one it reviewed, and every
 /// refusal the errand makes over a git source.
 pub(super) async fn resolved(
@@ -75,6 +79,14 @@ pub(super) async fn resolved(
                 Refused::Unreadable(why) => unreadable(&why),
             })
         },
+    )?;
+    // Before the name is looked up: a release the catalogue replaced still verifies, and
+    // what it reviewed may have been withdrawn since. Remembered only by a run that acts,
+    // because a reading and a rehearsal write nothing.
+    super::newest::held(
+        ctx,
+        read.serial(),
+        !ctx.dry_run && consent.agreement.is_some(),
     )?;
     let entry = read
         .entry(name)

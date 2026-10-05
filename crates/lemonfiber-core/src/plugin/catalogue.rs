@@ -53,6 +53,8 @@ pub fn carried() -> Option<Key> {
 pub struct Index {
     /// The shape it is written in.
     schema: u32,
+    /// Which release of the catalogue it is, raised by each release above the last.
+    serial: u64,
     /// One entry per registered plugin.
     plugins: Vec<Entry>,
 }
@@ -71,6 +73,12 @@ pub struct Entry {
 }
 
 impl Index {
+    /// Which release of the catalogue it is.
+    #[must_use]
+    pub const fn serial(&self) -> u64 {
+        self.serial
+    }
+
     /// The entry for one name, where the index holds one.
     #[must_use]
     pub fn entry(&self, id: &str) -> Option<&Entry> {
@@ -82,9 +90,16 @@ impl Entry {
     /// Whether a manifest's bytes are the ones this entry's digest names.
     #[must_use]
     pub fn holds(&self, manifest: &[u8]) -> bool {
-        let taken =
-            crate::secret::render(ring::digest::digest(&ring::digest::SHA256, manifest).as_ref());
-        self.manifest == format!("{DIGEST}{taken}")
+        self.reviewed(&crate::secret::render(
+            ring::digest::digest(&ring::digest::SHA256, manifest).as_ref(),
+        ))
+    }
+
+    /// Whether a manifest whose SHA-256 is `digest`, in lower-case hexadecimal, is the
+    /// one this entry's digest names.
+    #[must_use]
+    pub fn reviewed(&self, digest: &str) -> bool {
+        self.manifest == format!("{DIGEST}{digest}")
     }
 
     /// Whether its revision is one whole commit, which is the only thing an index may

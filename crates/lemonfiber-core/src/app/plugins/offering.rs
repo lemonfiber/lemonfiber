@@ -56,42 +56,41 @@ pub struct Consent {
 }
 
 /// What an install is offered as: the plugin, what it would write, what it would leave
-/// contested, and what it would send where.
+/// contested, and what it would send where. `read` is the SHA-256 of the manifest's
+/// bytes as they were read.
 pub(super) fn installing(
-    manifest: &lemonfiber_plugin::Manifest,
+    read: &str,
     would: &Installed,
     changes: &[Changing],
     contests: &[Contest],
 ) -> String {
-    let plugin = the_plugin(manifest, would);
-    let wrote = json(changes);
-    let contested = json(contests);
     let sent = crate::plugin::approvals(&would.recipes).join("\n");
-    crate::agreement::parted(&[&[&plugin], &[&wrote], &[&contested], &[&sent]])
+    crate::agreement::joined(&[
+        the_plugin(read, would),
+        crate::agreement::over(&[&json(changes)]),
+        crate::agreement::over(&[&json(contests)]),
+        crate::agreement::over(&[&sent]),
+    ])
 }
 
 /// What an update is offered as: an install's parts, with the version it replaces and
 /// what it would stop.
 pub(super) fn updating(
-    manifest: &lemonfiber_plugin::Manifest,
+    read: &str,
     was: &Installed,
     would: &Installed,
     changes: &[Changing],
     contests: &[Contest],
 ) -> String {
-    let plugin = the_plugin(manifest, would);
-    let replaces = json(was);
-    let wrote = json(changes);
-    let contested = json(contests);
     let stops = stopping(was).join("\n");
     let sent = crate::plugin::approvals(&would.recipes).join("\n");
-    crate::agreement::parted(&[
-        &[&plugin],
-        &[&replaces],
-        &[&wrote],
-        &[&contested],
-        &[&stops],
-        &[&sent],
+    crate::agreement::joined(&[
+        the_plugin(read, would),
+        crate::agreement::over(&[&json(was)]),
+        crate::agreement::over(&[&json(changes)]),
+        crate::agreement::over(&[&json(contests)]),
+        crate::agreement::over(&[&stops]),
+        crate::agreement::over(&[&sent]),
     ])
 }
 
@@ -159,15 +158,21 @@ pub(super) fn acting(
     Ok(!ctx.dry_run)
 }
 
-/// The plugin as an operator reads it: everything its manifest says, and where it came
-/// from. The moment it would be recorded at is left out, because it is a fact about
-/// the run rather than about the plugin.
-fn the_plugin(manifest: &lemonfiber_plugin::Manifest, would: &Installed) -> String {
+/// The plugin as an operator reads it, sealed: the bytes of its manifest as they were
+/// read, and what installing it would record, which names where it came from. The
+/// moment it would be recorded at is left out, because it is a fact about the run
+/// rather than about the plugin.
+///
+/// Sealed rather than checksummed, because this is the one part a stranger writes: a
+/// manifest rewritten after it was read, to answer to the offer the original was read
+/// under, would otherwise be installed on the strength of an agreement to a different
+/// file.
+fn the_plugin(read: &str, would: &Installed) -> String {
     let source = Installed {
         installed_at: String::new(),
         ..would.clone()
     };
-    format!("{manifest:?}\n{}", json(&source))
+    crate::agreement::sealed(&[read, &json(&source)])
 }
 
 /// A value as words an offer can be named over.

@@ -79,6 +79,38 @@ pub fn over(words: &[&str]) -> String {
     format!("{:08x}", hasher.finalize())
 }
 
+/// How many bytes of a SHA-256 digest a sealed part keeps.
+///
+/// Half of it: a hundred and twenty-eight bits is far past anything a forger could
+/// search for a second reading that names alike, and thirty-two characters still
+/// travel in a request body and read back in a log.
+const SEALED: usize = 16;
+
+/// A digest over words somebody other than the operator wrote, so that a reading
+/// forged to name alike is as hard to make as one that is the same.
+///
+/// [`over`] notices a change nobody meant, and that is enough where what was read is
+/// this machine's own state. It is not enough where it is a stranger's file: a
+/// checksum can be steered, so a file rewritten with that in mind would answer to the
+/// offer the original was read under. The words are ended as [`over`] ends them.
+#[must_use]
+pub fn sealed(words: &[&str]) -> String {
+    let mut context = ring::digest::Context::new(&ring::digest::SHA256);
+    for word in words {
+        context.update(word.as_bytes());
+        context.update(&[0]);
+    }
+    let digest = context.finish();
+    crate::secret::render(digest.as_ref().get(..SEALED).unwrap_or_default())
+}
+
+/// An offer from parts already named, each by [`over`] or [`sealed`], in the order
+/// given.
+#[must_use]
+pub fn joined(names: &[String]) -> String {
+    names.join(&BETWEEN.to_string())
+}
+
 /// What joins the parts of an offer that names each part it was built from.
 const BETWEEN: char = '-';
 
@@ -90,11 +122,12 @@ const BETWEEN: char = '-';
 /// has to read the whole offer again to find what; this says what.
 #[must_use]
 pub fn parted(parts: &[&[&str]]) -> String {
-    parts
-        .iter()
-        .map(|words| over(words))
-        .collect::<Vec<String>>()
-        .join(&BETWEEN.to_string())
+    joined(
+        &parts
+            .iter()
+            .map(|words| over(words))
+            .collect::<Vec<String>>(),
+    )
 }
 
 /// Which parts of an offer differ between the one answered and the one standing,

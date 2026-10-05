@@ -90,3 +90,28 @@ fn an_answer_of_another_shape_differs_in_every_part() {
     assert_eq!(differs("0badc0de", &standing, &names), vec!["one", "two"]);
     assert_eq!(differs("", &standing, &names), vec!["one", "two"]);
 }
+
+/// Two words a checksum cannot tell apart, which is why a stranger's file is sealed.
+#[test]
+fn a_seal_tells_apart_what_a_checksum_cannot() {
+    assert_eq!(super::over(&["plumless"]), super::over(&["buckeroo"]));
+    assert_ne!(super::sealed(&["plumless"]), super::sealed(&["buckeroo"]));
+}
+
+#[test]
+fn a_seal_is_thirty_two_characters_and_ends_each_word() {
+    let seal = super::sealed(&["plugin", "toml"]);
+    assert_eq!(seal.len(), 32);
+    assert!(seal.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    assert_ne!(seal, super::sealed(&["plugint", "oml"]));
+}
+
+#[test]
+fn an_offer_joined_from_named_parts_reads_back_part_by_part() {
+    let offer = super::joined(&[super::sealed(&["a"]), super::over(&["b"])]);
+    let standing = super::joined(&[super::sealed(&["a"]), super::over(&["c"])]);
+    assert_eq!(
+        super::differs(&offer, &standing, &["sealed", "checked"]),
+        ["checked"]
+    );
+}

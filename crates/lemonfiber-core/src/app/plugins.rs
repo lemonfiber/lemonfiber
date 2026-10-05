@@ -59,6 +59,8 @@ mod fetching;
 mod cataloguing;
 // What is installed, read off the record alone or with each source asked.
 mod listing;
+// The newest catalogue index this machine verified, and the refusal of any older.
+mod newest;
 // Installing from a directory: what it settles, its offer, and its writes and proofs.
 mod installing;
 // The yes to an install, an update or a removal, and the approval of what a recipe sends.

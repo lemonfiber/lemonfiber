@@ -369,3 +369,30 @@ async fn an_install_answering_a_reading_that_moved_writes_nothing() {
     assert!(said.contains("the plugin"), "it names what moved: {said}");
     assert_eq!(made_paths(&ctx), Vec::<String>::new());
 }
+
+/// The yes is to the bytes that were read. A source rewritten between the reading and
+/// the answer is refused even where the rewrite parses to the same plugin, because what
+/// the operator agreed to is the file they were shown and not whatever reads alike.
+#[tokio::test]
+async fn an_install_whose_source_was_rewritten_after_the_reading_is_refused() {
+    let ctx = ctx("install-rewritten");
+    let at = source("install-rewritten", MANIFEST);
+    let asked = |consent| Asked::Install {
+        source: crate::plugin::Source::Path(at.clone()),
+        consent,
+    };
+    let reading = plugins(&ctx, &asked(crate::app::plugins::Consent::default())).await;
+    let offer = reading.ok().and_then(|reading| reading.agreement);
+    assert!(offer.is_some(), "the reading named its offer");
+
+    let rewritten = format!("# rewritten after it was read\n{MANIFEST}");
+    assert!(std::fs::write(at.join("plugin.toml"), rewritten).is_ok());
+    let answered = crate::app::plugins::Consent {
+        agreement: offer,
+        approved: Vec::new(),
+    };
+    let (code, said) = refused(plugins(&ctx, &asked(answered)).await);
+    assert_eq!(code, "PLUGIN-25");
+    assert!(said.contains("the plugin"), "it names what moved: {said}");
+    assert_eq!(made_paths(&ctx), Vec::<String>::new());
+}

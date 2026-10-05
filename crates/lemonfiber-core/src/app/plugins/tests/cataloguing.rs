@@ -22,12 +22,18 @@ fn digest_of(manifest: &str) -> String {
     format!("sha256:{taken}")
 }
 
-/// An index registering komga at `revision`, with the digest of `manifest`.
+/// An index registering komga at `revision`, with the digest of `manifest`, as the
+/// catalogue's first release.
 fn index(revision: &str, manifest: &str) -> String {
+    released(1, revision, manifest)
+}
+
+/// The same, as the catalogue release numbered `serial`.
+fn released(serial: u64, revision: &str, manifest: &str) -> String {
     format!(
         "{{\n  \"plugins\": [\n    {{\n      \"id\": \"komga\",\n      \"manifest\": \"{}\",\n      \
          \"origin\": \"{ORIGIN}\",\n      \"revision\": \"{revision}\"\n    }}\n  ],\n  \
-         \"schema\": 1\n}}\n",
+         \"schema\": 1,\n  \"serial\": {serial}\n}}\n",
         digest_of(manifest)
     )
 }
@@ -377,5 +383,130 @@ async fn a_hop_that_is_unencrypted_or_endless_is_refused() {
 
         assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-19", "{name}");
         assert_eq!(handing.asked().len(), asked, "{name}");
+    }
+}
+
+/// Where the newest index this machine verified is remembered.
+fn newest(ctx: &Ctx) -> std::path::PathBuf {
+    ctx.settings
+        .env_file
+        .as_deref()
+        .map(|env| env.with_file_name(crate::config::paths::CATALOGUE))
+        .unwrap_or_default()
+}
+
+/// A release the catalogue has replaced still verifies, and is refused once this
+/// machine has verified a newer one: nothing is resolved through it and no origin is
+/// fetched from.
+#[tokio::test]
+async fn an_index_older_than_one_this_machine_verified_resolves_nothing() {
+    let signing = Signing::new();
+    assert!(signing.is_some(), "no key pair could be made");
+    if let Some(signing) = signing {
+        let newer = released(5, REVIEWED, MANIFEST);
+        let (ctx, _) = cataloguing(
+            "catalogue-newer",
+            release(&newer, Some(signing.signed(&newer))),
+            signing.key(),
+        );
+        assert_eq!(counted(by_name(&ctx, "komga").await), Some(1));
+
+        let older = released(4, REVIEWED, MANIFEST);
+        let (mut replayed, serving) = cataloguing(
+            "catalogue-older",
+            release(&older, Some(signing.signed(&older))),
+            signing.key(),
+        );
+        replayed.settings = ctx.settings.clone();
+        assert_eq!(refusal(by_name(&replayed, "komga").await), "PLUGIN-29");
+        assert!(serving.asked().is_empty(), "{:?}", serving.asked());
+    }
+}
+
+/// A record of the newest index that cannot be read is not read as none: nothing is
+/// resolved until it can be, because a replaced release would otherwise verify.
+#[tokio::test]
+async fn an_unreadable_record_of_the_newest_index_resolves_nothing() {
+    let signing = Signing::new();
+    assert!(signing.is_some(), "no key pair could be made");
+    if let Some(signing) = signing {
+        let listed = index(REVIEWED, MANIFEST);
+        let (ctx, serving) = cataloguing(
+            "catalogue-unremembered",
+            release(&listed, Some(signing.signed(&listed))),
+            signing.key(),
+        );
+        assert!(std::fs::write(newest(&ctx), "not a record").is_ok());
+        assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-30");
+        assert!(serving.asked().is_empty(), "{:?}", serving.asked());
+        assert_eq!(
+            read(&newest(&ctx)),
+            "not a record",
+            "and it is left as it was"
+        );
+    }
+}
+
+/// A reading and a rehearsal remember nothing: the newest index is recorded by a run
+/// that answers an offer, and by no other.
+#[tokio::test]
+async fn only_a_run_that_acts_remembers_the_newest_index() {
+    let signing = Signing::new();
+    assert!(signing.is_some(), "no key pair could be made");
+    if let Some(signing) = signing {
+        let listed = released(3, REVIEWED, MANIFEST);
+        let (mut ctx, _) = cataloguing(
+            "catalogue-remembered",
+            release(&listed, Some(signing.signed(&listed))),
+            signing.key(),
+        );
+        let reading = Asked::Install {
+            source: Source::named("komga"),
+            consent: crate::app::plugins::Consent::default(),
+        };
+        assert!(plugins(&ctx, &reading).await.is_ok());
+        assert!(!newest(&ctx).exists(), "a reading remembered an index");
+        ctx.dry_run = true;
+        assert!(report(by_name(&ctx, "komga").await).is_some());
+        assert!(!newest(&ctx).exists(), "a rehearsal remembered an index");
+        ctx.dry_run = false;
+        assert_eq!(counted(by_name(&ctx, "komga").await), Some(1));
+        assert!(read(&newest(&ctx)).contains('3'), "{}", read(&newest(&ctx)));
+    }
+}
+
+/// A machine with nowhere to keep the record, and one that cannot write it, resolve
+/// nothing: either would leave the next replaced release free to verify.
+#[tokio::test]
+async fn a_newest_index_that_cannot_be_kept_resolves_nothing() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let signing = Signing::new();
+    assert!(signing.is_some(), "no key pair could be made");
+    if let Some(signing) = signing {
+        let listed = index(REVIEWED, MANIFEST);
+        let (mut nowhere, _) = cataloguing(
+            "catalogue-nowhere",
+            release(&listed, Some(signing.signed(&listed))),
+            signing.key(),
+        );
+        nowhere.settings.env_file = None;
+        assert_eq!(refusal(by_name(&nowhere, "komga").await), "PLUGIN-30");
+
+        let (ctx, _) = cataloguing(
+            "catalogue-unwritable",
+            release(&listed, Some(signing.signed(&listed))),
+            signing.key(),
+        );
+        let config = newest(&ctx).parent().map(std::path::Path::to_path_buf);
+        let locked = |mode: u32| {
+            config.as_ref().is_some_and(|dir| {
+                std::fs::set_permissions(dir, std::fs::Permissions::from_mode(mode)).is_ok()
+            })
+        };
+        assert!(locked(0o555));
+        let refused = refusal(by_name(&ctx, "komga").await);
+        assert!(locked(0o755));
+        assert_eq!(refused, "PLUGIN-30");
     }
 }

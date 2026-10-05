@@ -256,6 +256,12 @@ codes! {
         /// Raised when the source an update names holds a different plugin from the one
         /// it was asked to update.
         ANOTHER_PLUGIN = "PLUGIN-27",
+        /// Raised when the catalogue's index verifies and is older than the newest one
+        /// this machine has verified.
+        CATALOGUE_REPLACED = "PLUGIN-29",
+        /// Raised when the record of the newest catalogue index this machine verified
+        /// cannot be read or written.
+        NEWEST_UNKEPT = "PLUGIN-30",
     }
     /// The `PROVIDER` codes.
     provider {

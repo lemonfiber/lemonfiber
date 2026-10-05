@@ -45,7 +45,7 @@ pub(crate) async fn update(
     from: Option<&super::fetching::Fetched<'_>>,
     consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let manifest = super::installing::accepted(path)?;
+    let (manifest, digest) = super::installing::accepted(path, from)?;
     // The plugin named and the plugin the source holds have to be the one plugin: an
     // update asked for one and carried out on another would replace something nobody
     // named with something nobody read.
@@ -80,7 +80,7 @@ pub(crate) async fn update(
         ctx,
         crate::plugin::writes(&would, stack),
     ));
-    let offer = super::offering::updating(&manifest, &was, &would, &changes, &contests);
+    let offer = super::offering::updating(&digest, &was, &would, &changes, &contests);
     let acting = super::offering::acting(
         ctx,
         consent,
