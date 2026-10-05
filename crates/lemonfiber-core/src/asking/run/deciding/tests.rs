@@ -9,6 +9,7 @@ fn asked(id: i64, request_status: u8, media_status: u8) -> HouseholdRequest {
         id,
         made: Some("2026-08-17T21:04:09".to_owned()),
         member: "Ana".to_owned(),
+        member_id: None,
         kind: Some(crate::recyclarr::Kind::Radarr),
         item: None,
         request_status,

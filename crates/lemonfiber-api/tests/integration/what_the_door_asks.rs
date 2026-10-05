@@ -77,61 +77,7 @@ async fn a_body_that_is_not_a_password_is_said_plainly_rather_than_counted() {
     assert_eq!(answer.status, StatusCode::BAD_REQUEST);
     assert!(answer.body.contains("not a password"), "{}", answer.body);
     // A request that was never an answer is not a wrong answer, so nothing is owed.
-    assert_eq!(admitting.attempts.waiting(moment()).await, None);
-}
-
-#[tokio::test]
-async fn wrong_answers_are_free_for_a_while_and_then_made_to_wait() {
-    let path = keeping("counted");
-    let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
-
-    // Three cost nothing, which is a mistyped password, a forgotten capital, and one
-    // more.
-    for _ in 0..3u8 {
-        admitting.attempts.wrong(moment()).await;
-    }
-    assert_eq!(admitting.attempts.waiting(moment()).await, None);
-
-    admitting.attempts.wrong(moment()).await;
-    let owed = admitting.attempts.waiting(moment()).await;
-    assert!(owed.is_some_and(|left| left > Duration::ZERO), "{owed:?}");
-
-    // And the wait ends, rather than the door staying shut.
-    assert_eq!(
-        admitting
-            .attempts
-            .waiting(moment() + Duration::from_secs(600))
-            .await,
-        None
-    );
-
-    // A right answer forgets them, so the next mistake starts from nothing again.
-    admitting.attempts.wrong(moment()).await;
-    admitting.attempts.right().await;
-    assert_eq!(admitting.attempts.waiting(moment()).await, None);
-    let _ = fs::remove_dir_all(a_directory("counted"));
-}
-
-/// Answers arriving together are counted before any of them is checked, so the free
-/// ones are free once each rather than once per request in flight.
-#[tokio::test]
-async fn answers_arriving_together_are_each_counted_before_any_is_checked() {
-    let path = keeping("counted-together");
-    let (_, _, admitting) = door(Some(path), Chance::cycling());
-
-    let taken =
-        futures_util::future::join_all((0..10u8).map(|_| admitting.attempts.taken(moment()))).await;
-
-    let let_through = taken.iter().filter(|one| one.is_ok()).count();
-    assert!(
-        let_through < 10,
-        "every one of ten at once was let through: {taken:?}"
-    );
-    assert!(
-        admitting.attempts.waiting(moment()).await.is_some(),
-        "ten answers at once earned no wait"
-    );
-    let _ = fs::remove_dir_all(a_directory("counted-together"));
+    assert_eq!(admitting.attempts.waiting(unnamed(), moment()).await, None);
 }
 
 /// Guessing at the door is what earns the wait, rather than a count a test set.

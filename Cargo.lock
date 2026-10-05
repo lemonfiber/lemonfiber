@@ -1379,6 +1379,7 @@ dependencies = [
  "color-eyre",
  "etcetera",
  "flate2",
+ "http-body",
  "hyper",
  "hyper-util",
  "include_dir",

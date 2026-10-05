@@ -33,6 +33,10 @@ lemonfiber-api = { workspace = true }
 axum = { workspace = true }
 hyper = { workspace = true }
 hyper-util = { workspace = true }
+# Each request on a connection carries where it came from and a deadline for its
+# body, set by wrapping the router per connection.
+http-body = { workspace = true }
+tower = { workspace = true, features = ["util"] }
 # Serving the web surface encrypted, when it is asked to be, with the certificate the
 # core keeps. Nothing turns it on by default.
 rustls = { workspace = true }
@@ -62,9 +66,6 @@ lemonfiber-testing = { workspace = true }
 # Reading the embedded stack's own declaration of itself. Already a build
 # dependency, and a build dependency is not on a test target's path.
 lemonfiber-manifest = { workspace = true }
-# Driving a router without a socket, so what a route answers is checked as a fact
-# rather than by starting a server to ask it.
-tower = { workspace = true, features = ["util"] }
 # Moving the clock a serving surface looks at the policy on, so a test proves the
 # looking rather than waiting for it. The feature is a test one and is declared here
 # rather than beside the runtime, so nothing shipped can reach it.

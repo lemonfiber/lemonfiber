@@ -359,3 +359,91 @@ async fn the_household_view_reads_the_requests_and_names_them_from_the_library()
     );
     assert_eq!(first.and_then(|request| request.state), Some(State::Here));
 }
+
+/// The name the request service shows is the requester's own to change, so a request
+/// carrying the media server's id is filed under that account whatever name it wears.
+#[test]
+fn a_request_is_filed_by_the_id_it_carries_and_not_the_name_it_shows() {
+    let renamed = HouseholdRequest {
+        member_id: Some("ID-SAM".to_owned()),
+        ..request("Alex", Some(Kind::Radarr), Some(7), (2, 5))
+    };
+    let whole = assembled(
+        vec![account("Alex", true), account("Sam", true)],
+        vec![renamed],
+        &unnamed(),
+        &titles(),
+        None,
+    );
+    let counts: Vec<(&str, usize)> = whole
+        .members
+        .iter()
+        .map(|member| (member.name.as_str(), member.requests.len()))
+        .collect();
+    assert_eq!(
+        counts,
+        vec![("Alex", 0), ("Sam", 1)],
+        "a request was filed under the name it showed"
+    );
+}
+
+#[test]
+fn a_member_narrowed_by_id_is_not_handed_a_request_that_only_wears_their_name() {
+    let renamed = HouseholdRequest {
+        member_id: Some("id-sam".to_owned()),
+        ..request("Alex", Some(Kind::Radarr), Some(7), (2, 5))
+    };
+    let theirs = assembled(
+        vec![account("Alex", true), account("Sam", true)],
+        vec![renamed],
+        &unnamed(),
+        &titles(),
+        Some("id-alex"),
+    );
+    assert_eq!(theirs.members.len(), 1);
+    assert!(
+        theirs
+            .members
+            .iter()
+            .all(|member| member.requests.is_empty()),
+        "a member was handed somebody else's request: {theirs:?}"
+    );
+}
+
+/// An id names one account. Looked for inside names as well, it would also find an
+/// account whose name happens to contain it, and hand that row to the member too.
+#[test]
+fn an_id_names_one_account_even_where_another_name_contains_it() {
+    let report = assembled(
+        vec![account("Alex", true), account("Kid-alex", true)],
+        Vec::new(),
+        &unnamed(),
+        &titles(),
+        Some("id-alex"),
+    );
+    let named: Vec<&str> = report
+        .members
+        .iter()
+        .map(|member| member.name.as_str())
+        .collect();
+    assert_eq!(named, vec!["Alex"], "an id found {named:?}");
+}
+
+/// A member's read does not name the people whose requests nobody holds an account for.
+#[test]
+fn a_narrowed_read_names_nobody_else() {
+    let report = assembled(
+        vec![account("Alex", true)],
+        vec![request("Gone", Some(Kind::Radarr), Some(7), (2, 5))],
+        &unnamed(),
+        &titles(),
+        Some("id-alex"),
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| !finding.contains("gone")),
+        "a member was told who else asked for something: {report:?}"
+    );
+}

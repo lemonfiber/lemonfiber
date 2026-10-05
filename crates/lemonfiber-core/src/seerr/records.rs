@@ -73,12 +73,18 @@ pub(super) struct MediaRecord {
     pub(super) external_service_id: Option<i64>,
 }
 
-/// The member who asked, under the display name Seerr shows them by.
+/// The member who asked: the name Seerr shows them by, and the media server's id for
+/// them where they signed in through it.
+///
+/// The name is the account's own to change, so it says who asked and the id is what
+/// tells whose request it is.
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct MemberRecord {
     #[serde(default)]
     pub(super) display_name: String,
+    #[serde(default)]
+    pub(super) jellyfin_user_id: Option<String>,
 }
 
 impl RequestRecord {
@@ -89,6 +95,7 @@ impl RequestRecord {
             id: self.id,
             made: self.created_at,
             member: self.requested_by.display_name,
+            member_id: self.requested_by.jellyfin_user_id,
             kind: match self.media_type.as_str() {
                 "tv" => Some(Kind::Sonarr),
                 "movie" => Some(Kind::Radarr),

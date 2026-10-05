@@ -166,6 +166,7 @@ pub(crate) async fn sent(
             admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs: Jobs::default(),
             live: Arc::clone(&live),
+            kept: Arc::default(),
         },
         Arc::new(Streaming {
             admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),

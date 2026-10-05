@@ -20,6 +20,7 @@
 //! per name in that table, and the two reads that answer with a stream and a file.
 
 mod bundle;
+pub mod kept;
 mod logs;
 pub mod table;
 
@@ -59,7 +60,7 @@ pub fn routes() -> Router<Serving> {
                     move |State(serving): State<Serving>,
                           caller: Caller,
                           RawQuery(query): RawQuery| async move {
-                        reading(&serving.ctx, &caller, read, query.as_deref()).await
+                        reading(&serving, &caller, read, query.as_deref()).await
                     },
                 ),
             )
@@ -75,7 +76,7 @@ pub fn routes() -> Router<Serving> {
 /// the command it comes to are one decision made in one place rather than one
 /// made per route.
 pub(crate) async fn reading(
-    ctx: &Ctx,
+    serving: &Serving,
     caller: &Caller,
     read: &str,
     query: Option<&str>,
@@ -88,9 +89,14 @@ pub(crate) async fn reading(
         // Ruled on between naming the command and carrying it out, so what is
         // carried out is what this caller may have — narrowed where they may have
         // part of it, and nothing where it is not theirs at all.
-        Ok(command) => match may(caller, command) {
-            Permitted::This(command) => carried_out(ctx, command).await,
-            Permitted::Nothing => Refusal::NotYours.answered(),
+        Ok(command) => match (may(caller, command), caller) {
+            // A member's household is the operator's whole reading narrowed to them,
+            // so it is kept a few seconds rather than read again at every asking.
+            (Permitted::This(command @ Command::Household { .. }), Caller::Member(id)) => {
+                serving.kept.read(&serving.ctx, id, command).await
+            }
+            (Permitted::This(command), _) => carried_out(&serving.ctx, command).await,
+            (Permitted::Nothing, _) => Refusal::NotYours.answered(),
         },
         Err(why) => why.answered(),
     }
@@ -101,19 +107,31 @@ pub(crate) async fn reading(
 /// The three calls a machine-readable command line makes, in the order it makes
 /// them, so the bytes a caller reads here are the bytes it would have piped.
 pub async fn carried_out(ctx: &Ctx, command: Command) -> Response {
+    let (status, body) = rendered(ctx, command).await;
+    enveloped(status, body)
+}
+
+/// Carry out a command, and the status and envelope it is answered with.
+pub(crate) async fn rendered(ctx: &Ctx, command: Command) -> (StatusCode, Option<String>) {
     match dispatch(command, ctx).await {
-        Ok(outcome) => enveloped(StatusCode::OK, outcome.envelope().to_json()),
-        Err(problem) => went_wrong(&problem),
+        Ok(outcome) => (StatusCode::OK, outcome.envelope().to_json()),
+        Err(problem) => failed(&problem),
     }
+}
+
+/// The failure a command reported, as the status and envelope it is answered with.
+fn failed(problem: &Problem) -> (StatusCode, Option<String>) {
+    (
+        refusing(problem),
+        Envelope::new(kind::ERROR, problem).to_json(),
+    )
 }
 
 /// The failure a command reported, in the envelope machine-readable output gives
 /// it, at the status the refusal warrants.
 pub(crate) fn went_wrong(problem: &Problem) -> Response {
-    enveloped(
-        refusing(problem),
-        Envelope::new(kind::ERROR, problem).to_json(),
-    )
+    let (status, body) = failed(problem);
+    enveloped(status, body)
 }
 
 /// The status a refusal warrants.

@@ -31,21 +31,23 @@
 
 pub mod admitted;
 pub mod attempts;
+pub mod remembered;
 pub mod sessions;
 
 use sessions::Opened;
 
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{ConnectInfo, FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::routing::post;
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
 use lemonfiber_core::admission::{self as credential, Credential};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::model::{kind, Envelope};
@@ -61,7 +63,7 @@ use crate::router::Serving;
 /// How many unpredictable bytes name one sign-in at the media server.
 const DEVICE_BYTES: usize = 16;
 
-pub use attempts::Attempts;
+pub use attempts::{Attempts, Door, Ticket};
 pub use sessions::Sessions;
 
 /// Where a password is exchanged for a session.
@@ -102,12 +104,27 @@ pub struct Admitting {
 pub trait HouseholdAtHand: Send + Sync {
     /// The household as it stands now, or nothing where there is none to ask.
     fn now(&self) -> Option<Arc<dyn Household>>;
+
+    /// Whether the household vouches for whoever holds this account now, having just
+    /// proved its password.
+    ///
+    /// Asked of the household rather than of the media server, because an invitation
+    /// claimed after it ran out signs in like any other account there: whether it was
+    /// taken up in time is what this program recorded offering, not anything the server
+    /// keeps.
+    fn vouches_for(&self, id: &str) -> bool;
 }
 
 /// One household, the same at every asking.
+///
+/// It keeps no record of what it offered, so it vouches for everybody it signs in.
 impl HouseholdAtHand for Arc<dyn Household> {
     fn now(&self) -> Option<Arc<dyn Household>> {
         Some(Arc::clone(self))
+    }
+
+    fn vouches_for(&self, _: &str) -> bool {
+        true
     }
 }
 
@@ -115,6 +132,10 @@ impl HouseholdAtHand for Arc<dyn Household> {
 impl HouseholdAtHand for Ctx {
     fn now(&self) -> Option<Arc<dyn Household>> {
         lemonfiber_core::app::members::household(self)
+    }
+
+    fn vouches_for(&self, id: &str) -> bool {
+        lemonfiber_core::app::members::vouched_for(self, id)
     }
 }
 
@@ -135,12 +156,31 @@ impl Admitting {
         self.kept.as_deref().and_then(credential::at)
     }
 
+    /// The credential as it stands now, read on a thread made for blocking.
+    ///
+    /// What [`Self::credential`] answers, for a caller on the worker that answers
+    /// requests: a read from disk there holds up every other request for as long as
+    /// the disk takes.
+    async fn credential_now(&self) -> Option<Credential> {
+        let kept = self.kept.clone()?;
+        tokio::task::spawn_blocking(move || credential::at(&kept))
+            .await
+            .ok()
+            .flatten()
+    }
+
+    /// The household as it stands now, where there is one to open.
+    async fn household_now(&self) -> Option<Arc<dyn Household>> {
+        opened(Arc::clone(self.household.as_ref()?)).await
+    }
+
     /// Who a name and a password prove somebody to be, or nothing.
     ///
     /// **Two doors, tried in order, and nothing chooses between them.** The machine's
     /// own password is checked first because it needs no network and no media server;
     /// what it does not match is offered to the household, which is what holds the
-    /// accounts everybody else signs in with.
+    /// accounts everybody else signs in with. A door the attempt's ticket leaves shut
+    /// is not tried at all.
     ///
     /// The cost is deliberate and is paid once here: a refusal cannot say which door
     /// was meant. It says the pair was not recognised, because the alternative is
@@ -149,21 +189,29 @@ impl Admitting {
     /// A household that could not be asked refuses rather than admitting. That is the
     /// safe direction and the honest one — nothing here proved anything, so nobody is
     /// let in on it.
-    async fn whoever(&self, given: &Given, random: &dyn Random) -> Option<Opened> {
+    async fn whoever(
+        &self,
+        given: &Given,
+        ticket: &Ticket,
+        random: &dyn Random,
+    ) -> Option<(Opened, Door)> {
         // Checked on a thread made for blocking: the hash is built to be slow, and run
         // on the worker that answers requests it would stall every other request for as
         // long as it takes, once per guess.
-        if let Some(held) = self.credential() {
-            let offered = given.password.clone();
-            let proved =
-                tokio::task::spawn_blocking(move || held.verifies(&offered).then_some(held))
-                    .await
-                    .ok()
-                    .flatten();
-            if let Some(held) = proved {
-                return Some(Opened::Operator(held));
+        if ticket.operator {
+            if let Some(held) = self.credential_now().await {
+                let offered = given.password.clone();
+                let proved =
+                    tokio::task::spawn_blocking(move || held.verifies(&offered).then_some(held))
+                        .await
+                        .ok()
+                        .flatten();
+                if let Some(held) = proved {
+                    return Some((Opened::Operator(held), Door::Operator));
+                }
             }
         }
+        let door = ticket.member.clone()?;
         let name = given.name.as_deref()?;
         // An account nobody has claimed yet has no password, and the media server
         // lets an empty one sign in to it. That is an invitation still waiting for
@@ -172,7 +220,8 @@ impl Admitting {
         if given.password.is_empty() {
             return None;
         }
-        let household = self.household.as_ref()?.now()?;
+        let at = Arc::clone(self.household.as_ref()?);
+        let household = opened(Arc::clone(&at)).await?;
 
         // A name for this sign-in at the server, fresh each time: the server keeps one
         // sign-in per account and device, so a second under one name would end the
@@ -185,10 +234,14 @@ impl Admitting {
                 let _ = write!(named, "{byte:02x}");
                 named
             });
-        (household.whoever(name, &given.password, &device).await)
+        let signed = household
+            .whoever(name, &given.password, &device)
+            .await
             .ok()
-            .flatten()
-            .map(Opened::Member)
+            .flatten()?;
+        vouched(at, &signed.id)
+            .await
+            .then_some((Opened::Member(signed), door))
     }
 
     /// Who the secret a request carried proves it to be, or nothing.
@@ -209,15 +262,16 @@ impl Admitting {
         if token.carried_by(offered) {
             return Knocking::Known(Caller::Machine);
         }
-        // The credential is offered rather than required: a machine keeping none
-        // still has member sessions to answer for, and reading its absence as
-        // *nobody is admitted* would sign out a household the day the operator
-        // deleted their own password.
-        match self
-            .sessions
-            .holds(offered, now, self.credential().as_ref())
-            .await
-        {
+        // The credential is read only for a session that was opened against one, so a
+        // request carrying nothing, or a secret this run never handed out, costs no
+        // read at all. Its absence is not *nobody is admitted*: a machine keeping none
+        // still has member sessions to answer for.
+        let opened = self.sessions.opened_for(offered, now).await;
+        let against = match &opened {
+            Some(Opened::Operator(_)) => self.credential_now().await,
+            Some(Opened::Member(_)) | None => None,
+        };
+        match opened.and_then(|opened| sessions::still(opened, against.as_ref())) {
             Some(Opened::Operator(_)) => Knocking::Known(Caller::Operator),
             // Re-read on every call, the way the operator's credential above it is.
             // A session is a claim about an identity and only the media server can
@@ -238,7 +292,7 @@ impl Admitting {
     /// media-server reboot and tell them their account had been removed, which is
     /// the same mistake the sign-in door is built to avoid one floor down.
     async fn still_standing(&self, signed: Signed) -> Knocking {
-        let Some(household) = self.household.as_ref().and_then(|at| at.now()) else {
+        let Some(household) = self.household_now().await else {
             // With no household to open there is nobody to ask whether this member
             // still stands, so the session is one this run cannot vouch for.
             return Knocking::Unconfirmed;
@@ -249,6 +303,26 @@ impl Admitting {
             Err(_) => Knocking::Unconfirmed,
         }
     }
+}
+
+/// The household `at` holds now, opened on a thread made for blocking.
+///
+/// Opening one reads the stack's manifest and its recorded password from disk, and the
+/// worker that answers requests is no place to wait on a disk.
+async fn opened(at: Arc<dyn HouseholdAtHand>) -> Option<Arc<dyn Household>> {
+    tokio::task::spawn_blocking(move || at.now())
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Whether the household `at` holds vouches for whoever holds this account, asked on a
+/// thread made for blocking: it reads what was offered from disk, and may write it back.
+async fn vouched(at: Arc<dyn HouseholdAtHand>, id: &str) -> bool {
+    let id = id.to_owned();
+    tokio::task::spawn_blocking(move || at.vouches_for(&id))
+        .await
+        .unwrap_or(false)
 }
 
 /// What the guard learned when somebody knocked.
@@ -343,23 +417,30 @@ pub fn here(headers: &HeaderMap, at: &Binding) -> bool {
 /// Exchange a password for a session.
 async fn opening(
     State(serving): State<Serving>,
+    connected: Option<Extension<ConnectInfo<SocketAddr>>>,
     given: Result<Json<Given>, JsonRejection>,
 ) -> Response {
     let Ok(Json(given)) = given else {
         return Refusal::NotAPassword.answered();
     };
     let now = serving.ctx.seams.clock.now();
-    if let Err(left) = serving.admitting.attempts.taken(now).await {
-        return waiting(left.as_secs().max(1));
-    }
-    let Some(who) = serving
+    let ticket = match serving
         .admitting
-        .whoever(&given, serving.ctx.seams.random.as_ref())
+        .attempts
+        .taken(peer(connected), given.name.as_deref(), now)
+        .await
+    {
+        Ok(ticket) => ticket,
+        Err(left) => return waiting(left.as_secs().max(1)),
+    };
+    let Some((who, door)) = serving
+        .admitting
+        .whoever(&given, &ticket, serving.ctx.seams.random.as_ref())
         .await
     else {
         return Refusal::NotThePassword.answered();
     };
-    serving.admitting.attempts.right().await;
+    serving.admitting.attempts.right(&ticket, door, now).await;
     let opened = serving
         .admitting
         .sessions
@@ -368,6 +449,17 @@ async fn opening(
     enveloped(
         StatusCode::OK,
         opened.and_then(|opened| Envelope::new(kind::ADMISSION, opened).to_json()),
+    )
+}
+
+/// The address a request came from.
+///
+/// A surface answered without a socket — a test, driving the router directly — has no
+/// address to name, and every request it answers counts as one caller.
+fn peer(connected: Option<Extension<ConnectInfo<SocketAddr>>>) -> IpAddr {
+    connected.map_or(
+        IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+        |Extension(ConnectInfo(at))| at.ip(),
     )
 }
 

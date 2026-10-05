@@ -570,13 +570,14 @@ async fn a_wait_from_before_a_gap_is_never_handed_to_a_client_that_comes_back() 
     );
 }
 
-/// A session voided while its stream is open ends the stream at the next thing said,
-/// rather than carrying on until the client next asks for something.
+/// A session voided while its stream is open ends the stream at the first thing said
+/// once the last yes has run out, rather than carrying on until the client next asks
+/// for something — and a busy stream is not asked before every single thing it says.
 ///
 /// Removing the kept password is what voids an operator's session, and it is the
 /// same check every other request meets.
 #[tokio::test(start_paused = true)]
-async fn a_stream_whose_session_is_voided_ends_at_the_next_thing_said() {
+async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     let named = "listener-session-voided";
     let kept = crate::door::keeping(named);
     let admitting = Arc::new(lemonfiber_api::admission::Admitting {
@@ -616,10 +617,17 @@ async fn a_stream_whose_session_is_voided_ends_at_the_next_thing_said() {
     say(&live, "while it stood").await;
     let heard = body.next().await.and_then(Result::ok);
     let _ = std::fs::remove_file(&kept);
+    say(&live, "just after it went").await;
+    let soon = body.next().await.and_then(Result::ok);
+    tokio::time::advance(lemonfiber_api::events::RECHECKED_EVERY).await;
     say(&live, "after it went").await;
     let after = body.next().await;
     let _ = std::fs::remove_dir_all(crate::door::a_directory(named));
 
     assert!(heard.is_some_and(|said| String::from_utf8_lossy(&said).contains("while it stood")));
+    assert!(
+        soon.is_some_and(|said| String::from_utf8_lossy(&said).contains("just after it went")),
+        "the stream asked again before every thing it said"
+    );
     assert!(after.is_none(), "a voided session was still told things");
 }

@@ -13,6 +13,7 @@ fn asked(id: i64) -> HouseholdRequest {
         id,
         made: Some(AT.to_owned()),
         member: "Ana".to_owned(),
+        member_id: None,
         kind: Some(crate::recyclarr::Kind::Radarr),
         item: None,
         request_status: 1,

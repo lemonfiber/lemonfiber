@@ -80,6 +80,7 @@ impl Run {
                 admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
                 jobs: Jobs::default(),
                 live: Arc::clone(&live),
+                kept: Arc::default(),
             },
             live,
         })

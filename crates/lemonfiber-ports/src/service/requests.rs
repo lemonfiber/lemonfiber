@@ -24,7 +24,13 @@ pub struct HouseholdRequest {
     /// on somebody is measured against, and what a counting period runs from.
     pub made: Option<String>,
     /// The member who asked, by the name the request service shows them under.
+    ///
+    /// A name for saying, not for telling people apart: the request service lets
+    /// anybody change the name it shows them by.
     pub member: String,
+    /// The id the media server files the member who asked under, where the request
+    /// service records one — which is how a request is told to be somebody's.
+    pub member_id: Option<String>,
     /// Which service files the media — television or film — or `None` where the
     /// request service names a media type this build does not know.
     pub kind: Option<crate::media::Kind>,

@@ -4,6 +4,7 @@
 //! a request carries and what a household answers, and two copies of that would
 //! answer the same question differently the first time one of them was updated.
 pub(crate) use std::fs;
+pub(crate) use std::net::{IpAddr, Ipv6Addr};
 pub(crate) use std::path::PathBuf;
 pub(crate) use std::sync::atomic::{AtomicBool, Ordering};
 pub(crate) use std::sync::Arc;
@@ -111,6 +112,7 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
         jobs: Jobs::default(),
         admitting: Arc::clone(admitting),
         live: Arc::clone(&live),
+        kept: Arc::default(),
     };
     let streaming = Arc::new(Streaming {
         token: Arc::clone(&token),
@@ -183,6 +185,50 @@ pub(crate) async fn asked(
     let Ok(request) = building.body(Body::from(body.to_owned())) else {
         unreachable!("the request a test writes is one that can be built")
     };
+    let Ok(response) = router.oneshot(request).await;
+    let status = response.status();
+    let left = response
+        .headers()
+        .get(RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let Ok(read) = to_bytes(response.into_body(), 64 * 1024).await else {
+        unreachable!("an answer this surface produces is one that can be read")
+    };
+    Answer {
+        status,
+        body: String::from_utf8_lossy(&read).into_owned(),
+        left,
+    }
+}
+
+/// Where a request comes from when the surface is driven without a socket.
+pub(crate) fn unnamed() -> IpAddr {
+    IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+}
+
+/// A device on the household network.
+pub(crate) fn a_device(last: u8) -> IpAddr {
+    IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, last))
+}
+
+/// A password offered at the door from `from`, as a connection from there carries it.
+pub(crate) async fn offered_from(router: axum::Router, from: IpAddr, body: &str) -> Answer {
+    let mut building = Request::builder()
+        .method("POST")
+        .uri(SESSION)
+        .header(header::CONTENT_TYPE, "application/json");
+    for (name, value) in from_here() {
+        building = building.header(name, value);
+    }
+    let Ok(mut request) = building.body(Body::from(body.to_owned())) else {
+        unreachable!("the request a test writes is one that can be built")
+    };
+    request
+        .extensions_mut()
+        .insert(axum::extract::ConnectInfo(std::net::SocketAddr::new(
+            from, 50_000,
+        )));
     let Ok(response) = router.oneshot(request).await;
     let status = response.status();
     let left = response

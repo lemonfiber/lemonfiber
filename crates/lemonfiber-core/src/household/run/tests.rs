@@ -57,6 +57,7 @@ fn request(
         id: 0,
         made: None,
         member: member.to_owned(),
+        member_id: None,
         kind,
         item,
         request_status: statuses.0,

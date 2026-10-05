@@ -1,27 +1,53 @@
 use std::time::Duration;
 
-use axum::routing::get;
+use axum::extract::ConnectInfo;
+use axum::routing::{get, post};
 use axum::Router;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 
-use super::{answering, Accepting, Limits};
+use super::{answering, Accepting, Limits, Shares};
 
 /// Tight bounds, so each case below takes a fraction of a second.
 const TIGHT: Limits = Limits {
     headers_within: Duration::from_millis(300),
-    at_once: 2,
+    body_within: Duration::from_millis(300),
+    shares: Shares {
+        at_once: 2,
+        each_peer: 2,
+        kept_for_here: 0,
+    },
     let_go: Duration::from_millis(300),
 };
 
-/// A surface with one route that answers and one that never finishes.
+/// A surface with one route that answers, one that never finishes, one that reads
+/// what it is sent and one that says where a request came from.
 fn surface() -> Router {
     Router::new()
         .route("/", get(|| async { "answered" }))
         .route(
             "/forever",
             get(|| async { std::future::pending::<&'static str>().await }),
+        )
+        .route(
+            "/read",
+            post(
+                |body: Result<String, axum::extract::rejection::StringRejection>| async move {
+                    match body {
+                        Ok(read) => format!("read {} bytes", read.len()),
+                        Err(why) => format!("not read: {why}"),
+                    }
+                },
+            ),
+        )
+        .route(
+            "/from",
+            get(
+                |ConnectInfo(from): ConnectInfo<std::net::SocketAddr>| async move {
+                    format!("from {}", from.ip())
+                },
+            ),
         )
 }
 
@@ -56,23 +82,28 @@ struct FailingOnce {
 
 #[async_trait::async_trait]
 impl Accepting for FailingOnce {
-    async fn accept(&self) -> std::io::Result<TcpStream> {
+    async fn accept(&self) -> std::io::Result<(TcpStream, std::net::SocketAddr)> {
         if !self.failed.swap(true, std::sync::atomic::Ordering::SeqCst) {
             return Err(std::io::Error::other("out of descriptors"));
         }
-        self.listener.accept().await.map(|(socket, _)| socket)
+        self.listener.accept().await
     }
 }
 
 /// What a plain request to `at` is answered with.
 async fn answer_at(at: std::net::SocketAddr) -> String {
+    sent(
+        at,
+        b"GET / HTTP/1.1\r\nhost: here\r\nconnection: close\r\n\r\n",
+    )
+    .await
+}
+
+/// What `at` answers these bytes with.
+async fn sent(at: std::net::SocketAddr, request: &[u8]) -> String {
     let mut answer = String::new();
     if let Ok(mut stream) = TcpStream::connect(at).await {
-        if stream
-            .write_all(b"GET / HTTP/1.1\r\nhost: here\r\nconnection: close\r\n\r\n")
-            .await
-            .is_ok()
-        {
+        if stream.write_all(request).await.is_ok() {
             let _ = stream.read_to_string(&mut answer).await;
         }
     }
@@ -153,7 +184,7 @@ async fn a_connection_past_the_ceiling_is_closed() {
         unreachable!("a loopback socket could not be bound");
     };
     let mut holding = Vec::new();
-    for _ in 0..limits.at_once {
+    for _ in 0..limits.shares.at_once {
         holding.push(TcpStream::connect(at).await);
     }
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -165,6 +196,56 @@ async fn a_connection_past_the_ceiling_is_closed() {
         "a connection past the ceiling was held"
     );
     assert!(holding.iter().all(Result::is_ok));
+}
+
+/// A body promised and sent a byte at a time is cut off rather than waited for.
+#[tokio::test]
+async fn a_body_that_never_finishes_arriving_is_cut_off() {
+    let Some((at, _stop, _running)) = serving(TIGHT).await else {
+        unreachable!("a loopback socket could not be bound");
+    };
+    let Ok(mut stream) = TcpStream::connect(at).await else {
+        unreachable!("the socket did not accept");
+    };
+    assert!(stream
+        .write_all(b"POST /read HTTP/1.1\r\nhost: here\r\ncontent-length: 2000000\r\n\r\nx")
+        .await
+        .is_ok());
+    let mut answer = String::new();
+    let read = tokio::time::timeout(Duration::from_secs(3), stream.read_to_string(&mut answer));
+    assert!(
+        read.await.is_ok(),
+        "a body that never arrived held its socket"
+    );
+    assert!(answer.contains("did not arrive in time"), "{answer}");
+}
+
+/// A body that does arrive in time is read whole.
+#[tokio::test]
+async fn a_body_that_arrives_in_time_is_read() {
+    let Some((at, _stop, _running)) = serving(TIGHT).await else {
+        unreachable!("a loopback socket could not be bound");
+    };
+    let answer = sent(
+        at,
+        b"POST /read HTTP/1.1\r\nhost: here\r\ncontent-length: 5\r\nconnection: close\r\n\r\nhello",
+    )
+    .await;
+    assert!(answer.contains("read 5 bytes"), "{answer}");
+}
+
+/// Every request carries where it came from, for the routes that count by address.
+#[tokio::test]
+async fn a_request_says_where_it_came_from() {
+    let Some((at, _stop, _running)) = serving(TIGHT).await else {
+        unreachable!("a loopback socket could not be bound");
+    };
+    let answer = sent(
+        at,
+        b"GET /from HTTP/1.1\r\nhost: here\r\nconnection: close\r\n\r\n",
+    )
+    .await;
+    assert!(answer.contains("from 127.0.0.1"), "{answer}");
 }
 
 /// Stopping lets go within its bound, whatever a connection is still doing.
