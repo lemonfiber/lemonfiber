@@ -288,6 +288,12 @@ codes! {
         /// it keeps, so some could not be reported.
         LOST = "GATE-2",
     }
+    /// The `DECLINE` codes.
+    decline {
+        /// Raised when the decline service's key was used later than anything the
+        /// service recorded doing with it.
+        UNEXPLAINED = "DECLINE-1",
+    }
     /// The `TELLING` codes.
     telling {
         /// Raised when the household is told about less than lemonfiber now sets out to tell

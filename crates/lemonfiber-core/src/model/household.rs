@@ -157,8 +157,9 @@ impl Restriction {
 pub enum MemberStanding {
     /// Offered, and the offer still stands: nobody has set a password yet.
     Invited,
-    /// Offered, and the offer ran out before anybody claimed it. The next invitation
-    /// takes it back.
+    /// Offered, and the offer ran out before anybody claimed it. The stack takes it back
+    /// within a minute: an account nobody was seen in is removed and still listed as
+    /// this until the next invitation, and a reset is switched off and kept.
     Expired,
     /// Offered, and the person refused it at its decline address. The account is kept,
     /// switched off, until the operator removes it or reissues it; no sweep takes it
@@ -167,9 +168,9 @@ pub enum MemberStanding {
     /// Claimed, and able to sign in.
     #[default]
     Active,
-    /// Switched off — by the operator, by the media server after too many wrong
-    /// passwords, or when a reset ran out unclaimed. The account and what they watched
-    /// are kept, and a reissue switches it back on.
+    /// Switched off — by the operator, or by the media server after too many wrong
+    /// passwords. The account and what they watched are kept, and a reissue switches
+    /// it back on.
     Suspended,
 }
 

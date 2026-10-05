@@ -25,7 +25,7 @@ mod password;
 mod sessions;
 mod setup;
 
-pub use keys::{DECLINE_APP, GATE_APP, SEERR_APP};
+pub use keys::{Dated, DECLINE_APP, GATE_APP, SEERR_APP};
 pub use sessions::Sessions;
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access

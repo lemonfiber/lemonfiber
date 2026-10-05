@@ -10,6 +10,7 @@ mod a_start_that_fell_short;
 mod an_expired_invitation_keeps_its_account;
 mod an_invitation_can_be_declined;
 mod an_invitation_sets_nobodys_password;
+mod an_invitation_taken_back_at_its_lapse;
 mod audiobookshelf;
 mod bandwidth;
 mod bazarr;

@@ -20,6 +20,7 @@ pub mod bindings;
 mod bundled;
 pub mod contributed;
 pub mod credentials;
+pub mod declining;
 pub(crate) mod deferred;
 pub mod environment;
 mod examining;

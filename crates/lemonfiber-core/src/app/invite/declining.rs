@@ -6,10 +6,10 @@
 //! directory. Offering the same person again mints a new token, so an older address
 //! stops declining anything.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use lemonfiber_sidecar::decline::{File, Invitation, Refusals, Table, TokenHash};
+use lemonfiber_sidecar::decline::{File, Invitation, Lapses, Outcome, Refusals, Table, TokenHash};
 
 use crate::app::Ctx;
 use crate::invitation::Offers;
@@ -43,6 +43,8 @@ pub(super) fn minted(ctx: &Ctx) -> Option<String> {
 /// has nothing to decline.
 pub(super) fn table(offers: &Offers, household: &[Member]) -> Table {
     Table::of(
+        // The pinned media server says whether an account has a password.
+        lemonfiber_sidecar::decline::Claimed::HasPassword,
         offers
             .iter()
             .filter_map(|(id, offer)| {
@@ -92,6 +94,31 @@ fn refused(offers: &Offers, refusals: &Refusals) -> BTreeSet<String> {
                 .is_some_and(|token| refusals.of(token).is_some())
         })
         .map(|(id, _)| id.clone())
+        .collect()
+}
+
+/// The accounts the decline service removed when their offer's window closed, each
+/// against the name it was made under.
+///
+/// Matched on the offer's token, as a refusal is, so a removal recorded against an
+/// earlier offer of the same account says nothing about the one standing now. A record
+/// the service has not written, or one that cannot be read, removed nobody.
+pub(crate) fn removed_at_lapse(ctx: &Ctx, offers: &Offers) -> BTreeMap<String, String> {
+    crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
+        .and_then(|project| std::fs::read_to_string(path(&project, File::Lapses)).ok())
+        .and_then(|text| Lapses::read(&text).ok())
+        .map_or_else(BTreeMap::new, |lapses| removed(offers, &lapses))
+}
+
+/// The accounts among `offers` whose token `lapses` records the removal of.
+fn removed(offers: &Offers, lapses: &Lapses) -> BTreeMap<String, String> {
+    offers
+        .iter()
+        .filter_map(|(id, offer)| {
+            let lapse = lapses.of(offer.decline.as_ref()?)?;
+            (lapse.outcome == Outcome::Removed && &lapse.account == id)
+                .then(|| (id.clone(), lapse.name.clone()))
+        })
         .collect()
 }
 

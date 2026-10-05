@@ -401,13 +401,16 @@ fn offered_with(env: &Path, stack: &Path, token: &str) {
         "9": {"offered": at(-1), "lapses": at(47), "decline": TokenHash::of(token).as_str()}
     });
     let _ = std::fs::write(env.with_file_name("invitations.json"), record.to_string());
-    let table = Table::of(vec![lemonfiber_sidecar::decline::Invitation {
-        token: TokenHash::of(token),
-        account: "9".to_owned(),
-        name: "ana".to_owned(),
-        issued: 1,
-        lapses: u64::MAX,
-    }]);
+    let table = Table::of(
+        lemonfiber_sidecar::decline::Claimed::HasPassword,
+        vec![lemonfiber_sidecar::decline::Invitation {
+            token: TokenHash::of(token),
+            account: "9".to_owned(),
+            name: "ana".to_owned(),
+            issued: 1,
+            lapses: u64::MAX,
+        }],
+    );
     let _ = std::fs::create_dir_all(stack.join("config/decline"));
     let _ = std::fs::write(
         stack.join("config/decline/invitations.json"),
@@ -645,4 +648,62 @@ async fn the_decline_key_is_listed_shown_and_replaced() {
         .requests()
         .iter()
         .any(|asked| asked.method == Method::Delete && asked.url.ends_with("/Auth/Keys/old")));
+}
+
+/// The doctor reads the decline key's dates from the media server the stack runs, through
+/// the administrator lemonfiber recorded, and a key used only when it was made is
+/// explained.
+#[tokio::test]
+async fn the_doctor_dates_the_decline_key_from_the_media_server() {
+    let env = recorded_admin("decline-key-doctor");
+    let stack: &'static Path = Box::leak(stack_with_decline("key-doctor").into_boxed_path());
+    let http = Fake::by_route_in_turn(vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
+        ),
+        (
+            Method::Get,
+            "/Auth/Keys",
+            vec![Answer::reply(
+                200,
+                r#"{"Items":[{"AppName":"lemonfiber-decline","AccessToken":"held","DateCreated":"2026-10-05T00:00:00Z","DateLastActivity":"2026-10-05T00:00:30Z"}]}"#,
+            )],
+        ),
+    ]);
+    let ctx = lemonfiber_testing::a_context()
+        .over(Source::External(stack))
+        .engine(Arc::new(Reporting::holding(
+            &["jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+
+    let report = lemonfiber_core::app::diagnose(
+        &ctx,
+        &lemonfiber_core::doctor::Narrowing::Check("services.decline-key".to_owned()),
+        false,
+    )
+    .await
+    .ok();
+
+    let verdict = report
+        .as_ref()
+        .and_then(|read| read.findings.first())
+        .map(|finding| &finding.verdict);
+    assert!(
+        matches!(verdict, Some(lemonfiber_core::doctor::Verdict::Pass { .. })),
+        "{verdict:?}"
+    );
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.method == Method::Get && asked.url.ends_with("/Auth/Keys")));
 }

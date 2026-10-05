@@ -16,6 +16,7 @@ mod deferring;
 use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
+use crate::doctor::declining::{Decline, DeclineKeyCheck};
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::guides::GuidesCheck;
@@ -220,6 +221,26 @@ fn gate_record(
     GateRecordCheck::new(ctx.seams.filesystem.clone(), gate)
 }
 
+/// Whether the decline service's key was used for anything the service did not
+/// record, where the stack runs one: its two records, and the media server that dates
+/// the key.
+fn decline_key(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    project: Option<&std::path::Path>,
+) -> DeclineKeyCheck {
+    use lemonfiber_sidecar::decline::File;
+    let decline = project
+        .filter(|_| crate::app::invite::declining::service(services).is_some())
+        .map(|project| Decline {
+            refusals: crate::app::invite::declining::path(project, File::Refusals),
+            lapses: crate::app::invite::declining::path(project, File::Lapses),
+            keys: crate::app::targets::jellyfin_reader(ctx, services)
+                .map(|server| Arc::new(server) as Arc<dyn crate::doctor::declining::KeyDates>),
+        });
+    DeclineKeyCheck::new(ctx.seams.filesystem.clone(), decline)
+}
+
 /// Whether the people in the house will hear back about what they asked for.
 ///
 /// The read-only half of the seeding step that switches it on, so a household that
@@ -353,6 +374,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     );
     let telling = household_telling(ctx, &manifest.services);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
+    let decline = decline_key(ctx, &manifest.services, project.as_deref());
     // Whether the stack would actually come back after a restart, which is a different
     // question from whether the operator asked for it to. The answer they gave is read
     // here rather than inside the check, for the reason every other reading is: a check
@@ -380,6 +402,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(wiring),
         Box::new(telling),
         Box::new(gate),
+        Box::new(decline),
         Box::new(permissions),
     ];
     // Appended to the same list rather than kept in one of their own, which is the

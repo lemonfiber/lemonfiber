@@ -38,6 +38,7 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "providers.indexers",
     "providers.usenet",
     "providers.usenet.",
+    "services.decline-key",
     "services.quality-guides",
     "services.releases",
     "services.releases.",

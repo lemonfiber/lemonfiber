@@ -77,8 +77,11 @@ pub(crate) async fn household(
     // What is said about invitations names other people's accounts, so it is said only
     // to whoever reads the whole household.
     let mut about_invitations = Vec::new();
-    let (expired, declined) =
-        standing::invitations(ctx, &server, &accounts, &mut about_invitations).await;
+    let standing::Invitations {
+        expired,
+        declined,
+        removed,
+    } = standing::invitations(ctx, &server, &accounts, &mut about_invitations).await;
     if member.is_none() {
         findings.append(&mut about_invitations);
     }
@@ -132,6 +135,12 @@ pub(crate) async fn household(
         findings.extend(shown_to_the_household(ctx, access, &asked, &quality, no_room).await);
     }
 
+    // Listed in their place rather than dropped, so an invitation taken back at its lapse
+    // still reads as run out instead of as somebody who was never invited. Added only
+    // here, after the request service was asked about everybody else: a removed account
+    // has nothing there to read.
+    let mut accounts = accounts;
+    accounts.extend(removed);
     let mut report = assemble(
         accounts,
         requests,
