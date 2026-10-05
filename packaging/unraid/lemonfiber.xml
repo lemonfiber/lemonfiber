@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+  lemonfiber for Unraid. Save this file to the flash share as
+  config/plugins/dockerMan/templates-user/my-lemonfiber.xml, then choose it under
+  Docker > Add Container > Template.
+
+  This container holds the host's Docker socket. The socket is control of the host's
+  Docker: whoever holds it can start a privileged container that mounts the host's
+  root. lemonfiber needs it to run the stack, which is the same power a native install
+  gets from the docker group.
+-->
+<Container version="2">
+  <Name>lemonfiber</Name>
+  <Repository>{{IMAGE}}</Repository>
+  <Registry>https://github.com/lemonfiber/lemonfiber/pkgs/container/lemonfiber</Registry>
+  <Network>host</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/lemonfiber/lemonfiber/blob/main/packaging/README.md</Support>
+  <Project>https://github.com/lemonfiber/lemonfiber</Project>
+  <TemplateURL>https://github.com/lemonfiber/lemonfiber/releases/download/v{{VERSION}}/lemonfiber-unraid.xml</TemplateURL>
+  <Overview>Sets up and runs a media stack. This container holds the host's Docker socket, which is control of the host's Docker: whoever holds it can start a privileged container that mounts the host's root. It shares the host's network, so the stack's services are reached on the host's loopback, and the web surface listens on the host's loopback until a password is set. The terminal interface: docker exec -it lemonfiber lemonfiber</Overview>
+  <Category>MediaApp:Other Tools:Utilities</Category>
+  <ExtraParams>--user 99:100 --group-add 281</ExtraParams>
+  <PostArgs>ui --no-browser --port 7461</PostArgs>
+  <Config Name="Docker socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Description="The host's Docker socket. It is control of the host's Docker: whoever holds it can start a privileged container that mounts the host's root. lemonfiber runs as group 281, Unraid's docker group, set in Extra Parameters; change --group-add there if yours differs." Type="Path" Display="always" Required="true" Mask="false">/var/run/docker.sock</Config>
+  <Config Name="lemonfiber's directory" Target="/mnt/user/appdata/lemonfiber" Default="/mnt/user/appdata/lemonfiber" Mode="rw" Description="Its settings and the stack it writes. The container path must be the same as the host path, and the same as the start of XDG_CONFIG_HOME and XDG_DATA_HOME below: Compose resolves the stack's mounts on the host, and lemonfiber refuses to start a stack whose paths differ." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/lemonfiber</Config>
+  <Config Name="Media" Target="/mnt/user/data" Default="/mnt/user/data" Mode="rw" Description="Where your library and downloads live. The container path must be the same as the host path. Choose it as the data location during setup." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data</Config>
+  <Config Name="XDG_CONFIG_HOME" Target="XDG_CONFIG_HOME" Default="/mnt/user/appdata/lemonfiber/config" Mode="" Description="Where lemonfiber keeps its settings, under its directory." Type="Variable" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/lemonfiber/config</Config>
+  <Config Name="XDG_DATA_HOME" Target="XDG_DATA_HOME" Default="/mnt/user/appdata/lemonfiber/data" Mode="" Description="Where lemonfiber writes the stack, under its directory." Type="Variable" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/lemonfiber/data</Config>
+</Container>

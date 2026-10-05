@@ -126,6 +126,37 @@ async fn a_copy_somebody_else_owns_is_never_probed_for_writability() {
     assert!(files.removed().is_empty(), "{:?}", files.removed());
 }
 
+/// A copy in a container defers to its image: the operator is handed the pull and told
+/// to recreate the container on it, and nothing probes beside a binary whose file goes
+/// when the container does.
+#[tokio::test]
+async fn a_copy_in_a_container_defers_to_its_image_and_names_the_pull_and_the_recreate() {
+    let files = Program::ordinary().shared();
+    let http = Fake::always(Answer::reply(200, released("v0.99.0")));
+    let ctx = ctx(
+        &files,
+        &http,
+        Settings {
+            container: Some("4f1c0d7e".to_owned()),
+            ..settings(Some("/usr/local/bin/lemonfiber"))
+        },
+    );
+
+    let report = asked(Command::SelfUpdate { to: None }, &ctx).await;
+
+    assert_eq!(report.standing, Standing::ManagedExternally);
+    assert_eq!(report.installed, Installed::Image);
+    assert_eq!(
+        report.command.as_deref(),
+        Some("docker pull ghcr.io/lemonfiber/lemonfiber:0.99.0")
+    );
+    let follows = report.instead.unwrap_or_default();
+    assert!(follows.contains("recreate this container"), "{follows}");
+    assert!(follows.contains("releases/tag/v0.99.0"), "{follows}");
+    assert_eq!(report.replaceable, None);
+    assert!(files.removed().is_empty(), "{:?}", files.removed());
+}
+
 /// The one case a path cannot answer: the shell installer writes into cargo's own
 /// `bin`, so only the receipt beside it says which of the two put this copy here.
 #[tokio::test]

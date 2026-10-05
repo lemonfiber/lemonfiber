@@ -5,8 +5,12 @@
 //! here is about containers — what is running, what it wrote, what it is costing —
 //! and this is about the ground underneath them, asked once, by a guard, before any
 //! of the rest applies.
+//!
+//! The second question here is the same one asked from inside a container: which
+//! path on the machine stands behind a path the container sees. It names a container
+//! only to say whose view is meant, and what comes back is still about the machine.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 
@@ -27,6 +31,18 @@ pub enum Presence {
     /// happen; one that folded it into `Absent` would refuse a machine that is
     /// perfectly ready.
     Unknown,
+}
+
+/// One path a container sees, and the path on the engine's machine that is behind it.
+///
+/// Both halves as the engine reports them. Whether the two are the same path is the
+/// whole question a caller is asking, so neither is normalised here into an answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Mount {
+    /// Where the engine's machine keeps it.
+    pub source: PathBuf,
+    /// Where the container sees it.
+    pub destination: PathBuf,
 }
 
 /// Asking an engine whether a path is on the machine it runs on.
@@ -50,6 +66,18 @@ pub trait Locations: Send + Sync {
     /// reached at all, which is a different thing from an answer about the path and
     /// is reported as one.
     async fn located(&self, path: &Path) -> Result<Presence, Failure>;
+
+    /// What a container on this engine has mounted, and from where.
+    ///
+    /// Nothing where the engine has no container by that identifier, which is an
+    /// answer about the engine rather than a failure to reach it: a socket that leads
+    /// to a different daemon than the one running the asker answers exactly this way.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Failure`] the endpoint produced where the engine could not be
+    /// reached at all.
+    async fn mounted(&self, container: &str) -> Result<Option<Vec<Mount>>, Failure>;
 }
 
 #[cfg(test)]

@@ -118,6 +118,12 @@ jobs:
         run: python3 scripts/implementation_status.py --check
       - name: And the writer refuses a glyph written by hand
         run: python3 scripts/implementation_status.py --self-test
+      # The release writes each NAS template's image in by digest, and a template
+      # that has lost its place for it would be published naming none.
+      - name: Every NAS template has a place for the image
+        run: python3 scripts/the_templates_name_the_image.py --check
+      - name: And the writer refuses what it cannot write right
+        run: python3 scripts/the_templates_name_the_image.py --self-test
 
   msrv:
     runs-on: ubuntu-latest

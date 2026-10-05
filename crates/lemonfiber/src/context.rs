@@ -189,6 +189,12 @@ pub(crate) fn read_settings() -> Settings {
         // Where the tools that install programs leave a record of having done so,
         // which is the only thing this is read for.
         home: home_directory(),
+        // Which container this process runs in, read off its own mount table. The
+        // file exists only on Linux, and names a container only inside one.
+        container: std::fs::read_to_string(lemonfiber_core::contained::MOUNT_TABLE)
+            .ok()
+            .as_deref()
+            .and_then(lemonfiber_core::contained::container),
         // Which engine this run operates, resolved once from the environment and
         // from Docker's own records. Read here rather than by whoever needs it, so
         // the Engine API client, the image listing, the Compose invocation and the

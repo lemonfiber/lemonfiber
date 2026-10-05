@@ -1,0 +1,49 @@
+# lemonfiber for Synology, as a Container Manager project: Container Manager >
+# Project > Create, choose "Create docker-compose.yml", and paste this file.
+#
+# This container holds the host's Docker socket. The socket is control of the host's
+# Docker: whoever holds it can start a privileged container that mounts the host's
+# root. lemonfiber needs it to run the stack, which is the same power a native install
+# gets from the `docker` group.
+#
+# The container shares the host's network, so the stack's services are reached on
+# the host's loopback, where they publish their ports, and the web surface listens on
+# the host's loopback too. It refuses to listen beyond loopback until a password is set.
+#
+# Before creating the project, change these to match your NAS:
+#
+#   /volume1/docker/lemonfiber  lemonfiber's own directory: its settings and the stack
+#                               it writes. It appears four times below and must be the
+#                               same in all five, because Compose resolves the stack's
+#                               mounts on the host and lemonfiber refuses to start a
+#                               stack whose paths differ. Create the folder first.
+#   /volume1/data               where your library and downloads live, mounted the same
+#                               way. Choose it as the data location during setup.
+#   1026:100                    who lemonfiber runs as: your own user and the users
+#                               group, as Control Panel > User shows them. Not root.
+#   0                           the group that owns the socket. Container Manager's
+#                               socket belongs to the root group, so lemonfiber joins
+#                               that group; it still runs as your user, not as root.
+#   7461                        the port the web surface listens on.
+#
+# The terminal interface: docker exec -it lemonfiber lemonfiber
+#
+# Updating means a new image: stop the project, replace this file with the next
+# release's, which names that release's image by digest, and build it again.
+services:
+  lemonfiber:
+    image: "{{IMAGE}}"
+    container_name: lemonfiber
+    restart: unless-stopped
+    network_mode: host
+    user: "1026:100"
+    group_add:
+      - "0"
+    environment:
+      XDG_CONFIG_HOME: /volume1/docker/lemonfiber/config
+      XDG_DATA_HOME: /volume1/docker/lemonfiber/data
+    command: ["ui", "--no-browser", "--port", "7461"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /volume1/docker/lemonfiber:/volume1/docker/lemonfiber
+      - /volume1/data:/volume1/data

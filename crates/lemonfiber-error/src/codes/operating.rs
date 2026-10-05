@@ -139,6 +139,14 @@ codes! {
         NO_DATA_LOCATION = "LIFE-5",
         /// Raised when the stack's own location is not on the machine being operated.
         ABSENT_THERE = "LIFE-6",
+        /// Raised when a path the stack mounts is not at the same path on the machine
+        /// under the container lemonfiber runs in.
+        ELSEWHERE_UNDERNEATH = "LIFE-7",
+        /// Raised when lemonfiber runs in a container that cannot reach the engine.
+        NO_ENGINE_IN_HERE = "LIFE-8",
+        /// Raised when the engine lemonfiber reaches from a container does not know that
+        /// container.
+        NOT_ON_THIS_ENGINE = "LIFE-9",
     }
     /// The `MIGRATE` codes.
     migrate {

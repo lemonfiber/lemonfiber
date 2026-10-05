@@ -11,8 +11,8 @@
 //! Decided from what the machine says rather than from a build flag, because the
 //! same artefact reaches all of these roads: the binary in a Homebrew cellar and the
 //! one a shell installer wrote are byte-identical. Everything read is passed in, for
-//! the reason [`crate::platform::Environment::resolve`] takes its inputs — all seven
-//! answers are reachable from one laptop, so what this says on a machine nobody here
+//! the reason [`crate::platform::Environment::resolve`] takes its inputs — every
+//! answer is reachable from one laptop, so what this says on a machine nobody here
 //! has is proven rather than hoped for.
 
 use std::path::Path;
@@ -41,6 +41,10 @@ pub enum Installed {
     Installer,
     /// Downloaded, unpacked or built by hand, and owned by nobody but the operator.
     Elsewhere,
+    /// Running in a container, from an image. The binary is part of the image, so
+    /// moving to another version is pulling that version's image and recreating the
+    /// container on it; a binary replaced inside goes when the container does.
+    Image,
     /// This machine would not say where the running binary is, so none of the above
     /// can be told apart. Not a failure, and not a licence to guess.
     #[default]
@@ -65,6 +69,8 @@ pub struct Signs<'a> {
     pub receipt: bool,
     /// Whether cargo's record of what it installed names this program.
     pub recorded_by_cargo: bool,
+    /// Whether this copy runs inside a container.
+    pub contained: bool,
 }
 
 impl Installed {
@@ -77,8 +83,15 @@ impl Installed {
     /// either way. The receipt is read before cargo's record because the installer
     /// writes one on every run while cargo does not remove its record when something
     /// else overwrites the file, so of the two the receipt is the later truth.
+    ///
+    /// A container comes before all of them, path or no path: whatever the binary's
+    /// path looks like inside, the file belongs to the image the container was made
+    /// from.
     #[must_use]
     pub fn read(signs: &Signs) -> Self {
+        if signs.contained {
+            return Self::Image;
+        }
         let Some(at) = signs.at else {
             return Self::Untellable;
         };
@@ -115,6 +128,7 @@ impl Installed {
             Self::Winget => Some("winget"),
             Self::Cargo => Some("Cargo"),
             Self::Distribution => Some("this system's own package manager"),
+            Self::Image => Some("the container image"),
             Self::Installer | Self::Elsewhere | Self::Untellable => None,
         }
     }
@@ -154,6 +168,7 @@ impl Installed {
             Self::Distribution => "distribution",
             Self::Installer => "installer",
             Self::Elsewhere => "elsewhere",
+            Self::Image => "image",
             Self::Untellable => "untellable",
         }
     }
@@ -161,6 +176,7 @@ impl Installed {
 
 /// Every way a copy can have arrived, in the order they are told apart.
 pub const EVERY_WAY: &[Installed] = &[
+    Installed::Image,
     Installed::Homebrew,
     Installed::Scoop,
     Installed::Winget,

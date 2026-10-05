@@ -191,3 +191,100 @@ async fn a_machine_that_never_answered_is_a_failure_rather_than_an_answer() {
         "{refused:?}"
     );
 }
+
+/// What a container has mounted, read off the daemon's description of it.
+///
+/// Driven against a socket for the reason the location check is: the shape relied on
+/// is the daemon's, and a test of the reading alone would prove the reading and not
+/// the asking.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_containers_mounts_are_read_off_its_description() {
+    use lemonfiber_ports::docker::{Locations as _, Mount};
+    use std::path::PathBuf;
+
+    let engine = fake::engine(
+        "described",
+        vec![(
+            "containers/4f1c/json",
+            fake::Reply::Body(
+                200,
+                r#"{"Id":"4f1c","Mounts":[{"Type":"bind","Source":"/mnt/user/appdata/lemonfiber","Destination":"/mnt/user/appdata/lemonfiber"},{"Type":"bind","Source":"/var/run/docker.sock","Destination":"/var/run/docker.sock"}]}"#
+                    .to_owned(),
+            ),
+        )],
+    );
+
+    let mounts = Daemon::at(&engine.socket).mounted("4f1c").await;
+
+    assert_eq!(
+        mounts.ok().flatten(),
+        Some(vec![
+            Mount {
+                source: PathBuf::from("/mnt/user/appdata/lemonfiber"),
+                destination: PathBuf::from("/mnt/user/appdata/lemonfiber"),
+            },
+            Mount {
+                source: PathBuf::from("/var/run/docker.sock"),
+                destination: PathBuf::from("/var/run/docker.sock"),
+            },
+        ])
+    );
+    engine.stop().await;
+}
+
+/// A daemon with no such container says so, and that is an answer rather than a
+/// failure to reach it: the caller is told this engine is not the one running it.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_container_the_daemon_has_not_got_is_an_answer_rather_than_a_failure() {
+    use lemonfiber_ports::docker::Locations as _;
+
+    let engine = fake::engine(
+        "not-here",
+        vec![(
+            "containers/4f1c/json",
+            fake::Reply::Body(404, r#"{"message":"No such container: 4f1c"}"#.to_owned()),
+        )],
+    );
+
+    let answer = Daemon::at(&engine.socket).mounted("4f1c").await;
+
+    assert!(matches!(answer, Ok(None)), "{answer:?}");
+    engine.stop().await;
+}
+
+/// Any other refusal is the daemon failing, never a description with nothing in it.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_daemon_that_refuses_the_description_is_a_failure_rather_than_no_mounts() {
+    use lemonfiber_ports::docker::Locations as _;
+
+    let engine = fake::engine(
+        "refused",
+        vec![(
+            "containers/4f1c/json",
+            fake::Reply::Body(500, r#"{"message":"engine is having a day"}"#.to_owned()),
+        )],
+    );
+
+    let answer = Daemon::at(&engine.socket).mounted("4f1c").await;
+
+    assert!(answer.is_err(), "{answer:?}");
+    engine.stop().await;
+}
+
+/// A machine that never answered cannot describe anything.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_machine_that_never_answered_describes_no_container() {
+    use lemonfiber_ports::docker::Locations as _;
+
+    let nowhere = std::path::PathBuf::from("/tmp/lf-no-such-engine.sock");
+    let refused = Daemon::at(&nowhere).mounted("4f1c").await;
+
+    assert!(
+        matches!(refused, Err(Failure::Unreachable { .. })),
+        "{refused:?}"
+    );
+}

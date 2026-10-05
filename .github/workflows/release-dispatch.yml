@@ -150,4 +150,4 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          echo "::notice title=Tagged::v${VERSION} is tagged. release.yml builds it and leaves a draft, release-changelog puts the changelog on that draft and release-contract the contract, and a maintainer publishes it once both have run."
+          echo "::notice title=Tagged::v${VERSION} is tagged. release.yml builds it and leaves a draft, release-changelog puts the changelog on that draft, release-contract the contract and release-image the NAS templates, and a maintainer publishes it once all three have run."

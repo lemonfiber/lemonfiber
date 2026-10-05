@@ -41,7 +41,8 @@ pub struct UpdateReport {
     pub asked: Option<String>,
     /// Exactly what to type, where there is something exact to type.
     pub command: Option<String>,
-    /// Why there is nothing exact to type, where there is not.
+    /// Why there is nothing exact to type, where there is not; or, where typing the
+    /// command is not the whole of the move, what has to follow it.
     pub instead: Option<String>,
     /// Whether the directory holding the running binary can be written to.
     ///

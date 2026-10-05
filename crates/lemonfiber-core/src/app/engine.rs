@@ -21,15 +21,13 @@ mod lock;
 mod preview;
 pub(crate) use preview::preview;
 mod remote;
-// Reached from outside this module by the one lifecycle path that does not run the
-// prelude the rest share, which is the staged half of an update.
-pub(crate) use remote::verified;
 mod settling;
 mod status;
 mod stopping;
 pub(crate) use settling::{fell_short_into, settled_into};
 mod streaming;
 mod switch;
+mod underneath;
 mod waiting;
 
 pub use diagnosis::diagnose;
@@ -46,6 +44,26 @@ pub use streaming::{logs, pull_progress, start_progress, started};
 pub(crate) use diagnosis::quoted;
 pub(crate) use status::status;
 pub(crate) use switch::switch;
+
+/// Whether the machine the engine runs on has what the stack mounts, where the stack
+/// mounts it.
+///
+/// Two machines can be in the way, and each has its own guard: a remote engine's,
+/// which may not have the location at all, and the one under a container this copy
+/// runs in, which may keep a path somewhere other than where the container sees it.
+/// One function for both, because every path that runs Compose has to ask both, and
+/// a guard reached through a second call is one some path forgets.
+///
+/// Reached from outside this module by the one lifecycle path that does not run the
+/// prelude the rest share, which is the staged half of an update.
+///
+/// # Errors
+///
+/// Returns whichever guard's [`Problem`] refused first.
+pub(crate) async fn verified(ctx: &Ctx) -> Result<(), Box<Problem>> {
+    remote::verified(ctx).await?;
+    underneath::verified(ctx).await
+}
 
 /// What resolving the forms into a runnable Compose command produced.
 ///
@@ -229,7 +247,7 @@ async fn readied(
     // one stopped there stops something that was never started. Before the stack is
     // materialised rather than after, so a run that is going to be refused does not
     // rewrite anything on the way to saying so.
-    remote::verified(ctx).await?;
+    verified(ctx).await?;
 
     let Composed {
         manifest,

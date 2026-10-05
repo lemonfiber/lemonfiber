@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use lemonfiber_ports::docker::{Failure, Locations, Presence};
+use lemonfiber_ports::docker::{Failure, Locations, Mount, Presence};
 
 /// What a machine answers when it is asked about a path.
 pub enum Answers {
@@ -30,6 +30,7 @@ pub enum Answers {
 pub struct Located {
     answers: Answers,
     asked: Mutex<Vec<PathBuf>>,
+    container: Option<(String, Vec<Mount>)>,
 }
 
 impl Located {
@@ -57,6 +58,29 @@ impl Located {
         Arc::new(Self {
             answers,
             asked: Mutex::new(Vec::new()),
+            container: None,
+        })
+    }
+
+    /// A machine running one container, with these host paths mounted at these
+    /// container paths, given as `(host, container)`.
+    ///
+    /// Asked about any other container, it has none by that name.
+    #[must_use]
+    pub fn running(container: &str, mounts: &[(&str, &str)]) -> Arc<Self> {
+        Arc::new(Self {
+            answers: Answers::Only(Vec::new()),
+            asked: Mutex::new(Vec::new()),
+            container: Some((
+                container.to_owned(),
+                mounts
+                    .iter()
+                    .map(|(source, destination)| Mount {
+                        source: PathBuf::from(source),
+                        destination: PathBuf::from(destination),
+                    })
+                    .collect(),
+            )),
         })
     }
 
@@ -75,6 +99,27 @@ impl Locations for Located {
     async fn located(&self, path: &Path) -> Result<Presence, Failure> {
         answered(self, path)
     }
+
+    async fn mounted(&self, container: &str) -> Result<Option<Vec<Mount>>, Failure> {
+        described(self, container)
+    }
+}
+
+/// What this fixture says a container has mounted.
+///
+/// A machine that cannot be reached cannot describe a container either, so it fails
+/// here in the same words it fails about a path.
+fn described(machine: &Located, container: &str) -> Result<Option<Vec<Mount>>, Failure> {
+    if let Answers::Nothing(reason) = &machine.answers {
+        return Err(Failure::Unreachable {
+            reason: reason.clone(),
+        });
+    }
+    Ok(machine
+        .container
+        .as_ref()
+        .filter(|(id, _)| id == container)
+        .map(|(_, mounts)| mounts.clone()))
 }
 
 /// What this fixture says about a path, and the record that it was asked.

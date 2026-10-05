@@ -99,7 +99,8 @@ fn unowned(report: &UpdateReport) -> &'static str {
     }
 }
 
-/// The line to copy, or the reason there is none.
+/// The line to copy, or the reason there is none, and what has to follow the line
+/// where there is something.
 fn moving(report: &UpdateReport) -> Lines {
     let mut lines = Lines::default();
     if let Some(configuration) = &report.configuration {
@@ -108,7 +109,8 @@ fn moving(report: &UpdateReport) -> Lines {
     if let Some(command) = &report.command {
         lines.spaced(heading(report));
         lines.put(format!("  {command}"));
-    } else if let Some(instead) = &report.instead {
+    }
+    if let Some(instead) = &report.instead {
         lines.spaced(instead.clone());
     }
     lines

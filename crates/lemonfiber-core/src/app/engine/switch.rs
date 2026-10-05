@@ -67,7 +67,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     // A switch is two lifecycle commands in a coat, so it owes the same pre-flight
     // they do. It does not go through the one they share, which is exactly how a
     // guard comes to hold everywhere but the path nobody remembered.
-    super::remote::verified(ctx).await?;
+    super::verified(ctx).await?;
 
     let Composed {
         manifest,

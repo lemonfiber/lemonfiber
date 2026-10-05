@@ -18,7 +18,8 @@ mod reading;
 
 use crate::model::UpdateReport;
 use crate::self_update::{
-    availability, carries, command, configuration, stands, why_not, Installed, Standing, AFTERWARDS,
+    availability, carries, command, configuration, stands, then, why_not, Installed, Standing,
+    AFTERWARDS,
 };
 
 use crate::app::Ctx;
@@ -29,7 +30,13 @@ pub(crate) async fn standing(ctx: &Ctx, named: Option<&str>) -> UpdateReport {
     let running = env!("CARGO_PKG_VERSION");
     let files = ctx.seams.filesystem.as_ref();
     let at = reading::at(files, ctx.settings.program.as_ref()).await;
-    let installed = reading::installed(files, at.as_deref(), ctx.settings.home.as_ref()).await;
+    let installed = reading::installed(
+        files,
+        at.as_deref(),
+        ctx.settings.home.as_ref(),
+        ctx.settings.container.is_some(),
+    )
+    .await;
     let read = checking::read(ctx).await;
     let standing = stands(
         read.offered
@@ -60,6 +67,9 @@ pub(crate) async fn standing(ctx: &Ctx, named: Option<&str>) -> UpdateReport {
 
 /// What to type, or why there is nothing to type, where there is anything to do.
 ///
+/// Where typing it is not the whole of the move, what has to follow it rides in the
+/// second half, beside the command rather than in place of it.
+///
 /// A copy that is already the newest has nothing to move to, and the command for the
 /// version it is running is an instruction to reinstall — which reads as something
 /// worth doing to whoever is looking for a next step. Naming a version asks a
@@ -77,7 +87,9 @@ fn moving(
     let toward = toward(installed, named, offered);
     (
         command(installed, toward),
-        why_not(installed, toward).map(str::to_owned),
+        why_not(installed, toward)
+            .map(str::to_owned)
+            .or_else(|| then(installed, toward)),
     )
 }
 

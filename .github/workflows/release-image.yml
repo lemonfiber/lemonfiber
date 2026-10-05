@@ -1,0 +1,296 @@
+# Publish the image a NAS installs lemonfiber from, and put the templates that name
+# it on the release.
+#
+# Built from the binaries the release built rather than from source again: the two
+# musl archives the Release run produced are checked against their digests and
+# against the attestation that run signed for them, then copied into an image that
+# holds them and nothing to open a shell with. The image is pushed and attested as
+# the other artefacts are, and the templates under `packaging/` are written with the
+# image named by its digest and attached to the draft `release.yml` leaves.
+#
+# Onto the draft, before a maintainer publishes it, for the reason the contract is:
+# nothing about a release changes once it is published, which is what lets the
+# repository hold published releases immutable. `workflow_run` rather than a
+# `release` trigger, since GitHub fires no release event for a draft.
+#
+# Four jobs, so each grant sits with the least tagged content that can use it.
+# `gather` reads the tagged tree and the Release run's archives and can write
+# nothing. `image` holds the only `packages: write` in the repository and builds
+# what `gather` assembled. `templates` reads the tagged tree again to write the
+# templates and can write nothing. `attach` holds the write grant on releases and
+# checks out no code at all.
+#
+# Separate from `release.yml`, which dist autogenerates and would overwrite.
+name: release-image
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  gather:
+    # The generated workflow also runs on every pull request; only a successful
+    # tag push produced a release to build an image for. And only one from this
+    # repository: a `workflow_run` fires for a fork's run too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Reading the Release run's archives.
+      actions: read
+      # Reading the attestations that run signed for them.
+      attestations: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      # The tag reaches `ref:` and a registry tag below, so its shape is settled
+      # before anything uses it rather than trusted because of who can push a tag.
+      - name: Refuse a tag that is not a version
+        id: tag
+        env:
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::refusing to act on a tag that is not a version: $TAG"
+            exit 1
+          fi
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Take the tag's own copy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Take the Release run's musl archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          pattern: artifacts-build-local-*-unknown-linux-musl
+          path: ${{ runner.temp }}/fetched
+          merge-multiple: true
+
+      # What goes into the image is what the release built, and it is checked twice
+      # before it is used: against the digest dist wrote beside it, and against the
+      # attestation the Release run signed when it built it, from this tag. A binary
+      # that fails either is not built into anything.
+      - name: Check them and assemble the image's context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          fetched="$RUNNER_TEMP/fetched"
+          context="$RUNNER_TEMP/context"
+          mkdir -p "$context"
+          for pair in amd64:x86_64-unknown-linux-musl arm64:aarch64-unknown-linux-musl; do
+            arch="${pair%%:*}"
+            archive="lemonfiber-${pair#*:}.tar.xz"
+            if [ ! -s "$fetched/$archive" ] || [ ! -s "$fetched/$archive.sha256" ]; then
+              echo "::error::the Release run left no $archive with its digest"
+              exit 1
+            fi
+
+            expected=$(cut -d ' ' -f 1 < "$fetched/$archive.sha256")
+            actual=$(sha256sum "$fetched/$archive" | cut -d ' ' -f 1)
+            if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+              echo "::error::$archive does not match the digest written beside it"
+              exit 1
+            fi
+            gh attestation verify "$fetched/$archive" --repo "$REPO" \
+              --signer-workflow "$REPO/.github/workflows/release.yml" \
+              --source-ref "refs/tags/$TAG"
+
+            unpacked="$RUNNER_TEMP/unpacked-$arch"
+            mkdir -p "$unpacked" "$context/bin/$arch"
+            tar -xJf "$fetched/$archive" -C "$unpacked"
+            found=$(find "$unpacked" -type f -name lemonfiber)
+            if [ "$(printf '%s\n' "$found" | grep -c .)" != 1 ]; then
+              echo "::error::$archive does not hold exactly one lemonfiber binary"
+              exit 1
+            fi
+            install -m 0755 "$found" "$context/bin/$arch/lemonfiber"
+          done
+
+          # The one this runner can run says which version it is, and it has to be
+          # this release's.
+          said=$("$context/bin/amd64/lemonfiber" --version)
+          case "$said" in
+            *" $VERSION") ;;
+            *)
+              echo "::error::the binary says it is '$said', and this release is $VERSION"
+              exit 1
+              ;;
+          esac
+          cp packaging/image/Dockerfile "$context/Dockerfile"
+
+      - name: Hand the context to the half that pushes it
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-image-context
+          path: ${{ runner.temp }}/context/
+          if-no-files-found: error
+
+  image:
+    needs: gather
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushing the image. This job is the only one in the repository that may.
+      packages: write
+      # Signing the image's attestation.
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.pushed.outputs.digest }}
+    steps:
+      - name: Take the context
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-image-context
+          path: ${{ runner.temp }}/context
+
+      # Plain buildx rather than an action: every layer is a copy, so two platforms
+      # build without an emulator, and the builder the runner already has does it.
+      # Its own unsigned provenance is left off, because the attestation below is
+      # the signed one and an extra entry in the index confuses some NAS front ends.
+      - name: Build and push the image
+        id: pushed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          VERSION: ${{ needs.gather.outputs.version }}
+          REVISION: ${{ github.event.workflow_run.head_sha }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          context="$RUNNER_TEMP/context"
+          chmod 0755 "$context"/bin/*/lemonfiber
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+          docker buildx create --use --name lemonfiber-release
+          docker buildx build "$context" \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=false --sbom=false \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --label "org.opencontainers.image.revision=$REVISION" \
+            --tag "$IMAGE:$VERSION" \
+            --metadata-file "$RUNNER_TEMP/image.json" \
+            --push
+          digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/image.json")
+          if ! printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+            echo "::error::the build reported no digest for what it pushed: $digest"
+            exit 1
+          fi
+
+          # Both platforms, read back from the registry rather than assumed from the
+          # request.
+          platforms=$(docker buildx imagetools inspect "$IMAGE@$digest" --raw \
+            | jq -r '[.manifests[].platform | "\(.os)/\(.architecture)"] | sort | join(",")')
+          if [ "$platforms" != "linux/amd64,linux/arm64" ]; then
+            echo "::error::the pushed image holds $platforms, not linux/amd64 and linux/arm64"
+            exit 1
+          fi
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest the image
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.pushed.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
+  templates:
+    needs: [gather, image]
+    # Said again rather than left to `needs`: this job checks out and runs the
+    # tagged tree, and the condition that keeps a fork's run out of it belongs on
+    # the job that does that.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Take the tag's own copy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gather.outputs.tag }}
+          persist-credentials: false
+
+      - name: Write the templates naming the image
+        env:
+          DIGEST: ${{ needs.image.outputs.digest }}
+          VERSION: ${{ needs.gather.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/the_templates_name_the_image.py \
+            --digest "$DIGEST" --version "$VERSION" --out "$RUNNER_TEMP/templates"
+
+      - name: Hand them to the half that attaches them
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-image-templates
+          path: ${{ runner.temp }}/templates/
+          if-no-files-found: error
+
+  attach:
+    needs: [gather, templates]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Signing the templates' attestation.
+      id-token: write
+      attestations: write
+    steps:
+      - name: Take the templates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-image-templates
+          path: templates
+
+      - name: Attest the templates
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: templates/*
+
+      - name: Attach them to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.gather.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Found over the listing rather than by tag: a draft release is not yet
+          # attached to its tag, so the by-tag endpoint cannot see it, and the
+          # listing returns drafts to a token with push access.
+          draft=$(gh api "repos/${REPO}/releases?per_page=100" \
+            --jq '[.[] | select(.tag_name == env.TAG) | .draft] | first // empty')
+          if [ -z "$draft" ]; then
+            echo "::error::no release found for ${TAG}."
+            exit 1
+          fi
+          # Nothing is attached to a release once it is published, so one published
+          # before this ran carries no templates, which is better said here than by
+          # somebody looking for one.
+          if [ "$draft" != "true" ]; then
+            echo "::error::${TAG} was published before its templates were attached, and nothing is attached to a published release."
+            exit 1
+          fi
+          gh release upload "$TAG" templates/* --clobber --repo "$REPO"
+          for file in templates/*; do
+            echo "attached ${file#templates/} to ${TAG}"
+          done

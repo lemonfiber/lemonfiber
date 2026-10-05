@@ -66,6 +66,7 @@ pub mod clients;
 pub mod companion;
 pub mod condition;
 pub mod config;
+pub mod contained;
 pub mod credential;
 pub mod dashboard;
 pub mod decline;

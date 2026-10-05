@@ -240,6 +240,14 @@ pub struct Settings {
     /// of them put it there. Absent where the platform would not say, which reads as
     /// a machine with no such record rather than as a failure.
     pub home: Option<PathBuf>,
+    /// The container this copy of lemonfiber runs in, by the engine's identifier.
+    ///
+    /// Absent on every machine that is not a container. Where it is present, the
+    /// paths this copy hands Compose are resolved by the engine on the machine
+    /// underneath, so a start first asks the engine which machine path stands behind
+    /// each one, and this copy never replaces its own binary: the container's layer
+    /// is thrown away with the container.
+    pub container: Option<String>,
     /// Which container engine this run operates, and how it came to be that one.
     ///
     /// Resolved once at the edge from the environment and Docker's own records, and
@@ -292,6 +300,7 @@ impl Default for Settings {
             program: None,
             hosted: None,
             home: None,
+            container: None,
             docker: Target::local(),
         }
     }
