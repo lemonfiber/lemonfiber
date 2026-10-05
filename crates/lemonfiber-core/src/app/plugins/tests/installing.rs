@@ -255,9 +255,16 @@ async fn an_install_says_which_asks_it_would_leave_contested() {
             would
         });
 
-    let contests = would
-        .and_then(|would| {
-            super::super::standing::contested(&ctx, &crate::plugin::Register::empty(), &would).ok()
+    let contests = super::super::writing::stack_manifest(&ctx)
+        .ok()
+        .zip(would)
+        .map(|(manifest, would)| {
+            super::super::standing::contested(
+                &ctx,
+                &manifest,
+                &crate::plugin::Register::empty(),
+                &would,
+            )
         })
         .unwrap_or_default();
 

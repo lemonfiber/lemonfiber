@@ -217,9 +217,10 @@ async fn install(
     // from a git source is recorded as coming from that source, at the one commit that
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
+    let stack_manifest = writing::stack_manifest(ctx)?;
     let settled = Installed::of(&manifest)
         .installed(path, &stamp)
-        .joining(&writing::joins(ctx)?);
+        .joining(&writing::joins(ctx, &stack_manifest));
     let (would, named) = match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);
@@ -250,7 +251,7 @@ async fn install(
         .as_deref()
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
-    let contests = standing::contested(ctx, &held, &would)?;
+    let contests = standing::contested(ctx, &stack_manifest, &held, &would);
 
     let mut stated = crate::plugin::proofs(&manifest);
     let mut against = None;
