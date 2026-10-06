@@ -27,6 +27,9 @@ concurrency:
 # hands on only its report. `sonar` checks the tree out, reads that report and
 # runs the scanner, and runs nothing from the repository. Only `sonar` and the
 # gate are given `SONAR_TOKEN`, which is why a Dependabot run may be given it too.
+# The report is read as data and nothing else: it lands outside the workspace, is
+# refused unless it is the one regular file expected, and reaches the scanner as
+# an argument, so it can overwrite nothing the scanner reads and is never run.
 jobs:
   coverage:
     runs-on: ubuntu-latest
@@ -123,9 +126,25 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      # Into the runner's temporary directory, never the workspace: the artifact
+      # comes from the job that ran the repository's code.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: lcov
+          path: ${{ runner.temp }}/coverage
+      # What was found is reduced to one line of plain characters before it is
+      # printed, so a file name cannot read as a workflow command.
+      - name: The report is the one file expected
+        env:
+          DIR: ${{ runner.temp }}/coverage
+          EXPECTED: lcov.info
+        run: |
+          set -euo pipefail
+          found=$(find "$DIR" -mindepth 1 -printf '%P:%y,' | tr -c 'A-Za-z0-9._:,/-' '?')
+          if [ "$found" != "${EXPECTED}:f," ]; then
+            echo "::error::The coverage artifact has to hold ${EXPECTED} as a regular file and nothing else. It held (name:type, f file, l link, d directory): ${found:-nothing}"
+            exit 1
+          fi
       # A pull request from a fork reads no secret store, and a Dependabot run reads
       # the Dependabot one, so a pull request can arrive without a token.
       - name: Whether a token reached this run
@@ -148,6 +167,9 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # The report's path is given here rather than in `sonar-project.properties`.
+        with:
+          args: -Dsonar.rust.lcov.reportPaths=${{ runner.temp }}/coverage/lcov.info
       # Runs when the scan failed, and says whether the host was answering: a scanner
       # that cannot reach SonarCloud fails with a trace that reads like a finding.
       # It changes nothing about the run; the scan still failed and the check is red.
