@@ -1145,10 +1145,10 @@ rows = [
     "`ARCH-R129`",
     "`sdk-ts`'s generator refuses an artefact defining a name it writes itself, naming the definition and its kind (`scripts/contract-generate.mjs`, with its tests). `sdk-php`'s writes no definition names — it inlines each shape — so no definition can take one.",
   ] },
-  { state = "partial", cells = [
+  { state = "done", cells = [
     "A client reaches off this machine only with a pin",
     "`ARCH-R99`",
-    "`sdk-php` refuses a non-loopback address without a pin and checks the pin in the TLS handshake, and `Client::connector()` and `Admission::connector()` hand out the connector whose configuration can drop it. `sdk-ts` refuses every non-loopback address in `Client.at`, and its exported `follow()` takes any address and sends the token there.",
+    "In [`sdk-php`](https://github.com/lemonfiber/sdk-php), an address off this machine is refused unless it carries a certificate pin, and the pin is enforced as the handshake's peer fingerprint before a request is written (`src/Http/BaseUrl.php`, `src/Http/StackSender.php`, `tests/Feature/PinRefusalTest.php`); no connector whose configuration could drop the pin is handed out. [`sdk-ts`](https://github.com/lemonfiber/sdk-ts) refuses every address off this machine, and sends the token to the stack's own address and nowhere else. The companion and the web surface reach a stack only through these two clients.",
   ] },
   { state = "partial", cells = [
     "The design tokens, published whole and used whole",
@@ -2726,7 +2726,7 @@ rows = [
 [[milestone.part]]
 prose = '''
 What 0.18.0 locks that is built outside this repository: the companion, the household's
-web surface, Home Assistant, the two clients and the brand. Each row names the
+web surface, Home Assistant and the brand. Each row names the
 repository, the code and the test that hold it; the commits citing these requirements
 are in those repositories' histories, which the release gate searches.
 '''
@@ -2798,11 +2798,6 @@ rows = [
     "Home Assistant follows a stack through an integration key",
     "`F12-R1`, `F12-R2`, `F12-R3`, `F12-R4`, `F12-R10`, `F12-R13`",
     "In [`integration-home-assistant`](https://github.com/lemonfiber/integration-home-assistant), the integration reaches the stack only through the vendored `sdk-python` with an integration key and has no path for the operator password (`tests/test_architecture.py`). Setup takes the address, key and pin and checks all three against the stack before an entry exists, with the error on the field that failed; a refused key starts reauthentication and a reconfigure step moves the address and pin (`tests/test_config_flow.py`). Entities follow the key's capabilities and a member key gets none (`tests/test_init.py`). Diagnostics withhold the key, the address and the pin at any depth (`tests/test_diagnostics.py`). The repository installs as a HACS custom repository with the client vendored, checked by hassfest and HACS's action in CI.",
-  ] },
-  { state = "done", cells = [
-    "The clients refuse a stack off this machine unless it is pinned",
-    "`ARCH-R99`",
-    "In [`sdk-php`](https://github.com/lemonfiber/sdk-php), an address off this machine is refused unless it carries a certificate pin, and the pin is enforced as the handshake's peer fingerprint before a request is written (`src/Http/BaseUrl.php`, `src/Http/StackSender.php`, `tests/Feature/PinRefusalTest.php`). [`sdk-ts`](https://github.com/lemonfiber/sdk-ts) refuses every address off this machine, and the companion and the web surface reach a stack only through these two clients.",
   ] },
   { state = "done", cells = [
     "The ink theme redefines every surface token",
