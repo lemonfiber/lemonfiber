@@ -6,11 +6,12 @@
 //! against its recording, which must have been taken from the image the stack pins, so
 //! a pin moved without re-recording is refused rather than trusted.
 //!
-//! **Three answers, and only one of them refuses.** A recording that contradicts its
-//! probe refutes the claim, and so does a claim the contract refuses outright. A probe
-//! with no readable recording of its request, and a capability with no claim at all,
-//! establish nothing either way: they are reported as unproven and never counted as
-//! shown.
+//! **Every capability a service provides is claimed, and every claim holds.** A
+//! recording that contradicts its probe refutes the claim, and so does a claim the
+//! contract refuses outright. A capability a service provides and no claim demonstrates
+//! is refused too: a declaration nothing shows is one nothing holds the service to. A
+//! probe with no readable recording of its request establishes nothing either way: it
+//! is reported as unproven, never counted as shown, and refuses nothing.
 
 use std::path::Path;
 
@@ -70,10 +71,11 @@ impl Bundled {
             .filter(|one| matches!(one.verdict, Verdict::Unproven { .. }))
     }
 
-    /// Whether nothing refutes or refuses a bundled claim. Unproven is not a refusal.
+    /// Whether every capability provided is claimed and nothing refutes or refuses a
+    /// claim. An unproven probe is not a refusal.
     #[must_use]
     pub fn holds(&self) -> bool {
-        self.refused.is_empty() && self.refuted().next().is_none()
+        self.refused.is_empty() && self.unclaimed.is_empty() && self.refuted().next().is_none()
     }
 }
 
@@ -121,7 +123,8 @@ pub fn judged(manifest: &Manifest, stack: &Path) -> Bundled {
 }
 
 /// The report as lines, worst first: what refuses, then what refutes, then what is
-/// unproven, then what was shown, and a count of each at the end.
+/// unproven, then what was shown, and a count of each at the end. A capability nothing
+/// claims is said and counted among what refuses.
 #[must_use]
 pub fn said(report: &Bundled) -> Vec<String> {
     let mut lines: Vec<String> = report
@@ -129,8 +132,13 @@ pub fn said(report: &Bundled) -> Vec<String> {
         .iter()
         .map(|refused| format!("refused: {refused}"))
         .collect();
-    let mut unproven = report.unclaimed.len();
-    let (mut refuted, mut shown) = (0, 0);
+    lines.extend(report.unclaimed.iter().map(|gap| {
+        format!(
+            "refused: {} provides {}, and no claim demonstrates it",
+            gap.service, gap.capability
+        )
+    }));
+    let (mut refuted, mut unproven, mut shown) = (0, 0, 0);
     let mut later = Vec::new();
     for one in &report.judged {
         let about = format!("{} {} probe {}", one.service, one.capability, one.probe);
@@ -150,16 +158,10 @@ pub fn said(report: &Bundled) -> Vec<String> {
         }
     }
     later.sort_by_key(|line| !line.starts_with("unproven"));
-    lines.extend(report.unclaimed.iter().map(|gap| {
-        format!(
-            "unproven: {} provides {}, and no claim demonstrates it",
-            gap.service, gap.capability
-        )
-    }));
     lines.extend(later);
     lines.push(format!(
         "{} refused, {refuted} refuted, {unproven} unproven, {shown} demonstrated",
-        report.refused.len()
+        report.refused.len() + report.unclaimed.len()
     ));
     lines
 }
