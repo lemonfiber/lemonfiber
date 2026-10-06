@@ -688,3 +688,35 @@ fn a_plugins_door_that_is_not_running_or_not_proxied_is_unreachable() {
         );
     }
 }
+
+/// A record of what is installed that will not read leaves the stack's own services to
+/// answer for the door, rather than taking the door away with it.
+#[tokio::test]
+async fn an_unreadable_register_leaves_the_stacks_own_door() {
+    let env = crate::test_support::env_without_password("door-unread");
+    let beside = env.with_file_name(crate::config::paths::PLUGINS);
+    assert!(std::fs::write(&beside, "not a register").is_ok());
+    let watching = a_context()
+        .engine(std::sync::Arc::new(Reporting::holding(
+            &["seerr", "jellyfin"],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .settings(crate::config::Settings {
+            env_file: Some(env),
+            ..crate::config::Settings::default()
+        })
+        .build()
+        .with_site(Renamed::called(Some("kitchen-nas")));
+
+    let report = front_door(&watching).await.ok();
+
+    assert_eq!(
+        report.as_ref().and_then(|report| report.service.clone()),
+        Some("Seerr".to_owned())
+    );
+    assert_eq!(
+        report.as_ref().map(|report| report.standing),
+        Some(Standing::Established)
+    );
+}

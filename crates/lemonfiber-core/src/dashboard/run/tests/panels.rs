@@ -143,6 +143,30 @@ async fn a_machine_renamed_between_refreshes_is_addressed_as_it_is_now() {
 }
 
 #[tokio::test]
+async fn an_unreadable_register_leaves_the_door_panel_on_the_stacks_own_door() {
+    // As the command that shows the door does: what is installed failing to read
+    // narrows the candidates to the stack's own, and the panel still names a door.
+    let env = crate::test_support::env_without_password("panel-unread");
+    let beside = env.with_file_name(crate::config::paths::PLUGINS);
+    assert!(std::fs::write(&beside, "not a register").is_ok());
+    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+    let watching = a_context()
+        .engine(Arc::new(engine))
+        .settings(Settings {
+            env_file: Some(env),
+            ..Settings::default()
+        })
+        .build()
+        .with_site(Renamed::called(Some("kitchen-nas")));
+    let door = gather(&watching, None).await.door;
+
+    assert_eq!(
+        filled(&door).and_then(|door| door.service.clone()),
+        Some("Seerr".to_owned())
+    );
+}
+
+#[tokio::test]
 async fn a_stack_that_cannot_be_read_leaves_the_door_panel_saying_why() {
     let nowhere = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
