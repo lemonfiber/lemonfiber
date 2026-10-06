@@ -8,9 +8,8 @@
 <h1 align="center">Lemonfiber</h1>
 
 <p align="center">
-  The <code>lemonfiber</code> binary: one tool that sets up your media stack,
-  runs it in slices, and proves it's working.<br>
-  CLI and TUI over one core, and the API the web surface draws. Rust.
+  Sets up a self-hosted media stack, runs the part of it you need, and checks
+  that it is actually working.
 </p>
 
 <p align="center">
@@ -23,86 +22,109 @@
 
 ---
 
-> **Status: shipping (`0.16.0`).** The core, compose driver, CLI, setup wizard,
-> trust checks, seed, lifecycle and plugin work are built and released. Most
-> requests reach all three surfaces: the command line, a terminal dashboard that
-> acts rather than only watching, and a web API a browser is served from;
-> [the parity table](.docs/architecture/surface-parity.md) names each one that
-> reaches a surface in part or not at all.
-> See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
-> built-vs-roadmap and the
-> [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
-> (this repo is milestones **M2–M15**).
+`lemonfiber` is a command-line tool for running your own media server at home.
+It installs and wires together open-source services such as Jellyfin, Sonarr,
+Radarr, Prowlarr and Seerr, then keeps checking them: is the VPN really carrying
+the torrent traffic, are imports hardlinking instead of copying?
 
-## What it is
+It is for anyone comfortable running Docker who does not want to configure six
+web interfaces by hand. Everyone else in the house never sees it: they ask for
+things in Seerr and watch them in Jellyfin.
 
-`lemonfiber` orchestrates a fully open-source media stack — the *arr ecosystem,
-Jellyfin, Seerr — and does the parts that are usually manual: guided setup, wiring
-services together, and **verifying** things work rather than assuming they do
-(is the VPN actually isolating traffic? are imports hardlinking?).
+This repository holds the `lemonfiber` binary: the command line, a terminal
+dashboard, and the local web API that the web console and phone app use. It is
+written in Rust.
 
-Run it two ways, one core behind both:
+> **Status:** before 1.0. Every release is published as a pre-release.
+> [What is built](https://docs.lemonfiber.app/project/whats-built/) lists what
+> works today and what is still planned.
 
-```
-lemonfiber up tv        # scriptable
-lemonfiber              # a terminal dashboard
-```
+## Install
 
-A third surface, the web UI, is its own repository
-([ADR-0011](https://github.com/lemonfiber/spec/blob/main/00-overview/decisions/0011-web-surface-as-a-fifth-repo.md)):
-a single-page app that speaks to a local HTTP API this binary serves.
+You need:
 
-## The one load-bearing property
+- macOS or Linux. There is no native Windows build.
+- Docker with Compose v2.20 or newer, running.
 
-**`lemonfiber-core` cannot render.** It has no UI dependency of any kind — no
-terminal, no HTTP server. A surface (CLI, TUI, web) is a *rendering*, never a
-capability, which is what lets the web surface live in another repository at all. This is enforced by the crate graph, not by review. See spec
-[`ARCH-R11`](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md).
+Install the newest release with its installer. Releases are pre-releases, so
+name the tag; the newest is on the
+[releases page](https://github.com/lemonfiber/lemonfiber/releases).
 
-## Layout
-
-```
-crates/
-├── lemonfiber/          bin — the only crate that draws a terminal (CLI, TUI)
-├── lemonfiber-core/     lib — all logic, no UI
-├── lemonfiber-api/      lib — the HTTP endpoints, and serving the web app
-├── lemonfiber-adapters/ lib — the ports' implementations that reach the machine
-├── lemonfiber-ports/    lib — the boundary and its vocabulary
-├── lemonfiber-error/    lib — the error model and the registry of every code
-├── lemonfiber-plugin/   lib — parses plugin.toml
-├── lemonfiber-manifest/ lib — parses stack.toml
-├── lemonfiber-fixtures/ lib — the fakes tests stand in for the world with
-└── lemonfiber-testing/  lib — the context tests drive a command through
-.docs/                   repo-local technical docs (Rust-specific HOW)
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/lemonfiber/lemonfiber/releases/download/v0.16.0/lemonfiber-installer.sh | sh
 ```
 
-## Building
+The installer puts `lemonfiber` in `~/.cargo/bin` (or `$CARGO_HOME/bin`). Check
+it worked:
 
+```console
+$ lemonfiber --version
+lemonfiber 0.16.0
 ```
-cargo build --workspace     # or: just build
-just ci                     # what the build job reads, plus spelling and the scripts
+
+Prebuilt archives with checksums, and building from source, are covered in
+[Install lemonfiber](https://docs.lemonfiber.app/start/install/).
+
+## First run
+
+Run it with nothing configured and it offers to set itself up:
+
+```sh
+lemonfiber
 ```
 
-`just ci` also turns on this repository's git hooks: `pre-commit` (rustfmt and
-spelling), `commit-msg` (the subject, sign-off, `Spec:` trailer and attribution CI
-checks), and `pre-push`, which refuses a push that would leave a branch carrying
-no commit `origin/main` does not — what pushing the trunk over a feature branch
-looks like. It is `git config core.hooksPath .githooks`, per clone, and `just
-hooks` does only that. A clone where neither has run has no hook: git cannot read
-`.githooks/` on its own.
+Setup asks only what it cannot work out itself, tests each credential against
+the live service, and writes nothing until you confirm a summary. Then:
 
-## Contributing
+```sh
+lemonfiber up tv        # start one part of the stack: search, download, organise TV
+lemonfiber ps           # what each service is really doing
+lemonfiber doctor       # check the VPN, hardlinks, disk space and more
+```
 
-This project's spec is **canonical**: every change cites a spec identifier that
-already exists. Before your first PR, read
-[AGENTS.md](AGENTS.md) and the
-[contributing guide](https://github.com/lemonfiber/spec/blob/main/50-governance/contributing.md).
+`tv` is a *form*: a named part of the stack. `lemonfiber forms` lists them all,
+from `search` (just find things) to `full` (everything).
+[Your first stack](https://docs.lemonfiber.app/start/your-first-stack/) walks
+through setup step by step.
+
+## Documentation
+
+Everything about using lemonfiber is on
+[docs.lemonfiber.app](https://docs.lemonfiber.app):
+
+- [Running your stack](https://docs.lemonfiber.app/running/): forms, the services, quality, requests, backups
+- [When something is wrong](https://docs.lemonfiber.app/fixing/): the doctor, and every error code
+- [Command reference](https://docs.lemonfiber.app/commands/): every command and flag
+- [The API and the SDKs](https://docs.lemonfiber.app/api/): build on the local web API
+
+## Working on lemonfiber
+
+```sh
+git clone --recurse-submodules https://github.com/lemonfiber/lemonfiber.git
+cd lemonfiber
+cargo build --workspace
+just ci                 # formatting, lints, tests, spelling; also installs the git hooks
+```
+
+[`.docs/`](.docs/00-index.md) explains how the code is laid out and why, starting
+with the [module layout](.docs/architecture/module-layout.md). Every change cites
+a requirement in the [specification](https://github.com/lemonfiber/spec); read
+the [contributing guide](https://github.com/lemonfiber/spec/blob/main/50-governance/contributing.md)
+and [AGENTS.md](AGENTS.md) before your first pull request.
+
+To report a vulnerability, follow [SECURITY.md](SECURITY.md). Questions go to
+[Discord](https://discord.nightworks.io).
 
 ## Licence
 
-[Hippocratic License 3.0](LICENSE) — ethical-source, source-available,
-deliberately not OSI-approved. See the
-[rationale](https://github.com/lemonfiber/spec/blob/main/90-appendix/license-rationale.md).
+[Hippocratic License 3.0](LICENSE): source-available and ethical-source, and
+deliberately not OSI-approved. The
+[licence rationale](https://github.com/lemonfiber/spec/blob/main/90-appendix/license-rationale.md)
+explains what that means for you. The services lemonfiber runs keep their own
+open-source licences.
+
+lemonfiber is made by [NightWorksIO](https://nightworks.io).
 
 ---
 
