@@ -38,6 +38,7 @@ const NOWHERE: &str = "nowhere yet — this machine has no settings file";
 pub(crate) async fn taken(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
     installed: &[Installed],
 ) -> Vec<Held> {
@@ -69,7 +70,7 @@ pub(crate) async fn taken(
         ));
     }
     taken.extend(super::declining::held(ctx, services, project).await);
-    taken.extend(super::gating::held(ctx, services, project).await);
+    taken.extend(super::gating::held(ctx, services, fillers, project).await);
     taken.extend(super::tokening::held(ctx, services, project).await);
     taken.extend(installed.iter().flat_map(declared));
     taken

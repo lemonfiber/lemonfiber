@@ -36,7 +36,7 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let Some(server) = jellyfin_reader(ctx, &manifest.services) else {
+    let Some(server) = jellyfin_reader(ctx, &manifest) else {
         return Ok(unread(
             whose,
             "there is no media server to ask what the household holds, or no recorded \

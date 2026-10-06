@@ -14,7 +14,7 @@
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::app::targets::{record_secret, recorded_secret, service_addr};
+use crate::app::targets::{hosted, record_secret, recorded_secret, service_addr};
 use crate::app::Ctx;
 use crate::config;
 use crate::ports::service::Failure;
@@ -22,11 +22,18 @@ use crate::ports::service::Failure;
 /// What a replacement's name ends in, after the name of the credential it replaces.
 const PENDING: &str = "_PENDING";
 
-/// The credentials lemonfiber mints and replaces itself, and the service each opens.
-const MINTED: [(&str, ApiKind); 2] = [
-    (config::QBITTORRENT_PASSWORD_KEY, ApiKind::Qbittorrent),
-    (config::JELLYFIN_ADMIN_PASSWORD_KEY, ApiKind::Jellyfin),
-];
+/// A credential lemonfiber mints and replaces itself, and where the service it opens
+/// is asked whether it takes one.
+struct Minted {
+    /// The setting it is kept under.
+    setting: String,
+    /// Which kind of service it opens.
+    kind: ApiKind,
+    /// Where the host reaches that service.
+    loopback: String,
+    /// The service's id.
+    id: String,
+}
 
 /// The name a replacement for `setting` is kept under until the service has taken it.
 pub(crate) fn pending(setting: &str) -> String {
@@ -86,53 +93,68 @@ pub(crate) async fn settled(ctx: &Ctx) {
     if ctx.dry_run {
         return;
     }
-    let left: Vec<(&str, ApiKind, String)> = MINTED
-        .into_iter()
-        .filter_map(|(setting, kind)| {
-            Some((setting, kind, recorded_secret(ctx, &pending(setting))?))
-        })
-        .collect();
-    if left.is_empty() {
-        return;
-    }
-    // A stack that cannot be read has no service to ask, which leaves both for later.
-    let services = ctx
-        .stack
-        .manifest()
-        .map(|manifest| manifest.services)
-        .unwrap_or_default();
-    let asked = left.into_iter().filter_map(|(setting, kind, replacement)| {
-        Some((setting, kind, service_addr(&services, kind)?, replacement))
-    });
-    for (setting, kind, addr, replacement) in asked {
-        let current = recorded_secret(ctx, setting).unwrap_or_default();
-        match taken(ctx, kind, &addr, &current).await {
-            Some(true) => forgotten(ctx, setting),
-            Some(false) if taken(ctx, kind, &addr, &replacement).await == Some(true) => {
-                let _ = promoted(ctx, setting, &replacement);
+    // Only what is asked about is carried across the questions below: the settings file
+    // and the stack are read to find it and let go.
+    let asked = {
+        let Some(env) = ctx.settings.env_file.as_deref() else {
+            return;
+        };
+        let file = config::store::read(env).unwrap_or_default();
+        if !file.keys().iter().any(|key| key.ends_with(PENDING)) {
+            return;
+        }
+        // A stack that cannot be read has no service to ask, which leaves both for later.
+        let Ok(manifest) = ctx.stack.manifest() else {
+            return;
+        };
+        minted(ctx, &manifest)
+    };
+    for minted in asked {
+        let Some(replacement) = recorded_secret(ctx, &pending(&minted.setting)) else {
+            continue;
+        };
+        let current = recorded_secret(ctx, &minted.setting).unwrap_or_default();
+        match taken(ctx, &minted, &current).await {
+            Some(true) => forgotten(ctx, &minted.setting),
+            Some(false) if taken(ctx, &minted, &replacement).await == Some(true) => {
+                let _ = promoted(ctx, &minted.setting, &replacement);
             }
             Some(false) | None => {}
         }
     }
 }
 
+/// The credentials lemonfiber mints and replaces itself: the stack's torrent client's
+/// web UI password, and the administrator's password of whatever media server fills the
+/// identity source, under that server's own setting.
+fn minted(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Minted> {
+    let torrent = service_addr(&manifest.services, ApiKind::Qbittorrent).map(|addr| Minted {
+        setting: config::QBITTORRENT_PASSWORD_KEY.to_owned(),
+        kind: ApiKind::Qbittorrent,
+        loopback: addr.loopback,
+        id: addr.id,
+    });
+    let media = hosted(ctx, manifest).map(|server| Minted {
+        kind: ApiKind::Jellyfin,
+        loopback: server.loopback.clone(),
+        id: server.id().to_owned(),
+        setting: server.setting,
+    });
+    torrent.into_iter().chain(media).collect()
+}
+
 /// Whether the service signs in with `password`: yes, no, or nothing where it would
 /// not say.
-async fn taken(
-    ctx: &Ctx,
-    kind: ApiKind,
-    addr: &crate::app::targets::ServiceAddr,
-    password: &str,
-) -> Option<bool> {
-    let answer = if kind == ApiKind::Qbittorrent {
-        crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), &addr.loopback)
+async fn taken(ctx: &Ctx, minted: &Minted, password: &str) -> Option<bool> {
+    let answer = if minted.kind == ApiKind::Qbittorrent {
+        crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), &minted.loopback)
             .accepts(password)
             .await
     } else {
         crate::jellyfin::Jellyfin::authenticated(
             ctx.seams.http.clone(),
-            &addr.loopback,
-            &addr.id,
+            &minted.loopback,
+            &minted.id,
             config::JELLYFIN_ADMIN_USER,
             password,
         )

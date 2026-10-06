@@ -18,6 +18,7 @@ use crate::error::{Problem, Remedy, Severity, State};
 
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
+use crate::plugin::Installed;
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
@@ -167,9 +168,166 @@ pub(crate) fn stack_manifest(ctx: &Ctx) -> Result<lemonfiber_manifest::Manifest,
 }
 
 /// The stack's services as what a plugin's service could stand in for, with the networks
-/// its compose files put each on.
-pub(crate) fn joins(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> crate::plugin::Joins {
-    crate::plugin::Joins::of(manifest, &ctx.stack.attached())
+/// its compose files put each on, and what each ask is settled to reach with `installed`
+/// beside the stack under the choices made on this machine.
+fn joins(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    installed: &[Installed],
+) -> crate::plugin::Joins {
+    crate::plugin::Joins::of(
+        manifest,
+        &ctx.stack.attached(),
+        &crate::wiring::settle(
+            manifest,
+            installed,
+            &crate::app::targets::chosen_fillers(ctx),
+        ),
+    )
+}
+
+/// `draft` joining the networks it is settled into with the plugins already installed
+/// beside it, in place of any version of it among them: what an install or an update
+/// writes.
+pub(crate) fn joined(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    held: &[Installed],
+    draft: Installed,
+) -> Installed {
+    let beside: Vec<Installed> = held
+        .iter()
+        .filter(|one| one.plugin != draft.plugin)
+        .cloned()
+        .chain(std::iter::once(draft.clone()))
+        .collect();
+    draft.joining(&joins(ctx, manifest, &beside))
+}
+
+/// One file a choice of filler writes over: where it is, what it holds now, and what it
+/// is to hold.
+pub(crate) struct Overwrite {
+    /// The file.
+    pub(crate) path: PathBuf,
+    /// What it holds now, which a reversal writes back.
+    pub(crate) previous: String,
+    /// What it is to hold.
+    pub(crate) text: String,
+}
+
+/// Every file making the stack's asks settle under `chosen` writes over: the Compose
+/// document of each installed plugin whose services' networks that moves, and the record
+/// of what is installed, which carries those networks.
+///
+/// Nothing where no network moves, and no document for a plugin whose document is not
+/// there to be written over — a plugin with no document is one nothing runs, and the
+/// record alone is what it is written from.
+pub(crate) fn rejoined(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    register: &crate::plugin::Register,
+    chosen: &crate::wiring::Chosen,
+) -> Vec<Overwrite> {
+    let joins = crate::plugin::Joins::of(
+        manifest,
+        &ctx.stack.attached(),
+        &crate::wiring::settle(manifest, register.installed(), chosen),
+    );
+    let mut after = register.clone();
+    let mut overwrites = Vec::new();
+    for held in register.installed() {
+        let moved = held.clone().joining(&joins);
+        if moved == *held {
+            continue;
+        }
+        if let Some(stack) = ctx.settings.stack_dir.as_deref() {
+            let path = crate::plugin::overlay(stack, &held.plugin);
+            if let Ok(previous) = std::fs::read_to_string(&path) {
+                overwrites.push(Overwrite {
+                    path,
+                    previous,
+                    text: crate::plugin::written(&moved),
+                });
+            }
+        }
+        after.forget(&held.plugin);
+        let _ = after.record(moved);
+    }
+    let kept = super::kept_at(ctx)
+        .filter(|_| after != *register)
+        .and_then(|path| Some((std::fs::read_to_string(&path).ok()?, path)));
+    if let Some((previous, path)) = kept {
+        overwrites.push(Overwrite {
+            path,
+            previous,
+            text: serde_json::to_string(&after).unwrap_or_default(),
+        });
+    }
+    overwrites
+}
+
+/// Refuse where any file to be written over no longer holds what was read from it.
+///
+/// What a file is to hold was worked out from what it and the record of what is
+/// installed held when they were read. A plugin installed, removed or updated since has
+/// changed one of them, and writing what was worked out would put back a plugin that has
+/// gone or drop one that has arrived.
+///
+/// # Errors
+///
+/// Where a file holds something other than what was read, or is gone.
+pub(crate) fn unmoved(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
+    match overwrites.iter().find(|overwrite| {
+        std::fs::read_to_string(&overwrite.path).ok().as_deref() != Some(&overwrite.previous)
+    }) {
+        Some(moved) => Err(Box::new(moved_since(&moved.path))),
+        None => Ok(()),
+    }
+}
+
+/// Write each file over with what it is to hold, each asked again first whether it still
+/// holds what was read from it.
+///
+/// # Errors
+///
+/// Where a file no longer holds what was read, or cannot be written.
+pub(crate) fn overwritten(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
+    unmoved(overwrites)?;
+    for overwrite in overwrites {
+        unmoved(std::slice::from_ref(overwrite))?;
+        crate::config::store::write(&overwrite.path, &overwrite.text)
+            .map_err(|failure| Box::new(not_overwritten(&overwrite.path, &failure.to_string())))?;
+    }
+    Ok(())
+}
+
+/// A file a choice would write over has changed since the choice read it.
+fn moved_since(at: &Path) -> Problem {
+    Problem::new(
+        crate::error::codes::wire::WIRING_MOVED,
+        Severity::Error,
+        "What is installed changed while that choice was being made",
+        format!(
+            "{} no longer holds what it held when the choice was read, so nothing was changed.",
+            at.display()
+        ),
+        Remedy::new("Make the choice again"),
+    )
+    .in_state(State::Guided)
+}
+
+/// A file a choice writes over could not be written.
+fn not_overwritten(at: &Path, why: &str) -> Problem {
+    Problem::new(
+        crate::error::codes::wire::CHOICE_UNWRITABLE,
+        Severity::Error,
+        format!("{} could not be written", at.display()),
+        "The choice is recorded, and the change record holds what this file held, so \
+         `lemonfiber history` says what is there and it can be put back.",
+        Remedy::new("Check the permissions on the stack directory, then make the choice again"),
+    )
+    .in_state(State::Guided)
+    .with_detail(why.to_owned())
 }
 
 /// What the install decided, less every region with nowhere to land.

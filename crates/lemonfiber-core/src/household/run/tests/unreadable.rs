@@ -112,17 +112,15 @@ async fn an_unreadable_request_record_costs_the_requests_and_not_the_household()
 #[tokio::test]
 async fn with_nothing_to_ask_the_request_service_with_the_requests_are_what_is_lost() {
     let context = a_context().build();
-    let services = context
-        .stack
-        .checked_manifest(context.today())
-        .map(|manifest| manifest.services)
-        .unwrap_or_default();
+    let Ok(manifest) = context.stack.checked_manifest(context.today()) else {
+        unreachable!("the shipped stack does not read");
+    };
     assert!(
-        !services.is_empty(),
+        !manifest.services.is_empty(),
         "the shipped stack declared no services, so this asserts nothing"
     );
 
-    let asked = reaching(&context, &services).await;
+    let asked = reaching(&context, &manifest).await;
 
     assert!(
         asked.is_err_and(|reason| reason.contains("no request service")),

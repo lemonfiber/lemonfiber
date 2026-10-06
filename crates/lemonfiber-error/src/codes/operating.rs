@@ -266,6 +266,8 @@ codes! {
         STILL_HOLDING = "SETUP-11",
         /// Raised when a region a reversal would take out of a stack file cannot be.
         NOT_WITHDRAWN = "SETUP-12",
+        /// Raised when a file a reversal would write back to what it held cannot be.
+        NOT_REWOUND = "SETUP-13",
     }
     /// The `STACK` codes.
     stack {

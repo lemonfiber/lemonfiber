@@ -107,6 +107,19 @@ pub enum Kind {
         /// The checksum of what was written between the markers.
         written: u32,
     },
+    /// A file lemonfiber owns the whole of was written over: a plugin's Compose document,
+    /// or the record of what is installed. Undoing writes back what it held before.
+    ///
+    /// Only while the file still holds what was written, kept here as a checksum, so a
+    /// file somebody has written since is told apart from the one this change left.
+    Rewritten {
+        /// The file that was written over.
+        path: String,
+        /// What it held before.
+        previous: String,
+        /// The checksum of what was written in its place.
+        written: u32,
+    },
     /// A service was moved from one pinned version to another.
     ///
     /// The largest change this product makes to a machine, and the only one whose
@@ -203,6 +216,15 @@ impl Change {
                 owner: owner.clone(),
                 written: *written,
             },
+            Kind::Rewritten {
+                path,
+                previous,
+                written,
+            } => Action::Rewind {
+                path: path.clone(),
+                previous: previous.clone(),
+                written: *written,
+            },
             Kind::Pinned {
                 previous, current, ..
             } => Action::Repin {
@@ -288,6 +310,19 @@ pub enum Action {
         owner: String,
         /// The checksum of what was written between the markers, which has to still be
         /// what is there for taking it out to be taking out lemonfiber's own work.
+        written: u32,
+    },
+    /// Write a file back to what it held before lemonfiber wrote over it.
+    ///
+    /// Only where it still holds what was written. One written since is somebody
+    /// else's work now, and is left exactly as it is.
+    Rewind {
+        /// The file to write back.
+        path: String,
+        /// What to write back into it.
+        previous: String,
+        /// The checksum of what lemonfiber wrote, which has to still be what is there
+        /// for writing the old text back to be undoing lemonfiber's own work.
         written: u32,
     },
     /// Pin a service back to the version it was standing on.

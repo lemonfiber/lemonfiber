@@ -70,7 +70,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // the *requests* instead makes a list of requesters wearing the name of a list of
     // members: somebody with an account who has never asked for anything does not
     // appear at all, and neither does an invitation nobody has taken up.
-    let Some(server) = jellyfin_reader(ctx, &manifest.services) else {
+    let Some(server) = jellyfin_reader(ctx, &manifest) else {
         return Ok(unavailable(
             "there is no media server to ask who is in the household, or no recorded \
              password to sign in with — so who is here cannot be read",
@@ -110,7 +110,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // Kept rather than consumed, because the same session is what hangs the house's
     // notices further down — and hanging them is the only half of this reading the
     // household itself ever sees.
-    let reached = match reaching(ctx, &manifest.services).await {
+    let reached = match reaching(ctx, &manifest).await {
         Ok(access) => Some(access),
         Err(reason) => {
             findings.push(reason);
@@ -248,9 +248,9 @@ async fn shown_to_the_household(
 /// each is something the operator can act on.
 pub(crate) async fn reaching(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
 ) -> Result<crate::app::targets::HouseholdAccess, String> {
-    let Some(access) = seerr_reader(ctx, services).await else {
+    let Some(access) = seerr_reader(ctx, manifest).await else {
         return Err(
             "there is no request service to ask, or it has not written its own key yet, \
              so what the household has asked for is not shown"

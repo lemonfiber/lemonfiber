@@ -22,13 +22,13 @@ use crate::walkthrough::{Line, Link, Reason, Shape, Step};
 /// be found there.
 pub(super) async fn settle(
     walk: &mut Walk<'_>,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     chosen: &Chosen<'_>,
 ) -> WalkthroughReport {
     let link = linked(walk.ctx).await;
     walk.say(Line::saying(Step::Importing, note(link)));
 
-    let Some(jellyfin) = jellyfin_reader(walk.ctx, services) else {
+    let Some(jellyfin) = jellyfin_reader(walk.ctx, manifest) else {
         // Imported, with nothing running to play it from. Complete through the import and
         // said plainly, because "it worked and you cannot watch it" is not a failure of
         // the pipeline — it is a form that does not include a media server.
@@ -57,7 +57,7 @@ pub(super) async fn settle(
     }
 
     walk.say(Line::saying(Step::Available, chosen.named.clone()));
-    let household = seerr_reader(walk.ctx, services).await.is_some();
+    let household = seerr_reader(walk.ctx, manifest).await.is_some();
     walk.finished(Shape::Pipeline, &chosen.named, link, household)
 }
 

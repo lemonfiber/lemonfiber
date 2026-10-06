@@ -132,3 +132,29 @@ async fn nothing_pending_asks_no_service_anything() {
     any_command(&env, http.clone(), false).await;
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
+
+/// A stack that cannot be read has no service to ask, so a replacement left pending
+/// stays beside the credential in force for a later run to settle.
+#[tokio::test]
+async fn a_stack_that_cannot_be_read_leaves_both_for_later() {
+    let env = both("pending-unreadable-stack");
+    let http = Fake::by_path(vec![("/auth/login", Answer::reply(200, "Ok."))]);
+    let ctx = lemonfiber_testing::a_context()
+        .over(lemonfiber_core::stack::Source::External(
+            std::path::Path::new("/lemonfiber/no/such/stack"),
+        ))
+        .settings(lemonfiber_core::config::Settings {
+            env_file: Some(env.clone()),
+            ..lemonfiber_core::config::Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+    let _ = dispatch(Command::Forms, &ctx).await;
+
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+    assert_eq!(
+        recorded(&env, QBITTORRENT_PASSWORD_KEY),
+        Some(the_torrent_password())
+    );
+    assert_eq!(recorded(&env, QBITTORRENT_PENDING), Some(the_replacement()));
+}

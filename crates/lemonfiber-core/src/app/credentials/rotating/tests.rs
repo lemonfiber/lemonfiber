@@ -146,3 +146,71 @@ fn a_rotation_that_was_stopped_is_not_read_as_one_that_was_rehearsed() {
         "a refusal answered to the question a rehearsal answers"
     );
 }
+
+/// The stack's administrator password is not rotated against a plugin's server: where a
+/// plugin's media server fills the identity source, its password is kept under a setting
+/// of its own, so the stack's names no server, and nothing is asked of any.
+#[tokio::test]
+async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_server() {
+    let mut placed = crate::test_support::a_placed(
+        "emby",
+        &["identity.source"],
+        Some(lemonfiber_manifest::Api {
+            kind: lemonfiber_manifest::ApiKind::Jellyfin,
+            key_source: lemonfiber_manifest::KeySource::Generated,
+            path: None,
+            version: None,
+        }),
+        Some(8920),
+    );
+    placed.tag = "4.9.1".to_owned();
+    let installed = [crate::test_support::an_installed(
+        "emby-server",
+        vec![placed],
+    )];
+    let chosen = crate::wiring::Chosen::read(Some("identity.source=emby"));
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| crate::wiring::Fillers::of(&manifest, &installed, &chosen, None))
+        .unwrap_or_default();
+    let held = crate::credential::Held {
+        name: "Jellyfin administrator password".to_owned(),
+        setting: config::JELLYFIN_ADMIN_PASSWORD_KEY.to_owned(),
+        consumers: Vec::new(),
+        location: "the settings file".to_owned(),
+        origin: crate::credential::Origin::Lemonfiber,
+        from: crate::origin::Origin::Bundled,
+        state: crate::credential::State::Active,
+        fingerprint: None,
+        advisory: None,
+    };
+    let http = lemonfiber_fixtures::http::Fake::always(lemonfiber_fixtures::http::Answer::reply(
+        200, "{}",
+    ));
+    // The plugin's server holds a password lemonfiber recorded for it, so a rotation that
+    // took it for the stack's would have something to sign in with.
+    let env = crate::test_support::env_without_password("rotate-plugin-server");
+    assert!(crate::config::store::set(
+        &env,
+        "PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD",
+        &format!("{}{}", "7777ffff", "8888aaaa9999"),
+    )
+    .is_ok());
+    let ctx = crate::test_support::a_context()
+        .settings(config::Settings {
+            env_file: Some(env.clone()),
+            ..config::Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+
+    let rotation = super::administrator(&ctx, &held, &fillers).await;
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert!(
+        matches!(&rotation.settled, Settled::Unproven { detail } if detail == super::NO_ADMINISTRATOR_HELD),
+        "{:?}",
+        rotation.settled
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}

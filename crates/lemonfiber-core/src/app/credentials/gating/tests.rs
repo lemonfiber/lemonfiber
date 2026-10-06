@@ -54,15 +54,31 @@ fn service(
 
 /// Jellyfin, and the request gate where `gating`.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![service(
+    let mut jellyfin = service(
         "jellyfin",
         Some(lemonfiber_manifest::ApiKind::Jellyfin),
         8096,
-    )];
+    );
+    jellyfin.provides = vec!["identity.source".to_owned()];
+    jellyfin.listens = Some(8096);
+    let mut seerr = service("seerr", Some(lemonfiber_manifest::ApiKind::Seerr), 5055);
+    seerr.listens = Some(5055);
+    let mut services = vec![jellyfin, seerr];
     if gating {
         services.push(service("request-gate", None, PORT));
     }
     services
+}
+
+/// Who fills each of the shipped stack's asks among `services`.
+fn filling(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|mut manifest| {
+            manifest.services = services;
+            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), None)
+        })
+        .unwrap_or_default()
 }
 
 /// The gate's routes: Sonarr's, and Jellyfin's presenting `key`.
@@ -171,7 +187,7 @@ fn revoked(http: &Fake) -> Vec<String> {
 
 /// The line, or an empty one the assertions after it then fail on.
 async fn listed(ctx: &Ctx, project: &Path) -> Held {
-    held(ctx, &stack(true), Some(project))
+    held(ctx, &stack(true), &filling(stack(true)), Some(project))
         .await
         .unwrap_or_else(|| Held {
             name: String::new(),
@@ -251,10 +267,18 @@ async fn without_the_gate_jellyfin_or_a_stack_directory_there_is_no_line() {
         serving(&[], 204, 204, 200),
     );
 
-    assert!(held(&ctx, &stack(false), Some(&at)).await.is_none());
-    assert!(held(&ctx, &stack(true), None).await.is_none());
+    assert!(held(&ctx, &stack(false), &filling(stack(false)), Some(&at))
+        .await
+        .is_none());
+    assert!(held(&ctx, &stack(true), &filling(stack(true)), None)
+        .await
+        .is_none());
     let gate_alone = vec![service("request-gate", None, PORT)];
-    assert!(held(&ctx, &gate_alone, Some(&at)).await.is_none());
+    assert!(
+        held(&ctx, &gate_alone, &filling(gate_alone.clone()), Some(&at))
+            .await
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -288,7 +312,7 @@ async fn a_rotation_lands_only_once_jellyfin_takes_the_key() {
         &ctx,
         &listed,
         &stack(true),
-        &crate::wiring::Fillers::default(),
+        &filling(stack(true)),
         Some(&at),
     )
     .await;
@@ -311,7 +335,7 @@ async fn a_new_key_jellyfin_refuses_is_revoked_and_the_old_routes_put_back() {
     let (ctx, at) = scene("gate-rotate-untaken", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
 
-    let rotation = rotate(&ctx, &listed, &stack(true)).await;
+    let rotation = rotate(&ctx, &listed, &filling(stack(true))).await;
 
     assert!(
         unproven(&rotation.settled).is_some_and(|said| said.starts_with("Jellyfin did not take"))
@@ -339,14 +363,14 @@ async fn a_new_key_that_cannot_be_written_is_revoked_again() {
                 routes_file(&at),
                 &held_text,
             )]));
-            let rotation = rotate(&ctx, &listed, &stack(true)).await;
+            let rotation = rotate(&ctx, &listed, &filling(stack(true))).await;
             assert!(
                 unproven(&rotation.settled)
                     .is_some_and(|said| said.starts_with("the new key could not")),
                 "{name}: {rotation:?}"
             );
         } else {
-            let rotation = rotate(&ctx, &listed, &stack(true)).await;
+            let rotation = rotate(&ctx, &listed, &filling(stack(true))).await;
             assert!(
                 unproven(&rotation.settled)
                     .is_some_and(|said| said.starts_with("the new key could not")),
@@ -363,17 +387,17 @@ async fn a_mint_jellyfin_refuses_or_routes_not_there_change_nothing() {
     let http = serving(&[&["old"]], 500, 204, 200);
     let (ctx, at) = scene("gate-rotate-unminted", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
-    let rotation = rotate(&ctx, &listed, &stack(true)).await;
+    let rotation = rotate(&ctx, &listed, &filling(stack(true))).await;
     assert!(unproven(&rotation.settled).is_some(), "{rotation:?}");
     assert_eq!(on_disk(&at), Some(routes("old")));
     assert!(revoked(&http).is_empty());
 
     let http = serving(&[&[]], 204, 204, 200);
     let (ctx, at) = scene("gate-rotate-unrouted", true, None, http.clone());
-    let unrouted = held(&ctx, &stack(true), Some(&at)).await;
+    let unrouted = held(&ctx, &stack(true), &filling(stack(true)), Some(&at)).await;
     let rotation = match unrouted {
-        Some(line) => rotate(&ctx, &line, &stack(true)).await,
-        None => rotate(&ctx, &routes_held(&at), &stack(true)).await,
+        Some(line) => rotate(&ctx, &line, &filling(stack(true))).await,
+        None => rotate(&ctx, &routes_held(&at), &filling(stack(true))).await,
     };
     assert!(
         unproven(&rotation.settled).is_some_and(|said| said.contains("lemonfiber seed")),
@@ -396,12 +420,12 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
     );
     let listed = listed(&ctx, &at).await;
 
-    let unadministered = rotate(&ctx, &listed, &stack(true)).await;
+    let unadministered = rotate(&ctx, &listed, &filling(stack(true))).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
 
     let (mut rehearsing, _) = scene("gate-rotate-rehearsed", true, Some("old"), http.clone());
     rehearsing.dry_run = true;
-    let rehearsed = rotate(&rehearsing, &listed, &stack(true)).await;
+    let rehearsed = rotate(&rehearsing, &listed, &filling(stack(true))).await;
     assert!(
         matches!(rehearsed.settled, Settled::Rehearsed { .. }),
         "{rehearsed:?}"

@@ -13,17 +13,15 @@ use crate::test_support::a_context;
 #[tokio::test]
 async fn with_no_request_service_to_reach_nothing_is_tried() {
     let ctx = a_context().build();
-    let services = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map(|manifest| manifest.services)
-        .unwrap_or_default();
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        unreachable!("the shipped stack does not read");
+    };
     assert!(
-        !services.is_empty(),
+        !manifest.services.is_empty(),
         "the shipped stack declared no services, so this asserts nothing"
     );
 
-    let said = told(&ctx, &services, &["1".to_owned()], Some("1")).await;
+    let said = told(&ctx, &manifest, &["1".to_owned()], Some("1")).await;
 
     assert_eq!(
         said.linked,

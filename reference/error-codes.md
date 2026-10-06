@@ -257,6 +257,7 @@ what to do about it, is written for operators at
 - `SETUP-10`
 - `SETUP-11`
 - `SETUP-12`
+- `SETUP-13`
 - `SPACE-1`
 - `SPACE-2`
 - `SPACE-3`

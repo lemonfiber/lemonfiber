@@ -127,6 +127,7 @@ fn did(kind: &Kind) -> String {
         ),
         Kind::Made { path } => format!("made {path}"),
         Kind::Region { owner, path, .. } => format!("wrote {owner}'s region into {path}"),
+        Kind::Rewritten { path, .. } => format!("wrote over {path}"),
         Kind::Pinned {
             previous, current, ..
         } => format!("moved from {previous} to {current}"),

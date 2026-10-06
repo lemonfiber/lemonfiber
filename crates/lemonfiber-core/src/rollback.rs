@@ -254,6 +254,11 @@ pub fn standing(
             &format!("the key {name} was revoked, and a revoked key is never made good again"),
             Some("mint a new key for whatever still needs one"),
         ),
+        Kind::Rewritten {
+            path,
+            previous,
+            written,
+        } => overwritten(path, previous, *written, reads),
         // A setting, a path, one field of a service's record, or a key to revoke — each
         // reversed by something this product actually does.
         Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } | Kind::KeyMinted { .. } => {
@@ -298,6 +303,34 @@ fn bounded(
             )
         }
         Some(_) => Standing::whole(),
+    }
+}
+
+/// What writing a file back comes to, given what it holds now.
+///
+/// The file is lemonfiber's to write back only while it holds what lemonfiber wrote, or
+/// already holds what it held before. Written since, it holds somebody's work, and
+/// writing the old text over it would discard that. A file that is not there any more
+/// has nothing in it to put back, and nothing is owed.
+fn overwritten(
+    path: &str,
+    previous: &str,
+    written: u32,
+    reads: &dyn Fn(&str) -> Option<String>,
+) -> Standing {
+    match reads(path) {
+        Some(text)
+            if text != previous && crate::materialised::checksum(text.as_bytes()) != written =>
+        {
+            Standing::refused(
+                &format!(
+                    "{path} has been written since lemonfiber wrote it, and writing back what \
+                     it held would discard that"
+                ),
+                Some("write it back by hand if that change is not wanted"),
+            )
+        }
+        _ => Standing::whole(),
     }
 }
 

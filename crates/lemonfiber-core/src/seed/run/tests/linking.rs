@@ -152,12 +152,13 @@ async fn seeded_with(
     services: &[lemonfiber_manifest::Service],
     project: &std::path::Path,
 ) -> Vec<Wiring> {
-    let admin = super::super::identity::seed_jellyfin_admin(ctx, services, &identified()).await;
+    let server = served(services);
+    let admin = super::super::identity::seed_jellyfin_admin(ctx, server.as_ref()).await;
     super::super::seed_jellyfin_identity(
         ctx,
         services,
         &crate::baseline::Baseline::new(),
-        &identified(),
+        server.as_ref(),
         admin,
         Some(project),
     )

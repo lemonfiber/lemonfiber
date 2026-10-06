@@ -61,10 +61,8 @@ pub async fn walkthrough(
         // Asked for by a stack that cannot search: not a walk that failed, but the one
         // thing missing before there could be one, said with what to do about it.
         Why::Not(reason) => Ok(walk.stopped(Shape::Pipeline, None, reason)),
-        Why::Offer(Shape::LibraryOnly) => {
-            Ok(library::walk(&mut walk, &manifest.services, term).await)
-        }
-        Why::Offer(Shape::Pipeline) => pipeline(&mut walk, &arrs, &manifest.services, term).await,
+        Why::Offer(Shape::LibraryOnly) => Ok(library::walk(&mut walk, &manifest, term).await),
+        Why::Offer(Shape::Pipeline) => pipeline(&mut walk, &arrs, &manifest, term).await,
     }
 }
 
@@ -72,7 +70,7 @@ pub async fn walkthrough(
 async fn pipeline(
     walk: &mut Walk<'_>,
     arrs: &[crate::app::targets::OpenArr],
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     term: Option<&str>,
 ) -> Result<WalkthroughReport, Box<Problem>> {
     let chosen = match choose::choose(walk, arrs, term).await {
@@ -89,12 +87,12 @@ async fn pipeline(
     };
 
     match watch::watch(walk, &chosen, &item).await {
-        watch::Landed::Imported => Ok(settle::settle(walk, services, &chosen).await),
+        watch::Landed::Imported => Ok(settle::settle(walk, manifest, &chosen).await),
         // Left running rather than abandoned: the operator gets their terminal back and
         // the download keeps going, which is the promise the narration just made them.
         watch::Landed::StillGoing => Ok(walk.handed_off(&chosen.named)),
         watch::Landed::Stopped(reason) => {
-            let logs = watch::what_was_said(walk.ctx, services, &chosen.named).await;
+            let logs = watch::what_was_said(walk.ctx, &manifest.services, &chosen.named).await;
             Ok(walk.stopped_quoting(Shape::Pipeline, Some(chosen.named.clone()), reason, logs))
         }
     }

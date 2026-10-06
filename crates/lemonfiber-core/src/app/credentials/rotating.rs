@@ -21,7 +21,7 @@ use std::path::Path;
 use lemonfiber_manifest::{ApiKind, Service};
 
 use super::pending::{forgotten, kept, pending, promoted};
-use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for};
+use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
@@ -79,7 +79,7 @@ pub(crate) async fn rotate(
             super::declining::rotate(ctx, held, services).await
         }
         Origin::Lemonfiber if held.setting == super::gating::SETTING => {
-            super::gating::rotate(ctx, held, services).await
+            super::gating::rotate(ctx, held, fillers).await
         }
         Origin::Lemonfiber if super::tokening::is_token(held) => {
             super::tokening::rotate(ctx, held, services, project).await
@@ -94,7 +94,7 @@ pub(crate) async fn rotate(
             replaced(ctx, held, services).await
         }
         Origin::Lemonfiber if held.setting == config::JELLYFIN_ADMIN_PASSWORD_KEY => {
-            administrator(ctx, held, services).await
+            administrator(ctx, held, fillers).await
         }
         // A credential whose replacement comes from somewhere else writes nothing on
         // any run, so a rehearsal of it *is* the run: the same sentence, saying where a
@@ -248,8 +248,17 @@ fn unrecorded(failure: &config::store::Failure) -> String {
 }
 
 /// Replace the media server's administrator password with a freshly minted one.
-async fn administrator(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
-    match replace_jellyfin_password(ctx, services, ctx.dry_run).await {
+async fn administrator(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fillers) -> Rotation {
+    // The media server whose administrator's password this is: the one filling the
+    // identity source, where its password is kept under this credential's setting.
+    // Boxed, because it is carried across the replacement below.
+    let Some(server) = MediaServer::of(fillers)
+        .filter(|server| server.setting == held.setting)
+        .map(Box::new)
+    else {
+        return unproven(held, NO_ADMINISTRATOR_HELD);
+    };
+    match replace_jellyfin_password(ctx, &server, ctx.dry_run).await {
         Ok(Replaced::Rehearsed) => would_rotate(held, ADMINISTERING),
         Ok(Replaced::Done) => Rotation::landed(
             &held.name,
@@ -290,22 +299,23 @@ pub(crate) enum Replacing {
     Unkept(String),
 }
 
-/// Mint a new administrator password, record it under its pending name, set it on
-/// Jellyfin and prove it by signing in with it, and only then move it into place — the
-/// order that leaves the recorded password the one in force wherever this stops.
+/// What is said where lemonfiber holds no administrator password for the media server.
+const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
+                                     server, so there is nothing to change; run `lemonfiber seed`";
+
+/// Mint a new administrator password, record it under its pending name, set it on the
+/// media server and prove it by signing in with it, and only then move it into place —
+/// the order that leaves the recorded password the one in force wherever this stops.
+///
+/// Kept under the server's own setting throughout, so a plugin's server is given a
+/// replacement for its own password and the stack's is never touched for it.
 pub(crate) async fn replace_jellyfin_password(
     ctx: &Ctx,
-    services: &[Service],
+    server: &MediaServer,
     rehearsing: bool,
 ) -> Result<Replaced, Replacing> {
-    let Some((addr, current)) = service_addr(services, ApiKind::Jellyfin)
-        .zip(recorded_secret(ctx, config::JELLYFIN_ADMIN_PASSWORD_KEY))
-    else {
-        return Err(Replacing::Unproven(
-            "lemonfiber holds no administrator password for this Jellyfin, so there is nothing \
-             to change; run `lemonfiber seed`"
-                .to_owned(),
-        ));
+    let Some(current) = server.recorded_password(ctx) else {
+        return Err(Replacing::Unproven(NO_ADMINISTRATOR_HELD.to_owned()));
     };
     // Below what can be told without acting, and above the mint: a password generated to
     // describe a rotation is a secret that exists because somebody asked a question.
@@ -319,17 +329,11 @@ pub(crate) async fn replace_jellyfin_password(
                 .to_owned(),
         ));
     };
-    let setting = config::JELLYFIN_ADMIN_PASSWORD_KEY;
+    let setting = server.setting.as_str();
     if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
         return Err(Replacing::Unproven(unrecorded(&failure)));
     }
-    let client = crate::jellyfin::Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &addr.loopback,
-        &addr.id,
-        config::JELLYFIN_ADMIN_USER,
-        current,
-    );
+    let client = server.signed_in(ctx, current);
     match client.replace_password(&replacement).await {
         Ok(()) => promoted(ctx, setting, &replacement)
             .map(|()| Replaced::Done)

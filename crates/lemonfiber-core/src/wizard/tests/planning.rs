@@ -467,6 +467,16 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
         })),
         "a downloadclient's tvCategory"
     );
+    // A choice of filler's own record, found for the same reason: it writes over a
+    // plugin's document, and the journal is one file.
+    assert_eq!(
+        described(&change(Kind::Rewritten {
+            path: "/srv/stack/compose/plugins/komga.yml".to_owned(),
+            previous: String::new(),
+            written: 0,
+        })),
+        "the file /srv/stack/compose/plugins/komga.yml"
+    );
 }
 
 #[test]

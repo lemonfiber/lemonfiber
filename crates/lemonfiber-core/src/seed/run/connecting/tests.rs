@@ -396,6 +396,8 @@ fn a_service(
         key_file: None,
         confined_to: None,
         media_types: vec!["tv".to_owned()],
+        provides: Vec::new(),
+        majors: Vec::new(),
     }
 }
 

@@ -122,7 +122,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     let (installed, kept_back) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
     wirings.extend(kept_back);
     let chosen = crate::app::targets::chosen_fillers(ctx);
-    let filled = crate::wiring::filled(&crate::wiring::settle(&manifest, &installed, &chosen));
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let fillers = crate::wiring::Fillers::of(&manifest, &installed, &chosen, project.as_deref());
 
@@ -205,7 +204,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
             &manifest.services,
             &fillers,
             project.as_deref(),
-            &filled,
             &mut baseline,
         )
         .await,
@@ -469,41 +467,48 @@ const TEMP_PASSWORD_LOG_LINES: u32 = 200;
 /// The media server's administrator, and everything that signs in with it: who may
 /// read the server from a browser, the decline service's key, the request gate's
 /// routes, and the request service pointed at the server.
+///
+/// The media server is whatever fills the identity source the request service asks
+/// for, the stack's or a plugin's, so a server standing in for the bundled one is set up
+/// on the same terms with an administrator's password of its own.
 async fn seed_media_server(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
-    filled: &std::collections::BTreeMap<String, Vec<String>>,
     baseline: &mut crate::baseline::Baseline,
 ) -> Vec<crate::seed::Wiring> {
-    // Jellyfin as Seerr's identity source: one household account, not two. In two
-    // halves, because what Seerr is pointed at may need the first: Jellyfin has no key
-    // to read, so its admin password is minted and recorded like qBittorrent's here,
-    // and the request gate's Jellyfin key below is minted with it.
+    // Boxed, because it is carried across every await of the passes below.
+    let server = crate::app::targets::MediaServer::of(fillers).map(Box::new);
+    let server = server.as_deref();
+
+    // The media server as the request service's identity source: one household account,
+    // not two. In two halves, because what the request service is pointed at may need
+    // the first: the server has no key to read, so its administrator's password is
+    // minted and recorded here, and the request gate's key below is minted with it.
     let mut wirings = Vec::new();
-    let admin = identity::seed_jellyfin_admin(ctx, services, filled).await;
+    let admin = identity::seed_jellyfin_admin(ctx, server).await;
 
     // Which origins a browser may read the media server from: the front door's alone.
     // After the identity's first half, because that is what records the administrator
     // credential this is written with.
-    wirings.extend(cors::seed_cors(ctx, services).await);
+    wirings.extend(cors::seed_cors(ctx, services, server).await);
 
-    // The decline service's key, minted with the same administrator session.
+    // The decline service's key, minted in the server the decline service names.
     wirings.extend(decline::seed_decline_key(ctx, services, project).await);
 
     // The request gate's routes, with the same session.
-    wirings.extend(gate::seed_gate_routes(ctx, services, fillers, project).await);
+    wirings.extend(gate::seed_gate_routes(ctx, services, fillers, server, project).await);
 
-    // The second half: Seerr pointed at Jellyfin, through the gate where the stack runs
-    // one, whose routes the step above wrote.
+    // The second half: the request service pointed at the media server, through the
+    // gate where the stack runs one, whose routes the step above wrote.
     //
     // Ahead of everything that talks to the request service, because this is what
     // gives it an owner. A request service with none refuses the credential, and a
     // pass that asked it for anything first would report a fresh stack as broken and
     // then, in the same run, fix what it had just reported.
     let (identity_wirings, identity_records) =
-        seed_jellyfin_identity(ctx, services, baseline, filled, admin, project).await;
+        seed_jellyfin_identity(ctx, services, baseline, server, admin, project).await;
     baseline.merge(&identity_records);
     wirings.extend(identity_wirings);
     wirings

@@ -402,6 +402,7 @@ fn undone(undo: &Undo) -> String {
     match &undo.action {
         Action::Delete { path } => format!("removed {path}"),
         Action::Withdraw { owner, path, .. } => format!("took {owner}'s region out of {path}"),
+        Action::Rewind { path, .. } => format!("wrote {path} back as it was"),
         // Every other shape is a change a plugin install never makes: it writes files
         // and regions and nothing else. Named rather than left to a wildcard so the day
         // one of them can appear here, somebody has to say what it reads as.

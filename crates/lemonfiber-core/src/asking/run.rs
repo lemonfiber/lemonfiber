@@ -41,14 +41,14 @@ pub(crate) async fn allowing(ctx: &Ctx, chosen: &Chosen) -> Result<HouseholdRepo
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let access = reached(ctx, &manifest.services).await?;
+    let access = reached(ctx, &manifest).await?;
 
     // Each half reads what *it* is about to change before it changes it. A per-person
     // choice read against the household's own setting would inherit the household's
     // limit onto somebody who had one of their own, which is the opposite of leaving
     // alone what nobody named.
     let said = match chosen.member.as_deref() {
-        Some(name) => one_person(ctx, &access, &manifest.services, name, chosen).await?,
+        Some(name) => one_person(ctx, &access, &manifest, name, chosen).await?,
         None => everybody(ctx, &access, chosen).await?,
     };
 
@@ -68,9 +68,9 @@ const NOTHING_SET: &str = "what the household may ask for was not changed";
 /// could not be written is not worth pretending was.
 async fn reached(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
 ) -> Result<HouseholdAccess, Box<Problem>> {
-    crate::household::run::reaching(ctx, services)
+    crate::household::run::reaching(ctx, manifest)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))
 }
@@ -129,11 +129,11 @@ async fn everybody(
 async fn one_person(
     ctx: &Ctx,
     access: &HouseholdAccess,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     name: &str,
     chosen: &Chosen,
 ) -> Result<String, Box<Problem>> {
-    let account = found(ctx, services, name).await?;
+    let account = found(ctx, manifest, name).await?;
     let held = access
         .seerr
         .requesting(&account.id)
@@ -192,10 +192,10 @@ fn theirs(approves_own: bool, headroom: Headroom) -> Asking {
 /// account and has never opened it.
 async fn found(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     name: &str,
 ) -> Result<Member, Box<Problem>> {
-    let Some(server) = jellyfin_reader(ctx, services) else {
+    let Some(server) = jellyfin_reader(ctx, manifest) else {
         return Err(Box::new(crate::asking::unreachable(NOTHING_SET)));
     };
     let Ok(accounts) = server.household().await else {

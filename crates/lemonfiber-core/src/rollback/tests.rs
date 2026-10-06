@@ -479,3 +479,46 @@ fn a_mint_goes_back_and_a_revoke_does_not() {
         .refusal
         .is_some_and(|refusal| refusal.because.contains("never made good again")));
 }
+
+/// A plugin's document a choice of filler wrote over, holding `written` in its place.
+fn rewritten(written: &str) -> Change {
+    Change {
+        at: "1".to_owned(),
+        operation: "substitute".to_owned(),
+        target: "/stack/compose/plugins/komga.yml".to_owned(),
+        kind: Kind::Rewritten {
+            path: "/stack/compose/plugins/komga.yml".to_owned(),
+            previous: "before\n".to_owned(),
+            written: crate::materialised::checksum(written.as_bytes()),
+        },
+    }
+}
+
+/// The document holding `text`.
+fn holding_text(text: &'static str) -> impl Fn(&str) -> Option<String> {
+    move |_| Some(text.to_owned())
+}
+
+/// A file written over goes back whole while it holds what was written, what it held
+/// before, or nothing at all, and is refused where it was written since.
+#[test]
+fn a_file_written_over_goes_back_only_while_it_is_lemonfibers() {
+    let whole = |reads: &dyn Fn(&str) -> Option<String>| {
+        standing(&rewritten("after\n"), &[], &holding(&[]), reads).reversal == Reversal::Whole
+    };
+
+    assert!(whole(&holding_text("after\n")));
+    assert!(whole(&holding_text("before\n")));
+    assert!(whole(&|_: &str| None));
+
+    let edited = standing(
+        &rewritten("after\n"),
+        &[],
+        &holding(&[]),
+        &holding_text("somebody's\n"),
+    );
+    assert_eq!(edited.reversal, Reversal::None);
+    assert!(edited
+        .refusal
+        .is_some_and(|refusal| refusal.because.contains("written since")));
+}

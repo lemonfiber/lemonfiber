@@ -354,3 +354,23 @@ fn a_rehearsed_reversal_says_what_would_go_back_rather_than_what_did() {
         "a rehearsal has nothing that stayed as it was: {said}"
     );
 }
+
+/// A file a choice of filler wrote over reads as written back, naming the file.
+#[test]
+fn a_file_written_over_is_said_as_written_back() {
+    let undos = vec![Undo {
+        target: "komga".to_owned(),
+        action: Action::Rewind {
+            path: "/stack/compose/plugins/komga.yml".to_owned(),
+            previous: String::new(),
+            written: 0,
+        },
+    }];
+
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+
+    assert!(
+        said.contains("/stack/compose/plugins/komga.yml written back as it was"),
+        "{said}"
+    );
+}
