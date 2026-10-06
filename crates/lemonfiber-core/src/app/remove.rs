@@ -41,7 +41,7 @@ pub(crate) async fn remove(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    let Some(server) = super::targets::jellyfin_reader(ctx, &manifest.services) else {
+    let Some(server) = super::targets::jellyfin_reader(ctx, &manifest) else {
         return Err(Box::new(no_media_server()));
     };
     let Ok(household) = server.household().await else {
@@ -60,7 +60,7 @@ pub(crate) async fn remove(
         return Err(Box::new(runs_the_server(&member.name)));
     }
 
-    let asking = super::targets::seerr_reader(ctx, &manifest.services).await;
+    let asking = super::targets::seerr_reader(ctx, &manifest).await;
     let mut cost = what_it_costs(asking.as_ref(), &member).await;
 
     if !confirm {

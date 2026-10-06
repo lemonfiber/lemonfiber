@@ -44,7 +44,7 @@ pub(crate) async fn reissue(
     let Reaching {
         server,
         reachable,
-        services,
+        manifest,
     } = reaching(ctx, &name).await?;
 
     let Ok(household) = server.household().await else {
@@ -87,7 +87,7 @@ pub(crate) async fn reissue(
     super::offering::guarded(&server, &member, None, false).await?;
     // A new decline address with the new offer: the old token went with the old record,
     // so a refusal of it no longer reads as this account's standing.
-    let decline = super::declining::issued(ctx, &services, &held.household, &member).await;
+    let decline = super::declining::issued(ctx, &manifest.services, &held.household, &member).await;
     Ok(Invitation {
         decline,
         ..renewed(member.name, reachable, false)

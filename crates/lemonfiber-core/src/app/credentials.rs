@@ -48,7 +48,23 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
     // secrets off would be believed.
     let installed = super::plugins::read(ctx)?;
     let installed = installed.installed();
-    let held = reading::taken(ctx, &manifest.services, project.as_deref(), installed).await;
+    // Who fills each of the stack's asks: the media server the gate holds a key in, and
+    // who reaches the service whose key a rotation replaces, so every copy of the key is
+    // handed the new one and no other.
+    let fillers = crate::wiring::Fillers::of(
+        &manifest,
+        installed,
+        &super::targets::chosen_fillers(ctx),
+        project.as_deref(),
+    );
+    let held = reading::taken(
+        ctx,
+        &manifest.services,
+        &fillers,
+        project.as_deref(),
+        installed,
+    )
+    .await;
 
     let inventory = match asked {
         Asking::Read => Inventory::of(held),
@@ -57,14 +73,6 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
             confirmed,
         } => showing(ctx, held, &credential, confirmed).await,
         Asking::Rotate { credential } => {
-            // Who reaches the service whose key is replaced, as the stack's asks settle
-            // it, so every copy of the key is handed the new one and no other.
-            let fillers = crate::wiring::Fillers::of(
-                &manifest,
-                installed,
-                &super::targets::chosen_fillers(ctx),
-                project.as_deref(),
-            );
             replacing(
                 ctx,
                 held,
@@ -111,7 +119,7 @@ async fn replacing(
     let rotated = rotating::rotate(ctx, found, services, fillers, project).await;
     // Read again, because a landed replacement has changed what the answer is and an
     // inventory taken before it would report the state the rotation just left behind.
-    let after = reading::taken(ctx, services, project, installed).await;
+    let after = reading::taken(ctx, services, fillers, project, installed).await;
     Inventory::of(after).after(rotated)
 }
 

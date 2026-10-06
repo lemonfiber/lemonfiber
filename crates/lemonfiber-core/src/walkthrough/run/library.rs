@@ -16,10 +16,10 @@ use crate::walkthrough::{Line, Reason, Shape, Step};
 /// Point the media server at what is already on disk and confirm it can see it.
 pub(super) async fn walk(
     walk: &mut Walk<'_>,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     term: Option<&str>,
 ) -> WalkthroughReport {
-    let Some(jellyfin) = jellyfin_reader(walk.ctx, services) else {
+    let Some(jellyfin) = jellyfin_reader(walk.ctx, manifest) else {
         return walk.stopped(Shape::LibraryOnly, None, Reason::NoMediaServer);
     };
 
@@ -46,7 +46,7 @@ pub(super) async fn walk(
 
     let named = term.map_or_else(|| "your library".to_owned(), str::to_owned);
     walk.say(Line::saying(Step::Available, named.clone()));
-    let household = seerr_reader(walk.ctx, services).await.is_some();
+    let household = seerr_reader(walk.ctx, manifest).await.is_some();
     // No import happened, so there is nothing to say about hardlinks: the files were
     // already where they are.
     walk.finished(Shape::LibraryOnly, &named, None, household)

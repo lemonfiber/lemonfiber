@@ -19,10 +19,10 @@ use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstreams};
 use super::declining::{NO_ADMINISTRATOR, UNTAKEN};
 use super::rotating::{said, unproven, would_rotate};
 use crate::app::gating;
+use crate::app::targets::MediaServer;
 use crate::app::Ctx;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
-use crate::jellyfin::{Jellyfin, GATE_APP};
-use crate::seed::run::identity;
+use crate::jellyfin::GATE_APP;
 
 /// What the key is recorded as: where it lives inside the stack's configuration.
 pub(super) const SETTING: &str = "request-gate/upstreams.json#jellyfin";
@@ -51,9 +51,14 @@ const UNWRITTEN: &str =
     "the new key could not be written into the request gate's routes, so it was revoked again";
 
 /// The key's line in the inventory, where the stack runs the gate beside Jellyfin.
-pub(super) async fn held(ctx: &Ctx, services: &[Service], project: Option<&Path>) -> Option<Held> {
+pub(super) async fn held(
+    ctx: &Ctx,
+    services: &[Service],
+    fillers: &crate::wiring::Fillers,
+    project: Option<&Path>,
+) -> Option<Held> {
     gating::service(services)?;
-    identity::jellyfin_service(services)?;
+    MediaServer::of(fillers)?;
     let path = gating::path(project?, File::Upstreams);
     let key = read(ctx, &path).await.and_then(|routes| key_in(&routes));
     Some(Held {
@@ -81,23 +86,13 @@ pub(super) async fn value(ctx: &Ctx, held: &Held) -> Option<String> {
 }
 
 /// Replace the key, keeping a working one at every moment.
-pub(super) async fn rotate(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
-    let (Some(jellyfin), Some(password)) = (
-        identity::jellyfin_service(services),
-        identity::recorded_jellyfin_password(ctx),
-    ) else {
+pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fillers) -> Rotation {
+    let Some(client) = MediaServer::of(fillers).and_then(|server| server.administered(ctx)) else {
         return unproven(held, NO_ADMINISTRATOR);
     };
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
-    let client = Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    );
     let path = PathBuf::from(&held.location);
     // Routes the seed has not written yet have no key to replace, and nothing is minted.
     let Some(old) = read(ctx, &path).await else {

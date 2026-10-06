@@ -69,6 +69,11 @@ pub struct Filler {
     pub confined_to: Option<std::path::PathBuf>,
     /// The media it files, which decides which of an asker's connections it comes to.
     pub media_types: Vec<String>,
+    /// Every capability it says it provides.
+    pub provides: Vec<String>,
+    /// The majors of its image that run here: the first number of the tag it is pinned
+    /// by, or nothing where the tag does not open with one.
+    pub majors: Vec<u32>,
 }
 
 impl Filler {
@@ -284,6 +289,8 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         confined_to: project
             .map(|project| crate::app::targets::service_config_dir(project, &service.id)),
         media_types: service.media_types.clone(),
+        provides: service.provides.clone(),
+        majors: service.majors(),
     }
 }
 
@@ -309,6 +316,8 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>) -> Filler {
         confined_to: project
             .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
         media_types: placed.media_types.clone(),
+        provides: placed.provides.clone(),
+        majors: lemonfiber_manifest::majors(&placed.tag),
     }
 }
 

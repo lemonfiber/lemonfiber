@@ -46,7 +46,7 @@ pub(crate) async fn deciding(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let access = super::reached(ctx, &manifest.services).await?;
+    let access = super::reached(ctx, &manifest).await?;
     let asked = access
         .seerr
         .requests()

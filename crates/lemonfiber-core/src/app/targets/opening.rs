@@ -17,27 +17,43 @@ use crate::recyclarr::Kind;
 
 use super::downloads::{download_targets, DownloadKind};
 use super::layout::{project_directory, read_owned, service_config_dir};
-use super::secrets::recorded_secret;
 use super::servarr::{servarr_targets, target_for};
 
-/// The household's Jellyfin as a reading client, for the last stage of a trace —
-/// whether the item is finally in the library. Present only where the stack has a
-/// Jellyfin and lemonfiber recorded the admin password it minted for it: the read signs
-/// in with the household's own credential, so without it there is nothing to sign in as.
+/// The household's media server as a reading client, for the last stage of a trace —
+/// whether the item is finally in the library — and every read of who the household is.
+/// Present only where something fills the identity source and lemonfiber recorded the
+/// administrator's password it minted for that server: the read signs in with the
+/// household's own credential, so without it there is nothing to sign in as.
 ///
 /// A trace treats its absence as one more thing it cannot tell rather than a fault, so
 /// either gap simply leaves the availability question unanswered.
 pub(crate) fn jellyfin_reader(
     ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+) -> Option<Jellyfin> {
+    Some(
+        super::media::hosted(ctx, manifest)?
+            .administered(ctx)?
+            .remembering(std::sync::Arc::clone(&ctx.sessions)),
+    )
+}
+
+/// The stack's own Jellyfin as a reading client signed in as its administrator: the
+/// server the decline service acts on, which it names rather than asking for whatever
+/// serves identity. Nothing where the stack has none or lemonfiber holds no password
+/// for it.
+pub(crate) fn declined_reader(
+    ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Option<Jellyfin> {
     let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
-    let password = recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+    let password =
+        super::secrets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
     Some(
         Jellyfin::authenticated(
             ctx.seams.http.clone(),
             addr.loopback,
-            "jellyfin",
+            &addr.id,
             crate::config::JELLYFIN_ADMIN_USER,
             password,
         )
@@ -128,10 +144,11 @@ pub(crate) struct HouseholdAccess {
 /// has nobody to have asked for anything.
 pub(crate) async fn seerr_reader(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
 ) -> Option<HouseholdAccess> {
+    let services = manifest.services.as_slice();
     let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
-    service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    super::media::hosted(ctx, manifest)?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let key = seerr_key(ctx, services, project.as_deref()).await?;
     Some(HouseholdAccess {
@@ -139,21 +156,12 @@ pub(crate) async fn seerr_reader(
     })
 }
 
-/// Where a service is reached — on the host, and across the stack's own network — the
-/// two forms every service address is wanted in.
+/// Where the host reaches a service, and the id it runs under.
 pub(crate) struct ServiceAddr {
-    /// The service's compose id: names the container, and is the host in a network URL.
+    /// The service's compose id, which names its container.
     pub id: String,
     /// Where the host reaches it: `http://127.0.0.1:{port}`.
     pub loopback: String,
-    /// Where another container reaches it across the stack network: `http://{id}:{port}`.
-    pub network_url: String,
-    /// The port the host publishes it on.
-    ///
-    /// Kept because neither URL above is one to hand a person: both name a host only
-    /// this machine or this stack can resolve. An address for the household is built
-    /// from what the *machine* is called, and that needs the port on its own.
-    pub port: u16,
 }
 
 /// What the file a service's credential is read from holds.
@@ -207,8 +215,6 @@ pub(crate) fn service_addr(
         Some(ServiceAddr {
             id: service.id.clone(),
             loopback: loopback(port),
-            network_url: format!("http://{}:{port}", service.id),
-            port,
         })
     })
 }

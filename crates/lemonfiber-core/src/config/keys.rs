@@ -302,10 +302,22 @@ pub(crate) const USERNAME_SUFFIX: &str = "_USERNAME";
 /// What the setting a service's own key is published under ends in.
 pub(crate) const API_KEY_SUFFIX: &str = "_API_KEY";
 
+/// What the setting holding the password lemonfiber minted for a media server's
+/// administrator ends in.
+///
+/// The bundled media server's comes out as [`JELLYFIN_ADMIN_PASSWORD_KEY`], and a
+/// plugin's standing in for it as one in the plugin's own namespace, so the stack's
+/// administrator password is never read for, or sent to, a plugin's server.
+pub(crate) const ADMIN_PASSWORD_SUFFIX: &str = "_ADMIN_PASSWORD";
+
 /// Every ending a setting holding one service's credential is given, so a name computed
 /// for one service can be checked against every name another's would take.
-pub(crate) const CREDENTIAL_SUFFIXES: [&str; 3] =
-    [API_KEY_SUFFIX, PASSWORD_SUFFIX, USERNAME_SUFFIX];
+pub(crate) const CREDENTIAL_SUFFIXES: [&str; 4] = [
+    API_KEY_SUFFIX,
+    PASSWORD_SUFFIX,
+    USERNAME_SUFFIX,
+    ADMIN_PASSWORD_SUFFIX,
+];
 
 /// What a setting holding a credential of an installed plugin's service starts with,
 /// before the service's id.

@@ -585,3 +585,38 @@ async fn rotated_over(
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     (said, recorded(env, JELLYFIN_ADMIN_PASSWORD_KEY), http)
 }
+
+/// With nothing filling the identity source there is no media server to rotate the
+/// recorded administrator password against: nothing is asked and the password stays.
+#[tokio::test]
+async fn with_no_media_server_the_administrator_password_is_left_alone() {
+    let password = the_administrator_password();
+    let env = env_at(
+        "admin-no-server",
+        &[(JELLYFIN_ADMIN_PASSWORD_KEY, &password)],
+    );
+    let http = administered(200, 204, 200);
+    let ctx = lemonfiber_testing::a_context()
+        .over(crate::common::household::stack_without(
+            "jellyfin",
+            "rotate-admin",
+        ))
+        .settings(lemonfiber_core::config::Settings {
+            env_file: Some(env.clone()),
+            ..lemonfiber_core::config::Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "jellyfin".to_owned(),
+        },
+    )
+    .await;
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+
+    assert!(said.contains("holds no administrator password"), "{said}");
+    assert_eq!(recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY), Some(password));
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}

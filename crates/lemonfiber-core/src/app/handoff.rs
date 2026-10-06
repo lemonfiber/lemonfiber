@@ -101,20 +101,18 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    let Some(jellyfin) = super::seed::identity::jellyfin_service(&manifest.services) else {
-        return Err(Box::new(no_media_server()));
+    // Only the client and the port are carried on: the server as the lookup resolved
+    // it is not held across what follows.
+    let (server, port) = {
+        let Some(media) = super::targets::hosted(ctx, &manifest) else {
+            return Err(Box::new(no_media_server()));
+        };
+        let Some(server) = media.administered(ctx) else {
+            return Err(Box::new(not_set_up()));
+        };
+        (server, media.port)
     };
-    let Some(password) = super::seed::identity::recorded_jellyfin_password(ctx) else {
-        return Err(Box::new(not_set_up()));
-    };
-    let server = crate::jellyfin::Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        &password,
-    );
-    let reachable = super::invite::household_address(ctx, jellyfin.port).await;
+    let reachable = super::invite::household_address(ctx, port).await;
     let mut report = Handoff {
         name,
         state: HandoffState::Failed,
